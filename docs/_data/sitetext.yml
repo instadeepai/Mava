@@ -1,0 +1,111 @@
+header:
+    title: Mava
+    text: A framework for multi-agent reinforcement learning
+    headerGif: /logos/mava.gif
+    buttons:
+      - button: API
+        buttonlink: /api
+        icon: /assets/img/doc_icon.svg
+        iconsize: 80%
+      - button: Components
+        buttonlink: /envs
+        icon: /assets/img/environment_icon.svg
+        iconsize: 80%
+      - button: GitHub
+        buttonlink: https://github.com/arnupretorius/marl_framework
+        icon: /assets/img/github_icon.svg
+        iconsize: 80%
+      # - button: Dev Docs
+      #   buttonlink: /dev_docs
+      #   icon: /assets/img/dev_doc_icon.svg
+      #   iconsize: 80%
+
+services:
+    title: "Usage"
+    text: "An example of building a multi-agent reinforcement learning training loop:"
+    section: services
+
+timeline:
+    title: "Components"
+    section: timeline
+    rows:
+      - - title: "Systems"
+          desc: "Multi-player Atari 2600 games (both cooperative and competitive)"
+          image: /systems/atari_space_invaders.gif
+          alt:
+          align: left
+          link: systems
+        - title: "Agents"
+          desc: "Cooperative graphical games developed by us, requiring a high degree of coordination"
+          image: /agents/butterfly_pistonball.gif
+          alt:
+          align: left
+          link: agents
+        - title: "Modules"
+          desc: "Classical games including card games, board games, etc."
+          image: /modules/classic_chess.gif
+          alt:
+          align: left
+          link: modules
+      - - title: "Networks"
+          desc: "Configurable environments with massive numbers of particle agents"
+          image: /networks/magent_adversarial_pursuit.gif
+          alt:
+          align: left
+          link: networks
+        - title: "losses"
+          desc: "A set of simple nongraphical communication tasks originally from"
+          image: /losses/mpe_simple_world_comm.gif
+          url: "https://github.com/openai/multiagent-particle-envs"
+          alt:
+          align: left
+          link: losses
+
+about:
+    title: "About Us"
+    text: "our story"
+    section: about
+
+clients:
+    section: clients
+    max-height: 100px
+    horizontal-scrolling: "" #"yes/no"
+    list:
+      - title: "envato"
+        url: https://github.com/raviriley/agency-jekyll-theme
+        logo: /assets/img/clients/envato.jpg
+      - title: "designmodo"
+        url: https://github.com/raviriley/agency-jekyll-theme
+        logo: /assets/img/clients/designmodo.jpg
+      - title: "themeforest"
+        url: https://github.com/raviriley/agency-jekyll-theme
+        logo: /assets/img/clients/themeforest.jpg
+      - title: "Creative Market"
+        url: https://github.com/raviriley/agency-jekyll-theme
+        logo: /assets/img/clients/creative-market.jpg
+
+team:
+    title: "Get Started"
+    text: ""
+    subtext: ""
+    section: team
+    people:
+      - name: "Docs"
+        image: /assets/img/doc_icon.svg
+        imglink: documentation
+      - name: "Github"
+        image: /assets/img/github_icon.svg
+        imglink: https://github.com/PettingZoo-Team/PettingZoo
+      - name: "Environments"
+        image: /assets/img/environment_icon.svg
+        imglink: atari
+
+contact:
+    title: "Contact Us"
+    text: "Lorem ipsum or call 123456789"
+    section: contact
+
+footer:
+    easter_egg: "boo"
+
+# {{ site.data.sitetext.ex.ex | markdownify | default: example }}

@@ -1,0 +1,12 @@
+nav:
+  - title: "API"
+    url: "/api"
+
+  - title: "Components"
+    url: "/envs"
+
+  - title: "Github"
+    url: "https://github.com/instadeepai/mava"
+
+  # - title: "Dev Docs"
+  #   url: "/dev_docs"
