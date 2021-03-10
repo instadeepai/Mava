@@ -30,7 +30,7 @@ If you use Mava in your work, please cite the accompanying
 }
 ```
 
-[Agents]: mava/systems/
+[Systems]: mava/systems/
 [Examples]: examples/
 [Tutorial]: https://arxiv.org
 [Quickstart]: examples/quickstart.ipynb
