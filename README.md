@@ -17,38 +17,30 @@ baselines, while still providing enough flexibility to do novel research.
 
 ## Overview
 
-If you just want to get started using Acme quickly, the main thing to know about
-the library is that we expose a number of agent implementations and an
-`EnvironmentLoop` primitive that can be used as follows:
+If you just want to get started using Mava quickly, the main thing to know about
+the library is that we expose a number of system implementations and an
+`EnvironmentLoop` primitive similar to Acme that can be used as follows:
 
 ```python
-loop = acme.EnvironmentLoop(environment, agent)
+loop = mava.EnvironmentLoop(environment, system)
 loop.run()
 ```
 
-This will run a simple loop in which the given agent interacts with its
-environment and learns from this interaction. This assumes an `agent` instance
-(implementations of which you can find [here][Agents]) and an `environment`
+This will run a simple loop in which the given multi-agent system interacts with its
+environment and and each agent learns from this interaction. This assumes a `system` instance
+(implementations of which you can find [here][Systems]) and a multi-agent `environment`
 instance which implements the [DeepMind Environment API][dm_env]. Each
-individual agent also includes a `README.md` file describing the implementation
-in more detail. Of course, these two lines of code definitely simplify the
-picture. To actually get started, take a look at the detailed working code
+individual system also includes a `README.md` file describing the implementation
+in more detail. 
+
+For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a
-few agents and environments. We also include a
+few MARL systems and environments. We also include a
 [quickstart notebook][Quickstart].
 
-Acme also tries to maintain this level of simplicity while either diving deeper
-into the agent algorithms or by using them in more complicated settings. An
-overview of Acme along with more detailed descriptions of its underlying
-components can be found by referring to the [documentation]. And we also include
-a [tutorial notebook][Tutorial] which describes in more detail the underlying
-components behind a typical Acme agent and how these can be combined to form a
-novel implementation.
-
-> :information_source: Acme is first and foremost a framework for RL research written by
-> researchers, for researchers. We use it for our own work on a daily basis. So
-> with that in mind, while we will make every attempt to keep everything in good
-> working order, things may break occasionally. But if so we will make our best
+> :information_source: Mava heavily relies on Acme, therefore as is the case with Acme, we make the same statement regarding reliability: this framework is for MARL research written by
+> researchers, for researchers. We will make every attempt to keep everything in good
+> working order, but things may break occasionally. If they do, we will make our best
 > effort to fix them as quickly as possible!
 
 ## Installation
