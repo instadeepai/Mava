@@ -48,7 +48,7 @@ class PettingZooEnvironmentLoop(core.Worker):
     def __init__(
         self,
         environment: PettingZooWrapper,
-        actors: Dict[str, core.Actor],
+        system: core.System,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         should_update: bool = True,
@@ -56,7 +56,7 @@ class PettingZooEnvironmentLoop(core.Worker):
     ):
         # Internalize agent and environment.
         self._environment = environment
-        self._actors = actors
+        self._system = system
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger(label)
         self._should_update = should_update
@@ -79,7 +79,8 @@ class PettingZooEnvironmentLoop(core.Worker):
         timestep = self._environment.reset()
 
         # Make the first observation.
-        self._actors[self._environment.agent_selection].observe_first(timestep)
+        # self._actors[self._environment.agent_selection].observe_first(timestep)
+        self._system.observe_first(timestep)
 
         n_agents = self._environment.num_agents
         rewards = {

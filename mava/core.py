@@ -20,7 +20,7 @@ This file specifies and documents the notions of `Executor` and `Trainer` simila
 
 import abc
 import itertools
-from typing import Generic, List, Optional, Sequence, TypeVar
+from typing import Generic, List, Optional, Sequence, TypeVar, Dict
 
 from acme import types
 
@@ -39,21 +39,58 @@ class Executor(abc.ABC):
     form:
       # Make the first observation.
       timestep = env.reset()
-      actor.observe_first(timestep.observation)
+      system.observe_first(timestep.observation)
       # Take a step and observe.
-      action = actor.select_action(timestep.observation)
+      action = system.select_actions(timestep.observation)
       next_timestep = env.step(action)
       actor.observe(action, next_timestep)
       # Update the actor policy/parameters.
-      actor.update()
+      system.update()
     """
 
     @abc.abstractmethod
-    def select_action(self, observation: types.NestedArray) -> types.NestedArray:
-        """Samples from the policy and returns an action."""
+    def agent_select_action(
+        self, agent_id: str, observations: types.NestedArray
+    ) -> types.NestedArray:
+        """Samples from the policy and returns an action for an individual actor."""
 
     @abc.abstractmethod
-    def observe_first(self, timestep: dm_env.TimeStep):
+    def agent_observe_first(self, agent_id: str, timesteps: dm_env.TimeStep):
+        """Make a first observation from the environment.
+        Note that this need not be an initial state, it is merely beginning the
+        recording of a trajectory.
+        Args:
+          timestep: first timestep.
+        """
+
+    @abc.abstractmethod
+    def agent_observe(
+        self,
+        agent_id: str,
+        actions: types.NestedArray,
+        next_timesteps: dm_env.TimeStep,
+    ):
+        """Make an observation of timestep data from the environment.
+        Args:
+          action: action taken in the environment.
+          next_timestep: timestep produced by the environment given the action.
+        """
+
+    @abc.abstractmethod
+    def agent_update(self, wait: bool = False):
+        """Perform an update of an actor's parameters from past observations.
+        Args:
+          wait: if True, the update will be blocking.
+        """
+
+    @abc.abstractmethod
+    def select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> Dict[str, types.NestedArray]:
+        """Samples from the policy and returns an action for each agent."""
+
+    @abc.abstractmethod
+    def observe_first(self, timesteps: Dict[str, dm_env.TimeStep]):
         """Make a first observation from the environment.
         Note that this need not be an initial state, it is merely beginning the
         recording of a trajectory.
@@ -64,8 +101,8 @@ class Executor(abc.ABC):
     @abc.abstractmethod
     def observe(
         self,
-        action: types.NestedArray,
-        next_timestep: dm_env.TimeStep,
+        actions: Dict[str, types.NestedArray],
+        next_timesteps: Dict[str, dm_env.TimeStep],
     ):
         """Make an observation of timestep data from the environment.
         Args:
@@ -75,7 +112,7 @@ class Executor(abc.ABC):
 
     @abc.abstractmethod
     def update(self, wait: bool = False):
-        """Perform an update of the actor parameters from past observations.
+        """Perform an update of the system's parameters from past observations.
         Args:
           wait: if True, the update will be blocking.
         """
@@ -92,7 +129,22 @@ class VariableSource(abc.ABC):
     """
 
     @abc.abstractmethod
-    def get_variables(self, names: Sequence[str]) -> List[types.NestedArray]:
+    def agent_get_variables(
+        self, agent_id: str, names: Sequence[str]
+    ) -> List[types.NestedArray]:
+        """Return the named variables as a collection of (nested) numpy arrays.
+        Args:
+          names: args where each name is a string identifying a predefined subset of
+            the variables.
+        Returns:
+          A list of (nested) numpy arrays `variables` such that `variables[i]`
+          corresponds to the collection named by `names[i]`.
+        """
+
+    @abc.abstractmethod
+    def get_variables(
+        self, names: Dict[str, Sequence[str]]
+    ) -> Dict[str, List[types.NestedArray]]:
         """Return the named variables as a collection of (nested) numpy arrays.
         Args:
           names: args where each name is a string identifying a predefined subset of
@@ -139,8 +191,12 @@ class Trainer(VariableSource, Worker, Saveable):
     """
 
     @abc.abstractmethod
+    def agent_step(self, agent_id: str):
+        """Perform an update step of a learner's parameters."""
+
+    @abc.abstractmethod
     def step(self):
-        """Perform an update step of the learner's parameters."""
+        """Perform an update step of the system's parameters."""
 
     def run(self, num_steps: Optional[int] = None) -> None:
         """Run the update loop; typically an infinite loop which calls step."""

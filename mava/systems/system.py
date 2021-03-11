@@ -17,7 +17,8 @@
 
 from typing import List, Dict
 
-from acme import core
+from mava
+from acme
 from acme import types
 from acme.agents import Agent
 
@@ -44,7 +45,7 @@ def _calculate_num_learner_steps(
 
 
 # TODO: NEED TO CHANGE THIS TO MARL
-class System(core.Executor, core.VariableSource):
+class System(mava.core.Executor, mava.core.VariableSource):
     """Agent class which combines acting and learning.
     This provides an implementation of the `Actor` interface which acts and
     learns. It takes as input instances of both `acme.Actor` and `acme.Learner`
@@ -60,8 +61,8 @@ class System(core.Executor, core.VariableSource):
 
     def __init__(
         self,
-        actors: Dict[str, core.Actor],
-        learners: Dict[str, core.Learner],
+        actors: Dict[str, acme.core.Actor],
+        learners: Dict[str, acme.core.Learner],
         min_observations: int,
         observations_per_step: float,
     ):
@@ -71,11 +72,40 @@ class System(core.Executor, core.VariableSource):
         self._observations_per_step = observations_per_step
         self._num_observations = 0
 
-    def select_action(self, observation: types.NestedArray) -> types.NestedArray:
-        return self._actor.select_action(observation)
+    def agent_select_action(self, agent_id: str, observation: types.NestedArray) -> types.NestedArray:
+        return self._actors[agent_id].select_action(observation)
 
+    def agent_observe_first(self, agent_id: str, timestep: dm_env.TimeStep):
+        self._actors[agent_id].observe_first(timestep)
+
+    def agent_observe(self, agent_id: str, action: types.NestedArray, next_timestep: dm_env.TimeStep):
+        self._num_observations += 1
+        self._actors[agent_id].observe(action, next_timestep)
+
+    def agent_update(self, agent_id: str):
+        num_steps = _calculate_num_learner_steps(
+            num_observations=self._num_observations,
+            min_observations=self._min_observations,
+            observations_per_step=self._observations_per_step,
+        )
+        for _ in range(num_steps):
+            # Run learner steps (usually means gradient steps).
+            self._learners[agent_id].step()
+        if num_steps > 0:
+            # Update the actor weights when learner updates.
+            self._actors[agent_id].update()
+
+    def agent_get_variables(self, agent_id: str, names: List[str]) -> List[List[np.ndarray]]:
+        return self._learners[agent_id].get_variables(names)
+    
+    def select_actions(self, observations: Dict[str, types.NestedArray]) -> Dict[str, types.NestedArray]:
+        actions = {}
+        for agent_id, agent in self._actors.items():
+            actions[agent_id] = agent.select_action(observations[agent_id])
+        return actions
+    
     def observe_first(self, timestep: dm_env.TimeStep):
-        self._actor.observe_first(timestep)
+        self._executor.observe_first(timestep)
 
     def observe(self, action: types.NestedArray, next_timestep: dm_env.TimeStep):
         self._num_observations += 1
