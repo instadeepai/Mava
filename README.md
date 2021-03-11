@@ -38,7 +38,7 @@ examples found in our [examples] subdirectory which show how to instantiate a
 few MARL systems and environments. We also include a
 [quickstart notebook][Quickstart].
 
-> :information_source: Mava heavily relies on Acme, therefore as is the case with Acme, we make the same statement regarding reliability: this framework is for MARL research written by
+> :information_source: Mava heavily relies on Acme, therefore as is the case with Acme, we make the same statement regarding reliability: mava is a framework for MARL research written by
 > researchers, for researchers. We will make every attempt to keep everything in good
 > working order, but things may break occasionally. If they do, we will make our best
 > effort to fix them as quickly as possible!
