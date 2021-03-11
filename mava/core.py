@@ -77,12 +77,13 @@ class Executor(abc.ABC):
         """
 
     @abc.abstractmethod
-    def agent_update(self, wait: bool = False):
+    def agent_update(self, agent_id: str, wait: bool = False):
         """Perform an update of an actor's parameters from past observations.
         Args:
           wait: if True, the update will be blocking.
         """
 
+    # TODO(arnu) complete function below for MARL case
     @abc.abstractmethod
     def select_actions(
         self, observations: Dict[str, types.NestedArray]

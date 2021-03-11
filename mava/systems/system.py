@@ -61,26 +61,26 @@ class System(mava.core.Executor, mava.core.VariableSource):
 
     def __init__(
         self,
-        actors: Dict[str, acme.core.Actor],
-        learners: Dict[str, acme.core.Learner],
+        executor: mava.core.Executor,
+        trainer: mava.core.Trainer,
         min_observations: int,
         observations_per_step: float,
     ):
-        self._actors = actors
-        self._learners = learners
+        self._executor = executor
+        self._trainer = trainer
         self._min_observations = min_observations
         self._observations_per_step = observations_per_step
         self._num_observations = 0
 
     def agent_select_action(self, agent_id: str, observation: types.NestedArray) -> types.NestedArray:
-        return self._actors[agent_id].select_action(observation)
+        return self._executor.agent_select_action(agent_id, observation)
 
     def agent_observe_first(self, agent_id: str, timestep: dm_env.TimeStep):
-        self._actors[agent_id].observe_first(timestep)
+        self._executor.agent_observe_first(agent_id, timestep)
 
     def agent_observe(self, agent_id: str, action: types.NestedArray, next_timestep: dm_env.TimeStep):
         self._num_observations += 1
-        self._actors[agent_id].observe(action, next_timestep)
+        self._executor.observe(agent_id, action, next_timestep)
 
     def agent_update(self, agent_id: str):
         num_steps = _calculate_num_learner_steps(
@@ -90,14 +90,16 @@ class System(mava.core.Executor, mava.core.VariableSource):
         )
         for _ in range(num_steps):
             # Run learner steps (usually means gradient steps).
-            self._learners[agent_id].step()
+            self._trainer.agent_step(agent_id)
         if num_steps > 0:
             # Update the actor weights when learner updates.
-            self._actors[agent_id].update()
+            self._executor.agent_update(agent_id)
 
     def agent_get_variables(self, agent_id: str, names: List[str]) -> List[List[np.ndarray]]:
-        return self._learners[agent_id].get_variables(names)
+        return self._trainer.agent_get_variables(agent_id, names)
     
+    
+    # TODO(arnu) finish there functions for the multi-agent case
     def select_actions(self, observations: Dict[str, types.NestedArray]) -> Dict[str, types.NestedArray]:
         actions = {}
         for agent_id, agent in self._actors.items():
