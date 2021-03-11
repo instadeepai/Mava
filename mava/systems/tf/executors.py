@@ -27,10 +27,9 @@ class FeedForwardExecutor(core.Executor):
 
     def __init__(
         self,
-        agents: List[str],
-        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
-        adders: Optional[Dict[str, adders.Adder]] = None,
+        weight_sharing: bool,
+        adder: Optional[adders.Adder] = None,
         variable_clients: Optional[Dict[str, tf2_variable_utils.VariableClient]] = None,
     ):
         """Initializes the actor.
@@ -41,16 +40,16 @@ class FeedForwardExecutor(core.Executor):
           variable_client: object which allows to copy weights from the learner copy
             of the policy to the actor copy (in case they are separate).
         """
-        self._agents = agents
-        self._agent_types = agent_types
 
         # Store these for later use.
         self._adders = adders
         self._variable_clients = variable_clients
         self._policy_networks = policy_networks
+        self._weight_sharing = weight_sharing
 
+    # TODO (Arnu) make it so that if weight_sharing is true it uses agent type, otherwise it uses agent id.
     @tf.function
-    def _agent_policy(
+    def _policy(
         self, agent_id: str, observation: types.NestedTensor
     ) -> types.NestedTensor:
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
@@ -87,26 +86,17 @@ class FeedForwardExecutor(core.Executor):
         if self._variable_client[agent_id]:
             self._variable_client[agent_id].update(wait)
 
-    # TODO(Arnu) change these to work for MARL
-    @tf.function
-    def _policy(self, observation: types.NestedTensor) -> types.NestedTensor:
-        # Add a dummy batch dimension and as a side effect convert numpy to TF.
-        batched_observation = tf2_utils.add_batch_dim(observation)
-
-        # Compute the policy, conditioned on the observation.
-        policy = self._policy_network(batched_observation)
-
-        # Sample from the policy if it is stochastic.
-        action = policy.sample() if isinstance(policy, tfd.Distribution) else policy
-
-        return action
-
-    def select_actions(self, observation: types.NestedArray) -> types.NestedArray:
-        # Pass the observation through the policy network.
-        action = self._policy(observation)
+    def select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> Dict[str, types.NestedArray]:
+        actions = {}
+        for agent, observation in observations.items():
+            # Pass the observation through the policy network.
+            action = self._policy(agent, observation)
+            actions[agent] = tf2_utils.to_numpy_squeeze(action)
 
         # Return a numpy array with squeezed out batch dimension.
-        return tf2_utils.to_numpy_squeeze(action)
+        return actions
 
     def observe_first(self, timestep: dm_env.TimeStep):
         if self._adder:

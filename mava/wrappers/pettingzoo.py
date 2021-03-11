@@ -193,7 +193,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 else dm_env.StepType.MID
             )
         self._reset_next_step = step_type == dm_env.StepType.LAST
-
+        # TODO (Arnu) make the return a dict of timesteps one for each agent type.
         return dm_env.TimeStep(
             observation=observations,
             reward=rewards,

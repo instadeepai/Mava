@@ -50,6 +50,7 @@ class MADDPG(system.System):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module] = None,
+        shared_weights: bool = False,
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -89,45 +90,42 @@ class MADDPG(system.System):
           checkpoint: boolean indicating whether to checkpoint the learner.
           replay_table_name: string indicating what name to give the replay table.
         """
-        replay_tables = {}
-        adders = {}
-        datasets = {}
         behavior_networks = {}
         target_policy_networks = {}
         target_critic_networks = {}
         target_observation_networks = {}
+
+        # Create a replay server to add data to. This uses no limiter behavior in
+        # order to allow the Agent interface to handle it.
+        replay_table = reverb.Table(
+            name="replay_table_name",
+            sampler=reverb.selectors.Uniform(),
+            remover=reverb.selectors.Fifo(),
+            max_size=max_replay_size,
+            rate_limiter=reverb.rate_limiters.MinSize(1),
+            signature=adders.NStepTransitionAdder.signature(environment_spec),
+        )
+        self._server = reverb.Server([replay_table], port=None)
+
+        # The adder is used to insert observations into replay.
+        address = f"localhost:{self._server.port}"
+        adder = adders.NStepTransitionAdder(
+            priority_fns={replay_table_name: lambda x: 1.0},
+            client=reverb.Client(address),
+            n_step=n_step,
+            discount=discount,
+        )
+
+        # The dataset provides an interface to sample from replay.
+        dataset = datasets.make_reverb_dataset(
+            table=replay_table_name,
+            server_address=address,
+            batch_size=batch_size,
+            prefetch_size=prefetch_size,
+        )
+
+        # TODO (Arnu) Note that this implies shared weights between agents of the same type -> should make this optional
         for agent_type in agent_types:
-            # Create a replay server to add data to. This uses no limiter behavior in
-            # order to allow the Agent interface to handle it.
-            replay_table = reverb.Table(
-                name=f"{agent_type}_replay_table_name",
-                sampler=reverb.selectors.Uniform(),
-                remover=reverb.selectors.Fifo(),
-                max_size=max_replay_size,
-                rate_limiter=reverb.rate_limiters.MinSize(1),
-                signature=adders.NStepTransitionAdder.signature(environment_spec),
-            )
-            replay_tables[agent_type] = replay_table
-            self._server = reverb.Server([replay_table], port=None)
-
-            # The adder is used to insert observations into replay.
-            address = f"localhost:{self._server.port}"
-            adder = adders.NStepTransitionAdder(
-                priority_fns={replay_table_name: lambda x: 1.0},
-                client=reverb.Client(address),
-                n_step=n_step,
-                discount=discount,
-            )
-            adders[agent_type] = adder
-
-            # The dataset provides an interface to sample from replay.
-            dataset = datasets.make_reverb_dataset(
-                table=replay_table_name,
-                server_address=address,
-                batch_size=batch_size,
-                prefetch_size=prefetch_size,
-            )
-            datasets[agent_type] = dataset
 
             # Make sure observation network is a Sonnet Module.
             if observation_networks is None:
