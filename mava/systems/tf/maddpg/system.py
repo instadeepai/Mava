@@ -45,12 +45,11 @@ class MADDPG(system.System):
     def __init__(
         self,
         agents: List[str],
+        agent_types: List[str],
         environment_spec: specs.EnvironmentSpec,
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, types.TensorTransformation] = Dict[
-            str, tf.identity
-        ],
+        observation_networks: Dict[str, snt.Module] = None,
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -97,18 +96,18 @@ class MADDPG(system.System):
         target_policy_networks = {}
         target_critic_networks = {}
         target_observation_networks = {}
-        for agent in agents:
+        for agent_type in agent_types:
             # Create a replay server to add data to. This uses no limiter behavior in
             # order to allow the Agent interface to handle it.
             replay_table = reverb.Table(
-                name=f"{agent}_replay_table_name",
+                name=f"{agent_type}_replay_table_name",
                 sampler=reverb.selectors.Uniform(),
                 remover=reverb.selectors.Fifo(),
                 max_size=max_replay_size,
                 rate_limiter=reverb.rate_limiters.MinSize(1),
                 signature=adders.NStepTransitionAdder.signature(environment_spec),
             )
-            replay_tables[agent] = replay_table
+            replay_tables[agent_type] = replay_table
             self._server = reverb.Server([replay_table], port=None)
 
             # The adder is used to insert observations into replay.
@@ -119,7 +118,7 @@ class MADDPG(system.System):
                 n_step=n_step,
                 discount=discount,
             )
-            adders[agent] = adder
+            adders[agent_type] = adder
 
             # The dataset provides an interface to sample from replay.
             dataset = datasets.make_reverb_dataset(
@@ -128,40 +127,43 @@ class MADDPG(system.System):
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
             )
-            datasets[agent] = dataset
+            datasets[agent_type] = dataset
 
             # Make sure observation network is a Sonnet Module.
-            observation_network = tf2_utils.to_sonnet_module(
-                observation_networks[agent]
-            )
+            if observation_networks is None:
+                observation_network: types.TensorTransformation = tf.identity
+                observation_network = tf2_utils.to_sonnet_module(observation_network)
+                observation_networks[agent_type] = observation_network
 
             # Get observation and action specs.
-            act_spec = environment_spec[agent].actions
-            obs_spec = environment_spec[agent].observations
+            act_spec = environment_spec[agent_type].actions
+            obs_spec = environment_spec[agent_type].observations
             emb_spec = tf2_utils.create_variables(observation_network, [obs_spec])
 
             # Create target networks.
-            target_policy_network = copy.deepcopy(policy_networks[agent])
-            target_critic_network = copy.deepcopy(critic_networks[agent])
-            target_observation_network = copy.deepcopy(observation_networks[agent])
+            target_policy_network = copy.deepcopy(policy_networks[agent_type])
+            target_critic_network = copy.deepcopy(critic_networks[agent_type])
+            target_observation_network = copy.deepcopy(observation_networks[agent_type])
 
-            target_policy_networks[agent] = target_policy_network
-            target_critic_networks[agent] = target_critic_network
-            target_observation_networks[agent] = target_observation_network
+            target_policy_networks[agent_type] = target_policy_network
+            target_critic_networks[agent_type] = target_critic_network
+            target_observation_networks[agent_type] = target_observation_network
 
             # Create the behavior policy.
             behavior_network = snt.Sequential(
                 [
                     observation_network,
-                    policy_networks[agent],
+                    policy_networks[agent_type],
                     networks.ClippedGaussian(sigma),
                     networks.ClipToSpec(act_spec),
                 ]
             )
 
             # Create variables.
-            tf2_utils.create_variables(policy_networks[agent], [emb_spec])
-            tf2_utils.create_variables(critic_networks[agent], [emb_spec, act_spec])
+            tf2_utils.create_variables(policy_networks[agent_type], [emb_spec])
+            tf2_utils.create_variables(
+                critic_networks[agent_type], [emb_spec, act_spec]
+            )
             tf2_utils.create_variables(target_policy_network, [emb_spec])
             tf2_utils.create_variables(target_critic_network, [emb_spec, act_spec])
             tf2_utils.create_variables(target_observation_network, [obs_spec])
@@ -175,12 +177,14 @@ class MADDPG(system.System):
 
         # The learner updates the parameters (and initializes them).
         trainer = training.MADDPGTrainer(
-            policy_network=policy_networks,
-            critic_network=critic_networks,
-            observation_network=observation_networks,
-            target_policy_network=target_policy_networks,
-            target_critic_network=target_critic_networks,
-            target_observation_network=target_observation_networks,
+            agent=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            observation_networks=observation_networks,
+            target_policy_networks=target_policy_networks,
+            target_critic_networks=target_critic_networks,
+            target_observation_networks=target_observation_networks,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             clipping=clipping,

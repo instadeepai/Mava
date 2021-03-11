@@ -27,6 +27,8 @@ class FeedForwardExecutor(core.Executor):
 
     def __init__(
         self,
+        agents: List[str],
+        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         adders: Optional[Dict[str, adders.Adder]] = None,
         variable_clients: Optional[Dict[str, tf2_variable_utils.VariableClient]] = None,
@@ -39,6 +41,8 @@ class FeedForwardExecutor(core.Executor):
           variable_client: object which allows to copy weights from the learner copy
             of the policy to the actor copy (in case they are separate).
         """
+        self._agents = agents
+        self._agent_types = agent_types
 
         # Store these for later use.
         self._adders = adders
@@ -97,7 +101,7 @@ class FeedForwardExecutor(core.Executor):
 
         return action
 
-    def select_action(self, observation: types.NestedArray) -> types.NestedArray:
+    def select_actions(self, observation: types.NestedArray) -> types.NestedArray:
         # Pass the observation through the policy network.
         action = self._policy(observation)
 

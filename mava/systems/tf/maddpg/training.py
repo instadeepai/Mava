@@ -17,98 +17,132 @@
 """MADDPG trainer implementation."""
 
 import time
-from typing import Dict, List
+from typing import List, Dict
 
-import mava
 import acme
-from acme.adders import reverb as adders
+from acme import types
 from acme.tf import losses
 from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting
 from acme.utils import loggers
 import numpy as np
-import reverb
 import sonnet as snt
 import tensorflow as tf
+import tree
 import trfl
 
 
-class MADPPGLearner(mava.Trainer, tf2_savers.TFSaveable):
-    """DQN learner.
-    This is the learning component of a DQN agent. It takes a dataset as input
-    and implements update functionality to learn from this dataset. Optionally
-    it takes a replay client as well to allow for updating of priorities.
+class MADDPGLearner(mava.Trainer):
+    """MADDPG trainer.
+    This is the trainer component of a MADDPG system. IE it takes a dataset as input
+    and implements update functionality to learn from this dataset.
     """
 
     def __init__(
         self,
-        network: snt.Module,
-        target_network: snt.Module,
+        agents: List[str],
+        agent_types: List[str],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        target_policy_networks: Dict[str, snt.Module],
+        target_critic_networks: Dict[str, snt.Module],
         discount: float,
-        importance_sampling_exponent: float,
-        learning_rate: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        huber_loss_parameter: float = 1.0,
-        replay_client: reverb.TFClient = None,
+        observation_networks: Dict[str, snt.Module],
+        target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer = None,
+        critic_optimizer: snt.Optimizer = None,
+        clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
-        max_gradient_norm: float = None,
     ):
         """Initializes the learner.
         Args:
-          network: the online Q network (the one being optimized)
-          target_network: the target Q critic (which lags behind the online net).
+          policy_network: the online (optimized) policy.
+          critic_network: the online critic.
+          target_policy_network: the target policy (which lags behind the online
+            policy).
+          target_critic_network: the target critic.
           discount: discount to use for TD updates.
-          importance_sampling_exponent: power to which importance weights are raised
-            before normalizing.
-          learning_rate: learning rate for the q-network update.
           target_update_period: number of learner steps to perform before updating
             the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer (see
-            `acme.datasets.reverb.make_dataset` documentation).
-          huber_loss_parameter: Quadratic-linear boundary for Huber loss.
-          replay_client: client to replay to allow for updating priorities.
-          counter: Counter object for (potentially distributed) counting.
-          logger: Logger object for writing logs to.
+          dataset: dataset to learn from, whether fixed or from a replay buffer
+            (see `acme.datasets.reverb.make_dataset` documentation).
+          observation_network: an optional online network to process observations
+            before the policy and the critic.
+          target_observation_network: the target observation network.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizer to be applied to the critic loss.
+          clipping: whether to clip gradients by global norm.
+          counter: counter object used to keep track of steps.
+          logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.
-          max_gradient_norm: used for gradient clipping.
         """
 
-        # Internalise agent components (replay buffer, networks, optimizer).
+        self._agents = agents
+        self._agent_types = agent_types
+
+        # Store online and target networks.
+        self._policy_networks = policy_networks
+        self._critic_networks = critic_networks
+        self._target_policy_networks = target_policy_networks
+        self._target_critic_networks = target_critic_networks
+
+        # General learner book-keeping and loggers.
+        self._counter = counter or counting.Counter()
+        self._logger = logger or loggers.make_default_logger("learner")
+
+        # Other learner parameters.
+        self._discount = discount
+        self._clipping = clipping
+
+        # Necessary to track when to update target networks.
+        self._num_steps = tf.Variable(0, dtype=tf.int32)
+        self._target_update_period = target_update_period
+
+        # Create an iterator to go through the dataset.
         # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
-        self._network = network
-        self._target_network = target_network
-        self._optimizer = snt.optimizers.Adam(learning_rate)
-        self._replay_client = replay_client
 
-        # Internalise the hyperparameters.
-        self._discount = discount
-        self._target_update_period = target_update_period
-        self._importance_sampling_exponent = importance_sampling_exponent
-        self._huber_loss_parameter = huber_loss_parameter
-        if max_gradient_norm is None:
-            max_gradient_norm = 1e10  # A very large number. Infinity results in NaNs.
-        self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        # Create optimizers if they aren't given.
+        self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-4)
+        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
 
-        # Learner state.
-        self._variables: List[List[tf.Tensor]] = [network.trainable_variables]
-        self._num_steps = tf.Variable(0, dtype=tf.int32)
-
-        # Internalise logging/counting objects.
-        self._counter = counter or counting.Counter()
-        self._logger = logger or loggers.TerminalLogger("learner", time_delta=1.0)
-
-        # Create a snapshotter object.
-        if checkpoint:
-            self._snapshotter = tf2_savers.Snapshotter(
-                objects_to_save={"network": network}, time_delta_minutes=60.0
+        # Expose the variables.
+        policy_networks_to_expose = {}
+        self._system_network_variables = {}
+        self._system_checkpointer = {}
+        for agent_type in agent_types:
+            policy_network_to_expose = snt.Sequential(
+                [
+                    self._target_observation_network[agent_type],
+                    self._target_policy_networks[agent_type],
+                ]
             )
-        else:
-            self._snapshotter = None
+            policy_networks_to_expose[agent_type] = policy_network_to_expose
+            variables = {
+                "critic": target_critic_networks[agent_type].variables,
+                "policy": policy_network_to_expose.variables,
+            }
+            self._system_network_variables[agent_type] = variables
+            checkpointer = tf2_savers.Checkpointer(
+                time_delta_minutes=5,
+                objects_to_save={
+                    "counter": self._counter,
+                    "policy": self._policy_networks[agent_type],
+                    "critic": self._critic_networks[agent_type],
+                    "target_policy": self._target_policy_networks[agent_type],
+                    "target_critic": self._target_critic_networks[agent_type],
+                    "policy_optimizer": self._policy_optimizer,
+                    "critic_optimizer": self._critic_optimizer,
+                    "num_steps": self._num_steps,
+                },
+                enable_checkpointing=checkpoint,
+            )
+            self._system_checkpointer[agent_type] = checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -116,70 +150,106 @@ class MADPPGLearner(mava.Trainer, tf2_savers.TFSaveable):
         self._timestamp = None
 
     @tf.function
-    def _step(self) -> Dict[str, tf.Tensor]:
-        """Do a step of SGD and update the priorities."""
+    def _step(self):
+        # Update target network.
+        online_variables = (
+            *self._observation_network.variables,
+            *self._critic_network.variables,
+            *self._policy_network.variables,
+        )
+        target_variables = (
+            *self._target_observation_network.variables,
+            *self._target_critic_network.variables,
+            *self._target_policy_network.variables,
+        )
 
-        # Pull out the data needed for updates/priorities.
-        inputs = next(self._iterator)
-        o_tm1, a_tm1, r_t, d_t, o_t = inputs.data
-        keys, probs = inputs.info[:2]
-
-        with tf.GradientTape() as tape:
-            # Evaluate our networks.
-            q_tm1 = self._network(o_tm1)
-            q_t_value = self._target_network(o_t)
-            q_t_selector = self._network(o_t)
-
-            # The rewards and discounts have to have the same type as network values.
-            r_t = tf.cast(r_t, q_tm1.dtype)
-            r_t = tf.clip_by_value(r_t, -1.0, 1.0)
-            d_t = tf.cast(d_t, q_tm1.dtype) * tf.cast(self._discount, q_tm1.dtype)
-
-            # Compute the loss.
-            _, extra = trfl.double_qlearning(
-                q_tm1, a_tm1, r_t, d_t, q_t_value, q_t_selector
-            )
-            loss = losses.huber(extra.td_error, self._huber_loss_parameter)
-
-            # Get the importance weights.
-            importance_weights = 1.0 / probs  # [B]
-            importance_weights **= self._importance_sampling_exponent
-            importance_weights /= tf.reduce_max(importance_weights)
-
-            # Reweight.
-            loss *= tf.cast(importance_weights, loss.dtype)  # [B]
-            loss = tf.reduce_mean(loss, axis=[0])  # []
-
-        # Do a step of SGD.
-        gradients = tape.gradient(loss, self._network.trainable_variables)
-        gradients, _ = tf.clip_by_global_norm(gradients, self._max_gradient_norm)
-        self._optimizer.apply(gradients, self._network.trainable_variables)
-
-        # Update the priorities in the replay buffer.
-        if self._replay_client:
-            priorities = tf.cast(tf.abs(extra.td_error), tf.float64)
-            self._replay_client.update_priorities(
-                table=adders.DEFAULT_PRIORITY_TABLE, keys=keys, priorities=priorities
-            )
-
-        # Periodically update the target network.
+        # Make online -> target network update ops.
         if tf.math.mod(self._num_steps, self._target_update_period) == 0:
-            for src, dest in zip(
-                self._network.variables, self._target_network.variables
-            ):
+            for src, dest in zip(online_variables, target_variables):
                 dest.assign(src)
         self._num_steps.assign_add(1)
 
-        # Report loss & statistics for logging.
-        fetches = {
-            "loss": loss,
+        # Get data from replay (dropping extras if any). Note there is no
+        # extra data here because we do not insert any into Reverb.
+        inputs = next(self._iterator)
+        o_tm1, a_tm1, r_t, d_t, o_t = inputs.data
+
+        # Cast the additional discount to match the environment discount dtype.
+        discount = tf.cast(self._discount, dtype=d_t.dtype)
+
+        with tf.GradientTape(persistent=True) as tape:
+            # Maybe transform the observation before feeding into policy and critic.
+            # Transforming the observations this way at the start of the learning
+            # step effectively means that the policy and critic share observation
+            # network weights.
+            o_tm1 = self._observation_network(o_tm1)
+            o_t = self._target_observation_network(o_t)
+            # This stop_gradient prevents gradients to propagate into the target
+            # observation network. In addition, since the online policy network is
+            # evaluated at o_t, this also means the policy loss does not influence
+            # the observation network training.
+            o_t = tree.map_structure(tf.stop_gradient, o_t)
+
+            # Critic learning.
+            q_tm1 = self._critic_network(o_tm1, a_tm1)
+            q_t = self._target_critic_network(o_t, self._target_policy_network(o_t))
+
+            # Squeeze into the shape expected by the td_learning implementation.
+            q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
+            q_t = tf.squeeze(q_t, axis=-1)  # [B]
+
+            # Critic loss.
+            critic_loss = trfl.td_learning(q_tm1, r_t, discount * d_t, q_t).loss
+            critic_loss = tf.reduce_mean(critic_loss, axis=0)
+
+            # Actor learning.
+            dpg_a_t = self._policy_network(o_t)
+            dpg_q_t = self._critic_network(o_t, dpg_a_t)
+
+            # Actor loss. If clipping is true use dqda clipping and clip the norm.
+            dqda_clipping = 1.0 if self._clipping else None
+            policy_loss = losses.dpg(
+                dpg_q_t,
+                dpg_a_t,
+                tape=tape,
+                dqda_clipping=dqda_clipping,
+                clip_norm=self._clipping,
+            )
+            policy_loss = tf.reduce_mean(policy_loss, axis=0)
+
+        # Get trainable variables.
+        policy_variables = self._policy_network.trainable_variables
+        critic_variables = (
+            # In this agent, the critic loss trains the observation network.
+            self._observation_network.trainable_variables
+            + self._critic_network.trainable_variables
+        )
+
+        # Compute gradients.
+        policy_gradients = tape.gradient(policy_loss, policy_variables)
+        critic_gradients = tape.gradient(critic_loss, critic_variables)
+
+        # Delete the tape manually because of the persistent=True flag.
+        del tape
+
+        # Maybe clip gradients.
+        if self._clipping:
+            policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
+            critic_gradients = tf.clip_by_global_norm(critic_gradients, 40.0)[0]
+
+        # Apply gradients.
+        self._policy_optimizer.apply(policy_gradients, policy_variables)
+        self._critic_optimizer.apply(critic_gradients, critic_variables)
+
+        # Losses to track.
+        return {
+            "critic_loss": critic_loss,
+            "policy_loss": policy_loss,
         }
 
-        return fetches
-
     def step(self):
-        # Do a batch of SGD.
-        result = self._step()
+        # Run the learning step.
+        fetches = self._step()
 
         # Compute elapsed time.
         timestamp = time.time()
@@ -188,22 +258,11 @@ class MADPPGLearner(mava.Trainer, tf2_savers.TFSaveable):
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        result.update(counts)
+        fetches.update(counts)
 
-        # Snapshot and attempt to write logs.
-        if self._snapshotter is not None:
-            self._snapshotter.save()
-        self._logger.write(result)
+        # Checkpoint and attempt to write the logs.
+        self._checkpointer.save()
+        self._logger.write(fetches)
 
-    def get_variables(self, names: List[str]) -> List[np.ndarray]:
-        return tf2_utils.to_numpy(self._variables)
-
-    @property
-    def state(self):
-        """Returns the stateful parts of the learner for checkpointing."""
-        return {
-            "network": self._network,
-            "target_network": self._target_network,
-            "optimizer": self._optimizer,
-            "num_steps": self._num_steps,
-        }
+    def get_variables(self, names: List[str]) -> List[List[np.ndarray]]:
+        return [tf2_utils.to_numpy(self._variables[name]) for name in names]
