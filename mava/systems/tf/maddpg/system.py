@@ -44,10 +44,13 @@ class MADDPG(system.System):
 
     def __init__(
         self,
+        agents: List[str],
         environment_spec: specs.EnvironmentSpec,
-        policy_network: snt.Module,
-        critic_network: snt.Module,
-        observation_network: types.TensorTransformation = tf.identity,
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        observation_networks: Dict[str, types.TensorTransformation] = Dict[
+            str, tf.identity
+        ],
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -87,67 +90,84 @@ class MADDPG(system.System):
           checkpoint: boolean indicating whether to checkpoint the learner.
           replay_table_name: string indicating what name to give the replay table.
         """
-        # Create a replay server to add data to. This uses no limiter behavior in
-        # order to allow the Agent interface to handle it.
-        replay_table = reverb.Table(
-            name=replay_table_name,
-            sampler=reverb.selectors.Uniform(),
-            remover=reverb.selectors.Fifo(),
-            max_size=max_replay_size,
-            rate_limiter=reverb.rate_limiters.MinSize(1),
-            signature=adders.NStepTransitionAdder.signature(environment_spec),
-        )
-        self._server = reverb.Server([replay_table], port=None)
+        replay_tables = {}
+        adders = {}
+        datasets = {}
+        behavior_networks = {}
+        target_policy_networks = {}
+        target_critic_networks = {}
+        target_observation_networks = {}
+        for agent in agents:
+            # Create a replay server to add data to. This uses no limiter behavior in
+            # order to allow the Agent interface to handle it.
+            replay_table = reverb.Table(
+                name=f"{agent}_replay_table_name",
+                sampler=reverb.selectors.Uniform(),
+                remover=reverb.selectors.Fifo(),
+                max_size=max_replay_size,
+                rate_limiter=reverb.rate_limiters.MinSize(1),
+                signature=adders.NStepTransitionAdder.signature(environment_spec),
+            )
+            replay_tables[agent] = replay_table
+            self._server = reverb.Server([replay_table], port=None)
 
-        # The adder is used to insert observations into replay.
-        address = f"localhost:{self._server.port}"
-        adder = adders.NStepTransitionAdder(
-            priority_fns={replay_table_name: lambda x: 1.0},
-            client=reverb.Client(address),
-            n_step=n_step,
-            discount=discount,
-        )
+            # The adder is used to insert observations into replay.
+            address = f"localhost:{self._server.port}"
+            adder = adders.NStepTransitionAdder(
+                priority_fns={replay_table_name: lambda x: 1.0},
+                client=reverb.Client(address),
+                n_step=n_step,
+                discount=discount,
+            )
+            adders[agent] = adder
 
-        # The dataset provides an interface to sample from replay.
-        dataset = datasets.make_reverb_dataset(
-            table=replay_table_name,
-            server_address=address,
-            batch_size=batch_size,
-            prefetch_size=prefetch_size,
-        )
+            # The dataset provides an interface to sample from replay.
+            dataset = datasets.make_reverb_dataset(
+                table=replay_table_name,
+                server_address=address,
+                batch_size=batch_size,
+                prefetch_size=prefetch_size,
+            )
+            datasets[agent] = dataset
 
-        # Make sure observation network is a Sonnet Module.
-        observation_network = tf2_utils.to_sonnet_module(observation_network)
+            # Make sure observation network is a Sonnet Module.
+            observation_network = tf2_utils.to_sonnet_module(
+                observation_networks[agent]
+            )
 
-        # Get observation and action specs.
-        act_spec = environment_spec.actions
-        obs_spec = environment_spec.observations
-        emb_spec = tf2_utils.create_variables(observation_network, [obs_spec])
+            # Get observation and action specs.
+            act_spec = environment_spec[agent].actions
+            obs_spec = environment_spec[agent].observations
+            emb_spec = tf2_utils.create_variables(observation_network, [obs_spec])
 
-        # Create target networks.
-        target_policy_network = copy.deepcopy(policy_network)
-        target_critic_network = copy.deepcopy(critic_network)
-        target_observation_network = copy.deepcopy(observation_network)
+            # Create target networks.
+            target_policy_network = copy.deepcopy(policy_networks[agent])
+            target_critic_network = copy.deepcopy(critic_networks[agent])
+            target_observation_network = copy.deepcopy(observation_networks[agent])
 
-        # Create the behavior policy.
-        behavior_network = snt.Sequential(
-            [
-                observation_network,
-                policy_network,
-                networks.ClippedGaussian(sigma),
-                networks.ClipToSpec(act_spec),
-            ]
-        )
+            target_policy_networks[agent] = target_policy_network
+            target_critic_networks[agent] = target_critic_network
+            target_observation_networks[agent] = target_observation_network
 
-        # Create variables.
-        tf2_utils.create_variables(policy_network, [emb_spec])
-        tf2_utils.create_variables(critic_network, [emb_spec, act_spec])
-        tf2_utils.create_variables(target_policy_network, [emb_spec])
-        tf2_utils.create_variables(target_critic_network, [emb_spec, act_spec])
-        tf2_utils.create_variables(target_observation_network, [obs_spec])
+            # Create the behavior policy.
+            behavior_network = snt.Sequential(
+                [
+                    observation_network,
+                    policy_networks[agent],
+                    networks.ClippedGaussian(sigma),
+                    networks.ClipToSpec(act_spec),
+                ]
+            )
+
+            # Create variables.
+            tf2_utils.create_variables(policy_networks[agent], [emb_spec])
+            tf2_utils.create_variables(critic_networks[agent], [emb_spec, act_spec])
+            tf2_utils.create_variables(target_policy_network, [emb_spec])
+            tf2_utils.create_variables(target_critic_network, [emb_spec, act_spec])
+            tf2_utils.create_variables(target_observation_network, [obs_spec])
 
         # Create the actor which defines how we take actions.
-        executor = executors.FeedForwardActor(behavior_network, adder=adder)
+        executor = executors.FeedForwardActor(behavior_networks, adders=adders)
 
         # Create optimizers.
         policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
@@ -155,12 +175,12 @@ class MADDPG(system.System):
 
         # The learner updates the parameters (and initializes them).
         trainer = training.MADDPGTrainer(
-            policy_network=policy_network,
-            critic_network=critic_network,
-            observation_network=observation_network,
-            target_policy_network=target_policy_network,
-            target_critic_network=target_critic_network,
-            target_observation_network=target_observation_network,
+            policy_network=policy_networks,
+            critic_network=critic_networks,
+            observation_network=observation_networks,
+            target_policy_network=target_policy_networks,
+            target_critic_network=target_critic_networks,
+            target_observation_network=target_observation_networks,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             clipping=clipping,

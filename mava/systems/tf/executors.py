@@ -17,7 +17,7 @@ import tensorflow_probability as tfp
 
 tfd = tfp.distributions
 
-# TODO: CHANGE INTERNAL FUNCTION TO BE FOR MARL
+
 class FeedForwardExecutor(core.Executor):
     """A feed-forward actor.
     An actor based on a feed-forward policy which takes non-batched observations
@@ -27,9 +27,9 @@ class FeedForwardExecutor(core.Executor):
 
     def __init__(
         self,
-        policy_network: snt.Module,
-        adder: Optional[adders.Adder] = None,
-        variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        policy_networks: Dict[str, snt.Module],
+        adders: Optional[Dict[str, adders.Adder]] = None,
+        variable_clients: Optional[Dict[str, tf2_variable_utils.VariableClient]] = None,
     ):
         """Initializes the actor.
         Args:
@@ -41,10 +41,49 @@ class FeedForwardExecutor(core.Executor):
         """
 
         # Store these for later use.
-        self._adder = adder
-        self._variable_client = variable_client
-        self._policy_network = policy_network
+        self._adders = adders
+        self._variable_clients = variable_clients
+        self._policy_networks = policy_networks
 
+    @tf.function
+    def _agent_policy(
+        self, agent_id: str, observation: types.NestedTensor
+    ) -> types.NestedTensor:
+        # Add a dummy batch dimension and as a side effect convert numpy to TF.
+        batched_observation = tf2_utils.add_batch_dim(observation)
+
+        # Compute the policy, conditioned on the observation.
+        policy = self._policy_networks[agent_id](batched_observation)
+
+        # Sample from the policy if it is stochastic.
+        action = policy.sample() if isinstance(policy, tfd.Distribution) else policy
+
+        return action
+
+    def agent_select_action(
+        self, agent_id: str, observation: types.NestedArray
+    ) -> types.NestedArray:
+        # Pass the observation through the policy network.
+        action = self._agent_policy(observation)
+
+        # Return a numpy array with squeezed out batch dimension.
+        return tf2_utils.to_numpy_squeeze(action)
+
+    def agent_observe_first(self, agent_id: str, timestep: dm_env.TimeStep):
+        if self._adders[agent_id]:
+            self._adders[agent_id].add_first(timestep)
+
+    def agent_observe(
+        self, agent_id: str, action: types.NestedArray, next_timestep: dm_env.TimeStep
+    ):
+        if self._adders[agent_id]:
+            self._adders[agent_id].add(action, next_timestep)
+
+    def agent_update(self, agent_id: str, wait: bool = False):
+        if self._variable_client[agent_id]:
+            self._variable_client[agent_id].update(wait)
+
+    # TODO(Arnu) change these to work for MARL
     @tf.function
     def _policy(self, observation: types.NestedTensor) -> types.NestedTensor:
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
