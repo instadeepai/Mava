@@ -176,7 +176,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
         observations, rewards, dones, infos = self._environment.step(actions)
 
-        if self._environment.done:
+        if self._environment.env_done:
             self._environment.step(None)
         else:
             self._environment.step(actions)

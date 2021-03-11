@@ -17,8 +17,8 @@
 
 from typing import List, Dict
 
-from mava
-from acme
+import mava
+import acme
 from acme import types
 from acme.agents import Agent
 
@@ -72,13 +72,17 @@ class System(mava.core.Executor, mava.core.VariableSource):
         self._observations_per_step = observations_per_step
         self._num_observations = 0
 
-    def agent_select_action(self, agent_id: str, observation: types.NestedArray) -> types.NestedArray:
+    def agent_select_action(
+        self, agent_id: str, observation: types.NestedArray
+    ) -> types.NestedArray:
         return self._executor.agent_select_action(agent_id, observation)
 
     def agent_observe_first(self, agent_id: str, timestep: dm_env.TimeStep):
         self._executor.agent_observe_first(agent_id, timestep)
 
-    def agent_observe(self, agent_id: str, action: types.NestedArray, next_timestep: dm_env.TimeStep):
+    def agent_observe(
+        self, agent_id: str, action: types.NestedArray, next_timestep: dm_env.TimeStep
+    ):
         self._num_observations += 1
         self._executor.observe(agent_id, action, next_timestep)
 
@@ -95,17 +99,20 @@ class System(mava.core.Executor, mava.core.VariableSource):
             # Update the actor weights when learner updates.
             self._executor.agent_update(agent_id)
 
-    def agent_get_variables(self, agent_id: str, names: List[str]) -> List[List[np.ndarray]]:
+    def agent_get_variables(
+        self, agent_id: str, names: List[str]
+    ) -> List[List[np.ndarray]]:
         return self._trainer.agent_get_variables(agent_id, names)
-    
-    
+
     # TODO(arnu) finish there functions for the multi-agent case
-    def select_actions(self, observations: Dict[str, types.NestedArray]) -> Dict[str, types.NestedArray]:
+    def select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> Dict[str, types.NestedArray]:
         actions = {}
         for agent_id, agent in self._actors.items():
             actions[agent_id] = agent.select_action(observations[agent_id])
         return actions
-    
+
     def observe_first(self, timestep: dm_env.TimeStep):
         self._executor.observe_first(timestep)
 
