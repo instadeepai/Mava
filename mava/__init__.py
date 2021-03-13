@@ -21,6 +21,6 @@ from mava.environment_loop import EnvironmentLoop
 
 # Internal environment_loop import.
 
-from mava.specs import make_environment_spec
+from mava.specs import SystemSpec
 
 # Mava loves you more. ;)

@@ -3,8 +3,8 @@ header:
     text: A framework for multi-agent reinforcement learning
     headerGif: /logos/mava.gif
     buttons:
-      - button: API
-        buttonlink: /api
+      - button: Overview
+        buttonlink: /overview
         icon: /assets/img/doc_icon.svg
         iconsize: 80%
       - button: Components
@@ -12,7 +12,7 @@ header:
         icon: /assets/img/environment_icon.svg
         iconsize: 80%
       - button: GitHub
-        buttonlink: https://github.com/arnupretorius/marl_framework
+        buttonlink: https://github.com/arnupretorius/mava
         icon: /assets/img/github_icon.svg
         iconsize: 80%
       # - button: Dev Docs

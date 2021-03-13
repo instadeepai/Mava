@@ -124,50 +124,53 @@ class MADDPG(system.System):
             prefetch_size=prefetch_size,
         )
 
-        # TODO (Arnu) Note that this implies shared weights between agents of the same type -> should make this optional
-        for agent_type in agent_types:
+        agent_keys = self._agent_type if shared_weights else self._agents
+
+        for agent_key in agent_keys:
 
             # Make sure observation network is a Sonnet Module.
             if observation_networks is None:
                 observation_network: types.TensorTransformation = tf.identity
                 observation_network = tf2_utils.to_sonnet_module(observation_network)
-                observation_networks[agent_type] = observation_network
+                observation_networks[agent_key] = observation_network
 
             # Get observation and action specs.
-            act_spec = environment_spec[agent_type].actions
-            obs_spec = environment_spec[agent_type].observations
+            act_spec = environment_spec[agent_key].actions
+            obs_spec = environment_spec[agent_key].observations
             emb_spec = tf2_utils.create_variables(observation_network, [obs_spec])
 
             # Create target networks.
-            target_policy_network = copy.deepcopy(policy_networks[agent_type])
-            target_critic_network = copy.deepcopy(critic_networks[agent_type])
-            target_observation_network = copy.deepcopy(observation_networks[agent_type])
+            target_policy_network = copy.deepcopy(policy_networks[agent_key])
+            target_critic_network = copy.deepcopy(critic_networks[agent_key])
+            target_observation_network = copy.deepcopy(observation_networks[agent_key])
 
-            target_policy_networks[agent_type] = target_policy_network
-            target_critic_networks[agent_type] = target_critic_network
-            target_observation_networks[agent_type] = target_observation_network
+            target_policy_networks[agent_key] = target_policy_network
+            target_critic_networks[agent_key] = target_critic_network
+            target_observation_networks[agent_key] = target_observation_network
 
             # Create the behavior policy.
             behavior_network = snt.Sequential(
                 [
                     observation_network,
-                    policy_networks[agent_type],
+                    policy_networks[agent_key],
                     networks.ClippedGaussian(sigma),
                     networks.ClipToSpec(act_spec),
                 ]
             )
 
             # Create variables.
-            tf2_utils.create_variables(policy_networks[agent_type], [emb_spec])
-            tf2_utils.create_variables(
-                critic_networks[agent_type], [emb_spec, act_spec]
-            )
+            tf2_utils.create_variables(policy_networks[agent_key], [emb_spec])
+            tf2_utils.create_variables(critic_networks[agent_key], [emb_spec, act_spec])
             tf2_utils.create_variables(target_policy_network, [emb_spec])
             tf2_utils.create_variables(target_critic_network, [emb_spec, act_spec])
             tf2_utils.create_variables(target_observation_network, [obs_spec])
 
         # Create the actor which defines how we take actions.
-        executor = executors.FeedForwardActor(behavior_networks, adders=adders)
+        executor = executors.FeedForwardActor(
+            policy_networks=behavior_networks,
+            shared_weights=shared_weights,
+            adder=adder,
+        )
 
         # Create optimizers.
         policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
@@ -183,6 +186,7 @@ class MADDPG(system.System):
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
             target_observation_networks=target_observation_networks,
+            shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             clipping=clipping,

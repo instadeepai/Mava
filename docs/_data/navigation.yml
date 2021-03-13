@@ -1,6 +1,6 @@
 nav:
-  - title: "API"
-    url: "/api"
+  - title: "Overview"
+    url: "/overview"
 
   - title: "Components"
     url: "/envs"

@@ -1,8 +1,23 @@
-# API
+# Overview
 
-## Initializing Environments
+## Systems and the Executor-Trainer paradigm
 
-Using environments in PettingZoo is very similar to using them in OpenAI's Gym. You initialize an environment via:
+At the core of the Mava framework is the *system*. A system refers to a full multi-agent reinforcement learning algorithm and consists of two specific components: an *Executor* and a *Trainer*. 
+
+### Executor
+
+The Executor is the part of the system that interacts with the environment, takes actions for each agent and observes the next state as a collection of observations, one for each agent in the system. Essentially, executors are the multi-agent version of actors in Acme and are themselves constructed through feeding to the executor a dictionary of policy networks.
+
+### Trainer
+
+The Trainer is responsible for taking data collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner in Acme. 
+
+
+<p style="text-align:center;">
+<img src="logos/mava_distributed_training.png" style="max-width:60%;">
+</p>
+
+<!-- Using environments in PettingZoo is very similar to using them in OpenAI's Gym. You initialize an environment via:
 
 ```
 from pettingzoo.butterfly import pistonball_v4
@@ -192,4 +207,4 @@ from pettingzoo.butterfly import pistonball_v4
 env = pistonball_v4.env()
 env.reset()
 save_observation(env, agent=None, all_agents=False, save_dir=os.getcwd())
-```
+``` -->
