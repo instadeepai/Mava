@@ -25,12 +25,13 @@ import tree
 from acme.utils import counting, loggers
 from dm_env import specs
 
-from mava import core
-from mava.environments.wrappers.pettingzoo import PettingZooAECEnvWrapper
-from mava.environments.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+import acme
+import mava
+from mava.wrappers.pettingzoo import PettingZooAECEnvWrapper
+from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 
-class PettingZooAECEnvironmentLoop(core.Worker):
+class PettingZooAECEnvironmentLoop(acme.core.Worker):
     """A Petting Zoo RL environment loop.
     This takes `Environment` and list of `Actor` instances and coordinates their
     interaction. Agents are updated if `should_update=True`. This can be used as:
@@ -49,7 +50,7 @@ class PettingZooAECEnvironmentLoop(core.Worker):
     def __init__(
         self,
         environment: PettingZooAECEnvWrapper,
-        executor: core.Executor,
+        executor: mava.core.Executor,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         should_update: bool = True,
@@ -177,7 +178,7 @@ def _generate_zeros_from_spec(spec: specs.Array) -> np.ndarray:
     return np.zeros(spec.shape, spec.dtype)
 
 
-class PettingZooParallelEnvironmentLoop(core.Worker):
+class PettingZooParallelEnvironmentLoop(acme.core.Worker):
     """A Petting Zoo RL environment loop.
     This takes `Environment` and list of `Actor` instances and coordinates their
     interaction. Agents are updated if `should_update=True`. This can be used as:
@@ -196,7 +197,7 @@ class PettingZooParallelEnvironmentLoop(core.Worker):
     def __init__(
         self,
         environment: PettingZooParallelEnvWrapper,
-        executor: core.Executor,
+        executor: mava.core.Executor,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         should_update: bool = True,

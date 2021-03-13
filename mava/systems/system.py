@@ -20,7 +20,6 @@ from typing import List, Dict
 import mava
 import acme
 from acme import types
-from acme.agents import Agent
 
 # Internal imports.
 

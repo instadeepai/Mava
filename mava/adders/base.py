@@ -15,12 +15,15 @@
 
 """Interface for adders which transmit data to a replay buffer."""
 
-import acme
+import abc
+from typing import Dict
+
+from acme import adders
 from acme import types
 import dm_env
 
 
-class Adder(acme.Adder):
+class Adder(adders.Adder):
     """The Adder interface.
     An adder packs together data to send to the replay buffer, and potentially
     performs some reduction/transformation to this data in the process.

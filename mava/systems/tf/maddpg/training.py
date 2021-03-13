@@ -32,6 +32,8 @@ import tensorflow as tf
 import tree
 import trfl
 
+import mava
+
 
 class MADDPGTrainer(mava.Trainer):
     """MADDPG trainer.

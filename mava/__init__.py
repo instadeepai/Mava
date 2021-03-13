@@ -2,22 +2,22 @@
 
 # Expose specs and types modules.
 from mava import specs
-from mava import types
+from acme import types
 
 # Make __version__ accessible.
 from mava._metadata import __version__
 
 # Expose core interfaces.
 from mava.core import Executor
+from mava.core import Trainer
 
 # Internal core import.
-from mava.core import Trainer
-from mava.core import Saveable
-from mava.core import VariableSource
-from mava.core import Worker
+from acme.core import Saveable
+from acme.core import VariableSource
+from acme.core import Worker
 
 # Expose the environment loop.
-from mava.environment_loop import EnvironmentLoop
+# from mava.environment_loop import EnvironmentLoop
 
 # Internal environment_loop import.
 

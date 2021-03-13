@@ -16,6 +16,7 @@
 """MADDPG system implementation."""
 
 import copy
+from typing import List, Dict
 
 from acme import datasets
 from acme import specs
@@ -29,7 +30,7 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 
-from mava.system import system
+from mava.systems import system
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
 

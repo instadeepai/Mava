@@ -21,6 +21,7 @@ import numpy as np
 from acme import specs, types
 from pettingzoo.utils.env import AECEnv
 from pettingzoo.utils.env import ParallelEnv
+from pettingzoo.utils.conversions import parallel_wrapper_fn
 
 
 class OLT(NamedTuple):

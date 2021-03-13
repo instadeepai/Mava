@@ -130,3 +130,11 @@ dmypy.json
 
 # vscode
 .vscode
+
+# custom
+Dockerfile
+makefile
+mava/bin
+mava/lib64
+mava/pyvenv.cfg
+mava/share

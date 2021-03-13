@@ -16,23 +16,24 @@
 """Example running MADDPG on pettinzoo MPE environments."""
 
 import importlib
-from typing import Mapping, Sequence, Union
+from typing import Mapping, Sequence, Union, Dict
 
 from absl import app
 from absl import flags
 import acme
 from acme import types
-from acme import wrappers
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
-from pettinzoo.mpe import simple_spread_v2
 import dm_env
 import numpy as np
 import sonnet as snt
 
+from acme.specs import EnvironmentSpec
+
 from mava import specs
 from mava.systems.tf import executors
 from mava.systems.tf import maddpg
+from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
 
 FLAGS = flags.FLAGS
@@ -48,12 +49,13 @@ flags.DEFINE_integer(
 def make_environment(env_name: str = "simple_spread_v2") -> dm_env.Environment:
     """Creates a MPE environment."""
     env_module = importlib.import_module(f"pettingzoo.mpe.{env_name}")
-    environment = env_module.env()
+    env = env_module.parallel_env()
+    environment = PettingZooParallelEnvWrapper(env)
     return environment
 
 
 def make_networks(
-    action_specs: specs.BoundedArray,
+    specs: Dict[str, EnvironmentSpec],
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = False,
@@ -64,20 +66,20 @@ def make_networks(
     """Creates networks used by the agents."""
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
-            key: policy_networks_layer_sizes for key in action_specs.keys()
+            key: policy_networks_layer_sizes for key in specs.keys()
         }
     if isinstance(critic_networks_layer_sizes, Sequence):
         critic_networks_layer_sizes = {
-            key: critic_networks_layer_sizes for key in action_specs.keys()
+            key: critic_networks_layer_sizes for key in specs.keys()
         }
 
     observation_networks = {}
     policy_networks = {}
     critic_networks = {}
-    for key in action_specs.keys():
+    for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
-        num_dimensions = np.prod(action_specs[key].shape, dtype=int)
+        num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
         # Create the shared observation network; here simply a state-less operation.
         observation_network = tf2_utils.batch_concat
@@ -89,7 +91,7 @@ def make_networks(
                     policy_networks_layer_sizes[key], activate_final=True
                 ),
                 networks.NearZeroInitializedLinear(num_dimensions),
-                networks.TanhToSpec(action_specs[key]),
+                networks.TanhToSpec(specs[key].actions),
             ]
         )
 
@@ -120,14 +122,16 @@ def main(_):
     environment = make_environment()
     environment_specs = specs.SystemSpec(environment)
     agents, agent_types = environment_specs.get_agent_info()
-    system_networks = make_networks(environment_specs.spec.actions)
+    system_networks = make_networks(environment_specs.specs)
 
     # Construct the agent.
     system = maddpg.MADDPG(
-        environment_spec=environment_specs.spec,
-        policy_network=system_networks["policies"],
-        critic_network=system_networks["critics"],
-        observation_network=system_networks[
+        agents=agents,
+        agent_types=agent_types,
+        environment_spec=environment_specs.specs,
+        policy_networks=system_networks["policies"],
+        critic_networks=system_networks["critics"],
+        observation_networks=system_networks[
             "observations"
         ],  # pytype: disable=wrong-arg-types
     )
@@ -146,9 +150,9 @@ def main(_):
     )
 
     # Create the evaluation actor and loop.
-    eval_actor = executors.FeedForwardActor(policy_networks=eval_policies)
+    eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
     eval_env = make_environment()
-    eval_loop = acme.EnvironmentLoop(eval_env, eval_actor, label="eval_loop")
+    eval_loop = PettingZooParallelEnvironmentLoop(eval_env, eval_actor, label="eval_loop")
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)

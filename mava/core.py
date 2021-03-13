@@ -18,6 +18,7 @@
 This file specifies and documents the notions of `Executor` and `Trainer` similar to the `Actor` and `Learner` in Acme.
 """
 
+import abc
 import itertools
 from typing import Generic, List, Optional, Sequence, TypeVar, Dict
 
@@ -25,13 +26,11 @@ import acme
 from acme import types
 
 # Internal imports.
-from acme.utils import metrics
 import dm_env
 
 T = TypeVar("T")
 
 
-@metrics.record_class_usage
 class Executor(acme.Actor):
     """Interface for a system that can execute agent policies.
     This interface defines an API for a System to interact with an EnvironmentLoop

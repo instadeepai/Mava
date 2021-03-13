@@ -5,7 +5,7 @@ additional `EnvironmentSpec` class which collects all of the specs for a given
 environment. An `EnvironmentSpec` instance can be created directly or by using
 the `make_environment_spec` helper given a `dm_env.Environment` instance.
 """
-from typing import Any, Dict, NamedTuple
+from typing import Any, Dict, NamedTuple, List
 
 import dm_env
 from acme.specs import EnvironmentSpec
@@ -14,7 +14,7 @@ from acme.specs import EnvironmentSpec
 class SystemSpec:
     def __init__(self, environment: dm_env.Environment):
         self._environment = environment
-        self.spec = self.make_ma_environment_spec()
+        self.specs = self.make_ma_environment_spec()
 
     def make_ma_environment_spec(
         self,
@@ -38,14 +38,14 @@ class SystemSpec:
         specs = {}
         agent_types = list(set([agent.split("_")[0] for agent in self.spec.keys()]))
         for agent_type in agent_types:
-            specs[agent_type] = self._spec[f"{agent_type}_0"]
+            specs[agent_type] = self._specs[f"{agent_type}_0"]
         return specs
 
     def get_agent_types(self) -> List[str]:
-        return list(set([agent.split("_")[0] for agent in self.spec.keys()]))
+        return list(set([agent.split("_")[0] for agent in self.specs.keys()]))
 
     def get_agent_ids(self) -> List[str]:
-        return list(self.spec.keys())
+        return list(self.specs.keys())
 
     def get_agent_info(self) -> List[str]:
         return self.get_agent_ids(), self.get_agent_types()
