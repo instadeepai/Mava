@@ -45,7 +45,7 @@ def _calculate_num_learner_steps(
 
 
 # TODO: NEED TO CHANGE THIS TO MARL
-class System(mava.core.Executor, mava.core.VariableSource):
+class System(mava.core.Executor, acme.core.VariableSource):
     """Agent class which combines acting and learning.
     This provides an implementation of the `Actor` interface which acts and
     learns. It takes as input instances of both `acme.Actor` and `acme.Learner`
@@ -72,7 +72,7 @@ class System(mava.core.Executor, mava.core.VariableSource):
         self._observations_per_step = observations_per_step
         self._num_observations = 0
 
-    def agent_select_action(
+    def select_action(
         self, agent_id: str, observation: types.NestedArray
     ) -> types.NestedArray:
         return self._executor.agent_select_action(agent_id, observation)

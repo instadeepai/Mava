@@ -43,7 +43,7 @@ class FeedForwardExecutor(core.Executor):
         """
 
         # Store these for later use.
-        self._adders = adders
+        self._adder = adder
         self._variable_clients = variable_clients
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights

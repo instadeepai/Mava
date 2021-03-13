@@ -54,8 +54,8 @@ def make_environment(env_name: str = "simple_spread_v2") -> dm_env.Environment:
 
 def make_networks(
     action_specs: specs.BoundedArray,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence],
-    critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence],
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
+    critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = False,
     vmin: float = -150.0,
     vmax: float = 150.0,

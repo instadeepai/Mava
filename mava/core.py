@@ -18,7 +18,6 @@
 This file specifies and documents the notions of `Executor` and `Trainer` similar to the `Actor` and `Learner` in Acme.
 """
 
-import abc
 import itertools
 from typing import Generic, List, Optional, Sequence, TypeVar, Dict
 
@@ -77,6 +76,27 @@ class Executor(acme.Actor):
 # Internal class.
 
 
+class VariableSource(acme.VariableSource):
+    """Abstract source of variables.
+    Objects which implement this interface provide a source of variables, returned
+    as a collection of (nested) numpy arrays. Generally this will be used to
+    provide variables to some learned policy/etc.
+    """
+
+    @abc.abstractmethod
+    def get_variables(
+        self, names: Dict[str, Sequence[str]]
+    ) -> Dict[str, List[types.NestedArray]]:
+        """Return the named variables as a collection of (nested) numpy arrays.
+        Args:
+        names: args where each name is a string identifying a predefined subset of
+            the variables.
+        Returns:
+        A list of (nested) numpy arrays `variables` such that `variables[i]`
+        corresponds to the collection named by `names[i]`.
+        """
+
+
 class Trainer(acme.Learner):
     """Abstract learner object.
     This corresponds to an object which implements a learning loop. A single step
@@ -90,16 +110,3 @@ class Trainer(acme.Learner):
     Data will be read from this dataset asynchronously and this is primarily
     useful when the dataset is filled by an external process.
     """
-
-    @abc.abstractmethod
-    def get_variables(
-        self, names: Dict[str, Sequence[str]]
-    ) -> Dict[str, List[types.NestedArray]]:
-        """Return the named variables as a collection of (nested) numpy arrays.
-        Args:
-          names: args where each name is a string identifying a predefined subset of
-            the variables.
-        Returns:
-          A list of (nested) numpy arrays `variables` such that `variables[i]`
-          corresponds to the collection named by `names[i]`.
-        """

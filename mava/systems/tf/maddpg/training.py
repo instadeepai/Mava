@@ -312,6 +312,13 @@ class MADDPGTrainer(mava.Trainer):
         self._checkpointer.save()
         self._logger.write(fetches)
 
-    # TODO (arnu) change to MARL case
-    def get_variables(self, names: List[str]) -> List[List[np.ndarray]]:
-        return [tf2_utils.to_numpy(self._variables[name]) for name in names]
+    def get_variables(
+        self, names: Dict[str, List[str]]
+    ) -> Dict[str, List[List[np.ndarray]]]:
+        variables = {}
+        for agent in self._agents:
+            variables[agent] = [
+                tf2_utils.to_numpy(self._system_network_variables[agent][name])
+                for name in names[agent]
+            ]
+        return variables
