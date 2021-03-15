@@ -2,7 +2,7 @@
 
 ## Systems and the Executor-Trainer paradigm
 
-At the core of the Mava framework is the *system*. A system refers to a full multi-agent reinforcement learning algorithm and consists of two specific components: an *Executor* and a *Trainer*. 
+At the core of the Mava framework is the *system*. A system refers to a full multi-agent reinforcement learning algorithm and consists of two specific components: an *Executor* and a *Trainer*.
 
 ### Executor
 
@@ -10,7 +10,7 @@ The Executor is the part of the system that interacts with the environment, take
 
 ### Trainer
 
-The Trainer is responsible for taking data collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner in Acme. 
+The Trainer is responsible for taking data collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner in Acme.
 
 
 <p style="text-align:center;">

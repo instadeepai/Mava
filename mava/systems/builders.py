@@ -18,13 +18,9 @@
 import abc
 from typing import Dict, Iterator, List, Optional, Union
 
-from acme import adders
-from acme import core
-from acme import specs
-from acme.utils import counting
-from acme.utils import loggers
 import reverb
-
+from acme import adders, core, specs
+from acme.utils import counting, loggers
 
 NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
 

@@ -16,11 +16,10 @@
 """Install script for setuptools."""
 
 import datetime
-from importlib import util as import_util
 import sys
+from importlib import util as import_util
 
-from setuptools import find_packages
-from setuptools import setup
+from setuptools import find_packages, setup
 
 spec = import_util.spec_from_file_location("_metadata", "mava/_metadata.py")
 _metadata = import_util.module_from_spec(spec)
@@ -48,7 +47,7 @@ testing_requirements = [
 formatting_requirements = ["pre-commit"]
 
 long_description = """Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava builds off of Acme and in a similar way strives to expose simple, efficient, and readable components, as well as examples that serve both as reference implementations of popular algorithms and as strong
-baselines, while still providing enough flexibility to do novel research. 
+baselines, while still providing enough flexibility to do novel research.
 For more information see [github repository](https://github.com/instadeepai/mava)."""
 
 # Get the version from metadata.

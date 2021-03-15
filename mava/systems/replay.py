@@ -15,15 +15,14 @@
 
 """Common tools for reverb replay used for specifically for MARL."""
 
+import dataclasses
 from typing import Any, Callable, Dict, Iterator, Optional
 
-from acme import adders as adders_lib
-from acme import datasets
-from acme import specs
-from acme import types
-from acme.adders import reverb as adders
-import dataclasses
 import reverb
+from acme import adders as adders_lib
+from acme import datasets, specs, types
+from acme.adders import reverb as adders
+
 
 # TODO: CHANGE FUNCTION TO WORK FOR MARL
 @dataclasses.dataclass

@@ -18,9 +18,8 @@
 import abc
 from typing import Dict
 
-from acme import adders
-from acme import types
 import dm_env
+from acme import adders, types
 
 
 class Adder(adders.Adder):
@@ -35,11 +34,11 @@ class Adder(adders.Adder):
     timestep = env.reset()
     adder.add_first(timestep.observation)
     while not timestep.last():
-      # Generate an action from the policy and step the environment.
-      action = my_policy(timestep)
-      timestep = env.step(action)
-      # Add the action and the resulting timestep.
-      adder.add(action, next_timestep=timestep)
+        # Generate an action from the policy and step the environment.
+        action = my_policy(timestep)
+        timestep = env.step(action)
+        # Add the action and the resulting timestep.
+        adder.add(action, next_timestep=timestep)
     ```
     Note that for all adders, the `add()` method expects an action taken and the
     *resulting* timestep observed after taking this action. Note that this

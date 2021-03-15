@@ -20,13 +20,13 @@ This file specifies and documents the notions of `Executor` and `Trainer` simila
 
 import abc
 import itertools
-from typing import Generic, List, Optional, Sequence, TypeVar, Dict
+from typing import Dict, Generic, List, Optional, Sequence, TypeVar
 
 import acme
-from acme import types
 
 # Internal imports.
 import dm_env
+from acme import types
 
 T = TypeVar("T")
 

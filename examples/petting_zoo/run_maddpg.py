@@ -16,25 +16,22 @@
 """Example running MADDPG on pettinzoo MPE environments."""
 
 import importlib
-from typing import Mapping, Sequence, Union, Dict
+from typing import Dict, Mapping, Sequence, Union
 
-from absl import app
-from absl import flags
 import acme
-from acme import types
-from acme.tf import networks
-from acme.tf import utils as tf2_utils
 import dm_env
 import numpy as np
 import sonnet as snt
-
+from absl import app, flags
+from acme import types
 from acme.specs import EnvironmentSpec
+from acme.tf import networks
+from acme.tf import utils as tf2_utils
 
 from mava import specs
-from mava.systems.tf import executors
-from mava.systems.tf import maddpg
-from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
+from mava.systems.tf import executors, maddpg
+from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")

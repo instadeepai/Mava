@@ -1,19 +1,18 @@
 """Generic executor implementations, using TensorFlow and Sonnet."""
 
-from typing import Optional, Tuple, Dict
+from typing import Dict, Optional, Tuple
+
+import dm_env
+import sonnet as snt
+import tensorflow as tf
+import tensorflow_probability as tfp
 from acme import types
 
 # Internal imports.
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
-import dm_env
-import sonnet as snt
-import tensorflow as tf
-import tensorflow_probability as tfp
-
-from mava import core
-from mava import adders
+from mava import adders, core
 
 tfd = tfp.distributions
 

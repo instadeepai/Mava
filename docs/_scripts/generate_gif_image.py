@@ -1,15 +1,15 @@
-import random
-import time
-import numpy as np
 import json
-
-from pettingzoo.test.all_modules import all_environments
-from pettingzoo.classic import gin_rummy_v0
-from PIL import Image
 import os
-import scipy.misc
-import sys
+import random
 import subprocess
+import sys
+import time
+
+import numpy as np
+import scipy.misc
+from pettingzoo.classic import gin_rummy_v0
+from pettingzoo.test.all_modules import all_environments
+from PIL import Image
 
 
 def generate_data(nameline, module):

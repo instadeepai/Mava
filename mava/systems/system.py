@@ -15,16 +15,16 @@
 
 """The base system interface."""
 
-from typing import List, Dict
+from typing import Dict, List
 
-import mava
 import acme
-from acme import types
-
-# Internal imports.
-
 import dm_env
 import numpy as np
+from acme import types
+
+import mava
+
+# Internal imports.
 
 
 def _calculate_num_learner_steps(
