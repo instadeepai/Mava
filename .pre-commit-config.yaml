@@ -2,7 +2,7 @@
 # Pre-commit hooks for repo.
 
 # Packages:
-#   pre-commit: General pre-commits for formatting. 
+#   pre-commit: General pre-commits for formatting.
 #   black: Python code strict formatting.
 #   pyupgrade:  Upgrade syntax for newer versions of the language.
 #   isort: Sorts imports.

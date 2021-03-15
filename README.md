@@ -93,8 +93,8 @@ If you use Mava in your work, please cite the accompanying
 ```bibtex
 @article{pretorius2021mava,
     title={Mava: A Research Framework for Multi-Agent Reinforcement Learning},
-    author={Arnu Pretorius and Kale-ab Tessera and Siphelele Danisa and Kevin Eloff
-    and Claude Formanek and St John Grimbly and Jonathan Shock and Herman Kamper
+    author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Siphelele Danisa and Kevin Eloff
+    and Claude Formanek and St John Grimbly and Lawrence Francis and Jonathan Shock and Herman Kamper
     and Herman Engelbrecht and Alexandre Laterre and Karim Beguir},
     year={2021},
     journal={arXiv preprint},
