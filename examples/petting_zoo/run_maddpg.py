@@ -152,7 +152,9 @@ def main(_):
     # Create the evaluation actor and loop.
     eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
     eval_env = make_environment()
-    eval_loop = PettingZooParallelEnvironmentLoop(eval_env, eval_actor, label="eval_loop")
+    eval_loop = PettingZooParallelEnvironmentLoop(
+        eval_env, eval_actor, label="eval_loop"
+    )
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)

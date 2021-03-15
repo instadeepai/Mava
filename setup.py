@@ -22,33 +22,32 @@ import sys
 from setuptools import find_packages
 from setuptools import setup
 
-spec = import_util.spec_from_file_location('_metadata', 'mava/_metadata.py')
+spec = import_util.spec_from_file_location("_metadata", "mava/_metadata.py")
 _metadata = import_util.module_from_spec(spec)
 spec.loader.exec_module(_metadata)
 
 reverb_requirements = [
-    'dm-reverb',
-    'tensorflow>=2.4.0',
+    "dm-reverb",
+    "tensorflow>=2.4.0",
 ]
 
 tf_requirements = [
-    'tensorflow>=2.4.0',
-    'tensorflow_probability',
-    'dm-sonnet',
-    'trfl',
+    "tensorflow>=2.4.0",
+    "tensorflow_probability",
+    "dm-sonnet",
+    "trfl",
 ]
 
-env_requirements = [
-    'pettingzoo'
-]
+env_requirements = ["pettingzoo"]
 
 testing_requirements = [
-    'pytype',
-    'pytest-xdist',
+    "pytype",
+    "pytest-xdist",
 ]
 
-long_description = \
-"""Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava builds off of Acme and in a similar way strives to expose simple, efficient, and readable components, as well as examples that serve both as reference implementations of popular algorithms and as strong
+formatting_requirements = ["pre-commit"]
+
+long_description = """Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava builds off of Acme and in a similar way strives to expose simple, efficient, and readable components, as well as examples that serve both as reference implementations of popular algorithms and as strong
 baselines, while still providing enough flexibility to do novel research. 
 For more information see [github repository](https://github.com/instadeepai/mava)."""
 
@@ -56,42 +55,43 @@ For more information see [github repository](https://github.com/instadeepai/mava
 version = _metadata.__version__
 
 # If we're releasing a nightly/dev version append to the version string.
-if '--nightly' in sys.argv:
-  sys.argv.remove('--nightly')
-  version += '.dev' + datetime.datetime.now().strftime('%Y%m%d')
+if "--nightly" in sys.argv:
+    sys.argv.remove("--nightly")
+    version += ".dev" + datetime.datetime.now().strftime("%Y%m%d")
 
 setup(
-    name='id-mava',
+    name="id-mava",
     version=version,
-    description='A Python library for Multi-Agent Reinforcement Learning.',
+    description="A Python library for Multi-Agent Reinforcement Learning.",
     long_description=long_description,
-    long_description_content_type='text/markdown',
-    author='InstaDeep',
-    license='Apache License, Version 2.0',
-    keywords='multi-agent reinforcement-learning python machine learning',
+    long_description_content_type="text/markdown",
+    author="InstaDeep",
+    license="Apache License, Version 2.0",
+    keywords="multi-agent reinforcement-learning python machine learning",
     packages=find_packages(),
     install_requires=[
-        'absl-py',
-        'dm_env',
-        'dm-tree',
-        'numpy',
-        'pillow',
+        "absl-py",
+        "dm_env",
+        "dm-tree",
+        "numpy",
+        "pillow",
     ],
     extras_require={
-        'tf': tf_requirements,
-        'envs': env_requirements,
-        'reverb': reverb_requirements,
-        'testing': testing_requirements,
+        "tf": tf_requirements,
+        "envs": env_requirements,
+        "reverb": reverb_requirements,
+        "testing": testing_requirements,
+        "format": formatting_requirements,
     },
     classifiers=[
-        'Development Status :: 3 - Alpha',
-        'Environment :: Console',
-        'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: Apache Software License',
-        'Operating System :: POSIX :: Linux',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+        "Development Status :: 3 - Alpha",
+        "Environment :: Console",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: Apache Software License",
+        "Operating System :: POSIX :: Linux",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
 )
