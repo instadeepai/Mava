@@ -57,13 +57,19 @@ We have tested `mava` on Python 3.6 & 3.7.
     pip install --upgrade pip setuptools
     ```
 
-1.  To install the core libraries (including [Reverb], our storage backend):
+2.  To install the core libraries (including [Reverb], our storage backend):
 
     ```bash
     pip install id-mava
     ```
 
-1.  To install Acme dependencies for [TensorFlow]-based Acme agents:
+    or install from source (from root directory):
+    ```bash
+    pip install .
+    ```
+
+
+3.  To install Acme dependencies for [TensorFlow]-based Acme agents:
 
     ```bash
     pip install dm-acme
@@ -71,7 +77,7 @@ We have tested `mava` on Python 3.6 & 3.7.
     pip install dm-acme[tf]
     ```
 
-1.  Finally, to install a few example environments (including [pettingzoo],
+4.  Finally, to install a few example environments (including [pettingzoo],
     [openspiel], and [flatland]):
 
     ```bash
