@@ -18,7 +18,6 @@
 import importlib
 from typing import Dict, Mapping, Sequence, Union
 
-import acme
 import dm_env
 import numpy as np
 import sonnet as snt
@@ -46,7 +45,7 @@ flags.DEFINE_integer(
 def make_environment(env_name: str = "simple_spread_v2") -> dm_env.Environment:
     """Creates a MPE environment."""
     env_module = importlib.import_module(f"pettingzoo.mpe.{env_name}")
-    env = env_module.parallel_env()
+    env = env_module.parallel_env()  # type: ignore
     environment = PettingZooParallelEnvWrapper(env)
     return environment
 

@@ -15,12 +15,12 @@
 
 
 """Core Mava interfaces.
-This file specifies and documents the notions of `Executor` and `Trainer` similar to the `Actor` and `Learner` in Acme.
+This file specifies and documents the notions of `Executor` and `Trainer`
+similar to the `Actor` and `Learner` in Acme.
 """
 
 import abc
-import itertools
-from typing import Dict, Generic, List, Optional, Sequence, TypeVar
+from typing import Dict, List, Sequence, TypeVar
 
 import acme
 
