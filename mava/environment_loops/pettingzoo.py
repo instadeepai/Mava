@@ -17,7 +17,7 @@
 """A multi-agent/environment training loop for Petting Zoo."""
 import operator
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import acme
 import dm_env
@@ -174,10 +174,6 @@ class PettingZooAECEnvironmentLoop(acme.core.Worker):
             step_count += result["episode_length"]
             # Log the given results.
             self._logger.write(result)
-
-
-def _generate_zeros_from_spec(spec: specs.Array) -> np.ndarray:
-    return np.zeros(spec.shape, spec.dtype)
 
 
 class PettingZooParallelEnvironmentLoop(acme.core.Worker):

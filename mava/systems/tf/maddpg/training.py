@@ -19,14 +19,11 @@
 import time
 from typing import Dict, List
 
-import acme
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tree
 import trfl
-from acme import types
-from acme.tf import losses
 from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
@@ -226,7 +223,6 @@ class MADDPGTrainer(mava.Trainer):
                 s_tm1, s_t = self._transform_observations(s_tm1, s_t)
                 a_t = self._policy_actions(s_t)
 
-                o_tm1_feed = s_tm1[agent]
                 o_t_feed = s_t[agent]
                 s_tm1_feed = np.concatenate(s_tm1.values(), 1)
                 s_t_feed = np.concatenate(s_t.values(), 1)

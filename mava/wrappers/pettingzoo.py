@@ -19,7 +19,6 @@ from typing import Any, Dict, NamedTuple, Union
 import dm_env
 import numpy as np
 from acme import specs, types
-from pettingzoo.utils.conversions import parallel_wrapper_fn
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 
@@ -166,7 +165,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         self._reset_next_step = False
         self._discount = None  # Not used in pettingzoo
         observe = self._environment.reset()
-        observations = self._convert_observations(observations)
+        observations = self._convert_observations(observe)
         return dm_env.restart(observations)
 
     def step(self, actions: int) -> dm_env.TimeStep:
@@ -204,7 +203,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
     # Convert PettingZoo observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
     def _convert_observations(self, observes: Dict[str, np.ndarray]) -> Dict[str, OLT]:
-        observations = {}
+        observations: Dict[str, OLT] = {}
         for agent, observation in observes.items():
             if isinstance(observation, dict) and "action_mask" in observation:
                 observation = observation["observation"]

@@ -36,8 +36,8 @@ class MADDPG(system.System):
     """MADDPG system.
     This implements a single-process DDPG system. This is an actor-critic based
     system that generates data via a behavior policy, inserts N-step transitions into
-    a replay buffer, and periodically updates the policies of each agent (and as a result the
-    behavior) by sampling uniformly from this buffer.
+    a replay buffer, and periodically updates the policies of each agent
+    (and as a result the behavior) by sampling uniformly from this buffer.
     """
 
     def __init__(
@@ -47,7 +47,7 @@ class MADDPG(system.System):
         environment_spec: specs.EnvironmentSpec,
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module] = None,
+        observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -93,6 +93,11 @@ class MADDPG(system.System):
         target_critic_networks = {}
         target_observation_networks = {}
 
+        create_observation_networks = False
+        if observation_networks is None:
+            observation_networks = {}
+            create_observation_networks = True
+
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
         replay_table = reverb.Table(
@@ -127,7 +132,7 @@ class MADDPG(system.System):
         for agent_key in agent_keys:
 
             # Make sure observation network is a Sonnet Module.
-            if observation_networks is None:
+            if create_observation_networks:
                 observation_network: types.TensorTransformation = tf.identity
                 observation_network = tf2_utils.to_sonnet_module(observation_network)
                 observation_networks[agent_key] = observation_network
@@ -135,7 +140,9 @@ class MADDPG(system.System):
             # Get observation and action specs.
             act_spec = environment_spec[agent_key].actions
             obs_spec = environment_spec[agent_key].observations
-            emb_spec = tf2_utils.create_variables(observation_network, [obs_spec])
+            emb_spec = tf2_utils.create_variables(
+                observation_networks[agent_key], [obs_spec]
+            )
 
             # Create target networks.
             target_policy_network = copy.deepcopy(policy_networks[agent_key])
@@ -155,6 +162,7 @@ class MADDPG(system.System):
                     networks.ClipToSpec(act_spec),
                 ]
             )
+            behavior_networks[agent_key] = behavior_network
 
             # Create variables.
             tf2_utils.create_variables(policy_networks[agent_key], [emb_spec])
@@ -164,7 +172,7 @@ class MADDPG(system.System):
             tf2_utils.create_variables(target_observation_network, [obs_spec])
 
         # Create the actor which defines how we take actions.
-        executor = executors.FeedForwardActor(
+        executor = executors.FeedForwardExecutor(
             policy_networks=behavior_networks,
             shared_weights=shared_weights,
             adder=adder,
@@ -176,7 +184,7 @@ class MADDPG(system.System):
 
         # The learner updates the parameters (and initializes them).
         trainer = training.MADDPGTrainer(
-            agent=agents,
+            agents=agents,
             agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,

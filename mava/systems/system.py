@@ -15,11 +15,10 @@
 
 """The base system interface."""
 
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
 import acme
 import dm_env
-import numpy as np
 from acme import types
 
 import mava
@@ -74,36 +73,9 @@ class System(mava.core.Executor, acme.core.VariableSource):
     def select_action(
         self, agent_id: str, observation: types.NestedArray
     ) -> types.NestedArray:
-        return self._executor.agent_select_action(agent_id, observation)
+        return self._executor.select_action(agent_id, observation)
 
-    def agent_observe_first(self, agent_id: str, timestep: dm_env.TimeStep):
-        self._executor.agent_observe_first(agent_id, timestep)
-
-    def agent_observe(
-        self, agent_id: str, action: types.NestedArray, next_timestep: dm_env.TimeStep
-    ):
-        self._num_observations += 1
-        self._executor.observe(agent_id, action, next_timestep)
-
-    def agent_update(self, agent_id: str):
-        num_steps = _calculate_num_learner_steps(
-            num_observations=self._num_observations,
-            min_observations=self._min_observations,
-            observations_per_step=self._observations_per_step,
-        )
-        for _ in range(num_steps):
-            # Run learner steps (usually means gradient steps).
-            self._trainer.agent_step(agent_id)
-        if num_steps > 0:
-            # Update the actor weights when learner updates.
-            self._executor.agent_update(agent_id)
-
-    def agent_get_variables(
-        self, agent_id: str, names: List[str]
-    ) -> List[List[np.ndarray]]:
-        return self._trainer.agent_get_variables(agent_id, names)
-
-    # TODO(arnu) finish there functions for the multi-agent case
+    # TODO(arnu) finish these functions for the multi-agent case
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Dict[str, types.NestedArray]:
@@ -115,9 +87,11 @@ class System(mava.core.Executor, acme.core.VariableSource):
     def observe_first(self, timestep: dm_env.TimeStep):
         self._executor.observe_first(timestep)
 
-    def observe(self, action: types.NestedArray, next_timestep: dm_env.TimeStep):
+    def observe(
+        self, actions: Dict[str, types.NestedArray], next_timestep: dm_env.TimeStep
+    ):
         self._num_observations += 1
-        self._actor.observe(action, next_timestep)
+        self._executor.observe(actions, next_timestep)
 
     def update(self):
         num_steps = _calculate_num_learner_steps(
@@ -127,13 +101,15 @@ class System(mava.core.Executor, acme.core.VariableSource):
         )
         for _ in range(num_steps):
             # Run learner steps (usually means gradient steps).
-            self._learner.step()
+            self._trainer.step()
         if num_steps > 0:
             # Update the actor weights when learner updates.
-            self._actor.update()
+            self._executor.update()
 
-    def get_variables(self, names: List[str]) -> List[List[np.ndarray]]:
-        return self._learner.get_variables(names)
+    def get_variables(
+        self, names: Dict[str, Sequence[str]]
+    ) -> Dict[str, List[types.NestedArray]]:
+        return self._trainer.get_variables(names)
 
 
 # Internal class.

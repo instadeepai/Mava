@@ -54,8 +54,10 @@ class Adder(adders.Adder):
     ):
         """Defines the adder `add` interface.
         Args:
-          actions: Dictionary of a possibly nested structure corresponding to a_t for each agent.
+          actions: Dictionary of a possibly nested structure corresponding to
+            a_t for each agent.
           next_timestep: A dm_env Timestep object corresponding to the resulting
             data obtained by taking the given action.
-          extras: Dictionary of a possibly nested structure of extra data to add to replay.
+          extras: Dictionary of a possibly nested structure of extra data to add
+            to replay.
         """
