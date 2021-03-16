@@ -37,7 +37,7 @@ pip install .[testing]
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
 # Run static type-checking.
-pytype -j "${N_CPU}" mava
+mypy mava
 
 # Run all tests.
 pytest -n "${N_CPU}" mava
