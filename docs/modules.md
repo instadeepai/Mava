@@ -1,6 +1,6 @@
-## Classic Environments
+## Modules
 
-The unique dependencies for this set of environments can be installed via:
+<!-- The unique dependencies for this set of environments can be installed via:
 
 ````bash
 pip install pettingzoo[classic]
@@ -24,4 +24,4 @@ Many of the classic environments are based on [RLCard](https://github.com/dataml
   journal={arXiv preprint arXiv:1910.04376},
   year={2019}
 }
-```
+``` -->

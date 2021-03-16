@@ -1,7 +1,7 @@
 header:
     title: Mava
     text: A framework for multi-agent reinforcement learning
-    headerGif: /logos/mava.gif
+    headerGif: /images/mava.gif
     buttons:
       - button: Overview
         buttonlink: /overview
@@ -29,33 +29,27 @@ timeline:
     title: "Components"
     section: timeline
     rows:
-      - - title: "Systems"
-          desc: "Multi-player Atari 2600 games (both cooperative and competitive)"
-          image: /systems/atari_space_invaders.gif
+      - - title: "Architectures"
+          desc: "Information architectures for centralised and networked training."
+          image: /images/architectures.png
           alt:
           align: left
           link: systems
-        - title: "Agents"
-          desc: "Cooperative graphical games developed by us, requiring a high degree of coordination"
-          image: /agents/butterfly_pistonball.gif
-          alt:
-          align: left
-          link: agents
         - title: "Modules"
-          desc: "Classical games including card games, board games, etc."
-          image: /modules/classic_chess.gif
+          desc: "Modules for agent interaction: attention, communication and mixing."
+          image: /images/modules.png
           alt:
           align: left
           link: modules
       - - title: "Networks"
-          desc: "Configurable environments with massive numbers of particle agents"
-          image: /networks/magent_adversarial_pursuit.gif
+          desc: "Specific neural network implementations for multi-agent RL."
+          image: /images/networks.png
           alt:
           align: left
           link: networks
         - title: "losses"
-          desc: "A set of simple nongraphical communication tasks originally from"
-          image: /losses/mpe_simple_world_comm.gif
+          desc: "A set of loss functions specific to multi-agent RL."
+          image: /images/losses.png
           url: "https://github.com/openai/multiagent-particle-envs"
           alt:
           align: left
