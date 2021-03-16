@@ -10,7 +10,7 @@
   <meta name="author" content="Your Name">
   <link rel="canonical" href="http://localhost:4000/networks.html">
 
-  <title>MAgent environments | Mava</title>
+  <title>Networks | Mava</title>
 
   <!-- Bootstrap core CSS -->
   <link href="/assets/css/bootstrap.min.css" rel="stylesheet">
@@ -48,7 +48,7 @@
     <div class="collapse navbar-collapse" id="navbarResponsive">
       <ul class="navbar-nav text-uppercase ml-auto"><li class="nav-item"><a class="nav-link js-scroll-trigger" href="/overview">Overview</a></li>
         <li class="nav-item"><a class="nav-link js-scroll-trigger" href="/envs">Components</a></li>
-        <li class="nav-item"><a class="nav-link js-scroll-trigger" href="https://github.com/instadeepai/mava">Github</a></li>
+        <li class="nav-item"><a class="nav-link js-scroll-trigger" href="https://github.com/arnupretorius/mava">Github</a></li>
 
       </ul>
     </div>
@@ -56,16 +56,14 @@
 </nav>
 <!-- End Navigation -->
 
+
 <header></header>
 
 <section class="page-section">
   <div class="docnavcontainer">
     <div class="row environment-bar">
       <div class="col docnavi">
-        <a href="/systems"> Systems</a>
-      </div>
-      <div class="col docnavi">
-        <a href="/agents"> Agents</a>
+        <a href="/architectures"> Architectures</a>
       </div>
       <div class="col docnavi">
         <a href="/modules"> Modules</a>
@@ -80,53 +78,48 @@
   </div>
 </section>
 
+
 <div class="doccontainer container" id="pagecontainer">
   <div class="markdown-body">
 
-<h2 id="magent-environments">MAgent environments</h2>
+<h2 id="networks">Networks</h2>
 
-<p>The unique dependencies for this set of environments can be installed via:</p>
+<!-- The unique dependencies for this set of environments can be installed via:
 
-<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pip <span class="nb">install </span>pettingzoo[magent]
-</code></pre></div></div>
+````bash
+pip install pettingzoo[magent]
+````
 
-<p>MAgent is a set of environments where large numbers of pixel agents in a gridworld interact in battles or other competitive scenarios. These environments were originally derived from the <a href="https://github.com/geek-ai/MAgent">MAgent</a> codebase.</p>
+MAgent is a set of environments where large numbers of pixel agents in a gridworld interact in battles or other competitive scenarios. These environments were originally derived from the [MAgent](https://github.com/geek-ai/MAgent) codebase.
 
-<h3 id="types-of-environments">Types of Environments</h3>
+### Types of Environments
 
-<p>All environments, except Gather, are competitive team games where agents in each team must cooperate to defeat the other team. Note that reward is allocated entirely individually.</p>
+All environments, except Gather, are competitive team games where agents in each team must cooperate to defeat the other team. Note that reward is allocated entirely individually.
 
-<p>Gather is a competitive free for all game where agents try to stay alive for as long as possible, either by gathering food or killing other agents.</p>
+Gather is a competitive free for all game where agents try to stay alive for as long as possible, either by gathering food or killing other agents.
 
-<h3 id="key-concepts">Key Concepts</h3>
+### Key Concepts
 
-<ul>
-  <li>
-    <p><strong>Observation view</strong>: All agents observe a box around themselves. They see whether the coordinates are empty, contain an obstacle, or contain an agent in any of the observation channels. If an agent in on a coordinate, that entry will contain the value (agent’s HP / max agent HP).</p>
-  </li>
-  <li>
-    <p><strong>Feature vector</strong>: The feature vector contains information about the agent itself, rather than its surrounding. In normal mode it contains <code class="language-plaintext highlighter-rouge">&lt;agent_id, action, last_reward&gt;</code>, in minimap mode it also contains the agent position on the map, normalized to 0-1.</p>
-  </li>
-  <li>
-    <p><strong>Observation</strong>: The observation is 3D observation view concatenated with the 1D feature vector by repeating the value of the feature across an entire image channel.</p>
-  </li>
-  <li>
-    <p><strong>Minimap mode</strong>: For most of the games (Battle, Battlefield, Combined Arms, Gather), the agents have access to additional global information: two density maps of the teams’ respective presences on the map that are binned and concatenated onto the agent’s observation view (concatenated in the channel dimension, axis=2). Their own absolute positions on the global map is appended to the feature vector. This feature can be turned on or off with the <code class="language-plaintext highlighter-rouge">minimap_mode</code> environment argument.</p>
-  </li>
-  <li>
-    <p><strong>Moving and attacking</strong>: An agent can only act or move each step, so the action space is the concatenations of all possible moves and all possible attacks.</p>
-  </li>
-</ul>
+* **Observation view**: All agents observe a box around themselves. They see whether the coordinates are empty, contain an obstacle, or contain an agent in any of the observation channels. If an agent in on a coordinate, that entry will contain the value (agent's HP / max agent HP).
 
-<h3 id="termination">Termination</h3>
+* **Feature vector**: The feature vector contains information about the agent itself, rather than its surrounding. In normal mode it contains `<agent_id, action, last_reward>`, in minimap mode it also contains the agent position on the map, normalized to 0-1.
 
-<p>The game terminates after all agents of either team have died. This means that in the battle environments, where HP heals over time instead of decays, the game will go on for a very long time with random actions.</p>
+* **Observation**: The observation is 3D observation view concatenated with the 1D feature vector by repeating the value of the feature across an entire image channel.
 
-<h3 id="citation">Citation</h3>
+* **Minimap mode**: For most of the games (Battle, Battlefield, Combined Arms, Gather), the agents have access to additional global information: two density maps of the teams' respective presences on the map that are binned and concatenated onto the agent's observation view (concatenated in the channel dimension, axis=2). Their own absolute positions on the global map is appended to the feature vector. This feature can be turned on or off with the `minimap_mode` environment argument.
 
-<p>The MAgent environments were originally created for the following work:</p>
+* **Moving and attacking**: An agent can only act or move each step, so the action space is the concatenations of all possible moves and all possible attacks.
 
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>@article{DBLP:journals/corr/abs-1712-00600,
+### Termination
+
+The game terminates after all agents of either team have died. This means that in the battle environments, where HP heals over time instead of decays, the game will go on for a very long time with random actions.
+
+### Citation
+
+The MAgent environments were originally created for the following work:
+
+```
+@article{DBLP:journals/corr/abs-1712-00600,
   author    = {Lianmin Zheng and
                Jiacheng Yang and
                Han Cai and
@@ -145,12 +138,13 @@
   biburl    = {https://dblp.org/rec/journals/corr/abs-1712-00600.bib},
   bibsource = {dblp computer science bibliography, https://dblp.org}
 }
-</code></pre></div></div>
+```
 
-<p>Please cite this paper if you use these environments in your research.</p>
+Please cite this paper if you use these environments in your research. -->
 
   </div>
 </div>
+
 
 	    <!-- Footer -->
   <footer class="footer" id="footer" style="background-color:white;">
@@ -166,6 +160,7 @@
   </footer>
 
   <!-- End Footer -->
+
 
 
 	  <!-- Bootstrap core JavaScript -->

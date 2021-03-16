@@ -14,7 +14,7 @@ The Trainer is responsible for taking data collected from the executor and updat
 
 
 <p style="text-align:center;">
-<img src="logos/mava_distributed_training.png" style="max-width:60%;">
+<img src="images/mava_distributed_training.png" style="max-width:60%;">
 </p>
 
 <!-- Using environments in PettingZoo is very similar to using them in OpenAI's Gym. You initialize an environment via:

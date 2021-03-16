@@ -1,6 +1,6 @@
-## MPE environments
+## Losses
 
-The unique dependencies for this set of environments can be installed via:
+<!-- The unique dependencies for this set of environments can be installed via:
 
 ````bash
 pip install pettingzoo[mpe]
@@ -70,4 +70,4 @@ But were first released as a part of this work:
 }
 ```
 
-Please cite one or both of these if you use these environments in your research.
+Please cite one or both of these if you use these environments in your research. -->
