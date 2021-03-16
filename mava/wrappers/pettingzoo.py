@@ -19,9 +19,8 @@ from typing import Any, Dict, NamedTuple, Union
 import dm_env
 import numpy as np
 from acme import specs, types
-from pettingzoo.utils.env import AECEnv
-from pettingzoo.utils.env import ParallelEnv
 from pettingzoo.utils.conversions import parallel_wrapper_fn
+from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 
 class OLT(NamedTuple):

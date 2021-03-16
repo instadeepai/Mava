@@ -15,4 +15,3 @@ Use this area to describe your project. Lorem ipsum dolor sit amet, consectetur 
 - Date: January 2017
 - Client: Explore
 - Category: Graphic Design
-

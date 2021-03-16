@@ -15,20 +15,22 @@
 
 
 """A multi-agent/environment training loop for Petting Zoo."""
-from typing import Any, Dict, Optional
-
-import dm_env
-import numpy as np
 import operator
 import time
+from typing import Any, Dict, Optional
+
+import acme
+import dm_env
+import numpy as np
 import tree
 from acme.utils import counting, loggers
 from dm_env import specs
 
-import acme
 import mava
-from mava.wrappers.pettingzoo import PettingZooAECEnvWrapper
-from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+from mava.wrappers.pettingzoo import (
+    PettingZooAECEnvWrapper,
+    PettingZooParallelEnvWrapper,
+)
 
 
 class PettingZooAECEnvironmentLoop(acme.core.Worker):

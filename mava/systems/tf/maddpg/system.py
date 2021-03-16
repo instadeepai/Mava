@@ -16,19 +16,16 @@
 """MADDPG system implementation."""
 
 import copy
-from typing import List, Dict
+from typing import Dict, List
 
-from acme import datasets
-from acme import specs
-from acme import types
-from acme.adders import reverb as adders
-from acme.tf import networks
-from acme.tf import utils as tf2_utils
-from acme.utils import counting
-from acme.utils import loggers
 import reverb
 import sonnet as snt
 import tensorflow as tf
+from acme import datasets, specs, types
+from acme.adders import reverb as adders
+from acme.tf import networks
+from acme.tf import utils as tf2_utils
+from acme.utils import counting, loggers
 
 from mava.systems import system
 from mava.systems.tf import executors

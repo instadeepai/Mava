@@ -17,20 +17,19 @@
 """MADDPG trainer implementation."""
 
 import time
-from typing import List, Dict
+from typing import Dict, List
 
 import acme
-from acme import types
-from acme.tf import losses
-from acme.tf import savers as tf2_savers
-from acme.tf import utils as tf2_utils
-from acme.utils import counting
-from acme.utils import loggers
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tree
 import trfl
+from acme import types
+from acme.tf import losses
+from acme.tf import savers as tf2_savers
+from acme.tf import utils as tf2_utils
+from acme.utils import counting, loggers
 
 import mava
 

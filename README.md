@@ -12,7 +12,7 @@
 ![pytest](https://github.com/arnupretorius/mava/workflows/pytest/badge.svg)
 
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava builds off of Acme and in a similar way strives to expose simple, efficient, and readable components, as well as examples that serve both as reference implementations of popular algorithms and as strong
-baselines, while still providing enough flexibility to do novel research. 
+baselines, while still providing enough flexibility to do novel research.
 
 
 ## Overview
@@ -31,7 +31,7 @@ environment and and each agent learns from this interaction. This assumes a `sys
 (implementations of which you can find [here][Systems]) and a multi-agent `environment`
 instance which implements the [DeepMind Environment API][dm_env]. Each
 individual system also includes a `README.md` file describing the implementation
-in more detail. 
+in more detail.
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a
@@ -57,13 +57,19 @@ We have tested `mava` on Python 3.6 & 3.7.
     pip install --upgrade pip setuptools
     ```
 
-1.  To install the core libraries (including [Reverb], our storage backend):
+2.  To install the core libraries (including [Reverb], our storage backend):
 
     ```bash
     pip install id-mava
     ```
 
-1.  To install Acme dependencies for [TensorFlow]-based Acme agents:
+    or install from source (from root directory):
+    ```bash
+    pip install .
+    ```
+
+
+3.  To install Acme dependencies for [TensorFlow]-based Acme agents:
 
     ```bash
     pip install dm-acme
@@ -71,13 +77,13 @@ We have tested `mava` on Python 3.6 & 3.7.
     pip install dm-acme[tf]
     ```
 
-1.  Finally, to install a few example environments (including [pettingzoo],
+4.  Finally, to install a few example environments (including [pettingzoo],
     [openspiel], and [flatland]):
 
     ```bash
     pip install dm-mava[envs]
     ```
-    
+
 
 ## Citing Mava
 
@@ -87,8 +93,8 @@ If you use Mava in your work, please cite the accompanying
 ```bibtex
 @article{pretorius2021mava,
     title={Mava: A Research Framework for Multi-Agent Reinforcement Learning},
-    author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Siphelele Danisa and Kevin Eloff 
-    and Claude Formanek and St John Grimbly and Lawrence Francis and Jonathan Shock and Herman Kamper 
+    author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Siphelele Danisa and Kevin Eloff
+    and Claude Formanek and St John Grimbly and Lawrence Francis and Jonathan Shock and Herman Kamper
     and Herman Engelbrecht and Alexandre Laterre and Karim Beguir},
     year={2021},
     journal={arXiv preprint},
