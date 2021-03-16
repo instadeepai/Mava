@@ -1,4 +1,4 @@
-<img src="docs/logos/mava.png" width="50%">
+<img src="docs/images/mava.png" width="20%">
 
 # Mava: a research framework for multi-agent reinforcement learning
 
