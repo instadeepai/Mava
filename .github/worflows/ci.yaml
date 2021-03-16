@@ -22,11 +22,11 @@ jobs:
         pip install .[jax]
         pip install .[tf]
         pip install .[envs]
-        pip install .[testing]
+        pip install .[testing_formatting]
         pip install gym[atari]
-    - name: Check types with pytype
+    - name: Check types with mypy
       run: |
-        pytype -j "$(grep -c ^processor /proc/cpuinfo)" mava
+        mypy mava
     - name: Test with pytest
       run: |
         pytest -n "$(grep -c ^processor /proc/cpuinfo)" mava

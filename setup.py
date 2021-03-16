@@ -39,12 +39,7 @@ tf_requirements = [
 
 env_requirements = ["pettingzoo"]
 
-testing_requirements = [
-    "pytype",
-    "pytest-xdist",
-]
-
-formatting_requirements = ["pre-commit"]
+testing_formatting_requirements = ["pre-commit", "mypy", "pytest-xdist"]
 
 long_description = """Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava builds off of Acme and in a similar way strives to expose simple, efficient, and readable components, as well as examples that serve both as reference implementations of popular algorithms and as strong
 baselines, while still providing enough flexibility to do novel research.
@@ -79,8 +74,7 @@ setup(
         "tf": tf_requirements,
         "envs": env_requirements,
         "reverb": reverb_requirements,
-        "testing": testing_requirements,
-        "format": formatting_requirements,
+        "testing_formatting": testing_formatting_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
