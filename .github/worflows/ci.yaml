@@ -1,6 +1,10 @@
 name: pytest
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   test-ubuntu:
@@ -24,6 +28,14 @@ jobs:
         pip install .[envs]
         pip install .[testing_formatting]
         pip install gym[atari]
+    - name: Format code
+      run: | 
+        # Check code follows black formatting. 
+        black --check mava
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 mava --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 mava --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Check types with mypy
       run: |
         mypy mava
