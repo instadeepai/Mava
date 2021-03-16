@@ -1,7 +1,7 @@
 
-## MAgent environments
+## Networks
 
-The unique dependencies for this set of environments can be installed via:
+<!-- The unique dependencies for this set of environments can be installed via:
 
 ````bash
 pip install pettingzoo[magent]
@@ -57,4 +57,4 @@ The MAgent environments were originally created for the following work:
 }
 ```
 
-Please cite this paper if you use these environments in your research.
+Please cite this paper if you use these environments in your research. -->

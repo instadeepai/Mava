@@ -19,16 +19,15 @@ import operator
 import time
 from typing import Optional
 
+import dm_env
+import numpy as np
+import tree
 from acme import core
 
 # Internal imports.
-from acme.utils import counting
-from acme.utils import loggers
-
-import dm_env
+from acme.utils import counting, loggers
 from dm_env import specs
-import numpy as np
-import tree
+
 
 # TODO: NEED TO CHANGE THIS TO MARL
 class EnvironmentLoop(core.Worker):

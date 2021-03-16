@@ -1,19 +1,18 @@
 """Generic executor implementations, using TensorFlow and Sonnet."""
 
-from typing import Optional, Tuple, Dict
+from typing import Dict, Optional
+
+import dm_env
+import sonnet as snt
+import tensorflow as tf
+import tensorflow_probability as tfp
 from acme import types
 
 # Internal imports.
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
-import dm_env
-import sonnet as snt
-import tensorflow as tf
-import tensorflow_probability as tfp
-
-from mava import core
-from mava import adders
+from mava import adders, core
 
 tfd = tfp.distributions
 
@@ -47,7 +46,8 @@ class FeedForwardExecutor(core.Executor):
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights
 
-    # TODO (Arnu) make it so that if weight_sharing is true it uses agent type, otherwise it uses agent id.
+    # TODO (Arnu) make it so that if weight_sharing is true it uses agent
+    # type, otherwise it uses agent id.
     @tf.function
     def _policy(
         self, agent: str, observation: types.NestedTensor
@@ -76,7 +76,7 @@ class FeedForwardExecutor(core.Executor):
         return tf2_utils.to_numpy_squeeze(action)
 
     def observe_first(self, timestep: dm_env.TimeStep):
-        if self._adders:
+        if self._adder:
             self._adder.add_first(timestep)
 
     def observe(
@@ -98,7 +98,7 @@ class FeedForwardExecutor(core.Executor):
         return actions
 
     def update(self, wait: bool = False):
-        if self._variable_client:
+        if self._variable_clients:
             for client in self._variable_clients.values():
                 client.update(wait)
 

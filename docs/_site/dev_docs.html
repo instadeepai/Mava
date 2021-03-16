@@ -48,13 +48,14 @@
     <div class="collapse navbar-collapse" id="navbarResponsive">
       <ul class="navbar-nav text-uppercase ml-auto"><li class="nav-item"><a class="nav-link js-scroll-trigger" href="/overview">Overview</a></li>
         <li class="nav-item"><a class="nav-link js-scroll-trigger" href="/envs">Components</a></li>
-        <li class="nav-item"><a class="nav-link js-scroll-trigger" href="https://github.com/instadeepai/mava">Github</a></li>
-        
+        <li class="nav-item"><a class="nav-link js-scroll-trigger" href="https://github.com/arnupretorius/mava">Github</a></li>
+
       </ul>
     </div>
   </div>
 </nav>
 <!-- End Navigation -->
+
 
 <header></header>
 
@@ -62,10 +63,7 @@
   <div class="docnavcontainer">
     <div class="row environment-bar">
       <div class="col docnavi">
-        <a href="/systems"> Systems</a>
-      </div>
-      <div class="col docnavi">
-        <a href="/agents"> Agents</a>
+        <a href="/architectures"> Architectures</a>
       </div>
       <div class="col docnavi">
         <a href="/modules"> Modules</a>
@@ -79,6 +77,7 @@
     </div>
   </div>
 </section>
+
 
 <div class="doccontainer container" id="pagecontainer">
   <div class="markdown-body">
@@ -117,13 +116,13 @@
 
 
 <span class="k">def</span> <span class="nf">env</span><span class="p">():</span>
-    <span class="s">'''
+    <span class="s">"""
     The env function wraps the environment in 3 wrappers by default. These
     wrappers contain logic that is common to many pettingzoo environments.
     We recomend you use at least the OrderEnforcingWrapper on your own environment
     to provide sane error messages. You can find full documentation for these methods
     elsewhere in the developer documentation.
-    '''</span>
+    """</span>
     <span class="n">env</span> <span class="o">=</span> <span class="n">raw_env</span><span class="p">()</span>
     <span class="n">env</span> <span class="o">=</span> <span class="n">wrappers</span><span class="p">.</span><span class="n">CaptureStdoutWrapper</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
     <span class="n">env</span> <span class="o">=</span> <span class="n">wrappers</span><span class="p">.</span><span class="n">AssertOutOfBoundsWrapper</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
@@ -132,16 +131,17 @@
 
 
 <span class="k">class</span> <span class="nc">raw_env</span><span class="p">(</span><span class="n">AECEnv</span><span class="p">):</span>
-    <span class="s">'''
+    <span class="s">"""
     The metadata holds environment constants. From gym, we inherit the "render.modes",
     metadata which specifies which modes can be put into the render() method.
     At least human mode should be supported.
     The "name" metadata allows the environment to be pretty printed.
-    '''</span>
-    <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span><span class="s">'render.modes'</span><span class="p">:</span> <span class="p">[</span><span class="s">'human'</span><span class="p">],</span> <span class="s">"name"</span><span class="p">:</span> <span class="s">"rps_v1"</span><span class="p">}</span>
+    """</span>
+
+    <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span><span class="s">"render.modes"</span><span class="p">:</span> <span class="p">[</span><span class="s">"human"</span><span class="p">],</span> <span class="s">"name"</span><span class="p">:</span> <span class="s">"rps_v1"</span><span class="p">}</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         The init method takes in environment arguments and
          should define the following attributes:
         - possible_agents
@@ -149,44 +149,48 @@
         - observation_spaces
 
         These attributes should not be changed after initialization.
-        '''</span>
+        """</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span> <span class="o">=</span> <span class="p">[</span><span class="s">"player_"</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">)]</span>
-        <span class="bp">self</span><span class="p">.</span><span class="n">agent_name_mapping</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">)))))</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">agent_name_mapping</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">))))</span>
+        <span class="p">)</span>
 
         <span class="c1"># Gym spaces are defined and documented here: https://gym.openai.com/docs/#spaces
 </span>        <span class="bp">self</span><span class="p">.</span><span class="n">action_spaces</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="n">Discrete</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">}</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">observation_spaces</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="n">Discrete</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">}</span>
 
     <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">"human"</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         Renders the environment. In human mode, it can print to terminal, open
         up a graphical window, or open up some other display that a human can see and understand.
-        '''</span>
+        """</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">string</span> <span class="o">=</span> <span class="p">(</span><span class="s">"Current state: Agent1: {} , Agent2: {}"</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="n">MOVES</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]]],</span> <span class="n">MOVES</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]]]))</span>
+            <span class="n">string</span> <span class="o">=</span> <span class="s">"Current state: Agent1: {} , Agent2: {}"</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span>
+                <span class="n">MOVES</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]]],</span> <span class="n">MOVES</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]]]</span>
+            <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">string</span> <span class="o">=</span> <span class="s">"Game over"</span>
         <span class="k">print</span><span class="p">(</span><span class="n">string</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">observe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">agent</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         Observe should return the observation of the specified agent. This function
         should return a sane observation (though not necessarily the most up to date possible)
         at any time after reset() is called.
-        '''</span>
+        """</span>
         <span class="c1"># observation of one agent is the previous state of the other
 </span>        <span class="k">return</span> <span class="n">np</span><span class="p">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">observations</span><span class="p">[</span><span class="n">agent</span><span class="p">])</span>
 
     <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         Close should release any graphical displays, subprocesses, network connections
         or any other environment data which should not be kept around after the
         user is no longer using the environment.
-        '''</span>
+        """</span>
         <span class="k">pass</span>
 
     <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         Reset needs to initialize the following attributes
         - agents
         - rewards
@@ -198,7 +202,7 @@
         can be called without issues.
 
         Here it sets up the state dictionary which is used by step() and the observations dictionary which is used by step() and observe()
-        '''</span>
+        """</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">agents</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">[:]</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">rewards</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">}</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">_cumulative_rewards</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">}</span>
@@ -207,14 +211,14 @@
         <span class="bp">self</span><span class="p">.</span><span class="n">state</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="n">NONE</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">}</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">observations</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="n">NONE</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">}</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">num_moves</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="s">'''
+        <span class="s">"""
         Our agent_selector utility allows easy cyclic stepping through the agents list.
-        '''</span>
+        """</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">_agent_selector</span> <span class="o">=</span> <span class="n">agent_selector</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">)</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">agent_selection</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">_agent_selector</span><span class="p">.</span><span class="nb">next</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         step(action) takes in an action for the current agent (specified by
         agent_selection) and needs to update
         - rewards
@@ -223,7 +227,7 @@
         - infos
         - agent_selection (to the next agent)
         And any internal state used by observe() or render()
-        '''</span>
+        """</span>
         <span class="k">if</span> <span class="bp">self</span><span class="p">.</span><span class="n">dones</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agent_selection</span><span class="p">]:</span>
             <span class="c1"># handles stepping an agent which is already done
 </span>            <span class="c1"># accepts a None action for the one agent, and moves the agent_selection to
@@ -243,7 +247,9 @@
         <span class="c1"># collect reward if it is the last agent to act
 </span>        <span class="k">if</span> <span class="bp">self</span><span class="p">.</span><span class="n">_agent_selector</span><span class="p">.</span><span class="n">is_last</span><span class="p">():</span>
             <span class="c1"># rewards for all agents are placed in the .rewards dictionary
-</span>            <span class="bp">self</span><span class="p">.</span><span class="n">rewards</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="bp">self</span><span class="p">.</span><span class="n">rewards</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="n">REWARD_MAP</span><span class="p">[(</span><span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]])]</span>
+</span>            <span class="bp">self</span><span class="p">.</span><span class="n">rewards</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="bp">self</span><span class="p">.</span><span class="n">rewards</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="n">REWARD_MAP</span><span class="p">[</span>
+                <span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]])</span>
+            <span class="p">]</span>
 
             <span class="bp">self</span><span class="p">.</span><span class="n">num_moves</span> <span class="o">+=</span> <span class="mi">1</span>
             <span class="c1"># The dones dictionary must be updated for all players.
@@ -251,7 +257,9 @@
 
             <span class="c1"># observe the current state
 </span>            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">:</span>
-                <span class="bp">self</span><span class="p">.</span><span class="n">observations</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="p">.</span><span class="n">agent_name_mapping</span><span class="p">[</span><span class="n">i</span><span class="p">]]]</span>
+                <span class="bp">self</span><span class="p">.</span><span class="n">observations</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span>
+                    <span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="p">.</span><span class="n">agent_name_mapping</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span>
+                <span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># necessary so that observe() returns a reasonable observation at all times.
 </span>            <span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="p">.</span><span class="n">agent_name_mapping</span><span class="p">[</span><span class="n">agent</span><span class="p">]]]</span> <span class="o">=</span> <span class="n">NONE</span>
@@ -262,7 +270,6 @@
 </span>        <span class="bp">self</span><span class="p">.</span><span class="n">agent_selection</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">_agent_selector</span><span class="p">.</span><span class="nb">next</span><span class="p">()</span>
         <span class="c1"># Adds .rewards to ._cumulative_rewards
 </span>        <span class="bp">self</span><span class="p">.</span><span class="n">_accumulate_rewards</span><span class="p">()</span>
-
 </code></pre></div></div>
 
 <h2 id="example-custom-parallel-environment">Example Custom Parallel Environment</h2>
@@ -293,13 +300,13 @@
 
 
 <span class="k">def</span> <span class="nf">env</span><span class="p">():</span>
-    <span class="s">'''
+    <span class="s">"""
     The env function wraps the environment in 3 wrappers by default. These
     wrappers contain logic that is common to many pettingzoo environments.
     We recomend you use at least the OrderEnforcingWrapper on your own environment
     to provide sane error messages. You can find full documentation for these methods
     elsewhere in the developer documentation.
-    '''</span>
+    """</span>
     <span class="n">env</span> <span class="o">=</span> <span class="n">raw_env</span><span class="p">()</span>
     <span class="n">env</span> <span class="o">=</span> <span class="n">wrappers</span><span class="p">.</span><span class="n">CaptureStdoutWrapper</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
     <span class="n">env</span> <span class="o">=</span> <span class="n">wrappers</span><span class="p">.</span><span class="n">AssertOutOfBoundsWrapper</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
@@ -308,55 +315,59 @@
 
 
 <span class="k">def</span> <span class="nf">raw_env</span><span class="p">():</span>
-    <span class="s">'''
+    <span class="s">"""
     To support the AEC API, the raw_env() function just uses the from_parallel
     function to convert from a ParallelEnv to an AEC env
-    '''</span>
+    """</span>
     <span class="n">env</span> <span class="o">=</span> <span class="n">parallel_env</span><span class="p">()</span>
     <span class="n">env</span> <span class="o">=</span> <span class="n">from_parallel</span><span class="p">(</span><span class="n">env</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">env</span>
 
 
 <span class="k">class</span> <span class="nc">parallel_env</span><span class="p">(</span><span class="n">ParallelEnv</span><span class="p">):</span>
-    <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span><span class="s">'render.modes'</span><span class="p">:</span> <span class="p">[</span><span class="s">'human'</span><span class="p">],</span> <span class="s">"name"</span><span class="p">:</span> <span class="s">"rps_v1"</span><span class="p">}</span>
+    <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span><span class="s">"render.modes"</span><span class="p">:</span> <span class="p">[</span><span class="s">"human"</span><span class="p">],</span> <span class="s">"name"</span><span class="p">:</span> <span class="s">"rps_v1"</span><span class="p">}</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         The init method takes in environment arguments and should define the following attributes:
         - possible_agents
         - action_spaces
         - observation_spaces
 
         These attributes should not be changed after initialization.
-        '''</span>
+        """</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span> <span class="o">=</span> <span class="p">[</span><span class="s">"player_"</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">)]</span>
-        <span class="bp">self</span><span class="p">.</span><span class="n">agent_name_mapping</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">)))))</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">agent_name_mapping</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">))))</span>
+        <span class="p">)</span>
 
         <span class="c1"># Gym spaces are defined and documented here: https://gym.openai.com/docs/#spaces
 </span>        <span class="bp">self</span><span class="p">.</span><span class="n">action_spaces</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="n">Discrete</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">}</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">observation_spaces</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="n">Discrete</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">}</span>
 
     <span class="k">def</span> <span class="nf">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">"human"</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         Renders the environment. In human mode, it can print to terminal, open
         up a graphical window, or open up some other display that a human can see and understand.
-        '''</span>
+        """</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">string</span> <span class="o">=</span> <span class="p">(</span><span class="s">"Current state: Agent1: {} , Agent2: {}"</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span><span class="n">MOVES</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]]],</span> <span class="n">MOVES</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]]]))</span>
+            <span class="n">string</span> <span class="o">=</span> <span class="s">"Current state: Agent1: {} , Agent2: {}"</span><span class="p">.</span><span class="nb">format</span><span class="p">(</span>
+                <span class="n">MOVES</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]]],</span> <span class="n">MOVES</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">state</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]]]</span>
+            <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">string</span> <span class="o">=</span> <span class="s">"Game over"</span>
         <span class="k">print</span><span class="p">(</span><span class="n">string</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         Close should release any graphical displays, subprocesses, network connections
         or any other environment data which should not be kept around after the
         user is no longer using the environment.
-        '''</span>
+        """</span>
         <span class="k">pass</span>
 
     <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         Reset needs to initialize the `agents` attribute and must set up the
         environment so that render(), and step() can be called without issues.
 
@@ -364,21 +375,21 @@
         hands that are played.
 
         Returns the observations for each agent
-        '''</span>
+        """</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">agents</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">possible_agents</span><span class="p">[:]</span>
         <span class="bp">self</span><span class="p">.</span><span class="n">num_moves</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="n">observations</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="n">NONE</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">}</span>
         <span class="k">return</span> <span class="n">observations</span>
 
     <span class="k">def</span> <span class="nf">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actions</span><span class="p">):</span>
-        <span class="s">'''
+        <span class="s">"""
         step(action) takes in an action for each agent and should return the
         - observations
         - rewards
         - dones
         - infos
         dicts where each dict looks like {agent_1: item_1, agent_2: item_2}
-        '''</span>
+        """</span>
         <span class="c1"># If a user passes in actions with no agents, then just return empty observations, etc.
 </span>        <span class="k">if</span> <span class="ow">not</span> <span class="n">actions</span><span class="p">:</span>
             <span class="bp">self</span><span class="p">.</span><span class="n">agents</span> <span class="o">=</span> <span class="p">[]</span>
@@ -386,21 +397,25 @@
 
         <span class="c1"># rewards for all agents are placed in the rewards dictionary to be returned
 </span>        <span class="n">rewards</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">rewards</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">rewards</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="n">REWARD_MAP</span><span class="p">[(</span><span class="n">actions</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">actions</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]])]</span>
+        <span class="n">rewards</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">rewards</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="n">REWARD_MAP</span><span class="p">[</span>
+            <span class="p">(</span><span class="n">actions</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">actions</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span><span class="p">]])</span>
+        <span class="p">]</span>
 
         <span class="bp">self</span><span class="p">.</span><span class="n">num_moves</span> <span class="o">+=</span> <span class="mi">1</span>
         <span class="n">env_done</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">num_moves</span> <span class="o">&gt;=</span> <span class="n">NUM_ITERS</span>
         <span class="n">dones</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="n">env_done</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">}</span>
 
         <span class="c1"># current observation is just the other player's most recent action
-</span>        <span class="n">observations</span> <span class="o">=</span> <span class="p">{</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span> <span class="nb">int</span><span class="p">(</span><span class="n">actions</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">i</span><span class="p">]])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">))}</span>
+</span>        <span class="n">observations</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span> <span class="nb">int</span><span class="p">(</span><span class="n">actions</span><span class="p">[</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="n">i</span><span class="p">]])</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">))</span>
+        <span class="p">}</span>
 
         <span class="c1"># typically there won't be any information in the infos, but there must
 </span>        <span class="c1"># still be an entry for each agent
 </span>        <span class="n">infos</span> <span class="o">=</span> <span class="p">{</span><span class="n">agent</span><span class="p">:</span> <span class="p">{}</span> <span class="k">for</span> <span class="n">agent</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">agents</span><span class="p">}</span>
 
         <span class="k">return</span> <span class="n">observations</span><span class="p">,</span> <span class="n">rewards</span><span class="p">,</span> <span class="n">dones</span><span class="p">,</span> <span class="n">infos</span>
-
 </code></pre></div></div>
 
 <h2 id="wrappers">Wrappers</h2>
@@ -472,6 +487,7 @@ env = OrderEnforcingWrapper(env)
 <p>It can be used as follows to cycle through the list of agents:</p>
 
 <div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pettingzoo.utils</span> <span class="kn">import</span> <span class="n">agent_selector</span>
+
 <span class="n">agents</span> <span class="o">=</span> <span class="p">[</span><span class="s">"agent_1"</span><span class="p">,</span> <span class="s">"agent_2"</span><span class="p">,</span> <span class="s">"agent_3"</span><span class="p">]</span>
 <span class="n">selector</span> <span class="o">=</span> <span class="n">agent_selector</span><span class="p">(</span><span class="n">agents</span><span class="p">)</span>
 <span class="n">agent_selection</span> <span class="o">=</span> <span class="n">selector</span><span class="p">.</span><span class="n">reset</span><span class="p">()</span>
@@ -585,6 +601,7 @@ test_save_obs(env)
   </div>
 </div>
 
+
 	    <!-- Footer -->
   <footer class="footer" id="footer" style="background-color:white;">
     <div class="container">
@@ -599,6 +616,7 @@ test_save_obs(env)
   </footer>
 
   <!-- End Footer -->
+
 
 
 	  <!-- Bootstrap core JavaScript -->
