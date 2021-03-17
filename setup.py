@@ -78,6 +78,7 @@ setup(
         "dm-tree",
         "numpy",
         "pillow",
+        "dm-acme",
     ],
     extras_require={
         "tf": tf_requirements,
