@@ -77,13 +77,21 @@ We have tested `mava` on Python 3.6 & 3.7.
     pip install dm-acme[tf]
     ```
 
-4.  Finally, to install a few example environments (including [pettingzoo],
+4.  To install a few example environments (including [pettingzoo],
     [openspiel], and [flatland]):
 
     ```bash
     pip install dm-mava[envs]
     ```
-
+5.  **Optional**:  Finally, if you want to contribute, please read the [contributing docs](./CONTRIBUTING.md) and install the pre-commit hooks:
+    ```bash
+    pip install .[testing_formatting]
+    pre-commit install
+    ```
+    You can run all the pre-commit hooks without making a commit as follows:
+    ```bash
+    pre-commit run --all-files
+    ```
 
 ## Citing Mava
 
