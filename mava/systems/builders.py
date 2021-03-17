@@ -1,12 +1,13 @@
 # python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 """MARL system Builder interface."""
 
 import abc
 from typing import Dict, Iterator, List, Optional, Union
 
-from mava import adders
+from mava import core, adders
 import reverb
-from acme import core, specs
+from acme import specs
 from acme.utils import counting, loggers
 
 NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
