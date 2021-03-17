@@ -104,7 +104,7 @@ class MADDPG(system.System):
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
         replay_table = reverb.Table(
-            name="replay_table_name",
+            name=replay_table_name,
             sampler=reverb.selectors.Uniform(),
             remover=reverb.selectors.Fifo(),
             max_size=max_replay_size,
