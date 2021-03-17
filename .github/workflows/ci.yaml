@@ -38,7 +38,7 @@ jobs:
         flake8 mava --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Check types with mypy
       run: |
-        mypy mava
+        mypy . --exclude ^docs/
     - name: Test with pytest
       run: |
         pytest -n "$(grep -c ^processor /proc/cpuinfo)" mava

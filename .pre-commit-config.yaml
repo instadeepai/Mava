@@ -53,6 +53,7 @@ repos:
     rev: v0.812
     hooks:
     -   id: mypy
+        exclude: ^docs/
 
   - repo: https://github.com/asottile/blacken-docs
     rev: v1.8.0
