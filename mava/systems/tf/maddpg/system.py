@@ -18,6 +18,7 @@
 import copy
 from typing import Dict, List
 
+import numpy as np
 import reverb
 import sonnet as snt
 import tensorflow as tf
@@ -88,6 +89,8 @@ class MADDPG(system.System):
           checkpoint: boolean indicating whether to checkpoint the learner.
           replay_table_name: string indicating what name to give the replay table.
         """
+        n_agents = len(agents)
+
         behavior_networks = {}
         target_policy_networks = {}
         target_critic_networks = {}
@@ -143,6 +146,8 @@ class MADDPG(system.System):
             emb_spec = tf2_utils.create_variables(
                 observation_networks[agent_key], [obs_spec]
             )
+            critic_state_spec = np.tile(obs_spec, n_agents)
+            critic_act_spec = np.tile(act_spec, n_agents)
 
             # Create target networks.
             target_policy_network = copy.deepcopy(policy_networks[agent_key])
@@ -166,9 +171,13 @@ class MADDPG(system.System):
 
             # Create variables.
             tf2_utils.create_variables(policy_networks[agent_key], [emb_spec])
-            tf2_utils.create_variables(critic_networks[agent_key], [emb_spec, act_spec])
+            tf2_utils.create_variables(
+                critic_networks[agent_key], [critic_state_spec, critic_act_spec]
+            )
             tf2_utils.create_variables(target_policy_network, [emb_spec])
-            tf2_utils.create_variables(target_critic_network, [emb_spec, act_spec])
+            tf2_utils.create_variables(
+                target_critic_network, [critic_state_spec, critic_act_spec]
+            )
             tf2_utils.create_variables(target_observation_network, [obs_spec])
 
         # Create the actor which defines how we take actions.
