@@ -15,19 +15,16 @@
 
 """MADDPG system implementation."""
 
-import copy
+
 from typing import Dict, List
 
-import numpy as np
 import reverb
 import sonnet as snt
-import tensorflow as tf
-from acme import datasets, specs, types
+from acme import datasets, specs
 from acme.adders import reverb as adders
-from acme.tf import networks
-from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
+from mava.components.tf.architectures import CentralisedActorCritic
 from mava.systems import system
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
@@ -89,17 +86,6 @@ class MADDPG(system.System):
           checkpoint: boolean indicating whether to checkpoint the learner.
           replay_table_name: string indicating what name to give the replay table.
         """
-        n_agents = len(agents)
-
-        behavior_networks = {}
-        target_policy_networks = {}
-        target_critic_networks = {}
-        target_observation_networks = {}
-
-        create_observation_networks = False
-        if observation_networks is None:
-            observation_networks = {}
-            create_observation_networks = True
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
@@ -130,59 +116,19 @@ class MADDPG(system.System):
             prefetch_size=prefetch_size,
         )
 
-        agent_keys = self._agent_type if shared_weights else self._agents
-
-        for agent_key in agent_keys:
-
-            # Make sure observation network is a Sonnet Module.
-            if create_observation_networks:
-                observation_network: types.TensorTransformation = tf.identity
-                observation_network = tf2_utils.to_sonnet_module(observation_network)
-                observation_networks[agent_key] = observation_network
-
-            # Get observation and action specs.
-            act_spec = environment_spec[agent_key].actions
-            obs_spec = environment_spec[agent_key].observations
-            emb_spec = tf2_utils.create_variables(
-                observation_networks[agent_key], [obs_spec]
-            )
-            critic_state_spec = np.tile(obs_spec, n_agents)
-            critic_act_spec = np.tile(act_spec, n_agents)
-
-            # Create target networks.
-            target_policy_network = copy.deepcopy(policy_networks[agent_key])
-            target_critic_network = copy.deepcopy(critic_networks[agent_key])
-            target_observation_network = copy.deepcopy(observation_networks[agent_key])
-
-            target_policy_networks[agent_key] = target_policy_network
-            target_critic_networks[agent_key] = target_critic_network
-            target_observation_networks[agent_key] = target_observation_network
-
-            # Create the behavior policy.
-            behavior_network = snt.Sequential(
-                [
-                    observation_network,
-                    policy_networks[agent_key],
-                    networks.ClippedGaussian(sigma),
-                    networks.ClipToSpec(act_spec),
-                ]
-            )
-            behavior_networks[agent_key] = behavior_network
-
-            # Create variables.
-            tf2_utils.create_variables(policy_networks[agent_key], [emb_spec])
-            tf2_utils.create_variables(
-                critic_networks[agent_key], [critic_state_spec, critic_act_spec]
-            )
-            tf2_utils.create_variables(target_policy_network, [emb_spec])
-            tf2_utils.create_variables(
-                target_critic_network, [critic_state_spec, critic_act_spec]
-            )
-            tf2_utils.create_variables(target_observation_network, [obs_spec])
+        networks = CentralisedActorCritic(
+            agents=agents,
+            agent_types=agent_types,
+            environment_spec=environment_spec,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            observation_networks=observation_networks,
+            shared_weights=shared_weights,
+        ).create_system()
 
         # Create the actor which defines how we take actions.
         executor = executors.FeedForwardExecutor(
-            policy_networks=behavior_networks,
+            policy_networks=networks["policies"],
             shared_weights=shared_weights,
             adder=adder,
         )
@@ -195,12 +141,12 @@ class MADDPG(system.System):
         trainer = training.MADDPGTrainer(
             agents=agents,
             agent_types=agent_types,
-            policy_networks=policy_networks,
-            critic_networks=critic_networks,
-            observation_networks=observation_networks,
-            target_policy_networks=target_policy_networks,
-            target_critic_networks=target_critic_networks,
-            target_observation_networks=target_observation_networks,
+            policy_networks=networks["policies"],
+            critic_networks=networks["critics"],
+            observation_networks=networks["observations"],
+            target_policy_networks=networks["target_policies"],
+            target_critic_networks=networks["target_critics"],
+            target_observation_networks=networks["target_observations"],
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,

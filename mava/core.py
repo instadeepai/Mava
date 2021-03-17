@@ -64,7 +64,7 @@ class Executor(acme.Actor):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-    ):
+    ) -> None:
         """Make an observation of timestep data from the environment.
         Args:
         action: action taken in the environment.
@@ -96,7 +96,7 @@ class VariableSource(acme.VariableSource):
         """
 
 
-class Trainer(acme.Learner):
+class Trainer(acme.Learner, VariableSource):
     """Abstract learner object.
     This corresponds to an object which implements a learning loop. A single step
     of learning should be implemented via the `step` method and this step

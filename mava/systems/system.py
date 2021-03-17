@@ -84,16 +84,16 @@ class System(mava.core.Executor, acme.core.VariableSource):
             actions[agent_id] = agent.select_action(observations[agent_id])
         return actions
 
-    def observe_first(self, timestep: dm_env.TimeStep):
+    def observe_first(self, timestep: dm_env.TimeStep) -> None:
         self._executor.observe_first(timestep)
 
     def observe(
         self, actions: Dict[str, types.NestedArray], next_timestep: dm_env.TimeStep
-    ):
+    ) -> None:
         self._num_observations += 1
         self._executor.observe(actions, next_timestep)
 
-    def update(self):
+    def update(self) -> None:
         num_steps = _calculate_num_learner_steps(
             num_observations=self._num_observations,
             min_observations=self._min_observations,

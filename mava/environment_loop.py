@@ -120,7 +120,9 @@ class EnvironmentLoop(core.Worker):
         result.update(counts)
         return result
 
-    def run(self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None):
+    def run(
+        self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
+    ) -> None:
         """Perform the run loop.
         Run the environment loop either for `num_episodes` episodes or for at
         least `num_steps` steps (the last episode is always run until completion,
@@ -130,10 +132,10 @@ class EnvironmentLoop(core.Worker):
         of episodes and the number of steps are not given then this will interact
         with the environment infinitely.
         Args:
-          num_episodes: number of episodes to run the loop for.
-          num_steps: minimal number of steps to run the loop for.
+        num_episodes: number of episodes to run the loop for.
+        num_steps: minimal number of steps to run the loop for.
         Raises:
-          ValueError: If both 'num_episodes' and 'num_steps' are not None.
+        ValueError: If both 'num_episodes' and 'num_steps' are not None.
         """
 
         if not (num_episodes is None or num_steps is None):

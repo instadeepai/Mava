@@ -18,12 +18,15 @@
 import abc
 from typing import Dict, Iterator, List, Optional, Union
 
-from mava import core, adders
 import reverb
+import sonnet as snt
 from acme import specs
 from acme.utils import counting, loggers
 
+from mava import adders, core
+
 NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
+
 
 class SystemBuilder(abc.ABC):
     """Defines an interface for defining the components of an RL system.
@@ -60,13 +63,14 @@ class SystemBuilder(abc.ABC):
     @abc.abstractmethod
     def make_executor(
         self,
-        policy_networks,
+        policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.Adder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
         """Create an executer instance.
         Args:
-          policy_networks: A struct of instance of all the different policy networks; this should be a callable
+          policy_networks: A struct of instance of all the different
+            policy networks; this should be a callable
             which takes as input observations and returns actions.
           adder: How data is recorded (e.g. added to replay).
           variable_source: A source providing the necessary actor parameters.
@@ -75,7 +79,7 @@ class SystemBuilder(abc.ABC):
     @abc.abstractmethod
     def make_trainer(
         self,
-        networks,
+        networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
