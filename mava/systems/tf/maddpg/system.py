@@ -161,6 +161,7 @@ class MADDPGBuilder(SystemBuilder):
         """
 
 
+# TODO: Delete this line
 class MADDPG(system.System):
     """MADDPG system.
     This implements a single-process DDPG system. This is an actor-critic based
