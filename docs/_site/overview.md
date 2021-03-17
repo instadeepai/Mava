@@ -2,16 +2,27 @@
 
 ## Systems and the Executor-Trainer paradigm
 
-At the core of the Mava framework is the *system*. A system refers to a full multi-agent reinforcement learning algorithm and consists of two specific components: an *Executor* and a *Trainer*.
+At the core of the Mava framework is the concept of a *system*. A system refers to a full multi-agent reinforcement learning algorithm consisting of the following specific components: an *Executor*, a *Trainer* and a *Dataset*.
+
+<p style="text-align:center;">
+<img src="images/mava_system.png" style="max-width:60%;">
+</p>
 
 ### Executor
 
-The Executor is the part of the system that interacts with the environment, takes actions for each agent and observes the next state as a collection of observations, one for each agent in the system. Essentially, executors are the multi-agent version of actors in Acme and are themselves constructed through feeding to the executor a dictionary of policy networks.
+The Executor is the part of the system that interacts with the environment, takes actions for each agent and observes the next state as a collection of observations, one for each agent in the system. Essentially, executors are the multi-agent version of the Actor class in Acme and are themselves constructed through feeding to the executor a dictionary of policy networks.
 
 ### Trainer
 
-The Trainer is responsible for taking data collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner in Acme.
+The Trainer is responsible for sampling data from the Dataset originally collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner class in Acme.
 
+### Dataset
+
+The Dataset stores all of the information collected by the executors in the form of a collection of dictionaries for the actions, observations and rewards with keys corresponding to the individual agent ids.
+
+### Distributed system training
+
+Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to run these systems either as a single process, or distributed at scale, using the same underlying multi-agent RL system code. In the latter case, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of the actor networks used within each executor.
 
 <p style="text-align:center;">
 <img src="images/mava_distributed_training.png" style="max-width:60%;">

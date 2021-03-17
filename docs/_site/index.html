@@ -91,7 +91,7 @@
               <div class="row-sm">
                 <a class="btn btn-primary btn-circle btn-sm text-uppercase js-scroll-trigger circlebutton"
                   href="/envs">
-                  <img width="100%" height="100%" src="/assets/img/environment_icon.svg" width="90%"></img>
+                  <img width="100%" height="100%" src="/assets/img/components_icon.svg" width="90%"></img>
                 </a>
               </div>
               <div class="row-sm text-uppercase buttonfont" style="padding-top: 5px;">
@@ -146,11 +146,11 @@ from mava.tf import networks
 
 env = make_environment()
 env_spec = mava.make_environment_spec(env)
-network = networks.MADDPGPettingZooNetwork(env_spec.actions.num_values)
+networks = networks.MADDPGNetworks(env_spec)
 
-agent = maddpg.MADPPG(env_spec, network)
+system = maddpg.MADPPG(env_spec, networks)
 
-loop = mava.EnvironmentLoop(env, agent)
+loop = mava.EnvironmentLoop(env, system)
 loop.run(num_episodes=10000)
  </code> </pre>
     </div>

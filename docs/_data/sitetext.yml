@@ -9,7 +9,7 @@ header:
         iconsize: 80%
       - button: Components
         buttonlink: /envs
-        icon: /assets/img/environment_icon.svg
+        icon: /assets/img/components_icon.svg
         iconsize: 80%
       - button: GitHub
         buttonlink: https://github.com/arnupretorius/mava
@@ -34,7 +34,7 @@ timeline:
           image: /images/architectures.png
           alt:
           align: left
-          link: systems
+          link: architectures
         - title: "Modules"
           desc: "Modules for agent interaction: attention, communication and mixing."
           image: /images/modules.png
