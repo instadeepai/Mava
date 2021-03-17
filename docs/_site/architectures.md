@@ -1,5 +1,25 @@
 ## Architectures
 
+### Decentralised
+
+<p style="text-align:center;">
+<img src="images/decentralised_architecture.png" style="max-width:60%;">
+</p>
+
+
+### Centralised
+
+<p style="text-align:center;">
+<img src="images/centralised_architecture.png" style="max-width:60%;">
+</p>
+
+### Networked
+
+<p style="text-align:center;">
+<img src="images/networked_architecture.png" style="max-width:60%;">
+</p>
+
+
 <!-- The unique dependencies for this set of environments can be installed via:
 
 ````bash
