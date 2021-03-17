@@ -8,12 +8,11 @@ from typing import Dict, Iterator, List, Optional, Union
 from mava import core, adders
 import reverb
 from acme import specs
-from acme.agents import builders
 from acme.utils import counting, loggers
 
 NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
 
-class SystemBuilder(builders.ActorLearnerBuilder):
+class SystemBuilder(abc.ABC):
     """Defines an interface for defining the components of an RL system.
     Implementations of this interface contain a complete specification of a
     concrete RL system. An instance of this class can be used to build an
