@@ -113,7 +113,7 @@ def make_networks(
     }
 
 
-def main(_):
+def main() -> None:
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment()
     environment_specs = specs.SystemSpec(environment)

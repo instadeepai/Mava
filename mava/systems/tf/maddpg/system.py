@@ -14,21 +14,16 @@
 # limitations under the License.
 
 """MADDPG system implementation."""
-
-import copy
 import dataclasses
 from typing import Dict, Iterator, List, Optional, Union
 
-import numpy as np
 import reverb
 import sonnet as snt
-import tensorflow as tf
-from acme import datasets, specs, types
-from acme.tf import networks as acme_networks
-from acme.tf import utils as tf2_utils
+from acme import datasets, specs
 from acme.utils import counting, loggers
 
 from mava import adders, core
+from mava.components.tf.architectures import CentralisedActorCritic
 from mava.systems import system
 from mava.systems.tf import executors
 from mava.systems.tf.builders import SystemBuilder
@@ -104,14 +99,16 @@ class MADDPGBuilder(SystemBuilder):
         environment_spec: specs.EnvironmentSpec,
     ) -> List[reverb.Table]:
         """Create tables to insert data into."""
-        return reverb.Table(
-            name="replay_table_name",
-            sampler=reverb.selectors.Uniform(),
-            remover=reverb.selectors.Fifo(),
-            max_size=self._config.max_replay_size,
-            rate_limiter=reverb.rate_limiters.MinSize(1),
-            signature=adders.NStepTransitionAdder.signature(environment_spec),
-        )
+        return [
+            reverb.Table(
+                name="replay_table_name",
+                sampler=reverb.selectors.Uniform(),
+                remover=reverb.selectors.Fifo(),
+                max_size=self._config.max_replay_size,
+                rate_limiter=reverb.rate_limiters.MinSize(1),
+                signature=adders.NStepTransitionAdder.signature(environment_spec),
+            )
+        ]
 
     def make_dataset_iterator(
         self,
@@ -143,7 +140,7 @@ class MADDPGBuilder(SystemBuilder):
 
     def make_executor(
         self,
-        policy_networks,
+        policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.Adder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
@@ -167,7 +164,7 @@ class MADDPGBuilder(SystemBuilder):
 
     def make_trainer(
         self,
-        networks,
+        networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         # replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
@@ -187,22 +184,12 @@ class MADDPGBuilder(SystemBuilder):
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the learner checkpoints itself.
         """
-        observation_networks = self._config.observation_networks
-
         agents = self._config.agents
         agent_types = self._config.agent_types
         shared_weights = self._config.shared_weights
         clipping = self._config.clipping
         discount = self._config.discount
         target_update_period = self._config.target_update_period
-
-        (
-            policy_networks,
-            critic_networks,
-            target_policy_networks,
-            target_critic_networks,
-            target_observation_networks,
-        ) = networks
 
         # Create optimizers.
         policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
@@ -212,12 +199,12 @@ class MADDPGBuilder(SystemBuilder):
         trainer = training.MADDPGTrainer(
             agents=agents,
             agent_types=agent_types,
-            policy_networks=policy_networks,
-            critic_networks=critic_networks,
-            observation_networks=observation_networks,
-            target_policy_networks=target_policy_networks,
-            target_critic_networks=target_critic_networks,
-            target_observation_networks=target_observation_networks,
+            policy_networks=networks["policies"],
+            critic_networks=networks["critics"],
+            observation_networks=networks["observations"],
+            target_policy_networks=networks["target_policies"],
+            target_critic_networks=networks["target_critics"],
+            target_observation_networks=networks["target_observations"],
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
@@ -229,7 +216,6 @@ class MADDPGBuilder(SystemBuilder):
             logger=logger,
             checkpoint=checkpoint,
         )
-
         return trainer
 
 
@@ -289,7 +275,6 @@ class MADDPG(system.System):
           checkpoint: boolean indicating whether to checkpoint the learner.
           replay_table_name: string indicating what name to give the replay table.
         """
-
         builder = MADDPGBuilder(
             MADDPGConfig(
                 agents=agents,
@@ -318,7 +303,7 @@ class MADDPG(system.System):
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_tables()
+        replay_table = builder.make_replay_tables(environment_spec)[0]
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
@@ -328,82 +313,21 @@ class MADDPG(system.System):
         # The dataset provides an interface to sample from replay.
         dataset = builder.make_dataset_iterator(replay_client)
 
-        # Create networks
-        # TODO: Should this not be fed in through the policy_networks variable instead of _config?
-        #  e.g. policy_networks = (policy_networks, critic_networks)
-        #  Should the critic network even be in the make_executor function?
+        # Create the networks
+        networks = CentralisedActorCritic(
+            agents=agents,
+            agent_types=agent_types,
+            environment_spec=environment_spec,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            observation_networks=observation_networks,
+            shared_weights=shared_weights,
+        ).create_system()
 
-        n_agents = len(agents)
-        behavior_networks = {}
-        target_policy_networks = {}
-        target_critic_networks = {}
-        target_observation_networks = {}
+        # Create the actor which defines how we take actions.
+        executor = builder.make_executor(networks["policies"], adder)
 
-        if observation_networks is None:
-            observation_networks = {}
-            create_observation_networks = True
-
-        agent_keys = self._agent_type if shared_weights else self._agents
-
-        for agent_key in agent_keys:
-            # Make sure observation network is a Sonnet Module.
-            if create_observation_networks:
-                observation_network: types.TensorTransformation = tf.identity
-                observation_network = tf2_utils.to_sonnet_module(observation_network)
-                observation_networks[agent_key] = observation_network
-
-            # Get observation and action specs.
-            act_spec = environment_spec[agent_key].actions
-            obs_spec = environment_spec[agent_key].observations
-            emb_spec = tf2_utils.create_variables(
-                observation_networks[agent_key], [obs_spec]
-            )
-            critic_state_spec = np.tile(obs_spec, n_agents)
-            critic_act_spec = np.tile(act_spec, n_agents)
-
-            # Create target networks.
-            target_policy_network = copy.deepcopy(policy_networks[agent_key])
-            target_critic_network = copy.deepcopy(critic_networks[agent_key])
-            target_observation_network = copy.deepcopy(observation_networks[agent_key])
-
-            target_policy_networks[agent_key] = target_policy_network
-            target_critic_networks[agent_key] = target_critic_network
-            target_observation_networks[agent_key] = target_observation_network
-
-            # Create the behavior policy.
-            behavior_network = snt.Sequential(
-                [
-                    observation_network,
-                    policy_networks[agent_key],
-                    acme_networks.ClippedGaussian(sigma),
-                    acme_networks.ClipToSpec(act_spec),
-                ]
-            )
-            behavior_networks[agent_key] = behavior_network
-
-            # Create variables.
-            tf2_utils.create_variables(policy_networks[agent_key], [emb_spec])
-            tf2_utils.create_variables(
-                critic_networks[agent_key], [critic_state_spec, critic_act_spec]
-            )
-            tf2_utils.create_variables(target_policy_network, [emb_spec])
-            tf2_utils.create_variables(
-                target_critic_network, [critic_state_spec, critic_act_spec]
-            )
-            tf2_utils.create_variables(target_observation_network, [obs_spec])
-
-        # Create the executor
-        policy_networks = behavior_networks
-        executor = builder.make_executor(policy_networks, adder)
-
-        # Create the trainer
-        networks = (
-            policy_networks,
-            critic_networks,
-            target_policy_networks,
-            target_critic_networks,
-            target_observation_networks,
-        )
+        # The learner updates the parameters (and initializes them).
         trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
 
         super().__init__(

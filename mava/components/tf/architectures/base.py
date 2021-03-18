@@ -13,8 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MARL system architectural components."""
+import abc
+from typing import Dict
 
-from mava.components.tf.architectures.base import BaseArchitecture
-from mava.components.tf.architectures.centralised import CentralisedActorCritic
-from mava.components.tf.architectures.decentralised import DecentralisedActorCritic
+import sonnet as snt
+
+"""Base architecture interface for multi-agent RL systems"""
+
+
+class BaseArchitecture:
+    """Base class for MARL architectures.
+    Objects which implement this interface provide a set of functions
+    to create systems according to a specific architectural design,
+    e.g. decentralised, centralised or networked.
+    """
+
+    @abc.abstractmethod
+    def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
+        """Create system architecture."""
