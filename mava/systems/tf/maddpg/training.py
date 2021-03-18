@@ -17,13 +17,14 @@
 """MADDPG trainer implementation."""
 
 import time
-from typing import Dict, List
+from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tree
 import trfl
+from acme.tf import losses
 from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
@@ -152,7 +153,7 @@ class MADDPGTrainer(mava.Trainer):
         self._timestamp = None
 
     @tf.function
-    def _update_target_networks(self):
+    def _update_target_networks(self) -> None:
         for key in self._keys:
             # Update target network.
             online_variables = (
@@ -173,7 +174,9 @@ class MADDPGTrainer(mava.Trainer):
             self._num_steps.assign_add(1)
 
     @tf.function
-    def _transform_observations(self, state, next_state):
+    def _transform_observations(
+        self, state: Dict[str, np.ndarray], next_state: Dict[str, np.ndarray]
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         s_tm1 = {}
         s_t = {}
         for key in self._keys:
@@ -188,7 +191,7 @@ class MADDPGTrainer(mava.Trainer):
         return s_tm1, s_t
 
     @tf.function
-    def _policy_actions(self, next_state):
+    def _policy_actions(self, next_state: Dict[str, np.ndarray]) -> Any:
         actions = {}
         for agent in self._agents:
             agent_key = agent.split("_")[0] if self._shared_weights else agent
@@ -197,7 +200,9 @@ class MADDPGTrainer(mava.Trainer):
         return self._target_policy_networks[agent_key](next_observation)
 
     @tf.function
-    def _step(self):
+    def _step(
+        self,
+    ) -> Dict[str, Dict[str, Any]]:
 
         self._keys = self._agent_types if self._shared_weights else self._agents
         self._update_target_networks()
@@ -207,7 +212,7 @@ class MADDPGTrainer(mava.Trainer):
         inputs = next(self._iterator)
         s_tm1, a_tm1, r_t, d_t, s_t = inputs.data
 
-        losses = {}
+        logged_losses: Dict[str, Dict[str, Any]] = {}
 
         for agent in self._agents:
             agent_key = agent.split("_")[0] if self._shared_weights else agent
@@ -284,22 +289,25 @@ class MADDPGTrainer(mava.Trainer):
             self._policy_optimizer.apply(policy_gradients, policy_variables)
             self._critic_optimizer.apply(critic_gradients, critic_variables)
 
-            losses[agent] = {
+            logged_losses[agent] = {
                 "critic_loss": critic_loss,
                 "policy_loss": policy_loss,
             }
 
         # Losses to track.
-        return losses
+        return logged_losses
 
-    def step(self):
+    def step(self) -> None:
         # Run the learning step.
         fetches = self._step()
 
         # Compute elapsed time.
         timestamp = time.time()
-        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
-        self._timestamp = timestamp
+        if self._timestamp:
+            elapsed_time = timestamp - self._timestamp
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
@@ -310,7 +318,7 @@ class MADDPGTrainer(mava.Trainer):
         self._logger.write(fetches)
 
     def get_variables(
-        self, names: Dict[str, List[str]]
+        self, names: Dict[str, Sequence[str]]
     ) -> Dict[str, List[List[np.ndarray]]]:
         variables = {}
         for agent in self._agents:

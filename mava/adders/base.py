@@ -51,7 +51,7 @@ class Adder(adders.Adder):
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {"": ()},
-    ):
+    ) -> None:
         """Defines the adder `add` interface.
         Args:
           actions: Dictionary of a possibly nested structure corresponding to
