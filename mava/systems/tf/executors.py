@@ -92,7 +92,10 @@ class FeedForwardExecutor(core.Executor):
         for agent, observation in observations.items():
             # Pass the observation through the policy network.
             action = self._policy(agent, observation)
-            actions[agent] = tf2_utils.to_numpy_squeeze(action)
+            # Converts each agent's action into an int,
+            #   since our action space is Discrete
+            # TODO How do we specify discrete vs continous action spaces - in policy?
+            actions[agent] = tf2_utils.to_numpy_squeeze(action)[0].astype(int)
 
         # Return a numpy array with squeezed out batch dimension.
         return actions

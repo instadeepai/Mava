@@ -160,6 +160,11 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         self._reset_next_step = True
         self._step_type = dm_env.StepType.FIRST
 
+        # TODO we need to main and update dones
+        self._environment.dones = {
+            agent: False for agent in self._environment.possible_agents
+        }
+
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
         self._reset_next_step = False
@@ -212,7 +217,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 legals = np.ones(
                     self._environment.action_spaces[agent].n, dtype=np.float32
                 )
-            observation[agent] = OLT(
+            observations[agent] = OLT(
                 observation=observation,
                 legal_actions=legals,
                 terminal=np.asarray([self._environment.dones[agent]], dtype=np.float32),
