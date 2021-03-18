@@ -90,6 +90,9 @@ class MADDPG(system.System):
           replay_table_name: string indicating what name to give the replay table.
         """
         n_agents = len(agents)
+        self._agents = agents
+        self._agent_types = agent_types
+        self._shared_weights = shared_weights
 
         behavior_networks = {}
         target_policy_networks = {}

@@ -91,6 +91,8 @@ class MADDPGTrainer(mava.Trainer):
         self._target_policy_networks = target_policy_networks
         self._target_critic_networks = target_critic_networks
 
+        self._target_observation_networks = target_observation_networks
+
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger("trainer")
@@ -120,7 +122,7 @@ class MADDPGTrainer(mava.Trainer):
         for agent_key in agent_keys:
             policy_network_to_expose = snt.Sequential(
                 [
-                    self._target_observation_network[agent_key],
+                    self._target_observation_networks[agent_key],
                     self._target_policy_networks[agent_key],
                 ]
             )
