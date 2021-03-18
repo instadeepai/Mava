@@ -24,7 +24,7 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme import datasets, specs, types
-from acme.tf import networks
+from acme.tf import networks as acme_networks
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
@@ -104,12 +104,27 @@ class MADDPGBuilder(SystemBuilder):
         environment_spec: specs.EnvironmentSpec,
     ) -> List[reverb.Table]:
         """Create tables to insert data into."""
+        return reverb.Table(
+            name="replay_table_name",
+            sampler=reverb.selectors.Uniform(),
+            remover=reverb.selectors.Fifo(),
+            max_size=self._config.max_replay_size,
+            rate_limiter=reverb.rate_limiters.MinSize(1),
+            signature=adders.NStepTransitionAdder.signature(environment_spec),
+        )
 
     def make_dataset_iterator(
         self,
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for learning/updating the agent."""
+        dataset = datasets.make_reverb_dataset(
+            table=self._config.replay_table_name,
+            server_address=replay_client.server_address,
+            batch_size=self._config.batch_size,
+            prefetch_size=self._config.prefetch_size,
+        )
+        return iter(dataset)
 
     def make_adder(
         self,
@@ -119,6 +134,12 @@ class MADDPGBuilder(SystemBuilder):
         Args:
           replay_client: Reverb Client which points to the replay server.
         """
+        return adders.NStepTransitionAdder(
+            priority_fns={self._config.replay_table_name: lambda x: 1.0},
+            client=replay_client,
+            n_step=self._config.n_step,
+            discount=self._config.discount,
+        )
 
     def make_executor(
         self,
@@ -134,12 +155,21 @@ class MADDPGBuilder(SystemBuilder):
           adder: How data is recorded (e.g. added to replay).
           variable_source: A source providing the necessary actor parameters.
         """
+        shared_weights = self._config.shared_weights
+
+        # Create the actor which defines how we take actions.
+        return executors.FeedForwardExecutor(
+            policy_networks=policy_networks,
+            shared_weights=shared_weights,
+            variable_source=variable_source,
+            adder=adder,
+        )
 
     def make_trainer(
         self,
         networks,
         dataset: Iterator[reverb.ReplaySample],
-        replay_client: Optional[reverb.Client] = None,
+        # replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[NestedLogger] = None,
         # TODO: eliminate checkpoint and move it outside.
@@ -157,9 +187,52 @@ class MADDPGBuilder(SystemBuilder):
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the learner checkpoints itself.
         """
+        observation_networks = self._config.observation_networks
+
+        agents = self._config.agents
+        agent_types = self._config.agent_types
+        shared_weights = self._config.shared_weights
+        clipping = self._config.clipping
+        discount = self._config.discount
+        target_update_period = self._config.target_update_period
+
+        (
+            policy_networks,
+            critic_networks,
+            target_policy_networks,
+            target_critic_networks,
+            target_observation_networks,
+        ) = networks
+
+        # Create optimizers.
+        policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
+        critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
+
+        # The learner updates the parameters (and initializes them).
+        trainer = training.MADDPGTrainer(
+            agents=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            observation_networks=observation_networks,
+            target_policy_networks=target_policy_networks,
+            target_critic_networks=target_critic_networks,
+            target_observation_networks=target_observation_networks,
+            shared_weights=shared_weights,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            clipping=clipping,
+            discount=discount,
+            target_update_period=target_update_period,
+            dataset=dataset,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+        )
+
+        return trainer
 
 
-# TODO: Delete this line
 class MADDPG(system.System):
     """MADDPG system.
     This implements a single-process DDPG system. This is an actor-critic based
@@ -217,77 +290,62 @@ class MADDPG(system.System):
           replay_table_name: string indicating what name to give the replay table.
         """
 
-        # builder = MADDPGBuilder(
-        #     MADDPGConfig(
-        #         agents=agents,
-        #         agent_types=agent_types,
-        #         environment_spec=environment_spec,
-        #         policy_networks=policy_networks,
-        #         critic_networks=critic_networks,
-        #         observation_networks=observation_networks,
-        #         shared_weights=shared_weights,
-        #         discount=discount,
-        #         batch_size=batch_size,
-        #         prefetch_size=prefetch_size,
-        #         target_update_period=target_update_period,
-        #         min_replay_size=min_replay_size,
-        #         max_replay_size=max_replay_size,
-        #         samples_per_insert=samples_per_insert,
-        #         n_step=n_step,
-        #         sigma=sigma,
-        #         clipping=clipping,
-        #         logger=logger,
-        #         counter=counter,
-        #         checkpoint=checkpoint,
-        #         replay_table_name=replay_table_name,
-        #     )
-        # )
+        builder = MADDPGBuilder(
+            MADDPGConfig(
+                agents=agents,
+                agent_types=agent_types,
+                environment_spec=environment_spec,
+                policy_networks=policy_networks,
+                critic_networks=critic_networks,
+                observation_networks=observation_networks,
+                shared_weights=shared_weights,
+                discount=discount,
+                batch_size=batch_size,
+                prefetch_size=prefetch_size,
+                target_update_period=target_update_period,
+                min_replay_size=min_replay_size,
+                max_replay_size=max_replay_size,
+                samples_per_insert=samples_per_insert,
+                n_step=n_step,
+                sigma=sigma,
+                clipping=clipping,
+                logger=logger,
+                counter=counter,
+                checkpoint=checkpoint,
+                replay_table_name=replay_table_name,
+            )
+        )
+
+        # Create a replay server to add data to. This uses no limiter behavior in
+        # order to allow the Agent interface to handle it.
+        replay_table = builder.make_replay_tables()
+        self._server = reverb.Server([replay_table], port=None)
+        replay_client = reverb.Client(f"localhost:{self._server.port}")
+
+        # The adder is used to insert observations into replay.
+        adder = builder.make_adder(replay_client)
+
+        # The dataset provides an interface to sample from replay.
+        dataset = builder.make_dataset_iterator(replay_client)
+
+        # Create networks
+        # TODO: Should this not be fed in through the policy_networks variable instead of _config?
+        #  e.g. policy_networks = (policy_networks, critic_networks)
+        #  Should the critic network even be in the make_executor function?
 
         n_agents = len(agents)
-
         behavior_networks = {}
         target_policy_networks = {}
         target_critic_networks = {}
         target_observation_networks = {}
 
-        create_observation_networks = False
         if observation_networks is None:
             observation_networks = {}
             create_observation_networks = True
 
-        # Create a replay server to add data to. This uses no limiter behavior in
-        # order to allow the Agent interface to handle it.
-        replay_table = reverb.Table(
-            name="replay_table_name",
-            sampler=reverb.selectors.Uniform(),
-            remover=reverb.selectors.Fifo(),
-            max_size=max_replay_size,
-            rate_limiter=reverb.rate_limiters.MinSize(1),
-            signature=adders.NStepTransitionAdder.signature(environment_spec),
-        )
-        self._server = reverb.Server([replay_table], port=None)
-
-        # The adder is used to insert observations into replay.
-        address = f"localhost:{self._server.port}"
-        adder = adders.NStepTransitionAdder(
-            priority_fns={replay_table_name: lambda x: 1.0},
-            client=reverb.Client(address),
-            n_step=n_step,
-            discount=discount,
-        )
-
-        # The dataset provides an interface to sample from replay.
-        dataset = datasets.make_reverb_dataset(
-            table=replay_table_name,
-            server_address=address,
-            batch_size=batch_size,
-            prefetch_size=prefetch_size,
-        )
-
         agent_keys = self._agent_type if shared_weights else self._agents
 
         for agent_key in agent_keys:
-
             # Make sure observation network is a Sonnet Module.
             if create_observation_networks:
                 observation_network: types.TensorTransformation = tf.identity
@@ -317,8 +375,8 @@ class MADDPG(system.System):
                 [
                     observation_network,
                     policy_networks[agent_key],
-                    networks.ClippedGaussian(sigma),
-                    networks.ClipToSpec(act_spec),
+                    acme_networks.ClippedGaussian(sigma),
+                    acme_networks.ClipToSpec(act_spec),
                 ]
             )
             behavior_networks[agent_key] = behavior_network
@@ -334,38 +392,19 @@ class MADDPG(system.System):
             )
             tf2_utils.create_variables(target_observation_network, [obs_spec])
 
-        # Create the actor which defines how we take actions.
-        executor = executors.FeedForwardExecutor(
-            policy_networks=behavior_networks,
-            shared_weights=shared_weights,
-            adder=adder,
-        )
+        # Create the executor
+        policy_networks = behavior_networks
+        executor = builder.make_executor(policy_networks, adder)
 
-        # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-        critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-
-        # The learner updates the parameters (and initializes them).
-        trainer = training.MADDPGTrainer(
-            agents=agents,
-            agent_types=agent_types,
-            policy_networks=policy_networks,
-            critic_networks=critic_networks,
-            observation_networks=observation_networks,
-            target_policy_networks=target_policy_networks,
-            target_critic_networks=target_critic_networks,
-            target_observation_networks=target_observation_networks,
-            shared_weights=shared_weights,
-            policy_optimizer=policy_optimizer,
-            critic_optimizer=critic_optimizer,
-            clipping=clipping,
-            discount=discount,
-            target_update_period=target_update_period,
-            dataset=dataset,
-            counter=counter,
-            logger=logger,
-            checkpoint=checkpoint,
+        # Create the trainer
+        networks = (
+            policy_networks,
+            critic_networks,
+            target_policy_networks,
+            target_critic_networks,
+            target_observation_networks,
         )
+        trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
 
         super().__init__(
             executor=executor,
