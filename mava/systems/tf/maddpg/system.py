@@ -29,6 +29,7 @@ from mava.systems.tf import executors
 from mava.systems.tf.builders import SystemBuilder
 from mava.systems.tf.maddpg import training
 
+# TODO: Move this to a types file in future.
 NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
 
 
@@ -36,10 +37,12 @@ NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
 class MADDPGConfig:
     """Configuration options for the MADDPG system.
     Args:
+            agents: a list of the agent specs (ids).
+            agent_types: a list of the types of agents to be used.
             environment_spec: description of the actions, observations, etc.
-            policy_network: the online (optimized) policy.
-            critic_network: the online critic.
-            observation_network: optional network to transform the observations before
+            policy_networks: the online (optimized) policies for each agent in the system.
+            critic_networks: the online critic for each agent in the system.
+            observation_networks: dictionary of optional networks to transform the observations before
               they are fed into any network.
             discount: discount to use for TD updates.
             batch_size: batch size for updates.
@@ -53,9 +56,9 @@ class MADDPGConfig:
             n_step: number of steps to squash into a single transition.
             sigma: standard deviation of zero-mean, Gaussian exploration noise.
             clipping: whether to clip gradients by global norm.
-            logger: logger object to be used by learner.
+            logger: logger object to be used by trainers.
             counter: counter object used to keep track of steps.
-            checkpoint: boolean indicating whether to checkpoint the learner.
+            checkpoint: boolean indicating whether to checkpoint the trainers.
             replay_table_name: string indicating what name to give the replay table."""
 
     agents: List[str]
@@ -82,7 +85,7 @@ class MADDPGConfig:
 
 
 class MADDPGBuilder(SystemBuilder):
-    """Builder for D4PG which constructs individual components of the agent."""
+    """Builder for MADDPG which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an RL system.
       Implementations of this interface contain a complete specification of a
@@ -94,27 +97,25 @@ class MADDPGBuilder(SystemBuilder):
     def __init__(self, config: MADDPGConfig):
         self._config = config
 
-    def make_replay_tables(
+    def make_replay_table(
         self,
         environment_spec: specs.EnvironmentSpec,
-    ) -> List[reverb.Table]:
+    ) -> reverb.Table:
         """Create tables to insert data into."""
-        return [
-            reverb.Table(
-                name="replay_table_name",
-                sampler=reverb.selectors.Uniform(),
-                remover=reverb.selectors.Fifo(),
-                max_size=self._config.max_replay_size,
-                rate_limiter=reverb.rate_limiters.MinSize(1),
-                signature=adders.NStepTransitionAdder.signature(environment_spec),
-            )
-        ]
+        return reverb.Table(
+            name="replay_table_name",
+            sampler=reverb.selectors.Uniform(),
+            remover=reverb.selectors.Fifo(),
+            max_size=self._config.max_replay_size,
+            rate_limiter=reverb.rate_limiters.MinSize(1),
+            signature=adders.NStepTransitionAdder.signature(environment_spec),
+        )
 
     def make_dataset_iterator(
         self,
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the agent."""
+        """Create a dataset iterator to use for learning/updating the system."""
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
@@ -144,13 +145,13 @@ class MADDPGBuilder(SystemBuilder):
         adder: Optional[adders.Adder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
-        """Create an executer instance.
+        """Create an executor instance.
         Args:
           policy_networks: A struct of instance of all the different policy networks;
            this should be a callable
             which takes as input observations and returns actions.
           adder: How data is recorded (e.g. added to replay).
-          variable_source: A source providing the necessary actor parameters.
+          variable_source: A source providing the necessary executor parameters.
         """
         shared_weights = self._config.shared_weights
 
@@ -166,10 +167,9 @@ class MADDPGBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        # replay_client: Optional[reverb.Client] = None,
+        replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[NestedLogger] = None,
-        # TODO: eliminate checkpoint and move it outside.
         checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
@@ -179,10 +179,10 @@ class MADDPGBuilder(SystemBuilder):
           dataset: iterator over samples from replay.
           replay_client: client which allows communication with replay, e.g. in
             order to update priorities.
-          counter: a Counter which allows for recording of counts (learner steps,
-            actor steps, etc.) distributed throughout the agent.
+          counter: a Counter which allows for recording of counts (trainer steps,
+            executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the learner checkpoints itself.
+          checkpoint: bool controlling whether the trainer checkpoints itself.
         """
         agents = self._config.agents
         agent_types = self._config.agent_types
@@ -253,28 +253,29 @@ class MADDPG(system.System):
     ):
         """Initialize the system.
         Args:
-          environment_spec: description of the actions, observations, etc.
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          observation_network: optional network to transform the observations before
-            they are fed into any network.
-          discount: discount to use for TD updates.
-          batch_size: batch size for updates.
-          prefetch_size: size to prefetch from replay.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          min_replay_size: minimum replay size before updating.
-          max_replay_size: maximum replay size.
-          samples_per_insert: number of samples to take from replay for every insert
-            that is made.
-          n_step: number of steps to squash into a single transition.
-          sigma: standard deviation of zero-mean, Gaussian exploration noise.
-          clipping: whether to clip gradients by global norm.
-          logger: logger object to be used by learner.
-          counter: counter object used to keep track of steps.
-          checkpoint: boolean indicating whether to checkpoint the learner.
-          replay_table_name: string indicating what name to give the replay table.
-        """
+            agents: a list of the agent specs (ids).
+            agent_types: a list of the types of agents to be used.
+            environment_spec: description of the actions, observations, etc.
+            policy_networks: the online (optimized) policies for each agent in the system.
+            critic_networks: the online critic for each agent in the system.
+            observation_networks: dictionary of optional networks to transform the observations before
+              they are fed into any network.
+            discount: discount to use for TD updates.
+            batch_size: batch size for updates.
+            prefetch_size: size to prefetch from replay.
+            target_update_period: number of learner steps to perform before updating
+              the target networks.
+            min_replay_size: minimum replay size before updating.
+            max_replay_size: maximum replay size.
+            samples_per_insert: number of samples to take from replay for every insert
+              that is made.
+            n_step: number of steps to squash into a single transition.
+            sigma: standard deviation of zero-mean, Gaussian exploration noise.
+            clipping: whether to clip gradients by global norm.
+            logger: logger object to be used by trainers.
+            counter: counter object used to keep track of steps.
+            checkpoint: boolean indicating whether to checkpoint the trainers.
+            replay_table_name: string indicating what name to give the replay table."""
         builder = MADDPGBuilder(
             MADDPGConfig(
                 agents=agents,
@@ -303,7 +304,7 @@ class MADDPG(system.System):
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_tables(environment_spec)[0]
+        replay_table = builder.make_replay_tables(environment_spec)
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 

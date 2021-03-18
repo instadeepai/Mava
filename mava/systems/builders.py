@@ -16,7 +16,7 @@
 """MARL system Builder interface."""
 
 import abc
-from typing import Dict, Iterator, List, Optional, Union
+from typing import Dict, Iterator, Optional, Union
 
 import reverb
 import sonnet as snt
@@ -37,10 +37,10 @@ class SystemBuilder(abc.ABC):
     """
 
     @abc.abstractmethod
-    def make_replay_tables(
+    def make_replay_table(
         self,
         environment_spec: specs.EnvironmentSpec,
-    ) -> List[reverb.Table]:
+    ) -> reverb.Table:
         """Create tables to insert data into."""
 
     @abc.abstractmethod
