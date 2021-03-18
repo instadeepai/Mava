@@ -98,15 +98,17 @@ class DecentralisedActorCritic(BaseArchitecture):
 
             # Create variables.
             tf2_utils.create_variables(self._policy_networks[agent_key], [emb_spec])
+            # TODO Remove [0] - this is a temp fix to get this running
             tf2_utils.create_variables(
-                self._critic_networks[agent_key], [crit_obs_spec, crit_act_spec]
+                self._critic_networks[agent_key], [crit_obs_spec[0], crit_act_spec[0]]
             )
 
             # create target network variables
             tf2_utils.create_variables(target_policy_network, [emb_spec])
             tf2_utils.create_variables(target_observation_network, [obs_spec])
+            # TODO Remove [0] - this is a temp fix to get this running
             tf2_utils.create_variables(
-                target_critic_network, [crit_obs_spec, crit_act_spec]
+                target_critic_network, [crit_obs_spec[0], crit_act_spec[0]]
             )
             networks["policies"][agent_key] = self._policy_networks[agent_key]
             networks["critics"][agent_key] = self._critic_networks[agent_key]

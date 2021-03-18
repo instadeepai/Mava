@@ -160,7 +160,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         self._reset_next_step = True
         self._step_type = dm_env.StepType.FIRST
 
-        # TODO we need to main and update dones
+        # TODO we need to maintain and update dones
         self._environment.dones = {
             agent: False for agent in self._environment.possible_agents
         }
