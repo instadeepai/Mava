@@ -39,6 +39,7 @@ class SystemBuilder(abc.ABC):
     @abc.abstractmethod
     def make_replay_table(
         self,
+        replay_table_name: str,
         environment_spec: specs.EnvironmentSpec,
     ) -> reverb.Table:
         """Create tables to insert data into."""

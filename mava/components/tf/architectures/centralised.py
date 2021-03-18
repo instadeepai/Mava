@@ -22,7 +22,7 @@ import sonnet as snt
 from acme import specs
 from acme.tf import utils as tf2_utils
 
-from mava.components.architectures.decentralised import DecentralisedActorCritic
+from mava.components.tf.architectures.decentralised import DecentralisedActorCritic
 
 
 class CentralisedActorCritic(DecentralisedActorCritic):

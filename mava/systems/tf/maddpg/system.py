@@ -23,10 +23,10 @@ from acme import datasets, specs
 from acme.utils import counting, loggers
 
 from mava import adders, core
-from mava.components.tf.architectures import CentralisedActorCritic
+from mava.components.tf.architectures.centralised import CentralisedActorCritic
 from mava.systems import system
+from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
-from mava.systems.tf.builders import SystemBuilder
 from mava.systems.tf.maddpg import training
 
 # TODO: Move this to a types file in future.
@@ -99,11 +99,12 @@ class MADDPGBuilder(SystemBuilder):
 
     def make_replay_table(
         self,
+        replay_table_name: str,
         environment_spec: specs.EnvironmentSpec,
     ) -> reverb.Table:
         """Create tables to insert data into."""
         return reverb.Table(
-            name="replay_table_name",
+            name=replay_table_name,
             sampler=reverb.selectors.Uniform(),
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
@@ -304,7 +305,9 @@ class MADDPG(system.System):
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_tables(environment_spec)
+        replay_table = builder.make_replay_table(
+            replay_table_name=replay_table_name, environment_spec=environment_spec
+        )
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
