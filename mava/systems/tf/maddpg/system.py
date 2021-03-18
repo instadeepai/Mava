@@ -144,7 +144,7 @@ class MADDPGBuilder(SystemBuilder):
         self,
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.Adder] = None,
-        variable_source: Optional[core.VariableSource] = None,
+        variable_clients: Optional[core.VariableSource] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -152,7 +152,7 @@ class MADDPGBuilder(SystemBuilder):
            this should be a callable
             which takes as input observations and returns actions.
           adder: How data is recorded (e.g. added to replay).
-          variable_source: A source providing the necessary executor parameters.
+          variable_clients: A source providing the necessary executor parameters.
         """
         shared_weights = self._config.shared_weights
 
@@ -160,7 +160,7 @@ class MADDPGBuilder(SystemBuilder):
         return executors.FeedForwardExecutor(
             policy_networks=policy_networks,
             shared_weights=shared_weights,
-            variable_source=variable_source,
+            variable_clients=variable_clients,
             adder=adder,
         )
 

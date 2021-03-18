@@ -66,7 +66,7 @@ class SystemBuilder(abc.ABC):
         self,
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.Adder] = None,
-        variable_source: Optional[core.VariableSource] = None,
+        variable_clients: Optional[core.VariableSource] = None,
     ) -> core.Executor:
         """Create an executer instance.
         Args:
@@ -74,7 +74,7 @@ class SystemBuilder(abc.ABC):
             policy networks; this should be a callable
             which takes as input observations and returns actions.
           adder: How data is recorded (e.g. added to replay).
-          variable_source: A source providing the necessary actor parameters.
+          variable_clients: A source providing the necessary actor parameters.
         """
 
     @abc.abstractmethod
