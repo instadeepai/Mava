@@ -164,7 +164,7 @@ class MADDPG(system.System):
             # Create the behavior policy.
             behavior_network = snt.Sequential(
                 [
-                    observation_network,
+                    observation_networks[agent_key],
                     policy_networks[agent_key],
                     networks.ClippedGaussian(sigma),
                     networks.ClipToSpec(act_spec),
@@ -174,12 +174,14 @@ class MADDPG(system.System):
 
             # Create variables.
             tf2_utils.create_variables(policy_networks[agent_key], [emb_spec])
+            # TODO Remove [0] - this is a temp fix to get this running
             tf2_utils.create_variables(
-                critic_networks[agent_key], [critic_state_spec, critic_act_spec]
+                critic_networks[agent_key], [critic_state_spec[0], critic_act_spec[0]]
             )
             tf2_utils.create_variables(target_policy_network, [emb_spec])
+            # TODO Remove [0] - this is a temp fix to get this running
             tf2_utils.create_variables(
-                target_critic_network, [critic_state_spec, critic_act_spec]
+                target_critic_network, [critic_state_spec[0], critic_act_spec[0]]
             )
             tf2_utils.create_variables(target_observation_network, [obs_spec])
 
