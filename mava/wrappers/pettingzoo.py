@@ -103,6 +103,7 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         return observation
 
     # Converts action passed in to action compatitable with envs action space.
+    # TODO This should be defined by the policy network.
     def _convert_action(self, agent: str, action: np.ndarray) -> int:
         updated_action: int = action.item()
         # Convert to discrete if necessary
@@ -238,6 +239,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         return observations
 
     # Converts actions passed in to actions compatitable with envs action space.
+    # TODO This should be defined by the policy network.
     def _convert_actions(self, actions: Dict[str, np.ndarray]) -> Dict[str, int]:
         updated_actions = actions.copy()
         for agent, action in actions.items():
