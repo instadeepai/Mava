@@ -23,7 +23,7 @@ from acme import datasets, specs
 from acme.utils import counting, loggers
 
 from mava import adders, core
-from mava.components.tf.architectures.centralised import CentralisedActorCritic
+from mava.components.tf.architectures import CentralisedActorCritic
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
