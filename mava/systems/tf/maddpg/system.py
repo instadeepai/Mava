@@ -40,10 +40,12 @@ class MADDPGConfig:
             agents: a list of the agent specs (ids).
             agent_types: a list of the types of agents to be used.
             environment_spec: description of the actions, observations, etc.
-            policy_networks: the online (optimized) policies for each agent in the system.
-            critic_networks: the online critic for each agent in the system.
-            observation_networks: dictionary of optional networks to transform the observations before
-              they are fed into any network.
+            policy_networks: the online (optimized) policies for each agent
+              in the system.
+            critic_networks: the online critic for each agent
+              in the system.
+            observation_networks: dictionary of optional networks to transform
+              the observations before they are fed into any network.
             discount: discount to use for TD updates.
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
@@ -257,10 +259,11 @@ class MADDPG(system.System):
             agents: a list of the agent specs (ids).
             agent_types: a list of the types of agents to be used.
             environment_spec: description of the actions, observations, etc.
-            policy_networks: the online (optimized) policies for each agent in the system.
+            policy_networks: the online (optimized) policies for each agent
+              in the system.
             critic_networks: the online critic for each agent in the system.
-            observation_networks: dictionary of optional networks to transform the observations before
-              they are fed into any network.
+            observation_networks: dictionary of optional networks to
+              transform the observations before they are fed into any network.
             discount: discount to use for TD updates.
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
