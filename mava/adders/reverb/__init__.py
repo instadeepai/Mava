@@ -24,4 +24,4 @@ from mava.adders.reverb.base import (
     ReverbParallelAdder,
     Step,
 )
-from mava.adders.reverb.transition import NStepTransitionAdder
+from mava.adders.reverb.transition import ParallelNStepTransitionAdder

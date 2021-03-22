@@ -32,7 +32,8 @@ from acme.adders.reverb import base, utils
 from acme.utils import tree_utils
 
 
-class NStepTransitionAdder(base.ReverbParallelAdder):
+# TODO (Arnu): finish this Adder for parallel MARL case
+class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     """An N-step transition adder.
     This will buffer a sequence of N timesteps in order to form a single N-step
     transition which is added to reverb for future retrieval.
