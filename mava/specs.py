@@ -5,16 +5,16 @@ additional `EnvironmentSpec` class which collects all of the specs for a given
 environment. An `EnvironmentSpec` instance can be created directly or by using
 the `make_environment_spec` helper given a `dm_env.Environment` instance.
 """
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import dm_env
 from acme.specs import EnvironmentSpec
 
 
-class SystemSpec:
+class MAEnvironmentSpec:
     def __init__(self, environment: dm_env.Environment):
         self._environment = environment
-        self.specs = self.make_ma_environment_spec()
+        self._specs = self.make_ma_environment_spec()
 
     def make_ma_environment_spec(
         self,
@@ -35,18 +35,29 @@ class SystemSpec:
             )
         return specs
 
-    def get_agent_type_spec(self) -> Dict[str, EnvironmentSpec]:
+    def get_agent_specs(self) -> Dict[str, EnvironmentSpec]:
+        return self._specs
+
+    def get_agent_type_specs(self) -> Dict[str, EnvironmentSpec]:
         specs = {}
-        agent_types = list({agent.split("_")[0] for agent in self.specs.keys()})
+        agent_types = list({agent.split("_")[0] for agent in self._specs.keys()})
         for agent_type in agent_types:
-            specs[agent_type] = self.specs[f"{agent_type}_0"]
+            specs[agent_type] = self._specs[f"{agent_type}_0"]
         return specs
 
-    def get_agent_types(self) -> List[str]:
-        return list({agent.split("_")[0] for agent in self.specs.keys()})
-
     def get_agent_ids(self) -> List[str]:
-        return list(self.specs.keys())
+        return list(self._specs.keys())
 
-    def get_agent_info(self) -> Tuple[List[str], List[str]]:
-        return self.get_agent_ids(), self.get_agent_types()
+    def get_agent_types(self) -> List[str]:
+        return list({agent.split("_")[0] for agent in self._specs.keys()})
+
+    def get_agents_by_type(self) -> Dict[str, List[str]]:
+        agents_by_type: Dict[str, List[str]] = {}
+        agents_ids = self.get_agent_ids()
+        agent_types = self.get_agent_types()
+        for agent_type in agent_types:
+            agents_by_type[agent_type] = []
+            for agent in agents_ids:
+                if agent_type in agent:
+                    agents_by_type[agent_type].append(agent)
+        return agents_by_type

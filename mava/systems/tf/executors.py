@@ -46,8 +46,6 @@ class FeedForwardExecutor(core.Executor):
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights
 
-    # TODO (Arnu) make it so that if weight_sharing is true it uses agent
-    # type, otherwise it uses agent id.
     @tf.function
     def _policy(
         self, agent: str, observation: types.NestedTensor
