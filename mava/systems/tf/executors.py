@@ -28,7 +28,7 @@ class FeedForwardExecutor(core.Executor):
         self,
         policy_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        adder: Optional[adders.Adder] = None,
+        adder: Optional[adders.ParallelAdder] = None,
         variable_clients: Optional[Dict[str, tf2_variable_utils.VariableClient]] = None,
     ):
         """Initializes the actor.

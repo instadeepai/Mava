@@ -22,7 +22,7 @@ import dm_env
 from acme import adders, types
 
 
-class Adder(adders.Adder):
+class ParallelAdder(adders.Adder):
     """The Adder interface.
     An adder packs together data to send to the replay buffer, and potentially
     performs some reduction/transformation to this data in the process.

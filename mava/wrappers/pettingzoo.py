@@ -163,7 +163,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
         self._reset_next_step = False
-        self._discount = None  # Not used in pettingzoo
+        self._discount = 1.0  # Not used in pettingzoo
         observe = self._environment.reset()
         observations = self._convert_observations(observe)
         return dm_env.restart(observations)
@@ -192,7 +192,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 else dm_env.StepType.MID
             )
         self._reset_next_step = step_type == dm_env.StepType.LAST
-        # TODO (Arnu) make the return a dict of timesteps one for each agent type.
+
         return dm_env.TimeStep(
             observation=observations,
             reward=rewards,
@@ -256,7 +256,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         return discount_specs
 
     @property
-    def environment(self) -> AECEnv:
+    def environment(self) -> ParallelEnv:
         """Returns the wrapped environment."""
         return self._environment
 

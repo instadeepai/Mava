@@ -28,6 +28,8 @@ spec.loader.exec_module(_metadata)  # type: ignore
 reverb_requirements = [
     "dm-reverb",
     "tensorflow>=2.4.0",
+    "jax",
+    "jaxlib",
 ]
 
 tf_requirements = [
@@ -73,11 +75,14 @@ setup(
     keywords="multi-agent reinforcement-learning python machine learning",
     packages=find_packages(),
     install_requires=[
+        "dm-acme",
         "absl-py",
         "dm_env",
         "dm-tree",
         "numpy",
         "pillow",
+        "matplotlib",
+        "dataclasses",
     ],
     extras_require={
         "tf": tf_requirements,

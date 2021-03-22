@@ -16,7 +16,7 @@
 """Example running MADDPG on pettinzoo MPE environments."""
 
 import importlib
-from typing import Dict, Mapping, Sequence, Union
+from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
 import numpy as np
@@ -114,7 +114,7 @@ def make_networks(
     }
 
 
-def main() -> None:
+def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment()
     environment_spec = specs.MAEnvironmentSpec(environment)

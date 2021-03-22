@@ -18,8 +18,9 @@
 from typing import Dict, Tuple
 
 import sonnet as snt
-from acme import specs
+from acme import specs as acme_specs
 
+from mava import specs
 from mava.components.tf.architectures.decentralised import DecentralisedActorCritic
 
 
@@ -42,8 +43,8 @@ class CentralisedActorCritic(DecentralisedActorCritic):
             shared_weights=shared_weights,
         )
 
-    def _get_centralised_spec(self) -> Dict[str, specs.Array]:
-        specs_per_type: Dict[str, specs.Array] = {}
+    def _get_centralised_spec(self) -> Dict[str, acme_specs.Array]:
+        specs_per_type: Dict[str, acme_specs.Array] = {}
         agents_by_type = self._env_spec.get_agents_by_type()
         for agent_type, agents in agents_by_type.items():
             critic_spec = self._agent_specs[agents[0]]
@@ -68,7 +69,7 @@ class CentralisedActorCritic(DecentralisedActorCritic):
 
     def _get_critic_specs(
         self,
-    ) -> Tuple[Dict[str, specs.Array], Dict[str, specs.Array]]:
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
         centralised_specs = self._get_centralised_spec()
 
         critic_obs_specs = {}
