@@ -13,12 +13,11 @@ from mava._metadata import __version__
 
 # Expose core interfaces.
 from mava.core import Executor, Trainer
-from mava.specs import SystemSpec
+from mava.specs import MAEnvironmentSpec
 
 # Expose the environment loop.
 # from mava.environment_loop import EnvironmentLoop
 
 # Internal environment_loop import.
-
 
 # Mava loves you more. ;)

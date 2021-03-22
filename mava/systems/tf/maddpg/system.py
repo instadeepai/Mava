@@ -16,14 +16,15 @@
 """MADDPG system implementation."""
 
 
-from typing import Dict, List
+from typing import Dict
 
 import reverb
 import sonnet as snt
-from acme import datasets, specs
+from acme import datasets
 from acme.adders import reverb as adders
 from acme.utils import counting, loggers
 
+from mava import specs
 from mava.components.tf.architectures import CentralisedActorCritic
 from mava.systems import system
 from mava.systems.tf import executors
@@ -40,9 +41,7 @@ class MADDPG(system.System):
 
     def __init__(
         self,
-        agents: List[str],
-        agent_types: List[str],
-        environment_spec: specs.EnvironmentSpec,
+        environment_spec: specs.MAEnvironmentSpec,
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
@@ -117,8 +116,6 @@ class MADDPG(system.System):
         )
 
         networks = CentralisedActorCritic(
-            agents=agents,
-            agent_types=agent_types,
             environment_spec=environment_spec,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
@@ -136,6 +133,9 @@ class MADDPG(system.System):
         # Create optimizers.
         policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
         critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
+
+        agents = environment_spec.get_agent_ids()
+        agent_types = environment_spec.get_agent_types()
 
         # The learner updates the parameters (and initializes them).
         trainer = training.MADDPGTrainer(
