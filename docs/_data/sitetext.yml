@@ -1,7 +1,7 @@
 header:
     title: Mava
     text: A framework for multi-agent reinforcement learning
-    headerGif: /images/mava.gif
+    headerGif: /images/mava_logo.jpg
     buttons:
       - button: Overview
         buttonlink: /overview

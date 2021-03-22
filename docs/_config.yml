@@ -20,7 +20,7 @@ description: "Multi-Agent Reinforcement Learning Environments"
 author     : Your Name
 copyright  : InstaDeep Ltd
 logo:     #optional, defaults to site title
-  path: /assets/img/mava.png
+  path: /assets/img/mava_logo_icon.jpg
   height: 100 #height in px, defaults to 52px
 
 analytics:
