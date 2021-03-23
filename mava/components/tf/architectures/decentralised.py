@@ -16,104 +16,149 @@
 """Decentralised architectures for multi-agent RL systems"""
 
 import copy
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 import sonnet as snt
-from acme import specs
+from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
 
-from mava.components.tf.architectures import BaseArchitecture
+from mava import specs
+from mava.components.tf.architectures import BaseActorCritic
 
 
-class DecentralisedActorCritic(BaseArchitecture):
+class DecentralisedActorCritic(BaseActorCritic):
     """Decentralised (independent) multi-agent actor critic architecture."""
 
     def __init__(
         self,
-        agents: List[str],
-        agent_types: List[str],
-        environment_spec: specs.EnvironmentSpec,
+        environment_spec: specs.MAEnvironmentSpec,
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
     ):
-        self._agents = agents
-        self._agent_types = agent_types
-        self._environment_spec = environment_spec
+        self._env_spec = environment_spec
+        self._agents = self._env_spec.get_agent_ids()
+        self._agent_types = self._env_spec.get_agent_types()
+        self._agent_specs = self._env_spec.get_agent_specs()
+        self._agent_type_specs = self._env_spec.get_agent_type_specs()
+
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
         self._observation_networks = observation_networks
         self._shared_weights = shared_weights
-        self._agent_keys = self._agent_types if self._shared_weights else self._agents
+        self._actor_agent_keys = (
+            self._agent_types if self._shared_weights else self._agents
+        )
+        self._critic_agent_keys = self._actor_agent_keys
         self._n_agents = len(self._agents)
 
-    def _create_target_networks(
-        self, agent_key: str
-    ) -> Tuple[snt.Module, snt.Module, snt.Module]:
+        self._create_target_networks()
 
-        # Create target networks.
-        target_policy_network = copy.deepcopy(self._policy_networks[agent_key])
-        target_critic_network = copy.deepcopy(self._critic_networks[agent_key])
-        target_observation_network = copy.deepcopy(
-            self._observation_networks[agent_key]
-        )
-        return target_policy_network, target_critic_network, target_observation_network
+    def _create_target_networks(self) -> None:
+        # create target behaviour networks
+        self._target_policy_networks = copy.deepcopy(self._policy_networks)
+        self._target_observation_networks = copy.deepcopy(self._observation_networks)
 
-    def _get_specs(
-        self, agent_key: str
-    ) -> Tuple[specs.Array, specs.Array, specs.Array, Tuple[specs.Array, specs.Array]]:
+        # create target critic networks
+        self._target_critic_networks = copy.deepcopy(self._critic_networks)
 
-        # Get observation and action specs.
-        act_spec = self._environment_spec[agent_key].actions
-        obs_spec = self._environment_spec[agent_key].observations
-        emb_spec = tf2_utils.create_variables(
-            self._observation_networks[agent_key], [obs_spec]
-        )
-        crit_spec = (obs_spec, act_spec)
-        return act_spec, obs_spec, emb_spec, crit_spec
+    def _get_actor_specs(self) -> Dict[str, acme_specs.Array]:
+        actor_obs_specs = {}
+        for agent_key in self._actor_agent_keys:
+            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
 
-    def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
-        networks: Dict[str, Dict[str, snt.Module]] = {
+            # Get observation spec for policy.
+            actor_obs_specs[agent_key] = self._agent_specs[agent_spec_key].observations
+        return actor_obs_specs
+
+    def _get_critic_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        critic_obs_specs = {}
+        critic_act_specs = {}
+        for agent_key in self._critic_agent_keys:
+            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
+
+            # Get observation and action spec for critic.
+            critic_obs_specs[agent_key] = self._agent_specs[agent_spec_key].observations
+            critic_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
+        return critic_obs_specs, critic_act_specs
+
+    def create_actor_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+
+        actor_networks: Dict[str, Dict[str, snt.Module]] = {
             "policies": {},
-            "critics": {},
             "observations": {},
             "target_policies": {},
-            "target_critics": {},
             "target_observations": {},
         }
-        for agent_key in self._agent_keys:
 
-            # get specs
-            act_spec, obs_spec, emb_spec, crit_spec = self._get_specs(agent_key)
-            # create target networks
-            (
-                target_policy_network,
-                target_critic_network,
-                target_observation_network,
-            ) = self._create_target_networks(agent_key)
+        # get actor specs
+        actor_obs_specs = self._get_actor_specs()
 
-            # critic specs
-            crit_obs_spec, crit_act_spec = crit_spec
+        # create policy variables for each agent
+        for agent_key in self._actor_agent_keys:
+
+            obs_spec = actor_obs_specs[agent_key]
+            emb_spec = tf2_utils.create_variables(
+                self._observation_networks[agent_key], [obs_spec]
+            )
 
             # Create variables.
             tf2_utils.create_variables(self._policy_networks[agent_key], [emb_spec])
-            # TODO Remove [0] - this is a temp fix to get this running
+
+            # create target network variables
             tf2_utils.create_variables(
-                self._critic_networks[agent_key], [crit_obs_spec[0], crit_act_spec[0]]
+                self._target_policy_networks[agent_key], [emb_spec]
+            )
+            tf2_utils.create_variables(
+                self._target_observation_networks[agent_key], [obs_spec]
+            )
+
+        actor_networks["policies"] = self._policy_networks
+        actor_networks["observations"] = self._observation_networks
+        actor_networks["target_policies"] = self._target_policy_network
+        actor_networks["target_observations"] = self._target_observation_network
+
+        return actor_networks
+
+    def create_critic_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+
+        critic_networks: Dict[str, Dict[str, snt.Module]] = {
+            "critics": {},
+            "target_critics": {},
+        }
+
+        # get critic specs
+        obs_specs, act_specs = self._get_critic_specs()
+
+        # create critics
+        for agent_key in self._critic_agent_keys:
+
+            # get specs
+            obs_spec = obs_specs[agent_key]
+            act_spec = act_specs[agent_key]
+
+            # Create variables.
+            tf2_utils.create_variables(
+                self._critic_networks[agent_key], [obs_spec, act_spec]
             )
 
             # create target network variables
-            tf2_utils.create_variables(target_policy_network, [emb_spec])
-            tf2_utils.create_variables(target_observation_network, [obs_spec])
-            # TODO Remove [0] - this is a temp fix to get this running
             tf2_utils.create_variables(
-                target_critic_network, [crit_obs_spec[0], crit_act_spec[0]]
+                self._target_critic_networks[agent_key], [obs_spec, act_spec]
             )
-            networks["policies"][agent_key] = self._policy_networks[agent_key]
-            networks["critics"][agent_key] = self._critic_networks[agent_key]
-            networks["observations"][agent_key] = self._observation_networks[agent_key]
-            networks["target_policies"][agent_key] = target_policy_network
-            networks["target_critics"][agent_key] = target_critic_network
-            networks["target_observations"][agent_key] = target_observation_network
+
+        critic_networks["critics"][agent_key] = self._critic_networks
+        critic_networks["target_critics"][agent_key] = self._target_critic_networks
+
+        return critic_networks
+
+    def create_system(
+        self,
+    ) -> Dict[str, Dict[str, snt.Module]]:
+        networks = self.create_actor_variables()
+        critic_networks = self.create_critic_variables()
+        networks.update(critic_networks)
         return networks

@@ -23,7 +23,6 @@ import numpy as np
 import sonnet as snt
 from absl import app, flags
 from acme import types
-from acme.specs import EnvironmentSpec
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
@@ -51,7 +50,7 @@ def make_environment(env_name: str = "simple_spread_v2") -> dm_env.Environment:
 
 
 def make_networks(
-    specs: Dict[str, EnvironmentSpec],
+    environment_spec: specs.MAEnvironmentSpec,
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = False,
@@ -60,6 +59,7 @@ def make_networks(
     num_atoms: int = 51,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
+    specs = environment_spec.get_agent_specs()
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
             key: policy_networks_layer_sizes for key in specs.keys()
@@ -69,6 +69,7 @@ def make_networks(
             key: critic_networks_layer_sizes for key in specs.keys()
         }
 
+    specs = environment_spec.get_agent_specs()
     observation_networks = {}
     policy_networks = {}
     critic_networks = {}
@@ -116,15 +117,12 @@ def make_networks(
 def main() -> None:
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment()
-    environment_specs = specs.SystemSpec(environment)
-    agents, agent_types = environment_specs.get_agent_info()
-    system_networks = make_networks(environment_specs.specs)
+    environment_spec = specs.MAEnvironmentSpec(environment)
+    system_networks = make_networks(environment_spec)
 
     # Construct the agent.
     system = maddpg.MADDPG(
-        agents=agents,
-        agent_types=agent_types,
-        environment_spec=environment_specs.specs,
+        environment_spec=environment_spec,
         policy_networks=system_networks["policies"],
         critic_networks=system_networks["critics"],
         observation_networks=system_networks[
