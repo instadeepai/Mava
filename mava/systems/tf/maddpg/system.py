@@ -276,8 +276,6 @@ class MADDPG(system.System):
     ):
         """Initialize the system.
         Args:
-            agents: a list of the agent specs (ids).
-            agent_types: a list of the types of agents to be used.
             environment_spec: description of the actions, observations, etc.
             policy_networks: the online (optimized) policies for each agent in
                 the system.
