@@ -94,10 +94,13 @@ class MADDPGBuilder(SystemBuilder):
       """
 
     def __init__(self, config: MADDPGConfig):
-        """config: Configuration options for the MADDPG system.
-        agents: a list of the agent specs (ids).
-        agent_types: a list of the types of agents to be used."""
+        """Args:
+        config: Configuration options for the MADDPG system."""
+
         self._config = config
+
+        """ _agents: a list of the agent specs (ids).
+            _agent_types: a list of the types of agents to be used."""
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
 
