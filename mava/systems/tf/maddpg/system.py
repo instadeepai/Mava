@@ -353,9 +353,6 @@ class MADDPG(system.System):
         # Create the actor which defines how we take actions.
         executor = builder.make_executor(networks["policies"], adder)
 
-        agents = environment_spec.get_agent_ids()
-        agent_types = environment_spec.get_agent_types()
-
         # The learner updates the parameters (and initializes them).
         trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
 
