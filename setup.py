@@ -37,6 +37,8 @@ tf_requirements = [
     "trfl",
 ]
 
+jax_requirements = ["jax", "jaxlib"]
+
 env_requirements = ["pettingzoo"]
 
 testing_formatting_requirements = [
@@ -78,9 +80,12 @@ setup(
         "dm-tree",
         "numpy",
         "pillow",
+        "dm-acme",
+        "matplotlib",
     ],
     extras_require={
         "tf": tf_requirements,
+        "jax": jax_requirements,
         "envs": env_requirements,
         "reverb": reverb_requirements,
         "testing_formatting": testing_formatting_requirements,

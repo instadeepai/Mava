@@ -17,4 +17,4 @@
 
 # pylint: disable=unused-import
 
-from mava.adders.base import Adder
+from mava.adders.base import DEFAULT_PRIORITY_TABLE, Adder
