@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import dataclasses
-from typing import Dict, Iterator, List, Optional, Union
+from typing import Dict, Iterator, Optional, Union
 
 import reverb
 import sonnet as snt
@@ -39,8 +39,6 @@ NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
 class MADDPGConfig:
     """Configuration options for the MADDPG system.
     Args:
-            agents: a list of the agent specs (ids).
-            agent_types: a list of the types of agents to be used.
             environment_spec: description of the actions, observations, etc.
             policy_networks: the online (optimized) policies for each agent in
                 the system.
@@ -64,8 +62,6 @@ class MADDPGConfig:
             checkpoint: boolean indicating whether to checkpoint the trainers.
             replay_table_name: string indicating what name to give the replay table."""
 
-    agents: List[str]
-    agent_types: List[str]
     environment_spec: specs.MAEnvironmentSpec
     policy_networks: Dict[str, snt.Module]
     critic_networks: Dict[str, snt.Module]
@@ -98,7 +94,12 @@ class MADDPGBuilder(SystemBuilder):
       """
 
     def __init__(self, config: MADDPGConfig):
+        """config: Configuration options for the MADDPG system.
+        agents: a list of the agent specs (ids).
+        agent_types: a list of the types of agents to be used."""
         self._config = config
+        self.agents = self._config.environment_spec.get_agent_ids()
+        self.agent_types = self._config.environment_spec.get_agent_types()
 
     def make_replay_table(
         self,
@@ -157,7 +158,7 @@ class MADDPGBuilder(SystemBuilder):
           variable_source: A source providing the necessary executor parameters.
         """
         shared_weights = self._config.shared_weights
-        agent_keys = self._config.agent_types if shared_weights else self._config.agents
+        agent_keys = self.agent_types if shared_weights else self.agents
 
         variable_clients = None
         if variable_source:
@@ -208,8 +209,8 @@ class MADDPGBuilder(SystemBuilder):
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the trainer checkpoints itself.
         """
-        agents = self._config.agents
-        agent_types = self._config.agent_types
+        agents = self.agents
+        agent_types = self.agent_types
         shared_weights = self._config.shared_weights
         clipping = self._config.clipping
         discount = self._config.discount
@@ -300,13 +301,8 @@ class MADDPG(system.System):
             checkpoint: boolean indicating whether to checkpoint the trainers.
             replay_table_name: string indicating what name to give the replay table."""
 
-        agents = environment_spec.get_agent_ids()
-        agent_types = environment_spec.get_agent_types()
-
         builder = MADDPGBuilder(
             MADDPGConfig(
-                agents=agents,
-                agent_types=agent_types,
                 environment_spec=environment_spec,
                 policy_networks=policy_networks,
                 critic_networks=critic_networks,
