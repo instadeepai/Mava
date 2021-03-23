@@ -154,7 +154,7 @@ class MADDPGBuilder(SystemBuilder):
            this should be a callable
             which takes as input observations and returns actions.
           adder: How data is recorded (e.g. added to replay).
-          variable_clients: A source providing the necessary executor parameters.
+          variable_source: A source providing the necessary executor parameters.
         """
         shared_weights = self._config.shared_weights
         agent_keys = self._config.agent_types if shared_weights else self._config.agents
