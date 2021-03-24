@@ -49,19 +49,19 @@ class CentralisedActorCritic(DecentralisedActorCritic):
         for agent_type, agents in agents_by_type.items():
             critic_spec = self._agent_specs[agents[0]]
             critic_obs_shape = [
-                0 for dim in self._agent_specs[agents[0]].observations.shape
+                0 for dim in self._agent_specs[agents[0]].observations.observation.shape
             ]
             critic_act_shape = [0 for dim in self._agent_specs[agents[0]].actions.shape]
             for agent in agents:
                 for obs_dim in range(len(critic_obs_shape)):
                     critic_obs_shape[obs_dim] += self._agent_specs[
                         agent
-                    ].observations.shape[obs_dim]
+                    ].observations.observation.shape[obs_dim]
                 for act_dim in range(len(critic_act_shape)):
                     critic_act_shape[act_dim] += self._agent_specs[agent].actions.shape[
                         act_dim
                     ]
-            critic_spec.observations._shape = tuple(critic_obs_shape)
+            critic_spec.observations.observation._shape = tuple(critic_obs_shape)
             critic_spec.actions._shape = tuple(critic_act_shape)
             for agent in agents:
                 specs_per_type[agent] = critic_spec

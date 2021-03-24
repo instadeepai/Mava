@@ -18,12 +18,10 @@ from typing import Dict
 
 import sonnet as snt
 
-from mava import core
-
 """Base architecture interface for multi-agent RL systems"""
 
 
-class BaseArchitecture(core.VariableSource):
+class BaseArchitecture:
     """Base class for MARL architectures.
     Objects which implement this interface provide a set of functions
     to create systems according to a specific architectural design,

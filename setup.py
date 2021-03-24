@@ -85,6 +85,7 @@ setup(
         "pillow",
         "matplotlib",
         "dataclasses",
+        "Box2D",
     ],
     extras_require={
         "tf": tf_requirements,

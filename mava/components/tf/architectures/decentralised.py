@@ -118,8 +118,8 @@ class DecentralisedActorCritic(BaseActorCritic):
 
         actor_networks["policies"] = self._policy_networks
         actor_networks["observations"] = self._observation_networks
-        actor_networks["target_policies"] = self._target_policy_network
-        actor_networks["target_observations"] = self._target_observation_network
+        actor_networks["target_policies"] = self._target_policy_networks
+        actor_networks["target_observations"] = self._target_observation_networks
 
         return actor_networks
 

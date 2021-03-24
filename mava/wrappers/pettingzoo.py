@@ -19,7 +19,7 @@ from typing import Any, Dict, NamedTuple, Union
 import dm_env
 import numpy as np
 from acme import specs, types
-from gym.spaces import Discrete
+from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 
@@ -62,7 +62,6 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         if self._environment.dones[agent]:
             self._environment.step(None)
         else:
-            action = self._convert_action(agent, action)
             self._environment.step(action)
 
         observation = self._convert_observation(agent, observe, done)
@@ -94,7 +93,7 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
             observe = observe["observation"]
             legals = observe["action_mask"]
         else:
-            legals = np.ones(self._environment.action_spaces[agent].n, dtype=np.float32)
+            legals = None
         observation = OLT(
             observation=observe,
             legal_actions=legals,
@@ -102,27 +101,14 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         )
         return observation
 
-    # Converts action passed in to action compatitable with envs action space.
-    # TODO This should be defined by the policy network.
-    def _convert_action(self, agent: str, action: np.ndarray) -> int:
-        updated_action: int = action.item()
-        # Convert to discrete if necessary
-        if (
-            self._environment.action_spaces[agent].contains(updated_action) is False
-        ) & (isinstance(self._environment.action_spaces[agent], Discrete)):
-            updated_action = int(updated_action)
-        return updated_action
-
     def observation_spec(self) -> Dict[str, OLT]:
         observation_specs = {}
         for agent in self._environment.possible_agents:
             observation_specs[agent] = OLT(
-                observation=specs.Array(
-                    self._environment.observation_spaces[agent].shape, np.float32
+                observation=_convert_to_spec(
+                    self._environment.observation_spaces[agent]
                 ),
-                legal_actions=specs.Array(
-                    (self._environment.action_spaces[agent].n,), np.float32
-                ),
+                legal_actions=_convert_to_spec(self._environment.action_spaces[agent]),
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
@@ -130,8 +116,8 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
     def action_spec(self) -> Dict[str, specs.DiscreteArray]:
         action_specs = {}
         for agent in self._environment.possible_agents:
-            action_specs[agent] = specs.DiscreteArray(
-                self._environment.action_spaces[agent].n
+            action_specs[agent] = _convert_to_spec(
+                self._environment.action_spaces[agent]
             )
         return action_specs
 
@@ -191,7 +177,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         if self._reset_next_step:
             return self.reset()
 
-        actions = self._convert_actions(actions)
+        actions = actions
         observations, rewards, dones, infos = self._environment.step(actions)
 
         if self._environment.env_done:
@@ -228,9 +214,8 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 observation = observation["observation"]
                 legals = observation["action_mask"]
             else:
-                legals = np.ones(
-                    self._environment.action_spaces[agent].n, dtype=np.float32
-                )
+                legals = None  # NOTE (Arnu) not sure how this is
+                # handled further down stream.
             observations[agent] = OLT(
                 observation=observation,
                 legal_actions=legals,
@@ -238,40 +223,23 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
             )
         return observations
 
-    # Converts actions passed in to actions compatitable with envs action space.
-    # TODO This should be defined by the policy network.
-    def _convert_actions(self, actions: Dict[str, np.ndarray]) -> Dict[str, int]:
-        updated_actions = actions.copy()
-        for agent, action in actions.items():
-            action = action.item()
-            # Convert to discrete if necessary
-            if (self._environment.action_spaces[agent].contains(action) is False) & (
-                isinstance(self._environment.action_spaces[agent], Discrete)
-            ):
-                action = int(action)
-            updated_actions[agent] = action
-        return updated_actions
-
     def observation_spec(self) -> Dict[str, OLT]:
         observation_specs = {}
         for agent in self._environment.possible_agents:
             observation_specs[agent] = OLT(
-                observation=specs.Array(
-                    self._environment.observation_spaces[agent].shape, np.float32
+                observation=_convert_to_spec(
+                    self._environment.observation_spaces[agent]
                 ),
-                legal_actions=specs.Array(
-                    (self._environment.action_spaces[agent].n,), np.float32
-                ),
+                legal_actions=_convert_to_spec(self._environment.action_spaces[agent]),
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
 
-    def action_spec(self) -> Dict[str, specs.DiscreteArray]:
+    def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
         action_specs = {}
+        action_spaces = self._environment.action_spaces
         for agent in self._environment.possible_agents:
-            action_specs[agent] = specs.DiscreteArray(
-                self._environment.action_spaces[agent].n
-            )
+            action_specs[agent] = _convert_to_spec(action_spaces[agent])
         return action_specs
 
     def reward_spec(self) -> Dict[str, specs.Array]:
