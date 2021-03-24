@@ -13,23 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# mypy: ignore-errors
+
 """Transition adders.
 This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 
-import copy
 import itertools
 import operator
-from typing import Optional
+from typing import Dict, Optional
 
 import numpy as np
 import reverb
 import tensorflow as tf
 import tree
-from acme import specs, types
-from acme.adders.reverb import base, utils
+from acme import specs as acme_specs
+from acme import types
+from acme.adders.reverb import utils
 from acme.utils import tree_utils
+
+from mava import specs as mava_specs
+from mava.adders.reverb import base
 
 
 # TODO (Arnu): finish this Adder for parallel MARL case
@@ -116,10 +121,10 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # N-1, ...). See the Note in the docstring.
 
         # Form the n-step transition given the steps.
-        observation = self._buffer[0].observation
-        action = self._buffer[0].action
+        observations = self._buffer[0].observations
+        actions = self._buffer[0].actions
         extras = self._buffer[0].extras
-        next_observation = self._next_observation
+        next_observations = self._next_observations
 
         # Give the same tree structure to the n-step return accumulator,
         # n-step discount accumulator, and self.discount, so that they can be
@@ -129,7 +134,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             total_discount,
             self_discount,
         ) = tree_utils.broadcast_structures(
-            self._buffer[0].reward, self._buffer[0].discount, self._discount
+            self._buffer[0].rewards, self._buffer[0].discount, self._discount
         )
 
         # Copy total_discount, so that accumulating into it doesn't affect
@@ -172,24 +177,22 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             # Equivalent to: `total_discount *= step.discount`.
             tree.map_structure(operator.imul, total_discount, step_discount)
 
-        # TODO (Kale-ab): for some reason typing is being flagged here
-        # as being incorrect.
         if extras:
             transition = (
-                observation,
-                action,
+                observations,
+                actions,
                 n_step_return,
                 total_discount,
-                next_observation,
+                next_observations,
                 extras,
             )  # type: ignore
         else:
             transition = (
-                observation,
-                action,
+                observations,
+                actions,
                 n_step_return,
                 total_discount,
-                next_observation,
+                next_observations,
             )  # type: ignore
 
         # Create a list of steps.
@@ -197,10 +200,10 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             # utils.final_step_like is expensive (around 0.085ms) to run every time
             # so we cache its output.
             self._final_step_placeholder = utils.final_step_like(
-                self._buffer[0], next_observation
+                self._buffer[0], next_observations
             )
         final_step: base.Step = self._final_step_placeholder._replace(
-            observation=next_observation
+            observations=next_observations
         )
         steps = list(self._buffer) + [final_step]
 
@@ -221,7 +224,9 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
 
     @classmethod
     def signature(
-        cls, environment_spec: specs.EnvironmentSpec, extras_spec: types.NestedSpec = ()
+        cls,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        extras_spec: Dict[str, types.NestedSpec] = {"": ()},
     ) -> tf.TypeSpec:
 
         # This function currently assumes that self._discount is a scalar.
@@ -234,37 +239,26 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # either the signature discount shape nor the signature reward shape, so we
         # can ignore it.
 
-        rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
-            environment_spec.rewards, environment_spec.discounts
-        )
-        rewards_spec = tree.map_structure(
-            _broadcast_specs, rewards_spec, step_discounts_spec
-        )
-        step_discounts_spec = tree.map_structure(copy.deepcopy, step_discounts_spec)
+        agent_specs = environment_spec.get_agent_specs()
+        agents = environment_spec.get_agent_ids()
+        obs_specs = {}
+        act_specs = {}
+        reward_specs = {}
+        extras_spec = {}
+        for agent in agents:
+            obs_specs[agent] = agent_specs[agent].observations
+            act_specs[agent] = agent_specs[agent].actions
+            reward_specs[agent] = agent_specs[agent].rewards
+            extras_spec[agent] = {}
 
         transition_spec = [
-            environment_spec.observations,
-            environment_spec.actions,
-            rewards_spec,
-            step_discounts_spec,
-            environment_spec.observations,  # next_observation
+            obs_specs,
+            act_specs,
+            reward_specs,
+            acme_specs.BoundedArray((), np.float32, minimum=0, maximum=1.0),
+            extras_spec,
+            obs_specs,  # next_observation
         ]
-
-        if extras_spec:
-            transition_spec.append(extras_spec)
-
         return tree.map_structure_with_path(
             base.spec_like_to_tensor_spec, tuple(transition_spec)
         )
-
-
-def _broadcast_specs(*args: specs.Array) -> specs.Array:
-    """Like np.broadcast, but for specs.Array.
-    Args:
-      *args: one or more specs.Array instances.
-    Returns:
-      A specs.Array with the broadcasted shape and dtype of the specs in *args.
-    """
-    bc_info = np.broadcast(*tuple(a.generate_value() for a in args))
-    dtype = np.result_type(*tuple(a.dtype for a in args))
-    return specs.Array(shape=bc_info.shape, dtype=dtype)

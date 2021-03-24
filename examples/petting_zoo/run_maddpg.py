@@ -26,7 +26,7 @@ from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
-from mava import specs
+from mava import specs as mava_specs
 from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
@@ -50,7 +50,7 @@ def make_environment(env_name: str = "simple_spread_v2") -> dm_env.Environment:
 
 
 def make_networks(
-    environment_spec: specs.MAEnvironmentSpec,
+    environment_spec: mava_specs.MAEnvironmentSpec,
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = False,
@@ -117,7 +117,7 @@ def make_networks(
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment()
-    environment_spec = specs.MAEnvironmentSpec(environment)
+    environment_spec = mava_specs.MAEnvironmentSpec(environment)
     system_networks = make_networks(environment_spec)
 
     # Construct the agent.

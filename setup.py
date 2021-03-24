@@ -39,6 +39,8 @@ tf_requirements = [
     "trfl",
 ]
 
+jax_requirements = ["jax", "jaxlib"]
+
 env_requirements = ["pettingzoo"]
 
 testing_formatting_requirements = [
@@ -86,6 +88,7 @@ setup(
     ],
     extras_require={
         "tf": tf_requirements,
+        "jax": jax_requirements,
         "envs": env_requirements,
         "reverb": reverb_requirements,
         "testing_formatting": testing_formatting_requirements,

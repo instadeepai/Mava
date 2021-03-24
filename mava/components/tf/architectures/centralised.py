@@ -20,7 +20,7 @@ from typing import Dict, Tuple
 import sonnet as snt
 from acme import specs as acme_specs
 
-from mava import specs
+from mava import specs as mava_specs
 from mava.components.tf.architectures.decentralised import DecentralisedActorCritic
 
 
@@ -29,7 +29,7 @@ class CentralisedActorCritic(DecentralisedActorCritic):
 
     def __init__(
         self,
-        environment_spec: specs.MAEnvironmentSpec,
+        environment_spec: mava_specs.MAEnvironmentSpec,
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],

@@ -79,10 +79,7 @@ class System(mava.core.Executor, acme.core.VariableSource):
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Dict[str, types.NestedArray]:
-        actions = {}
-        for agent_id, agent in self._actors.items():
-            actions[agent_id] = agent.select_action(observations[agent_id])
-        return actions
+        return self._executor.select_actions(observations)
 
     def observe_first(self, timestep: dm_env.TimeStep) -> None:
         self._executor.observe_first(timestep)

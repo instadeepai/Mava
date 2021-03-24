@@ -36,9 +36,9 @@ import tensorflow as tf
 import tree
 from acme import specs as acme_specs
 from acme import types
-from acme.adders import base
 
-from mava import specs
+from mava import specs as mava_specs
+from mava.adders import base
 
 DEFAULT_PRIORITY_TABLE = "priority_table"
 
@@ -125,7 +125,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         # The state of the adder is captured by a buffer of `buffer_size` steps
         # (generally SAR tuples) and one additional dangling observation.
         self._buffer: Deque = collections.deque(maxlen=buffer_size)
-        self._next_observation = None
+        self._next_observations = None
         self._start_of_episode = False
 
     def __del__(self) -> None:
@@ -160,7 +160,7 @@ class ReverbParallelAdder(base.ParallelAdder):
             self._writer.close()
             self.__writer = None
         self._buffer.clear()
-        self._next_observation = None
+        self._next_observations = None
 
     def add_first(self, timestep: dm_env.TimeStep) -> None:
         """Record the first observation of a trajectory."""
@@ -170,7 +170,7 @@ class ReverbParallelAdder(base.ParallelAdder):
                 "which timestep.first() is True"
             )
 
-        if self._next_observation is not None:
+        if self._next_observations is not None:
             raise ValueError(
                 "adder.reset must be called before adder.add_first "
                 "(called automatically if `next_timestep.last()` is "
@@ -178,7 +178,7 @@ class ReverbParallelAdder(base.ParallelAdder):
             )
 
         # Record the next observation.
-        self._next_observation = timestep.observation
+        self._next_observations = timestep.observation
         self._start_of_episode = True
 
     def add(
@@ -188,7 +188,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         extras: Dict[str, types.NestedArray] = {"": ()},
     ) -> None:
         """Record an action and the following timestep."""
-        if self._next_observation is None:
+        if self._next_observations is None:
             raise ValueError("adder.add_first must be called before adder.add.")
 
         discount = next_timestep.discount
@@ -207,7 +207,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         # Add the timestep to the buffer.
         self._buffer.append(
             Step(
-                observations=self._next_observation,
+                observations=self._next_observations,
                 actions=actions,
                 rewards=next_timestep.reward,
                 discount=discount,
@@ -217,7 +217,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         )
 
         # Record the next observation and write.
-        self._next_observation = next_timestep.observation
+        self._next_observations = next_timestep.observation
         self._start_of_episode = False
         self._write()
 
@@ -229,7 +229,7 @@ class ReverbParallelAdder(base.ParallelAdder):
     @classmethod
     def signature(
         cls,
-        environment_spec: specs.MAEnvironmentSpec,
+        environment_spec: mava_specs.MAEnvironmentSpec,
         extras_spec: Dict[str, types.NestedSpec] = {"": ()},
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
@@ -263,7 +263,7 @@ class ReverbParallelAdder(base.ParallelAdder):
             actions=act_specs,
             rewards=reward_specs,
             # TODO (Arnu): assumes a single discount for all agents,
-            # perhaps generalise to multi-agent case later
+            # perhaps generalise later
             discount=acme_specs.BoundedArray((), np.float32, minimum=0, maximum=1.0),
             start_of_episode=acme_specs.Array(shape=(), dtype=bool),
             extras=extras_spec,

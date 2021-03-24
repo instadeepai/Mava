@@ -19,6 +19,7 @@ from typing import Any, Dict, NamedTuple, Union
 import dm_env
 import numpy as np
 from acme import specs, types
+from gym.spaces import Discrete
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 
@@ -51,7 +52,7 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         observation = self._convert_observation(agent, observe, done)
         return dm_env.restart(observation)
 
-    def step(self, action: int) -> dm_env.TimeStep:
+    def step(self, action: np.ndarray) -> dm_env.TimeStep:
         """Steps the environment."""
         if self._reset_next_step:
             return self.reset()
@@ -61,6 +62,7 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         if self._environment.dones[agent]:
             self._environment.step(None)
         else:
+            action = self._convert_action(agent, action)
             self._environment.step(action)
 
         observation = self._convert_observation(agent, observe, done)
@@ -99,6 +101,17 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
             terminal=np.asarray([done], dtype=np.float32),
         )
         return observation
+
+    # Converts action passed in to action compatitable with envs action space.
+    # TODO This should be defined by the policy network.
+    def _convert_action(self, agent: str, action: np.ndarray) -> int:
+        updated_action: int = action.item()
+        # Convert to discrete if necessary
+        if (
+            self._environment.action_spaces[agent].contains(updated_action) is False
+        ) & (isinstance(self._environment.action_spaces[agent], Discrete)):
+            updated_action = int(updated_action)
+        return updated_action
 
     def observation_spec(self) -> Dict[str, OLT]:
         observation_specs = {}
@@ -160,6 +173,11 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         self._reset_next_step = True
         self._step_type = dm_env.StepType.FIRST
 
+        # TODO we need to maintain and update dones
+        self._environment.dones = {
+            agent: False for agent in self._environment.possible_agents
+        }
+
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
         self._reset_next_step = False
@@ -168,11 +186,12 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         observations = self._convert_observations(observe)
         return dm_env.restart(observations)
 
-    def step(self, actions: int) -> dm_env.TimeStep:
+    def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
         if self._reset_next_step:
             return self.reset()
 
+        actions = self._convert_actions(actions)
         observations, rewards, dones, infos = self._environment.step(actions)
 
         if self._environment.env_done:
@@ -212,12 +231,26 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 legals = np.ones(
                     self._environment.action_spaces[agent].n, dtype=np.float32
                 )
-            observation[agent] = OLT(
+            observations[agent] = OLT(
                 observation=observation,
                 legal_actions=legals,
                 terminal=np.asarray([self._environment.dones[agent]], dtype=np.float32),
             )
         return observations
+
+    # Converts actions passed in to actions compatitable with envs action space.
+    # TODO This should be defined by the policy network.
+    def _convert_actions(self, actions: Dict[str, np.ndarray]) -> Dict[str, int]:
+        updated_actions = actions.copy()
+        for agent, action in actions.items():
+            action = action.item()
+            # Convert to discrete if necessary
+            if (self._environment.action_spaces[agent].contains(action) is False) & (
+                isinstance(self._environment.action_spaces[agent], Discrete)
+            ):
+                action = int(action)
+            updated_actions[agent] = action
+        return updated_actions
 
     def observation_spec(self) -> Dict[str, OLT]:
         observation_specs = {}

@@ -31,6 +31,10 @@ class BaseArchitecture(core.VariableSource):
     """
 
     @abc.abstractmethod
+    def create_actor_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+        """Create network variables for actors in the system."""
+
+    @abc.abstractmethod
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         """Create system architecture."""
 
@@ -41,10 +45,6 @@ class BaseActorCritic(BaseArchitecture):
     to create systems according to a specific architectural design,
     e.g. decentralised, centralised or networked.
     """
-
-    @abc.abstractmethod
-    def create_actor_variables(self) -> Dict[str, Dict[str, snt.Module]]:
-        """Create network variables for actors in the system."""
 
     @abc.abstractmethod
     def create_critic_variables(self) -> Dict[str, Dict[str, snt.Module]]:

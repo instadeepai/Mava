@@ -15,6 +15,7 @@ class MAEnvironmentSpec:
     def __init__(self, environment: dm_env.Environment):
         self._environment = environment
         self._specs = self.make_ma_environment_spec()
+        self._keys = self._specs.keys()
 
     def make_ma_environment_spec(
         self,
@@ -40,16 +41,16 @@ class MAEnvironmentSpec:
 
     def get_agent_type_specs(self) -> Dict[str, EnvironmentSpec]:
         specs = {}
-        agent_types = list({agent.split("_")[0] for agent in self._specs.keys()})
+        agent_types = list({agent.split("_")[0] for agent in self._keys})
         for agent_type in agent_types:
             specs[agent_type] = self._specs[f"{agent_type}_0"]
         return specs
 
     def get_agent_ids(self) -> List[str]:
-        return list(self._specs.keys())
+        return list(self._keys)
 
     def get_agent_types(self) -> List[str]:
-        return list({agent.split("_")[0] for agent in self._specs.keys()})
+        return list({agent.split("_")[0] for agent in self._keys})
 
     def get_agents_by_type(self) -> Dict[str, List[str]]:
         agents_by_type: Dict[str, List[str]] = {}

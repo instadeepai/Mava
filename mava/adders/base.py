@@ -21,6 +21,8 @@ from typing import Dict
 import dm_env
 from acme import adders, types
 
+DEFAULT_PRIORITY_TABLE = "priority_table"
+
 
 class ParallelAdder(adders.Adder):
     """The Adder interface.
