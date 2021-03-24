@@ -15,6 +15,7 @@
 
 """Commonly used centralised architectures for multi-agent RL systems"""
 
+import copy
 from typing import Dict, Tuple
 
 import sonnet as snt
@@ -57,7 +58,7 @@ class CentralisedActorCritic(DecentralisedActorCritic):
         #  observations/actions inputs of
         #  agents from different types as well. Maybe use a multiplexer to do so?
         for agent_type, agents in agents_by_type.items():
-            critic_spec = self._agent_specs[agents[0]]
+            critic_spec = copy.deepcopy(self._agent_specs[agents[0]])
 
             critic_obs_shape = self._embed_specs[agents[0]].copy()
             critic_obs_shape.insert(0, len(agents))
