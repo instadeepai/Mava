@@ -63,7 +63,7 @@ class CentralisedActorCritic(DecentralisedActorCritic):
             critic_obs_shape = self._embed_specs[agents[0]].copy()
             critic_obs_shape.insert(0, len(agents))
 
-            critic_act_shape = self._agent_specs[agents[0]].copy()
+            critic_act_shape = self._agent_specs[agents[0]].actions.shape.copy()
             critic_act_shape.insert(0, len(agents))
 
             critic_spec.observations._shape = tuple(critic_obs_shape)
