@@ -55,8 +55,8 @@ class CentralisedActorCritic(DecentralisedActorCritic):
         # TODO (dries): Add the option of directly getting state information
         #  from the environment.
         # TODO (dries): Make the critic more general and allow the critic network to get
-        #  observations/actions inputs of
-        #  agents from different types as well. Maybe use a multiplexer to do so?
+        #  observations/actions inputs of agents from different types as well.
+        #  Maybe use a multiplexer to do so?
         for agent_type, agents in agents_by_type.items():
             critic_spec = copy.deepcopy(self._agent_specs[agents[0]])
 
