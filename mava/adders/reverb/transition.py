@@ -19,7 +19,7 @@
 This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
-
+import copy
 import itertools
 import operator
 from typing import Dict, Optional
@@ -30,11 +30,12 @@ import tensorflow as tf
 import tree
 from acme import specs as acme_specs
 from acme import types
-from acme.adders.reverb import utils
+
+# from acme.adders.reverb import utils as acme_utils
 from acme.utils import tree_utils
 
 from mava import specs as mava_specs
-from mava.adders.reverb import base
+from mava.adders.reverb import base, utils
 
 
 # TODO (Arnu): finish this Adder for parallel MARL case
@@ -125,16 +126,35 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         actions = self._buffer[0].actions
         extras = self._buffer[0].extras
         next_observations = self._next_observations
+        self._discounts = {agent: self._discount for agent in observations.keys()}
+
+        # print("OBS:", observations)
+        # print("ACT:", actions)
+        # print("EXTRA:", extras)
+        # print("NEXT_OBS:", next_observations)
+        # print("DISCOUNTS:", self._discounts)
 
         # Give the same tree structure to the n-step return accumulator,
         # n-step discount accumulator, and self.discount, so that they can be
         # iterated in parallel using tree.map_structure.
+
+        # print("REWARDS: ", self._buffer[0].rewards)
+        # print("DISCOUNTS: ", self._buffer[0].discounts)
+        # print("SELF DISCOUNTS: ", self._discounts)
+        # NOTE (Arnu): temp fix for empty rewards dict
+        if not self._buffer[0].rewards:
+            rewards = {
+                agent: np.dtype("float32").type(0.0)
+                for agent in self._buffer[0].discounts.keys()
+            }
+        else:
+            rewards = self._buffer[0].rewards
         (
             n_step_return,
             total_discount,
             self_discount,
         ) = tree_utils.broadcast_structures(
-            self._buffer[0].rewards, self._buffer[0].discount, self._discount
+            rewards, self._buffer[0].discounts, self._discounts
         )
 
         # Copy total_discount, so that accumulating into it doesn't affect
@@ -155,18 +175,32 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # discount we don't apply it twice. Inside the following loop we will
         # apply this right before summing up the n_step_return.
         for step in itertools.islice(self._buffer, 1, None):
+            # print("DISCOUNTS:", step.discounts)
+            # print("REWARDS:", step.rewards)
+            # print("TOTAL_DISCOUNTS:", total_discount)
+
+            # NOTE (Arnu): temp fix for empty rewards dict
+            if not step.rewards:
+                rewards = {
+                    agent: np.dtype("float32").type(0.0)
+                    for agent in step.discounts.keys()
+                }
+            else:
+                rewards = step.rewards
+            # print(rewards)
+            # print(type(rewards))
             (
                 step_discount,
                 step_reward,
                 total_discount,
-            ) = tree_utils.broadcast_structures(
-                step.discount, step.reward, total_discount
-            )
+            ) = tree_utils.broadcast_structures(step.discounts, rewards, total_discount)
 
             # Equivalent to: `total_discount *= self._discount`.
+            # print("Computing total discount")
             tree.map_structure(operator.imul, total_discount, self_discount)
 
             # Equivalent to: `n_step_return += step.reward * total_discount`.
+            # print("Computing total n_step reward")
             tree.map_structure(
                 lambda nsr, sr, td: operator.iadd(nsr, sr * td),
                 n_step_return,
@@ -175,6 +209,9 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             )
 
             # Equivalent to: `total_discount *= step.discount`.
+            # print("Computing total discount with step.discount")
+            # print("TOTAL DISCOUNT", total_discount)
+            # print("STEP COUNT", step_discount)
             tree.map_structure(operator.imul, total_discount, step_discount)
 
         if extras:
@@ -205,9 +242,14 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         final_step: base.Step = self._final_step_placeholder._replace(
             observations=next_observations
         )
+        # print("FINAL STEP: ", final_step)
         steps = list(self._buffer) + [final_step]
 
+        # print("STEPS: ", steps)
+        # print("STEPS length: ", len(steps))
         # Calculate the priority for this transition.
+
+        # NOTE (Arnu): removed because of errors
         table_priorities = utils.calculate_priorities(self._priority_fns, steps)
 
         # Insert the transition into replay along with its priority.
@@ -241,24 +283,52 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
 
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
+
         obs_specs = {}
         act_specs = {}
         reward_specs = {}
+        step_discount_specs = {}
         extras_spec = {}
         for agent in agents:
+
+            rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
+                agent_specs[agent].rewards, agent_specs[agent].discounts
+            )
+
+            rewards_spec = tree.map_structure(
+                _broadcast_specs, rewards_spec, step_discounts_spec
+            )
+            step_discounts_spec = tree.map_structure(copy.deepcopy, step_discounts_spec)
+
             obs_specs[agent] = agent_specs[agent].observations
             act_specs[agent] = agent_specs[agent].actions
-            reward_specs[agent] = agent_specs[agent].rewards
+            reward_specs[agent] = rewards_spec
+            step_discount_specs[agent] = step_discounts_spec
             extras_spec[agent] = {}
 
         transition_spec = [
             obs_specs,
             act_specs,
             reward_specs,
-            acme_specs.BoundedArray((), np.float32, minimum=0, maximum=1.0),
-            extras_spec,
+            step_discount_specs,
             obs_specs,  # next_observation
         ]
+
+        if extras_spec:
+            transition_spec.append(extras_spec)
+
         return tree.map_structure_with_path(
             base.spec_like_to_tensor_spec, tuple(transition_spec)
         )
+
+
+def _broadcast_specs(*args: acme_specs.Array) -> acme_specs.Array:
+    """Like np.broadcast, but for specs.Array.
+    Args:
+      *args: one or more specs.Array instances.
+    Returns:
+      A specs.Array with the broadcasted shape and dtype of the specs in *args.
+    """
+    bc_info = np.broadcast(*tuple(a.generate_value() for a in args))
+    dtype = np.result_type(*tuple(a.dtype for a in args))
+    return acme_specs.Array(shape=bc_info.shape, dtype=dtype)

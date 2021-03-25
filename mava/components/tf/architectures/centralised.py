@@ -15,7 +15,7 @@
 
 """Commonly used centralised architectures for multi-agent RL systems"""
 
-from typing import Dict, Tuple
+from typing import Dict
 
 import sonnet as snt
 from acme import specs as acme_specs
@@ -33,6 +33,7 @@ class CentralisedActorCritic(DecentralisedActorCritic):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
     ):
         super().__init__(
@@ -40,45 +41,11 @@ class CentralisedActorCritic(DecentralisedActorCritic):
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             observation_networks=observation_networks,
+            behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         )
 
-    def _get_centralised_spec(self) -> Dict[str, acme_specs.Array]:
-        specs_per_type: Dict[str, acme_specs.Array] = {}
-        agents_by_type = self._env_spec.get_agents_by_type()
-        for agent_type, agents in agents_by_type.items():
-            critic_spec = self._agent_specs[agents[0]]
-            critic_obs_shape = [
-                0 for dim in self._agent_specs[agents[0]].observations.observation.shape
-            ]
-            critic_act_shape = [0 for dim in self._agent_specs[agents[0]].actions.shape]
-            for agent in agents:
-                for obs_dim in range(len(critic_obs_shape)):
-                    critic_obs_shape[obs_dim] += self._agent_specs[
-                        agent
-                    ].observations.observation.shape[obs_dim]
-                for act_dim in range(len(critic_act_shape)):
-                    critic_act_shape[act_dim] += self._agent_specs[agent].actions.shape[
-                        act_dim
-                    ]
-            critic_spec.observations.observation._shape = tuple(critic_obs_shape)
-            critic_spec.actions._shape = tuple(critic_act_shape)
-            for agent in agents:
-                specs_per_type[agent] = critic_spec
-        return specs_per_type
-
     def _get_critic_specs(
         self,
-    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
-        centralised_specs = self._get_centralised_spec()
-
-        critic_obs_specs = {}
-        critic_act_specs = {}
-
-        for agent_key in self._critic_agent_keys:
-            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
-
-            # Get observation and action spec for critic.
-            critic_obs_specs[agent_key] = centralised_specs[agent_spec_key].observations
-            critic_act_specs[agent_key] = centralised_specs[agent_spec_key].actions
-        return critic_obs_specs, critic_act_specs
+    ) -> Dict[str, acme_specs.Array]:
+        """Implement centralised critic spec"""

@@ -93,7 +93,10 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
             observe = observe["observation"]
             legals = observe["action_mask"]
         else:
-            legals = None
+            legals = np.ones(
+                _convert_to_spec(self._environment.action_spaces[agent]).shape,
+                dtype=np.float32,
+            )
         observation = OLT(
             observation=observe,
             legal_actions=legals,
@@ -167,7 +170,10 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
         self._reset_next_step = False
-        self._discount = 1.0  # Not used in pettingzoo
+        self._discounts = {
+            agent: np.dtype("float32").type(1.0)
+            for agent in self._environment.possible_agents
+        }
         observe = self._environment.reset()
         observations = self._convert_observations(observe)
         return dm_env.restart(observations)
@@ -179,6 +185,9 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
         actions = actions
         observations, rewards, dones, infos = self._environment.step(actions)
+        rewards = {
+            agent: np.dtype("float32").type(reward) for agent, reward in rewards.items()
+        }
 
         if self._environment.env_done:
             self._environment.step(None)
@@ -201,7 +210,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         return dm_env.TimeStep(
             observation=observations,
             reward=rewards,
-            discount=self._discount,
+            discount=self._discounts,
             step_type=step_type,
         )
 
@@ -211,11 +220,13 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         observations: Dict[str, OLT] = {}
         for agent, observation in observes.items():
             if isinstance(observation, dict) and "action_mask" in observation:
-                observation = observation["observation"]
                 legals = observation["action_mask"]
+                observation = observation["observation"]
             else:
-                legals = None  # NOTE (Arnu) not sure how this is
-                # handled further down stream.
+                legals = np.ones(
+                    _convert_to_spec(self._environment.action_spaces[agent]).shape,
+                    dtype=np.float32,
+                )
             observations[agent] = OLT(
                 observation=observation,
                 legal_actions=legals,

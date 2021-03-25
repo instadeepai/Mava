@@ -49,7 +49,7 @@ class Step(NamedTuple):
     observations: Dict[str, types.NestedArray]
     actions: Dict[str, types.NestedArray]
     rewards: Dict[str, types.NestedArray]
-    discount: types.NestedArray
+    discounts: Dict[str, types.NestedArray]
     start_of_episode: Union[bool, acme_specs.Array, tf.Tensor, Tuple[()]]
     extras: Dict[str, types.NestedArray]
 
@@ -60,7 +60,7 @@ class PriorityFnInput(NamedTuple):
     observations: Dict[str, types.NestedArray]
     actions: Dict[str, types.NestedArray]
     rewards: Dict[str, types.NestedArray]
-    discounts: types.NestedArray
+    discounts: Dict[str, types.NestedArray]
     start_of_episode: types.NestedArray
     extras: Dict[str, types.NestedArray]
 
@@ -193,6 +193,7 @@ class ReverbParallelAdder(base.ParallelAdder):
 
         discount = next_timestep.discount
         if next_timestep.last():
+            # print("LAST")
             # Terminal timesteps created by dm_env.termination() will have a scalar
             # discount of 0.0. This may not match the array shape / nested structure
             # of the previous timesteps' discounts. The below will match
@@ -205,28 +206,33 @@ class ReverbParallelAdder(base.ParallelAdder):
                 )
 
         # Add the timestep to the buffer.
+        # print("APPENDING TO BUFFER")
         self._buffer.append(
             Step(
                 observations=self._next_observations,
                 actions=actions,
                 rewards=next_timestep.reward,
-                discount=discount,
+                discounts=discount,
                 start_of_episode=self._start_of_episode,
                 extras=extras,
             )
         )
 
-        # Record the next observation and write.
-        self._next_observations = next_timestep.observation
-        self._start_of_episode = False
-        self._write()
-
         # Write the last "dangling" observation.
         if next_timestep.last():
+            self._start_of_episode = False
+            self._write()
+
+            # print("LAST writing and reset.")
             self._write_last()
             self.reset()
+        else:
+            # Record the next observation and write.
+            self._next_observations = next_timestep.observation
+            self._start_of_episode = False
+            self._write()
 
-    @classmethod
+    @abc.abstractmethod
     def signature(
         cls,
         environment_spec: mava_specs.MAEnvironmentSpec,
@@ -246,29 +252,6 @@ class ReverbParallelAdder(base.ParallelAdder):
         Returns:
           A `Step` whose leaf nodes are `tf.TensorSpec` objects.
         """
-        agent_specs = environment_spec.get_agent_specs()
-        agents = environment_spec.get_agent_ids()
-        obs_specs = {}
-        act_specs = {}
-        reward_specs = {}
-        extras_spec = {}
-        for agent in agents:
-            obs_specs[agent] = agent_specs[agent].observations
-            act_specs[agent] = agent_specs[agent].actions
-            reward_specs[agent] = agent_specs[agent].rewards
-            extras_spec[agent] = {}
-
-        spec_step = Step(
-            observations=obs_specs,
-            actions=act_specs,
-            rewards=reward_specs,
-            # TODO (Arnu): assumes a single discount for all agents,
-            # perhaps generalise later
-            discount=acme_specs.BoundedArray((), np.float32, minimum=0, maximum=1.0),
-            start_of_episode=acme_specs.Array(shape=(), dtype=bool),
-            extras=extras_spec,
-        )
-        return tree.map_structure_with_path(spec_like_to_tensor_spec, spec_step)
 
     @abc.abstractmethod
     def _write(self) -> None:

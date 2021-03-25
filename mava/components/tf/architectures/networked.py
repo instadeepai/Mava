@@ -52,6 +52,7 @@ class NetworkedActorCritic(DecentralisedActorCritic, NetworkedSystem):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
     ):
         super().__init__(
@@ -59,6 +60,7 @@ class NetworkedActorCritic(DecentralisedActorCritic, NetworkedSystem):
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             observation_networks=observation_networks,
+            behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         )
 

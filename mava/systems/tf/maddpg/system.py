@@ -25,7 +25,7 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import CentralisedActorCritic
+from mava.components.tf.architectures import DecentralisedActorCritic
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
@@ -142,7 +142,7 @@ class MADDPGBuilder(SystemBuilder):
           replay_client: Reverb Client which points to the replay server.
         """
         return reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns={self._config.replay_table_name: lambda x: 1.0},
+            priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
             client=replay_client,
             n_step=self._config.n_step,
             discount=self._config.discount,
@@ -263,6 +263,7 @@ class MADDPG(system.System):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -341,16 +342,17 @@ class MADDPG(system.System):
         dataset = builder.make_dataset_iterator(replay_client)
 
         # Create the networks
-        networks = CentralisedActorCritic(
+        networks = DecentralisedActorCritic(
             environment_spec=environment_spec,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             observation_networks=observation_networks,
+            behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         ).create_system()
 
         # Create the actor which defines how we take actions.
-        executor = builder.make_executor(networks["policies"], adder)
+        executor = builder.make_executor(networks["behaviors"], adder)
 
         # The learner updates the parameters (and initializes them).
         trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
