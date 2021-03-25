@@ -15,6 +15,7 @@
 
 """Commonly used centralised architectures for multi-agent RL systems"""
 
+import copy
 from typing import Dict, Tuple
 
 import sonnet as snt
@@ -43,42 +44,39 @@ class CentralisedActorCritic(DecentralisedActorCritic):
             shared_weights=shared_weights,
         )
 
-    def _get_centralised_spec(self) -> Dict[str, acme_specs.Array]:
-        specs_per_type: Dict[str, acme_specs.Array] = {}
-        agents_by_type = self._env_spec.get_agents_by_type()
-        for agent_type, agents in agents_by_type.items():
-            critic_spec = self._agent_specs[agents[0]]
-            critic_obs_shape = [
-                0 for dim in self._agent_specs[agents[0]].observations.shape
-            ]
-            critic_act_shape = [0 for dim in self._agent_specs[agents[0]].actions.shape]
-            for agent in agents:
-                for obs_dim in range(len(critic_obs_shape)):
-                    critic_obs_shape[obs_dim] += self._agent_specs[
-                        agent
-                    ].observations.shape[obs_dim]
-                for act_dim in range(len(critic_act_shape)):
-                    critic_act_shape[act_dim] += self._agent_specs[agent].actions.shape[
-                        act_dim
-                    ]
-            critic_spec.observations._shape = tuple(critic_obs_shape)
-            critic_spec.actions._shape = tuple(critic_act_shape)
-            for agent in agents:
-                specs_per_type[agent] = critic_spec
-        return specs_per_type
-
     def _get_critic_specs(
         self,
     ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
-        centralised_specs = self._get_centralised_spec()
+        specs_per_type: Dict[str, acme_specs.Array] = {}
+        agents_by_type = self._env_spec.get_agents_by_type()
+
+        # Create one critic per agent. Each critic gets the concatenated
+        # observations/actions of each agent of the same type as the agent.
+        # TODO (dries): Add the option of directly getting state information
+        #  from the environment.
+        # TODO (dries): Make the critic more general and allow the critic network to get
+        #  observations/actions inputs of agents from different types as well.
+        #  Maybe use a multiplexer to do so?
+        for agent_type, agents in agents_by_type.items():
+            critic_spec = copy.deepcopy(self._agent_specs[agents[0]])
+
+            critic_obs_shape = copy.copy(self._embed_specs[agents[0]].shape)
+            critic_obs_shape.insert(0, len(agents))
+
+            critic_act_shape = copy.copy(self._agent_specs[agents[0]].actions.shape)
+            critic_act_shape.insert(0, len(agents))
+
+            critic_spec.observations._shape = tuple(critic_obs_shape)
+            critic_spec.actions._shape = tuple(critic_act_shape)
+
+            specs_per_type[agent_type] = critic_spec
 
         critic_obs_specs = {}
         critic_act_specs = {}
-
         for agent_key in self._critic_agent_keys:
-            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
+            agent_type = agent_key.split("_")[0]
 
             # Get observation and action spec for critic.
-            critic_obs_specs[agent_key] = centralised_specs[agent_spec_key].observations
-            critic_act_specs[agent_key] = centralised_specs[agent_spec_key].actions
+            critic_obs_specs[agent_key] = specs_per_type[agent_type].observations
+            critic_act_specs[agent_key] = specs_per_type[agent_type].actions
         return critic_obs_specs, critic_act_specs
