@@ -16,7 +16,7 @@
 """Decentralised architectures for multi-agent RL systems"""
 
 import copy
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 import sonnet as snt
 from acme import specs as acme_specs
@@ -77,14 +77,14 @@ class DecentralisedActorCritic(BaseActorCritic):
 
     def _get_critic_specs(
         self,
-    ) -> Dict[str, acme_specs.Array]:
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
         critic_act_specs = {}
         for agent_key in self._critic_agent_keys:
             agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
 
             # Get observation and action spec for critic.
             critic_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
-        return critic_act_specs
+        return self._embed_specs, critic_act_specs
 
     def create_actor_variables(self) -> Dict[str, Dict[str, snt.Module]]:
 
@@ -134,13 +134,13 @@ class DecentralisedActorCritic(BaseActorCritic):
         }
 
         # get critic specs
-        act_specs = self._get_critic_specs()
+        embed_specs, act_specs = self._get_critic_specs()
 
         # create critics
         for agent_key in self._critic_agent_keys:
 
             # get specs
-            emb_spec = self._embed_specs[agent_key]
+            emb_spec = embed_specs[agent_key]
             act_spec = act_specs[agent_key]
 
             # Create variables.
