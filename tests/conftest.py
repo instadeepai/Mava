@@ -34,6 +34,7 @@ class Helpers:
     def verify_all_props_not_none(props_which_should_not_be_none: list) -> bool:
         return all(prop is not None for prop in props_which_should_not_be_none)
 
+    # Return an env - currently Pettingzoo envs.
     @staticmethod
     def retrieve_env(env_spec: EnvSpec) -> Tuple[Union[AECEnv, ParallelEnv], int]:
         env, num_agents = None, None
@@ -49,6 +50,7 @@ class Helpers:
         num_agents = len(env.agents)
         return env, num_agents
 
+    # Returns a wrapper.
     @staticmethod
     def retrieve_wrapper(
         env_spec: EnvSpec,
