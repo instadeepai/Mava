@@ -91,8 +91,8 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         self, agent: str, observe: Union[dict, np.ndarray], done: bool
     ) -> OLT:
         if isinstance(observe, dict) and "action_mask" in observe:
-            observe = observe["observation"]
             legals = observe["action_mask"]
+            observe = observe["observation"]
         else:
             legals = np.ones(self._environment.action_spaces[agent].n, dtype=np.float32)
         observation = OLT(
@@ -173,17 +173,15 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         self._reset_next_step = True
         self._step_type = dm_env.StepType.FIRST
 
-        # TODO we need to maintain and update dones
-        self._environment.dones = {
-            agent: False for agent in self._environment.possible_agents
-        }
-
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
         self._reset_next_step = False
         self._discount = None  # Not used in pettingzoo
+
         observe = self._environment.reset()
-        observations = self._convert_observations(observe)
+        observations = self._convert_observations(
+            observe, {agent: False for agent in self.possible_agents}
+        )
         return dm_env.restart(observations)
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
@@ -199,7 +197,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         else:
             self._environment.step(actions)
 
-        observations = self._convert_observations(observations)
+        observations = self._convert_observations(observations, dones)
 
         if self._step_type == dm_env.StepType.FIRST:
             step_type = self._step_type
@@ -221,12 +219,14 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
     # Convert PettingZoo observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
-    def _convert_observations(self, observes: Dict[str, np.ndarray]) -> Dict[str, OLT]:
+    def _convert_observations(
+        self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
+    ) -> Dict[str, OLT]:
         observations: Dict[str, OLT] = {}
         for agent, observation in observes.items():
             if isinstance(observation, dict) and "action_mask" in observation:
-                observation = observation["observation"]
                 legals = observation["action_mask"]
+                observation = observation["observation"]
             else:
                 legals = np.ones(
                     self._environment.action_spaces[agent].n, dtype=np.float32
@@ -234,8 +234,9 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
             observations[agent] = OLT(
                 observation=observation,
                 legal_actions=legals,
-                terminal=np.asarray([self._environment.dones[agent]], dtype=np.float32),
+                terminal=np.asarray([dones[agent]], dtype=np.float32),
             )
+
         return observations
 
     # Converts actions passed in to actions compatitable with envs action space.
