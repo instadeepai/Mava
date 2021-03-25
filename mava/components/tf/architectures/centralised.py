@@ -60,7 +60,7 @@ class CentralisedActorCritic(DecentralisedActorCritic):
         for agent_type, agents in agents_by_type.items():
             critic_spec = copy.deepcopy(self._agent_specs[agents[0]])
 
-            critic_obs_shape = copy.copy(self._embed_specs[agents[0]])
+            critic_obs_shape = copy.copy(self._embed_specs[agents[0]].shape)
             critic_obs_shape.insert(0, len(agents))
 
             critic_act_shape = copy.copy(self._agent_specs[agents[0]].actions.shape)
