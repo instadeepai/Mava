@@ -16,13 +16,13 @@
 """Decentralised architectures for multi-agent RL systems"""
 
 import copy
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 
 import sonnet as snt
 from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
 
-from mava import specs
+from mava import specs as mava_specs
 from mava.components.tf.architectures import BaseActorCritic
 
 
@@ -31,10 +31,11 @@ class DecentralisedActorCritic(BaseActorCritic):
 
     def __init__(
         self,
-        environment_spec: specs.MAEnvironmentSpec,
+        environment_spec: mava_specs.MAEnvironmentSpec,
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
     ):
         self._env_spec = environment_spec
@@ -46,12 +47,14 @@ class DecentralisedActorCritic(BaseActorCritic):
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
         self._observation_networks = observation_networks
+        self._behavior_networks = behavior_networks
         self._shared_weights = shared_weights
         self._actor_agent_keys = (
             self._agent_types if self._shared_weights else self._agents
         )
         self._critic_agent_keys = self._actor_agent_keys
         self._n_agents = len(self._agents)
+        self._embed_specs: Dict[str, Any] = {}
 
         self._create_target_networks()
 
@@ -75,15 +78,13 @@ class DecentralisedActorCritic(BaseActorCritic):
     def _get_critic_specs(
         self,
     ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
-        critic_obs_specs = {}
         critic_act_specs = {}
         for agent_key in self._critic_agent_keys:
             agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
 
             # Get observation and action spec for critic.
-            critic_obs_specs[agent_key] = self._agent_specs[agent_spec_key].observations
             critic_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
-        return critic_obs_specs, critic_act_specs
+        return self._embed_specs, critic_act_specs
 
     def create_actor_variables(self) -> Dict[str, Dict[str, snt.Module]]:
 
@@ -100,10 +101,11 @@ class DecentralisedActorCritic(BaseActorCritic):
         # create policy variables for each agent
         for agent_key in self._actor_agent_keys:
 
-            obs_spec = actor_obs_specs[agent_key]
+            obs_spec = actor_obs_specs[agent_key].observation
             emb_spec = tf2_utils.create_variables(
                 self._observation_networks[agent_key], [obs_spec]
             )
+            self._embed_specs[agent_key] = emb_spec
 
             # Create variables.
             tf2_utils.create_variables(self._policy_networks[agent_key], [emb_spec])
@@ -118,8 +120,9 @@ class DecentralisedActorCritic(BaseActorCritic):
 
         actor_networks["policies"] = self._policy_networks
         actor_networks["observations"] = self._observation_networks
-        actor_networks["target_policies"] = self._target_policy_network
-        actor_networks["target_observations"] = self._target_observation_network
+        actor_networks["behaviors"] = self._behavior_networks
+        actor_networks["target_policies"] = self._target_policy_networks
+        actor_networks["target_observations"] = self._target_observation_networks
 
         return actor_networks
 
@@ -131,27 +134,27 @@ class DecentralisedActorCritic(BaseActorCritic):
         }
 
         # get critic specs
-        obs_specs, act_specs = self._get_critic_specs()
+        embed_specs, act_specs = self._get_critic_specs()
 
         # create critics
         for agent_key in self._critic_agent_keys:
 
             # get specs
-            obs_spec = obs_specs[agent_key]
+            emb_spec = embed_specs[agent_key]
             act_spec = act_specs[agent_key]
 
             # Create variables.
             tf2_utils.create_variables(
-                self._critic_networks[agent_key], [obs_spec, act_spec]
+                self._critic_networks[agent_key], [emb_spec, act_spec]
             )
 
             # create target network variables
             tf2_utils.create_variables(
-                self._target_critic_networks[agent_key], [obs_spec, act_spec]
+                self._target_critic_networks[agent_key], [emb_spec, act_spec]
             )
 
-        critic_networks["critics"][agent_key] = self._critic_networks
-        critic_networks["target_critics"][agent_key] = self._target_critic_networks
+        critic_networks["critics"] = self._critic_networks
+        critic_networks["target_critics"] = self._target_critic_networks
 
         return critic_networks
 
