@@ -205,9 +205,7 @@ class MADDPGTrainer(mava.Trainer):
         for agent in self._agents:
             agent_key = agent.split("_")[0] if self._shared_weights else agent
             next_observation = next_state[agent]
-            actions[agent] = self._target_policy_networks[agent_key](
-                next_observation[agent]
-            )
+            actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
 
     @tf.function

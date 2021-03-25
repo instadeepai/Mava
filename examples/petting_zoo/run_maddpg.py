@@ -33,7 +33,7 @@ from mava.systems.tf import maddpg
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 1000, "Number of training episodes to run for.")
+flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
 
 flags.DEFINE_integer(
     "num_episodes_per_eval",
@@ -57,9 +57,6 @@ def make_networks(
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = False,
-    vmin: float = -150.0,
-    vmax: float = 150.0,
-    num_atoms: int = 51,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -115,8 +112,7 @@ def make_networks(
                 networks.LayerNormMLP(
                     critic_networks_layer_sizes[key], activate_final=False
                 ),
-                snt.Linear(1)
-                # networks.DiscreteValuedHead(vmin, vmax, num_atoms),
+                snt.Linear(1),
             ]
         )
         observation_networks[key] = observation_network
