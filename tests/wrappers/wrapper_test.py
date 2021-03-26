@@ -102,7 +102,10 @@ class TestEnvWrapper:
         ):
             #  Get agent names from env and mock out data
             agents = wrapped_env.agents
-            test_agents_observations = {agent: np.random.rand(5, 5) for agent in agents}
+            test_agents_observations = {
+                agent: np.random.rand(*wrapped_env.observation_spaces[agent].shape)
+                for agent in agents
+            }
 
             # Parallel env_types
             if env_spec.env_type == EnvType.Parallel:
@@ -154,8 +157,12 @@ class TestEnvWrapper:
             for agent in agents:
                 # TODO If cont action space masking is implemented - Update
                 test_agents_observations[agent] = {
-                    "observation": np.random.rand(5, 5),
-                    "action_mask": np.random.randint(2, size=5),
+                    "observation": np.random.rand(
+                        *wrapped_env.observation_spaces[agent].shape
+                    ),
+                    "action_mask": np.random.randint(
+                        2, size=wrapped_env.action_spaces[agent].shape
+                    ),
                 }
             # Parallel env_types
             if env_spec.env_type == EnvType.Parallel:
@@ -196,3 +203,76 @@ class TestEnvWrapper:
                     assert (
                         bool(dm_env_timestep.terminal) is False
                     ), "Failed to set terminal."
+
+    # Test we can take a action and it updates observations
+    def test_step_0_valid(self, env_spec: EnvSpec, helpers: pytest.fixture) -> None:
+        env, num_agents = helpers.retrieve_env(env_spec)
+        wrapper_func = helpers.retrieve_wrapper(env_spec)
+        wrapped_env = wrapper_func(env)
+
+        #  Get agent names from env
+        agents = wrapped_env.agents
+
+        initial_dm_env_timestep = wrapped_env.reset()
+        # Parallel env_types
+        if env_spec.env_type == EnvType.Parallel:
+            test_agents_actions = {
+                agent: wrapped_env.action_spaces[agent].sample() for agent in agents
+            }
+            curr_dm_timestep = wrapped_env.step(test_agents_actions)
+
+            for agent in wrapped_env.agents:
+                assert not np.array_equal(
+                    initial_dm_env_timestep.observation[agent].observation,
+                    curr_dm_timestep.observation[agent].observation,
+                ), "Failed to update observations."
+
+        # Sequential env_types
+        elif env_spec.env_type == EnvType.Sequential:
+            for agent in agents:
+                test_agent_actions = wrapped_env.action_spaces[agent].sample()
+                curr_dm_timestep = wrapped_env.step(test_agent_actions)
+                assert not np.array_equal(
+                    initial_dm_env_timestep.observation.observation,
+                    curr_dm_timestep.observation.observation,
+                ), "Failed to update observations."
+
+        assert (
+            wrapped_env._reset_next_step is False
+        ), "Failed to set _reset_next_step correctly."
+        assert curr_dm_timestep.reward is not None, "Failed to set rewards."
+        assert (
+            curr_dm_timestep.step_type is dm_env.StepType.MID
+        ), "Failed to update step type."
+
+    # Test if the agent is done, agent can't step
+    #  Env throws exception
+    def test_step_1_invalid(self, env_spec: EnvSpec, helpers: pytest.fixture) -> None:
+        env, num_agents = helpers.retrieve_env(env_spec)
+        wrapper_func = helpers.retrieve_wrapper(env_spec)
+        wrapped_env = wrapper_func(env)
+
+        #  Get agent names from env
+        agents = wrapped_env.agents
+
+        with pytest.raises(Exception):
+            # Parallel env_types
+            if env_spec.env_type == EnvType.Parallel:
+                test_agents_actions = {
+                    agent: wrapped_env.action_spaces[agent].sample() for agent in agents
+                }
+                # Set agent as being done
+                wrapped_env._environment.aec_env.dones = {
+                    agent: True for agent in wrapped_env.agents
+                }
+
+                _ = wrapped_env.step(test_agents_actions)
+
+            # Sequential env_types
+            elif env_spec.env_type == EnvType.Sequential:
+                for agent in agents:
+                    test_agent_actions = wrapped_env.action_spaces[agent].sample()
+
+                    # Set agent as done
+                    wrapped_env._environment.dones[agent] = True
+                    _ = wrapped_env.step(test_agent_actions)

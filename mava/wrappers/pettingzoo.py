@@ -39,49 +39,49 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
     def __init__(self, environment: AECEnv):
         self._environment = environment
         self._reset_next_step = True
-        self._step_type = dm_env.StepType.FIRST
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
         self._reset_next_step = False
         self._environment.reset()
         self._discount = None  # Not used in pettingzoo
+        self._step_type = dm_env.StepType.FIRST
 
         observe, _, done, _ = self._environment.last()
         agent = self._environment.agent_selection
         observation = self._convert_observation(agent, observe, done)
         return dm_env.restart(observation)
 
-    def step(self, action: np.ndarray) -> dm_env.TimeStep:
+    def step(self, action: Union[int, float]) -> dm_env.TimeStep:
         """Steps the environment."""
         if self._reset_next_step:
             return self.reset()
 
         observe, reward, done, info = self._environment.last()
+
         agent = self._environment.agent_selection
         if self._environment.dones[agent]:
             self._environment.step(None)
         else:
             self._environment.step(action)
 
+        # Update these vars so dm_env.TimeStep returned has
+        # the last information.
+        observe, reward, done, info = self._environment.last()
+
         observation = self._convert_observation(agent, observe, done)
 
-        if self._step_type == dm_env.StepType.FIRST:
-            step_type = self._step_type
-            self._step_type = dm_env.StepType.MID
+        if self._environment.env_done:
+            self._step_type = dm_env.StepType.LAST
+            self._reset_next_step = True
         else:
-            step_type = (
-                dm_env.StepType.LAST
-                if self._environment.env_done
-                else dm_env.StepType.MID
-            )
-        self._reset_next_step = step_type == dm_env.StepType.LAST
+            self._step_type = dm_env.StepType.MID
 
         return dm_env.TimeStep(
             observation=observation,
             reward=reward,
             discount=self._discount,
-            step_type=step_type,
+            step_type=self._step_type,
         )
 
     # Convert PettingZoo observation so it's dm_env compatible. Also, the list
@@ -160,11 +160,11 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
     def __init__(self, environment: ParallelEnv):
         self._environment = environment
         self._reset_next_step = True
-        self._step_type = dm_env.StepType.FIRST
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
         self._reset_next_step = False
+        self._step_type = dm_env.StepType.FIRST
         self._discounts = {
             agent: np.dtype("float32").type(1.0)
             for agent in self._environment.possible_agents
@@ -177,11 +177,12 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
+
         if self._reset_next_step:
             return self.reset()
 
-        actions = actions
         observations, rewards, dones, infos = self._environment.step(actions)
+
         rewards = {
             agent: np.dtype("float32").type(reward) for agent, reward in rewards.items()
         }
@@ -193,22 +194,17 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
         observations = self._convert_observations(observations, dones)
 
-        if self._step_type == dm_env.StepType.FIRST:
-            step_type = self._step_type
-            self._step_type = dm_env.StepType.MID
+        if self._environment.env_done:
+            self._step_type = dm_env.StepType.LAST
+            self._reset_next_step = True
         else:
-            step_type = (
-                dm_env.StepType.LAST
-                if self._environment.env_done
-                else dm_env.StepType.MID
-            )
-        self._reset_next_step = step_type == dm_env.StepType.LAST
+            self._step_type = dm_env.StepType.MID
 
         return dm_env.TimeStep(
             observation=observations,
             reward=rewards,
             discount=self._discounts,
-            step_type=step_type,
+            step_type=self._step_type,
         )
 
     # Convert PettingZoo observation so it's dm_env compatible. Also, the list
