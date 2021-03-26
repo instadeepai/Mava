@@ -222,6 +222,9 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 legals = observation["action_mask"]
                 observation = observation["observation"]
             else:
+                # TODO Handle legal actions better for continous envs,
+                #  maybe have min and max for each action and clip the agents actions
+                #  accordingly
                 legals = np.ones(
                     _convert_to_spec(self._environment.action_spaces[agent]).shape,
                     dtype=np.float32,
