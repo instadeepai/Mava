@@ -11,6 +11,8 @@ This is meant to flexibily test various environments wrappers.
     It is parametrize by an EnvSpec object:
         env_name: [name of env]
         env_type: [EnvType.Parallel/EnvType.Sequential]
+
+    For new environments - you might need to update the Helpers class in conftest.py.
 """
 
 
@@ -150,6 +152,7 @@ class TestEnvWrapper:
             agents = wrapped_env.agents
             test_agents_observations = {}
             for agent in agents:
+                # TODO If cont action space masking is implemented - Update
                 test_agents_observations[agent] = {
                     "observation": np.random.rand(5, 5),
                     "action_mask": np.random.randint(2, size=5),
