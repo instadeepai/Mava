@@ -13,8 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Adders for sending data from actors to replay buffers."""
+"""Adders for Reverb replay buffers."""
 
 # pylint: disable=unused-import
 
-from mava.adders.base import ParallelAdder
+from mava.adders.reverb.base import (
+    DEFAULT_PRIORITY_TABLE,
+    PriorityFn,
+    PriorityFnInput,
+    ReverbParallelAdder,
+    Step,
+)
+from mava.adders.reverb.transition import ParallelNStepTransitionAdder

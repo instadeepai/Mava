@@ -31,6 +31,10 @@ from acme.utils import counting, loggers
 
 import mava
 
+# NOTE (Arnu): in TF2 this should be the default
+# but for some reason it is not when I run it.
+# tf.config.run_functions_eagerly(True)
+
 
 class MADDPGTrainer(mava.Trainer):
     """MADDPG trainer.
@@ -92,6 +96,7 @@ class MADDPGTrainer(mava.Trainer):
         self._target_policy_networks = target_policy_networks
         self._target_critic_networks = target_critic_networks
 
+        self._observation_networks = observation_networks
         self._target_observation_networks = target_observation_networks
 
         # General learner book-keeping and loggers.
@@ -182,8 +187,10 @@ class MADDPGTrainer(mava.Trainer):
         s_tm1 = {}
         s_t = {}
         for key in self._keys:
-            s_tm1[key] = self._observation_networks[key](state[key])
-            s_t[key] = self._target_observation_networks[key](next_state[key])
+            s_tm1[key] = self._observation_networks[key](state[key].observation)
+            s_t[key] = self._target_observation_networks[key](
+                next_state[key].observation
+            )
 
             # This stop_gradient prevents gradients to propagate into the target
             # observation network. In addition, since the online policy network is
@@ -198,8 +205,8 @@ class MADDPGTrainer(mava.Trainer):
         for agent in self._agents:
             agent_key = agent.split("_")[0] if self._shared_weights else agent
             next_observation = next_state[agent]
-            actions[agent] = self._target_policy_networks[agent_key](next_state[agent])
-        return self._target_policy_networks[agent_key](next_observation)
+            actions[agent] = self._target_policy_networks[agent_key](next_observation)
+        return actions
 
     @tf.function
     def _step(
@@ -212,29 +219,50 @@ class MADDPGTrainer(mava.Trainer):
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
-        s_tm1, a_tm1, r_t, d_t, s_t = inputs.data
+
+        # print("DATA: ", inputs.data)
+        # print(len(inputs.data))
+
+        s_tm1, a_tm1, r_t, d_t, s_t, e = inputs.data
+
+        # print(s_tm1)
+        # print(a_tm1)
+        # print(r_t)
+        # print(d_t)
+        # print(s_t)
+        # print(e)
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
         for agent in self._agents:
             agent_key = agent.split("_")[0] if self._shared_weights else agent
+            print("TRAINING STEP FOR AGENT: ", agent)
 
             # Cast the additional discount to match the environment discount dtype.
-            discount = tf.cast(self._discount, dtype=d_t.dtype)
+            discount = tf.cast(self._discount, dtype=d_t[agent_key].dtype)
 
             with tf.GradientTape(persistent=True) as tape:
                 # Maybe transform the observation before feeding into policy and critic.
                 # Transforming the observations this way at the start of the learning
                 # step effectively means that the policy and critic share observation
                 # network weights.
-                s_tm1, s_t = self._transform_observations(s_tm1, s_t)
-                a_t = self._policy_actions(s_t)
+                s_tm1_trans, s_t_trans = self._transform_observations(s_tm1, s_t)
+                a_t = self._policy_actions(s_t_trans)
 
-                o_t_feed = s_t[agent]
-                s_tm1_feed = np.concatenate(s_tm1.values(), 1)
-                s_t_feed = np.concatenate(s_t.values(), 1)
-                a_tm1_feed = np.concatenate(a_tm1.values(), 1)
-                a_t_feed = np.concatenate(a_t.values(), 1)
+                o_t_feed = s_t_trans[agent]
+
+                # NOTE (Arnu): This is the centralised case where we concat
+                # obs to form states and concat all agent actions.
+                # s_tm1_feed = tf.concat([x.numpy() for x in s_tm1.values()], 1)
+                # s_t_feed = tf.concat([x.numpy() for x in s_t.values()], 1)
+                # a_tm1_feed = tf.concat([x.numpy() for x in a_tm1.values()], 1)
+                # a_t_feed = tf.concat([x.numpy() for x in a_t.values()], 1)
+
+                # Decentralised critic
+                s_tm1_feed = s_tm1_trans[agent_key]
+                s_t_feed = s_t_trans[agent_key]
+                a_tm1_feed = a_tm1[agent_key]
+                a_t_feed = a_t[agent_key]
 
                 # Critic learning.
                 q_tm1 = self._critic_networks[agent_key](s_tm1_feed, a_tm1_feed)
@@ -252,8 +280,13 @@ class MADDPGTrainer(mava.Trainer):
 
                 # Actor learning.
                 dpg_a_t = self._policy_networks[agent_key](o_t_feed)
-                dpg_a_t_feed = a_t
-                dpg_a_t_feed[agent] = dpg_a_t
+                dpg_a_t_feed = dpg_a_t
+
+                # NOTE (Arnu): Below is for centralised case
+                # dpg_a_t_feed = a_t
+                # dpg_a_t_feed[agent] = dpg_a_t
+                # dpg_q_t = self._critic_networks[agent_key](s_t_feed, dpg_a_t_feed)
+
                 dpg_q_t = self._critic_networks[agent_key](s_t_feed, dpg_a_t_feed)
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
@@ -316,8 +349,10 @@ class MADDPGTrainer(mava.Trainer):
         fetches.update(counts)
 
         # Checkpoint and attempt to write the logs.
-        self._checkpointer.save()
-        self._logger.write(fetches)
+
+        # NOTE (Arnu): ignoring checkpointing and logging for now
+        # self._checkpointer.save()
+        # self._logger.write(fetches)
 
     def get_variables(
         self, names: Dict[str, Sequence[str]]

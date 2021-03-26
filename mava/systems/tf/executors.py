@@ -28,7 +28,7 @@ class FeedForwardExecutor(core.Executor):
         self,
         policy_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        adder: Optional[adders.Adder] = None,
+        adder: Optional[adders.ParallelAdder] = None,
         variable_clients: Optional[Dict[str, tf2_variable_utils.VariableClient]] = None,
     ):
         """Initializes the actor.
@@ -50,6 +50,7 @@ class FeedForwardExecutor(core.Executor):
     def _policy(
         self, agent: str, observation: types.NestedTensor
     ) -> types.NestedTensor:
+
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
 
@@ -89,7 +90,7 @@ class FeedForwardExecutor(core.Executor):
         actions = {}
         for agent, observation in observations.items():
             # Pass the observation through the policy network.
-            action = self._policy(agent, observation)
+            action = self._policy(agent, observation.observation)
             actions[agent] = tf2_utils.to_numpy_squeeze(action)
 
         # Return a numpy array with squeezed out batch dimension.
