@@ -2,7 +2,7 @@ import dm_env
 import numpy as np
 import pytest
 
-from tests.conftest import EnvSpec, EnvType
+from tests.conftest import EnvSpec, EnvType, Helpers
 
 """
 TestEnvWrapper is a general purpose test class that runs tests for environment wrappers.
@@ -28,7 +28,7 @@ This is meant to flexibily test various environments wrappers.
 class TestEnvWrapper:
     # Test that we can load a env module and that it contains agents,
     #   action_spaces and observation_spaces.
-    def test_loadmodule(self, env_spec: EnvSpec, helpers: pytest.fixture) -> None:
+    def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, _ = helpers.retrieve_env(env_spec)
         props_which_should_not_be_none = [
             env,
@@ -42,9 +42,7 @@ class TestEnvWrapper:
 
     #  Test initialization of env wrapper, which should have
     #   a nested environment, an observation and action space for each agent.
-    def testwrapper_initialization(
-        self, env_spec: EnvSpec, helpers: pytest.fixture
-    ) -> None:
+    def testwrapper_initialization(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, num_agents = helpers.retrieve_env(env_spec)
         wrapper_func = helpers.retrieve_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
@@ -64,7 +62,7 @@ class TestEnvWrapper:
         ), "Failed to generate action specs for all agents."
 
     # Test of reset of wrapper and that dm_env_timestep has basic props.
-    def testwrapper_env_reset(self, env_spec: EnvSpec, helpers: pytest.fixture) -> None:
+    def testwrapper_env_reset(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, num_agents = helpers.retrieve_env(env_spec)
         wrapper_func = helpers.retrieve_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
@@ -90,7 +88,7 @@ class TestEnvWrapper:
     #   dm observations correctly. This only runs
     #   if wrapper has a _convert_observations or _convert_observation functions.
     def test_covertenv_to_dm_ev_0_no_action_mask(
-        self, env_spec: EnvSpec, helpers: pytest.fixture
+        self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
         env, num_agents = helpers.retrieve_env(env_spec)
         wrapper_func = helpers.retrieve_wrapper(env_spec)
@@ -141,7 +139,7 @@ class TestEnvWrapper:
     #   converted to dm observations correctly. This only runs
     #   if wrapper has a _convert_observations or _convert_observation functions.
     def test_covertenv_to_dm_ev_1_with_action_mask(
-        self, env_spec: EnvSpec, helpers: pytest.fixture
+        self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
         env, num_agents = helpers.retrieve_env(env_spec)
         wrapper_func = helpers.retrieve_wrapper(env_spec)
@@ -205,7 +203,7 @@ class TestEnvWrapper:
                     ), "Failed to set terminal."
 
     # Test we can take a action and it updates observations
-    def test_step_0_valid(self, env_spec: EnvSpec, helpers: pytest.fixture) -> None:
+    def test_step_0_valid(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, num_agents = helpers.retrieve_env(env_spec)
         wrapper_func = helpers.retrieve_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
@@ -247,7 +245,7 @@ class TestEnvWrapper:
 
     # Test if the agent is done, agent can't step
     #  Env throws exception
-    def test_step_1_invalid(self, env_spec: EnvSpec, helpers: pytest.fixture) -> None:
+    def test_step_1_invalid(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, num_agents = helpers.retrieve_env(env_spec)
         wrapper_func = helpers.retrieve_wrapper(env_spec)
         wrapped_env = wrapper_func(env)

@@ -1,4 +1,5 @@
 import importlib
+import typing
 from enum import Enum
 from typing import Tuple, Union
 
@@ -65,6 +66,7 @@ class Helpers:
         return wrapper
 
 
+@typing.no_type_check
 @pytest.fixture
-def helpers() -> pytest.fixture:
+def helpers() -> Helpers:
     return Helpers
