@@ -19,9 +19,8 @@ This is meant to flexibily test various environments wrappers.
     [
         EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Parallel),
         EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
-        # TODO Uncomment once we have working legal_actions for continuous envs
-        # EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Parallel),
-        # EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Sequential),
+        EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Parallel),
+        EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Sequential),
     ],
 )
 class TestEnvWrapper:
@@ -99,7 +98,8 @@ class TestEnvWrapper:
         if hasattr(wrapped_env, "_convert_observations") or hasattr(
             wrapped_env, "_convert_observation"
         ):
-            agents = ["agent_0", "agent_1", "agent_2"]
+            #  Get agent names from env and mock out data
+            agents = wrapped_env.agents
             test_agents_observations = {agent: np.random.rand(5, 5) for agent in agents}
 
             # Parallel env_types
@@ -146,7 +146,8 @@ class TestEnvWrapper:
         if hasattr(wrapped_env, "_convert_observations") or hasattr(
             wrapped_env, "_convert_observation"
         ):
-            agents = ["agent_0", "agent_1", "agent_2"]
+            #  Get agent names from env and mock out data
+            agents = wrapped_env.agents
             test_agents_observations = {}
             for agent in agents:
                 test_agents_observations[agent] = {
