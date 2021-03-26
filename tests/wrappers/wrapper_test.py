@@ -255,6 +255,8 @@ class TestEnvWrapper:
         #  Get agent names from env
         agents = wrapped_env.agents
 
+        _ = wrapped_env.reset()
+
         with pytest.raises(Exception):
             # Parallel env_types
             if env_spec.env_type == EnvType.Parallel:
