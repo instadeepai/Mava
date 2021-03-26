@@ -14,7 +14,7 @@ from acme.specs import EnvironmentSpec
 class MAEnvironmentSpec:
     def __init__(self, environment: dm_env.Environment):
         self._specs = self._make_ma_environment_spec(environment)
-        self._keys = self._specs.keys()
+        self._keys = list(self._specs.keys())
 
     def _make_ma_environment_spec(
         self, environment: dm_env.Environment
@@ -46,7 +46,7 @@ class MAEnvironmentSpec:
         return specs
 
     def get_agent_ids(self) -> List[str]:
-        return list(self._keys)
+        return self._keys
 
     def get_agent_types(self) -> List[str]:
         return list({agent.split("_")[0] for agent in self._keys})
