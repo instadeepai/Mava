@@ -73,6 +73,7 @@ class DecentralisedActorCritic(BaseActorCritic):
 
             # Get observation spec for policy.
             actor_obs_specs[agent_key] = self._agent_specs[agent_spec_key].observations
+
         return actor_obs_specs
 
     def _get_critic_specs(
