@@ -26,7 +26,9 @@ import mava
 
 
 def _calculate_num_learner_steps(
-    num_observations: int, min_observations: int, observations_per_step: float
+    num_observations: int,
+    min_observations: int,
+    observations_per_step: float,
 ) -> int:
     """Calculates the number of learner steps to do at step=num_observations."""
     n = num_observations - min_observations
@@ -73,7 +75,6 @@ class System(mava.core.Executor, mava.core.VariableSource):
     ) -> types.NestedArray:
         return self._executor.select_action(agent_id, observation)
 
-    # TODO(arnu) finish these functions for the multi-agent case
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Dict[str, types.NestedArray]:
