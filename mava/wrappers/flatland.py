@@ -14,14 +14,14 @@
 # limitations under the License.
 
 """Wraps a Flatland MARL environment to be used as a dm_env environment."""
-from typing import Any, Callable, Dict, NamedTuple, Union, Tuple
+from typing import Any, Callable, Dict, NamedTuple, Tuple, Union
 
 import dm_env
 import numpy as np
 from acme import specs, types
-from acme.wrappers.gym_wrapper import _convert_to_spec
-from flatland.envs.observations import GlobalObsForRailEnv, TreeObsForRailEnv
+from flatland.envs.observations import GlobalObsForRailEnv, Node, TreeObsForRailEnv
 from flatland.envs.rail_env import RailEnv
+
 
 class OLT(NamedTuple):
     """Container for (observation, legal_actions, terminal) tuples."""
@@ -29,65 +29,65 @@ class OLT(NamedTuple):
     observation: types.Nest
     legal_actions: types.Nest
     terminal: types.Nest
-    
+
 
 class FlatlandEnvWrapper(dm_env.Environment):
     """Environment wrapper for Flatland environments.
-    
-    All environments would require an observation preprocessor, except for 
-    'GlobalObsForRailEnv'. This is because flatland gives users the 
+
+    All environments would require an observation preprocessor, except for
+    'GlobalObsForRailEnv'. This is because flatland gives users the
     flexibility of designing custom observation builders. 'TreeObsForRailEnv'
     would use the normalize_observation function from the flatland baselines
     if none is supplied.
-    
+
     The supplied preprocessor should return either an array, tuple of arrays or
     a dictionary of arrays for an observation input.
-    
-    The obervation, for an agent, returned by this wrapper would consist of the 
-    agent observation and agent info. This is because flatland also provides 
+
+    The obervation, for an agent, returned by this wrapper would consist of the
+    agent observation and agent info. This is because flatland also provides
     informationn about the agents at each step. This information include;
     'action_required', 'malfunction', 'speed', and 'status', and it is appended
     to the observation, by this wrapper, as an array. action_required is a boolean,
     malfunction is an int denoting the number of steps for which the agent would
     remain motionless, speed is a float and status can be any of the below;
-    
-    READY_TO_DEPART = 0 
-    ACTIVE = 1  
+
+    READY_TO_DEPART = 0
+    ACTIVE = 1
     DONE = 2
-    DONE_REMOVED = 3  
+    DONE_REMOVED = 3
     """
 
     # Note: we don't inherit from base.EnvironmentWrapper because that class
     # assumes that the wrapped environment is a dm_env.Environment.
-    def __init__(self, environment: RailEnv, preprocessor: Callable = None):
+    def __init__(
+        self,
+        environment: RailEnv,
+        preprocessor: Callable[
+            [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
+        ] = None,
+    ):
         self._environment = environment
         self._reset_next_step = True
         self._step_type = dm_env.StepType.FIRST
         self.num_actions = 5
-        
+
         # preprocessor must be for observation builders other than global obs
         # treeobs builders would use the default preprocessor if none is
         # supplied
-        if not isinstance(environment.obs_builder, GlobalObsForRailEnv):
-            if isinstance(environment.obs_builder, TreeObsForRailEnv):
-                self.preprocessor = normalize_observation if not preprocessor else preprocessor
-            assert preprocessor is not None
-            self.preprocessor = preprocessor
-        else:
-            def _preprocessor(x):
-                return x
-            self.preprocessor = _preprocessor
-            
+        self.preprocessor: Callable[
+            [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
+        ] = self._obtain_preprocessor(preprocessor)
+
         # observation space:
         # flatland defines no observation space for an agent. Here we try
         # to define the observation space. All agents are identical and would
         # have the same observation space.
-        # Infer observation space based on returned observation 
+        # Infer observation space based on returned observation
         obs, _ = self._environment.reset()
         obs_spec = _infer_observation_spec(obs)
         agent_info_spec = _agent_info_spec()
-        self.obs_spec = tuple(obs_spec, agent_info_spec)
-        self.action_spec = specs.DiscreteArray(num_values=self.num_actions)
+        self.obs_spec = tuple((obs_spec, agent_info_spec))
+        self.act_spec = specs.DiscreteArray(num_values=self.num_actions)
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
@@ -105,10 +105,10 @@ class FlatlandEnvWrapper(dm_env.Environment):
         if self._reset_next_step:
             return self.reset()
 
-        actions = {int(k.split("_")[-1]):int(v) for k, v in actions.item()}
-        observations, rewards, dones, infos = self._environment.step(actions)
+        actions_ = {int(k.split("_")[-1]): int(v) for k, v in actions.items()}
+        observations, rewards, dones, infos = self._environment.step(actions_)
         rewards = {
-            f"train_{agent}": np.dtype("float32").type(reward) 
+            f"train_{agent}": np.dtype("float32").type(reward)
             for agent, reward in rewards.items()
         }
 
@@ -134,12 +134,13 @@ class FlatlandEnvWrapper(dm_env.Environment):
 
     # Convert Flatland observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
-    def _convert_observations(self, observes: Dict[str, np.ndarray], 
-                              info: Dict[str: Dict[int: Any]]) -> Dict[str, OLT]:
+    def _convert_observations(
+        self, observes: Dict[int, np.ndarray], info: Dict[str, Dict[int, Any]]
+    ) -> Dict[str, OLT]:
         observations: Dict[str, OLT] = {}
         for agent, observation in observes.items():
             agent_id = f"train_{agent}"
-            legals = np.ones(self.num_actions,dtype=np.float32)
+            legals = np.ones(self.num_actions, dtype=np.float32)
             agent_info = np.array([info[k][agent] for k in info.keys()])
             observation = self.preprocessor(observation)
             observations[agent_id] = OLT(
@@ -149,13 +150,37 @@ class FlatlandEnvWrapper(dm_env.Environment):
             )
         return observations
 
+    def _obtain_preprocessor(
+        self, preprocessor: Any
+    ) -> Callable[[Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]]:
+        """Obtains the actual preprocessor to be used based on the supplied
+        preprocessor and the env's obs_builder object"""
+        if not isinstance(self._environment.obs_builder, GlobalObsForRailEnv):
+            _preprocessor = preprocessor
+            if isinstance(self._environment.obs_builder, TreeObsForRailEnv):
+                _preprocessor = (
+                    normalize_observation if not preprocessor else preprocessor
+                )
+            assert _preprocessor is not None
+        else:
+
+            def _preprocessor(
+                x: Tuple[np.ndarray, np.ndarray, np.ndarray]
+            ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                return x
+
+        returned_preprocessor: Callable[
+            [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
+        ] = _preprocessor
+        return returned_preprocessor
+
     def observation_spec(self) -> Dict[str, OLT]:
         observation_specs = {}
         for agent in range(self._environment.number_of_agents):
             agent_id = f"train_{agent}"
             observation_specs[agent_id] = OLT(
                 observation=self.obs_spec,
-                legal_actions=self.action_spec,
+                legal_actions=self.act_spec,
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
@@ -163,7 +188,7 @@ class FlatlandEnvWrapper(dm_env.Environment):
     def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
         action_specs = {}
         for agent in self._environment.number_of_agents:
-            action_specs[agent] = self.action_spec
+            action_specs[agent] = self.act_spec
         return action_specs
 
     def reward_spec(self) -> Dict[str, specs.Array]:
@@ -184,51 +209,56 @@ class FlatlandEnvWrapper(dm_env.Environment):
     def environment(self) -> RailEnv:
         """Returns the wrapped environment."""
         return self._environment
-    
+
     @property
     def num_agents(self) -> int:
         """Returns the number of trains/agents in the flatland environment"""
-        return self._environment.number_of_agents
+        return int(self._environment.number_of_agents)
 
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment."""
         return getattr(self._environment, name)
-    
-    
+
+
 # HELPER FUNCTIONS used in the flatland env wrapper above
 
-def _infer_observation_spec(obs):
+
+def _infer_observation_spec(
+    obs: Union[tuple, np.ndarray, dict]
+) -> Union[specs.BoundedArray, tuple, dict]:
     """Observation spec from a sample observation"""
     if isinstance(obs, np.ndarray):
-        return specs.BoundedArray(obs.shape,
-                                dtype=obs.dtype,
-                                minimum=-np.inf,
-                                maximum=np.inf,)
+        return specs.BoundedArray(
+            obs.shape,
+            dtype=obs.dtype,
+            minimum=-np.inf,
+            maximum=np.inf,
+        )
     elif isinstance(obs, tuple):
         return tuple(_infer_observation_spec(o) for o in obs)
     elif isinstance(obs, dict):
-        return {
-            key: _infer_observation_spec(value)
-            for key, value in obs.items()
-        }
+        return {key: _infer_observation_spec(value) for key, value in obs.items()}
     else:
-        raise ValueError(f'Unexpected observation type: {type(obs)}. '
-                         f'Observation should be of either of this types '
-                         f'(np.ndarray, tuple, or dict)')
-    
-    
-def _agent_info_spec():
-    """Create the spec for the agent_info part of the observation"""
-    return specs.BoundedArray((4,), dtype=np.float32,
-                            minimum=0.0, maximum=10)
+        raise ValueError(
+            f"Unexpected observation type: {type(obs)}. "
+            f"Observation should be of either of this types "
+            f"(np.ndarray, tuple, or dict)"
+        )
 
-    
+
+def _agent_info_spec() -> specs.BoundedArray:
+    """Create the spec for the agent_info part of the observation"""
+    return specs.BoundedArray((4,), dtype=np.float32, minimum=0.0, maximum=10)
+
+
 # The block of code below is obtained from the flatland starter-kit
-# at https://gitlab.aicrowd.com/flatland/flatland-starter-kit/-/blob/master/utils/observation_utils.py
+# at https://gitlab.aicrowd.com/flatland/flatland-starter-kit/-/blob/master/
+# utils/observation_utils.py
 # this is done just to obtain the normalize_observation function that would
 # serve as the default preprocessor for the Tree obs builder.
-    
-def max_lt(seq, val):
+
+
+def max_lt(seq: Any, val: Any) -> Any:
     """
     Return greatest item in seq for which item < val applies.
     None is returned if seq was empty or all items in seq were >= val.
@@ -242,7 +272,7 @@ def max_lt(seq, val):
     return max
 
 
-def min_gt(seq, val):
+def min_gt(seq: Any, val: Any) -> Any:
     """
     Return smallest item in seq for which item > val applies.
     None is returned if seq was empty or all items in seq were >= val.
@@ -256,7 +286,13 @@ def min_gt(seq, val):
     return min
 
 
-def norm_obs_clip(obs, clip_min=-1, clip_max=1, fixed_radius=0, normalize_to_range=False):
+def norm_obs_clip(
+    obs: np.ndarray,
+    clip_min: int = -1,
+    clip_max: int = 1,
+    fixed_radius: int = 0,
+    normalize_to_range: bool = False,
+) -> np.ndarray:
     """
     This function returns the difference between min and max value of an observation
     :param obs: Observation that should be normalized
@@ -280,7 +316,9 @@ def norm_obs_clip(obs, clip_min=-1, clip_max=1, fixed_radius=0, normalize_to_ran
     return np.clip((np.array(obs) - min_obs) / norm, clip_min, clip_max)
 
 
-def _split_node_into_feature_groups(node) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _split_node_into_feature_groups(
+    node: Node,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     data = np.zeros(6)
     distance = np.zeros(1)
     agent_data = np.zeros(4)
@@ -302,15 +340,19 @@ def _split_node_into_feature_groups(node) -> Tuple[np.ndarray, np.ndarray, np.nd
     return data, distance, agent_data
 
 
-def _split_subtree_into_feature_groups(node, current_tree_depth: int,
-                max_tree_depth: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _split_subtree_into_feature_groups(
+    node: Node, current_tree_depth: int, max_tree_depth: int
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     if node == -np.inf:
         remaining_depth = max_tree_depth - current_tree_depth
-        # reference: 
+        # reference:
         # https://stackoverflow.com/questions/515214/total-number-of-nodes-in-a-tree-data-structure
         num_remaining_nodes = int((4 ** (remaining_depth + 1) - 1) / (4 - 1))
-        return [-np.inf] * num_remaining_nodes * 6, \
-            [-np.inf] * num_remaining_nodes, [-np.inf] * num_remaining_nodes * 4
+        return (
+            [-np.inf] * num_remaining_nodes * 6,
+            [-np.inf] * num_remaining_nodes,
+            [-np.inf] * num_remaining_nodes * 4,
+        )
 
     data, distance, agent_data = _split_node_into_feature_groups(node)
 
@@ -318,9 +360,9 @@ def _split_subtree_into_feature_groups(node, current_tree_depth: int,
         return data, distance, agent_data
 
     for direction in TreeObsForRailEnv.tree_explored_actions_char:
-        sub_data, sub_distance, sub_agent_data = \
-            _split_subtree_into_feature_groups(node.childs[direction], \
-                current_tree_depth + 1, max_tree_depth)
+        sub_data, sub_distance, sub_agent_data = _split_subtree_into_feature_groups(
+            node.childs[direction], current_tree_depth + 1, max_tree_depth
+        )
         data = np.concatenate((data, sub_data))
         distance = np.concatenate((distance, sub_distance))
         agent_data = np.concatenate((agent_data, sub_agent_data))
@@ -328,16 +370,18 @@ def _split_subtree_into_feature_groups(node, current_tree_depth: int,
     return data, distance, agent_data
 
 
-def split_tree_into_feature_groups(tree, max_tree_depth: int) \
-        -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def split_tree_into_feature_groups(
+    tree: Node, max_tree_depth: int
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     This function splits the tree into three difference arrays of values
     """
     data, distance, agent_data = _split_node_into_feature_groups(tree)
 
     for direction in TreeObsForRailEnv.tree_explored_actions_char:
-        sub_data, sub_distance, sub_agent_data = \
-            _split_subtree_into_feature_groups(tree.childs[direction], 1, max_tree_depth)
+        sub_data, sub_distance, sub_agent_data = _split_subtree_into_feature_groups(
+            tree.childs[direction], 1, max_tree_depth
+        )
         data = np.concatenate((data, sub_data))
         distance = np.concatenate((distance, sub_distance))
         agent_data = np.concatenate((agent_data, sub_agent_data))
@@ -345,7 +389,9 @@ def split_tree_into_feature_groups(tree, max_tree_depth: int) \
     return data, distance, agent_data
 
 
-def normalize_observation(observation, tree_depth: int, observation_radius=0):
+def normalize_observation(
+    observation: Node, tree_depth: int, observation_radius: int = 0
+) -> np.ndarray:
     """
     This function normalizes the observation used by the RL algorithm
     """
