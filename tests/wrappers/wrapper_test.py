@@ -87,7 +87,7 @@ class TestEnvWrapper:
     # Test that observations from petting zoo get converted to
     #   dm observations correctly. This only runs
     #   if wrapper has a _convert_observations or _convert_observation functions.
-    def test_covertenv_to_dm_ev_0_no_action_mask(
+    def test_covert_env_to_dm_env_0_no_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
         env, num_agents = helpers.retrieve_env(env_spec)
@@ -138,7 +138,7 @@ class TestEnvWrapper:
     # Test that observations **with actions masked** from petting zoo get
     #   converted to dm observations correctly. This only runs
     #   if wrapper has a _convert_observations or _convert_observation functions.
-    def test_covertenv_to_dm_ev_1_with_action_mask(
+    def test_covert_env_to_dm_env_1_with_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
         env, num_agents = helpers.retrieve_env(env_spec)
@@ -203,7 +203,9 @@ class TestEnvWrapper:
                     ), "Failed to set terminal."
 
     # Test we can take a action and it updates observations
-    def test_step_0_valid(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+    def test_step_0_valid_when_env_not_done(
+        self, env_spec: EnvSpec, helpers: Helpers
+    ) -> None:
         env, num_agents = helpers.retrieve_env(env_spec)
         wrapper_func = helpers.retrieve_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
@@ -245,7 +247,9 @@ class TestEnvWrapper:
 
     # Test if the agent is done, agent can't step
     #  Env throws exception
-    def test_step_1_invalid(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+    def test_step_1_invalid_when_env_done(
+        self, env_spec: EnvSpec, helpers: Helpers
+    ) -> None:
         env, num_agents = helpers.retrieve_env(env_spec)
         wrapper_func = helpers.retrieve_wrapper(env_spec)
         wrapped_env = wrapper_func(env)

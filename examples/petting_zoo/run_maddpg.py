@@ -43,10 +43,10 @@ flags.DEFINE_integer(
 
 
 def make_environment(
-    env_type: str = "sisl", env_name: str = "multiwalker_v6", **kwargs: int
+    env_class: str = "sisl", env_name: str = "multiwalker_v6", **kwargs: int
 ) -> dm_env.Environment:
     """Creates a MPE environment."""
-    env_module = importlib.import_module(f"pettingzoo.{env_type}.{env_name}")
+    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
     env = env_module.parallel_env(**kwargs)  # type: ignore
     environment = PettingZooParallelEnvWrapper(env)
     return environment
