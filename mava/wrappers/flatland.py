@@ -209,11 +209,11 @@ class FlatlandEnvWrapper(dm_env.Environment):
     def environment(self) -> RailEnv:
         """Returns the wrapped environment."""
         return self._environment
-    
+
     @property
     def num_agents(self) -> int:
         """Returns the number of trains/agents in the flatland environment"""
-        return self._environment.number_of_agents
+        return int(self._environment.number_of_agents)
 
     @property
     def num_agents(self) -> int:
