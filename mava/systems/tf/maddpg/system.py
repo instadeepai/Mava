@@ -166,11 +166,25 @@ class MADDPGBuilder(SystemBuilder):
 
         variable_client = None
         if variable_source:
+            agent_keys = self._agent_types if shared_weights else self._agents
+
+            # Create policy variables
+            variables = {}
+            for agent in agent_keys:
+                variables[agent] = policy_networks[agent].variables
+
+            # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
-                variables={"policy": policy_networks},
+                variables={"policy": variables},
                 update_period=1000,
             )
+
+            # Update variables
+            # TODO: Is this needed? Probably not because
+            #  in acme they only update policy.variables.
+            # for agent in agent_keys:
+            #     policy_networks[agent].variables = variables[agent]
 
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
