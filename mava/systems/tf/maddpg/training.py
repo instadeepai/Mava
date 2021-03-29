@@ -118,6 +118,7 @@ class MADDPGTrainer(mava.Trainer):
         # Create optimizers if they aren't given.
         self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-4)
         self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
+
         agent_keys = self._agent_type if shared_weights else self._agents
 
         # Expose the variables.
