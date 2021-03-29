@@ -248,6 +248,8 @@ class PettingZooParallelEnvironmentLoop(acme.core.Worker):
             actions = self._get_actions(timestep)
             timestep = self._environment.step(actions)
 
+            rewards = timestep.reward
+
             # Have the agent observe the timestep and let the actor update itself.
             self._executor.observe(actions, next_timestep=timestep)
 
@@ -256,6 +258,13 @@ class PettingZooParallelEnvironmentLoop(acme.core.Worker):
 
             # Book-keeping.
             episode_steps += 1
+
+            # NOTE (Arnu): fix for when env returns empty dict at end of episode.
+            if not rewards:
+                rewards = {
+                    agent: _generate_zeros_from_spec(spec)
+                    for agent, spec in self._environment.reward_spec().items()
+                }
 
             # Equivalent to: episode_return += timestep.reward
             # We capture the return value because if timestep.reward is a JAX
@@ -273,7 +282,7 @@ class PettingZooParallelEnvironmentLoop(acme.core.Worker):
         steps_per_second = episode_steps / (time.time() - start_time)
         result = {
             "episode_length": episode_steps,
-            "mean_episode_return": episode_return,
+            "mean_episode_return": np.mean(episode_return),
             "steps_per_second": steps_per_second,
         }
         result.update(counts)

@@ -38,7 +38,6 @@ from mava import specs as mava_specs
 from mava.adders.reverb import base, utils
 
 
-# TODO (Arnu): finish this Adder for parallel MARL case
 class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     """An N-step transition adder.
     This will buffer a sequence of N timesteps in order to form a single N-step
