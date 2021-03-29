@@ -163,33 +163,24 @@ class MADDPGBuilder(SystemBuilder):
           variable_source: A source providing the necessary executor parameters.
         """
         shared_weights = self._config.shared_weights
-        agent_keys = self._agent_types if shared_weights else self._agents
 
-        variable_clients = None
+        variable_client = None
         if variable_source:
-            variable_clients = {}
+            variable_client = variable_utils.VariableClient(
+                client=variable_source,
+                variables={"policy": policy_networks},
+                update_period=1000,
+            )
 
-            for agent_key in agent_keys:
-                # Create the variable client responsible for keeping the
-                # actor up-to-date.
-                variable_client = variable_utils.VariableClient(
-                    client=variable_source,
-                    variables={"policy": policy_networks[agent_key].variables},
-                    update_period=1000,
-                )
-
-                # Make sure not to use a random policy after checkpoint restoration by
-                # assigning variables before running the environment loop.
-                variable_client.update_and_wait()
-
-                # store variable client for each agent
-                variable_clients[agent_key] = variable_client
+            # Make sure not to use a random policy after checkpoint restoration by
+            # assigning variables before running the environment loop.
+            variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
         return executors.FeedForwardExecutor(
             policy_networks=policy_networks,
             shared_weights=shared_weights,
-            variable_clients=variable_clients,
+            variable_client=variable_client,
             adder=adder,
         )
 

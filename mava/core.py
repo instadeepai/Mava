@@ -96,7 +96,7 @@ class VariableSource(acme.VariableSource):
         """
 
 
-class Trainer(acme.Learner, VariableSource):
+class Trainer(acme.Learner):
     """Abstract learner object.
     This corresponds to an object which implements a learning loop. A single step
     of learning should be implemented via the `step` method and this step
