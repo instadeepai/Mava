@@ -97,7 +97,6 @@ class System(mava.core.Executor, mava.core.VariableSource):
         )
         for _ in range(num_steps):
             # Run learner steps (usually means gradient steps).
-            print(" --- CALLING TRAINER STEP --- ")
             self._trainer.step()
         if num_steps > 0:
             # Update the actor weights when learner updates.
