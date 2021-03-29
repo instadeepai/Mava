@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Wraps a PettingZoo MARL environment to be used as a dm_env environment."""
+"""Wraps a Flatland MARL environment to be used as a dm_env environment."""
 from typing import Any, Callable, Dict, NamedTuple, Union, Tuple
 
 import dm_env
@@ -83,8 +83,7 @@ class FlatlandEnvWrapper(dm_env.Environment):
         # to define the observation space. All agents are identical and would
         # have the same observation space.
         # Infer observation space based on returned observation 
-        obs, info = self.reset()
-        obs, _ = obs[0]
+        obs, _ = self._environment.reset()
         obs_spec = _infer_observation_spec(obs)
         agent_info_spec = _agent_info_spec()
         self.obs_spec = tuple(obs_spec, agent_info_spec)
@@ -185,6 +184,11 @@ class FlatlandEnvWrapper(dm_env.Environment):
     def environment(self) -> RailEnv:
         """Returns the wrapped environment."""
         return self._environment
+    
+    @property
+    def num_agents(self) -> int:
+        """Returns the number of trains/agents in the flatland environment"""
+        return self._environment.number_of_agents
 
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment."""
