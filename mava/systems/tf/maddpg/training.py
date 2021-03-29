@@ -222,7 +222,18 @@ class MADDPGTrainer(mava.Trainer):
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
-        s_tm1, a_tm1, r_t, d_t, s_t, e = inputs.data
+
+        # Unpack input data as follows:
+        # s_tm1 = dictionary of observations one for each agent
+        #   (forming the system state)
+        # a_tm1 = dictionary of actions taken from obs in s_tm1
+        # r_t = dictionary of rewards or rewards sequences
+        #   (if using N step transitions) ensuing from actions a_tm1
+        # d_t = environment discount ensuing from actions a_tm1.
+        #   This discount is applied to future rewards after r_t.
+        # s_t = dictionary of next observations or next observation sequences
+        # e_t [Optional] = extra data that the agents persist in replay.
+        s_tm1, a_tm1, r_t, d_t, s_t, e_t = inputs.data
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
