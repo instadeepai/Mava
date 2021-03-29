@@ -208,35 +208,26 @@ class MADDPGTrainer(mava.Trainer):
             actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
 
-    @tf.function
+    # NOTE (Arnu): the decorator below was causing this _step() function not
+    # to be called by the step() function below. Removing it makes the code
+    # work. The docs on tf.function says it is useful for speed improvements
+    # but as far as I can see, we can go ahead without it. At least for now.
+    # @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-
         self._keys = self._agent_types if self._shared_weights else self._agents
         self._update_target_networks()
 
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
-
-        # print("DATA: ", inputs.data)
-        # print(len(inputs.data))
-
         s_tm1, a_tm1, r_t, d_t, s_t, e = inputs.data
-
-        # print(s_tm1)
-        # print(a_tm1)
-        # print(r_t)
-        # print(d_t)
-        # print(s_t)
-        # print(e)
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
         for agent in self._agents:
             agent_key = agent.split("_")[0] if self._shared_weights else agent
-            print("TRAINING STEP FOR AGENT: ", agent)
 
             # Cast the additional discount to match the environment discount dtype.
             discount = tf.cast(self._discount, dtype=d_t[agent_key].dtype)
