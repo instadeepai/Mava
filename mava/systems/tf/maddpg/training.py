@@ -208,11 +208,14 @@ class MADDPGTrainer(mava.Trainer):
             actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
 
-    @tf.function
+    # NOTE (Arnu): the decorator below was causing this _step() function not
+    # to be called by the step() function below. Removing it makes the code
+    # work. The docs on tf.function says it is useful for speed improvements
+    # but as far as I can see, we can go ahead without it. At least for now.
+    # @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-
         self._keys = self._agent_types if self._shared_weights else self._agents
         self._update_target_networks()
 
@@ -220,23 +223,22 @@ class MADDPGTrainer(mava.Trainer):
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
 
-        # print("DATA: ", inputs.data)
-        # print(len(inputs.data))
-
-        s_tm1, a_tm1, r_t, d_t, s_t, e = inputs.data
-
-        # print(s_tm1)
-        # print(a_tm1)
-        # print(r_t)
-        # print(d_t)
-        # print(s_t)
-        # print(e)
+        # Unpack input data as follows:
+        # s_tm1 = dictionary of observations one for each agent
+        #   (forming the system state)
+        # a_tm1 = dictionary of actions taken from obs in s_tm1
+        # r_t = dictionary of rewards or rewards sequences
+        #   (if using N step transitions) ensuing from actions a_tm1
+        # d_t = environment discount ensuing from actions a_tm1.
+        #   This discount is applied to future rewards after r_t.
+        # s_t = dictionary of next observations or next observation sequences
+        # e_t [Optional] = extra data that the agents persist in replay.
+        s_tm1, a_tm1, r_t, d_t, s_t, e_t = inputs.data
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
         for agent in self._agents:
             agent_key = agent.split("_")[0] if self._shared_weights else agent
-            print("TRAINING STEP FOR AGENT: ", agent)
 
             # Cast the additional discount to match the environment discount dtype.
             discount = tf.cast(self._discount, dtype=d_t[agent_key].dtype)
