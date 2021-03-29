@@ -13,21 +13,20 @@ from acme.specs import EnvironmentSpec
 
 class MAEnvironmentSpec:
     def __init__(self, environment: dm_env.Environment):
-        self._environment = environment
-        self._specs = self.make_ma_environment_spec()
-        self._keys = self._specs.keys()
+        self._specs = self._make_ma_environment_spec(environment)
+        self._keys = list(self._specs.keys())
 
-    def make_ma_environment_spec(
-        self,
+    def _make_ma_environment_spec(
+        self, environment: dm_env.Environment
     ) -> Dict[str, EnvironmentSpec]:
         """Returns an `EnvironmentSpec` describing values used by
         an environment for each agent."""
         specs = {}
-        observation_specs = self._environment.observation_spec()
-        action_specs = self._environment.action_spec()
-        reward_specs = self._environment.reward_spec()
-        discount_specs = self._environment.discount_spec()
-        for agent in self._environment.possible_agents:
+        observation_specs = environment.observation_spec()
+        action_specs = environment.action_spec()
+        reward_specs = environment.reward_spec()
+        discount_specs = environment.discount_spec()
+        for agent in environment.possible_agents:
             specs[agent] = EnvironmentSpec(
                 observations=observation_specs[agent],
                 actions=action_specs[agent],
@@ -47,7 +46,7 @@ class MAEnvironmentSpec:
         return specs
 
     def get_agent_ids(self) -> List[str]:
-        return list(self._keys)
+        return self._keys
 
     def get_agent_types(self) -> List[str]:
         return list({agent.split("_")[0] for agent in self._keys})
