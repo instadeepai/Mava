@@ -226,7 +226,6 @@ class MADDPGTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-        # self._keys = self._agent_types if self._shared_weights else self._agents
         self._update_target_networks()
 
         # Get data from replay (dropping extras if any). Note there is no
