@@ -23,7 +23,6 @@ jobs:
           pip install --upgrade pip setuptools
           pip install .
           pip install .[reverb]
-          pip install .[jax]
           pip install .[tf]
           pip install .[envs]
           pip install .[testing_formatting]
@@ -39,6 +38,6 @@ jobs:
       - name: Check types with mypy
         run: |
           mypy . --exclude docs/
-      - name: Test with pytest
+      - name: Test with pytest and get code coverage
         run: |
-          pytest -n "$(grep -c ^processor /proc/cpuinfo)" tests
+          pytest --cov-report term-missing --cov=mava  -n "$(grep -c ^processor /proc/cpuinfo)" tests

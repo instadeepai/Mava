@@ -138,6 +138,9 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
             )
         return discount_specs
 
+    def seed(self, seed: int = None) -> None:
+        self._environment.seed(seed)
+
     @property
     def environment(self) -> AECEnv:
         """Returns the wrapped environment."""
@@ -265,6 +268,9 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 (), np.float32, minimum=0, maximum=1.0
             )
         return discount_specs
+
+    def seed(self, seed: int = None) -> None:
+        self._environment.seed(seed)
 
     @property
     def environment(self) -> ParallelEnv:
