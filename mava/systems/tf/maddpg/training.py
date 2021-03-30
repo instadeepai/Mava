@@ -119,7 +119,7 @@ class MADDPGTrainer(mava.Trainer):
         self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-4)
         self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
 
-        agent_keys = self._agent_type if shared_weights else self._agents
+        agent_keys = self._agent_types if shared_weights else self._agents
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -167,7 +167,8 @@ class MADDPGTrainer(mava.Trainer):
 
     @tf.function
     def _update_target_networks(self) -> None:
-        for key in self._keys:
+        agent_keys = self._agent_types if self._shared_weights else self._agents
+        for key in agent_keys:
             # Update target network.
             online_variables = (
                 *self._observation_networks[key].variables,
@@ -192,17 +193,20 @@ class MADDPGTrainer(mava.Trainer):
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         s_tm1 = {}
         s_t = {}
-        for key in self._keys:
-            s_tm1[key] = self._observation_networks[key](state[key].observation)
-            s_t[key] = self._target_observation_networks[key](
-                next_state[key].observation
+        for agent in self._agents:
+            agent_key = agent.split("_")[0] if self._shared_weights else agent
+            s_tm1[agent] = self._observation_networks[agent_key](
+                state[agent].observation
+            )
+            s_t[agent] = self._target_observation_networks[agent_key](
+                next_state[agent].observation
             )
 
             # This stop_gradient prevents gradients to propagate into the target
             # observation network. In addition, since the online policy network is
             # evaluated at o_t, this also means the policy loss does not influence
             # the observation network training.
-            s_t[key] = tree.map_structure(tf.stop_gradient, s_t[key])
+            s_t[agent] = tree.map_structure(tf.stop_gradient, s_t[agent])
         return s_tm1, s_t
 
     @tf.function
@@ -222,7 +226,7 @@ class MADDPGTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-        self._keys = self._agent_types if self._shared_weights else self._agents
+        # self._keys = self._agent_types if self._shared_weights else self._agents
         self._update_target_networks()
 
         # Get data from replay (dropping extras if any). Note there is no
@@ -247,7 +251,7 @@ class MADDPGTrainer(mava.Trainer):
             agent_key = agent.split("_")[0] if self._shared_weights else agent
 
             # Cast the additional discount to match the environment discount dtype.
-            discount = tf.cast(self._discount, dtype=d_t[agent_key].dtype)
+            discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
 
             with tf.GradientTape(persistent=True) as tape:
                 # Maybe transform the observation before feeding into policy and critic.
@@ -267,10 +271,10 @@ class MADDPGTrainer(mava.Trainer):
                 # a_t_feed = tf.concat([x.numpy() for x in a_t.values()], 1)
 
                 # Decentralised critic
-                s_tm1_feed = s_tm1_trans[agent_key]
-                s_t_feed = s_t_trans[agent_key]
-                a_tm1_feed = a_tm1[agent_key]
-                a_t_feed = a_t[agent_key]
+                s_tm1_feed = s_tm1_trans[agent]
+                s_t_feed = s_t_trans[agent]
+                a_tm1_feed = a_tm1[agent]
+                a_t_feed = a_t[agent]
 
                 # Critic learning.
                 q_tm1 = self._critic_networks[agent_key](s_tm1_feed, a_tm1_feed)
@@ -366,7 +370,9 @@ class MADDPGTrainer(mava.Trainer):
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
             variables[network_type] = {}
-            for agent in self._agents:
+            agent_keys = self._agent_types if self._shared_weights else self._agents
+
+            for agent in agent_keys:
                 variables[network_type][agent] = tf2_utils.to_numpy(
                     self._system_network_variables[network_type][agent]
                 )
