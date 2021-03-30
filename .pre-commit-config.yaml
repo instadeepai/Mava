@@ -43,12 +43,13 @@ repos:
     hooks:
       - id: flake8
         additional_dependencies: [flake8-isort]
+        exclude: ^mava/systems/tf/dial/
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v0.812
     hooks:
       - id: mypy
-        exclude: ^docs/
+        exclude: ^docs/|^mava/systems/tf/dial/
 
   - repo: https://github.com/asottile/blacken-docs
     rev: v1.8.0
