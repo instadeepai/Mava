@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from tests.conftest import EnvSpec, EnvType, Helpers
+from _pytest.monkeypatch import MonkeyPatch
 
 """
 TestEnvWrapper is a general purpose test class that runs tests for environment wrappers.
@@ -253,7 +254,7 @@ class TestEnvWrapper:
 
     # Test if all agents are done, env is set to done
     def test_step_1_invalid_when_env_done(
-        self, env_spec: EnvSpec, helpers: Helpers, monkeypatch: pytest.fixture
+        self, env_spec: EnvSpec, helpers: Helpers, monkeypatch: MonkeyPatch
     ) -> None:
         env, num_agents = helpers.get_env(env_spec)
         wrapper_func = helpers.get_wrapper(env_spec)
