@@ -289,6 +289,11 @@ class TestEnvWrapper:
                 if index == len(agents) - 1:
                     monkeypatch.setattr(
                         wrapped_env._environment,
+                        "dones",
+                        {agent: True for agent in wrapped_env.agents},
+                    )
+                    monkeypatch.setattr(
+                        wrapped_env._environment,
                         "agents",
                         [],
                     )
