@@ -42,7 +42,7 @@ class FeedForwardExecutor(core.Executor):
 
         # Store these for later use.
         self._adder = adder
-        self.variable_client = variable_client
+        self._variable_client = variable_client
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights
 
@@ -69,7 +69,10 @@ class FeedForwardExecutor(core.Executor):
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
         # Pass the observation through the policy network.
-        action = self._policy(agent, observation)
+        action = self._policy(agent, observation.observation)
+
+        # TODO Mask actions here using observation.legal_actions
+        # What happens in discrete vs cont case
 
         # Return a numpy array with squeezed out batch dimension.
         return tf2_utils.to_numpy_squeeze(action)
@@ -91,14 +94,16 @@ class FeedForwardExecutor(core.Executor):
         for agent, observation in observations.items():
             # Pass the observation through the policy network.
             action = self._policy(agent, observation.observation)
+            # TODO Mask actions here using observation.legal_actions
+            # What happens in discrete vs cont case
             actions[agent] = tf2_utils.to_numpy_squeeze(action)
 
         # Return a numpy array with squeezed out batch dimension.
         return actions
 
     def update(self, wait: bool = False) -> None:
-        if self.variable_client:
-            self.variable_client.update(wait)
+        if self._variable_client:
+            self._variable_client.update(wait)
 
 
 # Internal class 1.
