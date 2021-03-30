@@ -123,7 +123,10 @@ class MADDPGTrainer(mava.Trainer):
 
         # Expose the variables.
         policy_networks_to_expose = {}
-        self._system_network_variables = {}
+        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
+            "critic": {},
+            "policy": {},
+        }
         self._system_checkpointer = {}
         for agent_key in agent_keys:
             policy_network_to_expose = snt.Sequential(
@@ -133,11 +136,14 @@ class MADDPGTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            variables = {
-                "critic": target_critic_networks[agent_key].variables,
-                "policy": policy_network_to_expose.variables,
-            }
-            self._system_network_variables[agent_key] = variables
+            # TODO (dries): Determine why acme has a critic
+            #  in self._system_network_variables
+            self._system_network_variables["critic"][
+                agent_key
+            ] = target_critic_networks[agent_key].variables
+            self._system_network_variables["policy"][
+                agent_key
+            ] = policy_network_to_expose.variables
             checkpointer = tf2_savers.Checkpointer(
                 time_delta_minutes=5,
                 objects_to_save={
@@ -356,13 +362,12 @@ class MADDPGTrainer(mava.Trainer):
         # self._checkpointer.save()
         # self._logger.write(fetches)
 
-    def get_variables(
-        self, names: Dict[str, Sequence[str]]
-    ) -> Dict[str, List[List[np.ndarray]]]:
-        variables = {}
-        for agent in self._agents:
-            variables[agent] = [
-                tf2_utils.to_numpy(self._system_network_variables[agent][name])
-                for name in names[agent]
-            ]
+    def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+        variables: Dict[str, Dict[str, np.ndarray]] = {}
+        for network_type in names:
+            variables[network_type] = {}
+            for agent in self._agents:
+                variables[network_type][agent] = tf2_utils.to_numpy(
+                    self._system_network_variables[network_type][agent]
+                )
         return variables

@@ -37,7 +37,7 @@ class Helpers:
 
     # Return an env - currently Pettingzoo envs.
     @staticmethod
-    def retrieve_env(env_spec: EnvSpec) -> Tuple[Union[AECEnv, ParallelEnv], int]:
+    def get_env(env_spec: EnvSpec) -> Tuple[Union[AECEnv, ParallelEnv], int]:
         env, num_agents = None, None
         if env_spec.env_type == EnvType.Parallel:
             mod = importlib.import_module(env_spec.env_name)
@@ -53,7 +53,7 @@ class Helpers:
 
     # Returns a wrapper.
     @staticmethod
-    def retrieve_wrapper(
+    def get_wrapper(
         env_spec: EnvSpec,
     ) -> dm_env.Environment:
         wrapper = None
@@ -64,6 +64,17 @@ class Helpers:
         else:
             raise Exception("Env_spec is not valid.")
         return wrapper
+
+    # Seeds action space
+    @staticmethod
+    def seed_action_space(
+        env_wrapper: Union[PettingZooAECEnvWrapper, PettingZooParallelEnvWrapper],
+        random_seed: int,
+    ) -> None:
+        [
+            env_wrapper.action_spaces[agent].seed(random_seed)
+            for agent in env_wrapper.agents
+        ]
 
 
 @typing.no_type_check

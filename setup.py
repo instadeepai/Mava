@@ -39,8 +39,6 @@ tf_requirements = [
     "trfl",
 ]
 
-jax_requirements = ["jax", "jaxlib"]
-
 env_requirements = ["pettingzoo"]
 
 testing_formatting_requirements = [
@@ -49,6 +47,7 @@ testing_formatting_requirements = [
     "pytest-xdist",
     "flake8",
     "black",
+    "pytest-cov",
 ]
 
 long_description = """Mava is a library for building multi-agent reinforcement
@@ -89,7 +88,6 @@ setup(
     ],
     extras_require={
         "tf": tf_requirements,
-        "jax": jax_requirements,
         "envs": env_requirements,
         "reverb": reverb_requirements,
         "testing_formatting": testing_formatting_requirements,

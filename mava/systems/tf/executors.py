@@ -29,7 +29,7 @@ class FeedForwardExecutor(core.Executor):
         policy_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
         adder: Optional[adders.ParallelAdder] = None,
-        variable_clients: Optional[Dict[str, tf2_variable_utils.VariableClient]] = None,
+        variable_client: tf2_variable_utils.VariableClient = None,
     ):
         """Initializes the actor.
         Args:
@@ -42,7 +42,7 @@ class FeedForwardExecutor(core.Executor):
 
         # Store these for later use.
         self._adder = adder
-        self._variable_clients = variable_clients
+        self._variable_client = variable_client
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights
 
@@ -102,9 +102,8 @@ class FeedForwardExecutor(core.Executor):
         return actions
 
     def update(self, wait: bool = False) -> None:
-        if self._variable_clients:
-            for client in self._variable_clients.values():
-                client.update(wait)
+        if self._variable_client:
+            self._variable_client.update(wait)
 
 
 # Internal class 1.
