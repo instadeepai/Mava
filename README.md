@@ -9,7 +9,7 @@
 
 ![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava)
 ![PyPI version](https://badge.fury.io/py/id-mava.svg)
-![pytest](https://github.com/arnupretorius/mava/workflows/pytest/badge.svg)
+![pytest](https://github.com/arnupretorius/mava/workflows/format_and_test/badge.svg)
 
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava builds off of Acme and in a similar way strives to expose simple, efficient, and readable components, as well as examples that serve both as reference implementations of popular algorithms and as strong
 baselines, while still providing enough flexibility to do novel research.
