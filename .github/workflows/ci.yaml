@@ -2,9 +2,9 @@ name: format_and_test
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   test-ubuntu:
@@ -13,32 +13,32 @@ jobs:
       matrix:
         python-version: [3.6, 3.7]
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        pip install --upgrade pip setuptools
-        pip install .
-        pip install .[reverb]
-        pip install .[jax]
-        pip install .[tf]
-        pip install .[envs]
-        pip install .[testing_formatting]
-        pip install gym[atari]
-    - name: Format code
-      run: |
-        # Check code follows black formatting.
-        black --check mava
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 mava --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 mava --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Check types with mypy
-      run: |
-        mypy . --exclude ^docs/
-    - name: Test with pytest
-      run: |
-        pytest -n "$(grep -c ^processor /proc/cpuinfo)" mava
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v1
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip setuptools
+          pip install .
+          pip install .[reverb]
+          pip install .[jax]
+          pip install .[tf]
+          pip install .[envs]
+          pip install .[testing_formatting]
+          pip install gym[atari]
+      - name: Format code
+        run: |
+          # Check code follows black formatting.
+          black --check .
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 .  --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Check types with mypy
+        run: |
+          mypy . --exclude docs/
+      - name: Test with pytest
+        run: |
+          pytest -n "$(grep -c ^processor /proc/cpuinfo)" tests

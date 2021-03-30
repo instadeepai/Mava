@@ -19,11 +19,13 @@ exclude = '''
     | \.mypy_cache
     | \.tox
     | \.venv
+    | \.pytype
     | _build
     | buck-out
     | build
     | dist
     | proto
+    | docs
   )/
 )
 '''

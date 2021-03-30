@@ -29,7 +29,7 @@ from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
-from mava.systems.tf import maddpg
+from mava.systems.tf import executors, maddpg
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
@@ -43,10 +43,10 @@ flags.DEFINE_integer(
 
 
 def make_environment(
-    env_type: str = "sisl", env_name: str = "multiwalker_v6", **kwargs: int
+    env_class: str = "sisl", env_name: str = "multiwalker_v6", **kwargs: int
 ) -> dm_env.Environment:
     """Creates a MPE environment."""
-    env_module = importlib.import_module(f"pettingzoo.{env_type}.{env_name}")
+    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
     env = env_module.parallel_env(**kwargs)  # type: ignore
     environment = PettingZooParallelEnvWrapper(env)
     return environment
@@ -150,25 +150,27 @@ def main(_: Any) -> None:
         environment, system, label="train_loop"
     )
 
-    # NOTE (Arnu): removing evaluation for now
     # Create the evaluation policy.
-    # eval_policies = snt.Sequential(
-    #     [
-    #         system_networks["observations"],
-    #         system_networks["policies"],
-    #     ]
-    # )
+    eval_policies = {
+        key: snt.Sequential(
+            [
+                system_networks["observations"][key],
+                system_networks["policies"][key],
+            ]
+        )
+        for key in environment_spec.get_agent_specs().keys()
+    }
 
     # Create the evaluation actor and loop.
-    # eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
-    # eval_env = make_environment()
-    # eval_loop = PettingZooParallelEnvironmentLoop(
-    #     eval_env, eval_actor, label="eval_loop"
-    # )
+    eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
+    eval_env = make_environment(remove_on_fall=False)
+    eval_loop = PettingZooParallelEnvironmentLoop(
+        eval_env, eval_actor, label="eval_loop"
+    )
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        # eval_loop.run(num_episodes=1)
+        eval_loop.run(num_episodes=1)
 
 
 if __name__ == "__main__":
