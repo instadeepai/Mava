@@ -65,6 +65,17 @@ class Helpers:
             raise Exception("Env_spec is not valid.")
         return wrapper
 
+    # Seeds action space
+    @staticmethod
+    def seed_action_space(
+        env_wrapper: Union[PettingZooAECEnvWrapper, PettingZooParallelEnvWrapper],
+        random_seed: int,
+    ) -> None:
+        [
+            env_wrapper.action_spaces[agent].seed(random_seed)
+            for agent in env_wrapper.agents
+        ]
+
 
 @typing.no_type_check
 @pytest.fixture

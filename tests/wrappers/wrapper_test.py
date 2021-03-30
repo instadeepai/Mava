@@ -211,7 +211,10 @@ class TestEnvWrapper:
         wrapped_env = wrapper_func(env)
 
         # Seed environment since we are sampling actions.
-        wrapped_env._environment.seed(42)
+        # We need to seed env and action space.
+        random_seed = 42
+        wrapped_env.seed(random_seed)
+        helpers.seed_action_space(wrapped_env, random_seed)
 
         #  Get agent names from env
         agents = wrapped_env.agents
@@ -257,7 +260,10 @@ class TestEnvWrapper:
         wrapped_env = wrapper_func(env)
 
         # Seed environment since we are sampling actions.
-        wrapped_env._environment.seed(42)
+        # We need to seed env and action space.
+        random_seed = 42
+        wrapped_env.seed(random_seed)
+        helpers.seed_action_space(wrapped_env, random_seed)
 
         #  Get agent names from env
         agents = wrapped_env.agents
