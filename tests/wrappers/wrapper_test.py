@@ -29,7 +29,7 @@ class TestEnvWrapper:
     # Test that we can load a env module and that it contains agents,
     #   action_spaces and observation_spaces.
     def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        env, _ = helpers.retrieve_env(env_spec)
+        env, _ = helpers.get_env(env_spec)
         props_which_should_not_be_none = [
             env,
             env.agents,
@@ -43,8 +43,8 @@ class TestEnvWrapper:
     #  Test initialization of env wrapper, which should have
     #   a nested environment, an observation and action space for each agent.
     def testwrapper_initialization(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        env, num_agents = helpers.retrieve_env(env_spec)
-        wrapper_func = helpers.retrieve_wrapper(env_spec)
+        env, num_agents = helpers.get_env(env_spec)
+        wrapper_func = helpers.get_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
         props_which_should_not_be_none = [
             wrapped_env,
@@ -63,8 +63,8 @@ class TestEnvWrapper:
 
     # Test of reset of wrapper and that dm_env_timestep has basic props.
     def testwrapper_env_reset(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        env, num_agents = helpers.retrieve_env(env_spec)
-        wrapper_func = helpers.retrieve_wrapper(env_spec)
+        env, num_agents = helpers.get_env(env_spec)
+        wrapper_func = helpers.get_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
 
         dm_env_timestep = wrapped_env.reset()
@@ -90,8 +90,8 @@ class TestEnvWrapper:
     def test_covert_env_to_dm_env_0_no_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        env, num_agents = helpers.retrieve_env(env_spec)
-        wrapper_func = helpers.retrieve_wrapper(env_spec)
+        env, num_agents = helpers.get_env(env_spec)
+        wrapper_func = helpers.get_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
 
         # Does the wrapper have the functions we want to test
@@ -141,8 +141,8 @@ class TestEnvWrapper:
     def test_covert_env_to_dm_env_1_with_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        env, num_agents = helpers.retrieve_env(env_spec)
-        wrapper_func = helpers.retrieve_wrapper(env_spec)
+        env, num_agents = helpers.get_env(env_spec)
+        wrapper_func = helpers.get_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
 
         # Does the wrapper have the functions we want to test
@@ -206,9 +206,12 @@ class TestEnvWrapper:
     def test_step_0_valid_when_env_not_done(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        env, num_agents = helpers.retrieve_env(env_spec)
-        wrapper_func = helpers.retrieve_wrapper(env_spec)
+        env, num_agents = helpers.get_env(env_spec)
+        wrapper_func = helpers.get_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
+
+        # Seed environment since we are sampling actions.
+        wrapped_env._environment.seed(42)
 
         #  Get agent names from env
         agents = wrapped_env.agents
@@ -245,38 +248,56 @@ class TestEnvWrapper:
             curr_dm_timestep.step_type is dm_env.StepType.MID
         ), "Failed to update step type."
 
-    # Test if the agent is done, agent can't step
-    #  Env throws exception
+    # Test if all agents are done, env is set to done
     def test_step_1_invalid_when_env_done(
-        self, env_spec: EnvSpec, helpers: Helpers
+        self, env_spec: EnvSpec, helpers: Helpers, monkeypatch: pytest.fixture
     ) -> None:
-        env, num_agents = helpers.retrieve_env(env_spec)
-        wrapper_func = helpers.retrieve_wrapper(env_spec)
+        env, num_agents = helpers.get_env(env_spec)
+        wrapper_func = helpers.get_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
+
+        # Seed environment since we are sampling actions.
+        wrapped_env._environment.seed(42)
 
         #  Get agent names from env
         agents = wrapped_env.agents
 
         _ = wrapped_env.reset()
 
-        with pytest.raises(Exception):
-            # Parallel env_types
-            if env_spec.env_type == EnvType.Parallel:
-                test_agents_actions = {
-                    agent: wrapped_env.action_spaces[agent].sample() for agent in agents
-                }
-                # Set agent as being done
-                wrapped_env._environment.aec_env.dones = {
-                    agent: True for agent in wrapped_env.agents
-                }
+        # Parallel env_types
+        if env_spec.env_type == EnvType.Parallel:
+            test_agents_actions = {
+                agent: wrapped_env.action_spaces[agent].sample() for agent in agents
+            }
 
-                _ = wrapped_env.step(test_agents_actions)
+            # Mock being done
+            monkeypatch.setattr(
+                wrapped_env._environment.aec_env,
+                "agents",
+                [],
+            )
 
-            # Sequential env_types
-            elif env_spec.env_type == EnvType.Sequential:
-                for agent in agents:
-                    test_agent_actions = wrapped_env.action_spaces[agent].sample()
+            curr_dm_timestep = wrapped_env.step(test_agents_actions)
 
-                    # Set agent as done
-                    wrapped_env._environment.dones[agent] = True
-                    _ = wrapped_env.step(test_agent_actions)
+        # Sequential env_types
+        elif env_spec.env_type == EnvType.Sequential:
+
+            for index, agent in enumerate(agents):
+                test_agent_actions = wrapped_env.action_spaces[agent].sample()
+
+                # Mock being done when you reach final agent
+                if index == len(agents) - 1:
+                    monkeypatch.setattr(
+                        wrapped_env._environment,
+                        "agents",
+                        [],
+                    )
+
+                curr_dm_timestep = wrapped_env.step(test_agent_actions)
+
+        assert (
+            wrapped_env._reset_next_step is True
+        ), "Failed to set _reset_next_step correctly."
+        assert (
+            curr_dm_timestep.step_type is dm_env.StepType.LAST
+        ), "Failed to update step type."
