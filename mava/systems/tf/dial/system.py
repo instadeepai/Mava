@@ -13,7 +13,8 @@
 # limitations under the License.
 
 # type: ignore
-# noqa: F401, F821
+
+# TODO (Kevin): finish DIAL system
 
 """DIAL system implementation."""
 import dataclasses
@@ -28,6 +29,7 @@ from acme.utils import counting, loggers
 from mava import adders, core, specs
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import CentralisedActor
+from mava.components.tf.modules.communication import DifferentiableCommunication
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
@@ -68,6 +70,7 @@ class DIALConfig:
             Otherwise, an epsilon greedy policy using the online Q network will be
             created. Policy network is used in the actor to sample actions.
         max_gradient_norm: used for gradient clipping.
+        replay_table_name: string indicating what name to give the replay table.
     """
 
     environment_spec: specs.MAEnvironmentSpec
@@ -86,9 +89,10 @@ class DIALConfig:
     discount: float = 0.99
     logger: loggers.Logger = None
     checkpoint: bool = True
-    checkpoint_subpath: str = "~/acme/"
+    checkpoint_subpath: str = "~/mava/"
     policy_networks: Optional[Dict[str, snt.Module]] = None
     max_gradient_norm: Optional[float] = None
+    replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
 class DIALBuilder(SystemBuilder):
@@ -148,7 +152,7 @@ class DIALBuilder(SystemBuilder):
           replay_client: Reverb Client which points to the replay server.
         """
         return reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+            priority_fns={self._config.replay_table_name: lambda x: 1.0},
             client=replay_client,
             n_step=self._config.n_step,
             discount=self._config.discount,
@@ -169,33 +173,32 @@ class DIALBuilder(SystemBuilder):
           variable_source: A source providing the necessary executor parameters.
         """
         shared_weights = self._config.shared_weights
-        agent_keys = self._agent_types if shared_weights else self._agents
 
-        variable_clients = None
+        variable_client = None
         if variable_source:
-            variable_clients = {}
+            agent_keys = self._agent_types if shared_weights else self._agents
 
-            for agent_key in agent_keys:
-                # Create the variable client responsible for keeping the
-                # actor up-to-date.
-                variable_client = variable_utils.VariableClient(
-                    client=variable_source,
-                    variables={"policy": policy_networks[agent_key].variables},
-                    update_period=1000,
-                )
+            # Create policy variables
+            variables = {}
+            for agent in agent_keys:
+                variables[agent] = policy_networks[agent].variables
 
-                # Make sure not to use a random policy after checkpoint restoration by
-                # assigning variables before running the environment loop.
-                variable_client.update_and_wait()
+            # Get new policy variables
+            variable_client = variable_utils.VariableClient(
+                client=variable_source,
+                variables={"policy": variables},
+                update_period=1000,
+            )
 
-                # store variable client for each agent
-                variable_clients[agent_key] = variable_client
+            # Make sure not to use a random policy after checkpoint restoration by
+            # assigning variables before running the environment loop.
+            variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
-        return executors.FeedForwardExecutor(
+        return executors.RecurrentExecutor(
             policy_networks=policy_networks,
             shared_weights=shared_weights,
-            variable_clients=variable_clients,
+            variable_client=variable_client,
             adder=adder,
         )
 
@@ -203,6 +206,7 @@ class DIALBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
+        huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[NestedLogger] = None,
@@ -226,38 +230,37 @@ class DIALBuilder(SystemBuilder):
         clipping = self._config.clipping
         discount = self._config.discount
         target_update_period = self._config.target_update_period
+        max_gradient_norm = self._config.max_gradient_norm
+        learning_rate = self._config.learning_rate
+        importance_sampling_exponent = self._config.importance_sampling_exponent
 
         # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-        critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
+        policy_optimizer = snt.optimizers.Adam(learning_rate=learning_rate)
 
         # The learner updates the parameters (and initializes them).
         trainer = training.DIALTrainer(
             agents=agents,
             agent_types=agent_types,
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            observation_networks=networks["observations"],
-            target_policy_networks=networks["target_policies"],
-            target_critic_networks=networks["target_critics"],
-            target_observation_networks=networks["target_observations"],
-            shared_weights=shared_weights,
-            policy_optimizer=policy_optimizer,
-            critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            networks=networks["networks"],
+            target_network=networks["target_networks"],
             discount=discount,
+            importance_sampling_exponent=importance_sampling_exponent,
+            policy_optimizer=policy_optimizer,
             target_update_period=target_update_period,
             dataset=dataset,
+            huber_loss_parameter=huber_loss_parameter,
+            replay_client=replay_client,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            max_gradient_norm=max_gradient_norm,
         )
         return trainer
 
 
 class DIAL(system.System):
     """DIAL system.
-    This implements a single-process DDPG system. This is an actor-critic based
+    This implements a single-process DIAL system. This is an actor-critic based
     system that generates data via a behavior policy, inserts N-step transitions into
     a replay buffer, and periodically updates the policies of each agent
     (and as a result the behavior) by sampling uniformly from this buffer.
@@ -266,71 +269,82 @@ class DIAL(system.System):
     def __init__(
         self,
         environment_spec: specs.MAEnvironmentSpec,
-        policy_networks: Dict[str, snt.Module],
-        critic_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
+        networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
         target_update_period: int = 100,
+        samples_per_insert: float = 32.0,
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
-        samples_per_insert: float = 32.0,
+        importance_sampling_exponent: float = 0.2,
+        priority_exponent: float = 0.6,
         n_step: int = 5,
-        sigma: float = 0.3,
-        clipping: bool = True,
+        epsilon: Optional[tf.Tensor] = None,
+        learning_rate: float = 1e-3,
+        discount: float = 0.99,
         logger: loggers.Logger = None,
         counter: counting.Counter = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
+        policy_networks: Optional[Dict[str, snt.Module]] = None,
+        max_gradient_norm: Optional[float] = None,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
     ):
         """Initialize the system.
         Args:
             environment_spec: description of the actions, observations, etc.
-            policy_networks: the online (optimized) policies for each agent in
-                the system.
-            critic_networks: the online critic for each agent in the system.
-            observation_networks: dictionary of optional networks to transform
-                the observations before they are fed into any network.
-            discount: discount to use for TD updates.
+            networks: the online Q network (the one being optimized)
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
             target_update_period: number of learner steps to perform before updating
-              the target networks.
-            min_replay_size: minimum replay size before updating.
-            max_replay_size: maximum replay size.
+                the target networks.
             samples_per_insert: number of samples to take from replay for every insert
-              that is made.
+                that is made.
+            min_replay_size: minimum replay size before updating. This and all
+                following arguments are related to dataset construction and will be
+                ignored if a dataset argument is passed.
+            max_replay_size: maximum replay size.
+            importance_sampling_exponent: power to which importance weights are raised
+                before normalizing.
+            priority_exponent: exponent used in prioritized sampling.
             n_step: number of steps to squash into a single transition.
-            sigma: standard deviation of zero-mean, Gaussian exploration noise.
-            clipping: whether to clip gradients by global norm.
-            logger: logger object to be used by trainers.
-            counter: counter object used to keep track of steps.
-            checkpoint: boolean indicating whether to checkpoint the trainers.
+            epsilon: probability of taking a random action; ignored if a policy
+                network is given.
+            learning_rate: learning rate for the q-network update.
+            discount: discount to use for TD updates.
+            logger: logger object to be used by learner.
+            checkpoint: boolean indicating whether to checkpoint the learner.
+            checkpoint_subpath: directory for the checkpoint.
+            policy_networks: if given, this will be used as the policy network.
+                Otherwise, an epsilon greedy policy using the online Q network will be
+                created. Policy network is used in the actor to sample actions.
+            max_gradient_norm: used for gradient clipping.
             replay_table_name: string indicating what name to give the replay table."""
 
         builder = DIALBuilder(
             DIALConfig(
                 environment_spec=environment_spec,
-                policy_networks=policy_networks,
-                critic_networks=critic_networks,
-                observation_networks=observation_networks,
+                networks=networks,
                 shared_weights=shared_weights,
-                discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
                 target_update_period=target_update_period,
+                samples_per_insert=samples_per_insert,
                 min_replay_size=min_replay_size,
                 max_replay_size=max_replay_size,
-                samples_per_insert=samples_per_insert,
+                importance_sampling_exponent=importance_sampling_exponent,
+                priority_exponent=priority_exponent,
                 n_step=n_step,
-                sigma=sigma,
-                clipping=clipping,
+                epsilon=epsilon,
+                learning_rate=learning_rate,
+                discount=discount,
                 logger=logger,
                 counter=counter,
                 checkpoint=checkpoint,
+                checkpoint_subpath=checkpoint_subpath,
+                policy_networks=policy_networks,
+                max_gradient_norm=max_gradient_norm,
                 replay_table_name=replay_table_name,
             )
         )
@@ -347,18 +361,24 @@ class DIAL(system.System):
         # The dataset provides an interface to sample from replay.
         dataset = builder.make_dataset_iterator(replay_client)
 
-        # Create the networks
-        networks = DecentralisedActorCritic(
+        # Create system architecture
+        # TODO (Kevin): create decentralised/centralised/networked actor architectures
+        # see mava/components/tf/architectures
+        architecture = CentralisedActor(
             environment_spec=environment_spec,
-            policy_networks=policy_networks,
-            critic_networks=critic_networks,
-            observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
+            networks=networks,
             shared_weights=shared_weights,
+        )
+
+        # Add differentiable communication and get networks
+        # TODO (Kevin): create differentiable communication module
+        # See mava/components/tf/modules/communication
+        networks = DifferentiableCommunication(
+            architecture=architecture,
         ).create_system()
 
         # Create the actor which defines how we take actions.
-        executor = builder.make_executor(networks["behaviors"], adder)
+        executor = builder.make_executor(networks["policies"], adder)
 
         # The learner updates the parameters (and initializes them).
         trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
