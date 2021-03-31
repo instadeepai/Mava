@@ -95,7 +95,7 @@ Please read our [contributing docs](./CONTRIBUTING.md) for details on how to sub
 
 ## Troubleshooting and FAQs
 
-Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md). 
+Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
 
 ## Citing Mava
 
