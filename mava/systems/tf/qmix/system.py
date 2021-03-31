@@ -128,7 +128,9 @@ class QMIXBuilder(SystemBuilder):
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
             rate_limiter=reverb.rate_limiters.MinSize(1),
-            signature=adders.NStepTransitionAdder.signature(environment_spec),
+            signature=reverb_adders.ParallelNStepTransitionAdder.signature(
+                environment_spec
+            ),
         )
 
     def make_dataset_iterator(
