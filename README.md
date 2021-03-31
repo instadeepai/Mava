@@ -81,7 +81,12 @@ We have tested `mava` on Python 3.6 & 3.7.
     [openspiel], and [flatland]):
 
     ```bash
-    pip install dm-mava[envs]
+    pip install id-mava[envs]
+    ```
+
+    or locally: 	
+    ```bash
+    pip install .[envs]
     ```
 5.  **Optional**:  Finally, if you want to contribute, please read the [contributing docs](./CONTRIBUTING.md) and install the pre-commit hooks:
     ```bash
