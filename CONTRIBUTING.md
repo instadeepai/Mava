@@ -15,6 +15,18 @@ You generally only need to submit a CLA once, so if you've already submitted one
 (even if it was for a different project), you probably don't need to do it
 again.
 
+## Installing Pre-Commit Hooks and Testing Dependencies
+
+Install the pre-commit hooks and testing dependencies:
+```bash
+pip install .[testing_formatting]
+pre-commit install
+```
+You can run all the pre-commit hooks without making a commit as follows:
+```bash
+pre-commit run --all-files
+```
+
 ## Naming Conventions
 ### Branch Names
 We name our feature and bugfix branches as follows - `feature/[BRANCH-NAME]` or `bugfix/[BRANCH-NAME]`. Please ensure `[BRANCH-NAME]` is hyphen delimited.
