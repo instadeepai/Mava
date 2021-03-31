@@ -15,6 +15,8 @@
 
 # TODO (Kevin): implement DIAL executor (if required)
 # Helper resources
-#   - single agent generic actors in acme: https://github.com/deepmind/acme/blob/master/acme/agents/tf/actors.py
-#   - single agent custom actor for Impala in acme: https://github.com/deepmind/acme/blob/master/acme/agents/tf/impala/acting.py
+#   - single agent generic actors in acme:
+#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/actors.py
+#   - single agent custom actor for Impala in acme:
+#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/impala/acting.py
 #   - multi-agent generic executors in mava: mava/systems/tf/executors.py

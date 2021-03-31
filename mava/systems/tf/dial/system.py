@@ -18,15 +18,16 @@
 
 """DIAL system implementation."""
 import dataclasses
-from typing import Dict, Iterator, Optional, Union
+from typing import Dict, Iterator, Optional
 
 import reverb
 import sonnet as snt
+import tensorflow as tf
 from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
-from mava import adders, core, specs
+from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import CentralisedActor
 from mava.components.tf.modules.communication import DifferentiableCommunication
@@ -34,9 +35,6 @@ from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.dial import training
-
-# TODO: Move this to a types file in future.
-NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
 
 
 @dataclasses.dataclass
@@ -211,7 +209,7 @@ class DIALBuilder(SystemBuilder):
         huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
-        logger: Optional[NestedLogger] = None,
+        logger: Optional[types.NestedLogger] = None,
         checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
@@ -245,6 +243,7 @@ class DIALBuilder(SystemBuilder):
             agent_types=agent_types,
             networks=networks["networks"],
             target_network=networks["target_networks"],
+            shared_weights=shared_weights,
             discount=discount,
             importance_sampling_exponent=importance_sampling_exponent,
             policy_optimizer=policy_optimizer,
@@ -252,6 +251,7 @@ class DIALBuilder(SystemBuilder):
             dataset=dataset,
             huber_loss_parameter=huber_loss_parameter,
             replay_client=replay_client,
+            clipping=clipping,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,

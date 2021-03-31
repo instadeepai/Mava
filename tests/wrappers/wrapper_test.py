@@ -1,9 +1,9 @@
 import dm_env
 import numpy as np
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 from tests.conftest import EnvSpec, EnvType, Helpers
-from _pytest.monkeypatch import MonkeyPatch
 
 """
 TestEnvWrapper is a general purpose test class that runs tests for environment wrappers.

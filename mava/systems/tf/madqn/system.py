@@ -19,10 +19,11 @@
 
 """MADQN system implementation."""
 import dataclasses
-from typing import Dict, Iterator, Optional, Union
+from typing import Dict, Iterator, Optional
 
 import reverb
 import sonnet as snt
+import tensorflow as tf
 from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
@@ -243,6 +244,7 @@ class MADQNBuilder(SystemBuilder):
             agent_types=agent_types,
             networks=networks["networks"],
             target_network=networks["target_networks"],
+            shared_weights=shared_weights,
             discount=discount,
             importance_sampling_exponent=importance_sampling_exponent,
             policy_optimizer=policy_optimizer,
@@ -250,6 +252,7 @@ class MADQNBuilder(SystemBuilder):
             dataset=dataset,
             huber_loss_parameter=huber_loss_parameter,
             replay_client=replay_client,
+            clipping=clipping,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,

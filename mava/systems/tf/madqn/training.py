@@ -15,5 +15,6 @@
 
 # TODO (Claude): implement MADQN trainer with stabilising experience replay
 # Helper resources
-#   - single agent dqn learner in acme: https://github.com/deepmind/acme/blob/master/acme/agents/tf/dqn/learning.py
+#   - single agent dqn learner in acme:
+#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/dqn/learning.py
 #   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
