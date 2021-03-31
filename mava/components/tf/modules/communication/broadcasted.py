@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO (Kevin): complete class for broadcasted communication
+
 """Broadcasted communication for multi-agent RL systems"""
 
 
