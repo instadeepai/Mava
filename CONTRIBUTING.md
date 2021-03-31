@@ -15,6 +15,12 @@ You generally only need to submit a CLA once, so if you've already submitted one
 (even if it was for a different project), you probably don't need to do it
 again.
 
+## Naming Conventions
+### Branch Names
+We name our feature and bugfix branchs as follows - `feature/[BRANCH-NAME]` or `bugfix/[BRANCH-NAME]`. Please ensure `[BRANCH-NAME]` is hyphen delimited. 
+### Commit Messages
+We follow the conventional commits [standard] (https://www.conventionalcommits.org/en/v1.0.0/).
+
 ## Code reviews
 
 All submissions, including submissions by project members, require review. We

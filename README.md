@@ -84,7 +84,7 @@ We have tested `mava` on Python 3.6 & 3.7.
     pip install id-mava[envs]
     ```
 
-    or locally: 	
+    or from source: 	
     ```bash
     pip install .[envs]
     ```
