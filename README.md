@@ -69,25 +69,31 @@ We have tested `mava` on Python 3.6 & 3.7.
     ```
 
 
-3.  To install Acme dependencies for [TensorFlow]-based Acme agents:
+3. To install Acme dependencies for [TensorFlow]-based Acme agents:
 
-    ```bash
-    pip install dm-acme
-    pip install dm-acme[reverb]
-    pip install dm-acme[tf]
-    ```
+   ```
+   pip install id-mava[reverb]
+   pip install id-mava[tf]
+   ```
 
-4.  Finally, to install a few example environments (including [pettingzoo],
-    [openspiel], and [flatland]):
+   or from source:
 
-    ```bash
-    pip install id-mava[envs]
-    ```
+   ```bash
+   pip install .[reverb]
+   pip install .[tf]
+   ```
 
-    or from source:
-    ```bash
-    pip install .[envs]
-    ```
+4. Finally, to install a few example environments (including [pettingzoo],
+   [openspiel], and [flatland]):
+
+   ```bash
+   pip install id-mava[envs]
+   ```
+
+   or from source:
+   ```bash
+   pip install .[envs]
+   ```
 
 ## Contributing
 
