@@ -12,3 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""MARL system mixing modules."""
+
+from mava.components.tf.modules.mixing.base import BaseMixingModule
+from mava.components.tf.modules.mixing.monotonic import MonotonicMixing
+from mava.components.tf.modules.mixing.transformed import TransformedMixing
+from mava.components.tf.modules.mixing.weighted import WeightedMixing

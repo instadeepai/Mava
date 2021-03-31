@@ -12,23 +12,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# TODO (StJohn): complete class for monotonic mixing
-
-"""Mixing for multi-agent RL systems"""
-
-from mava.components.tf.architectures import BaseArchitecture
-from mava.components.tf.modules.mixing import BaseMixingModule
-
-
-class MonotonicMixing(BaseMixingModule):
-    """Multi-agent mixing architecture."""
-
-    def __init__(
-        self,
-        architecture: BaseArchitecture,
-    ) -> None:
-        self._architecture = architecture
-
-    def some_mixing_function(self) -> None:
-        """Perform some mixing logic"""

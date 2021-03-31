@@ -13,22 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): complete class for monotonic mixing
-
-"""Mixing for multi-agent RL systems"""
-
-from mava.components.tf.architectures import BaseArchitecture
-from mava.components.tf.modules.mixing import BaseMixingModule
-
-
-class MonotonicMixing(BaseMixingModule):
-    """Multi-agent mixing architecture."""
-
-    def __init__(
-        self,
-        architecture: BaseArchitecture,
-    ) -> None:
-        self._architecture = architecture
-
-    def some_mixing_function(self) -> None:
-        """Perform some mixing logic"""
+# TODO (Claude): implement MADQN executor (if required)
+# Helper resources
+#   - single agent generic actors in acme:
+#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/actors.py
+#   - single agent custom actor for Impala in acme:
+#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/impala/acting.py
+#   - multi-agent generic executors in mava: mava/systems/tf/executors.py

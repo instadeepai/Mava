@@ -38,7 +38,7 @@ class BaseArchitecture:
 
 
 class BaseActorCritic(BaseArchitecture):
-    """Base class for MARL architectures.
+    """Base class for MARL Actor critic architectures.
     Objects which implement this interface provide a set of functions
     to create systems according to a specific architectural design,
     e.g. decentralised, centralised or networked.

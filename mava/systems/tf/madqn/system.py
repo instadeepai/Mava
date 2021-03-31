@@ -15,9 +15,9 @@
 
 # type: ignore
 
-# TODO (StJohn): finish Qmix
+# TODO (Claude): finish MADQN system using stabilised experience replay
 
-"""QMIX system implementation."""
+"""MADQN system implementation."""
 import dataclasses
 from typing import Dict, Iterator, Optional
 
@@ -31,16 +31,16 @@ from acme.utils import counting, loggers
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import CentralisedActor
-from mava.components.tf.modules.mixing import MonotonicMixing
+from mava.components.tf.modules.stabilising import FingerPrints
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
-from mava.systems.tf.qmix import training
+from mava.systems.tf.madqn import training
 
 
 @dataclasses.dataclass
-class QMIXConfig:
-    """Configuration options for the QMIX system
+class MADQNConfig:
+    """Configuration options for the MADQN system
     Args:
         environment_spec: description of the actions, observations, etc.
         networks: the online Q network (the one being optimized)
@@ -94,8 +94,8 @@ class QMIXConfig:
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
-class QMIXBuilder(SystemBuilder):
-    """Builder for QMIX which constructs individual components of the system."""
+class MADQNBuilder(SystemBuilder):
+    """Builder for MADQN which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an MARL system.
       Implementations of this interface contain a complete specification of a
@@ -104,9 +104,9 @@ class QMIXBuilder(SystemBuilder):
       distributed setup.
       """
 
-    def __init__(self, config: QMIXConfig):
+    def __init__(self, config: MADQNConfig):
         """Args:
-        config: Configuration options for the QMIX system."""
+        config: Configuration options for the MADQN system."""
 
         self._config = config
 
@@ -239,7 +239,7 @@ class QMIXBuilder(SystemBuilder):
         policy_optimizer = snt.optimizers.Adam(learning_rate=learning_rate)
 
         # The learner updates the parameters (and initializes them).
-        trainer = training.QMIXTrainer(
+        trainer = training.MADQNTrainer(
             agents=agents,
             agent_types=agent_types,
             networks=networks["networks"],
@@ -261,9 +261,9 @@ class QMIXBuilder(SystemBuilder):
         return trainer
 
 
-class QMIX(system.System):
-    """QMIX system.
-    This implements a single-process QMIX system. This is an actor-critic based
+class MADQN(system.System):
+    """MADQN system.
+    This implements a single-process MADQN system. This is an actor-critic based
     system that generates data via a behavior policy, inserts N-step transitions into
     a replay buffer, and periodically updates the policies of each agent
     (and as a result the behavior) by sampling uniformly from this buffer.
@@ -325,8 +325,8 @@ class QMIX(system.System):
             max_gradient_norm: used for gradient clipping.
             replay_table_name: string indicating what name to give the replay table."""
 
-        builder = QMIXBuilder(
-            QMIXConfig(
+        builder = MADQNBuilder(
+            MADQNConfig(
                 environment_spec=environment_spec,
                 networks=networks,
                 shared_weights=shared_weights,
@@ -371,10 +371,10 @@ class QMIX(system.System):
             shared_weights=shared_weights,
         )
 
-        # Add monotonic mixing and get networks
-        # TODO (StJohn): create monotonic mixing module for Qmix
-        # See mava/components/tf/modules/mixing
-        networks = MonotonicMixing(
+        # Add stabilisation of the replay buffer using fingerprints and get networks
+        # TODO (Claude): create fingerprints module for stabilising experience replay
+        # See mava/components/tf/modules/stabilising
+        networks = FingerPrints(
             architecture=architecture,
         ).create_system()
 
