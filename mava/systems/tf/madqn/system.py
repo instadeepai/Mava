@@ -27,7 +27,7 @@ from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
-from mava import adders, core, specs
+from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import CentralisedActor
 from mava.components.tf.modules.stabilising import FingerPrints
@@ -35,9 +35,6 @@ from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import training
-
-# TODO: Move this to a types file in future.
-NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
 
 
 @dataclasses.dataclass
@@ -212,7 +209,7 @@ class MADQNBuilder(SystemBuilder):
         huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
-        logger: Optional[NestedLogger] = None,
+        logger: Optional[types.NestedLogger] = None,
         checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.

@@ -36,9 +36,6 @@ from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.qmix import training
 
-# TODO: Move this to a types file in future.
-NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
-
 
 @dataclasses.dataclass
 class QMIXConfig:
@@ -212,7 +209,7 @@ class QMIXBuilder(SystemBuilder):
         huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
-        logger: Optional[NestedLogger] = None,
+        logger: Optional[types.NestedLogger] = None,
         checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
