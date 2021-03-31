@@ -6,7 +6,7 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
-    activesupport (6.0.3.5)
+    activesupport (6.0.3.6)
       concurrent-ruby (~> 1.0, >= 1.0.2)
       i18n (>= 0.7, < 2)
       minitest (~> 5.1)
@@ -39,7 +39,7 @@ GEM
     ffi (1.15.0)
     forwardable-extended (2.6.0)
     gemoji (3.0.1)
-    github-pages (212)
+    github-pages (213)
       github-pages-health-check (= 1.17.0)
       jekyll (= 3.9.0)
       jekyll-avatar (= 0.7.0)
@@ -55,7 +55,7 @@ GEM
       jekyll-readme-index (= 0.3.0)
       jekyll-redirect-from (= 0.16.0)
       jekyll-relative-links (= 0.6.1)
-      jekyll-remote-theme (= 0.4.2)
+      jekyll-remote-theme (= 0.4.3)
       jekyll-sass-converter (= 1.5.2)
       jekyll-seo-tag (= 2.7.1)
       jekyll-sitemap (= 1.4.0)
@@ -141,7 +141,7 @@ GEM
       jekyll (>= 3.3, < 5.0)
     jekyll-relative-links (0.6.1)
       jekyll (>= 3.3, < 5.0)
-    jekyll-remote-theme (0.4.2)
+    jekyll-remote-theme (0.4.3)
       addressable (~> 2.0)
       jekyll (>= 3.5, < 5.0)
       jekyll-sass-converter (>= 1.0, <= 3.0.0, != 2.0.0)
@@ -206,7 +206,7 @@ GEM
     kramdown-parser-gfm (1.1.0)
       kramdown (~> 2.0)
     liquid (4.0.3)
-    listen (3.4.1)
+    listen (3.5.1)
       rb-fsevent (~> 0.10, >= 0.10.3)
       rb-inotify (~> 0.9, >= 0.9.10)
     mercenary (0.3.6)
@@ -216,7 +216,7 @@ GEM
       jekyll-seo-tag (~> 2.1)
     minitest (5.14.4)
     multipart-post (2.1.1)
-    nokogiri (1.11.1-x86_64-darwin)
+    nokogiri (1.11.2-x86_64-linux)
       racc (~> 1.4)
     octokit (4.20.0)
       faraday (>= 0.9)
@@ -261,14 +261,14 @@ GEM
     zeitwerk (2.4.2)
 
 PLATFORMS
-  x86_64-darwin-19
+  x86_64-linux
 
 DEPENDENCIES
   bundler (~> 2.0)
-  github-pages
+  github-pages (~> 213)
   jekyll-agency!
   rake (~> 13.0)
   webrick (~> 1.7)
 
 BUNDLED WITH
-   2.2.14
+   2.2.15
