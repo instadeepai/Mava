@@ -188,7 +188,9 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
         #  Handle empty rewards
         if not rewards:
-            rewards = {agent: 0 for agent in self.possible_agents}
+            rewards = {
+                agent: np.dtype("float32").type(0) for agent in self.possible_agents
+            }
         else:
             rewards = {
                 agent: np.dtype("float32").type(reward)

@@ -23,7 +23,7 @@ from acme import types
 
 from mava.adders.reverb import base
 
-# from acme.tf import utils as tf2_utils
+from acme.tf import utils as tf2_utils
 
 
 def zeros_like(
@@ -95,14 +95,11 @@ def calculate_priorities(
       A dictionary mapping from table names to the priority (a float) for the
       given collection of steps.
     """
-    # if any([priority_fn is not None for priority_fn in priority_fns.values()]):
-    #     print("Computing function input")
-    #     # Stack the steps and wrap them as PriorityFnInput.
-    #     fn_input = base.PriorityFnInput(*tf2_utils.stack_sequence_fields(steps))
+    if any([priority_fn is not None for priority_fn in priority_fns.values()]):
+        # Stack the steps and wrap them as PriorityFnInput.
+        fn_input = base.PriorityFnInput(*tf2_utils.stack_sequence_fields(steps))
 
-    # {
-    #     table: (priority_fn(fn_input) if priority_fn else 1.0)
-    #     for table, priority_fn in priority_fns.items()
-    # }
-
-    return {table: 1.0 for table, priority_fn in priority_fns.items()}
+    return {
+        table: (priority_fn(fn_input) if priority_fn else 1.0)
+        for table, priority_fn in priority_fns.items()
+    }
