@@ -18,6 +18,8 @@
 import copy
 from typing import Dict, Tuple
 
+import tensorflow as tf
+
 import sonnet as snt
 from acme import specs as acme_specs
 
@@ -49,7 +51,9 @@ class CentralisedActorCritic(DecentralisedActorCritic):
     def _get_critic_specs(
         self,
     ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
-        specs_per_type: Dict[str, acme_specs.Array] = {}
+        obs_specs_per_type: Dict[str, acme_specs.Array] = {}
+        action_specs_per_type: Dict[str, acme_specs.Array] = {}
+
         agents_by_type = self._env_spec.get_agents_by_type()
 
         # Create one critic per agent. Each critic gets the concatenated
@@ -60,32 +64,24 @@ class CentralisedActorCritic(DecentralisedActorCritic):
         #  observations/actions inputs of agents from different types as well.
         #  Maybe use a multiplexer to do so?
         for agent_type, agents in agents_by_type.items():
-            critic_spec = copy.deepcopy(self._agent_specs[agents[0]])
             critic_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
             critic_obs_shape.insert(0, len(agents))
-
             critic_act_shape = list(
                 copy.copy(self._agent_specs[agents[0]].actions.shape)
             )
             critic_act_shape.insert(0, len(agents))
-
-            print("critic_spec.observations: ", critic_spec.observations)
-
-            critic_spec.observations._shape = tuple(critic_obs_shape)
-            critic_spec.actions._shape = tuple(critic_act_shape)
-
-            specs_per_type[agent_type] = critic_spec
+            obs_specs_per_type[agent_type] = tf.TensorSpec(shape=critic_obs_shape,
+                                                           dtype=tf.dtypes.float32,
+                                                           )
+            action_specs_per_type[agent_type] = tf.TensorSpec(shape=critic_act_shape,
+                                                              dtype=tf.dtypes.float32,
+                                                              )
 
         critic_obs_specs = {}
         critic_act_specs = {}
         for agent_key in self._critic_agent_keys:
             agent_type = agent_key.split("_")[0]
-
             # Get observation and action spec for critic.
-            critic_obs_specs[agent_key] = specs_per_type[agent_type].observations
-            critic_act_specs[agent_key] = specs_per_type[agent_type].actions
-
-        print("critic_obs_specs: ", critic_obs_specs)
-        print("critic_act_specs: ", critic_act_specs)
-        exit()
+            critic_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+            critic_act_specs[agent_key] = action_specs_per_type[agent_type]
         return critic_obs_specs, critic_act_specs

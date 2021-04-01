@@ -214,6 +214,36 @@ class MADDPGTrainer(mava.Trainer):
         return s_tm1, s_t
 
     @tf.function
+    def _get_critic_feed(
+            self, s_tm1_trans: Dict[str, np.ndarray], s_t_trans: Dict[str, np.ndarray],
+            a_tm1: Dict[str, np.ndarray], a_t: Dict[str, np.ndarray]
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        # Decentralised critic
+        # s_tm1_feed = s_tm1_trans[agent]
+        # s_t_feed = s_t_trans[agent]
+        # a_tm1_feed = a_tm1[agent]
+        # a_t_feed = a_t[agent]
+
+        # Centralised critic.
+        s_tm1_feed = tf.stack([x for x in s_tm1_trans.values()], 1)
+        s_t_feed = tf.stack([x for x in s_t_trans.values()], 1)
+        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
+        a_t_feed = tf.stack([x for x in a_t.values()], 1)
+        return s_tm1_feed, s_t_feed, a_tm1_feed, a_t_feed
+
+    # @tf.function
+    # def _update_actions_for_critic(
+    #         self, dpg_a_t: Dict[str, np.ndarray], a_t: Dict[str, tf.Tensor], agent: str
+    # ) -> tf.Tensor:
+    #     # Decentralised DPG
+    #     # dpg_a_t_feed = dpg_a_t
+    #
+    #     # Centralised DPG
+    #     dpg_a_t_feed = a_t
+    #     dpg_a_t_feed[agent] = dpg_a_t
+    #     return dpg_a_t_feed
+
+    @tf.function
     def _policy_actions(self, next_state: Dict[str, np.ndarray]) -> Any:
         actions = {}
         for agent in self._agents:
@@ -266,21 +296,10 @@ class MADDPGTrainer(mava.Trainer):
 
                 o_t_feed = s_t_trans[agent]
 
-                # NOTE (Arnu): This is the centralised case where we concat
-                # obs to form states and concat all agent actions.
-                # s_tm1_feed = tf.concat([x.numpy() for x in s_tm1.values()], 1)
-                # s_t_feed = tf.concat([x.numpy() for x in s_t.values()], 1)
-                # a_tm1_feed = tf.concat([x.numpy() for x in a_tm1.values()], 1)
-                # a_t_feed = tf.concat([x.numpy() for x in a_t.values()], 1)
-
-                # Decentralised critic
-                s_tm1_feed = s_tm1_trans[agent]
-                s_t_feed = s_t_trans[agent]
-                a_tm1_feed = a_tm1[agent]
-                a_t_feed = a_t[agent]
+                # Get critic feed
+                s_tm1_feed, s_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(s_tm1_trans, s_t_trans, a_tm1, a_t)
 
                 # Critic learning.
-                # TODO: This seems only to work in the decentralised case?
                 q_tm1 = self._critic_networks[agent_key](s_tm1_feed, a_tm1_feed)
                 q_t = self._target_critic_networks[agent_key](s_t_feed, a_t_feed)
 
@@ -296,13 +315,16 @@ class MADDPGTrainer(mava.Trainer):
 
                 # Actor learning.
                 dpg_a_t = self._policy_networks[agent_key](o_t_feed)
-                dpg_a_t_feed = dpg_a_t
 
-                # NOTE (Arnu): Below is for centralised case
-                # dpg_a_t_feed = a_t
-                # dpg_a_t_feed[agent] = dpg_a_t
-                # dpg_q_t = self._critic_networks[agent_key](s_t_feed, dpg_a_t_feed)
+                # Get dpg actions
+                # Decentralised DPG
+                # dpg_a_t_feed = dpg_a_t
 
+                # Centralised DPG
+                dpg_a_t_feed = a_t
+                dpg_a_t_feed[agent] = dpg_a_t
+
+                # Get dpg Q values.
                 dpg_q_t = self._critic_networks[agent_key](s_t_feed, dpg_a_t_feed)
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.

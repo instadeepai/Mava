@@ -155,7 +155,6 @@ class DecentralisedActorCritic(BaseActorCritic):
 
         critic_networks["critics"] = self._critic_networks
         critic_networks["target_critics"] = self._target_critic_networks
-
         return critic_networks
 
     def create_system(
