@@ -61,12 +61,15 @@ class CentralisedActorCritic(DecentralisedActorCritic):
         #  Maybe use a multiplexer to do so?
         for agent_type, agents in agents_by_type.items():
             critic_spec = copy.deepcopy(self._agent_specs[agents[0]])
-
-            critic_obs_shape = copy.copy(self._embed_specs[agents[0]].shape)
+            critic_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
             critic_obs_shape.insert(0, len(agents))
 
-            critic_act_shape = copy.copy(self._agent_specs[agents[0]].actions.shape)
+            critic_act_shape = list(
+                copy.copy(self._agent_specs[agents[0]].actions.shape)
+            )
             critic_act_shape.insert(0, len(agents))
+
+            print("critic_spec.observations: ", critic_spec.observations)
 
             critic_spec.observations._shape = tuple(critic_obs_shape)
             critic_spec.actions._shape = tuple(critic_act_shape)
@@ -81,4 +84,8 @@ class CentralisedActorCritic(DecentralisedActorCritic):
             # Get observation and action spec for critic.
             critic_obs_specs[agent_key] = specs_per_type[agent_type].observations
             critic_act_specs[agent_key] = specs_per_type[agent_type].actions
+
+        print("critic_obs_specs: ", critic_obs_specs)
+        print("critic_act_specs: ", critic_act_specs)
+        exit()
         return critic_obs_specs, critic_act_specs

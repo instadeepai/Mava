@@ -280,6 +280,7 @@ class MADDPGTrainer(mava.Trainer):
                 a_t_feed = a_t[agent]
 
                 # Critic learning.
+                # TODO: This seems only to work in the decentralised case?
                 q_tm1 = self._critic_networks[agent_key](s_tm1_feed, a_tm1_feed)
                 q_t = self._target_critic_networks[agent_key](s_t_feed, a_t_feed)
 
