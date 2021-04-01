@@ -286,6 +286,10 @@ class TestEnvWrapper:
 
             curr_dm_timestep = wrapped_env.step(test_agents_actions)
 
+            assert curr_dm_timestep.reward == {
+                agent: 0 for agent, reward in wrapped_env.agents
+            }, "Failed to correctly set reward. "
+
         # Sequential env_types
         elif env_spec.env_type == EnvType.Sequential:
 
@@ -306,6 +310,8 @@ class TestEnvWrapper:
                     )
 
                 curr_dm_timestep = wrapped_env.step(test_agent_actions)
+
+            assert curr_dm_timestep.reward == 0, "Failed to correctly set reward. "
 
         assert (
             wrapped_env._reset_next_step is True

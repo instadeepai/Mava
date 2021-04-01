@@ -1,12 +1,13 @@
 """mava is a framework for multi-agent reinforcement learning."""
 
 # Expose specs and types modules.
-from acme import types
+from acme import types as acme_types
 
 # Internal core import.
 from acme.core import Saveable, VariableSource, Worker
 
 from mava import specs
+from mava import types
 
 # Make __version__ accessible.
 from mava._metadata import __version__
