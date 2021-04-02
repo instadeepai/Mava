@@ -123,23 +123,14 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # Form the n-step transition given the steps.
         observations = self._buffer[0].observations
         actions = self._buffer[0].actions
-        extras = self._buffer[0].extras
         next_observations = self._next_observations
         self._discounts = {agent: self._discount for agent in observations.keys()}
-
-        # print("OBS:", observations)
-        # print("ACT:", actions)
-        # print("EXTRA:", extras)
-        # print("NEXT_OBS:", next_observations)
-        # print("DISCOUNTS:", self._discounts)
+        extras = self._buffer[0].extras
 
         # Give the same tree structure to the n-step return accumulator,
         # n-step discount accumulator, and self.discount, so that they can be
         # iterated in parallel using tree.map_structure.
 
-        # print("REWARDS: ", self._buffer[0].rewards)
-        # print("DISCOUNTS: ", self._buffer[0].discounts)
-        # print("SELF DISCOUNTS: ", self._discounts)
         # NOTE (Arnu): temp fix for empty rewards dict
         if not self._buffer[0].rewards:
             rewards = {
@@ -186,8 +177,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
                 }
             else:
                 rewards = step.rewards
-            # print(rewards)
-            # print(type(rewards))
             (
                 step_discount,
                 step_reward,
@@ -199,7 +188,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             tree.map_structure(operator.imul, total_discount, self_discount)
 
             # Equivalent to: `n_step_return += step.reward * total_discount`.
-            # print("Computing total n_step reward")
             tree.map_structure(
                 lambda nsr, sr, td: operator.iadd(nsr, sr * td),
                 n_step_return,
@@ -208,9 +196,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             )
 
             # Equivalent to: `total_discount *= step.discount`.
-            # print("Computing total discount with step.discount")
-            # print("TOTAL DISCOUNT", total_discount)
-            # print("STEP COUNT", step_discount)
             tree.map_structure(operator.imul, total_discount, step_discount)
 
         if extras:
@@ -241,11 +226,8 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         final_step: base.Step = self._final_step_placeholder._replace(
             observations=next_observations
         )
-        # print("FINAL STEP: ", final_step)
         steps = list(self._buffer) + [final_step]
 
-        # print("STEPS: ", steps)
-        # print("STEPS length: ", len(steps))
         # Calculate the priority for this transition.
 
         # NOTE (Arnu): removed because of errors
@@ -287,7 +269,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         act_specs = {}
         reward_specs = {}
         step_discount_specs = {}
-        extras_spec = {}
+        extras_specs = {}
         for agent in agents:
 
             rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
@@ -303,7 +285,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             act_specs[agent] = agent_specs[agent].actions
             reward_specs[agent] = rewards_spec
             step_discount_specs[agent] = step_discounts_spec
-            extras_spec[agent] = {}
+            extras_spec[agent] = extras_spec
 
         transition_spec = [
             obs_specs,
@@ -311,10 +293,8 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             reward_specs,
             step_discount_specs,
             obs_specs,  # next_observation
+            extras_specs,
         ]
-
-        if extras_spec:
-            transition_spec.append(extras_spec)
 
         return tree.map_structure_with_path(
             base.spec_like_to_tensor_spec, tuple(transition_spec)

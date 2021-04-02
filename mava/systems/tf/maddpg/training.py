@@ -195,14 +195,14 @@ class MADDPGTrainer(mava.Trainer):
     def _transform_observations(
         self, state: Dict[str, np.ndarray], next_state: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        s_tm1 = {}
-        s_t = {}
+        o_tm1 = {}
+        o_t = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            s_tm1[agent] = self._observation_networks[agent_key](
+            o_tm1[agent] = self._observation_networks[agent_key](
                 state[agent].observation
             )
-            s_t[agent] = self._target_observation_networks[agent_key](
+            o_t[agent] = self._target_observation_networks[agent_key](
                 next_state[agent].observation
             )
 
@@ -210,26 +210,33 @@ class MADDPGTrainer(mava.Trainer):
             # observation network. In addition, since the online policy network is
             # evaluated at o_t, this also means the policy loss does not influence
             # the observation network training.
-            s_t[agent] = tree.map_structure(tf.stop_gradient, s_t[agent])
-        return s_tm1, s_t
+            o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
+        return o_tm1, o_t
 
     @tf.function
     def _get_critic_feed(
-            self, s_tm1_trans: Dict[str, np.ndarray], s_t_trans: Dict[str, np.ndarray],
-            a_tm1: Dict[str, np.ndarray], a_t: Dict[str, np.ndarray]
+            self, o_tm1_trans: Dict[str, np.ndarray], o_t_trans: Dict[str, np.ndarray],
+            a_tm1: Dict[str, np.ndarray], a_t: Dict[str, np.ndarray], e_t: Dict[str, np.array]
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         # Decentralised critic
-        # s_tm1_feed = s_tm1_trans[agent]
-        # s_t_feed = s_t_trans[agent]
+        # o_tm1_feed = o_tm1_trans[agent]
+        # o_t_feed = o_t_trans[agent]
         # a_tm1_feed = a_tm1[agent]
         # a_t_feed = a_t[agent]
 
         # Centralised critic.
-        s_tm1_feed = tf.stack([x for x in s_tm1_trans.values()], 1)
-        s_t_feed = tf.stack([x for x in s_t_trans.values()], 1)
+        # o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
+        # o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
+        # a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
+        # a_t_feed = tf.stack([x for x in a_t.values()], 1)
+
+        # State based
+        o_tm1_feed = tf.stack([["s_tm1"] for _ in o_tm1_trans.values()], 1)
+        o_t_feed = tf.stack([e_t["s_t"] for _ in o_t_trans.values()], 1)
         a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
         a_t_feed = tf.stack([x for x in a_t.values()], 1)
-        return s_tm1_feed, s_t_feed, a_tm1_feed, a_t_feed
+
+        return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     # @tf.function
     # def _update_actions_for_critic(
@@ -267,16 +274,19 @@ class MADDPGTrainer(mava.Trainer):
         inputs = next(self._iterator)
 
         # Unpack input data as follows:
-        # s_tm1 = dictionary of observations one for each agent
-        #   (forming the system state)
-        # a_tm1 = dictionary of actions taken from obs in s_tm1
+        # o_tm1 = dictionary of observations one for each agent
+        # a_tm1 = dictionary of actions taken from obs in o_tm1
         # r_t = dictionary of rewards or rewards sequences
         #   (if using N step transitions) ensuing from actions a_tm1
         # d_t = environment discount ensuing from actions a_tm1.
         #   This discount is applied to future rewards after r_t.
-        # s_t = dictionary of next observations or next observation sequences
+        # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data that the agents persist in replay.
-        s_tm1, a_tm1, r_t, d_t, s_t, e_t = inputs.data
+        o_tm1, a_tm1, r_t, d_t, o_t, e_t = inputs.data
+
+
+        print("e_t: ", e_t)
+        exit()
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
@@ -291,17 +301,17 @@ class MADDPGTrainer(mava.Trainer):
                 # Transforming the observations this way at the start of the learning
                 # step effectively means that the policy and critic share observation
                 # network weights.
-                s_tm1_trans, s_t_trans = self._transform_observations(s_tm1, s_t)
-                a_t = self._policy_actions(s_t_trans)
+                o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
+                a_t = self._policy_actions(o_t_trans)
 
-                o_t_feed = s_t_trans[agent]
+                o_t_agent_feed = o_t_trans[agent]
 
                 # Get critic feed
-                s_tm1_feed, s_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(s_tm1_trans, s_t_trans, a_tm1, a_t)
+                o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(o_tm1_trans, o_t_trans, a_tm1, a_t, e_t)
 
                 # Critic learning.
-                q_tm1 = self._critic_networks[agent_key](s_tm1_feed, a_tm1_feed)
-                q_t = self._target_critic_networks[agent_key](s_t_feed, a_t_feed)
+                q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
+                q_t = self._target_critic_networks[agent_key](o_t_feed, a_t_feed)
 
                 # Squeeze into the shape expected by the td_learning implementation.
                 q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
@@ -314,7 +324,7 @@ class MADDPGTrainer(mava.Trainer):
                 critic_loss = tf.reduce_mean(critic_loss, axis=0)
 
                 # Actor learning.
-                dpg_a_t = self._policy_networks[agent_key](o_t_feed)
+                dpg_a_t = self._policy_networks[agent_key](o_t_agent_feed)
 
                 # Get dpg actions
                 # Decentralised DPG
@@ -325,7 +335,7 @@ class MADDPGTrainer(mava.Trainer):
                 dpg_a_t_feed[agent] = dpg_a_t
 
                 # Get dpg Q values.
-                dpg_q_t = self._critic_networks[agent_key](s_t_feed, dpg_a_t_feed)
+                dpg_q_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
                 dqda_clipping = 1.0 if self._clipping else None

@@ -23,9 +23,11 @@ class MAEnvironmentSpec:
         an environment for each agent."""
         specs = {}
         observation_specs = environment.observation_spec()
+
         action_specs = environment.action_spec()
         reward_specs = environment.reward_spec()
         discount_specs = environment.discount_spec()
+        self.state_specs = environment.state_spec()
         for agent in environment.possible_agents:
             specs[agent] = EnvironmentSpec(
                 observations=observation_specs[agent],
@@ -34,6 +36,9 @@ class MAEnvironmentSpec:
                 discounts=discount_specs[agent],
             )
         return specs
+
+    def get_state_specs(self) -> Dict[str, EnvironmentSpec]:
+        return self.state_specs
 
     def get_agent_specs(self) -> Dict[str, EnvironmentSpec]:
         return self._specs
