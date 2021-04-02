@@ -231,8 +231,8 @@ class MADDPGTrainer(mava.Trainer):
         # a_t_feed = tf.stack([x for x in a_t.values()], 1)
 
         # State based
-        o_tm1_feed = tf.stack([["s_tm1"] for _ in o_tm1_trans.values()], 1)
-        o_t_feed = tf.stack([e_t["s_t"] for _ in o_t_trans.values()], 1)
+        o_tm1_feed = e_t["s_tm1"]
+        o_t_feed = e_t["s_t"]
         a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
         a_t_feed = tf.stack([x for x in a_t.values()], 1)
 
@@ -283,11 +283,6 @@ class MADDPGTrainer(mava.Trainer):
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data that the agents persist in replay.
         o_tm1, a_tm1, r_t, d_t, o_t, e_t = inputs.data
-
-
-        print("e_t: ", e_t)
-        exit()
-
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
         for agent in self._agents:
@@ -303,8 +298,6 @@ class MADDPGTrainer(mava.Trainer):
                 # network weights.
                 o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
                 a_t = self._policy_actions(o_t_trans)
-
-                o_t_agent_feed = o_t_trans[agent]
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(o_tm1_trans, o_t_trans, a_tm1, a_t, e_t)
@@ -324,6 +317,7 @@ class MADDPGTrainer(mava.Trainer):
                 critic_loss = tf.reduce_mean(critic_loss, axis=0)
 
                 # Actor learning.
+                o_t_agent_feed = o_t_trans[agent]
                 dpg_a_t = self._policy_networks[agent_key](o_t_agent_feed)
 
                 # Get dpg actions

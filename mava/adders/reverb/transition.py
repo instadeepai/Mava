@@ -215,7 +215,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
                 total_discount,
                 next_observations,
             )  # type: ignore
-
         # Create a list of steps.
         if self._final_step_placeholder is None:
             # utils.final_step_like is expensive (around 0.085ms) to run every time
@@ -263,13 +262,11 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
 
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
-        extras_spec = environment_spec.get_extra_specs()
-
+        extras_specs = environment_spec.get_extra_specs()
         obs_specs = {}
         act_specs = {}
         reward_specs = {}
         step_discount_specs = {}
-        extras_specs = {}
         for agent in agents:
 
             rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
@@ -285,7 +282,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             act_specs[agent] = agent_specs[agent].actions
             reward_specs[agent] = rewards_spec
             step_discount_specs[agent] = step_discounts_spec
-            extras_specs[agent] = extras_spec
 
         transition_spec = [
             obs_specs,
