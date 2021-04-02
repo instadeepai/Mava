@@ -249,7 +249,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     def signature(
         cls,
         environment_spec: mava_specs.MAEnvironmentSpec,
-        extras_spec: Dict[str, types.NestedSpec] = {"": ()},
     ) -> tf.TypeSpec:
 
         # This function currently assumes that self._discount is a scalar.
@@ -264,6 +263,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
 
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
+        extras_spec = environment_spec.get_extra_specs()
 
         obs_specs = {}
         act_specs = {}
@@ -285,7 +285,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             act_specs[agent] = agent_specs[agent].actions
             reward_specs[agent] = rewards_spec
             step_discount_specs[agent] = step_discounts_spec
-            extras_spec[agent] = extras_spec
+            extras_specs[agent] = extras_spec
 
         transition_spec = [
             obs_specs,

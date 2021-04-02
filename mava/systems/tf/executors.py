@@ -89,7 +89,7 @@ class FeedForwardExecutor(core.Executor):
             if extras:
                 self._adder.add(actions, next_timestep, extras)
             else:
-                self._adder.add(actions, next_timestep, extras)
+                self._adder.add(actions, next_timestep)
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]

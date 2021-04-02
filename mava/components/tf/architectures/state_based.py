@@ -63,7 +63,7 @@ class StateBasedActorCritic(DecentralisedActorCritic):
             # critic_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
             # critic_obs_shape.insert(0, len(agents))
 
-            critic_state_shape = self._env_spec.get_state_specs().shape
+            critic_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
             critic_act_shape = list(
                 copy.copy(self._agent_specs[agents[0]].actions.shape)
             )
