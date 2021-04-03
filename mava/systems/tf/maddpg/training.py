@@ -205,12 +205,19 @@ class MADDPGTrainer(mava.Trainer):
             o_t[agent] = self._target_observation_networks[agent_key](
                 next_state[agent].observation
             )
-
             # This stop_gradient prevents gradients to propagate into the target
             # observation network. In addition, since the online policy network is
             # evaluated at o_t, this also means the policy loss does not influence
             # the observation network training.
-            o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
+            # o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
+
+            # TODO (dries): Add this stop gradient back in if necessary. Why is there a stop gradient? The target
+            #  will not be updated unless included into the policy_variables or critic_variables to be updated.
+            #  Helping with preventing the observation network being updated from the policy_loss is a good point.
+            #  But why would we want that? Don't we want both the critic and policy to update the observation network?
+            #  Or is it bad to have two optimisation processes optimising the same set of weights? If this is the
+            #  case the stop_gradient can be added back in. But the StateBasedActorCritic will then not work
+            #  as the critic is not dependent on the behavior networks.
         return o_tm1, o_t
 
     @tf.function
@@ -267,6 +274,8 @@ class MADDPGTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
+
+        # Update the target networks
         self._update_target_networks()
 
         # Get data from replay (dropping extras if any). Note there is no
@@ -300,11 +309,16 @@ class MADDPGTrainer(mava.Trainer):
                 a_t = self._policy_actions(o_t_trans)
 
                 # Get critic feed
-                o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(o_tm1_trans, o_t_trans, a_tm1, a_t, e_t)
+                o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(o_tm1_trans, o_t_trans, a_tm1, a_t,
+                                                                                   e_t)
 
                 # Critic learning.
                 q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
                 q_t = self._target_critic_networks[agent_key](o_t_feed, a_t_feed)
+
+                # TODO (dries): Shouldn't q_t also have some sort of stop gradient? So that the target_critic is not
+                #  updated. This should not be a problem, but might be good practice as it is defined above.
+                # q_t = tree.map_structure(tf.stop_gradient, q_t)
 
                 # Squeeze into the shape expected by the td_learning implementation.
                 q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
@@ -324,7 +338,7 @@ class MADDPGTrainer(mava.Trainer):
                 # Decentralised DPG
                 # dpg_a_t_feed = dpg_a_t
 
-                # Centralised DPG
+                # Centralised and StateBased DPG
                 dpg_a_t_feed = a_t
                 dpg_a_t_feed[agent] = dpg_a_t
 
@@ -343,7 +357,13 @@ class MADDPGTrainer(mava.Trainer):
                 policy_loss = tf.reduce_mean(policy_loss, axis=0)
 
             # Get trainable variables.
-            policy_variables = self._policy_networks[agent_key].trainable_variables
+            # TODO (dries): Figure out why the observation_network variables are only included in the critic_variables
+            #  set and not in the policy_variables? This breaks the training when a StateBasedArchitecture is used.
+            #  Also see comment in the _transform_observations function. If the observation_network parameters should
+            #  not be in the policy_variables, feel free to delete it.
+            policy_variables = (
+                    self._observation_networks[agent_key].trainable_variables +
+                    self._policy_networks[agent_key].trainable_variables)
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
                 self._observation_networks[agent_key].trainable_variables
