@@ -209,7 +209,7 @@ class MADDPGTrainer(mava.Trainer):
             # observation network. In addition, since the online policy network is
             # evaluated at o_t, this also means the policy loss does not influence
             # the observation network training.
-            # o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
+            o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
 
             # TODO (dries): Add this stop gradient back in if necessary. Why is there a stop gradient? The target
             #  will not be updated unless included into the policy_variables or critic_variables to be updated.
@@ -362,7 +362,7 @@ class MADDPGTrainer(mava.Trainer):
             #  Also see comment in the _transform_observations function. If the observation_network parameters should
             #  not be in the policy_variables, feel free to delete it.
             policy_variables = (
-                    self._observation_networks[agent_key].trainable_variables +
+                    # self._observation_networks[agent_key].trainable_variables +
                     self._policy_networks[agent_key].trainable_variables)
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
