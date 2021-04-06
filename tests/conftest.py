@@ -29,8 +29,11 @@ Helpers contains re-usable test functions.
 """
 
 # TODO(Kale-ab): Better structure helper funcs
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> b6238ed3b4345c412d0aa756e95cfc5ce3be1a1e
 class Helpers:
     # Check all props are not none
     @staticmethod
@@ -79,7 +82,11 @@ class Helpers:
         ]
 
     @staticmethod
+<<<<<<< HEAD
     def compare_dicts(dictA: Dict, dictB: Dict) -> bool:
+=======
+    def compare_dicts(dictA: dict, dictB: dict) -> None:
+>>>>>>> b6238ed3b4345c412d0aa756e95cfc5ce3be1a1e
         typesA = [type(k) for k in dictA.values()]
         typesB = [type(k) for k in dictB.values()]
 
