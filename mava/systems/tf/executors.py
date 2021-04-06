@@ -83,7 +83,7 @@ class FeedForwardExecutor(core.Executor):
 
     def observe(
         self, actions: Dict[str, types.NestedArray], next_timestep: dm_env.TimeStep,
-            extras: Optional[Dict[str, types.NestedArray]],
+            extras: Optional[Dict[str, types.NestedArray]] = {},
     ) -> None:
         if self._adder:
             if extras:

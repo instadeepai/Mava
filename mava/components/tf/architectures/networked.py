@@ -62,6 +62,7 @@ class NetworkedActorCritic(DecentralisedActorCritic, NetworkedSystem):
             observation_networks=observation_networks,
             behavior_networks=behavior_networks,
             shared_weights=shared_weights,
+            training_info="networked",
         )
 
         self._network_spec = network_spec

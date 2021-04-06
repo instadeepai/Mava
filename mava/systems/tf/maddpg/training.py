@@ -55,6 +55,7 @@ class MADDPGTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        training_info: str,
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
@@ -89,6 +90,7 @@ class MADDPGTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
+        self._training_info = training_info
 
         # Store online and target networks.
         self._policy_networks = policy_networks
@@ -223,39 +225,31 @@ class MADDPGTrainer(mava.Trainer):
     @tf.function
     def _get_critic_feed(
             self, o_tm1_trans: Dict[str, np.ndarray], o_t_trans: Dict[str, np.ndarray],
-            a_tm1: Dict[str, np.ndarray], a_t: Dict[str, np.ndarray], e_t: Dict[str, np.array]
+            a_tm1: Dict[str, np.ndarray], a_t: Dict[str, np.ndarray], e_t: Dict[str, np.array], agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        # Decentralised critic
-        # o_tm1_feed = o_tm1_trans[agent]
-        # o_t_feed = o_t_trans[agent]
-        # a_tm1_feed = a_tm1[agent]
-        # a_t_feed = a_t[agent]
 
-        # Centralised critic.
-        # o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
-        # o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
-        # a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        # a_t_feed = tf.stack([x for x in a_t.values()], 1)
-
-        # State based
-        o_tm1_feed = e_t["s_tm1"]
-        o_t_feed = e_t["s_t"]
-        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        a_t_feed = tf.stack([x for x in a_t.values()], 1)
+        if self._training_info=='decentralised':
+            # Decentralised critic
+            o_tm1_feed = o_tm1_trans[agent]
+            o_t_feed = o_t_trans[agent]
+            a_tm1_feed = a_tm1[agent]
+            a_t_feed = a_t[agent]
+        elif self._training_info=='centralised':
+            # Centralised critic.
+            o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
+            o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
+            a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
+            a_t_feed = tf.stack([x for x in a_t.values()], 1)
+        elif self._training_info=='state_based':
+            # State based
+            o_tm1_feed = e_t["s_tm1"]
+            o_t_feed = e_t["s_t"]
+            a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
+            a_t_feed = tf.stack([x for x in a_t.values()], 1)
+        else:
+            raise NotImplementedError("Critic feed for architecture not implemented yet: ", self._training_info)
 
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
-
-    # @tf.function
-    # def _update_actions_for_critic(
-    #         self, dpg_a_t: Dict[str, np.ndarray], a_t: Dict[str, tf.Tensor], agent: str
-    # ) -> tf.Tensor:
-    #     # Decentralised DPG
-    #     # dpg_a_t_feed = dpg_a_t
-    #
-    #     # Centralised DPG
-    #     dpg_a_t_feed = a_t
-    #     dpg_a_t_feed[agent] = dpg_a_t
-    #     return dpg_a_t_feed
 
     @tf.function
     def _policy_actions(self, next_state: Dict[str, np.ndarray]) -> Any:
@@ -310,7 +304,7 @@ class MADDPGTrainer(mava.Trainer):
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(o_tm1_trans, o_t_trans, a_tm1, a_t,
-                                                                                   e_t)
+                                                                                   e_t, agent)
 
                 # Critic learning.
                 q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
@@ -334,13 +328,21 @@ class MADDPGTrainer(mava.Trainer):
                 o_t_agent_feed = o_t_trans[agent]
                 dpg_a_t = self._policy_networks[agent_key](o_t_agent_feed)
 
-                # Get dpg actions
-                # Decentralised DPG
-                # dpg_a_t_feed = dpg_a_t
+                # TODO (dries): Move the dpg action updating to a function.
+                #  There is a variable overwrite error that needs to
+                #  be fixed for the code can be moved to a function.
 
-                # Centralised and StateBased DPG
-                dpg_a_t_feed = a_t
-                dpg_a_t_feed[agent] = dpg_a_t
+                # Get dpg actions
+                if self._training_info == 'decentralised':
+                    # Decentralised DPG
+                    dpg_a_t_feed = dpg_a_t
+                elif self._training_info in ["centralised", "state_based"]:
+                    # Centralised and StateBased DPG
+                    dpg_a_t_feed = a_t
+                    dpg_a_t_feed[agent] = dpg_a_t
+                else:
+                    raise NotImplementedError("Critic feed for architecture not implemented yet: ",
+                                              self._training_info)
 
                 # Get dpg Q values.
                 dpg_q_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)

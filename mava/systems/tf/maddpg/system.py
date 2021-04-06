@@ -240,6 +240,7 @@ class MADDPGBuilder(SystemBuilder):
             target_policy_networks=networks["target_policies"],
             target_critic_networks=networks["target_critics"],
             target_observation_networks=networks["target_observations"],
+            training_info=networks["training_info"],
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,

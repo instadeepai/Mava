@@ -16,7 +16,7 @@
 """Decentralised architectures for multi-agent RL systems"""
 
 import copy
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Union
 
 import sonnet as snt
 from acme import specs as acme_specs
@@ -37,6 +37,7 @@ class DecentralisedActorCritic(BaseActorCritic):
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
+        training_info: str = "decentralised",
     ):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()
@@ -55,6 +56,8 @@ class DecentralisedActorCritic(BaseActorCritic):
         self._critic_agent_keys = self._actor_agent_keys
         self._n_agents = len(self._agents)
         self._embed_specs: Dict[str, Any] = {}
+
+        self._training_info = training_info
 
         self._create_target_networks()
 
@@ -88,11 +91,15 @@ class DecentralisedActorCritic(BaseActorCritic):
 
     def create_actor_variables(self) -> Dict[str, Dict[str, snt.Module]]:
 
-        actor_networks: Dict[str, Dict[str, snt.Module]] = {
+        actor_networks: Dict[str, Union[Dict[str, snt.Module], str]] = {
             "policies": {},
             "observations": {},
             "target_policies": {},
             "target_observations": {},
+            # Note (dries): I am not sure if this is the best way of sending the training information to the trainer.
+            # The trainer needs to know what architecture is used (Decentralised, Centralised, StateBased, etc.) as it
+            # changes how training is preformed.
+            "training_info": self._training_info,
         }
 
         # get actor specs
@@ -159,7 +166,7 @@ class DecentralisedActorCritic(BaseActorCritic):
 
     def create_system(
         self,
-    ) -> Dict[str, Dict[str, snt.Module]]:
+    ) -> Dict[str, Dict[str, Union[snt.Module, str]]]:
         networks = self.create_actor_variables()
         critic_networks = self.create_critic_variables()
         networks.update(critic_networks)
