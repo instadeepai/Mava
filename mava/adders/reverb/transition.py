@@ -30,13 +30,13 @@ import tensorflow as tf
 import tree
 from acme import specs as acme_specs
 from acme import types
+from acme.adders.reverb import utils as acme_utils
 
 # from acme.adders.reverb import utils as acme_utils
 from acme.utils import tree_utils
 
 from mava import specs as mava_specs
 from mava.adders.reverb import base
-from acme.adders.reverb import utils as acme_utils
 
 
 class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
