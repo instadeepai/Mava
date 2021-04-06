@@ -35,7 +35,8 @@ from acme import types
 from acme.utils import tree_utils
 
 from mava import specs as mava_specs
-from mava.adders.reverb import base, utils
+from mava.adders.reverb import base
+from acme.adders.reverb import utils as acme_utils
 
 
 class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
@@ -235,7 +236,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         if self._final_step_placeholder is None:
             # utils.final_step_like is expensive (around 0.085ms) to run every time
             # so we cache its output.
-            self._final_step_placeholder = utils.final_step_like(
+            self._final_step_placeholder = acme_utils.final_step_like(
                 self._buffer[0], next_observations
             )
         final_step: base.Step = self._final_step_placeholder._replace(
@@ -249,7 +250,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # Calculate the priority for this transition.
 
         # NOTE (Arnu): removed because of errors
-        table_priorities = utils.calculate_priorities(self._priority_fns, steps)
+        table_priorities = acme_utils.calculate_priorities(self._priority_fns, steps)
 
         # Insert the transition into replay along with its priority.
         self._writer.append(transition)
