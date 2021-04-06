@@ -95,10 +95,10 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
    pip install .[envs]
    ```
 
-5. **Optional**: To install [CUDA toolkit](https://docs.nvidia.com/cuda/) for NVIDIA GPU support:
+5. **Optional**: To install [CUDA toolkit](https://docs.nvidia.com/cuda/) for NVIDIA GPU support, dowload [here](https://anaconda.org/anaconda/cudatoolkit). Alternatively, for anaconda users:
 
     ```bash
-    pip install cudatoolkit
+    conda install -c anaconda cudatoolkit
     ```
 
 ## Contributing
