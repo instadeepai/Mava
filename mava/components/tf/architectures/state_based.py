@@ -18,9 +18,8 @@
 import copy
 from typing import Dict, Tuple
 
-import tensorflow as tf
-
 import sonnet as snt
+import tensorflow as tf
 from acme import specs as acme_specs
 
 from mava import specs as mava_specs
@@ -69,12 +68,14 @@ class StateBasedActorCritic(DecentralisedActorCritic):
                 copy.copy(self._agent_specs[agents[0]].actions.shape)
             )
             critic_act_shape.insert(0, len(agents))
-            obs_specs_per_type[agent_type] = tf.TensorSpec(shape=critic_state_shape,
-                                                           dtype=tf.dtypes.float32,
-                                                           )
-            action_specs_per_type[agent_type] = tf.TensorSpec(shape=critic_act_shape,
-                                                              dtype=tf.dtypes.float32,
-                                                              )
+            obs_specs_per_type[agent_type] = tf.TensorSpec(
+                shape=critic_state_shape,
+                dtype=tf.dtypes.float32,
+            )
+            action_specs_per_type[agent_type] = tf.TensorSpec(
+                shape=critic_act_shape,
+                dtype=tf.dtypes.float32,
+            )
 
         critic_obs_specs = {}
         critic_act_specs = {}

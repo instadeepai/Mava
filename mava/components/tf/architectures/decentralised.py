@@ -16,7 +16,7 @@
 """Decentralised architectures for multi-agent RL systems"""
 
 import copy
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Tuple
 
 import sonnet as snt
 from acme import specs as acme_specs
@@ -91,15 +91,11 @@ class DecentralisedActorCritic(BaseActorCritic):
 
     def create_actor_variables(self) -> Dict[str, Dict[str, snt.Module]]:
 
-        actor_networks: Dict[str, Union[Dict[str, snt.Module], str]] = {
+        actor_networks: Dict[str, Dict[str, snt.Module]] = {
             "policies": {},
             "observations": {},
             "target_policies": {},
             "target_observations": {},
-            # Note (dries): I am not sure if this is the best way of sending the training information to the trainer.
-            # The trainer needs to know what architecture is used (Decentralised, Centralised, StateBased, etc.) as it
-            # changes how training is preformed.
-            "training_info": self._training_info,
         }
 
         # get actor specs
@@ -166,8 +162,12 @@ class DecentralisedActorCritic(BaseActorCritic):
 
     def create_system(
         self,
-    ) -> Dict[str, Dict[str, Union[snt.Module, str]]]:
+    ) -> Tuple[Dict[str, Dict[str, snt.Module]], str]:
         networks = self.create_actor_variables()
         critic_networks = self.create_critic_variables()
         networks.update(critic_networks)
-        return networks
+        # Note (dries): This training_info is needed by the trainer to know
+        # how to process the experience for the specific critic. Is there a
+        # better way of providing the training info to the trainer without
+        # deviating from acme builder setup?
+        return networks, self._training_info

@@ -80,6 +80,7 @@ class SystemBuilder(abc.ABC):
     def make_trainer(
         self,
         networks: Dict[str, Dict[str, snt.Module]],
+        training_info: str,
         dataset: Iterator[reverb.ReplaySample],
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
@@ -91,6 +92,9 @@ class SystemBuilder(abc.ABC):
         Args:
           networks: struct describing the networks needed by the trainer; this can
             be specific to the trainer in question.
+          training_info: Info on what architecture is used. This is necessary for
+          the trainer to know how to process
+          certain data to work with the specific critics.
           dataset: iterator over samples from replay.
           replay_client: client which allows communication with replay, e.g. in
             order to update priorities.

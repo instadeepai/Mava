@@ -201,6 +201,7 @@ class MADDPGBuilder(SystemBuilder):
     def make_trainer(
         self,
         networks: Dict[str, Dict[str, snt.Module]],
+        training_info: str,
         dataset: Iterator[reverb.ReplaySample],
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
@@ -240,7 +241,7 @@ class MADDPGBuilder(SystemBuilder):
             target_policy_networks=networks["target_policies"],
             target_critic_networks=networks["target_critics"],
             target_observation_networks=networks["target_observations"],
-            training_info=networks["training_info"],
+            training_info=training_info,
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
@@ -348,7 +349,7 @@ class MADDPG(system.System):
         dataset = builder.make_dataset_iterator(replay_client)
 
         # Create the networks
-        networks = DecentralisedActorCritic(
+        networks, training_info = DecentralisedActorCritic(
             environment_spec=environment_spec,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
@@ -361,7 +362,9 @@ class MADDPG(system.System):
         executor = builder.make_executor(networks["behaviors"], adder)
 
         # The learner updates the parameters (and initializes them).
-        trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
+        trainer = builder.make_trainer(
+            networks, training_info, dataset, counter, logger, checkpoint
+        )
 
         super().__init__(
             executor=executor,

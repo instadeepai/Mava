@@ -213,41 +213,53 @@ class MADDPGTrainer(mava.Trainer):
             # the observation network training.
             o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
 
-            # TODO (dries): Add this stop gradient back in if necessary. Why is there a stop gradient? The target
-            #  will not be updated unless included into the policy_variables or critic_variables to be updated.
-            #  Helping with preventing the observation network being updated from the policy_loss is a good point.
-            #  But why would we want that? Don't we want both the critic and policy to update the observation network?
-            #  Or is it bad to have two optimisation processes optimising the same set of weights? If this is the
-            #  case the stop_gradient can be added back in. But the StateBasedActorCritic will then not work
-            #  as the critic is not dependent on the behavior networks.
+            # TODO (dries): Why is there a stop gradient here? The target
+            #  will not be updated unless included into the
+            #  policy_variables or critic_variables sets.
+            #  One reason might be that it helps with preventing the observation
+            #  network from being updated from the policy_loss.
+            #  But why would we want that? Don't we want both the critic
+            #  and policy to update the observation network?
+            #  Or is it bad to have two optimisation processes optimising
+            #  the same set of weights? But the
+            #  StateBasedActorCritic will then not work as the critic
+            #  is not dependent on the behavior networks.
         return o_tm1, o_t
 
     @tf.function
     def _get_critic_feed(
-            self, o_tm1_trans: Dict[str, np.ndarray], o_t_trans: Dict[str, np.ndarray],
-            a_tm1: Dict[str, np.ndarray], a_t: Dict[str, np.ndarray], e_t: Dict[str, np.array], agent: str,
+        self,
+        o_tm1_trans: Dict[str, np.ndarray],
+        o_t_trans: Dict[str, np.ndarray],
+        a_tm1: Dict[str, np.ndarray],
+        a_t: Dict[str, np.ndarray],
+        e_t: Dict[str, np.array],
+        agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
-        if self._training_info=='decentralised':
+        if self._training_info == "decentralised":
             # Decentralised critic
             o_tm1_feed = o_tm1_trans[agent]
             o_t_feed = o_t_trans[agent]
             a_tm1_feed = a_tm1[agent]
             a_t_feed = a_t[agent]
-        elif self._training_info=='centralised':
+        elif self._training_info == "centralised":
             # Centralised critic.
             o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
             o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
             a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
             a_t_feed = tf.stack([x for x in a_t.values()], 1)
-        elif self._training_info=='state_based':
+        elif self._training_info == "state_based":
             # State based
             o_tm1_feed = e_t["s_tm1"]
             o_t_feed = e_t["s_t"]
             a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
             a_t_feed = tf.stack([x for x in a_t.values()], 1)
         else:
-            raise NotImplementedError("Critic feed for architecture not implemented yet: ", self._training_info)
+            raise NotImplementedError(
+                "Critic feed for architecture not implemented yet: ",
+                self._training_info,
+            )
 
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
@@ -303,16 +315,13 @@ class MADDPGTrainer(mava.Trainer):
                 a_t = self._policy_actions(o_t_trans)
 
                 # Get critic feed
-                o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(o_tm1_trans, o_t_trans, a_tm1, a_t,
-                                                                                   e_t, agent)
+                o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
+                    o_tm1_trans, o_t_trans, a_tm1, a_t, e_t, agent
+                )
 
                 # Critic learning.
                 q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
                 q_t = self._target_critic_networks[agent_key](o_t_feed, a_t_feed)
-
-                # TODO (dries): Shouldn't q_t also have some sort of stop gradient? So that the target_critic is not
-                #  updated. This should not be a problem, but might be good practice as it is defined above.
-                # q_t = tree.map_structure(tf.stop_gradient, q_t)
 
                 # Squeeze into the shape expected by the td_learning implementation.
                 q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
@@ -332,8 +341,8 @@ class MADDPGTrainer(mava.Trainer):
                 #  There is a variable overwrite error that needs to
                 #  be fixed for the code can be moved to a function.
 
-                # Get dpg actions
-                if self._training_info == 'decentralised':
+                # Get dpg actionsgit s
+                if self._training_info == "decentralised":
                     # Decentralised DPG
                     dpg_a_t_feed = dpg_a_t
                 elif self._training_info in ["centralised", "state_based"]:
@@ -341,8 +350,10 @@ class MADDPGTrainer(mava.Trainer):
                     dpg_a_t_feed = a_t
                     dpg_a_t_feed[agent] = dpg_a_t
                 else:
-                    raise NotImplementedError("Critic feed for architecture not implemented yet: ",
-                                              self._training_info)
+                    raise NotImplementedError(
+                        "Critic feed for architecture not implemented yet: ",
+                        self._training_info,
+                    )
 
                 # Get dpg Q values.
                 dpg_q_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
@@ -359,13 +370,15 @@ class MADDPGTrainer(mava.Trainer):
                 policy_loss = tf.reduce_mean(policy_loss, axis=0)
 
             # Get trainable variables.
-            # TODO (dries): Figure out why the observation_network variables are only included in the critic_variables
-            #  set and not in the policy_variables? This breaks the training when a StateBasedArchitecture is used.
-            #  Also see comment in the _transform_observations function. If the observation_network parameters should
-            #  not be in the policy_variables, feel free to delete it.
+            # TODO (dries): Figure out why the observation_network variables
+            #  are only included in the critic_variables set and not in the
+            #  policy_variables? This breaks the training when a
+            #  StateBasedArchitecture is used. Also see comment in the
+            #  _transform_observations function.
             policy_variables = (
-                    # self._observation_networks[agent_key].trainable_variables +
-                    self._policy_networks[agent_key].trainable_variables)
+                # self._observation_networks[agent_key].trainable_variables +
+                self._policy_networks[agent_key].trainable_variables
+            )
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
                 self._observation_networks[agent_key].trainable_variables
@@ -373,12 +386,13 @@ class MADDPGTrainer(mava.Trainer):
             )
 
             # Compute gradients.
-            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient on a persistent tape inside
-            #  its context is significantly less efficient than calling it outside the
-            #  context (it causes the gradient ops to be recorded on the tape,
-            #  leading to increased CPU and memory usage). Only call GradientTape.gradient
-            #  inside the context if you actually want to trace the gradient in
-            #  order to compute higher order derivatives.
+            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
+            #  on a persistent tape inside its context is significantly less efficient
+            #  than calling it outside the context (it causes the gradient ops to be
+            #  recorded on the tape, leading to increased CPU and memory usage).
+            #  Only call GradientTape.gradient inside the context if you actually want
+            #  to trace the gradient in order to compute higher order derivatives.
+            #  to trace the gradient in order to compute higher order derivatives.
             policy_gradients = tape.gradient(policy_loss, policy_variables)
             critic_gradients = tape.gradient(critic_loss, critic_variables)
 
