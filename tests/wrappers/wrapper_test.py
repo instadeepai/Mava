@@ -314,7 +314,9 @@ class TestEnvWrapper:
 
                 curr_dm_timestep = wrapped_env.step(test_agent_actions)
 
-            assert curr_dm_timestep.reward == 0, "Failed to correctly set reward. "
+            assert curr_dm_timestep.reward == 0.0 and isinstance(
+                curr_dm_timestep.reward, np.float32
+            ), "Failed to correctly set reward. "
 
         assert (
             wrapped_env._reset_next_step is True

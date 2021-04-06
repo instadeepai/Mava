@@ -69,6 +69,9 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         # the last information.
         observe, reward, done, info = self._environment.last()
 
+        if reward == 0:
+            reward = np.dtype("float32").type(0)
+
         observation = self._convert_observation(agent, observe, done)
 
         if self._environment.env_done:
