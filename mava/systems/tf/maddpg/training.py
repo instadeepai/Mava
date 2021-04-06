@@ -371,6 +371,12 @@ class MADDPGTrainer(mava.Trainer):
             )
 
             # Compute gradients.
+            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient on a persistent tape inside
+            #  its context is significantly less efficient than calling it outside the
+            #  context (it causes the gradient ops to be recorded on the tape,
+            #  leading to increased CPU and memory usage). Only call GradientTape.gradient
+            #  inside the context if you actually want to trace the gradient in
+            #  order to compute higher order derivatives.
             policy_gradients = tape.gradient(policy_loss, policy_variables)
             critic_gradients = tape.gradient(critic_loss, critic_variables)
 
