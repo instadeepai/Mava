@@ -56,7 +56,6 @@ class DecentralisedActorCritic(BaseActorCritic):
         self._critic_agent_keys = self._actor_agent_keys
         self._n_agents = len(self._agents)
         self._embed_specs: Dict[str, Any] = {}
-
         self._training_info = training_info
 
         self._create_target_networks()

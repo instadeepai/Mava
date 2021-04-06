@@ -23,7 +23,6 @@ class MAEnvironmentSpec:
         an environment for each agent."""
         specs = {}
         observation_specs = environment.observation_spec()
-
         action_specs = environment.action_spec()
         reward_specs = environment.reward_spec()
         discount_specs = environment.discount_spec()
