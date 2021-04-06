@@ -28,7 +28,7 @@ class EnvSpec:
 Helpers contains re-usable test functions.
 """
 
-
+# TODO(Kale-ab): Better structure helper funcs
 class Helpers:
     # Check all props are not none
     @staticmethod
@@ -75,6 +75,13 @@ class Helpers:
             env_wrapper.action_spaces[agent].seed(random_seed)
             for agent in env_wrapper.agents
         ]
+
+    @staticmethod
+    def compare_dicts(dictA: dict, dictB: dict) -> None:
+        typesA = [type(k) for k in dictA.values()]
+        typesB = [type(k) for k in dictB.values()]
+
+        return (dictA == dictB) and (typesA == typesB)
 
 
 @typing.no_type_check

@@ -277,7 +277,9 @@ class TestEnvWrapper:
                 agent: wrapped_env.action_spaces[agent].sample() for agent in agents
             }
 
-            expected_reward = {agent: 0 for agent in wrapped_env.agents}
+            expected_reward = {
+                agent: np.dtype("float32").type(0) for agent in wrapped_env.agents
+            }
             # Mock being done
             monkeypatch.setattr(
                 wrapped_env._environment.aec_env,
@@ -287,8 +289,8 @@ class TestEnvWrapper:
 
             curr_dm_timestep = wrapped_env.step(test_agents_actions)
 
-            assert (
-                curr_dm_timestep.reward == expected_reward
+            assert helpers.compare_dicts(
+                curr_dm_timestep.reward, expected_reward
             ), "Failed to correctly set reward. "
 
         # Sequential env_types
