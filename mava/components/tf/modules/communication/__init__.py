@@ -12,3 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""MARL system communication modules."""
+
+from mava.components.tf.modules.communication.base import BaseCommunicationModule
+from mava.components.tf.modules.communication.broadcasted import (
+    BroadcastedCommunication,
+)
+from mava.components.tf.modules.communication.targeted import TargetedCommunication

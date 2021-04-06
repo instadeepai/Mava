@@ -13,22 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): complete class for monotonic mixing
-
-"""Mixing for multi-agent RL systems"""
-
-from mava.components.tf.architectures import BaseArchitecture
-from mava.components.tf.modules.mixing import BaseMixingModule
-
-
-class MonotonicMixing(BaseMixingModule):
-    """Multi-agent mixing architecture."""
-
-    def __init__(
-        self,
-        architecture: BaseArchitecture,
-    ) -> None:
-        self._architecture = architecture
-
-    def some_mixing_function(self) -> None:
-        """Perform some mixing logic"""
+# TODO (Siphelele): implement MAPPO trainer
+# Helper resources
+#   - single agent impala learner in acme:
+#       https://github.com/deepmind/acme/blob/master/acme/agents/tf/impala/learning.py
+#   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py

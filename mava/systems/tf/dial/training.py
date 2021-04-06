@@ -12,3 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# TODO (Kevin): implement DIAL trainer
+# Helper resources
+#   - single agent dqn learner in acme:
+#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/dqn/learning.py
+#   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py

@@ -15,87 +15,66 @@
 
 # type: ignore
 
-# TODO (StJohn): finish Qmix
+# TODO (Siphelele): finish MAPPO system
 
-"""QMIX system implementation."""
+"""MAPPO system implementation."""
 import dataclasses
 from typing import Dict, Iterator, Optional
 
 import reverb
 import sonnet as snt
-import tensorflow as tf
 from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import CentralisedActor
-from mava.components.tf.modules.mixing import MonotonicMixing
+from mava.components.tf.architectures import CentralisedActorCritic
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
-from mava.systems.tf.qmix import training
+from mava.systems.tf.mappo import training
 
 
 @dataclasses.dataclass
-class QMIXConfig:
-    """Configuration options for the QMIX system
+class MAPPOConfig:
+    """Configuration options for the MAPPO system
     Args:
         environment_spec: description of the actions, observations, etc.
         networks: the online Q network (the one being optimized)
+        sequence_length: ...
+        sequence_period: ...
+        entropy_cost: ...
+        baseline_cost: ...
+        max_abs_reward: ...
         batch_size: batch size for updates.
-        prefetch_size: size to prefetch from replay.
-        target_update_period: number of learner steps to perform before updating
-            the target networks.
-        samples_per_insert: number of samples to take from replay for every insert
-            that is made.
-        min_replay_size: minimum replay size before updating. This and all
-            following arguments are related to dataset construction and will be
-            ignored if a dataset argument is passed.
-        max_replay_size: maximum replay size.
-        importance_sampling_exponent: power to which importance weights are raised
-            before normalizing.
-        priority_exponent: exponent used in prioritized sampling.
-        n_step: number of steps to squash into a single transition.
-        epsilon: probability of taking a random action; ignored if a policy
-            network is given.
+        max_queue_size: maximum queue size.
         learning_rate: learning rate for the q-network update.
         discount: discount to use for TD updates.
         logger: logger object to be used by learner.
-        checkpoint: boolean indicating whether to checkpoint the learner.
-        checkpoint_subpath: directory for the checkpoint.
-        policy_networks: if given, this will be used as the policy network.
-            Otherwise, an epsilon greedy policy using the online Q network will be
-            created. Policy network is used in the actor to sample actions.
         max_gradient_norm: used for gradient clipping.
         replay_table_name: string indicating what name to give the replay table.
     """
 
-    environment_spec: specs.MAEnvironmentSpec
+    environment_spec: specs.EnvironmentSpec
     networks: Dict[str, snt.Module]
-    batch_size: int = 256
-    prefetch_size: int = 4
-    target_update_period: int = 100
-    samples_per_insert: float = 32.0
-    min_replay_size: int = 1000
-    max_replay_size: int = 1000000
-    importance_sampling_exponent: float = 0.2
-    priority_exponent: float = 0.6
-    n_step: int = 5
-    epsilon: Optional[tf.Tensor] = None
-    learning_rate: float = 1e-3
-    discount: float = 0.99
+    sequence_length: int
+    sequence_period: int
+    counter: counting.Counter = None
     logger: loggers.Logger = None
-    checkpoint: bool = True
-    checkpoint_subpath: str = "~/mava/"
-    policy_networks: Optional[Dict[str, snt.Module]] = None
+    discount: float = 0.99
+    max_queue_size: int = 100000
+    batch_size: int = 16
+    learning_rate: float = 1e-3
+    entropy_cost: float = 0.01
+    baseline_cost: float = 0.5
+    max_abs_reward: Optional[float] = None
     max_gradient_norm: Optional[float] = None
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
-class QMIXBuilder(SystemBuilder):
-    """Builder for QMIX which constructs individual components of the system."""
+class MAPPOBuilder(SystemBuilder):
+    """Builder for MAPPO which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an MARL system.
       Implementations of this interface contain a complete specification of a
@@ -104,9 +83,9 @@ class QMIXBuilder(SystemBuilder):
       distributed setup.
       """
 
-    def __init__(self, config: QMIXConfig):
+    def __init__(self, config: MAPPOConfig):
         """Args:
-        config: Configuration options for the QMIX system."""
+        config: Configuration options for the MAPPO system."""
 
         self._config = config
 
@@ -120,15 +99,10 @@ class QMIXBuilder(SystemBuilder):
         environment_spec: specs.MAEnvironmentSpec,
     ) -> reverb.Table:
         """Create tables to insert data into."""
-        return reverb.Table(
+        return reverb.Table.queue(
             name=self._config.replay_table_name,
-            sampler=reverb.selectors.Prioritized(self._config.priority_exponent),
-            remover=reverb.selectors.Fifo(),
-            max_size=self._config.max_replay_size,
-            rate_limiter=reverb.rate_limiters.MinSize(1),
-            signature=reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec
-            ),
+            max_size=self._config.max_queue_size,
+            signature=adders.ParallelSequenceAdder.signature(environment_spec),
         )
 
     def make_dataset_iterator(
@@ -137,10 +111,9 @@ class QMIXBuilder(SystemBuilder):
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for learning/updating the system."""
         dataset = datasets.make_reverb_dataset(
-            table=self._config.replay_table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
-            prefetch_size=self._config.prefetch_size,
+            sequence_length=self._config.sequence_length,
         )
         return iter(dataset)
 
@@ -152,11 +125,10 @@ class QMIXBuilder(SystemBuilder):
         Args:
           replay_client: Reverb Client which points to the replay server.
         """
-        return reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns={self._config.replay_table_name: lambda x: 1.0},
+        return reverb_adders.ParallelSequenceAdder(
             client=replay_client,
-            n_step=self._config.n_step,
-            discount=self._config.discount,
+            period=self._config.sequence_period,
+            sequence_length=self._config.sequence_length,
         )
 
     def make_executor(
@@ -207,7 +179,6 @@ class QMIXBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
@@ -228,42 +199,40 @@ class QMIXBuilder(SystemBuilder):
         agents = self._agents
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
-        clipping = self._config.clipping
         discount = self._config.discount
-        target_update_period = self._config.target_update_period
+        sequence_length = self._config.sequence_length
+        sequence_period = self._config.sequence_period
         max_gradient_norm = self._config.max_gradient_norm
         learning_rate = self._config.learning_rate
-        importance_sampling_exponent = self._config.importance_sampling_exponent
-
-        # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=learning_rate)
+        max_queue_size = self._config.max_queue_size
+        entropy_cost = self._config.entropy_cost
+        baseline_cost = self._config.baseline_cost
+        max_abs_reward = self._config.max_abs_reward
 
         # The learner updates the parameters (and initializes them).
-        trainer = training.QMIXTrainer(
+        trainer = training.MAPPOTrainer(
             agents=agents,
             agent_types=agent_types,
             networks=networks["networks"],
-            target_network=networks["target_networks"],
             shared_weights=shared_weights,
-            discount=discount,
-            importance_sampling_exponent=importance_sampling_exponent,
-            policy_optimizer=policy_optimizer,
-            target_update_period=target_update_period,
-            dataset=dataset,
-            huber_loss_parameter=huber_loss_parameter,
-            replay_client=replay_client,
-            clipping=clipping,
+            sequence_length=sequence_length,
+            sequence_period=sequence_period,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
+            discount=discount,
+            max_queue_size=max_queue_size,
+            learning_rate=learning_rate,
+            entropy_cost=entropy_cost,
+            baseline_cost=baseline_cost,
+            max_abs_reward=max_abs_reward,
             max_gradient_norm=max_gradient_norm,
         )
         return trainer
 
 
-class QMIX(system.System):
-    """QMIX system.
-    This implements a single-process QMIX system. This is an actor-critic based
+class MAPPO(system.System):
+    """MAPPO system.
+    This implements a single-process MAPPO system. This is an actor-critic based
     system that generates data via a behavior policy, inserts N-step transitions into
     a replay buffer, and periodically updates the policies of each agent
     (and as a result the behavior) by sampling uniformly from this buffer.
@@ -273,81 +242,57 @@ class QMIX(system.System):
         self,
         environment_spec: specs.MAEnvironmentSpec,
         networks: Dict[str, snt.Module],
+        sequence_length: int,
+        sequence_period: int,
         shared_weights: bool = False,
-        batch_size: int = 256,
-        prefetch_size: int = 4,
-        target_update_period: int = 100,
-        samples_per_insert: float = 32.0,
-        min_replay_size: int = 1000,
-        max_replay_size: int = 1000000,
-        importance_sampling_exponent: float = 0.2,
-        priority_exponent: float = 0.6,
-        n_step: int = 5,
-        epsilon: Optional[tf.Tensor] = None,
-        learning_rate: float = 1e-3,
-        discount: float = 0.99,
-        logger: loggers.Logger = None,
         counter: counting.Counter = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
-        policy_networks: Optional[Dict[str, snt.Module]] = None,
+        logger: loggers.Logger = None,
+        discount: float = 0.99,
+        max_queue_size: int = 100000,
+        batch_size: int = 16,
+        learning_rate: float = 1e-3,
+        entropy_cost: float = 0.01,
+        baseline_cost: float = 0.5,
+        max_abs_reward: Optional[float] = None,
         max_gradient_norm: Optional[float] = None,
+        checkpoint: bool = True,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
     ):
         """Initialize the system.
         Args:
-            environment_spec: description of the actions, observations, etc.
-            networks: the online Q network (the one being optimized)
-            batch_size: batch size for updates.
-            prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-                the target networks.
-            samples_per_insert: number of samples to take from replay for every insert
-                that is made.
-            min_replay_size: minimum replay size before updating. This and all
-                following arguments are related to dataset construction and will be
-                ignored if a dataset argument is passed.
-            max_replay_size: maximum replay size.
-            importance_sampling_exponent: power to which importance weights are raised
-                before normalizing.
-            priority_exponent: exponent used in prioritized sampling.
-            n_step: number of steps to squash into a single transition.
-            epsilon: probability of taking a random action; ignored if a policy
-                network is given.
-            learning_rate: learning rate for the q-network update.
-            discount: discount to use for TD updates.
-            logger: logger object to be used by learner.
-            checkpoint: boolean indicating whether to checkpoint the learner.
-            checkpoint_subpath: directory for the checkpoint.
-            policy_networks: if given, this will be used as the policy network.
-                Otherwise, an epsilon greedy policy using the online Q network will be
-                created. Policy network is used in the actor to sample actions.
-            max_gradient_norm: used for gradient clipping.
-            replay_table_name: string indicating what name to give the replay table."""
+        environment_spec: description of the actions, observations, etc.
+        networks: the online Q network (the one being optimized)
+        sequence_length: ...
+        sequence_period: ...
+        entropy_cost: ...
+        baseline_cost: ...
+        max_abs_reward: ...
+        batch_size: batch size for updates.
+        max_queue_size: maximum queue size.
+        learning_rate: learning rate for the q-network update.
+        discount: discount to use for TD updates.
+        logger: logger object to be used by learner.
+        max_gradient_norm: used for gradient clipping.
+        replay_table_name: string indicating what name to give the replay table."""
 
-        builder = QMIXBuilder(
-            QMIXConfig(
+        builder = MAPPOBuilder(
+            MAPPOConfig(
                 environment_spec=environment_spec,
                 networks=networks,
+                sequence_length=sequence_length,
+                sequence_period=sequence_period,
                 shared_weights=shared_weights,
-                batch_size=batch_size,
-                prefetch_size=prefetch_size,
-                target_update_period=target_update_period,
-                samples_per_insert=samples_per_insert,
-                min_replay_size=min_replay_size,
-                max_replay_size=max_replay_size,
-                importance_sampling_exponent=importance_sampling_exponent,
-                priority_exponent=priority_exponent,
-                n_step=n_step,
-                epsilon=epsilon,
-                learning_rate=learning_rate,
-                discount=discount,
-                logger=logger,
                 counter=counter,
-                checkpoint=checkpoint,
-                checkpoint_subpath=checkpoint_subpath,
-                policy_networks=policy_networks,
+                logger=logger,
+                discount=discount,
+                max_queue_size=max_queue_size,
+                batch_size=batch_size,
+                learning_rate=learning_rate,
+                entropy_cost=entropy_cost,
+                baseline_cost=baseline_cost,
+                max_abs_reward=max_abs_reward,
                 max_gradient_norm=max_gradient_norm,
+                checkpoint=checkpoint,
                 replay_table_name=replay_table_name,
             )
         )
@@ -365,17 +310,10 @@ class QMIX(system.System):
         dataset = builder.make_dataset_iterator(replay_client)
 
         # Create system architecture
-        architecture = CentralisedActor(
+        networks = CentralisedActorCritic(
             environment_spec=environment_spec,
             networks=networks,
             shared_weights=shared_weights,
-        )
-
-        # Add monotonic mixing and get networks
-        # TODO (StJohn): create monotonic mixing module for Qmix
-        # See mava/components/tf/modules/mixing
-        networks = MonotonicMixing(
-            architecture=architecture,
         ).create_system()
 
         # Create the actor which defines how we take actions.
@@ -387,6 +325,6 @@ class QMIX(system.System):
         super().__init__(
             executor=executor,
             trainer=trainer,
-            min_observations=max(batch_size, min_replay_size),
-            observations_per_step=float(batch_size) / samples_per_insert,
+            min_observations=batch_size,
+            observations_per_step=batch_size,
         )
