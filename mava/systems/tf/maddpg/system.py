@@ -29,7 +29,7 @@ from mava.components.tf.architectures import DecentralisedActorCritic
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
-from mava.systems.tf.maddpg import training_base
+from mava.systems.tf.maddpg import training
 
 
 @dataclasses.dataclass
@@ -93,7 +93,9 @@ class MADDPGBuilder(SystemBuilder):
     def __init__(
         self,
         config: MADDPGConfig,
-        trainer_fn: Type[training_base.MADDPGTrainer] = training_base.MADDPGTrainer,
+        trainer_fn: Type[
+            training.BaseMADDPGTrainer
+        ] = training.DecentralisedMADDPGTrainer,
     ):
         """Args:
         config: Configuration options for the MADDPG system.
@@ -272,7 +274,9 @@ class MADDPG(system.System):
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        trainer_fn: Type[training_base.MADDPGTrainer] = training_base.MADDPGTrainer,
+        trainer_fn: Type[
+            training.BaseMADDPGTrainer
+        ] = training.DecentralisedMADDPGTrainer,
         shared_weights: bool = False,
         discount: float = 0.99,
         batch_size: int = 256,
