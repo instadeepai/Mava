@@ -34,14 +34,3 @@ push:
 
 pull:
 	docker pull $(IMAGE)
-
-
-
-# example:
-# 	docker run -it --gpus all --rm --entrypoint='' --workdir='/mava' -v ${PWD}:/mava mava_image python ./mava/examples/petting_zoo/run_maddpg.py
-# bash:
-# 	#docker run -it --gpus all --rm --entrypoint='' --workdir='/mava' -v ${PWD}:/mava mava_image bash
-# 	docker run -it --rm --entrypoint='' --workdir='/mava' -v ${PWD}:/mava mava_image bash
-
-# build:
-# 	docker build -t mava_image .
