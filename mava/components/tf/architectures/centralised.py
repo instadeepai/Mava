@@ -45,7 +45,6 @@ class CentralisedActorCritic(DecentralisedActorCritic):
             observation_networks=observation_networks,
             behavior_networks=behavior_networks,
             shared_weights=shared_weights,
-            training_info="centralised",
         )
 
     def _get_critic_specs(

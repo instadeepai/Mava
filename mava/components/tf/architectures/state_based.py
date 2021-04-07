@@ -45,7 +45,6 @@ class StateBasedActorCritic(DecentralisedActorCritic):
             observation_networks=observation_networks,
             behavior_networks=behavior_networks,
             shared_weights=shared_weights,
-            training_info="state_based",
         )
 
     def _get_critic_specs(

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import abc
-from typing import Dict, Tuple
+from typing import Dict
 
 import sonnet as snt
 
@@ -33,7 +33,7 @@ class BaseArchitecture:
         """Create network variables for actors in the system."""
 
     @abc.abstractmethod
-    def create_system(self) -> Tuple[Dict[str, Dict[str, snt.Module]], str]:
+    def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         """Create system architecture."""
 
 

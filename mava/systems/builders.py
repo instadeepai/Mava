@@ -80,7 +80,6 @@ class SystemBuilder(abc.ABC):
     def make_trainer(
         self,
         networks: Dict[str, Dict[str, snt.Module]],
-        training_info: str,
         dataset: Iterator[reverb.ReplaySample],
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,

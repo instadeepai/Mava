@@ -37,7 +37,6 @@ class DecentralisedActorCritic(BaseActorCritic):
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        training_info: str = "decentralised",
     ):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()
@@ -56,7 +55,6 @@ class DecentralisedActorCritic(BaseActorCritic):
         self._critic_agent_keys = self._actor_agent_keys
         self._n_agents = len(self._agents)
         self._embed_specs: Dict[str, Any] = {}
-        self._training_info = training_info
 
         self._create_target_networks()
 
@@ -161,7 +159,7 @@ class DecentralisedActorCritic(BaseActorCritic):
 
     def create_system(
         self,
-    ) -> Tuple[Dict[str, Dict[str, snt.Module]], str]:
+    ) -> Dict[str, Dict[str, snt.Module]]:
         networks = self.create_actor_variables()
         critic_networks = self.create_critic_variables()
         networks.update(critic_networks)
@@ -169,4 +167,4 @@ class DecentralisedActorCritic(BaseActorCritic):
         # how to process the experience for the specific critic. Is there a
         # better way of providing the training info to the trainer without
         # deviating from acme builder setup?
-        return networks, self._training_info
+        return networks

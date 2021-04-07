@@ -22,16 +22,13 @@ into a single transition, simplifying to a simple transition adder when N=1.
 import copy
 import itertools
 import operator
-from typing import Dict, Optional
+from typing import Optional
 
 import numpy as np
 import reverb
 import tensorflow as tf
 import tree
 from acme import specs as acme_specs
-from acme import types
-
-# from acme.adders.reverb import utils as acme_utils
 from acme.utils import tree_utils
 
 from mava import specs as mava_specs
@@ -228,8 +225,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         steps = list(self._buffer) + [final_step]
 
         # Calculate the priority for this transition.
-
-        # NOTE (Arnu): removed because of errors
         table_priorities = utils.calculate_priorities(self._priority_fns, steps)
 
         # Insert the transition into replay along with its priority.

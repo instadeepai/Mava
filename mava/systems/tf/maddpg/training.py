@@ -55,7 +55,6 @@ class MADDPGTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        training_info: str,
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
@@ -90,7 +89,6 @@ class MADDPGTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
-        self._training_info = training_info
 
         # Store online and target networks.
         self._policy_networks = policy_networks
@@ -237,29 +235,23 @@ class MADDPGTrainer(mava.Trainer):
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
-        if self._training_info == "decentralised":
-            # Decentralised critic
-            o_tm1_feed = o_tm1_trans[agent]
-            o_t_feed = o_t_trans[agent]
-            a_tm1_feed = a_tm1[agent]
-            a_t_feed = a_t[agent]
-        elif self._training_info == "centralised":
-            # Centralised critic.
-            o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
-            o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
-            a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-            a_t_feed = tf.stack([x for x in a_t.values()], 1)
-        elif self._training_info == "state_based":
-            # State based
-            o_tm1_feed = e_t["s_tm1"]
-            o_t_feed = e_t["s_t"]
-            a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-            a_t_feed = tf.stack([x for x in a_t.values()], 1)
-        else:
-            raise NotImplementedError(
-                "Critic feed for architecture not implemented yet: ",
-                self._training_info,
-            )
+        # Decentralised critic
+        # o_tm1_feed = o_tm1_trans[agent]
+        # o_t_feed = o_t_trans[agent]
+        # a_tm1_feed = a_tm1[agent]
+        # a_t_feed = a_t[agent]
+
+        # Centralised critic.
+        # o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
+        # o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
+        # a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
+        # a_t_feed = tf.stack([x for x in a_t.values()], 1)
+
+        # State based
+        o_tm1_feed = e_t["s_tm1"]
+        o_t_feed = e_t["s_t"]
+        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
+        a_t_feed = tf.stack([x for x in a_t.values()], 1)
 
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
@@ -341,19 +333,13 @@ class MADDPGTrainer(mava.Trainer):
                 #  There is a variable overwrite error that needs to
                 #  be fixed for the code can be moved to a function.
 
-                # Get dpg actionsgit s
-                if self._training_info == "decentralised":
-                    # Decentralised DPG
-                    dpg_a_t_feed = dpg_a_t
-                elif self._training_info in ["centralised", "state_based"]:
-                    # Centralised and StateBased DPG
-                    dpg_a_t_feed = a_t
-                    dpg_a_t_feed[agent] = dpg_a_t
-                else:
-                    raise NotImplementedError(
-                        "Critic feed for architecture not implemented yet: ",
-                        self._training_info,
-                    )
+                # Get dpg actions
+                # Decentralised DPG
+                # dpg_a_t_feed = dpg_a_t
+
+                # Centralised and StateBased DPG
+                dpg_a_t_feed = a_t
+                dpg_a_t_feed[agent] = dpg_a_t
 
                 # Get dpg Q values.
                 dpg_q_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
@@ -370,14 +356,9 @@ class MADDPGTrainer(mava.Trainer):
                 policy_loss = tf.reduce_mean(policy_loss, axis=0)
 
             # Get trainable variables.
-            # TODO (dries): Figure out why the observation_network variables
-            #  are only included in the critic_variables set and not in the
-            #  policy_variables? This breaks the training when a
-            #  StateBasedArchitecture is used. Also see comment in the
-            #  _transform_observations function.
             policy_variables = (
-                # self._observation_networks[agent_key].trainable_variables +
-                self._policy_networks[agent_key].trainable_variables
+                self._observation_networks[agent_key].trainable_variables
+                + self._policy_networks[agent_key].trainable_variables
             )
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
