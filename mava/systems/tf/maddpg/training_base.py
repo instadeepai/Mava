@@ -239,19 +239,6 @@ class MADDPGTrainer(mava.Trainer):
         o_t_feed = o_t_trans[agent]
         a_tm1_feed = a_tm1[agent]
         a_t_feed = a_t[agent]
-
-        # Centralised critic.
-        # o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
-        # o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
-        # a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        # a_t_feed = tf.stack([x for x in a_t.values()], 1)
-
-        # State based
-        # o_tm1_feed = e_t["s_tm1"]
-        # o_t_feed = e_t["s_t"]
-        # a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        # a_t_feed = tf.stack([x for x in a_t.values()], 1)
-
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     @tf.function
@@ -263,14 +250,6 @@ class MADDPGTrainer(mava.Trainer):
     ) -> tf.Tensor:
         # Decentralised DPG
         dpg_a_t_feed = dpg_a_t
-
-        # Centralised and StateBased DPG
-        # Note (dries): Copy has to be made because the input
-        # variables cannot be changed.
-        # import copy
-        # dpg_a_t_feed = copy.copy(a_t)
-        # dpg_a_t_feed[agent] = dpg_a_t
-
         return dpg_a_t_feed
 
     @tf.function
