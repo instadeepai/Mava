@@ -22,6 +22,8 @@ from acme import specs, types
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
+from mava.utils.wrapper_utils import generate_zeros_from_spec
+
 
 class OLT(NamedTuple):
     """Container for (observation, legal_actions, terminal) tuples."""
@@ -69,8 +71,9 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         # the last information.
         observe, reward, done, info = self._environment.last()
 
+        # Handle empty rewards
         if reward == 0:
-            reward = np.dtype("float32").type(0)
+            reward = generate_zeros_from_spec(self.reward_spec()[agent]).item()
 
         observation = self._convert_observation(agent, observe, done)
 
@@ -131,6 +134,7 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         reward_specs = {}
         for agent in self._environment.possible_agents:
             reward_specs[agent] = specs.Array((), np.float32)
+
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
@@ -191,12 +195,15 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
         #  Handle empty rewards
         if not rewards:
+            rewards_spec = self.reward_spec()
             rewards = {
-                agent: np.dtype("float32").type(0) for agent in self.possible_agents
+                agent: generate_zeros_from_spec(rewards_spec[agent]).item()
+                for agent in self.possible_agents
             }
         else:
+            rewards_spec = self.reward_spec()
             rewards = {
-                agent: np.dtype("float32").type(reward)
+                agent: np.dtype(type(rewards_spec[agent])).type(reward)
                 for agent, reward in rewards.items()
             }
 
@@ -269,6 +276,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         reward_specs = {}
         for agent in self._environment.possible_agents:
             reward_specs[agent] = specs.Array((), np.float32)
+
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:

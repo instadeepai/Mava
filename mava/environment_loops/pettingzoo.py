@@ -27,12 +27,11 @@ from acme.utils import counting, loggers
 from dm_env import specs
 
 import mava
+from mava.utils.wrapper_utils import generate_zeros_from_spec
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
-
-from mava.utils.wrapper_utils import generate_zeros_from_spec
 
 
 class PettingZooAECEnvironmentLoop(acme.core.Worker):

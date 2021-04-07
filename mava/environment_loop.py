@@ -20,13 +20,13 @@ import time
 from typing import Optional
 
 import dm_env
-import numpy as np
 import tree
 from acme import core
 
 # Internal imports.
 from acme.utils import counting, loggers
-from dm_env import specs
+
+from mava.utils.wrapper_utils import generate_zeros_from_spec
 
 
 # TODO: NEED TO CHANGE THIS TO MARL
