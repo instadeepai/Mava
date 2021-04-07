@@ -32,6 +32,8 @@ from mava.wrappers.pettingzoo import (
     PettingZooParallelEnvWrapper,
 )
 
+from mava.utils.wrapper_utils import generate_zeros_from_spec
+
 
 class PettingZooAECEnvironmentLoop(acme.core.Worker):
     """A Petting Zoo RL environment loop.
@@ -88,7 +90,7 @@ class PettingZooAECEnvironmentLoop(acme.core.Worker):
 
         n_agents = self._environment.num_agents
         rewards = {
-            agent: _generate_zeros_from_spec(spec)
+            agent: generate_zeros_from_spec(spec)
             for agent, spec in self._environment.reward_spec().items()
         }
 
@@ -96,7 +98,7 @@ class PettingZooAECEnvironmentLoop(acme.core.Worker):
         # for each agent accumulated during the episode.
         multiagent_reward_spec = specs.Array((n_agents,), np.float32)
         episode_return = tree.map_structure(
-            _generate_zeros_from_spec, multiagent_reward_spec
+            generate_zeros_from_spec, multiagent_reward_spec
         )
 
         # Run an episode.
@@ -230,7 +232,7 @@ class PettingZooParallelEnvironmentLoop(acme.core.Worker):
 
         n_agents = self._environment.num_agents
         rewards = {
-            agent: _generate_zeros_from_spec(spec)
+            agent: generate_zeros_from_spec(spec)
             for agent, spec in self._environment.reward_spec().items()
         }
 
@@ -238,7 +240,7 @@ class PettingZooParallelEnvironmentLoop(acme.core.Worker):
         # for each agent accumulated during the episode.
         multiagent_reward_spec = specs.Array((n_agents,), np.float32)
         episode_return = tree.map_structure(
-            _generate_zeros_from_spec, multiagent_reward_spec
+            generate_zeros_from_spec, multiagent_reward_spec
         )
 
         # Run an episode.
@@ -262,7 +264,7 @@ class PettingZooParallelEnvironmentLoop(acme.core.Worker):
             # NOTE (Arnu): fix for when env returns empty dict at end of episode.
             if not rewards:
                 rewards = {
-                    agent: _generate_zeros_from_spec(spec)
+                    agent: generate_zeros_from_spec(spec)
                     for agent, spec in self._environment.reward_spec().items()
                 }
 
@@ -322,7 +324,3 @@ class PettingZooParallelEnvironmentLoop(acme.core.Worker):
             step_count += result["episode_length"]
             # Log the given results.
             self._logger.write(result)
-
-
-def _generate_zeros_from_spec(spec: specs.Array) -> np.ndarray:
-    return np.zeros(spec.shape, spec.dtype)
