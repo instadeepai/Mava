@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
-from mava.utils.wrapper_utils import generate_zeros_from_spec
+from mava.utils.wrapper_utils import convert_np_type
 from tests.conftest import EnvSpec, EnvType, Helpers
 
 """
@@ -277,9 +277,9 @@ class TestEnvWrapper:
             test_agents_actions = {
                 agent: wrapped_env.action_spaces[agent].sample() for agent in agents
             }
-
-            expected_reward = {
-                agent: generate_zeros_from_spec(wrapped_env.reward_spec()[agent]).item()
+            rewards_spec = wrapped_env.reward_spec()
+            expected_rewards = {
+                agent: convert_np_type(rewards_spec[agent].dtype, 0)
                 for agent in wrapped_env.agents
             }
             # Mock being done
@@ -292,7 +292,7 @@ class TestEnvWrapper:
             curr_dm_timestep = wrapped_env.step(test_agents_actions)
 
             assert helpers.compare_dicts(
-                curr_dm_timestep.reward, expected_reward
+                curr_dm_timestep.reward, expected_rewards
             ), "Failed to correctly set reward. "
 
         # Sequential env_types
@@ -302,9 +302,9 @@ class TestEnvWrapper:
 
                 # Mock being done when you reach final agent
                 if index == len(agents) - 1:
-                    expected_reward = generate_zeros_from_spec(
-                        wrapped_env.reward_spec()[agent]
-                    ).item()
+                    expected_reward = convert_np_type(
+                        wrapped_env.reward_spec()[agent], 0
+                    )
                     monkeypatch.setattr(
                         wrapped_env._environment,
                         "dones",

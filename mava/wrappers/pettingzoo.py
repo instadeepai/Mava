@@ -22,7 +22,7 @@ from acme import specs, types
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
-from mava.utils.wrapper_utils import generate_zeros_from_spec
+from mava.utils.wrapper_utils import convert_np_type
 
 
 class OLT(NamedTuple):
@@ -73,7 +73,7 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
 
         # Handle empty rewards
         if reward == 0:
-            reward = generate_zeros_from_spec(self.reward_spec()[agent]).item()
+            reward = convert_np_type(self.reward_spec()[agent], reward)
 
         observation = self._convert_observation(agent, observe, done)
 
@@ -197,13 +197,13 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         if not rewards:
             rewards_spec = self.reward_spec()
             rewards = {
-                agent: generate_zeros_from_spec(rewards_spec[agent]).item()
+                agent: convert_np_type(rewards_spec[agent].dtype, 0)
                 for agent in self.possible_agents
             }
         else:
             rewards_spec = self.reward_spec()
             rewards = {
-                agent: np.dtype(type(rewards_spec[agent])).type(reward)
+                agent: convert_np_type(rewards_spec[agent].dtype, reward)
                 for agent, reward in rewards.items()
             }
 
