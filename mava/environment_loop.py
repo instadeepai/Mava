@@ -20,13 +20,13 @@ import time
 from typing import Optional
 
 import dm_env
-import numpy as np
 import tree
 from acme import core
 
 # Internal imports.
 from acme.utils import counting, loggers
-from dm_env import specs
+
+from mava.utils.wrapper_utils import generate_zeros_from_spec
 
 
 # TODO: NEED TO CHANGE THIS TO MARL
@@ -77,7 +77,7 @@ class EnvironmentLoop(core.Worker):
         # For evaluation, this keeps track of the total undiscounted reward
         # accumulated during the episode.
         episode_return = tree.map_structure(
-            _generate_zeros_from_spec, self._environment.reward_spec()
+            generate_zeros_from_spec, self._environment.reward_spec()
         )
         timestep = self._environment.reset()
 
@@ -153,10 +153,6 @@ class EnvironmentLoop(core.Worker):
             step_count += result["episode_length"]
             # Log the given results.
             self._logger.write(result)
-
-
-def _generate_zeros_from_spec(spec: specs.Array) -> np.ndarray:
-    return np.zeros(spec.shape, spec.dtype)
 
 
 # Internal class.
