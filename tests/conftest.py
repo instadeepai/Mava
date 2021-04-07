@@ -1,7 +1,7 @@
 import importlib
 import typing
 from enum import Enum
-from typing import Tuple, Union
+from typing import Dict, Tuple, Union
 
 import dm_env
 import pytest
@@ -27,6 +27,8 @@ class EnvSpec:
 """
 Helpers contains re-usable test functions.
 """
+
+# TODO(Kale-ab): Better structure helper funcs
 
 
 class Helpers:
@@ -75,6 +77,13 @@ class Helpers:
             env_wrapper.action_spaces[agent].seed(random_seed)
             for agent in env_wrapper.agents
         ]
+
+    @staticmethod
+    def compare_dicts(dictA: Dict, dictB: Dict) -> bool:
+        typesA = [type(k) for k in dictA.values()]
+        typesB = [type(k) for k in dictB.values()]
+
+        return (dictA == dictB) and (typesA == typesB)
 
 
 @typing.no_type_check
