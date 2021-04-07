@@ -6,7 +6,7 @@ from acme import types as acme_types
 # Internal core import.
 from acme.core import Saveable, VariableSource, Worker
 
-from mava import specs, types
+from mava import specs, types, utils
 
 # Make __version__ accessible.
 from mava._metadata import __version__

@@ -37,6 +37,7 @@ from acme.utils import tree_utils
 
 from mava import specs as mava_specs
 from mava.adders.reverb import base
+from mava.adders.reverb import utils as mava_utils
 
 
 class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
@@ -236,7 +237,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         if self._final_step_placeholder is None:
             # utils.final_step_like is expensive (around 0.085ms) to run every time
             # so we cache its output.
-            self._final_step_placeholder = acme_utils.final_step_like(
+            self._final_step_placeholder = mava_utils.final_step_like(
                 self._buffer[0], next_observations
             )
         final_step: base.Step = self._final_step_placeholder._replace(
