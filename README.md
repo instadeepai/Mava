@@ -45,7 +45,7 @@ few MARL systems and environments. We also include a
 
 ## Installation
 
-We have tested `mava` on Python 3.6 & 3.7.
+We have tested `mava` on Python 3.6, 3.7 and 3.8.
 
 1.  **Optional**: We strongly recommend using a
     [Python virtual environment](https://docs.python.org/3/tutorial/venv.html)
@@ -94,6 +94,12 @@ We have tested `mava` on Python 3.6 & 3.7.
    ```bash
    pip install .[envs]
    ```
+
+5. **Optional**: To install [CUDA toolkit](https://docs.nvidia.com/cuda/) for NVIDIA GPU support, dowload [here](https://anaconda.org/anaconda/cudatoolkit). Alternatively, for anaconda users:
+
+    ```bash
+    conda install -c anaconda cudatoolkit
+    ```
 
 ## Contributing
 
