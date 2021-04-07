@@ -22,6 +22,8 @@ from acme import specs, types
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
+from mava.utils.wrapper_utils import convert_np_type
+
 
 class OLT(NamedTuple):
     """Container for (observation, legal_actions, terminal) tuples."""
@@ -68,6 +70,10 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         # Update these vars so dm_env.TimeStep returned has
         # the last information.
         observe, reward, done, info = self._environment.last()
+
+        # Handle empty rewards
+        if reward == 0:
+            reward = convert_np_type(self.reward_spec()[agent], reward)
 
         observation = self._convert_observation(agent, observe, done)
 
@@ -128,6 +134,7 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         reward_specs = {}
         for agent in self._environment.possible_agents:
             reward_specs[agent] = specs.Array((), np.float32)
+
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
@@ -189,9 +196,19 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
         observations, rewards, dones, infos = self._environment.step(actions)
 
-        rewards = {
-            agent: np.dtype("float32").type(reward) for agent, reward in rewards.items()
-        }
+        #  Handle empty rewards
+        if not rewards:
+            rewards_spec = self.reward_spec()
+            rewards = {
+                agent: convert_np_type(rewards_spec[agent].dtype, 0)
+                for agent in self.possible_agents
+            }
+        else:
+            rewards_spec = self.reward_spec()
+            rewards = {
+                agent: convert_np_type(rewards_spec[agent].dtype, reward)
+                for agent, reward in rewards.items()
+            }
 
         if self._environment.env_done:
             self._environment.step(None)
@@ -262,6 +279,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         reward_specs = {}
         for agent in self._environment.possible_agents:
             reward_specs[agent] = specs.Array((), np.float32)
+
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
