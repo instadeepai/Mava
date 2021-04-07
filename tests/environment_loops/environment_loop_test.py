@@ -3,7 +3,7 @@ from tests.conftest import EnvSpec, EnvType, Helpers
 
 # from mocks import MockedExecutor
 
-from tests.mocks import MockedExecutor, Environment, get_mocked_env_spec
+from tests.mocks import MockedSystem, Environment, get_mocked_env_spec
 
 # from acme.testing.fakes import Environment
 import dm_env
@@ -62,7 +62,7 @@ class TestEnvironmentLoop:
 
         env_loop = env_loop_func(
             wrapped_env,
-            MockedExecutor(get_mocked_env_spec(wrapped_env)._specs, env_spec.env_type),
+            MockedSystem(get_mocked_env_spec(wrapped_env)._specs, env_spec.env_type),
         )
 
         print(env_loop.run_episode())
