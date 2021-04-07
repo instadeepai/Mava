@@ -15,7 +15,6 @@
 
 
 """MADDPG trainer implementation."""
-
 import time
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -236,10 +235,10 @@ class MADDPGTrainer(mava.Trainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # Decentralised critic
-        # o_tm1_feed = o_tm1_trans[agent]
-        # o_t_feed = o_t_trans[agent]
-        # a_tm1_feed = a_tm1[agent]
-        # a_t_feed = a_t[agent]
+        o_tm1_feed = o_tm1_trans[agent]
+        o_t_feed = o_t_trans[agent]
+        a_tm1_feed = a_tm1[agent]
+        a_t_feed = a_t[agent]
 
         # Centralised critic.
         # o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
@@ -248,12 +247,31 @@ class MADDPGTrainer(mava.Trainer):
         # a_t_feed = tf.stack([x for x in a_t.values()], 1)
 
         # State based
-        o_tm1_feed = e_t["s_tm1"]
-        o_t_feed = e_t["s_t"]
-        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        a_t_feed = tf.stack([x for x in a_t.values()], 1)
+        # o_tm1_feed = e_t["s_tm1"]
+        # o_t_feed = e_t["s_t"]
+        # a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
+        # a_t_feed = tf.stack([x for x in a_t.values()], 1)
 
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
+
+    @tf.function
+    def _get_dpg_feed(
+        self,
+        a_t: Dict[str, np.ndarray],
+        dpg_a_t: np.ndarray,
+        agent: str,
+    ) -> tf.Tensor:
+        # Decentralised DPG
+        dpg_a_t_feed = dpg_a_t
+
+        # Centralised and StateBased DPG
+        # Note (dries): Copy has to be made because the input
+        # variables cannot be changed.
+        # import copy
+        # dpg_a_t_feed = copy.copy(a_t)
+        # dpg_a_t_feed[agent] = dpg_a_t
+
+        return dpg_a_t_feed
 
     @tf.function
     def _policy_actions(self, next_state: Dict[str, np.ndarray]) -> Any:
@@ -334,12 +352,7 @@ class MADDPGTrainer(mava.Trainer):
                 #  be fixed for the code can be moved to a function.
 
                 # Get dpg actions
-                # Decentralised DPG
-                # dpg_a_t_feed = dpg_a_t
-
-                # Centralised and StateBased DPG
-                dpg_a_t_feed = a_t
-                dpg_a_t_feed[agent] = dpg_a_t
+                dpg_a_t_feed = self._get_dpg_feed(a_t, dpg_a_t, agent)
 
                 # Get dpg Q values.
                 dpg_q_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
