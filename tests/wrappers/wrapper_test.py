@@ -43,7 +43,7 @@ class TestEnvWrapper:
 
     #  Test initialization of env wrapper, which should have
     #   a nested environment, an observation and action space for each agent.
-    def testwrapper_initialization(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+    def test_wrapper_initialization(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, num_agents = helpers.get_env(env_spec)
         wrapper_func = helpers.get_wrapper(env_spec)
         wrapped_env = wrapper_func(env)
@@ -63,7 +63,7 @@ class TestEnvWrapper:
         ), "Failed to generate action specs for all agents."
 
     # Test of reset of wrapper and that dm_env_timestep has basic props.
-    def testwrapper_env_reset(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+    def test_wrapper_env_reset(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, num_agents = helpers.get_env(env_spec)
         wrapper_func = helpers.get_wrapper(env_spec)
         wrapped_env = wrapper_func(env)

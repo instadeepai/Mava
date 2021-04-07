@@ -12,6 +12,11 @@ from mava.wrappers.pettingzoo import (
     PettingZooParallelEnvWrapper,
 )
 
+from mava.environment_loops.pettingzoo import (
+    PettingZooParallelEnvironmentLoop,
+    PettingZooAECEnvironmentLoop,
+)
+
 
 class EnvType(Enum):
     Sequential = 1
@@ -64,6 +69,20 @@ class Helpers:
         else:
             raise Exception("Env_spec is not valid.")
         return wrapper
+
+    # Returns an env loop.
+    @staticmethod
+    def get_env_loop(
+        env_spec: EnvSpec,
+    ) -> dm_env.Environment:
+        env_loop = None
+        if env_spec.env_type == EnvType.Parallel:
+            env_loop = PettingZooParallelEnvironmentLoop
+        elif env_spec.env_type == EnvType.Sequential:
+            env_loop = PettingZooAECEnvironmentLoop
+        else:
+            raise Exception("Env_spec is not valid.")
+        return env_loop
 
     # Seeds action space
     @staticmethod
