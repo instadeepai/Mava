@@ -1,3 +1,18 @@
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import importlib
 import typing
 from enum import Enum
@@ -7,14 +22,13 @@ import dm_env
 import pytest
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
+from mava.environment_loops.pettingzoo import (
+    PettingZooAECEnvironmentLoop,
+    PettingZooParallelEnvironmentLoop,
+)
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
-)
-
-from mava.environment_loops.pettingzoo import (
-    PettingZooParallelEnvironmentLoop,
-    PettingZooAECEnvironmentLoop,
 )
 
 
@@ -103,6 +117,16 @@ class Helpers:
         typesB = [type(k) for k in dictB.values()]
 
         return (dictA == dictB) and (typesA == typesB)
+
+    @staticmethod
+    def assert_valid_episode(episode_result: Dict) -> None:
+        assert (
+            episode_result["episode_length"] > 0
+            and episode_result["mean_episode_return"] is not None
+            and episode_result["steps_per_second"] is not None
+            and episode_result["episodes"] == 1
+            and episode_result["steps"] > 0
+        )
 
 
 @typing.no_type_check
