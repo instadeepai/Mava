@@ -183,7 +183,7 @@ class RecurrentExecutor(core.Executor):
 
         # Step the recurrent policy forward given the current observation and state.
         policy_output, new_state = self._policy(
-            agent, observation.observation, self._state
+            agent, observation.observation, self._states[agent]
         )
 
         # Bookkeeping of recurrent states for the observe method.
@@ -198,7 +198,7 @@ class RecurrentExecutor(core.Executor):
             self._adder.add_first(timestep)
 
         # Set the state to None so that we re-initialize at the next policy call.
-        self._state = None
+        self._states = {}
 
     def observe(
         self,
