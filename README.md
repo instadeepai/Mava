@@ -53,7 +53,7 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     make build
     ```
-    
+
 2. Run bash inside a docker container with mava installed:
     ```bash
     make bash
