@@ -206,7 +206,6 @@ class ReverbParallelAdder(base.ParallelAdder):
                 )
 
         # Add the timestep to the buffer.
-        # print("APPENDING TO BUFFER")
         self._buffer.append(
             Step(
                 observations=self._next_observations,
