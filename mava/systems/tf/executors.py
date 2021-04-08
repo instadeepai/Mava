@@ -18,10 +18,11 @@ tfd = tfp.distributions
 
 
 class FeedForwardExecutor(core.Executor):
-    """A feed-forward actor.
-    An actor based on a feed-forward policy which takes non-batched observations
-    and outputs non-batched actions. It also allows adding experiences to replay
-    and updating the weights from the policy on the learner.
+    """A feed-forward executor.
+    An executor based on a feed-forward policy for each agent in the system
+    which takes non-batched observations and outputs non-batched actions.
+    It also allows adding experiences to replay and updating the weights
+    from the policy on the learner.
     """
 
     def __init__(
@@ -31,14 +32,14 @@ class FeedForwardExecutor(core.Executor):
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
-        """Initializes the actor.
+        """Initializes the executor.
         Args:
           policy_network: the policy to run for each agent in the system.
           shared_weights: specify if weights are shared between agent networks.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
-          variable_client: object which allows to copy weights from the learner copy
-            of the policy to the actor copy (in case they are separate).
+          variable_client: object which allows to copy weights from the trainer copy
+            of the policies to the executor copy (in case they are separate).
         """
 
         # Store these for later use.
@@ -115,10 +116,10 @@ class FeedForwardExecutor(core.Executor):
 
 class RecurrentExecutor(core.Executor):
     """A recurrent Executor.
-    An actor based on a recurrent policy which takes non-batched observations and
-    outputs non-batched actions, and keeps track of the recurrent state inside. It
-    also allows adding experiences to replay and updating the weights from the
-    policy on the learner.
+    An executor based on a recurrent policy for each agent in the system which
+    takes non-batched observations and outputs non-batched actions, and keeps
+    track of the recurrent state inside. It also allows adding experiences to
+    replay and updating the weights from the policy on the learner.
     """
 
     def __init__(
@@ -129,14 +130,14 @@ class RecurrentExecutor(core.Executor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
     ):
-        """Initializes the actor.
+        """Initializes the executor.
         Args:
           policy_networks: the (recurrent) policy to run for each agent in the system.
           shared_weights: specify if weights are shared between agent networks.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
-          variable_client: object which allows to copy weights from the learner copy
-            of the policy to the actor copy (in case they are separate).
+          variable_client: object which allows to copy weights from the trainer copy
+            of the policies to the executor copy (in case they are separate).
           store_recurrent_state: Whether to pass the recurrent state to the adder.
         """
         # Store these for later use.
