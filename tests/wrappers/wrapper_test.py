@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
+from mava.utils.wrapper_utils import convert_np_type
 from tests.conftest import EnvSpec, EnvType, Helpers
 
 """
@@ -276,7 +277,11 @@ class TestEnvWrapper:
             test_agents_actions = {
                 agent: wrapped_env.action_spaces[agent].sample() for agent in agents
             }
-
+            rewards_spec = wrapped_env.reward_spec()
+            expected_rewards = {
+                agent: convert_np_type(rewards_spec[agent].dtype, 0)
+                for agent in wrapped_env.agents
+            }
             # Mock being done
             monkeypatch.setattr(
                 wrapped_env._environment.aec_env,
@@ -286,14 +291,20 @@ class TestEnvWrapper:
 
             curr_dm_timestep = wrapped_env.step(test_agents_actions)
 
+            assert helpers.compare_dicts(
+                curr_dm_timestep.reward, expected_rewards
+            ), "Failed to correctly set reward. "
+
         # Sequential env_types
         elif env_spec.env_type == EnvType.Sequential:
-
             for index, agent in enumerate(agents):
                 test_agent_actions = wrapped_env.action_spaces[agent].sample()
 
                 # Mock being done when you reach final agent
                 if index == len(agents) - 1:
+                    expected_reward = convert_np_type(
+                        wrapped_env.reward_spec()[agent], 0
+                    )
                     monkeypatch.setattr(
                         wrapped_env._environment,
                         "dones",
@@ -306,6 +317,10 @@ class TestEnvWrapper:
                     )
 
                 curr_dm_timestep = wrapped_env.step(test_agent_actions)
+
+            assert curr_dm_timestep.reward == expected_reward and type(
+                curr_dm_timestep.reward
+            ) == type(expected_reward), "Failed to correctly set reward. "
 
         assert (
             wrapped_env._reset_next_step is True

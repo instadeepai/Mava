@@ -47,7 +47,30 @@ few MARL systems and environments. We also include a
 
 We have tested `mava` on Python 3.6, 3.7 and 3.8.
 
-1.  **Optional**: We strongly recommend using a
+### Docker
+
+1. Build the docker image using the following make command:
+    ```bash
+    make build
+    ```
+    
+2. Run bash inside a docker container with mava installed:
+    ```bash
+    make bash
+    ```
+From here, examples can be run using:
+    ```
+    python dir/to/example/example.py
+    ```
+Alternatively, examples can be run directly from the command line without first launching the container by using the following make command:
+    ```
+    make run EXAMPLE=dir/to/example/example.py
+    ```
+
+
+### Python virtual environment
+
+1.  If not using docker, we strongly recommend using a
     [Python virtual environment](https://docs.python.org/3/tutorial/venv.html)
     to manage your dependencies in order to avoid version conflicts:
 
@@ -94,6 +117,12 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
    ```bash
    pip install .[envs]
    ```
+
+5. **Optional**: To install [CUDA toolkit](https://docs.nvidia.com/cuda/) for NVIDIA GPU support, download [here](https://anaconda.org/anaconda/cudatoolkit). Alternatively, for anaconda users:
+
+    ```bash
+    conda install -c anaconda cudatoolkit
+    ```
 
 ## Contributing
 

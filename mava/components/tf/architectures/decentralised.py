@@ -155,7 +155,6 @@ class DecentralisedActorCritic(BaseActorCritic):
 
         critic_networks["critics"] = self._critic_networks
         critic_networks["target_critics"] = self._target_critic_networks
-
         return critic_networks
 
     def create_system(
@@ -164,4 +163,8 @@ class DecentralisedActorCritic(BaseActorCritic):
         networks = self.create_actor_variables()
         critic_networks = self.create_critic_variables()
         networks.update(critic_networks)
+        # Note (dries): This training_info is needed by the trainer to know
+        # how to process the experience for the specific critic. Is there a
+        # better way of providing the training info to the trainer without
+        # deviating from acme builder setup?
         return networks

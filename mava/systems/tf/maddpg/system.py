@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import dataclasses
-from typing import Dict, Iterator, Optional
+from typing import Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -90,9 +90,16 @@ class MADDPGBuilder(SystemBuilder):
       distributed setup.
       """
 
-    def __init__(self, config: MADDPGConfig):
+    def __init__(
+        self,
+        config: MADDPGConfig,
+        trainer_fn: Type[
+            training.BaseMADDPGTrainer
+        ] = training.DecentralisedMADDPGTrainer,
+    ):
         """Args:
-        config: Configuration options for the MADDPG system."""
+        config: Configuration options for the MADDPG system.
+        trainer_fn: Trainer module to use."""
 
         self._config = config
 
@@ -100,6 +107,7 @@ class MADDPGBuilder(SystemBuilder):
             _agent_types: a list of the types of agents to be used."""
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
+        self._trainer_fn = trainer_fn
 
     def make_replay_table(
         self,
@@ -228,7 +236,7 @@ class MADDPGBuilder(SystemBuilder):
         critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
 
         # The learner updates the parameters (and initializes them).
-        trainer = training.MADDPGTrainer(
+        trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
             policy_networks=networks["policies"],
@@ -266,6 +274,9 @@ class MADDPG(system.System):
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
+        trainer_fn: Type[
+            training.BaseMADDPGTrainer
+        ] = training.DecentralisedMADDPGTrainer,
         shared_weights: bool = False,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -328,7 +339,8 @@ class MADDPG(system.System):
                 counter=counter,
                 checkpoint=checkpoint,
                 replay_table_name=replay_table_name,
-            )
+            ),
+            trainer_fn=trainer_fn,
         )
 
         # Create a replay server to add data to. This uses no limiter behavior in
