@@ -35,7 +35,7 @@ class DecentralisedActor(BaseArchitecture):
         policy_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        shared_weights: bool = True,
     ):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()
@@ -126,7 +126,7 @@ class DecentralisedActorCritic(BaseActorCritic):
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        shared_weights: bool = True,
     ):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()

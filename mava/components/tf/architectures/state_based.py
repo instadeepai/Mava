@@ -39,7 +39,7 @@ class StateBasedActor(DecentralisedActor):
         policy_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
@@ -84,7 +84,7 @@ class StateBasedCritic(DecentralisedActorCritic):
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
@@ -142,7 +142,7 @@ class StateBasedActorCritic(StateBasedActor, StateBasedCritic):  # type: ignore
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        shared_weights: bool = True,
     ):
 
         StateBasedCritic.__init__(

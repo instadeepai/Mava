@@ -38,7 +38,7 @@ class CentralisedActor(DecentralisedActor):
         policy_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
@@ -81,7 +81,7 @@ class CentralisedCritic(DecentralisedActorCritic):
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
@@ -138,7 +138,7 @@ class CentralisedActorCritic(CentralisedActor, CentralisedCritic):  # type: igno
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        shared_weights: bool = True,
     ):
 
         CentralisedCritic.__init__(
