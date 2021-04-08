@@ -18,3 +18,37 @@
 #   - single agent dqn learner in acme:
 #           https://github.com/deepmind/acme/blob/master/acme/agents/tf/dqn/learning.py
 #   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
+
+"""Qmix trainer implementation."""
+
+# Imports
+
+class BaseQmixTrainer(mava.Trainer):
+    """Qmix trainer.
+    This is the trainer component of a MADDPG system. i.e. it takes a dataset as input
+    and implements update functionality to learn from this dataset.
+    """
+
+    def __init__():
+        """Initializes the learner.
+        Args:
+        """
+    
+    
+class DecentralisedQmixTrainer(BaseQmixTrainer):
+    def __init__():
+        """"""
+        super().__init__()
+
+
+class CentralisedQmixTrainer(BaseQmixTrainer):
+    def __init__():
+        """"""
+        super().__init__()
+      
+
+class StateBasedQmixTrainer(BaseQmixTrainer):
+    def __init__():
+        """"""
+        super().__init__()
+      
