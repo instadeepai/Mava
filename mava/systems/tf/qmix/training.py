@@ -21,7 +21,8 @@
 
 """Qmix trainer implementation."""
 
-# Imports
+import mava
+
 
 class BaseQmixTrainer(mava.Trainer):
     """Qmix trainer.
@@ -29,26 +30,7 @@ class BaseQmixTrainer(mava.Trainer):
     and implements update functionality to learn from this dataset.
     """
 
-    def __init__():
+    def __init__(self) -> None:
         """Initializes the learner.
         Args:
         """
-    
-    
-class DecentralisedQmixTrainer(BaseQmixTrainer):
-    def __init__():
-        """"""
-        super().__init__()
-
-
-class CentralisedQmixTrainer(BaseQmixTrainer):
-    def __init__():
-        """"""
-        super().__init__()
-      
-
-class StateBasedQmixTrainer(BaseQmixTrainer):
-    def __init__():
-        """"""
-        super().__init__()
-      
