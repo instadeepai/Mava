@@ -1,6 +1,6 @@
 """Generic executor implementations, using TensorFlow and Sonnet."""
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import dm_env
 import sonnet as snt
@@ -80,6 +80,24 @@ class FeedForwardExecutor(core.Executor):
     def observe_first(self, timestep: dm_env.TimeStep) -> None:
         if self._adder:
             self._adder.add_first(timestep)
+
+    def agent_observe_first(self, agent: str, timestep: dm_env.TimeStep) -> None:
+        if self._adder:
+            self._adder.add_first({agent: timestep})
+
+    # Sequential agent observe - We need to pass the agent info for sampling later.
+    def agent_observe(
+        self,
+        agent: str,
+        action: Union[float, int],
+        next_timestep: dm_env.TimeStep,
+        extras: Optional[Dict] = {},
+    ) -> None:
+        if self._adder:
+            if not extras:
+                extras = {}
+            extras["agent_id"] = agent
+            self._adder.add(action, next_timestep, extras)  # type: ignore
 
     def observe(
         self,
