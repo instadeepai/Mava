@@ -132,7 +132,8 @@ class StateBasedCritic(DecentralisedActorCritic):
 
 
 class StateBasedActorCritic(StateBasedActor, StateBasedCritic):  # type: ignore
-    """Multi-agent actor critic architecture using environment state information"""
+    """Multi-agent actor critic architecture where both actor policies
+    and critics use environment state information"""
 
     def __init__(
         self,
