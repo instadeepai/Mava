@@ -95,7 +95,6 @@ class MockedSystem(MockedExecutor, System):
         self.variables: Dict = {}
         network_type = "mlp"
         self.variables[network_type] = {}
-        print(f"Here: {self._spec}")
         for agent in self._spec.keys():
             self.variables[network_type][agent] = np.random.rand(5, 5)
 

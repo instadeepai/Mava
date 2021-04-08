@@ -55,7 +55,8 @@ class TestEnvironmentLoop:
             props_which_should_not_be_none
         ), "Failed to initialize env loop."
 
-    def test_get_actions(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+    # Test that we can run an episode and that the episode returns valid data.
+    def test_valid_episode(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, _ = helpers.get_env(env_spec)
         env_loop_func = helpers.get_env_loop(env_spec)
 
