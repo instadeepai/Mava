@@ -60,11 +60,10 @@ class Helpers:
     @staticmethod
     def get_env(env_spec: EnvSpec) -> Tuple[Union[AECEnv, ParallelEnv], int]:
         env, num_agents = None, None
+        mod = importlib.import_module(env_spec.env_name)
         if env_spec.env_type == EnvType.Parallel:
-            mod = importlib.import_module(env_spec.env_name)
             env = mod.parallel_env()  # type: ignore
         elif env_spec.env_type == EnvType.Sequential:
-            mod = importlib.import_module(env_spec.env_name)
             env = mod.env()  # type: ignore
         else:
             raise Exception("Env_spec is not valid.")

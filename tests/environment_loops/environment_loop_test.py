@@ -16,31 +16,28 @@
 import pytest
 
 from tests.conftest import EnvSpec, EnvType, Helpers
-from tests.mocks import MockedSystem, get_mocked_env_spec
+from tests.mocks import MockedSystem, get_mocked_env
 
 
 @pytest.mark.parametrize(
     "env_spec",
     [
-        EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Parallel),
-        EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
-        EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Parallel),
-        EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Sequential),
+        EnvSpec("mock_discrete", EnvType.Parallel),
+        EnvSpec("mock_discrete", EnvType.Sequential),
+        # EnvSpec("mock_continous", EnvType.Parallel),
+        # EnvSpec("mock_continous", EnvType.Sequential),
     ],
 )
 class TestEnvironmentLoop:
     # Test that we can load a env loop and that it contains
     #   an env, executor, counter, logger and should_update.
     def test_initialize_env_loop(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        env, _ = helpers.get_env(env_spec)
+        wrapped_env = get_mocked_env(env_spec)
         env_loop_func = helpers.get_env_loop(env_spec)
-
-        wrapper_func = helpers.get_wrapper(env_spec)
-        wrapped_env = wrapper_func(env)
 
         env_loop = env_loop_func(
             wrapped_env,
-            MockedSystem(get_mocked_env_spec(wrapped_env)._specs),
+            MockedSystem(wrapped_env._specs),
         )
 
         props_which_should_not_be_none = [
@@ -55,17 +52,15 @@ class TestEnvironmentLoop:
             props_which_should_not_be_none
         ), "Failed to initialize env loop."
 
-    # Test that we can run an episode and that the episode returns valid data.
+    # # Test that we can run an episode and that the episode returns valid data.
     def test_valid_episode(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        env, _ = helpers.get_env(env_spec)
+        wrapped_env = get_mocked_env(env_spec)
         env_loop_func = helpers.get_env_loop(env_spec)
 
-        wrapper_func = helpers.get_wrapper(env_spec)
-        wrapped_env = wrapper_func(env)
-
+        # pprint.pprint(vars(wrapped_env))
         env_loop = env_loop_func(
             wrapped_env,
-            MockedSystem(get_mocked_env_spec(wrapped_env)._specs),
+            MockedSystem(wrapped_env._specs),
         )
 
         result = env_loop.run_episode()
