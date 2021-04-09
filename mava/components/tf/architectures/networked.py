@@ -24,7 +24,7 @@ import sonnet as snt
 from acme import specs as acme_specs
 
 from mava import specs
-from mava.components.tf.architectures.decentralised import DecentralisedActorCritic
+from mava.components.tf.architectures.decentralised import DecentralisedActor
 
 
 def fully_connected_network_spec(agents: List[str]) -> Dict[str, np.ndarray]:
@@ -42,7 +42,7 @@ class NetworkedSystem:
         """Create network structure specifying connection between agents"""
 
 
-class NetworkedActorCritic(DecentralisedActorCritic, NetworkedSystem):
+class NetworkedActor(DecentralisedActor, NetworkedSystem):
     """Networked multi-agent actor critic architecture."""
 
     def __init__(
@@ -50,15 +50,13 @@ class NetworkedActorCritic(DecentralisedActorCritic, NetworkedSystem):
         network_spec: Dict[str, np.ndarray],
         environment_spec: specs.MAEnvironmentSpec,
         policy_networks: Dict[str, snt.Module],
-        critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
             policy_networks=policy_networks,
-            critic_networks=critic_networks,
             observation_networks=observation_networks,
             behavior_networks=behavior_networks,
             shared_weights=shared_weights,

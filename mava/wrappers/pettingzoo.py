@@ -145,6 +145,9 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
             )
         return discount_specs
 
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        return {}
+
     def seed(self, seed: int = None) -> None:
         self._environment.seed(seed)
 
@@ -286,6 +289,9 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 (), np.float32, minimum=0, maximum=1.0
             )
         return discount_specs
+
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        return {}
 
     def seed(self, seed: int = None) -> None:
         self._environment.seed(seed)

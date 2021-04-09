@@ -29,8 +29,9 @@ from mava.components.tf.architectures.decentralised import (
 )
 
 
-class CentralisedActor(DecentralisedActor):
-    """Centralised multi-agent actor architecture."""
+class StateBasedActor(DecentralisedActor):
+    """Multi-agent actor architecture using
+    environment state information."""
 
     def __init__(
         self,
@@ -55,11 +56,12 @@ class CentralisedActor(DecentralisedActor):
 
         agents_by_type = self._env_spec.get_agents_by_type()
 
+        # Create one critic per agent. Each critic gets the concatenated
+        # observations/actions of each agent of the same type as the agent.
         for agent_type, agents in agents_by_type.items():
-            actor_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
-            actor_obs_shape.insert(0, len(agents))
+            actor_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
             obs_specs_per_type[agent_type] = tf.TensorSpec(
-                shape=actor_obs_shape,
+                shape=actor_state_shape,
                 dtype=tf.dtypes.float32,
             )
 
@@ -71,8 +73,9 @@ class CentralisedActor(DecentralisedActor):
         return actor_obs_specs
 
 
-class CentralisedCritic(DecentralisedActorCritic):
-    """Centralised multi-agent actor critic architecture."""
+class StateBasedCritic(DecentralisedActorCritic):
+    """Multi-agent actor critic architecture with a critic using
+    environment state information."""
 
     def __init__(
         self,
@@ -100,15 +103,17 @@ class CentralisedCritic(DecentralisedActorCritic):
 
         agents_by_type = self._env_spec.get_agents_by_type()
 
+        # Create one critic per agent. Each critic gets the concatenated
+        # observations/actions of each agent of the same type as the agent.
+
         for agent_type, agents in agents_by_type.items():
-            critic_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
-            critic_obs_shape.insert(0, len(agents))
+            critic_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
             critic_act_shape = list(
                 copy.copy(self._agent_specs[agents[0]].actions.shape)
             )
             critic_act_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
-                shape=critic_obs_shape,
+                shape=critic_state_shape,
                 dtype=tf.dtypes.float32,
             )
             action_specs_per_type[agent_type] = tf.TensorSpec(
@@ -126,10 +131,9 @@ class CentralisedCritic(DecentralisedActorCritic):
         return critic_obs_specs, critic_act_specs
 
 
-# TODO (Arnu): remove mypy type ignore once we can handle type checking for
-# nested/multiple inheritance
-class CentralisedActorCritic(CentralisedActor, CentralisedCritic):  # type: ignore
-    """Centralised multi-agent actor critic architecture."""
+class StateBasedActorCritic(StateBasedActor, StateBasedCritic):  # type: ignore
+    """Multi-agent actor critic architecture where both actor policies
+    and critics use environment state information"""
 
     def __init__(
         self,
@@ -141,7 +145,7 @@ class CentralisedActorCritic(CentralisedActor, CentralisedCritic):  # type: igno
         shared_weights: bool = True,
     ):
 
-        CentralisedCritic.__init__(
+        StateBasedCritic.__init__(
             self,
             environment_spec=environment_spec,
             policy_networks=policy_networks,

@@ -82,10 +82,16 @@ class FeedForwardExecutor(core.Executor):
             self._adder.add_first(timestep)
 
     def observe(
-        self, actions: Dict[str, types.NestedArray], next_timestep: dm_env.TimeStep
+        self,
+        actions: Dict[str, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
+        extras: Optional[Dict[str, types.NestedArray]] = {},
     ) -> None:
         if self._adder:
-            self._adder.add(actions, next_timestep)
+            if extras:
+                self._adder.add(actions, next_timestep, extras)
+            else:
+                self._adder.add(actions, next_timestep)
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
