@@ -215,11 +215,6 @@ class FlatlandEnvWrapper(dm_env.Environment):
         """Returns the number of trains/agents in the flatland environment"""
         return int(self._environment.number_of_agents)
 
-    @property
-    def num_agents(self) -> int:
-        """Returns the number of trains/agents in the flatland environment"""
-        return int(self._environment.number_of_agents)
-
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment."""
         return getattr(self._environment, name)
