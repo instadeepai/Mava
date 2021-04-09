@@ -14,23 +14,15 @@
 # limitations under the License.
 
 """Wraps a PettingZoo MARL environment to be used as a dm_env environment."""
-from typing import Any, Dict, NamedTuple, Union
+from typing import Any, Dict, Union
 
 import dm_env
 import numpy as np
-from acme import specs, types
+from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
-from mava.utils.wrapper_utils import convert_np_type
-
-
-class OLT(NamedTuple):
-    """Container for (observation, legal_actions, terminal) tuples."""
-
-    observation: types.Nest
-    legal_actions: types.Nest
-    terminal: types.Nest
+from mava.utils.wrapper_utils import OLT, convert_np_type, parameterized_restart
 
 
 class PettingZooAECEnvWrapper(dm_env.Environment):
@@ -46,14 +38,15 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         """Resets the episode."""
         self._reset_next_step = False
         self._environment.reset()
-        self._discount = convert_np_type("float32", 1)  # Not used in pettingzoo
         self._step_type = dm_env.StepType.FIRST
 
         observe, _, done, _ = self._environment.last()
         agent = self._environment.agent_selection
         observation = self._convert_observation(agent, observe, done)
 
-        return dm_env.restart(observation)
+        discount = convert_np_type("float32", 1)  # Not used in pettingzoo
+        reward = convert_np_type("float32", 0)
+        return parameterized_restart(reward, discount, observation)
 
     def step(self, action: Union[int, float]) -> dm_env.TimeStep:
         """Steps the environment."""
@@ -177,15 +170,20 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         """Resets the episode."""
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
-        self._discounts = {
-            agent: convert_np_type("float32", 1)
-            for agent in self._environment.possible_agents
-        }
+
         observe = self._environment.reset()
         observations = self._convert_observations(
             observe, {agent: False for agent in self.possible_agents}
         )
-        return dm_env.restart(observations)
+        rewards_spec = self.reward_spec()
+        rewards = {
+            agent: convert_np_type(rewards_spec[agent].dtype, 0)
+            for agent in self.possible_agents
+        }
+        discounts = {
+            agent: convert_np_type("float32", 1) for agent in self.possible_agents
+        }
+        return parameterized_restart(rewards, discounts, observations)
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
