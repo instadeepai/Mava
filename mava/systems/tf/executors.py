@@ -221,7 +221,7 @@ class RecurrentExecutor(core.Executor):
             for agent, prev_state in self._prev_states.items()
         }
         if extras:
-            extras.update({"states": numpy_states})
+            extras.update({"core_states": numpy_states})
             self._adder.add(actions, next_timestep, extras)
         else:
             self._adder.add(actions, next_timestep, numpy_states)
