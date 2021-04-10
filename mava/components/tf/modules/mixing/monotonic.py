@@ -17,6 +17,7 @@
 #   - [] Complete class for monotonic mixing
 #   - [] Generalise Qmixing to allow for different activations,
 #          hypernetwork structures etc.
+#   - [] Decide on whether to accept an 'args' term or receive each arg individually.
 
 # NOTE (StJohn): I'm still thinking about the structure in general. One of the biggest
 # design choices at the moment is how to structure what is passed to the __init__ when
@@ -28,7 +29,7 @@
 
 """Mixing for multi-agent RL systems"""
 
-from typing import Dict
+from typing import Tuple
 
 import tensorflow as tf
 from tensorflow import Tensor
@@ -43,10 +44,12 @@ class MonotonicMixing(BaseMixingModule):
     def __init__(
         self,
         architecture: BaseArchitecture,
-        state_shape: tuple,
-        hypernet_embed: tuple,
+        state_dim: int,
+        hypernet_embed: Tuple,
         n_agents: int,
-        embed_dim: tuple,
+        hypernet_hidden_dim: int,
+        num_hypernet_layers: int,
+        qmix_hidden_dim: Tuple,
         mixer: str = "vdn",
     ) -> None:
         """Initializes the mixer.
@@ -55,53 +58,46 @@ class MonotonicMixing(BaseMixingModule):
             mixer: the type of monotonic mixing.
         """
         self._architecture = architecture
-        self._state_shape = state_shape  # Defined by the environment
+        self._state_dim = state_dim  # Defined by the environment
         self._hypernet_embed = hypernet_embed
         self._n_agents = n_agents
-        self._embed_dim = embed_dim
+        self._hypernet_hidden_dim = hypernet_hidden_dim
+        self._num_hypernet_layers = num_hypernet_layers
+        self._qmix_hidden_dim = qmix_hidden_dim
         self._mixer = mixer.lower()  # Ensure we accept different cases vDn qMiX etc
 
-    def forward(
-        self,
-        agent_qs: Dict[str, float],  # Check type
-        states: Dict[str, float],  # Check type
-        num_hypernet_layers: int = 1,
-    ) -> Tensor:
-
-        """Monotonic mixing logic."""
-        if self._mixer == "vdn":
-            # Not sure if this is the way to simply sum in tf.
-            # I'm looking for an equivalent to th.sum(...) in PyTorch.
-            return tf.math.accumulate_n(agent_qs)
-
-        elif self._mixer == "qmix":
-            # Set up hypernetwork configuration
+        # Set up hypernetwork configuration
+        if self._mixer == "qmix":
             if num_hypernet_layers == 1:
-                self.hyper_w_1 = tf.keras.models.Sequential(
+                self.hyper_w1 = tf.keras.models.Sequential(
                     [
-                        tf.keras.layers.Flatten(input_shape=self._state_shape),
-                        tf.keras.layers.Dense(self._embed_dim * self._n_agents),
+                        tf.keras.layers.Flatten(input_shape=self._state_dim),
+                        tf.keras.layers.Dense(self._qmix_hidden_dim * self._n_agents),
                     ]
                 )
-                self.hyper_w_final = tf.keras.models.Sequential(
+                self.hyper_w2 = tf.keras.models.Sequential(
                     [
-                        tf.keras.layers.Flatten(input_shape=self._state_shape),
-                        tf.keras.layers.Dense(self._state_shape),
+                        tf.keras.layers.Flatten(input_shape=self._state_dim),
+                        tf.keras.layers.Dense(self._qmix_hidden_dim),
                     ]
                 )
             elif num_hypernet_layers == 2:
-                self.hyper_w_1 = tf.keras.models.Sequential(
+                self.hyper_w1 = tf.keras.models.Sequential(
                     [
-                        tf.keras.layers.Flatten(input_shape=self._state_shape),
-                        tf.keras.layers.Dense(self._hypernet_embed, activation="relu"),
-                        tf.keras.layers.Dense(self._embed_dim * self._n_agents),
+                        tf.keras.layers.Flatten(input_shape=self._state_dim),
+                        tf.keras.layers.Dense(
+                            self._hypernet_hidden_dim, activation="relu"
+                        ),
+                        tf.keras.layers.Dense(self._qmix_hidden_dim * self._n_agents),
                     ]
                 )
-                self.hyper_w_final = tf.keras.models.Sequential(
+                self.hyper_w2 = tf.keras.models.Sequential(
                     [
-                        tf.keras.layers.Flatten(input_shape=self._state_shape),
-                        tf.keras.layers.Dense(self._hypernet_embed, activation="relu"),
-                        tf.keras.layers.Dense(self._embed_dim),
+                        tf.keras.layers.Flatten(input_shape=self._state_dim),
+                        tf.keras.layers.Dense(
+                            self._hypernet_hidden_dim, activation="relu"
+                        ),
+                        tf.keras.layers.Dense(self._qmix_hidden_dim),
                     ]
                 )
             elif num_hypernet_layers > 2:
@@ -110,34 +106,65 @@ class MonotonicMixing(BaseMixingModule):
                 raise Exception("Error setting number of hypernet layers.")
 
             # State dependent bias for hidden layer
+            self.hyper_b1 = tf.keras.models.Sequential(
+                [
+                    tf.keras.layers.Flatten(input_shape=self._state_dim),
+                    tf.keras.layers.Dense(self._qmix_hidden_dim),
+                ]
+            )
+            self.hyper_b2 = tf.keras.models.Sequential(
+                [
+                    tf.keras.layers.Flatten(input_shape=self._state_dim),
+                    tf.keras.layers.Dense(self._qmix_hidden_dim, activation="relu"),
+                    tf.keras.layers.Dense(1),
+                ]
+            )
 
-            # # V(s) instead of a bias for the last layers
+    def forward(
+        self,
+        q_values: Tensor,  # Check type
+        states: Tensor,  # Check type
+    ) -> Tensor:
 
-            # # Forward pass
-            # bs = agent_qs.size(0)
-            # states = tf.reshape(states, shape=self._state_shape)
-            # agent_qs = tf.reshape(agent_qs, shape=(-1, 1))
-            # # First layer
-            # w1 = tf.abs(self.hyper_w_1(states))
+        """Monotonic mixing logic."""
+        if self._mixer == "vdn":
+            # Not sure if this is the way to simply sum in tf.
+            # I'm looking for an equivalent to th.sum(...) in PyTorch.
+            return self._vdn_forward(q_values)
 
-    # # Oxwhirl PyTorch implementation of forward pass
-    # def forward(self, agent_qs, states):
-    #     bs = agent_qs.size(0)
-    #     states = states.reshape(-1, self.state_dim)
-    #     agent_qs = agent_qs.view(-1, 1, self.n_agents)
-    #     # First layer
-    #     w1 = th.abs(self.hyper_w_1(states))
-    #     b1 = self.hyper_b_1(states)
-    #     w1 = w1.view(-1, self.n_agents, self.embed_dim)
-    #     b1 = b1.view(-1, 1, self.embed_dim)
-    #     hidden = F.elu(th.bmm(agent_qs, w1) + b1)
-    #     # Second layer
-    #     w_final = th.abs(self.hyper_w_final(states))
-    #     w_final = w_final.view(-1, self.embed_dim, 1)
-    #     # State-dependent bias
-    #     v = self.V(states).view(-1, 1, 1)
-    #     # Compute final output
-    #     y = th.bmm(hidden, w_final) + v
-    #     # Reshape and return
-    #     q_tot = y.view(bs, -1, 1)
-    #     return q_tot
+        elif self._mixer == "qmix":
+            return self._qmix_forward(q_values, states)
+
+    def _vdn_forward(self, q_values: Tensor) -> Tensor:
+        """Helper function to implement forward pass logic for VDN network."""
+        return tf.math.accumulate_n(q_values)
+
+    def _qmix_forward(
+        self,
+        q_values: Tensor,  # Check type
+        states: Tensor,  # Check type
+    ) -> Tensor:
+        """Helper function to implement forward pass logic for Qmix network."""
+        # Forward pass
+        episode_num = tf.size(q_values).numpy()  # Get int from 0D tensor length
+        states = tf.reshape(states, shape=(-1, self._state_dim))
+        q_values = tf.reshape(q_values, shape=(-1, 1, self._n_agents))
+
+        # First layer
+        w1 = tf.abs(self.hyper_w1(states))
+        b1 = self.hyper_w1(states)
+        w1 = tf.reshape(w1, shape=(-1, self._n_agents, self._qmix_hidden_dim))
+        b1 = tf.reshape(b1, shape=(-1, 1, self._qmix_hidden_dim))
+        hidden = tf.nn.elu(
+            tf.linalg.matmul(q_values, w1) + b1
+        )  # ELU -> Exp. linear unit
+
+        # Second layer
+        w2 = tf.abs(self.hyper_w2(states))
+        b2 = self.hyper_b2(states)
+        w2 = tf.reshape(w2, shape=(-1, self._qmix_hidden_dim, 1))
+        b2 = tf.reshape(b2, shape=(-1, 1, 1))
+
+        q_tot = tf.linalg.matmul(hidden, w2) + b2
+        q_tot = tf.reshape(q_tot, shape=(episode_num, -1, 1))
+        return q_tot
