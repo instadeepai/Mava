@@ -303,7 +303,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         # print("Coords: ", obs_coords, " : ", state_coords)
         # print("Angle: ", obs_ang, " : ", state_ang)
 
-        assert obs_coords[0] == state_coords[0] and obs_coords[1] == state_coords[1] and obs_ang == state_ang
+        # assert obs_coords[0] == state_coords[0] and obs_coords[1] == state_coords[1] and obs_ang == state_ang
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
 

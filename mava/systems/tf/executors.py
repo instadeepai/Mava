@@ -197,9 +197,10 @@ class RecurrentExecutor(core.Executor):
         # Return a numpy array with squeezed out batch dimension.
         return tf2_utils.to_numpy_squeeze(policy_output)
 
-    def observe_first(self, timestep: dm_env.TimeStep) -> None:
+    def observe_first(self, timestep: dm_env.TimeStep,
+                      extras: Dict[str, types.NestedArray] = {"": ()},) -> None:
         if self._adder:
-            self._adder.add_first(timestep)
+            self._adder.add_first(timestep, extras)
 
         # Set the state to None so that we re-initialize at the next policy call.
         self._states = {}
@@ -208,14 +209,14 @@ class RecurrentExecutor(core.Executor):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        extras: Optional[Dict[str, types.NestedArray]] = {},
+        next_extras: Optional[Dict[str, types.NestedArray]] = {},
     ) -> None:
         if not self._adder:
             return
 
         if not self._store_recurrent_state:
-            if extras:
-                self._adder.add(actions, next_timestep, extras)
+            if next_extras:
+                self._adder.add(actions, next_timestep, next_extras)
             else:
                 self._adder.add(actions, next_timestep)
             return
@@ -224,9 +225,9 @@ class RecurrentExecutor(core.Executor):
             agent: tf2_utils.to_numpy_squeeze(prev_state)
             for agent, prev_state in self._prev_states.items()
         }
-        if extras:
-            extras.update({"core_states": numpy_states})
-            self._adder.add(actions, next_timestep, extras)
+        if next_extras:
+            next_extras.update({"core_states": numpy_states})
+            self._adder.add(actions, next_timestep, next_extras)
         else:
             self._adder.add(actions, next_timestep, numpy_states)
 
