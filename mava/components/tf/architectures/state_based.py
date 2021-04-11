@@ -98,24 +98,20 @@ class StateBasedCritic(DecentralisedActorCritic):
     def _get_critic_specs(
         self,
     ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
-        obs_specs_per_type: Dict[str, acme_specs.Array] = {}
         action_specs_per_type: Dict[str, acme_specs.Array] = {}
 
         agents_by_type = self._env_spec.get_agents_by_type()
 
-        # Create one critic per agent. Each critic gets the concatenated
-        # observations/actions of each agent of the same type as the agent.
-
+        # Create one critic per agent. Each critic gets absolute state information of the environment.
+        critic_state_shape = self._env_spec.get_extra_specs()["env_state"].shape
+        critic_obs_spec = tf.TensorSpec(
+                shape=critic_state_shape,
+                dtype=tf.dtypes.float32,)
         for agent_type, agents in agents_by_type.items():
-            critic_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
             critic_act_shape = list(
                 copy.copy(self._agent_specs[agents[0]].actions.shape)
             )
             critic_act_shape.insert(0, len(agents))
-            obs_specs_per_type[agent_type] = tf.TensorSpec(
-                shape=critic_state_shape,
-                dtype=tf.dtypes.float32,
-            )
             action_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=critic_act_shape,
                 dtype=tf.dtypes.float32,
@@ -126,7 +122,7 @@ class StateBasedCritic(DecentralisedActorCritic):
         for agent_key in self._critic_agent_keys:
             agent_type = agent_key.split("_")[0]
             # Get observation and action spec for critic.
-            critic_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+            critic_obs_specs[agent_key] = critic_obs_spec
             critic_act_specs[agent_key] = action_specs_per_type[agent_type]
         return critic_obs_specs, critic_act_specs
 

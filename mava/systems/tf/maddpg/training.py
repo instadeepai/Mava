@@ -231,6 +231,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         o_t_trans: Dict[str, np.ndarray],
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
+        e_tm1: Dict[str, np.ndarray],
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
@@ -287,7 +288,23 @@ class BaseMADDPGTrainer(mava.Trainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data that the agents persist in replay.
-        o_tm1, a_tm1, r_t, d_t, o_t, e_t = inputs.data
+        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+
+        # observation = o_t["player_0"].observation[104].numpy()
+        # state = e_t['env_state'][104].numpy()
+        # obs_norm = 200
+        # obs_coords = observation[1:3] * obs_norm
+        # obs_ang_x, obs_ang_y = observation[3:5]
+        # obs_ang = np.arctan2(obs_ang_y, obs_ang_x)
+        # state_coords = state[5:7] * obs_norm
+        # state_ang_x, state_ang_y = state[9:11]
+        # state_ang = np.arctan2(state_ang_y, state_ang_x)
+        #
+        # print("Coords: ", obs_coords, " : ", state_coords)
+        # print("Angle: ", obs_ang, " : ", state_ang)
+
+        assert obs_coords[0] == state_coords[0] and obs_coords[1] == state_coords[1] and obs_ang == state_ang
+
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
         for agent in self._agents:
@@ -306,7 +323,7 @@ class BaseMADDPGTrainer(mava.Trainer):
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
-                    o_tm1_trans, o_t_trans, a_tm1, a_t, e_t, agent
+                    o_tm1_trans, o_t_trans, a_tm1, a_t, e_tm1, e_t, agent
                 )
 
                 # Critic learning.
@@ -573,6 +590,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         o_t_trans: Dict[str, np.ndarray],
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
+        e_tm1: Dict[str, np.ndarray],
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
@@ -678,15 +696,15 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         o_t_trans: Dict[str, np.ndarray],
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
+        e_tm1: Dict[str, np.ndarray],
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         # State based
-        o_tm1_feed = e_t["s_tm1"]
-        o_t_feed = e_t["s_t"]
+        o_tm1_feed = e_tm1["env_state"]
+        o_t_feed = e_t["env_state"]
         a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
         a_t_feed = tf.stack([x for x in a_t.values()], 1)
-
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     @tf.function
