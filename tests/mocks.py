@@ -18,14 +18,15 @@ from typing import Any, Dict, Iterator, List, Sequence, Union
 import dm_env
 import numpy as np
 from acme import specs, types
+from acme.specs import EnvironmentSpec
 from acme.testing.fakes import Actor as ActorMock
-from acme.testing.fakes import DiscreteEnvironment, _generate_from_spec, _validate_spec
+from acme.testing.fakes import ContinuousEnvironment, DiscreteEnvironment
+from acme.testing.fakes import Environment as MockedEnvironment
+from acme.testing.fakes import _generate_from_spec, _validate_spec
 
 from mava import core
-from mava import specs as mava_specs
 from mava.systems.system import System
 from mava.utils.wrapper_utils import OLT, convert_np_type, parameterized_restart
-from tests.conftest import EnvSpec, EnvType
 
 """Mock Objects for Tests"""
 
@@ -50,13 +51,14 @@ class MockedExecutor(ActorMock, core.Executor):
         return _generate_from_spec(self._spec[agent].actions)
 
     def observe_first(self, timestep: dm_env.TimeStep) -> None:
-        for agent, observation_spec in self._spec.items():
+        for agent, observation_spec in self._specs.items():
             _validate_spec(
-                observation_spec.observations, timestep.observation[agent].observation
+                observation_spec.observations,
+                timestep.observation[agent],
             )
 
     def agent_observe_first(self, agent: str, timestep: dm_env.TimeStep) -> None:
-        _validate_spec(self._spec[agent].observations, timestep.observation.observation)
+        _validate_spec(self._spec[agent].observations, timestep.observation)
 
     def observe(
         self,
@@ -81,9 +83,6 @@ class MockedExecutor(ActorMock, core.Executor):
     ) -> None:
         observation_spec = self._spec[agent]
         _validate_spec(observation_spec.actions, action)
-        # _validate_spec(observation_spec.observations, next_timestep.observation)
-
-        # print(f"herere {observation_spec.rewards}{next_timestep.reward}")
         _validate_spec(observation_spec.rewards, next_timestep.reward)
         _validate_spec(observation_spec.discounts, next_timestep.discount)
 
@@ -93,16 +92,16 @@ class MockedSystem(MockedExecutor, System):
 
     def __init__(
         self,
-        spec: specs.EnvironmentSpec,
+        specs: specs.EnvironmentSpec,
     ):
-        super().__init__(spec)
-        self._spec = spec
+        super().__init__(specs)
+        self._specs = specs
 
         # Initialize Mock Vars
         self.variables: Dict = {}
         network_type = "mlp"
         self.variables[network_type] = {}
-        for agent in self._spec.keys():
+        for agent in self._specs.keys():
             self.variables[network_type][agent] = np.random.rand(5, 5)
 
     def get_variables(self, names: Dict[str, Sequence[str]]) -> Dict[str, List[Any]]:
@@ -114,51 +113,87 @@ class MockedSystem(MockedExecutor, System):
         return variables
 
 
-class MockedMADiscreteEnvironment(DiscreteEnvironment):
-    def __init__(self, env_type: EnvType, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
-        self.agents = ["agent_0", "agent_1", "agent_2"]
-        self.possible_agents = self.agents
-        self.num_agents = len(self.agents)
-        self.env_type = env_type
-
-        multi_agent_specs = {}
-        for agent in self.agents:
-            multi_agent_specs[agent] = self._spec
-        self._specs = multi_agent_specs
-
-    def extra_spec(self) -> Dict:
-        return {}
-
-    def observation_spec(self) -> Dict[str, OLT]:
-        observation_specs = {}
-        for agent in self.possible_agents:
-            observation_specs[agent] = super().observation_spec()
-        return observation_specs
-
-    def reward_spec(self) -> Dict[str, specs.Array]:
-        reward_specs = {}
-        for agent in self.possible_agents:
-            reward_specs[agent] = super().reward_spec()
-        return reward_specs
-
-    def discount_spec(self) -> Dict[str, specs.BoundedArray]:
-        discount_specs = {}
-        for agent in self.possible_agents:
-            discount_specs[agent] = super().discount_spec()
-        return discount_specs
+"""Function returns a Multi-agent env, of type base_class.
+base_class: DiscreteEnvironment or ContinuousEnvironment. """
 
 
-class SequentialMADiscreteEnvironment(MockedMADiscreteEnvironment):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+def get_ma_environment(
+    base_class: Union[DiscreteEnvironment, ContinuousEnvironment]
+) -> Any:
+    class MockedMAEnvironment(base_class):  # type: ignore
+        """Mocked Multi-Agent Environment.
+        This simply creates multiple agents, with a spec per agent
+        and updates the spec functions of base_class."""
+
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            base_class.__init__(self, *args, **kwargs)
+            self.agents = ["agent_0", "agent_1", "agent_2"]
+            self.agents = self.agents
+            self.num_agents = len(self.agents)
+
+            multi_agent_specs = {}
+            for agent in self.agents:
+                spec = self._spec
+                actions = spec.actions
+                rewards = spec.rewards
+                discounts = spec.discounts
+
+                # Observation spec needs to be an OLT
+                ma_observation_spec = self.observation_spec()
+                multi_agent_specs[agent] = EnvironmentSpec(
+                    observations=ma_observation_spec,
+                    actions=actions,
+                    rewards=rewards,
+                    discounts=discounts,
+                )
+
+            self._specs = multi_agent_specs
+
+        def extra_spec(self) -> Dict:
+            return {}
+
+        def reward_spec(self) -> Dict[str, specs.Array]:
+            reward_specs = {}
+            for agent in self.agents:
+                reward_specs[agent] = super().reward_spec()
+            return reward_specs
+
+        def discount_spec(self) -> Dict[str, specs.BoundedArray]:
+            discount_specs = {}
+            for agent in self.agents:
+                discount_specs[agent] = super().discount_spec()
+            return discount_specs
+
+    return MockedMAEnvironment
+
+
+"""Class that updates functions for sequential environment.
+This class should be inherited with a MockedMAEnvironment. """
+
+
+class SequentialEnvironment(MockedEnvironment):
+    def __init__(self, agents: Dict, specs: EnvironmentSpec) -> None:
+        self.agents = agents
+        self._specs = specs
         self.agent_selection = self.agents[0]
 
     def agent_iter(self, n_agents: int) -> Iterator[str]:
         return iter(self.agents)
 
-    def _generate_fake_observation(self) -> types.NestedArray:
-        return _generate_from_spec(self._specs[self.agent_selection].observations)
+    def observation_spec(self) -> OLT:
+
+        if hasattr(self, "agent_selection"):
+            active_agent = self.agent_selection
+        else:
+            active_agent = self.agents[0]
+        return OLT(
+            observation=super().observation_spec(),
+            legal_actions=self.action_spec()[active_agent],
+            terminal=specs.Array(
+                (1,),
+                np.float32,
+            ),
+        )
 
     def _generate_fake_reward(self) -> types.NestedArray:
         return _generate_from_spec(self._specs[self.agent_selection].rewards)
@@ -166,81 +201,105 @@ class SequentialMADiscreteEnvironment(MockedMADiscreteEnvironment):
     def _generate_fake_discount(self) -> types.NestedArray:
         return _generate_from_spec(self._specs[self.agent_selection].discounts)
 
-    def action_spec(self) -> Dict[str, specs.DiscreteArray]:
+    def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
         action_specs = {}
-        for agent in self.possible_agents:
-            action_specs[agent] = super(DiscreteEnvironment, self).action_spec()
+        for agent in self.agents:
+            action_specs[agent] = super().action_spec()
         return action_specs
 
     def reset(self) -> dm_env.TimeStep:
         observation = self._generate_fake_observation()
-        agent = self.agent_selection
         legals = np.ones(
-            self.action_spec()[agent].shape,
-            np.float32,
+            self.action_spec()[self.agent_selection].shape,
+            self.action_spec()[self.agent_selection].dtype,
         )
 
-        rewards = convert_np_type("float32", 0)
-        discounts = convert_np_type("float32", 1)
-        done = False
-        observation = OLT(
+        discount = convert_np_type("float32", 1)  # Not used in pettingzoo
+        reward = convert_np_type("float32", 0)
+        observation_olt = OLT(
             observation=observation,
             legal_actions=legals,
-            terminal=np.asarray([done], dtype=np.float32),
+            terminal=np.asarray([0], dtype=np.float32),
         )
         self._step = 1
-        return parameterized_restart(rewards, discounts, observation)
+        return parameterized_restart(
+            reward=reward, discount=discount, observation=observation_olt
+        )
 
 
-class ParallelMADiscreteEnvironment(MockedMADiscreteEnvironment):
-    def __init__(self, *args: Any, **kwargs: Any):
-        super().__init__(*args, **kwargs)
+"""Class that updates functions for parallel environment.
+This class should be inherited with a MockedMAEnvironment. """
 
-    def action_spec(self) -> Dict[str, specs.DiscreteArray]:
-        return {
-            agent: super(DiscreteEnvironment, self).action_spec()
-            for agent in self.possible_agents
-        }
 
-    def reset(self) -> dm_env.TimeStep:
-        observations: Dict[str, OLT] = {}
-        dones = {agent: False for agent in self.possible_agents}
-        for agent in self.possible_agents:
-            observation = self._generate_fake_observation()
+class ParallelEnvironment(MockedEnvironment):
+    def __init__(self, agents: Dict, specs: EnvironmentSpec) -> None:
+        self.agents = agents
+        self._specs = specs
+
+    def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
+        action_spec = {}
+        for agent in self.agents:
+            action_spec[agent] = super().action_spec()
+        return action_spec
+
+    def observation_spec(self) -> Dict[str, OLT]:
+        observation_specs = {}
+        for agent in self.agents:
+            legals = self.action_spec()[agent]
+            terminal = specs.Array(
+                (1,),
+                np.float32,
+            )
+
+            observation_specs[agent] = OLT(
+                observation=super().observation_spec(),
+                legal_actions=legals,
+                terminal=terminal,
+            )
+        return observation_specs
+
+    def _generate_fake_observation(self) -> Dict[str, OLT]:
+        observations = {}
+        for agent in self.agents:
+            fake_observation = _generate_from_spec(
+                self.observation_spec()[agent].observation
+            )
             legals = np.ones(
                 self.action_spec()[agent].shape,
-                dtype=np.float32,
+                self.action_spec()[agent].dtype,
             )
+
+            terminal = np.asarray([0], dtype=np.float32)
             observations[agent] = OLT(
-                observation=observation,
-                legal_actions=legals,
-                terminal=np.asarray([dones[agent]], dtype=np.float32),
+                observation=fake_observation, legal_actions=legals, terminal=terminal
             )
-        rewards = {
-            agent: convert_np_type("float32", 0) for agent in self.possible_agents
-        }
-        discounts = {
-            agent: convert_np_type("float32", 1) for agent in self.possible_agents
-        }
+        return observations
+
+    def reset(self) -> dm_env.TimeStep:
+        observations: Dict[str, Dict[str, OLT]] = {}
+        for agent in self.agents:
+            observation = self._generate_fake_observation()
+            observations[agent] = observation
+        rewards = {agent: convert_np_type("float32", 0) for agent in self.agents}
+        discounts = {agent: convert_np_type("float32", 1) for agent in self.agents}
 
         self._step = 1
         return parameterized_restart(rewards, discounts, observations)
 
     def step(self, actions: Dict[str, Union[float, int]]) -> dm_env.TimeStep:
+
         # Return a reset timestep if we haven't touched the environment yet.
         if not self._step:
             return self.reset()
 
         for agent, action in actions.items():
-            _validate_spec(self._spec.actions, action)
+            _validate_spec(self._specs[agent].actions, action)
 
         observation = {
-            agent: self._generate_fake_observation() for agent in self.possible_agents
+            agent: self._generate_fake_observation() for agent in self.agents
         }
-        reward = {agent: self._generate_fake_reward() for agent in self.possible_agents}
-        discount = {
-            agent: self._generate_fake_discount() for agent in self.possible_agents
-        }
+        reward = {agent: self._generate_fake_reward() for agent in self.agents}
+        discount = {agent: self._generate_fake_discount() for agent in self.agents}
 
         if self._episode_length and (self._step == self._episode_length):
             self._step = 0
@@ -254,35 +313,67 @@ class ParallelMADiscreteEnvironment(MockedMADiscreteEnvironment):
             )
 
 
-def get_mocked_env(
-    env_spec: EnvSpec,
-) -> Union[ParallelMADiscreteEnvironment, SequentialMADiscreteEnvironment]:
-    env = None
-    if "discrete" in env_spec.env_name.lower():
-        if env_spec.env_type == EnvType.Parallel:
-            env = ParallelMADiscreteEnvironment(
-                num_actions=18,
-                num_observations=2,
-                obs_shape=(84, 84, 4),
-                obs_dtype=np.float32,
-                episode_length=10,
-                env_type=env_spec.env_type,
-            )
-        else:
-            env = SequentialMADiscreteEnvironment(
-                num_actions=18,
-                num_observations=2,
-                obs_shape=(84, 84, 4),
-                obs_dtype=np.float32,
-                episode_length=10,
-                env_type=env_spec.env_type,
-            )
-    # elif "continous" in env_spec.env_name.lower():
-    #     return None
-    else:
-        raise Exception("Env_spec is not valid.")
-    return env
+"""Mocked Multi-Agent Discrete Environment"""
 
 
-def get_mocked_env_spec(environment: dm_env.Environment) -> dm_env.Environment:
-    return mava_specs.MAEnvironmentSpec(environment)
+DiscreteMAEnvironment = get_ma_environment(DiscreteEnvironment)
+ContinuousMAEnvironment = get_ma_environment(ContinuousEnvironment)
+
+
+class MockedMADiscreteEnvironment(
+    DiscreteMAEnvironment, DiscreteEnvironment  # type: ignore
+):
+    def __init__(self, *args: Any, **kwargs: Any):
+        DiscreteMAEnvironment.__init__(self, *args, **kwargs)
+
+
+"""Mocked Multi-Agent Continuous Environment"""
+
+
+class MockedMAContinuousEnvironment(
+    ContinuousMAEnvironment, ContinuousEnvironment  # type: ignore
+):
+    def __init__(self, *args: Any, **kwargs: Any):
+        ContinuousMAEnvironment.__init__(self, *args, **kwargs)
+
+
+"""Mocked Multi-Agent Parallel Discrete Environment"""
+
+
+class ParallelMADiscreteEnvironment(ParallelEnvironment, MockedMADiscreteEnvironment):
+    def __init__(self, *args: Any, **kwargs: Any):
+        MockedMADiscreteEnvironment.__init__(self, *args, **kwargs)
+        ParallelEnvironment.__init__(self, self.agents, self._specs)
+
+
+"""Mocked Multi-Agent Sequential Discrete Environment"""
+
+
+class SequentialMADiscreteEnvironment(
+    SequentialEnvironment, MockedMADiscreteEnvironment
+):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        MockedMADiscreteEnvironment.__init__(self, *args, **kwargs)
+        SequentialEnvironment.__init__(self, self.agents, self._specs)
+
+
+"""Mocked Multi-Agent Parallel Continuous Environment"""
+
+
+class ParallelMAContinuousEnvironment(
+    ParallelEnvironment, MockedMAContinuousEnvironment
+):
+    def __init__(self, *args: Any, **kwargs: Any):
+        MockedMAContinuousEnvironment.__init__(self, *args, **kwargs)
+        ParallelEnvironment.__init__(self, self.agents, self._specs)
+
+
+"""Mocked Multi-Agent Sequential Continuous Environment"""
+
+
+class SequentialMAContinuousEnvironment(
+    SequentialEnvironment, MockedMAContinuousEnvironment
+):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        MockedMAContinuousEnvironment.__init__(self, *args, **kwargs)
+        SequentialEnvironment.__init__(self, self.agents, self._specs)
