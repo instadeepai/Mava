@@ -700,7 +700,6 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
-        # TODO: This copy.copy might be breaking gradient flows! Is a copy allowed?
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
         tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
