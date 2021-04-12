@@ -14,21 +14,29 @@
 # limitations under the License.
 
 # TODO (StJohn): complete class for transformed mixing
-
+# https://github.com/oxwhirl/wqmix/blob/master/src/modules/mixers/qtran.py
 """Mixing for multi-agent RL systems"""
 
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
 
 
-class TransformedMixing(BaseMixingModule):
+class QTranBase(BaseMixingModule):
     """Multi-agent mixing architecture."""
 
-    def __init__(
-        self,
-        architecture: BaseArchitecture,
-    ) -> None:
+    def __init__(self, architecture: BaseArchitecture) -> None:
+        """Initializes the mixer."""
+        super(QTranBase, self).__init__()
         self._architecture = architecture
 
-    def some_mixing_function(self) -> None:
+    def forward(self) -> None:
+        """Perform some mixing logic"""
+
+
+class QTranAlt(BaseMixingModule):
+    def __init__(self, architecture: BaseArchitecture) -> None:
+        super(QTranAlt, self).__init__()
+        self._architecture = architecture
+
+    def forward(self) -> None:
         """Perform some mixing logic"""
