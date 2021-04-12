@@ -141,8 +141,10 @@ def main(_: Any) -> None:
     system_networks = make_networks(environment_spec)
 
     # create tf loggers
-    train_logger = TFSummaryLogger("logs/train_loop")
-    eval_logger = TFSummaryLogger("logs/eval_loop")
+    logs_dir = "logs"
+    system_logger = TFSummaryLogger(f"{logs_dir}/system")
+    train_logger = TFSummaryLogger(f"{logs_dir}/train_loop")
+    eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
 
     # Construct the agent.
     system = maddpg.MADDPG(
@@ -153,6 +155,7 @@ def main(_: Any) -> None:
             "observations"
         ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
+        logger=system_logger,
     )
 
     # Create the environment loop used for training.

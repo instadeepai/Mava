@@ -369,7 +369,13 @@ class MADDPG(system.System):
         executor = builder.make_executor(networks["behaviors"], adder)
 
         # The learner updates the parameters (and initializes them).
-        trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
+        trainer = builder.make_trainer(
+            networks=networks,
+            dataset=dataset,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+        )
 
         super().__init__(
             executor=executor,
