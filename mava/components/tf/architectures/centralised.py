@@ -23,10 +23,55 @@ import tensorflow as tf
 from acme import specs as acme_specs
 
 from mava import specs as mava_specs
-from mava.components.tf.architectures.decentralised import DecentralisedActorCritic
+from mava.components.tf.architectures.decentralised import (
+    DecentralisedActor,
+    DecentralisedActorCritic,
+)
 
 
-class CentralisedActorCritic(DecentralisedActorCritic):
+class CentralisedActor(DecentralisedActor):
+    """Centralised multi-agent actor architecture."""
+
+    def __init__(
+        self,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        policy_networks: Dict[str, snt.Module],
+        observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
+        shared_weights: bool = True,
+    ):
+        super().__init__(
+            environment_spec=environment_spec,
+            policy_networks=policy_networks,
+            observation_networks=observation_networks,
+            behavior_networks=behavior_networks,
+            shared_weights=shared_weights,
+        )
+
+    def _get_actor_specs(
+        self,
+    ) -> Dict[str, acme_specs.Array]:
+        obs_specs_per_type: Dict[str, acme_specs.Array] = {}
+
+        agents_by_type = self._env_spec.get_agents_by_type()
+
+        for agent_type, agents in agents_by_type.items():
+            actor_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            actor_obs_shape.insert(0, len(agents))
+            obs_specs_per_type[agent_type] = tf.TensorSpec(
+                shape=actor_obs_shape,
+                dtype=tf.dtypes.float32,
+            )
+
+        actor_obs_specs = {}
+        for agent_key in self._actor_agent_keys:
+            agent_type = agent_key.split("_")[0]
+            # Get observation and action spec for critic.
+            actor_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+        return actor_obs_specs
+
+
+class CentralisedCritic(DecentralisedActorCritic):
     """Centralised multi-agent actor critic architecture."""
 
     def __init__(
@@ -36,7 +81,7 @@ class CentralisedActorCritic(DecentralisedActorCritic):
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
@@ -55,13 +100,6 @@ class CentralisedActorCritic(DecentralisedActorCritic):
 
         agents_by_type = self._env_spec.get_agents_by_type()
 
-        # Create one critic per agent. Each critic gets the concatenated
-        # observations/actions of each agent of the same type as the agent.
-        # TODO (dries): Add the option of directly getting state information
-        #  from the environment.
-        # TODO (dries): Make the critic more general and allow the critic network to get
-        #  observations/actions inputs of agents from different types as well.
-        #  Maybe use a multiplexer to do so?
         for agent_type, agents in agents_by_type.items():
             critic_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
             critic_obs_shape.insert(0, len(agents))
@@ -86,3 +124,29 @@ class CentralisedActorCritic(DecentralisedActorCritic):
             critic_obs_specs[agent_key] = obs_specs_per_type[agent_type]
             critic_act_specs[agent_key] = action_specs_per_type[agent_type]
         return critic_obs_specs, critic_act_specs
+
+
+# TODO (Arnu): remove mypy type ignore once we can handle type checking for
+# nested/multiple inheritance
+class CentralisedActorCritic(CentralisedActor, CentralisedCritic):  # type: ignore
+    """Centralised multi-agent actor critic architecture."""
+
+    def __init__(
+        self,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
+        shared_weights: bool = True,
+    ):
+
+        CentralisedCritic.__init__(
+            self,
+            environment_spec=environment_spec,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            observation_networks=observation_networks,
+            behavior_networks=behavior_networks,
+            shared_weights=shared_weights,
+        )
