@@ -15,29 +15,35 @@
 
 import pytest
 
-from tests.conftest import EnvSpec, EnvType, Helpers
-from tests.mocks import MockedSystem, get_mocked_env
+from tests.conftest import EnvSpec, EnvType, Helpers, MockedEnvironments
+from tests.mocks import MockedSystem
 
 
 @pytest.mark.parametrize(
     "env_spec",
     [
-        EnvSpec("mock_discrete", EnvType.Parallel),
-        EnvSpec("mock_discrete", EnvType.Sequential),
-        # EnvSpec("mock_continous", EnvType.Parallel),
-        # EnvSpec("mock_continous", EnvType.Sequential),
+        # Mocked environments
+        EnvSpec(MockedEnvironments.Mocked_Dicrete, EnvType.Parallel),
+        EnvSpec(MockedEnvironments.Mocked_Dicrete, EnvType.Sequential),
+        EnvSpec(MockedEnvironments.Mocked_Continous, EnvType.Parallel),
+        EnvSpec(MockedEnvironments.Mocked_Continous, EnvType.Sequential),
+        # Real Environments
+        EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Parallel),
+        EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
+        EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Parallel),
+        EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Sequential),
     ],
 )
 class TestEnvironmentLoop:
     # Test that we can load a env loop and that it contains
     #   an env, executor, counter, logger and should_update.
     def test_initialize_env_loop(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        wrapped_env = get_mocked_env(env_spec)
+        wrapped_env, specs = helpers.get_wrapped_env(env_spec)
         env_loop_func = helpers.get_env_loop(env_spec)
 
         env_loop = env_loop_func(
             wrapped_env,
-            MockedSystem(wrapped_env._specs),
+            MockedSystem(specs),
         )
 
         props_which_should_not_be_none = [
@@ -52,15 +58,14 @@ class TestEnvironmentLoop:
             props_which_should_not_be_none
         ), "Failed to initialize env loop."
 
-    # # Test that we can run an episode and that the episode returns valid data.
+    # Test that we can run an episode and that the episode returns valid data.
     def test_valid_episode(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        wrapped_env = get_mocked_env(env_spec)
+        wrapped_env, specs = helpers.get_wrapped_env(env_spec)
         env_loop_func = helpers.get_env_loop(env_spec)
 
-        # pprint.pprint(vars(wrapped_env))
         env_loop = env_loop_func(
             wrapped_env,
-            MockedSystem(wrapped_env._specs),
+            MockedSystem(specs),
         )
 
         result = env_loop.run_episode()
