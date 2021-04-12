@@ -18,11 +18,11 @@
 #   - [] Generalise Qmixing to allow for different activations,
 #          hypernetwork structures etc.
 #   - [] Decide on whether to accept an 'args' term or receive each arg individually.
+#   - [] Think about how to default values.
 
 # NOTE (StJohn): I'm still thinking about the structure in general. One of the biggest
 # design choices at the moment is how to structure what is passed to the __init__ when
-# instantiating vs what is passed to the forward functions. The distinction is due to
-# the differences in what VDN and Qmix need.
+# instantiating vs what is passed to the forward functions.
 
 # Code inspired by PyMARL framework implementation
 # https://github.com/oxwhirl/pymarl/blob/master/src/modules/mixers/qmix.py
@@ -31,6 +31,7 @@
 
 from typing import Tuple
 
+import numpy as np
 import tensorflow as tf
 from tensorflow import Tensor
 
@@ -39,112 +40,96 @@ from mava.components.tf.modules.mixing import BaseMixingModule
 
 
 class MonotonicMixing(BaseMixingModule):
-    """Multi-agent mixing architecture."""
+    """Multi-agent monotonic mixing architecture.
+    This is the component which can be used to add monotonic mixing to an underlying
+    agent architecture. It currently supports generalised monotonic mixing using
+    hypernetworks (1 or 2 layers) for control of decomposition parameters (QMix)."""
 
     def __init__(
         self,
         architecture: BaseArchitecture,
-        state_dim: int,
-        hypernet_embed: Tuple,
+        state_shape: Tuple,
         n_agents: int,
-        hypernet_hidden_dim: int,
-        num_hypernet_layers: int,
-        qmix_hidden_dim: Tuple,
-        mixer: str = "vdn",
+        qmix_hidden_dim: int,
+        num_hypernet_layers: int = 2,
+        hypernet_hidden_dim: int = 64,
     ) -> None:
         """Initializes the mixer.
         Args:
             architecture: the BaseArchitecture used.
-            mixer: the type of monotonic mixing.
+            state_shape: The state shape as defined by the environment.
+            n_agents: The number of agents (i.e. Q-values) to mix.
+            qmix_hidden_dim: Mixing layers hidden dimensions.
+            num_hypernet_layers: Number of hypernetwork layers. Currently 1 or 2.
+            hypernet_hidden_dim: The number of nodes in the hypernetwork hidden
+                layer. Relevant for num_hypernet_layers > 1.
         """
+        super(MonotonicMixing, self).__init__()
+
         self._architecture = architecture
-        self._state_dim = state_dim  # Defined by the environment
-        self._hypernet_embed = hypernet_embed
+
+        self._state_dim = int(np.prod(state_shape))  # Defined by the environment
         self._n_agents = n_agents
-        self._hypernet_hidden_dim = hypernet_hidden_dim
-        self._num_hypernet_layers = num_hypernet_layers
         self._qmix_hidden_dim = qmix_hidden_dim
-        self._mixer = mixer.lower()  # Ensure we accept different cases vDn qMiX etc
+        self._num_hypernet_layers = num_hypernet_layers
+        self._hypernet_hidden_dim = hypernet_hidden_dim
 
         # Set up hypernetwork configuration
-        if self._mixer == "qmix":
-            if num_hypernet_layers == 1:
-                self.hyper_w1 = tf.keras.models.Sequential(
-                    [
-                        tf.keras.layers.Flatten(input_shape=self._state_dim),
-                        tf.keras.layers.Dense(self._qmix_hidden_dim * self._n_agents),
-                    ]
-                )
-                self.hyper_w2 = tf.keras.models.Sequential(
-                    [
-                        tf.keras.layers.Flatten(input_shape=self._state_dim),
-                        tf.keras.layers.Dense(self._qmix_hidden_dim),
-                    ]
-                )
-            elif num_hypernet_layers == 2:
-                self.hyper_w1 = tf.keras.models.Sequential(
-                    [
-                        tf.keras.layers.Flatten(input_shape=self._state_dim),
-                        tf.keras.layers.Dense(
-                            self._hypernet_hidden_dim, activation="relu"
-                        ),
-                        tf.keras.layers.Dense(self._qmix_hidden_dim * self._n_agents),
-                    ]
-                )
-                self.hyper_w2 = tf.keras.models.Sequential(
-                    [
-                        tf.keras.layers.Flatten(input_shape=self._state_dim),
-                        tf.keras.layers.Dense(
-                            self._hypernet_hidden_dim, activation="relu"
-                        ),
-                        tf.keras.layers.Dense(self._qmix_hidden_dim),
-                    ]
-                )
-            elif num_hypernet_layers > 2:
-                raise Exception("Sorry >2 hypernet layers is not implemented!")
-            else:
-                raise Exception("Error setting number of hypernet layers.")
-
-            # State dependent bias for hidden layer
-            self.hyper_b1 = tf.keras.models.Sequential(
+        if self._num_hypernet_layers == 1:
+            self.hyper_w1 = tf.keras.models.Sequential(
+                [
+                    tf.keras.layers.Flatten(input_shape=self._state_dim),
+                    tf.keras.layers.Dense(self._qmix_hidden_dim * self._n_agents),
+                ]
+            )
+            self.hyper_w2 = tf.keras.models.Sequential(
                 [
                     tf.keras.layers.Flatten(input_shape=self._state_dim),
                     tf.keras.layers.Dense(self._qmix_hidden_dim),
                 ]
             )
-            self.hyper_b2 = tf.keras.models.Sequential(
+        elif self._num_hypernet_layers == 2:
+            self.hyper_w1 = tf.keras.models.Sequential(
                 [
                     tf.keras.layers.Flatten(input_shape=self._state_dim),
-                    tf.keras.layers.Dense(self._qmix_hidden_dim, activation="relu"),
-                    tf.keras.layers.Dense(1),
+                    tf.keras.layers.Dense(self._hypernet_hidden_dim, activation="relu"),
+                    tf.keras.layers.Dense(self._qmix_hidden_dim * self._n_agents),
                 ]
             )
+            self.hyper_w2 = tf.keras.models.Sequential(
+                [
+                    tf.keras.layers.Flatten(input_shape=self._state_dim),
+                    tf.keras.layers.Dense(self._hypernet_hidden_dim, activation="relu"),
+                    tf.keras.layers.Dense(self._qmix_hidden_dim),
+                ]
+            )
+        elif self._num_hypernet_layers > 2:
+            raise Exception("Sorry >2 hypernet layers is not implemented!")
+        else:
+            raise Exception("Error setting number of hypernet layers.")
+
+        # State dependent bias for hidden layer
+        self.hyper_b1 = tf.keras.models.Sequential(
+            [
+                tf.keras.layers.Flatten(input_shape=self._state_dim),
+                tf.keras.layers.Dense(self._qmix_hidden_dim),
+            ]
+        )
+        self.hyper_b2 = tf.keras.models.Sequential(
+            [
+                tf.keras.layers.Flatten(input_shape=self._state_dim),
+                tf.keras.layers.Dense(self._qmix_hidden_dim, activation="relu"),
+                tf.keras.layers.Dense(1),
+            ]
+        )
 
     def forward(
         self,
         q_values: Tensor,  # Check type
         states: Tensor,  # Check type
     ) -> Tensor:
-
         """Monotonic mixing logic."""
-        if self._mixer == "vdn":
-            # Not sure if this is the way to simply sum in tf.
-            # I'm looking for an equivalent to th.sum(...) in PyTorch.
-            return self._vdn_forward(q_values)
 
-        elif self._mixer == "qmix":
-            return self._qmix_forward(q_values, states)
-
-    def _vdn_forward(self, q_values: Tensor) -> Tensor:
-        """Helper function to implement forward pass logic for VDN network."""
-        return tf.math.accumulate_n(q_values)
-
-    def _qmix_forward(
-        self,
-        q_values: Tensor,  # Check type
-        states: Tensor,  # Check type
-    ) -> Tensor:
-        """Helper function to implement forward pass logic for Qmix network."""
         # Forward pass
         episode_num = tf.size(q_values).numpy()  # Get int from 0D tensor length
         states = tf.reshape(states, shape=(-1, self._state_dim))
