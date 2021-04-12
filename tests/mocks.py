@@ -36,6 +36,7 @@ class MockedExecutor(ActorMock, core.Executor):
 
     def __init__(self, spec: specs.EnvironmentSpec):
         super().__init__(spec)
+        self._specs = spec
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
