@@ -81,11 +81,12 @@ class FeedForwardExecutor(core.Executor):
         if self._adder:
             self._adder.add_first(timestep)
 
+    # TODO(Kale-ab) - This is temp. This will be changed when doing seq adder.
     def agent_observe_first(self, agent: str, timestep: dm_env.TimeStep) -> None:
         if self._adder:
             self._adder.add_first({agent: timestep})
 
-    # Sequential agent observe - We need to pass the agent info for sampling later.
+    # TODO(Kale-ab) - This is temp. This will be changed when doing seq adder.
     def agent_observe(
         self,
         agent: str,
