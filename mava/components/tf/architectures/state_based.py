@@ -102,11 +102,13 @@ class StateBasedCritic(DecentralisedActorCritic):
 
         agents_by_type = self._env_spec.get_agents_by_type()
 
-        # Create one critic per agent. Each critic gets absolute state information of the environment.
+        # Create one critic per agent. Each critic gets
+        # absolute state information of the environment.
         critic_state_shape = self._env_spec.get_extra_specs()["env_state"].shape
         critic_obs_spec = tf.TensorSpec(
-                shape=critic_state_shape,
-                dtype=tf.dtypes.float32,)
+            shape=critic_state_shape,
+            dtype=tf.dtypes.float32,
+        )
         for agent_type, agents in agents_by_type.items():
             critic_act_shape = list(
                 copy.copy(self._agent_specs[agents[0]].actions.shape)

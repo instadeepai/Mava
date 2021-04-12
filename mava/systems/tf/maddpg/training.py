@@ -199,9 +199,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         o_t = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            o_tm1[agent] = self._observation_networks[agent_key](
-                obs[agent].observation
-            )
+            o_tm1[agent] = self._observation_networks[agent_key](obs[agent].observation)
             o_t[agent] = self._target_observation_networks[agent_key](
                 next_obs[agent].observation
             )
@@ -282,7 +280,8 @@ class BaseMADDPGTrainer(mava.Trainer):
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
-        # e_tm1 [Optional] = extra data for timestep t-1 that the agents persist in replay.
+        # e_tm1 [Optional] = extra data for timestep t-1
+        # that the agents persist in replay.
         # r_t = dictionary of rewards or rewards sequences
         #   (if using N step transitions) ensuing from actions a_tm1
         # d_t = environment discount ensuing from actions a_tm1.
@@ -309,8 +308,13 @@ class BaseMADDPGTrainer(mava.Trainer):
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
-                    o_tm1_trans=o_tm1_trans, o_t_trans=o_t_trans, a_tm1=a_tm1, a_t=a_t, e_tm1=e_tm1, e_t=e_t,
-                    agent=agent
+                    o_tm1_trans=o_tm1_trans,
+                    o_t_trans=o_t_trans,
+                    a_tm1=a_tm1,
+                    a_t=a_t,
+                    e_tm1=e_tm1,
+                    e_t=e_t,
+                    agent=agent,
                 )
 
                 # Critic learning.

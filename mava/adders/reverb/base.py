@@ -125,7 +125,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         # The state of the adder is captured by a buffer of `buffer_size` steps
         # (generally SAR tuples) and one additional dangling observation.
         self._buffer: Deque = collections.deque(maxlen=buffer_size)
-        self._next_extras = None
+        self._next_extras: Dict[str, types.NestedArray] = {}
         self._next_observations = None
         self._start_of_episode = False
 
@@ -163,9 +163,11 @@ class ReverbParallelAdder(base.ParallelAdder):
         self._buffer.clear()
         self._next_observations = None
 
-    def add_first(self, timestep: dm_env.TimeStep,
-                  extras: Dict[str, types.NestedArray] = {"": ()},
-                  ) -> None:
+    def add_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Dict[str, types.NestedArray] = {"": ()},
+    ) -> None:
         """Record the first observation of a trajectory."""
         if not timestep.first():
             raise ValueError(

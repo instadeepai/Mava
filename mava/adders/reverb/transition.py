@@ -127,7 +127,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         next_extras = self._next_extras
         self._discounts = {agent: self._discount for agent in observations.keys()}
 
-
         # Give the same tree structure to the n-step return accumulator,
         # n-step discount accumulator, and self.discount, so that they can be
         # iterated in parallel using tree.map_structure.
