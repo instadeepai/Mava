@@ -90,7 +90,9 @@ class FeedForwardExecutor(core.Executor):
     # TODO(Kale-ab) - This is temp. This will be changed when doing seq adder.
     def agent_observe_first(self, agent: str, timestep: dm_env.TimeStep) -> None:
         if self._adder:
-            self._adder.add_first({agent: timestep})
+            extras = {}
+            extras["agent_id"] = agent
+            self._adder.add_first(timestep, extras)
 
     # TODO(Kale-ab) - This is temp. This will be changed when doing seq adder.
     def agent_observe(
