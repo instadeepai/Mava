@@ -44,9 +44,9 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         agent = self._environment.agent_selection
         observation = self._convert_observation(agent, observe, done)
 
-        discount = convert_np_type("float32", 1)  # Not used in pettingzoo
+        self._discount = convert_np_type("float32", 1)  # Not used in pettingzoo
         reward = convert_np_type("float32", 0)
-        return parameterized_restart(reward, discount, observation)
+        return parameterized_restart(reward, self._discount, observation)
 
     def step(self, action: Union[int, float]) -> dm_env.TimeStep:
         """Steps the environment."""
@@ -180,10 +180,10 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
             agent: convert_np_type(rewards_spec[agent].dtype, 0)
             for agent in self.possible_agents
         }
-        discounts = {
+        self._discounts = {
             agent: convert_np_type("float32", 1) for agent in self.possible_agents
         }
-        return parameterized_restart(rewards, discounts, observations)
+        return parameterized_restart(rewards, self._discounts, observations)
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
