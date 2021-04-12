@@ -4,7 +4,7 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
 from mava.utils.wrapper_utils import convert_np_type
-from tests.conftest import EnvSpec, EnvType, Helpers
+from tests.conftest import EnvSpec, EnvType, Helpers, NPZ_EnvName
 
 """
 TestEnvWrapper is a general purpose test class that runs tests for environment wrappers.
@@ -25,6 +25,7 @@ This is meant to flexibily test various environments wrappers.
         EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
         EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Parallel),
         EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Sequential),
+        EnvSpec(NPZ_EnvName.FLATLAND, EnvType.Parallel),
     ],
 )
 class TestEnvWrapper:

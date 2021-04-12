@@ -14,13 +14,16 @@
 # limitations under the License.
 
 """Wraps a Flatland MARL environment to be used as a dm_env environment."""
+from functools import partial
 from typing import Any, Callable, Dict, NamedTuple, Tuple, Union
 
 import dm_env
 import numpy as np
 from acme import specs, types
+from acme.wrappers.gym_wrapper import _convert_to_spec
 from flatland.envs.observations import GlobalObsForRailEnv, Node, TreeObsForRailEnv
 from flatland.envs.rail_env import RailEnv
+from gym.spaces import Box, Discrete
 
 
 class OLT(NamedTuple):
@@ -67,15 +70,21 @@ class FlatlandEnvWrapper(dm_env.Environment):
         ] = None,
     ):
         self._environment = environment
+        self._environment.aec_env = self
+
+        self.agents = [f"train_{i}" for i in range(self.num_agents)]
+        self.possible_agents = self.agents[:]
+
         self._reset_next_step = True
         self._step_type = dm_env.StepType.FIRST
         self.num_actions = 5
+        self.action_spaces = {agent: Discrete(5) for agent in self.agents}
 
         # preprocessor must be for observation builders other than global obs
         # treeobs builders would use the default preprocessor if none is
         # supplied
         self.preprocessor: Callable[
-            [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
+            [Dict[int, Any]], Dict[int, Any]
         ] = self._obtain_preprocessor(preprocessor)
 
         # observation space:
@@ -84,46 +93,57 @@ class FlatlandEnvWrapper(dm_env.Environment):
         # have the same observation space.
         # Infer observation space based on returned observation
         obs, _ = self._environment.reset()
-        obs_spec = _infer_observation_spec(obs)
-        agent_info_spec = _agent_info_spec()
-        self.obs_spec = tuple((obs_spec, agent_info_spec))
+        obs = self.preprocessor(obs)
+        self.observation_spaces = {
+            f"train_{i}": _infer_observation_space(ob) for i, ob in obs.items()
+        }
         self.act_spec = specs.DiscreteArray(num_values=self.num_actions)
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
         self._reset_next_step = False
+        self.agents = self.possible_agents[:]
         self._discounts = {
-            agent: np.dtype("float32").type(1.0)
-            for agent in self._environment.number_of_agents
+            agent: np.dtype("float32").type(1.0) for agent in self.agents
         }
         observe, info = self._environment.reset()
-        observations = self._convert_observations(observe, info)
+        observations = self._create_observations(observe, info, self._environment.dones)
         return dm_env.restart(observations)
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
+        self.pre_step()
+
         if self._reset_next_step:
             return self.reset()
 
         actions_ = {int(k.split("_")[-1]): int(v) for k, v in actions.items()}
+        self.agents = [
+            agent
+            for agent in self.agents
+            if not self._environment.dones[int(agent.split("_")[-1])]
+        ]
+
         observations, rewards, dones, infos = self._environment.step(actions_)
         rewards = {
             f"train_{agent}": np.dtype("float32").type(reward)
             for agent, reward in rewards.items()
         }
 
-        observations = self._convert_observations(observations, infos)
+        observations = self._create_observations(observations, infos, dones)
 
-        if self._step_type == dm_env.StepType.FIRST:
+        if dones["__all__"] or not self.agents:
             step_type = self._step_type
-            self._step_type = dm_env.StepType.MID
+            self._step_type = dm_env.StepType.LAST
         else:
-            step_type = (
-                dm_env.StepType.LAST
-                if self._environment.dones["__all__"]
-                else dm_env.StepType.MID
-            )
-        self._reset_next_step = step_type == dm_env.StepType.LAST
+            step_type = dm_env.StepType.MID
+            self._step_type = step_type
+
+        if step_type == dm_env.StepType.LAST:
+            self._reset_next_step = True
+            rewards = {
+                agent: np.dtype("float32").type(0) for agent, _ in rewards.items()
+            }
 
         return dm_env.TimeStep(
             observation=observations,
@@ -135,31 +155,65 @@ class FlatlandEnvWrapper(dm_env.Environment):
     # Convert Flatland observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
     def _convert_observations(
-        self, observes: Dict[int, np.ndarray], info: Dict[str, Dict[int, Any]]
+        self, observes: Dict[str, Tuple[np.array, np.ndarray]], dones: Dict[str, bool]
     ) -> Dict[str, OLT]:
         observations: Dict[str, OLT] = {}
         for agent, observation in observes.items():
-            agent_id = f"train_{agent}"
-            legals = np.ones(self.num_actions, dtype=np.float32)
-            agent_info = np.array([info[k][agent] for k in info.keys()])
-            observation = self.preprocessor(observation)
-            observations[agent_id] = OLT(
-                observation=(observation, agent_info),
+            if isinstance(observation, dict) and "action_mask" in observation:
+                legals = observation["action_mask"]
+                observation = observation["observation"]
+            else:
+                legals = np.ones(self.num_actions, dtype=np.float32)
+            observations[agent] = OLT(
+                observation=observation,
                 legal_actions=legals,
-                terminal=np.asarray([self._environment.dones[agent]], dtype=np.float32),
+                terminal=np.asarray([dones[agent]], dtype=np.float32),
             )
+
+        return observations
+
+    # collate agent info and observation into a tuple, making the agents obervation to
+    # be a tuple of the observation from the env and the agent info
+    def _collate_obs_and_info(
+        self, observes: Dict[int, np.ndarray], info: Dict[str, Dict[int, Any]]
+    ) -> Dict[str, Tuple[np.array, np.ndarray]]:
+        observations: Dict[str, Tuple[np.array, np.ndarray]] = {}
+        observes = self.preprocessor(observes)
+        for agent, obs in observes.items():
+            agent_id = f"train_{agent}"
+            agent_info = np.array(
+                [info[k][agent] for k in info.keys()], dtype=np.float32
+            )
+            obs = (obs, agent_info)
+            observations[agent_id] = obs
+
+        return observations
+
+    def _create_observations(
+        self,
+        obs: Dict[int, np.ndarray],
+        info: Dict[str, Dict[int, Any]],
+        dones: Dict[int, bool],
+    ) -> Dict[str, OLT]:
+        observations_ = self._collate_obs_and_info(obs, info)
+        dones_ = {f"train_{k}": v for k, v in dones.items()}
+        observations = self._convert_observations(observations_, dones_)
         return observations
 
     def _obtain_preprocessor(
         self, preprocessor: Any
-    ) -> Callable[[Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]]:
+    ) -> Callable[[Dict[int, Any]], Dict[int, np.ndarray]]:
         """Obtains the actual preprocessor to be used based on the supplied
         preprocessor and the env's obs_builder object"""
-        if not isinstance(self._environment.obs_builder, GlobalObsForRailEnv):
-            _preprocessor = preprocessor
-            if isinstance(self._environment.obs_builder, TreeObsForRailEnv):
+        if not isinstance(self.obs_builder, GlobalObsForRailEnv):
+            _preprocessor = preprocessor if preprocessor else lambda x: x
+            if isinstance(self.obs_builder, TreeObsForRailEnv):
                 _preprocessor = (
-                    normalize_observation if not preprocessor else preprocessor
+                    partial(
+                        normalize_observation, tree_depth=self.obs_builder.max_depth
+                    )
+                    if not preprocessor
+                    else preprocessor
                 )
             assert _preprocessor is not None
         else:
@@ -169,17 +223,30 @@ class FlatlandEnvWrapper(dm_env.Environment):
             ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
                 return x
 
-        returned_preprocessor: Callable[
-            [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
-        ] = _preprocessor
+        def returned_preprocessor(obs: Dict[int, Any]) -> Dict[int, np.ndarray]:
+            temp_obs = {}
+            for agent_id, ob in obs.items():
+                temp_obs[agent_id] = _preprocessor(ob)
+            return temp_obs
+
         return returned_preprocessor
+
+    # set all parameters that should be available before an environment step
+    # if no available agent, then environment is done and should be reset
+    def pre_step(self) -> None:
+        if not self.agents:
+            self._step_type = dm_env.StepType.LAST
 
     def observation_spec(self) -> Dict[str, OLT]:
         observation_specs = {}
-        for agent in range(self._environment.number_of_agents):
-            agent_id = f"train_{agent}"
-            observation_specs[agent_id] = OLT(
-                observation=self.obs_spec,
+        for agent in self.agents:
+            observation_specs[agent] = OLT(
+                observation=tuple(
+                    (
+                        _convert_to_spec(self.observation_spaces[agent]),
+                        _agent_info_spec(),
+                    )
+                ),
                 legal_actions=self.act_spec,
                 terminal=specs.Array((1,), np.float32),
             )
@@ -187,23 +254,26 @@ class FlatlandEnvWrapper(dm_env.Environment):
 
     def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
         action_specs = {}
-        for agent in self._environment.number_of_agents:
+        for agent in self.agents:
             action_specs[agent] = self.act_spec
         return action_specs
 
     def reward_spec(self) -> Dict[str, specs.Array]:
         reward_specs = {}
-        for agent in self._environment.number_of_agents:
+        for agent in self.agents:
             reward_specs[agent] = specs.Array((), np.float32)
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
         discount_specs = {}
-        for agent in self._environment.number_of_agents:
+        for agent in self.agents:
             discount_specs[agent] = specs.BoundedArray(
                 (), np.float32, minimum=0, maximum=1.0
             )
         return discount_specs
+
+    def seed(self, seed: int = None) -> None:
+        self._environment._seed(seed)
 
     @property
     def environment(self) -> RailEnv:
@@ -223,21 +293,21 @@ class FlatlandEnvWrapper(dm_env.Environment):
 # HELPER FUNCTIONS used in the flatland env wrapper above
 
 
-def _infer_observation_spec(
+def _infer_observation_space(
     obs: Union[tuple, np.ndarray, dict]
-) -> Union[specs.BoundedArray, tuple, dict]:
+) -> Union[Box, tuple, dict]:
     """Observation spec from a sample observation"""
     if isinstance(obs, np.ndarray):
-        return specs.BoundedArray(
-            obs.shape,
+        return Box(
+            -np.inf,
+            np.inf,
+            shape=obs.shape,
             dtype=obs.dtype,
-            minimum=-np.inf,
-            maximum=np.inf,
         )
     elif isinstance(obs, tuple):
-        return tuple(_infer_observation_spec(o) for o in obs)
+        return tuple(_infer_observation_space(o) for o in obs)
     elif isinstance(obs, dict):
-        return {key: _infer_observation_spec(value) for key, value in obs.items()}
+        return {key: _infer_observation_space(value) for key, value in obs.items()}
     else:
         raise ValueError(
             f"Unexpected observation type: {type(obs)}. "
@@ -400,5 +470,7 @@ def normalize_observation(
     data = norm_obs_clip(data, fixed_radius=observation_radius)
     distance = norm_obs_clip(distance, normalize_to_range=True)
     agent_data = np.clip(agent_data, -1, 1)
-    normalized_obs = np.concatenate((np.concatenate((data, distance)), agent_data))
+    normalized_obs = np.array(
+        np.concatenate((np.concatenate((data, distance)), agent_data)), dtype=np.float32
+    )
     return normalized_obs
