@@ -193,17 +193,17 @@ class BaseMADDPGTrainer(mava.Trainer):
 
     @tf.function
     def _transform_observations(
-        self, state: Dict[str, np.ndarray], next_state: Dict[str, np.ndarray]
+        self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         o_tm1 = {}
         o_t = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
             o_tm1[agent] = self._observation_networks[agent_key](
-                state[agent].observation
+                obs[agent].observation
             )
             o_t[agent] = self._target_observation_networks[agent_key](
-                next_state[agent].observation
+                next_obs[agent].observation
             )
             # This stop_gradient prevents gradients to propagate into the target
             # observation network. In addition, since the online policy network is
@@ -255,11 +255,11 @@ class BaseMADDPGTrainer(mava.Trainer):
         return dpg_a_t_feed
 
     @tf.function
-    def _policy_actions(self, next_state: Dict[str, np.ndarray]) -> Any:
+    def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            next_observation = next_state[agent]
+            next_observation = next_obs[agent]
             actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
 
@@ -282,28 +282,14 @@ class BaseMADDPGTrainer(mava.Trainer):
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
+        # e_tm1 [Optional] = extra data for timestep t-1 that the agents persist in replay.
         # r_t = dictionary of rewards or rewards sequences
         #   (if using N step transitions) ensuing from actions a_tm1
         # d_t = environment discount ensuing from actions a_tm1.
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
-        # e_t [Optional] = extra data that the agents persist in replay.
+        # e_t [Optional] = extra data for timestep t that the agents persist in replay.
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
-
-        # observation = o_t["player_0"].observation[104].numpy()
-        # state = e_t['env_state'][104].numpy()
-        # obs_norm = 200
-        # obs_coords = observation[1:3] * obs_norm
-        # obs_ang_x, obs_ang_y = observation[3:5]
-        # obs_ang = np.arctan2(obs_ang_y, obs_ang_x)
-        # state_coords = state[5:7] * obs_norm
-        # state_ang_x, state_ang_y = state[9:11]
-        # state_ang = np.arctan2(state_ang_y, state_ang_x)
-        #
-        # print("Coords: ", obs_coords, " : ", state_coords)
-        # print("Angle: ", obs_ang, " : ", state_ang)
-
-        # assert obs_coords[0] == state_coords[0] and obs_coords[1] == state_coords[1] and obs_ang == state_ang
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
@@ -323,7 +309,8 @@ class BaseMADDPGTrainer(mava.Trainer):
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
-                    o_tm1_trans, o_t_trans, a_tm1, a_t, e_tm1, e_t, agent
+                    o_tm1_trans=o_tm1_trans, o_t_trans=o_t_trans, a_tm1=a_tm1, a_t=a_t, e_tm1=e_tm1, e_t=e_t,
+                    agent=agent
                 )
 
                 # Critic learning.
@@ -343,10 +330,6 @@ class BaseMADDPGTrainer(mava.Trainer):
                 # Actor learning.
                 o_t_agent_feed = o_t_trans[agent]
                 dpg_a_t = self._policy_networks[agent_key](o_t_agent_feed)
-
-                # TODO (dries): Move the dpg action updating to a function.
-                #  There is a variable overwrite error that needs to
-                #  be fixed for the code can be moved to a function.
 
                 # Get dpg actions
                 dpg_a_t_feed = self._get_dpg_feed(a_t, dpg_a_t, agent)
@@ -614,7 +597,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         # variables cannot be changed.
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
-
+        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
         return dpg_a_t_feed
 
 
@@ -717,7 +700,9 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
+        # TODO: This copy.copy might be breaking gradient flows! Is a copy allowed?
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
+        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
 
         return dpg_a_t_feed
