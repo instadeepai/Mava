@@ -1,9 +1,9 @@
 from enum import Enum
 
 
-class MockedEnvironments(Enum):
-    Mocked_Dicrete = 1
-    Mocked_Continous = 2
+class MockedEnvironments(str, Enum):
+    Mocked_Dicrete = "discrete_mock"
+    Mocked_Continous = "continous_mock"
 
 
 class EnvType(Enum):
