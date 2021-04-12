@@ -123,7 +123,7 @@ class MonotonicMixing(BaseMixingModule):
             ]
         )
 
-    def forward(
+    def call(
         self,
         q_values: Tensor,  # Check type
         states: Tensor,  # Check type

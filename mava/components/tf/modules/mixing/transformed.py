@@ -29,7 +29,7 @@ class QTranBase(BaseMixingModule):
         super(QTranBase, self).__init__()
         self._architecture = architecture
 
-    def forward(self) -> None:
+    def call(self) -> None:
         """Perform some mixing logic"""
 
 
@@ -38,5 +38,5 @@ class QTranAlt(BaseMixingModule):
         super(QTranAlt, self).__init__()
         self._architecture = architecture
 
-    def forward(self) -> None:
+    def call(self) -> None:
         """Perform some mixing logic"""

@@ -27,7 +27,7 @@ class AdditiveMixing(BaseMixingModule):
         """Initializes the mixer."""
         super(AdditiveMixing, self).__init__()
 
-    def forward(self, q_values: Tensor) -> Tensor:
+    def call(self, q_values: Tensor) -> Tensor:
         """Monotonic mixing logic."""
         # Not sure if this is the way to simply sum in tf.
         # I'm looking for an equivalent to th.sum(...) in PyTorch.
