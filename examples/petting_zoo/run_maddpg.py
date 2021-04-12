@@ -139,8 +139,10 @@ def main(_: Any) -> None:
     environment = make_environment(remove_on_fall=False)
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
     system_networks = make_networks(environment_spec)
-    train_logger = TFSummaryLogger("train_loop")
-    eval_logger = TFSummaryLogger("eval_loop")
+
+    # create tf loggers
+    train_logger = TFSummaryLogger("logs/train_loop")
+    eval_logger = TFSummaryLogger("logs/eval_loop")
 
     # Construct the agent.
     system = maddpg.MADDPG(
