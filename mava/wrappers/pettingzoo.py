@@ -25,6 +25,7 @@ from pettingzoo.utils.env import AECEnv, ParallelEnv
 from mava.utils.wrapper_utils import OLT, convert_np_type, parameterized_restart
 
 
+# TODO(Kale-ab): Check usage agents vs possible agents
 class PettingZooAECEnvWrapper(dm_env.Environment):
     """Environment wrapper for PettingZoo MARL environments."""
 
