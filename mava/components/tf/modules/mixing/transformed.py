@@ -304,7 +304,9 @@ class QTranAlt(BaseMixingModule):
 
         q_outputs = self._Q(inputs)
 
-        states = batch["state"].repeat(1, 1, self.n_agents).view(-1, self.state_dim)
+        states = tf.tile(batch["state"], [1, 1, self.n_agents])
+        states = tf.reshape(states, shape=(-1, self.state_dim))
+
         v_outputs = self._V(states)
 
         return q_outputs, v_outputs
