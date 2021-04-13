@@ -135,22 +135,22 @@ class MonotonicMixing(BaseMixingModule):
 
         # Forward pass
         episode_num = tf.size(q_values).numpy()  # Get int from 0D tensor length
-        states = snt.reshape(states, output_shape=(-1, self._state_dim))
-        q_values = snt.reshape(q_values, output_shape=(-1, 1, self._n_agents))
+        states = tf.reshape(states, shape=(-1, self._state_dim))
+        q_values = tf.reshape(q_values, shape=(-1, 1, self._n_agents))
 
         # First layer
         w1 = tf.abs(self.hyper_w1(states))
         b1 = self.hyper_w1(states)
-        w1 = snt.reshape(w1, output_shape=(-1, self._n_agents, self._qmix_hidden_dim))
-        b1 = snt.reshape(b1, output_shape=(-1, 1, self._qmix_hidden_dim))
+        w1 = tf.reshape(w1, shape=(-1, self._n_agents, self._qmix_hidden_dim))
+        b1 = tf.reshape(b1, shape=(-1, 1, self._qmix_hidden_dim))
         hidden = tf.nn.elu(tf.matmul(q_values, w1) + b1)  # ELU -> Exp. linear unit
 
         # Second layer
         w2 = tf.abs(self.hyper_w2(states))
         b2 = self.hyper_b2(states)
-        w2 = snt.reshape(w2, output_shape=(-1, self._qmix_hidden_dim, 1))
-        b2 = snt.reshape(b2, output_shape=(-1, 1, 1))
+        w2 = tf.reshape(w2, shape=(-1, self._qmix_hidden_dim, 1))
+        b2 = tf.reshape(b2, shape=(-1, 1, 1))
 
         q_tot = tf.matmul(hidden, w2) + b2
-        q_tot = snt.reshape(q_tot, output_shape=(episode_num, -1, 1))
+        q_tot = tf.reshape(q_tot, shape=(episode_num, -1, 1))
         return q_tot
