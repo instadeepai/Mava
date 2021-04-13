@@ -56,7 +56,11 @@ class CentralisedActor(DecentralisedActor):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            actor_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            actor_obs_shape = list(
+                copy.copy(
+                    self._agent_type_specs[agent_type].observations.observation.shape
+                )
+            )
             actor_obs_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=actor_obs_shape,
@@ -103,14 +107,15 @@ class CentralisedCritic(DecentralisedActorCritic):
         for agent_type, agents in agents_by_type.items():
             critic_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
             critic_obs_shape.insert(0, len(agents))
-            critic_act_shape = list(
-                copy.copy(self._agent_specs[agents[0]].actions.shape)
-            )
-            critic_act_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=critic_obs_shape,
                 dtype=tf.dtypes.float32,
             )
+
+            critic_act_shape = list(
+                copy.copy(self._agent_specs[agents[0]].actions.shape)
+            )
+            critic_act_shape.insert(0, len(agents))
             action_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=critic_act_shape,
                 dtype=tf.dtypes.float32,

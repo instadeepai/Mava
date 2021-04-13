@@ -14,25 +14,18 @@
 # limitations under the License.
 
 """Wraps a PettingZoo MARL environment to be used as a dm_env environment."""
-from typing import Any, Dict, NamedTuple, Union
+from typing import Any, Dict, Union
 
 import dm_env
 import numpy as np
-from acme import specs, types
+from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
-from mava.utils.wrapper_utils import convert_np_type
+from mava.utils.wrapper_utils import OLT, convert_np_type, parameterized_restart
 
 
-class OLT(NamedTuple):
-    """Container for (observation, legal_actions, terminal) tuples."""
-
-    observation: types.Nest
-    legal_actions: types.Nest
-    terminal: types.Nest
-
-
+# TODO(Kale-ab): Check usage agents vs possible agents
 class PettingZooAECEnvWrapper(dm_env.Environment):
     """Environment wrapper for PettingZoo MARL environments."""
 
@@ -46,13 +39,17 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         """Resets the episode."""
         self._reset_next_step = False
         self._environment.reset()
-        self._discount = None  # Not used in pettingzoo
         self._step_type = dm_env.StepType.FIRST
 
         observe, _, done, _ = self._environment.last()
         agent = self._environment.agent_selection
         observation = self._convert_observation(agent, observe, done)
-        return dm_env.restart(observation)
+
+        self._discount = convert_np_type(
+            self.discount_spec()[agent].dtype, 1
+        )  # Not used in pettingzoo
+        reward = convert_np_type(self.reward_spec()[agent].dtype, 0)
+        return parameterized_restart(reward, self._discount, observation)
 
     def step(self, action: Union[int, float]) -> dm_env.TimeStep:
         """Steps the environment."""
@@ -66,14 +63,12 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
             self._environment.step(None)
         else:
             self._environment.step(action)
+            # Update these vars so dm_env.TimeStep returned has
+            # the last information.
+            observe, reward, done, info = self._environment.last()
 
-        # Update these vars so dm_env.TimeStep returned has
-        # the last information.
-        observe, reward, done, info = self._environment.last()
-
-        # Handle empty rewards
-        if reward == 0:
-            reward = convert_np_type(self.reward_spec()[agent], reward)
+        # Convert rewards to match spec
+        reward = convert_np_type(self.reward_spec()[agent].dtype, reward)
 
         observation = self._convert_observation(agent, observe, done)
 
@@ -101,7 +96,7 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         else:
             legals = np.ones(
                 _convert_to_spec(self._environment.action_spaces[agent]).shape,
-                dtype=np.float32,
+                dtype=self._environment.action_spaces[agent].dtype,
             )
         observation = OLT(
             observation=observe,
@@ -178,15 +173,27 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         """Resets the episode."""
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
+        discount_spec = self.discount_spec()
         self._discounts = {
-            agent: np.dtype("float32").type(1.0)
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self._environment.possible_agents
         }
         observe = self._environment.reset()
         observations = self._convert_observations(
             observe, {agent: False for agent in self.possible_agents}
         )
-        return dm_env.restart(observations)
+        rewards_spec = self.reward_spec()
+        rewards = {
+            agent: convert_np_type(rewards_spec[agent].dtype, 0)
+            for agent in self.possible_agents
+        }
+
+        discount_spec = self.discount_spec()
+        self._discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self.possible_agents
+        }
+        return parameterized_restart(rewards, self._discounts, observations)
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
@@ -196,15 +203,14 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
         observations, rewards, dones, infos = self._environment.step(actions)
 
+        rewards_spec = self.reward_spec()
         #  Handle empty rewards
         if not rewards:
-            rewards_spec = self.reward_spec()
             rewards = {
                 agent: convert_np_type(rewards_spec[agent].dtype, 0)
                 for agent in self.possible_agents
             }
         else:
-            rewards_spec = self.reward_spec()
             rewards = {
                 agent: convert_np_type(rewards_spec[agent].dtype, reward)
                 for agent, reward in rewards.items()
@@ -246,7 +252,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 #  accordingly
                 legals = np.ones(
                     _convert_to_spec(self._environment.action_spaces[agent]).shape,
-                    dtype=np.float32,
+                    dtype=self._environment.action_spaces[agent].dtype,
                 )
             observations[agent] = OLT(
                 observation=observation,
