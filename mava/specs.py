@@ -11,6 +11,8 @@ import dm_env
 from acme.specs import EnvironmentSpec
 
 
+# TODO Why use this class to define specs, when you can just update
+# the specs on the wrappers themselves
 class MAEnvironmentSpec:
     def __init__(self, environment: dm_env.Environment):
         self._specs = self._make_ma_environment_spec(environment)
