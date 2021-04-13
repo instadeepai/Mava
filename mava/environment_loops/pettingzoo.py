@@ -27,7 +27,11 @@ from acme.utils import counting, loggers
 from dm_env import specs
 
 import mava
-from mava.utils.wrapper_utils import generate_zeros_from_spec
+from mava.utils.wrapper_utils import (
+    generate_zeros_from_spec,
+    convert_seq_timestep_and_actions_to_parallel,
+    project_timestep_to_all_agents,
+)
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
@@ -84,8 +88,12 @@ class PettingZooAECEnvironmentLoop(acme.core.Worker):
         timestep = self._environment.reset()
         agent = self._environment.agent_selection
 
+        parallel_timestep = project_timestep_to_all_agents(
+            timestep, self._environment.possible_agents
+        )
+
         # Make the first observation.
-        self._executor.agent_observe_first(agent, timestep)
+        self._executor.observe_first(parallel_timestep)
 
         n_agents = self._environment.num_agents
         rewards = {
@@ -102,19 +110,28 @@ class PettingZooAECEnvironmentLoop(acme.core.Worker):
 
         # Run an episode.
         while not timestep.last():
-
+            timesteps = {}
             # Generate an action from the agent's policy and step the environment.
             for agent in self._environment.agent_iter(n_agents):
                 action = self._get_action(agent, timestep)
                 timestep = self._environment.step(action)
-
+                timesteps[agent] = {"timestep": timestep, "action": action}
                 rewards[agent] = timestep.reward
 
-                # Have the agent observe the timestep and let the actor update itself.
-                self._executor.agent_observe(agent, action, next_timestep=timestep)
+            # Combine actions and timesteps to use parallel adder
+            (
+                parallel_actions,
+                parallel_timestep,
+            ) = convert_seq_timestep_and_actions_to_parallel(
+                timesteps, self._environment.possible_agents
+            )
 
-                if self._should_update:
-                    self._executor.update(agent)
+            # Call observe using parallel data.
+            self._executor.observe(parallel_actions, next_timestep=parallel_timestep)
+
+            # Update all actors
+            if self._should_update:
+                self._executor.update()
 
             # Book-keeping.
             episode_steps += 1
@@ -174,7 +191,8 @@ class PettingZooAECEnvironmentLoop(acme.core.Worker):
             episode_count += 1
             step_count += result["episode_length"]
             # Log the given results.
-            self._logger.write(result)
+            if self._logger:
+                self._logger.write(result)
 
 
 class PettingZooParallelEnvironmentLoop(acme.core.Worker):
