@@ -16,6 +16,7 @@
 
 """MADDPG trainer implementation."""
 import copy
+import os
 import time
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -62,6 +63,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "Checkpoints",
     ):
         """Initializes the learner.
         Args:
@@ -132,7 +134,6 @@ class BaseMADDPGTrainer(mava.Trainer):
             "critic": {},
             "policy": {},
         }
-        self._system_checkpointer = {}
         for agent_key in self.unique_net_keys:
             policy_network_to_expose = snt.Sequential(
                 [
@@ -149,21 +150,40 @@ class BaseMADDPGTrainer(mava.Trainer):
             self._system_network_variables["policy"][
                 agent_key
             ] = policy_network_to_expose.variables
-            checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=5,
-                objects_to_save={
+
+        # Create checkpointer
+        self._system_checkpointer = {}
+        if checkpoint:
+            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
+            #  of the last 11 calls to
+            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
+            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
+            #  expensive and the excessive number tracings could be due to (1)
+            #  creating @tf.function repeatedly in a loop, (2) passing tensors
+            #  with different shapes, (3) passing Python objects instead of tensors.
+            for agent_key in self.unique_net_keys:
+                objects_to_save = {
                     "counter": self._counter,
                     "policy": self._policy_networks[agent_key],
                     "critic": self._critic_networks[agent_key],
+                    "observation": self._observation_networks[agent_key],
                     "target_policy": self._target_policy_networks[agent_key],
                     "target_critic": self._target_critic_networks[agent_key],
+                    "target_observation": self._target_observation_networks[agent_key],
                     "policy_optimizer": self._policy_optimizer,
                     "critic_optimizer": self._critic_optimizer,
                     "num_steps": self._num_steps,
-                },
-                enable_checkpointing=checkpoint,
-            )
-            self._system_checkpointer[agent_key] = checkpointer
+                }
+
+                checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
+                checkpointer = tf2_savers.Checkpointer(
+                    time_delta_minutes=1,
+                    add_uid=False,
+                    directory=checkpointer_dir,
+                    objects_to_save=objects_to_save,
+                    enable_checkpointing=True,
+                )
+                self._system_checkpointer[agent_key] = checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -412,10 +432,12 @@ class BaseMADDPGTrainer(mava.Trainer):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        # Checkpoint and attempt to write the logs.
+        # Checkpoint the networks.
+        if len(self._system_checkpointer.keys()) > 0:
+            for agent_key in self.unique_net_keys:
+                checkpointer = self._system_checkpointer[agent_key]
+                checkpointer.save()
 
-        # NOTE (Arnu): ignoring checkpointing and logging for now
-        # self._checkpointer.save()
         self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
