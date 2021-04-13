@@ -13,7 +13,7 @@ from mava.components.tf.architectures import DecentralisedActor
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
-from mava.systems.tf.tmp_idqn import training
+from mava.systems.tf.idqn import training
 
 @dataclasses.dataclass
 class IDQNConfig:

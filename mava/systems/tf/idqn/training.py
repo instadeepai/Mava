@@ -155,7 +155,6 @@ class IDQNTrainer(mava.Trainer):
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
-        # Decentralised critic
         o_tm1_feed = o_tm1_trans[agent]
         o_t_feed = o_t_trans[agent]
         a_tm1_feed = a_tm1[agent]
@@ -183,7 +182,7 @@ class IDQNTrainer(mava.Trainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data that the agents persist in replay.
-        o_tm1, a_tm1, r_t, d_t, o_t, e_t = inputs.data
+        o_tm1, a_tm1, _, r_t, d_t, o_t, _ = inputs.data
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
         for agent in self._agents:
@@ -200,7 +199,7 @@ class IDQNTrainer(mava.Trainer):
                 o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t) #TODO can this go outside 
                                                                                     # the agent loop. duplicate work going on here
 
-                o_tm1_feed, o_t_feed, a_tm1_feed, a_tm1_feed = self._get_feed(o_tm1_trans, o_t_trans, a_tm1)
+                o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(o_tm1_trans, o_t_trans, a_tm1, agent)
 
                 q_tm1 = self._q_networks[agent](o_tm1_feed)
                 q_t = self._target_q_networks[agent](o_t_feed)
@@ -210,7 +209,7 @@ class IDQNTrainer(mava.Trainer):
                 loss = tf.reduce_mean(loss, axis=[0])
 
             # Retrieve gradients
-            q_network_variables = self._q_network[agent_key].trainable_variables
+            q_network_variables = self._q_networks[agent_key].trainable_variables
             gradients = tape.gradient(loss, q_network_variables)
 
             # Delete the tape manually because of the persistent=True flag.

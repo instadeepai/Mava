@@ -12,16 +12,16 @@ from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
-from mava.systems.tf import executors, tmp_idqn
+from mava.systems.tf import executors, idqn
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 import trfl
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
+flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
 
 flags.DEFINE_integer(
     "num_episodes_per_eval",
-    10,
+    100,
     "Number of training episodes to run between evaluation " "episodes.",
 )
 
@@ -69,11 +69,11 @@ def make_networks(
             ]
         )
 
-        epsilon = tf.Variable(0.05, trainable=False) # fixed for now. not sure where to update it. maybe in the learner
+        epsilon = tf.Variable(0.1, trainable=False) # fixed for now. not sure where to update it. maybe in the learner
         behavior_network = snt.Sequential(
             [
                 q_network,
-                lambda q: trfl.epsilon_greedy(q, epsilon=epsilon).sample()
+                lambda q: tf.cast(trfl.epsilon_greedy(q, epsilon=epsilon).sample(), 'int64')
             ]
         )
 
@@ -89,12 +89,12 @@ def make_networks(
 
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment()
+    environment = make_environment(max_cycles=25)
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
     system_networks = make_networks(environment_spec)
 
     # Construct the agent.
-    system = tmp_idqn.IDQN(
+    system = idqn.IDQN(
         environment_spec=environment_spec,
         q_networks=system_networks["q_networks"],
         observation_networks=system_networks["observations"],  # pytype: disable=wrong-arg-types
