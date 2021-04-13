@@ -63,7 +63,7 @@ class Executor(acme.Actor):
     def agent_observe(
         self,
         agent: str,
-        action: Union[float, int],
+        action: Union[float, int, types.NestedArray],
         next_timestep: dm_env.TimeStep,
     ) -> None:
         """Make an observation of timestep data from sequential environment.

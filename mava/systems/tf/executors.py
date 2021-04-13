@@ -98,7 +98,7 @@ class FeedForwardExecutor(core.Executor):
     def agent_observe(
         self,
         agent: str,
-        action: Union[float, int],
+        action: Union[float, int, types.NestedArray],
         next_timestep: dm_env.TimeStep,
         extras: Optional[Dict] = {},
     ) -> None:

@@ -93,7 +93,10 @@ class System(mava.core.Executor, mava.core.VariableSource):
         self._executor.observe(actions, next_timestep)
 
     def agent_observe(
-        self, agent: str, action: Union[float, int], next_timestep: dm_env.TimeStep
+        self,
+        agent: str,
+        action: Union[float, int, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
     ) -> None:
         self._num_observations += 1
         self._executor.agent_observe(agent, action, next_timestep)
