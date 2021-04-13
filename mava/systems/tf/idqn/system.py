@@ -1,19 +1,3 @@
-# python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""IDQN system implementation."""
 import dataclasses
 from typing import Dict, Iterator, Optional, Type
 
@@ -29,16 +13,16 @@ from mava.components.tf.architectures import DecentralisedActor
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
-from mava.systems.tf.idqn import training
-
+from mava.systems.tf.tmp_idqn import training
 
 @dataclasses.dataclass
 class IDQNConfig:
-    """Configuration options for the IDQN system.
+    """Configuration options for the MADDPG system.
     Args:
             environment_spec: description of the actions, observations, etc.
-            networks: the online (optimized) q-networks for each agent in
+            policy_networks: the online (optimized) policies for each agent in
                 the system.
+            critic_networks: the online critic for each agent in the system.
             observation_networks: dictionary of optional networks to transform
                 the observations before they are fed into any network.
             discount: discount to use for TD updates.
@@ -59,9 +43,9 @@ class IDQNConfig:
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
-    qnetworks: Dict[str, snt.Module]
-    policy_networks: Dict[str, snt.Module]
+    q_networks: Dict[str, snt.Module]
     observation_networks: Dict[str, snt.Module]
+    shared_weights: bool = False
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -70,7 +54,6 @@ class IDQNConfig:
     max_replay_size: int = 1000000
     samples_per_insert: float = 32.0
     n_step: int = 5
-    shared_weights: bool = False
     clipping: bool = True
     logger: loggers.Logger = None
     counter: counting.Counter = None
@@ -79,7 +62,7 @@ class IDQNConfig:
 
 
 class IDQNBuilder(SystemBuilder):
-    """Builder for IDQN which constructs individual components of the system."""
+    """Builder for MADDPG which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an RL system.
       Implementations of this interface contain a complete specification of a
@@ -106,6 +89,7 @@ class IDQNBuilder(SystemBuilder):
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
+
 
     def make_replay_table(
         self,
@@ -135,7 +119,7 @@ class IDQNBuilder(SystemBuilder):
             prefetch_size=self._config.prefetch_size,
         )
         return iter(dataset)
-
+    
     def make_adder(
         self,
         replay_client: reverb.Client,
@@ -236,9 +220,10 @@ class IDQNBuilder(SystemBuilder):
         trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
-            qnetworks=networks["qnetworks"],
+            q_networks=networks["policies"],
             observation_networks=networks["observations"],
-            target_policy=networks["target_policies"],
+            target_q_networks=networks["target_policies"],
+            target_observation_networks=networks["target_observations"],
             shared_weights=shared_weights,
             optimizer=optimizer,
             clipping=clipping,
@@ -253,18 +238,17 @@ class IDQNBuilder(SystemBuilder):
 
 
 class IDQN(system.System):
-    """IDQN system.
-    This implements a single-process IDQN system. This is an Q-learning based
-    system that generates data via an epsilon-greedy policy, inserts N-step transitions into
-    a replay buffer, and periodically updates the q-networks of each agent
+    """MADDPG system.
+    This implements a single-process DDPG system. This is an actor-critic based
+    system that generates data via a behavior policy, inserts N-step transitions into
+    a replay buffer, and periodically updates the policies of each agent
     (and as a result the behavior) by sampling uniformly from this buffer.
     """
 
     def __init__(
         self,
         environment_spec: specs.MAEnvironmentSpec,
-        qnetworks: Dict[str, snt.Module],
-        policy_networks: Dict[str, snt.Module],
+        q_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
         trainer_fn: Type[
@@ -285,11 +269,13 @@ class IDQN(system.System):
         checkpoint: bool = True,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
     ):
+
         """Initialize the system.
         Args:
             environment_spec: description of the actions, observations, etc.
-            networks: the online (optimized) q-networks for each agent in
+            policy_networks: the online (optimized) policies for each agent in
                 the system.
+            critic_networks: the online critic for each agent in the system.
             observation_networks: dictionary of optional networks to transform
                 the observations before they are fed into any network.
             discount: discount to use for TD updates.
@@ -302,6 +288,7 @@ class IDQN(system.System):
             samples_per_insert: number of samples to take from replay for every insert
               that is made.
             n_step: number of steps to squash into a single transition.
+            sigma: standard deviation of zero-mean, Gaussian exploration noise.
             clipping: whether to clip gradients by global norm.
             logger: logger object to be used by trainers.
             counter: counter object used to keep track of steps.
@@ -311,8 +298,7 @@ class IDQN(system.System):
         builder = IDQNBuilder(
             IDQNConfig(
                 environment_spec=environment_spec,
-                qnetworks=qnetworks,
-                policy_networks=policy_networks,
+                q_networks=q_networks,
                 observation_networks=observation_networks,
                 shared_weights=shared_weights,
                 discount=discount,
@@ -347,7 +333,7 @@ class IDQN(system.System):
         # Create the networks
         networks = DecentralisedActor(
             environment_spec=environment_spec,
-            policy_networks=policy_networks,
+            policy_networks=q_networks,
             observation_networks=observation_networks,
             behavior_networks=behavior_networks,
             shared_weights=shared_weights,

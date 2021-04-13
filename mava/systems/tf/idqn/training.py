@@ -1,20 +1,3 @@
-# python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-
-"""IDQN trainer implementation."""
 import copy
 import time
 from typing import Any, Dict, List, Sequence, Tuple
@@ -31,14 +14,10 @@ from acme.utils import counting, loggers
 
 import mava
 
-# NOTE (Arnu): in TF2 this should be the default
-# but for some reason it is not when I run it.
-# tf.config.run_functions_eagerly(True)
-
 
 class IDQNTrainer(mava.Trainer):
     """IDQN trainer.
-    This is the trainer component of a IDQN system. IE it takes a dataset as input
+    This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
 
@@ -46,56 +25,37 @@ class IDQNTrainer(mava.Trainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        qnetworks: Dict[str, snt.Module],
-        target_qnetworks: Dict[str, snt.Module],
+        q_networks: Dict[str, snt.Module],
+        target_q_networks: Dict[str, snt.Module],
         discount: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        shared_weights: bool = False,
         optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
-        shared_weights: bool = False
     ):
-        """Initializes the trainer.
-        Args:
-          qnetworks: the online Q-networks.
-          target_networks: the target networks (which lag behind the online
-            networks).
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_networks: optional online networks to process observations
-            before the Q-network.
-          target_observation_networks: the target observation networks.
-          optimizer: the optimizer to be applied to network loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by the trainer.
-          checkpoint: boolean indicating whether to checkpoint the trainer.
-        """
 
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
 
         # Store online and target networks.
-        self._qnetworks = qnetworks
-        self._target_qnetworks = target_qnetworks
+        self._q_networks = q_networks
+        self._target_q_networks = target_q_networks
 
         self._observation_networks = observation_networks
         self._target_observation_networks = target_observation_networks
 
-        # General trainer book-keeping and loggers.
+        # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger("trainer")
 
-        # Other trainer parameters.
+        # Other learner parameters.
         self._discount = discount
         self._clipping = clipping
 
@@ -118,30 +78,20 @@ class IDQNTrainer(mava.Trainer):
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Expose the variables.
-        networks_to_expose = {}
+        q_networks_to_expose = {}
         self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
-            "network": {},
+            "q_network": {},
         }
         self._system_checkpointer = {}
-        for agent_key in self.agent_net_keys:
-            network_to_expose = snt.Sequential(
-                [
-                    self._target_observation_networks[agent_key],
-                    self._target_qnetworks[agent_key],
-                ]
-            )
-            networks_to_expose[agent_key] = network_to_expose
-            # TODO (dries): Determine why acme has a critic
-            #  in self._system_network_variables
-            self._system_network_variables["network"][
-                agent_key
-            ] = network_to_expose.variables
+        for agent_key in self.unique_net_keys:
+            self._system_network_variables["q_network"][agent_key] = q_networks[agent_key].variables
+
             checkpointer = tf2_savers.Checkpointer(
                 time_delta_minutes=5,
                 objects_to_save={
                     "counter": self._counter,
-                    "network": self._networks[agent_key],
-                    "target_network": self._target_networks[agent_key],
+                    "q_network": self._q_networks[agent_key],
+                    "target_q_network": self._target_q_networks[agent_key],
                     "optimizer": self._optimizer,
                     "num_steps": self._num_steps,
                 },
@@ -154,24 +104,24 @@ class IDQNTrainer(mava.Trainer):
         # fill the replay buffer.
         self._timestamp = None
 
+
     @tf.function
     def _update_target_networks(self) -> None:
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (
-                *self._observation_networks[key].variables,
-                *self._qnetworks[key].variables,
-
+                *self._q_networks[key].variables,
             )
+
             target_variables = (
-                *self._target_observation_networks[key].variables,
-                *self._target_qnetworks[key].variables,
+                *self._target_q_networks[key].variables,
             )
 
             # Make online -> target network update ops.
             if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                 for src, dest in zip(online_variables, target_variables):
                     dest.assign(src)
+
             self._num_steps.assign_add(1)
 
     @tf.function
@@ -194,52 +144,25 @@ class IDQNTrainer(mava.Trainer):
             # the observation network training.
             o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
 
-            # TODO (dries): Why is there a stop gradient here? The target
-            #  will not be updated unless included into the
-            #  policy_variables or critic_variables sets.
-            #  One reason might be that it helps with preventing the observation
-            #  network from being updated from the policy_loss.
-            #  But why would we want that? Don't we want both the critic
-            #  and policy to update the observation network?
-            #  Or is it bad to have two optimisation processes optimising
-            #  the same set of weights? But the
-            #  StateBasedActorCritic will then not work as the critic
-            #  is not dependent on the behavior networks.
         return o_tm1, o_t
 
     @tf.function
-    def _get_network_feed(
+    def _get_feed(
         self,
         o_tm1_trans: Dict[str, np.ndarray],
         o_t_trans: Dict[str, np.ndarray],
         a_tm1: Dict[str, np.ndarray],
-        a_t: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
-        # Decentralised agents
+        # Decentralised critic
         o_tm1_feed = o_tm1_trans[agent]
         o_t_feed = o_t_trans[agent]
         a_tm1_feed = a_tm1[agent]
-        a_t_feed = a_t[agent]
-        return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
+
+        return o_tm1_feed, o_t_feed, a_tm1_feed
 
 
-    @tf.function
-    def _policy_actions(self, next_state: Dict[str, np.ndarray]) -> Any:
-        actions = {}
-        for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
-            next_observation = next_state[agent]
-            actions[agent] = self._target_policy_networks[agent_key](next_observation)
-        return actions
-
-    # NOTE (Arnu): the decorator below was causing this _step() function not
-    # to be called by the step() function below. Removing it makes the code
-    # work. The docs on tf.function says it is useful for speed improvements
-    # but as far as I can see, we can go ahead without it. At least for now.
-    # @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -274,43 +197,21 @@ class IDQNTrainer(mava.Trainer):
                 # Transforming the observations this way at the start of the learning
                 # step effectively means that the policy and critic share observation
                 # network weights.
-                o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-                a_t = self._policy_actions(o_t_trans)
+                o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t) #TODO can this go outside 
+                                                                                    # the agent loop. duplicate work going on here
 
-                # Get critic feed
-                o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
-                    o_tm1_trans, o_t_trans, a_tm1, a_t, e_t, agent
-                )
+                o_tm1_feed, o_t_feed, a_tm1_feed, a_tm1_feed = self._get_feed(o_tm1_trans, o_t_trans, a_tm1)
 
-                # Critic learning.
-                q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
-                q_t = self._target_critic_networks[agent_key](o_t_feed, a_t_feed)
+                q_tm1 = self._q_networks[agent](o_tm1_feed)
+                q_t = self._target_q_networks[agent](o_t_feed)
 
-                # Squeeze into the shape expected by the td_learning implementation.
-                q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
-                q_t = tf.squeeze(q_t, axis=-1)  # [B]
+                loss, _ = trfl.qlearning(q_tm1, a_tm1_feed, r_t[agent], d_t[agent], q_t)
 
-                # Critic loss.
-                loss = trfl.td_learning(
-                    q_tm1, r_t[agent], discount * d_t[agent], q_t
-                ).loss
-                loss = tf.reduce_mean(loss, axis=0)
+                loss = tf.reduce_mean(loss, axis=[0])
 
-            # Get trainable variables.
-            network_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._networks[agent_key].trainable_variables
-            )
-
-            # Compute gradients.
-            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
-            #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context (it causes the gradient ops to be
-            #  recorded on the tape, leading to increased CPU and memory usage).
-            #  Only call GradientTape.gradient inside the context if you actually want
-            #  to trace the gradient in order to compute higher order derivatives.
-            #  to trace the gradient in order to compute higher order derivatives.
-            gradients = tape.gradient(loss, network_variables)
+            # Retrieve gradients
+            q_network_variables = self._q_network[agent_key].trainable_variables
+            gradients = tape.gradient(loss, q_network_variables)
 
             # Delete the tape manually because of the persistent=True flag.
             del tape
@@ -320,14 +221,15 @@ class IDQNTrainer(mava.Trainer):
                 gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
 
             # Apply gradients.
-            self._optimizer.apply(gradients, network_variables)
+            self._optimizer.apply(gradients, q_network_variables)
 
             logged_losses[agent] = {
-                "loss": loss,
+                "loss": loss
             }
 
-        # Losses to track.
         return logged_losses
+
+    
 
     def step(self) -> None:
         # Run the learning step.
@@ -360,3 +262,5 @@ class IDQNTrainer(mava.Trainer):
                     self._system_network_variables[network_type][agent]
                 )
         return variables
+
+            
