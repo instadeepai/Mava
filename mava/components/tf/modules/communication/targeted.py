@@ -17,6 +17,9 @@
 
 """Broadcasted communication for multi-agent RL systems"""
 
+from typing import Dict
+
+import sonnet as snt
 
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.communication import BaseCommunicationModule
@@ -28,5 +31,8 @@ class TargetedCommunication(BaseCommunicationModule):
     def __init__(self, architecture: BaseArchitecture) -> None:
         self._architecture = architecture
 
-    def process_messages(self) -> None:
+    def process_messages(
+        self,
+        messages: Dict[str, snt.Module],
+    ) -> Dict[str, snt.Module]:
         """Perform some communication logic"""

@@ -19,6 +19,7 @@
 
 from typing import Dict
 
+import sonnet as snt
 import tensorflow as tf
 from tensorflow import Tensor
 
@@ -33,6 +34,7 @@ class BroadcastedCommunication(BaseCommunicationModule):
         self,
         architecture: BaseArchitecture,
         shared: bool = True,
+        channel_size: int = 4,
         channel_noise: float = 0.0,
     ) -> None:
         """Initializes the broadcaster communicator.
@@ -45,9 +47,21 @@ class BroadcastedCommunication(BaseCommunicationModule):
         self._shared = shared
         self._channel_noise = channel_noise
 
+    # def create_communication_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+    #     print(self._architecture)
+    #     pass
+
+    def create_system(
+        self,
+    ) -> Dict[str, Dict[str, snt.Module]]:
+        """Create system architecture with communication by modifying architecture."""
+        # networks = self.create_communication_variables()
+
+        return self._architecture.create_system()
+
     def process_messages(
         self,
-        messages: Dict[str, Tensor],
+        messages: Dict[str, Tensor] = {},
     ) -> Dict[str, Tensor]:
         """Initializes the broadcaster communicator.
         Args:
