@@ -45,8 +45,10 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         agent = self._environment.agent_selection
         observation = self._convert_observation(agent, observe, done)
 
-        self._discount = convert_np_type("float32", 1)  # Not used in pettingzoo
-        reward = convert_np_type("float32", 0)
+        self._discount = convert_np_type(
+            self.discount_spec()[agent].dtype, 1
+        )  # Not used in pettingzoo
+        reward = convert_np_type(self.reward_spec()[agent].dtype, 0)
         return parameterized_restart(reward, self._discount, observation)
 
     def step(self, action: Union[int, float]) -> dm_env.TimeStep:
@@ -171,7 +173,11 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         """Resets the episode."""
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
-
+        discount_spec = self.discount_spec()
+        self._discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self._environment.possible_agents
+        }
         observe = self._environment.reset()
         observations = self._convert_observations(
             observe, {agent: False for agent in self.possible_agents}
@@ -181,8 +187,11 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
             agent: convert_np_type(rewards_spec[agent].dtype, 0)
             for agent in self.possible_agents
         }
+
+        discount_spec = self.discount_spec()
         self._discounts = {
-            agent: convert_np_type("float32", 1) for agent in self.possible_agents
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self.possible_agents
         }
         return parameterized_restart(rewards, self._discounts, observations)
 
