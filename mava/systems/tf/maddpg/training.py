@@ -406,10 +406,12 @@ class BaseMADDPGTrainer(mava.Trainer):
             self._policy_optimizer.apply(policy_gradients, policy_variables)
             self._critic_optimizer.apply(critic_gradients, critic_variables)
 
-            logged_losses[agent] = {
-                "critic_loss": critic_loss,
-                "policy_loss": policy_loss,
-            }
+            logged_losses.update(
+                {
+                    f"{agent}_critic_loss": critic_loss,
+                    f"{agent}_policy_loss": policy_loss,
+                }
+            )
 
         # Losses to track.
         return logged_losses
@@ -436,8 +438,7 @@ class BaseMADDPGTrainer(mava.Trainer):
                 checkpointer = self._system_checkpointer[agent_key]
                 checkpointer.save()
 
-        # NOTE (Arnu): ignoring logging for now
-        # self._logger.write(fetches)
+        self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
