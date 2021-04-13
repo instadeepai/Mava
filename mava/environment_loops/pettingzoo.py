@@ -66,8 +66,8 @@ class PettingZooAECEnvironmentLoop(acme.core.Worker):
         self._logger = logger or loggers.make_default_logger(label)
         self._should_update = should_update
 
-    def _get_action(self, timestep: dm_env.TimeStep, agent_id: str) -> Any:
-        return self._executor.agent_select_action(agent_id, timestep.observation)
+    def _get_action(self, agent_id: str, timestep: dm_env.TimeStep) -> Any:
+        return self._executor.select_action(agent_id, timestep.observation)
 
     def run_episode(self) -> loggers.LoggingData:
         """Run one episode.
@@ -105,7 +105,7 @@ class PettingZooAECEnvironmentLoop(acme.core.Worker):
 
             # Generate an action from the agent's policy and step the environment.
             for agent in self._environment.agent_iter(n_agents):
-                action = self._get_action(timestep, agent)
+                action = self._get_action(agent, timestep)
                 timestep = self._environment.step(action)
 
                 rewards[agent] = timestep.reward
@@ -135,7 +135,7 @@ class PettingZooAECEnvironmentLoop(acme.core.Worker):
         steps_per_second = episode_steps / (time.time() - start_time)
         result = {
             "episode_length": episode_steps,
-            "mean_episode_return": episode_return,
+            "mean_episode_return": np.mean(episode_return),
             "steps_per_second": steps_per_second,
         }
         result.update(counts)
@@ -252,6 +252,7 @@ class PettingZooParallelEnvironmentLoop(acme.core.Worker):
             rewards = timestep.reward
 
             # Have the agent observe the timestep and let the actor update itself.
+
             self._executor.observe(actions, next_timestep=timestep)
 
             if self._should_update:
