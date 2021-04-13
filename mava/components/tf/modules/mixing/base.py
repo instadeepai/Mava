@@ -13,13 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): complete base class for mixing
+# TODO (StJohn):
+#   - [] complete base class for mixing
+#   - [] Do I need to include the call() method in this class since
+#        since I extend tf.keras.Model?
 
 import abc
 from typing import Dict
 
 import sonnet as snt
-import tensorflow as tf
 
 """Base mixing interface for multi-agent RL systems"""
 
@@ -30,7 +32,7 @@ import tensorflow as tf
 # be the forward() method.
 
 
-class BaseMixingModule(tf.keras.Model):
+class BaseMixingModule(snt.Model):
     """Base class for MARL mixing.
     Objects which implement this interface provide a set of functions
     to create systems that can perform value decomposition via a mixing
@@ -39,7 +41,7 @@ class BaseMixingModule(tf.keras.Model):
 
     @abc.abstractmethod
     def some_abstract_mixing_function(self) -> Dict[str, Dict[str, snt.Module]]:
-        """Abstract communication function."""
+        """Abstract mixing function."""
 
     @abc.abstractmethod
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
