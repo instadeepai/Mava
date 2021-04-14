@@ -27,10 +27,10 @@ from acme.utils import loggers
 from dm_env import specs
 
 from mava.environment_loop import ParallelEnvironmentLoop
-from mava.utils.wrapper_utils import generate_zeros_from_spec
+from mava.utils.wrapper_utils import RunningStatistics, generate_zeros_from_spec
 
 
-class PerAgentStatisticsBase(ParallelEnvironmentLoop):
+class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
     """A parallel MARL environment loop.
     This takes `Environment` and `Executor` instances and coordinates their
     interaction. Executors are updated if `should_update=True`. This can be used as:
@@ -89,11 +89,51 @@ class PerAgentStatisticsBase(ParallelEnvironmentLoop):
         self._environment_loop.run(num_episodes, num_steps)
 
 
-class MeanPerAgentStatistics(PerAgentStatisticsBase):
+class DetailedStatistics(EnvironmentLoopStatisticsBase):
     def __init__(self, environment_loop: ParallelEnvironmentLoop):
         super().__init__(environment_loop)
 
-        self._running_statistics: Dict[str, types.NestedArray] = {}
+        self._episode_len_stats = RunningStatistics("episode_length")
+        self._episode_return_stats = RunningStatistics("episode_return")
+        self._steps_per_second_stats = RunningStatistics("steps_per_second")
+        self._running_statistics: Dict[str, types.NestedArray] = {
+            "mean_episode_length": 0.0,
+            "max_episode_length": 0.0,
+            "min_episode_length": 0.0,
+            "var_episode_length": 0.0,
+            "std_episode_length": 0.0,
+            "mean_episode_return": 0.0,
+            "max_episode_return": 0.0,
+            "min_episode_return": 0.0,
+            "var_episode_return": 0.0,
+            "std_episode_return": 0.0,
+            "mean_steps_per_second": 0.0,
+            "max_steps_per_second": 0.0,
+            "min_steps_per_second": 0.0,
+            "var_steps_per_second": 0.0,
+            "std_steps_per_second": 0.0,
+        }
+
+        agents_stats: Dict[str, Dict[str, RunningStatistics]] = {}
+
+        # statistics dictionary
+        for agent in self._environment.possible_agents:
+            agents_stats[agent]["return"] = RunningStatistics(f"{agent}_episode_return")
+            agents_stats[agent]["reward"] = RunningStatistics(f"{agent}_episode_reward")
+            self._running_statistics.update(
+                {
+                    f"{agent}_mean_return": 0.0,
+                    f"{agent}_max_return": 0.0,
+                    f"{agent}_min_return": 0.0,
+                    f"{agent}_var_return": 0.0,
+                    f"{agent}_std_return": 0.0,
+                    f"{agent}_mean_episode_reward": 0.0,
+                    f"{agent}_max_episode_reward": 0.0,
+                    f"{agent}_min_episode_reward": 0.0,
+                    f"{agent}_var_episode_reward": 0.0,
+                    f"{agent}_std_episode_reward": 0.0,
+                }
+            )
 
     def run_episode(self) -> loggers.LoggingData:
         """Run one episode.
@@ -103,6 +143,7 @@ class MeanPerAgentStatistics(PerAgentStatisticsBase):
         Returns:
             An instance of `loggers.LoggingData`.
         """
+
         # Reset any counts and start the environment.
         start_time = time.time()
         episode_steps = 0
@@ -167,7 +208,7 @@ class MeanPerAgentStatistics(PerAgentStatisticsBase):
         steps_per_second = episode_steps / (time.time() - start_time)
         result = {
             "episode_length": episode_steps,
-            "mean_episode_return": np.mean(episode_return),
+            "episode_return": np.mean(episode_return),
             "steps_per_second": steps_per_second,
         }
         result.update(counts)

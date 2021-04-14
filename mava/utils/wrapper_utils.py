@@ -39,7 +39,7 @@ class RunningStatistics:
     a specific quantity.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, label: str) -> None:
         self.count = 0
         self.old_mean = 0.0
         self.new_mean = 0.0
@@ -48,6 +48,8 @@ class RunningStatistics:
 
         self._max = -9999999.9
         self._min = 9999999.9
+
+        self._label = label
 
     def push(self, x: float) -> None:
         self.count += 1
