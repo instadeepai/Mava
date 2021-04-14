@@ -25,8 +25,8 @@ from typing import Optional, Tuple
 import sonnet as snt
 import tensorflow as tf
 
-from mava.components.tf.architectures import BaseArchitecture
-from mava.components.tf.modules.mixing import BaseMixingModule
+from mava.components.tf.architectures.base import BaseArchitecture
+from mava.components.tf.modules.mixing.base import BaseMixingModule
 
 
 class QTranBase(BaseMixingModule):

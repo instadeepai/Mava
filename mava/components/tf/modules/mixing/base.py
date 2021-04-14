@@ -32,7 +32,7 @@ import sonnet as snt
 # be the forward() method.
 
 
-class BaseMixingModule(snt.Model):
+class BaseMixingModule(snt.Module):
     """Base class for MARL mixing.
     Objects which implement this interface provide a set of functions
     to create systems that can perform value decomposition via a mixing
