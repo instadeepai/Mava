@@ -87,27 +87,6 @@ class FeedForwardExecutor(core.Executor):
         if self._adder:
             self._adder.add_first(timestep, extras)
 
-    # TODO(Kale-ab) - This is temp. This will be changed when doing seq adder.
-    def agent_observe_first(self, agent: str, timestep: dm_env.TimeStep) -> None:
-        if self._adder:
-            extras = {}
-            extras["agent_id"] = agent
-            self._adder.add_first(timestep, extras)
-
-    # TODO(Kale-ab) - This is temp. This will be changed when doing seq adder.
-    def agent_observe(
-        self,
-        agent: str,
-        action: Union[float, int, types.NestedArray],
-        next_timestep: dm_env.TimeStep,
-        extras: Optional[Dict] = {},
-    ) -> None:
-        if self._adder:
-            if not extras:
-                extras = {}
-            extras["agent_id"] = agent
-            self._adder.add(action, next_timestep, extras)  # type: ignore
-
     def observe(
         self,
         actions: Dict[str, types.NestedArray],

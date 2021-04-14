@@ -44,7 +44,7 @@ class OLT(NamedTuple):
 """Project single timestep to all agents."""
 
 
-def project_timestep_to_all_agents(
+def broadcast_timestep_to_all_agents(
     timestep: dm_env.TimeStep, possible_agents: list
 ) -> dm_env.TimeStep:
     parallel_timestep = dm_env.TimeStep(
@@ -65,6 +65,7 @@ def convert_seq_timestep_and_actions_to_parallel(
 ) -> Tuple[dm_env.TimeStep, dict]:
 
     # Use each agents timestep
+    agent = next(iter(timesteps))
     parallel_timestep = dm_env.TimeStep(
         observation={
             agent: timesteps[agent].get("timestep").observation
@@ -77,10 +78,7 @@ def convert_seq_timestep_and_actions_to_parallel(
             agent: timesteps[agent].get("timestep").discount
             for agent in possible_agents
         },
-        step_type={
-            agent: timesteps[agent].get("timestep").step_type
-            for agent in possible_agents
-        },
+        step_type=timesteps[agent].get("timestep").step_type,
     )
 
     parallel_actions = {
