@@ -122,9 +122,10 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # Form the n-step transition given the steps.
         observations = self._buffer[0].observations
         actions = self._buffer[0].actions
-        next_observations = self._next_observations
-        self._discounts = {agent: self._discount for agent in observations.keys()}
         extras = self._buffer[0].extras
+        next_observations = self._next_observations
+        next_extras = self._next_extras
+        self._discounts = {agent: self._discount for agent in observations.keys()}
 
         # Give the same tree structure to the n-step return accumulator,
         # n-step discount accumulator, and self.discount, so that they can be
@@ -201,10 +202,11 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             transition = (
                 observations,
                 actions,
+                extras,
                 n_step_return,
                 total_discount,
                 next_observations,
-                extras,
+                next_extras,
             )  # type: ignore
         else:
             transition = (
@@ -285,6 +287,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         transition_spec = [
             obs_specs,
             act_specs,
+            extras_specs,
             reward_specs,
             step_discount_specs,
             obs_specs,  # next_observation

@@ -1,4 +1,4 @@
-#!/bin/bash
+# python3
 # Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,35 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from enum import Enum
 
-# Bash settings: fail on any error and display all commands being run.
-set -e
-set -x
 
-# Python must be 3.6 or higher.
-python --version
+class MockedEnvironments(str, Enum):
+    Mocked_Dicrete = "discrete_mock"
+    Mocked_Continous = "continous_mock"
 
-# Set up a virtual environment.
-python -m venv mava_testing
-source mava_testing/bin/activate
 
-# Install dependencies.
-pip install --upgrade pip setuptools
-pip --version
-pip install .
-pip install .[tf]
-pip install .[reverb]
-pip install .[envs]
-pip install .[testing]
+class EnvType(Enum):
+    Sequential = 1
+    Parallel = 2
 
-N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
-# Run static type-checking.
-mypy mava
-
-# Run all tests.
-pytest -n "${N_CPU}" tests
-
-# Clean-up.
-deactivate
-rm -rf mava_testing/
+class EnvSpec:
+    def __init__(self, env_name: str, env_type: EnvType):
+        self.env_name = env_name
+        self.env_type = env_type

@@ -20,7 +20,7 @@ similar to the `Actor` and `Learner` in Acme.
 """
 
 import abc
-from typing import Dict, List, Sequence, TypeVar
+from typing import Dict, List, Sequence, TypeVar, Union
 
 import acme
 
@@ -60,12 +60,26 @@ class Executor(acme.Actor):
         """Samples from the policy and returns an action for each agent."""
 
     @abc.abstractmethod
+    def agent_observe(
+        self,
+        agent: str,
+        action: Union[float, int, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
+    ) -> None:
+        """Make an observation of timestep data from sequential environment.
+        Args:
+        agent: agent id.
+        action: action taken in the environment.
+        next_timestep: timestep produced by the environment given the action.
+        """
+
+    @abc.abstractmethod
     def observe(
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
     ) -> None:
-        """Make an observation of timestep data from the environment.
+        """Make an observation of timestep data from parallel environment.
         Args:
         action: action taken in the environment.
         next_timestep: timestep produced by the environment given the action.
