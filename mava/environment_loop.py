@@ -17,7 +17,7 @@
 
 import operator
 import time
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import acme
 import dm_env
@@ -28,9 +28,10 @@ from dm_env import specs
 
 import mava
 from mava.utils.wrapper_utils import (
-    generate_zeros_from_spec,
-    convert_seq_timestep_and_actions_to_parallel,
+    SeqTimestepDict,
     broadcast_timestep_to_all_agents,
+    convert_seq_timestep_and_actions_to_parallel,
+    generate_zeros_from_spec,
 )
 
 
@@ -85,6 +86,8 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         agent = self._environment.agent_selection
 
         # Broadcast timestep for all agents - to use parallel adder.
+        # TODO (Kale-ab) : Make more robust -this could cause issues
+        # if agents have different discounts, obs or legal actions.
         parallel_timestep = broadcast_timestep_to_all_agents(
             timestep, self._environment.possible_agents
         )
@@ -108,7 +111,7 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         # Run an episode.
         while not timestep.last():
             # Keep track of timesteps for all agents in the step.
-            timesteps = {}
+            timesteps: Dict[str, SeqTimestepDict] = {}
             # Generate an action from the agent's policy and step the environment.
             for agent in self._environment.agent_iter(n_agents):
                 action = self._get_action(agent, timestep)

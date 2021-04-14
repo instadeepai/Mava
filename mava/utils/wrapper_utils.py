@@ -1,4 +1,4 @@
-from typing import Dict, NamedTuple, Union, Tuple
+from typing import Dict, NamedTuple, Tuple, Union
 
 import dm_env
 import numpy as np
@@ -8,8 +8,8 @@ from dm_env import specs
 # Need to install typing_extensions since we support pre python 3.8
 from typing_extensions import TypedDict
 
-SequentialTimestepActions = TypedDict(
-    "AgentSeqInfo",
+SeqTimestepDict = TypedDict(
+    "SeqTimestepDict",
     {"timestep": dm_env.TimeStep, "action": Union[int, float, types.NestedArray]},
 )
 
@@ -61,28 +61,24 @@ def broadcast_timestep_to_all_agents(
 
 
 def convert_seq_timestep_and_actions_to_parallel(
-    timesteps: SequentialTimestepActions, possible_agents: list
+    timesteps: Dict[str, SeqTimestepDict], possible_agents: list
 ) -> Tuple[dm_env.TimeStep, dict]:
 
     # Use each agents timestep
     agent = next(iter(timesteps))
     parallel_timestep = dm_env.TimeStep(
         observation={
-            agent: timesteps[agent].get("timestep").observation
-            for agent in possible_agents
+            agent: timesteps[agent]["timestep"].observation for agent in possible_agents
         },
         reward={
-            agent: timesteps[agent].get("timestep").reward for agent in possible_agents
+            agent: timesteps[agent]["timestep"].reward for agent in possible_agents
         },
         discount={
-            agent: timesteps[agent].get("timestep").discount
-            for agent in possible_agents
+            agent: timesteps[agent]["timestep"].discount for agent in possible_agents
         },
-        step_type=timesteps[agent].get("timestep").step_type,
+        step_type=timesteps[agent]["timestep"].step_type,
     )
 
-    parallel_actions = {
-        agent: timesteps[agent].get("action") for agent in possible_agents
-    }
+    parallel_actions = {agent: timesteps[agent]["action"] for agent in possible_agents}
 
     return parallel_actions, parallel_timestep

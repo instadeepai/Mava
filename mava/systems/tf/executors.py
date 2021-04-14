@@ -1,6 +1,6 @@
 """Generic executor implementations, using TensorFlow and Sonnet."""
 
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 import dm_env
 import sonnet as snt
