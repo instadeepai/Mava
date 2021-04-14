@@ -24,10 +24,7 @@ import pytest
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 from mava import specs as mava_specs
-from mava.environment_loops.pettingzoo import (
-    PettingZooAECEnvironmentLoop,
-    PettingZooParallelEnvironmentLoop,
-)
+from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
 from mava.utils.wrapper_utils import convert_np_type
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
@@ -90,9 +87,9 @@ class Helpers:
     ) -> acme.core.Worker:
         env_loop = None
         if env_spec.env_type == EnvType.Parallel:
-            env_loop = PettingZooParallelEnvironmentLoop
+            env_loop = ParallelEnvironmentLoop
         elif env_spec.env_type == EnvType.Sequential:
-            env_loop = PettingZooAECEnvironmentLoop
+            env_loop = SequentialEnvironmentLoop
         else:
             raise Exception("Env_spec is not valid.")
         return env_loop
