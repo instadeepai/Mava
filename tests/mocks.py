@@ -175,6 +175,7 @@ This class should be inherited with a MockedMAEnvironment. """
 class SequentialEnvironment(MockedEnvironment):
     def __init__(self, agents: Dict, specs: EnvironmentSpec) -> None:
         self.agents = agents
+        self.possible_agents = agents
         self._specs = specs
         self.agent_selection = self.agents[0]
 
@@ -210,22 +211,15 @@ class SequentialEnvironment(MockedEnvironment):
 
     def reset(self) -> dm_env.TimeStep:
         observation = self._generate_fake_observation()
-        legals = np.ones(
-            self.action_spec()[self.agent_selection].shape,
-            self.action_spec()[self.agent_selection].dtype,
-        )
-
         discount = convert_np_type("float32", 1)  # Not used in pettingzoo
         reward = convert_np_type("float32", 0)
-        observation_olt = OLT(
-            observation=observation,
-            legal_actions=legals,
-            terminal=np.asarray([0], dtype=np.float32),
-        )
         self._step = 1
         return parameterized_restart(
-            reward=reward, discount=discount, observation=observation_olt
+            reward=reward, discount=discount, observation=observation
         )
+
+    def _generate_fake_observation(self) -> OLT:
+        return _generate_from_spec(self.observation_spec())
 
 
 """Class that updates functions for parallel environment.
@@ -262,18 +256,8 @@ class ParallelEnvironment(MockedEnvironment):
     def _generate_fake_observation(self) -> Dict[str, OLT]:
         observations = {}
         for agent in self.agents:
-            fake_observation = _generate_from_spec(
-                self.observation_spec()[agent].observation
-            )
-            legals = np.ones(
-                self.action_spec()[agent].shape,
-                self.action_spec()[agent].dtype,
-            )
-
-            terminal = np.asarray([0], dtype=np.float32)
-            observations[agent] = OLT(
-                observation=fake_observation, legal_actions=legals, terminal=terminal
-            )
+            fake_observation = _generate_from_spec(self.observation_spec()[agent])
+            observations[agent] = fake_observation
         return observations
 
     def reset(self) -> dm_env.TimeStep:
