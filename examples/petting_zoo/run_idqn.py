@@ -11,7 +11,7 @@ from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
-from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import idqn
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
@@ -105,9 +105,7 @@ def main(_: Any) -> None:
     )
 
     # Create the environment loop used for training.
-    train_loop = PettingZooParallelEnvironmentLoop(
-        environment, system, label="train_loop"
-    )
+    train_loop = ParallelEnvironmentLoop(environment, system, label="train_loop")
 
     # TODO fix the eval loop
 
@@ -122,7 +120,7 @@ def main(_: Any) -> None:
     # # Create the evaluation actor and loop.
     # eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
     # eval_env = make_environment()
-    # eval_loop = PettingZooParallelEnvironmentLoop(
+    # eval_loop = ParallelEnvironmentLoop(
     #     eval_env, eval_actor, label="eval_loop"
     # )
 
