@@ -41,11 +41,12 @@ def make_networks(
     shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
+
     specs = environment_spec.get_agent_specs()
+
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
-    specs = environment_spec.get_agent_specs()
     observation_networks = {}
     q_networks = {}
     behavior_networks = {}
