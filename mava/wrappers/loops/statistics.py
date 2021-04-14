@@ -263,6 +263,7 @@ class DetailedStatistics(EnvironmentLoopStatisticsBase):
         self._compute_episode_statistics(
             episode_returns, episode_return, episode_steps, steps_per_second
         )
+        self._running_statistics.update({"episode_length": episode_steps})
         self._running_statistics.update(counts)
 
         return self._running_statistics
