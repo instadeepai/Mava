@@ -79,8 +79,8 @@ class RunningStatistics:
     def mean(self) -> float:
         return self.new_mean if self.count else 0.0
 
-    def variance(self) -> float:
+    def var(self) -> float:
         return self.new_var / (self.count - 1) if self.count > 1 else 0.0
 
-    def standard_deviation(self) -> float:
-        return np.sqrt(self.variance())
+    def std(self) -> float:
+        return np.sqrt(self.var())
