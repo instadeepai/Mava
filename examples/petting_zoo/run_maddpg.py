@@ -29,7 +29,7 @@ from acme.tf import utils as tf2_utils
 from acme.utils.loggers.tf_summary import TFSummaryLogger
 
 from mava import specs as mava_specs
-from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
@@ -159,7 +159,7 @@ def main(_: Any) -> None:
     )
 
     # Create the environment loop used for training.
-    train_loop = PettingZooParallelEnvironmentLoop(
+    train_loop = ParallelEnvironmentLoop(
         environment, system, logger=train_logger, label="train_loop"
     )
 
@@ -181,7 +181,7 @@ def main(_: Any) -> None:
     # Create the evaluation actor and loop.
     eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
     eval_env = make_environment(remove_on_fall=False)
-    eval_loop = PettingZooParallelEnvironmentLoop(
+    eval_loop = ParallelEnvironmentLoop(
         eval_env, eval_actor, logger=eval_logger, label="eval_loop"
     )
 
