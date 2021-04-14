@@ -15,6 +15,10 @@
 
 """Generic environment loop wrapper to track system statistics"""
 
+from typing import Any, Optional
+
+import dm_env
+from acme.utils import loggers
 
 from mava.environment_loop import ParallelEnvironmentLoop
 
