@@ -31,7 +31,8 @@ from acme.utils.loggers.tf_summary import TFSummaryLogger
 from mava import specs as mava_specs
 from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
-from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+from mava.wrappers.environments.pettingzoo import PettingZooParallelEnvWrapper
+from mava.wrappers.loops.statistics import DetailedStatistics
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
@@ -162,6 +163,9 @@ def main(_: Any) -> None:
     train_loop = PettingZooParallelEnvironmentLoop(
         environment, system, logger=train_logger, label="train_loop"
     )
+
+    # Wrap training loop to compute and log detailed running statistics
+    train_loop = DetailedStatistics(train_loop)
 
     # Create the evaluation policy.
     # NOTE: assumes weight sharing
