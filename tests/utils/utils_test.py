@@ -35,8 +35,9 @@ class TestUtils:
 
         expected_parallel_timesteps = get_expected_parallel_timesteps_1()
 
+        possible_agents = ["agent_0", "agent_1", "agent_2"]
         parallel_timesteps = broadcast_timestep_to_all_agents(
-            seq_timesteps, ["agent_0", "agent_1", "agent_2"]
+            seq_timesteps, possible_agents
         )
 
         assert np.array_equal(
@@ -47,12 +48,11 @@ class TestUtils:
     # Test convert_seq_timestep_and_actions_to_parallel
     def test_convert_seq_timestep_and_actions_to_parallel(self) -> None:
 
-        possible_agents = ["agent_0", "agent_1", "agent_2"]
         timesteps = get_seq_timesteps_dict_2()
-
         expected_parallel_timesteps = get_expected_parallel_timesteps_2()
-        expected_actions = {"agent_0": 0, "agent_1": 2, "agent_2": 1}
 
+        possible_agents = ["agent_0", "agent_1", "agent_2"]
+        expected_actions = {"agent_0": 0, "agent_1": 2, "agent_2": 1}
         (
             parallel_actions,
             parallel_timesteps,
