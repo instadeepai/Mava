@@ -13,6 +13,6 @@ ENV TF_CPP_MIN_LOG_LEVEL=3
 # Install Mava and dependencies
 COPY . /home/app/mava
 RUN python -m pip install --upgrade pip
-RUN python -m pip install -e .[tf,envs,reverb]
+RUN python -m pip install -e .[tf,envs,reverb,testing_formatting]
 
 EXPOSE 6006
