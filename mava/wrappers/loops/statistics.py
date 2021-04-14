@@ -15,12 +15,19 @@
 
 """Generic environment loop wrapper to track system statistics"""
 
-from typing import Any, Optional
+import operator
+import time
+from typing import Any, Dict, Optional
 
 import dm_env
+import numpy as np
+import tree
+from acme import types
 from acme.utils import loggers
+from dm_env import specs
 
 from mava.environment_loop import ParallelEnvironmentLoop
+from mava.utils.wrapper_utils import generate_zeros_from_spec
 
 
 class PerAgentStatisticsBase(ParallelEnvironmentLoop):
@@ -42,9 +49,11 @@ class PerAgentStatisticsBase(ParallelEnvironmentLoop):
     def __init__(
         self,
         environment_loop: ParallelEnvironmentLoop,
-    ):
+    ) -> None:
         # Internalize agent and environment.
         self._environment_loop = environment_loop
+        self._environment = self._environment_loop._environment
+        self._executor = self._environment_loop._executor
 
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._environment_loop._get_actions(timestep)
@@ -78,3 +87,89 @@ class PerAgentStatisticsBase(ParallelEnvironmentLoop):
         """
 
         self._environment_loop.run(num_episodes, num_steps)
+
+
+class MeanPerAgentStatistics(PerAgentStatisticsBase):
+    def __init__(self, environment_loop: ParallelEnvironmentLoop):
+        super().__init__(environment_loop)
+
+        self._running_statistics: Dict[str, types.NestedArray] = {}
+
+    def run_episode(self) -> loggers.LoggingData:
+        """Run one episode.
+        Each episode is a loop which interacts first with the environment to get a
+        dictionary of observations and then give those observations to the executor
+        in order to retrieve an action for each agent in the system.
+        Returns:
+            An instance of `loggers.LoggingData`.
+        """
+        # Reset any counts and start the environment.
+        start_time = time.time()
+        episode_steps = 0
+
+        timestep = self._environment.reset()
+
+        # Make the first observation.
+        self._executor.observe_first(timestep)
+
+        n_agents = self._environment.num_agents
+        rewards = {
+            agent: generate_zeros_from_spec(spec)
+            for agent, spec in self._environment.reward_spec().items()
+        }
+
+        # For evaluation, this keeps track of the total undiscounted reward
+        # for each agent accumulated during the episode.
+        multiagent_reward_spec = specs.Array((n_agents,), np.float32)
+        episode_return = tree.map_structure(
+            generate_zeros_from_spec, multiagent_reward_spec
+        )
+
+        # Run an episode.
+        while not timestep.last():
+
+            # Generate an action from the agent's policy and step the environment.
+            actions = self._get_actions(timestep)
+            timestep = self._environment.step(actions)
+
+            rewards = timestep.reward
+
+            # Have the agent observe the timestep and let the actor update itself.
+
+            self._executor.observe(actions, next_timestep=timestep)
+
+            if self._should_update:
+                self._executor.update()
+
+            # Book-keeping.
+            episode_steps += 1
+
+            # NOTE (Arnu): fix for when env returns empty dict at end of episode.
+            if not rewards:
+                rewards = {
+                    agent: generate_zeros_from_spec(spec)
+                    for agent, spec in self._environment.reward_spec().items()
+                }
+
+            # Equivalent to: episode_return += timestep.reward
+            # We capture the return value because if timestep.reward is a JAX
+            # DeviceArray, episode_return will not be mutated in-place. (In all other
+            # cases, the returned episode_return will be the same object as the
+            # argument episode_return.)
+            episode_return = tree.map_structure(
+                operator.iadd, episode_return, np.array(list(rewards.values()))
+            )
+
+        # Record counts.
+        counts = self._counter.increment(episodes=1, steps=episode_steps)
+
+        # Collect the results and combine with counts.
+        steps_per_second = episode_steps / (time.time() - start_time)
+        result = {
+            "episode_length": episode_steps,
+            "mean_episode_return": np.mean(episode_return),
+            "steps_per_second": steps_per_second,
+        }
+        result.update(counts)
+
+        return result
