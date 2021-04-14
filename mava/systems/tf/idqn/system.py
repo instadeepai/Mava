@@ -15,6 +15,7 @@ from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.idqn import training
 
+
 @dataclasses.dataclass
 class IDQNConfig:
     """Configuration options for the MADDPG system.
@@ -74,9 +75,7 @@ class IDQNBuilder(SystemBuilder):
     def __init__(
         self,
         config: IDQNConfig,
-        trainer_fn: Type[
-            training.IDQNTrainer
-        ] = training.IDQNTrainer,
+        trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
     ):
         """Args:
         config: Configuration options for the MADDPG system.
@@ -89,7 +88,6 @@ class IDQNBuilder(SystemBuilder):
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
-
 
     def make_replay_table(
         self,
@@ -119,7 +117,7 @@ class IDQNBuilder(SystemBuilder):
             prefetch_size=self._config.prefetch_size,
         )
         return iter(dataset)
-    
+
     def make_adder(
         self,
         replay_client: reverb.Client,
@@ -251,9 +249,7 @@ class IDQN(system.System):
         q_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        trainer_fn: Type[
-            training.IDQNTrainer
-        ] = training.IDQNTrainer,
+        trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
         shared_weights: bool = False,
         discount: float = 0.99,
         batch_size: int = 256,

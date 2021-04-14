@@ -1,4 +1,3 @@
-import copy
 import time
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -7,7 +6,6 @@ import sonnet as snt
 import tensorflow as tf
 import tree
 import trfl
-from acme.tf import losses
 from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
@@ -78,13 +76,14 @@ class IDQNTrainer(mava.Trainer):
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Expose the variables.
-        q_networks_to_expose = {}
         self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
             "q_network": {},
         }
         self._system_checkpointer = {}
         for agent_key in self.unique_net_keys:
-            self._system_network_variables["q_network"][agent_key] = q_networks[agent_key].variables
+            self._system_network_variables["q_network"][agent_key] = q_networks[
+                agent_key
+            ].variables
 
             checkpointer = tf2_savers.Checkpointer(
                 time_delta_minutes=5,
@@ -104,18 +103,13 @@ class IDQNTrainer(mava.Trainer):
         # fill the replay buffer.
         self._timestamp = None
 
-
     @tf.function
     def _update_target_networks(self) -> None:
         for key in self.unique_net_keys:
             # Update target network.
-            online_variables = (
-                *self._q_networks[key].variables,
-            )
+            online_variables = (*self._q_networks[key].variables,)
 
-            target_variables = (
-                *self._target_q_networks[key].variables,
-            )
+            target_variables = (*self._target_q_networks[key].variables,)
 
             # Make online -> target network update ops.
             if tf.math.mod(self._num_steps, self._target_update_period) == 0:
@@ -153,14 +147,13 @@ class IDQNTrainer(mava.Trainer):
         o_t_trans: Dict[str, np.ndarray],
         a_tm1: Dict[str, np.ndarray],
         agent: str,
-    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
 
         o_tm1_feed = o_tm1_trans[agent]
         o_t_feed = o_t_trans[agent]
         a_tm1_feed = a_tm1[agent]
 
         return o_tm1_feed, o_t_feed, a_tm1_feed
-
 
     def _step(
         self,
@@ -196,15 +189,23 @@ class IDQNTrainer(mava.Trainer):
                 # Transforming the observations this way at the start of the learning
                 # step effectively means that the policy and critic share observation
                 # network weights.
-                o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t) #TODO can this go outside 
-                                                                                    # the agent loop. duplicate work going on here
+                o_tm1_trans, o_t_trans = self._transform_observations(
+                    o_tm1, o_t
+                )  # TODO can this go outside
+                # the agent loop. duplicate work going on here
 
-                o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(o_tm1_trans, o_t_trans, a_tm1, agent)
+                o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
+                    o_tm1_trans, o_t_trans, a_tm1, agent
+                )
 
                 q_tm1 = self._q_networks[agent](o_tm1_feed)
                 q_t = self._target_q_networks[agent](o_t_feed)
 
-                loss, _ = trfl.qlearning(q_tm1, a_tm1_feed, r_t[agent], d_t[agent], q_t)
+                # Squeeze into the shape expected by the td_learning implementation.
+                q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
+                q_t = tf.squeeze(q_t, axis=-1)  # [B]
+
+                loss, _ = trfl.qlearning(q_tm1, a_tm1_feed, discount, d_t[agent], q_t)
 
                 loss = tf.reduce_mean(loss, axis=[0])
 
@@ -222,13 +223,9 @@ class IDQNTrainer(mava.Trainer):
             # Apply gradients.
             self._optimizer.apply(gradients, q_network_variables)
 
-            logged_losses[agent] = {
-                "loss": loss
-            }
+            logged_losses[agent] = {"loss": loss}
 
         return logged_losses
-
-    
 
     def step(self) -> None:
         # Run the learning step.
@@ -261,5 +258,3 @@ class IDQNTrainer(mava.Trainer):
                     self._system_network_variables[network_type][agent]
                 )
         return variables
-
-            
