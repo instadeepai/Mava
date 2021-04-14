@@ -25,9 +25,8 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-
-# from mava.components.tf.architectures import DecentralisedActorCritic
-# from mava.systems import system
+from mava.components.tf.architectures import DecentralisedActorCritic
+from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.ippo import training
@@ -76,12 +75,12 @@ class IPPOConfig:
     baseline_cost: float = 0.5
 
     # Reverb stuff
+    n_step: int = 5
     batch_size: int = 32
     prefetch_size: int = 4
     max_queue_size: int = 100_000
     samples_per_insert: float = 32.0
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
-    n_step = 5
 
     # Gradient clipping
     clipping: bool = True
@@ -244,8 +243,8 @@ class IPPOBuilder(SystemBuilder):
         target_update_period = self._config.target_update_period
 
         # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-        critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
+        policy_optimizer = snt.optimizers.Adam(learning_rate=1e-3)
+        critic_optimizer = snt.optimizers.Adam(learning_rate=1e-3)
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
@@ -273,3 +272,131 @@ class IPPOBuilder(SystemBuilder):
             checkpoint=checkpoint,
         )
         return trainer
+
+
+class IPPO(system.System):
+    """IPPO system.
+    This implements a single-process PPO system. This is an actor-critic based
+    system that generates data via a behavior policy, inserts N-step transitions into
+    a replay buffer, and periodically updates the policies of each agent
+    (and as a result the behavior) by sampling uniformly from this buffer.
+    """
+
+    def __init__(
+        self,
+        environment_spec: specs.MAEnvironmentSpec,
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
+        trainer_fn: Type[training.IPPOTrainer] = training.IPPOTrainer,
+        shared_weights: bool = True,
+        discount: float = 0.99,
+        lambda_gae: float = 0.95,
+        entropy_cost: float = 0.01,
+        baseline_cost: float = 0.5,
+        clipping_epsilon: float = 0.2,
+        batch_size: int = 256,
+        prefetch_size: int = 4,
+        target_update_period: int = 100,
+        max_queue_size: int = 1000000,
+        samples_per_insert: float = 32.0,
+        n_step: int = 5,
+        clipping: bool = True,
+        logger: loggers.Logger = None,
+        counter: counting.Counter = None,
+        checkpoint: bool = True,
+        replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
+    ):
+        """Initialize the system.
+        Args:
+            environment_spec: description of the actions, observations, etc.
+            policy_networks: the online (optimized) policies for each agent in
+                the system.
+            critic_networks: the online critic for each agent in the system.
+            observation_networks: dictionary of optional networks to transform
+                the observations before they are fed into any network.
+            discount: discount to use for TD updates.
+            batch_size: batch size for updates.
+            prefetch_size: size to prefetch from replay.
+            target_update_period: number of learner steps to perform before updating
+              the target networks.
+            min_replay_size: minimum replay size before updating.
+            max_replay_size: maximum replay size.
+            samples_per_insert: number of samples to take from replay for every insert
+              that is made.
+            n_step: number of steps to squash into a single transition.
+            sigma: standard deviation of zero-mean, Gaussian exploration noise.
+            clipping: whether to clip gradients by global norm.
+            logger: logger object to be used by trainers.
+            counter: counter object used to keep track of steps.
+            checkpoint: boolean indicating whether to checkpoint the trainers.
+            replay_table_name: string indicating what name to give the replay table."""
+
+        builder = IPPOBuilder(
+            IPPOConfig(
+                environment_spec=environment_spec,
+                policy_networks=policy_networks,
+                critic_networks=critic_networks,
+                observation_networks=observation_networks,
+                shared_weights=shared_weights,
+                discount=discount,
+                clipping_epsilon=clipping_epsilon,
+                baseline_cost=baseline_cost,
+                entropy_cost=entropy_cost,
+                lambda_gae=lambda_gae,
+                batch_size=batch_size,
+                prefetch_size=prefetch_size,
+                target_update_period=target_update_period,
+                max_queue_size=max_queue_size,
+                samples_per_insert=samples_per_insert,
+                n_step=n_step,
+                clipping=clipping,
+                logger=logger,
+                counter=counter,
+                checkpoint=checkpoint,
+                replay_table_name=replay_table_name,
+            ),
+            trainer_fn=trainer_fn,
+        )
+
+        # Create a replay server to add data to. This uses no limiter behavior in
+        # order to allow the Agent interface to handle it.
+        replay_table = builder.make_replay_table(environment_spec=environment_spec)
+        self._server = reverb.Server([replay_table], port=None)
+        replay_client = reverb.Client(f"localhost:{self._server.port}")
+
+        # The adder is used to insert observations into replay.
+        adder = builder.make_adder(replay_client)
+
+        # The dataset provides an interface to sample from replay.
+        dataset = builder.make_dataset_iterator(replay_client)
+
+        # Create the networks
+        networks = DecentralisedActorCritic(
+            environment_spec=environment_spec,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            observation_networks=observation_networks,
+            behavior_networks=behavior_networks,
+            shared_weights=shared_weights,
+        ).create_system()
+
+        # Create the actor which defines how we take actions.
+        executor = builder.make_executor(networks["behaviors"], adder)
+
+        # The learner updates the parameters (and initializes them).
+        trainer = builder.make_trainer(
+            networks=networks,
+            dataset=dataset,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+        )
+
+        super().__init__(
+            executor=executor,
+            trainer=trainer,
+            min_observations=max_queue_size,
+            observations_per_step=float(batch_size) / samples_per_insert,
+        )
