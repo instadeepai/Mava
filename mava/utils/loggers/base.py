@@ -54,7 +54,6 @@ def make_logger(
         A logger (pipe) object that responds to logger.write(some_dict).
     """
     logger = []
-    # path = lambda d: str(directory / d) if d else str(directory)
 
     if to_terminal:
         logger += [loggers.TerminalLogger(label=label, print_fn=print_fn)]
