@@ -136,23 +136,23 @@ class DetailedStatistics(EnvironmentLoopStatisticsBase):
                 }
             )
 
-    def _compute_episode_statistics(self, ep_return: Dict[str, float]) -> None:
-        for agent, reward in rewards.items():
-            self._agents_stats[agent]["reward"].push(reward)
-            mean_reward = self._agents_stats[agent]["return"].mean()
-            max_reward = self._agents_stats[agent]["return"].max()
-            min_reward = self._agents_stats[agent]["return"].min()
-            var_reward = self._agents_stats[agent]["return"].variance()
-            std_reward = self._agents_stats[agent]["return"].standard_deviation()
-            self._running_statistics.update(
-                {
-                    f"{agent}_mean_return": 0.0,
-                    f"{agent}_max_return": 0.0,
-                    f"{agent}_min_return": 0.0,
-                    f"{agent}_var_return": 0.0,
-                    f"{agent}_std_return": 0.0,
-                }
-            )
+    # def _compute_episode_statistics(self, ep_return: Dict[str, float]) -> None:
+    #     for agent, reward in rewards.items():
+    #         self._agents_stats[agent]["reward"].push(reward)
+    #         mean_reward = self._agents_stats[agent]["return"].mean()
+    #         max_reward = self._agents_stats[agent]["return"].max()
+    #         min_reward = self._agents_stats[agent]["return"].min()
+    #         var_reward = self._agents_stats[agent]["return"].variance()
+    #         std_reward = self._agents_stats[agent]["return"].standard_deviation()
+    #         self._running_statistics.update(
+    #             {
+    #                 f"{agent}_mean_return": 0.0,
+    #                 f"{agent}_max_return": 0.0,
+    #                 f"{agent}_min_return": 0.0,
+    #                 f"{agent}_var_return": 0.0,
+    #                 f"{agent}_std_return": 0.0,
+    #             }
+    #         )
 
     def run_episode(self) -> loggers.LoggingData:
         """Run one episode.
