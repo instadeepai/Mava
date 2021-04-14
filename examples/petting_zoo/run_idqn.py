@@ -2,9 +2,9 @@ import importlib
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
+import trfl
 from absl import app, flags
 from acme import types
 from acme.tf import networks
@@ -12,9 +12,8 @@ from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
-from mava.systems.tf import executors, idqn
+from mava.systems.tf import idqn
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
-import trfl
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
@@ -24,6 +23,7 @@ flags.DEFINE_integer(
     100,
     "Number of training episodes to run between evaluation " "episodes.",
 )
+
 
 def make_environment(
     env_class: str = "mpe", env_name: str = "simple_v2", **kwargs: int
@@ -38,14 +38,12 @@ def make_environment(
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
-    shared_weights: bool = False
+    shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
     if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {
-            key: q_networks_layer_sizes for key in specs.keys()
-        }
+        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
     specs = environment_spec.get_agent_specs()
     observation_networks = {}
@@ -62,18 +60,20 @@ def make_networks(
         # Create the policy network.
         q_network = snt.Sequential(
             [
-                networks.LayerNormMLP(
-                    q_networks_layer_sizes[key], activate_final=True
-                ),
-                networks.NearZeroInitializedLinear(num_dimensions)
+                networks.LayerNormMLP(q_networks_layer_sizes[key], activate_final=True),
+                networks.NearZeroInitializedLinear(num_dimensions),
             ]
         )
 
-        epsilon = tf.Variable(0.1, trainable=False) # fixed for now. not sure where to update it. maybe in the learner
+        epsilon = tf.Variable(
+            0.1, trainable=False
+        )  # fixed for now. not sure where to update it. maybe in the learner
         behavior_network = snt.Sequential(
             [
                 q_network,
-                lambda q: tf.cast(trfl.epsilon_greedy(q, epsilon=epsilon).sample(), 'int64')
+                lambda q: tf.cast(
+                    trfl.epsilon_greedy(q, epsilon=epsilon).sample(), "int64"
+                ),
             ]
         )
 
@@ -87,6 +87,7 @@ def make_networks(
         "behaviors": behavior_networks,
     }
 
+
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment(max_cycles=25)
@@ -97,7 +98,9 @@ def main(_: Any) -> None:
     system = idqn.IDQN(
         environment_spec=environment_spec,
         q_networks=system_networks["q_networks"],
-        observation_networks=system_networks["observations"],  # pytype: disable=wrong-arg-types
+        observation_networks=system_networks[
+            "observations"
+        ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
     )
 
@@ -106,23 +109,22 @@ def main(_: Any) -> None:
         environment, system, label="train_loop"
     )
 
-    # Create the evaluation policy.
-    eval_policies = {
-        key: snt.Sequential(
-            [
-                system_networks["q_networks"][key],
-                lambda q: tf.math.argmax(q, axis=1)
-            ]
-        )
-        for key in environment_spec.get_agent_specs().keys()
-    }
+    # TODO fix the eval loop
 
-    # Create the evaluation actor and loop.
-    eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
-    eval_env = make_environment()
-    eval_loop = PettingZooParallelEnvironmentLoop(
-    eval_env, eval_actor, label="eval_loop"
-    )
+    # Create the evaluation policy.
+    # eval_policies = {
+    #     key: snt.Sequential(
+    #         [system_networks["q_networks"][key], lambda q: tf.math.argmax(q, axis=1)]
+    #     )
+    #     for key in environment_spec.get_agent_specs().keys()
+    # }
+
+    # # Create the evaluation actor and loop.
+    # eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
+    # eval_env = make_environment()
+    # eval_loop = PettingZooParallelEnvironmentLoop(
+    #     eval_env, eval_actor, label="eval_loop"
+    # )
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
@@ -131,6 +133,3 @@ def main(_: Any) -> None:
 
 if __name__ == "__main__":
     app.run(main)
-        
-
-
