@@ -201,6 +201,10 @@ class IDQNTrainer(mava.Trainer):
                 q_tm1 = self._q_networks[agent](o_tm1_feed)
                 q_t = self._target_q_networks[agent](o_t_feed)
 
+                # Squeeze into the shape expected by the td_learning implementation.
+                q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
+                q_t = tf.squeeze(q_t, axis=-1)  # [B]
+
                 loss, _ = trfl.qlearning(q_tm1, a_tm1_feed, discount, d_t[agent], q_t)
 
                 loss = tf.reduce_mean(loss, axis=[0])
