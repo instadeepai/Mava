@@ -33,8 +33,7 @@ from mava.components.tf.architectures import CentralisedActor
 from mava.components.tf.modules.communication import DifferentiableCommunication
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
-from mava.systems.tf import executors
-from mava.systems.tf.dial import training
+from mava.systems.tf.dial import execution, training
 
 
 @dataclasses.dataclass
@@ -195,7 +194,7 @@ class DIALBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
-        return executors.RecurrentExecutor(
+        return execution.DIALExecutor(
             policy_networks=policy_networks,
             shared_weights=shared_weights,
             variable_client=variable_client,

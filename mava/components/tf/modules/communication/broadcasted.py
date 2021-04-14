@@ -21,7 +21,6 @@ from typing import Dict
 
 import sonnet as snt
 import tensorflow as tf
-from tensorflow import Tensor
 
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.communication import BaseCommunicationModule
@@ -61,8 +60,8 @@ class BroadcastedCommunication(BaseCommunicationModule):
 
     def process_messages(
         self,
-        messages: Dict[str, Tensor] = {},
-    ) -> Dict[str, Tensor]:
+        messages: Dict[str, snt.Module],
+    ) -> Dict[str, snt.Module]:
         """Initializes the broadcaster communicator.
         Args:
             messages: Dict of agent messages.
