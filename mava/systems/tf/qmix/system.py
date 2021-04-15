@@ -19,7 +19,7 @@
 
 """QMIX system implementation."""
 import dataclasses
-from typing import Dict, Iterator, Optional
+from typing import Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -30,8 +30,8 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import CentralisedActor
-from mava.components.tf.modules.mixing import MonotonicMixing
+from mava.components.tf.architectures import DecentralisedActor
+from mava.components.tf.modules.mixing import AdditiveMixing
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
@@ -109,7 +109,7 @@ class QMIXBuilder(SystemBuilder):
       """
 
     def __init__(
-        self, 
+        self,
         config: QMIXConfig,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
     ):
@@ -216,7 +216,7 @@ class QMIXBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        #huber_loss_parameter: float = 1.0,
+        # huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
@@ -237,12 +237,12 @@ class QMIXBuilder(SystemBuilder):
         agents = self._agents
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
-        #clipping = self._config.clipping
+        # clipping = self._config.clipping
         discount = self._config.discount
         target_update_period = self._config.target_update_period
-        #max_gradient_norm = self._config.max_gradient_norm
+        # max_gradient_norm = self._config.max_gradient_norm
         learning_rate = self._config.learning_rate
-        #importance_sampling_exponent = self._config.importance_sampling_exponent
+        # importance_sampling_exponent = self._config.importance_sampling_exponent
 
         # Create optimizers.
         optimizer = snt.optimizers.Adam(learning_rate=learning_rate)
@@ -256,17 +256,17 @@ class QMIXBuilder(SystemBuilder):
             target_q_network=networks["target_networks"],
             shared_weights=shared_weights,
             discount=discount,
-            #importance_sampling_exponent=importance_sampling_exponent,
+            # importance_sampling_exponent=importance_sampling_exponent,
             optimizer=optimizer,
             target_update_period=target_update_period,
             dataset=dataset,
-            #huber_loss_parameter=huber_loss_parameter,
+            # huber_loss_parameter=huber_loss_parameter,
             replay_client=replay_client,
-            #clipping=clipping,
+            # clipping=clipping,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
-            #max_gradient_norm=max_gradient_norm,
+            # max_gradient_norm=max_gradient_norm,
         )
         return trainer
 
@@ -284,6 +284,7 @@ class QMIX(system.System):
         environment_spec: specs.MAEnvironmentSpec,
         q_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         shared_weights: bool = False,
         batch_size: int = 256,
@@ -292,8 +293,8 @@ class QMIX(system.System):
         samples_per_insert: float = 32.0,
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
-        #importance_sampling_exponent: float = 0.2,
-        #priority_exponent: float = 0.6,
+        # importance_sampling_exponent: float = 0.2,
+        # priority_exponent: float = 0.6,
         n_step: int = 5,
         epsilon: Optional[tf.Tensor] = None,
         learning_rate: float = 1e-3,
@@ -302,8 +303,8 @@ class QMIX(system.System):
         counter: counting.Counter = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        #policy_networks: Optional[Dict[str, snt.Module]] = None,
-        #max_gradient_norm: Optional[float] = None,
+        # policy_networks: Optional[Dict[str, snt.Module]] = None,
+        # max_gradient_norm: Optional[float] = None,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
     ):
         """Initialize the system.
@@ -340,7 +341,7 @@ class QMIX(system.System):
         builder = QMIXBuilder(
             QMIXConfig(
                 environment_spec=environment_spec,
-                q_networks=networks,
+                q_networks=q_networks,
                 observation_networks=observation_networks,
                 shared_weights=shared_weights,
                 batch_size=batch_size,
@@ -349,8 +350,8 @@ class QMIX(system.System):
                 samples_per_insert=samples_per_insert,
                 min_replay_size=min_replay_size,
                 max_replay_size=max_replay_size,
-                #importance_sampling_exponent=importance_sampling_exponent,
-                #priority_exponent=priority_exponent,
+                # importance_sampling_exponent=importance_sampling_exponent,
+                # priority_exponent=priority_exponent,
                 n_step=n_step,
                 epsilon=epsilon,
                 learning_rate=learning_rate,
@@ -359,8 +360,8 @@ class QMIX(system.System):
                 counter=counter,
                 checkpoint=checkpoint,
                 checkpoint_subpath=checkpoint_subpath,
-                #policy_networks=policy_networks,
-                #max_gradient_norm=max_gradient_norm,
+                # policy_networks=policy_networks,
+                # max_gradient_norm=max_gradient_norm,
                 replay_table_name=replay_table_name,
             )
         )
@@ -392,7 +393,7 @@ class QMIX(system.System):
 
         # Testing out on VDN Mixing.
         mixed_networks = AdditiveMixing(
-            architecture=architecture,
+            architecture=networks,
             # Q_values etc
         ).create_system()
 
@@ -402,11 +403,7 @@ class QMIX(system.System):
         # The learner updates the parameters (and initializes them).
         # TODO label these inputs properly
         trainer = builder.make_trainer(
-            mixed_networks, 
-            dataset, 
-            counter, 
-            logger, 
-            checkpoint
+            mixed_networks, dataset, counter, logger, checkpoint
         )
 
         super().__init__(

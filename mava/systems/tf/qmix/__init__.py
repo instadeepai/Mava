@@ -15,7 +15,7 @@
 
 """Implementations of a QMIX agent."""
 
-from mava.systems.tf.qmix.system.QMIX import QMIX
+from mava.systems.tf.qmix.system.QMIX import QMIX  # type: ignore
 from mava.systems.tf.qmix.training import BaseQmixTrainer
 
 # from mava.system.tf.qmix

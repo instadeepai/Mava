@@ -11,7 +11,9 @@ from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
-from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
+from mava.environment_loops.pettingzoo import (  # type: ignore
+    PettingZooParallelEnvironmentLoop,
+)
 from mava.systems.tf import idqn
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 

@@ -21,6 +21,18 @@
 
 """Qmix trainer implementation."""
 
+import time
+from typing import Any, Dict, List, Sequence, Tuple
+
+import numpy as np
+import sonnet as snt
+import tensorflow as tf
+import tree
+import trfl
+from acme.tf import savers as tf2_savers
+from acme.tf import utils as tf2_utils
+from acme.utils import counting, loggers
+
 import mava
 
 
@@ -47,7 +59,7 @@ class BaseQmixTrainer(mava.Trainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
-    ) -> None :
+    ) -> None:
         """Initializes the learner.
         Args:
         """
@@ -115,7 +127,6 @@ class BaseQmixTrainer(mava.Trainer):
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.
         self._timestamp = None
-
 
     @tf.function
     def _update_target_networks(self) -> None:
