@@ -216,7 +216,7 @@ class QMIXBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        huber_loss_parameter: float = 1.0,
+        #huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
@@ -251,9 +251,9 @@ class QMIXBuilder(SystemBuilder):
         trainer = training.QMIXTrainer(
             agents=agents,
             agent_types=agent_types,
-            networks=networks["networks"],
+            q_networks=networks["q_networks"],
             observation_networks=networks["observations"],
-            target_network=networks["target_networks"],
+            target_q_network=networks["target_networks"],
             shared_weights=shared_weights,
             discount=discount,
             #importance_sampling_exponent=importance_sampling_exponent,
@@ -391,15 +391,23 @@ class QMIX(system.System):
         # See mava/components/tf/modules/mixing
 
         # Testing out on VDN Mixing.
-        networks = AdditiveMixing(
+        mixed_networks = AdditiveMixing(
             architecture=architecture,
+            # Q_values etc
         ).create_system()
 
         # Create the actor which defines how we take actions.
         executor = builder.make_executor(networks["policies"], adder)
 
         # The learner updates the parameters (and initializes them).
-        trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
+        # TODO label these inputs properly
+        trainer = builder.make_trainer(
+            mixed_networks, 
+            dataset, 
+            counter, 
+            logger, 
+            checkpoint
+        )
 
         super().__init__(
             executor=executor,
