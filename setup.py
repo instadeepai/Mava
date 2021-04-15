@@ -39,7 +39,7 @@ tf_requirements = [
     "trfl",
 ]
 
-env_requirements = ["pettingzoo"]
+env_requirements = ["pettingzoo", "gym", "numpy-stl"]
 
 testing_formatting_requirements = [
     "pre-commit",
