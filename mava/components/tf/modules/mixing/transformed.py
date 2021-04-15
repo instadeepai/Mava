@@ -23,6 +23,7 @@ from mava.components.tf.modules.mixing import BaseMixingModule
 
 class QTranBase(BaseMixingModule):
     """Multi-agent mixing architecture."""
+
     def __init__(
         self,
         architecture: BaseArchitecture,
@@ -36,9 +37,9 @@ class QTranBase(BaseMixingModule):
         self._architecture = architecture
 
 
-
 class QTranAlt(BaseMixingModule):
     """Multi-agent mixing architecture."""
+
     def __init__(
         self,
         architecture: BaseArchitecture,

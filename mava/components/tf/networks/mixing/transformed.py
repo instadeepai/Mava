@@ -155,17 +155,17 @@ class QTranBase(BaseMixingModule):
             inputs = tf.concat((states, actions), axis=1)
         elif self._qtran_arch == "qtran_paper":
             hidden_states = tf.reshape(
-                hidden_states, shape=(bs * ts, self.n_agents, -1)
+                hidden_states, shape=(bs * ts, self._n_agents, -1)
             )
             agent_state_action_input = tf.concat((hidden_states, actions), axis=2)
 
             agent_state_action_encoding = self._action_encoding(
                 tf.reshape(
-                    agent_state_action_input, shape=(bs * ts * self.n_agents, -1)
+                    agent_state_action_input, shape=(bs * ts * self._n_agents, -1)
                 )
             )
             agent_state_action_encoding = tf.reshape(
-                agent_state_action_encoding, shape=(bs * ts, self.n_agents, -1)
+                agent_state_action_encoding, shape=(bs * ts, self._n_agents, -1)
             )
             agent_state_action_encoding = tf.math.reduce_sum(
                 agent_state_action_encoding, axis=1
@@ -174,7 +174,7 @@ class QTranBase(BaseMixingModule):
             inputs = tf.concat((states, agent_state_action_encoding), axis=1)
 
         q_outputs = self._Q(inputs)
-        states = tf.reshape(batch["state"], shape=(bs * ts, self.state_dim))
+        states = tf.reshape(batch["state"], shape=(bs * ts, self._state_dim))
         v_outputs = self._V(states)
 
         return q_outputs, v_outputs
@@ -291,21 +291,21 @@ class QTranAlt(BaseMixingModule):
                 masked_actions, shape=(-1, self._n_agents * self._n_actions)
             )
 
-        agent_ids = tf.eye(self.n_agents)  # [n_agents,n_agents]
+        agent_ids = tf.eye(self._n_agents)  # [n_agents,n_agents]
         agent_ids = tf.expand_dims(
             tf.expand_dims(agent_ids, 0), 0
         )  # [1,1,n_agents,n_agents]
         agent_ids = tf.tile(agent_ids, [bs, ts, 1, 1])  # [bs,ts,n_agents,n_agents]
         agent_ids = tf.reshape(
-            agent_ids, shape=(-1, self.n_agents)
+            agent_ids, shape=(-1, self._n_agents)
         )  # [bs*ts*n_agents,n_agents]
 
         inputs = tf.concat([repeated_states, masked_actions, agent_ids], axis=1)
 
         q_outputs = self._Q(inputs)
 
-        states = tf.tile(batch["state"], [1, 1, self.n_agents])
-        states = tf.reshape(states, shape=(-1, self.state_dim))
+        states = tf.tile(batch["state"], [1, 1, self._n_agents])
+        states = tf.reshape(states, shape=(-1, self._state_dim))
 
         v_outputs = self._V(states)
 

@@ -23,7 +23,8 @@ import sonnet as snt
 
 """Base mixing interface for multi-agent RL systems"""
 
-class BaseMixingModule():
+
+class BaseMixingModule:
     """Base class for MARL mixing.
     Objects which implement this interface provide a set of functions
     to create systems that can perform value decomposition via a mixing
