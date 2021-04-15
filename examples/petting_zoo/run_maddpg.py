@@ -143,14 +143,11 @@ def main(_: Any) -> None:
     system_networks = make_networks(environment_spec)
 
     # create tf loggers
-    # logs_dir = "logs"
-    # system_logger = TFSummaryLogger(f"{logs_dir}/system")
     base_dir = Path.cwd()
     log_dir = base_dir / "logs"
     train_logger = Logger(
         label="train_loop", directory=log_dir, to_terminal=True, to_tensorboard=True
     )
-    # eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
 
     # Construct the agent.
     system = maddpg.MADDPG(
