@@ -161,7 +161,7 @@ def make_networks(
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment(
-        env_name="simple_spread", action_space="continuous", render=True
+        env_name="simple_spread", action_space="continuous", render=False
     )
 
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
@@ -217,7 +217,7 @@ def main(_: Any) -> None:
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        eval_loop.run(num_episodes=1)
+        eval_loop.run(num_episodes=4)
 
 
 if __name__ == "__main__":
