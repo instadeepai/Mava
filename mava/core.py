@@ -60,20 +60,6 @@ class Executor(acme.Actor):
         """Samples from the policy and returns an action for each agent."""
 
     @abc.abstractmethod
-    def agent_observe(
-        self,
-        agent: str,
-        action: Union[float, int, types.NestedArray],
-        next_timestep: dm_env.TimeStep,
-    ) -> None:
-        """Make an observation of timestep data from sequential environment.
-        Args:
-        agent: agent id.
-        action: action taken in the environment.
-        next_timestep: timestep produced by the environment given the action.
-        """
-
-    @abc.abstractmethod
     def observe(
         self,
         actions: Dict[str, types.NestedArray],

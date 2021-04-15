@@ -26,7 +26,7 @@ from acme.testing.fakes import _generate_from_spec, _validate_spec
 
 from mava import core
 from mava.systems.system import System
-from mava.types import OLT
+from mava.types import OLT, Observation
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 
 """Mock Objects for Tests"""
@@ -271,7 +271,7 @@ class ParallelEnvironment(MockedEnvironment):
             action_spec[agent] = super().action_spec()
         return action_spec
 
-    def observation_spec(self) -> Dict[str, OLT]:
+    def observation_spec(self) -> Observation:
         observation_specs = {}
         for agent in self.agents:
             legals = self.action_spec()[agent]
@@ -287,7 +287,7 @@ class ParallelEnvironment(MockedEnvironment):
             )
         return observation_specs
 
-    def _generate_fake_observation(self) -> Dict[str, OLT]:
+    def _generate_fake_observation(self) -> Observation:
         return _generate_from_spec(self.observation_spec())
 
     def reset(self) -> dm_env.TimeStep:

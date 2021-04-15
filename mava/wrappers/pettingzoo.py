@@ -22,7 +22,7 @@ from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
-from mava.types import OLT
+from mava import types
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 
 
@@ -91,7 +91,7 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
     # of legal actions must be converted to a legal actions mask.
     def _convert_observation(
         self, agent: str, observe: Union[dict, np.ndarray], done: bool
-    ) -> OLT:
+    ) -> types.OLT:
         if isinstance(observe, dict) and "action_mask" in observe:
             legals = observe["action_mask"]
             observe = observe["observation"]
@@ -100,17 +100,17 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
                 _convert_to_spec(self._environment.action_spaces[agent]).shape,
                 dtype=self._environment.action_spaces[agent].dtype,
             )
-        observation = OLT(
+        observation = types.OLT(
             observation=observe,
             legal_actions=legals,
             terminal=np.asarray([done], dtype=np.float32),
         )
         return observation
 
-    def observation_spec(self) -> Dict[str, OLT]:
+    def observation_spec(self) -> types.Observation:
         observation_specs = {}
         for agent in self._environment.possible_agents:
-            observation_specs[agent] = OLT(
+            observation_specs[agent] = types.OLT(
                 observation=_convert_to_spec(
                     self._environment.observation_spaces[agent]
                 ),
@@ -242,8 +242,8 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
     # of legal actions must be converted to a legal actions mask.
     def _convert_observations(
         self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
-    ) -> Dict[str, OLT]:
-        observations: Dict[str, OLT] = {}
+    ) -> types.Observation:
+        observations: Dict[str, types.OLT] = {}
         for agent, observation in observes.items():
             if isinstance(observation, dict) and "action_mask" in observation:
                 legals = observation["action_mask"]
@@ -256,7 +256,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                     _convert_to_spec(self._environment.action_spaces[agent]).shape,
                     dtype=self._environment.action_spaces[agent].dtype,
                 )
-            observations[agent] = OLT(
+            observations[agent] = types.OLT(
                 observation=observation,
                 legal_actions=legals,
                 terminal=np.asarray([dones[agent]], dtype=np.float32),
@@ -264,10 +264,10 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
         return observations
 
-    def observation_spec(self) -> Dict[str, OLT]:
+    def observation_spec(self) -> types.Observation:
         observation_specs = {}
         for agent in self._environment.possible_agents:
-            observation_specs[agent] = OLT(
+            observation_specs[agent] = types.OLT(
                 observation=_convert_to_spec(
                     self._environment.observation_spaces[agent]
                 ),

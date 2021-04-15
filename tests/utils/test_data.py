@@ -17,7 +17,8 @@ from typing import Dict
 
 from dm_env import StepType, TimeStep
 
-from mava.utils.wrapper_utils import OLT, SeqTimestepDict
+from mava.types import OLT
+from mava.utils.wrapper_utils import SeqTimestepDict
 
 
 def get_seq_timesteps_1() -> TimeStep:
