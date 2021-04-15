@@ -19,7 +19,6 @@ import time
 from typing import Dict
 
 import numpy as np
-from acme import types
 from acme.utils import loggers
 
 from mava.environment_loop import ParallelEnvironmentLoop
@@ -158,27 +157,13 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
 class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
     def __init__(self, environment_loop: ParallelEnvironmentLoop):
         super().__init__(environment_loop)
-
-        self._episode_len_stats = RunningStatistics("episode_length")
-        self._episode_return_stats = RunningStatistics("episode_return")
-        self._steps_per_second_stats = RunningStatistics("steps_per_second")
-        self._running_statistics: Dict[str, types.NestedArray] = {
-            "mean_episode_length": 0.0,
-            "max_episode_length": 0.0,
-            "min_episode_length": 0.0,
-            "var_episode_length": 0.0,
-            "std_episode_length": 0.0,
-            "mean_episode_return": 0.0,
-            "max_episode_return": 0.0,
-            "min_episode_return": 0.0,
-            "var_episode_return": 0.0,
-            "std_episode_return": 0.0,
-            "mean_steps_per_second": 0.0,
-            "max_steps_per_second": 0.0,
-            "min_steps_per_second": 0.0,
-            "var_steps_per_second": 0.0,
-            "std_steps_per_second": 0.0,
-        }
+        self._summary_stats = ["mean", "max", "min", "var", "std"]
+        self._metrics = ["episode_length", "episode_return", "steps_per_second"]
+        self._running_statistics: Dict[str, float] = {}
+        for metric in self._metrics:
+            self.__setattr__(f"_{metric}_stats", RunningStatistics(metric))
+            for stat in self._summary_stats:
+                self._running_statistics[f"{stat}_{metric}"] = 0.0
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         pass
@@ -191,29 +176,15 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
         steps_per_second: float,
     ) -> None:
 
-        self._episode_len_stats.push(episode_length)
+        self._episode_length_stats.push(episode_length)
         self._episode_return_stats.push(episode_return)
         self._steps_per_second_stats.push(steps_per_second)
 
-        self._running_statistics.update(
-            {
-                "mean_episode_length": self._episode_len_stats.mean(),
-                "max_episode_length": self._episode_len_stats.max(),
-                "min_episode_length": self._episode_len_stats.min(),
-                "var_episode_length": self._episode_len_stats.var(),
-                "std_episode_length": self._episode_len_stats.std(),
-                "mean_episode_return": self._episode_return_stats.mean(),
-                "max_episode_return": self._episode_return_stats.max(),
-                "min_episode_return": self._episode_return_stats.min(),
-                "var_episode_return": self._episode_return_stats.var(),
-                "std_episode_return": self._episode_return_stats.std(),
-                "mean_steps_per_second": self._steps_per_second_stats.mean(),
-                "max_steps_per_second": self._steps_per_second_stats.max(),
-                "min_steps_per_second": self._steps_per_second_stats.min(),
-                "var_steps_per_second": self._steps_per_second_stats.var(),
-                "std_steps_per_second": self._steps_per_second_stats.std(),
-            }
-        )
+        for metric in self._metrics:
+            for stat in self._summary_stats:
+                self._running_statistics[f"{stat}_{metric}"] = self.__getattribute__(
+                    f"_{metric}_stats"
+                ).__getattribute__(stat)()
 
 
 class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
@@ -232,7 +203,6 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
             time_stamp,
         ) = self._logger._logger_info
 
-        self._agent_running_statistics: Dict[str, Dict[str, float]] = {}
         self._agents_stats: Dict[str, Dict[str, RunningStatistics]] = {
             agent: {} for agent in self._environment.possible_agents
         }
@@ -260,21 +230,13 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         for agent, reward in rewards.items():
+            agent_running_statistics: Dict[str, float] = {}
             self._agents_stats[agent]["reward"].push(reward)
-            mean_reward = self._agents_stats[agent]["reward"].mean()
-            max_reward = self._agents_stats[agent]["reward"].max()
-            min_reward = self._agents_stats[agent]["reward"].min()
-            var_reward = self._agents_stats[agent]["reward"].var()
-            std_reward = self._agents_stats[agent]["reward"].std()
-            self._agent_loggers[agent].write(
-                {
-                    f"{agent}_mean_episode_reward": mean_reward,
-                    f"{agent}_max_episode_reward": max_reward,
-                    f"{agent}_min_episode_reward": min_reward,
-                    f"{agent}_var_episode_reward": var_reward,
-                    f"{agent}_std_episode_reward": std_reward,
-                }
-            )
+            for stat in self._summary_stats:
+                agent_running_statistics[
+                    f"{agent}_{stat}_episode_reward"
+                ] = self._agents_stats[agent]["reward"].__getattribute__(stat)()
+            self._agent_loggers[agent].write(agent_running_statistics)
 
     def _compute_episode_statistics(
         self,
@@ -284,43 +246,21 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         steps_per_second: float,
     ) -> None:
 
-        self._episode_len_stats.push(episode_length)
+        self._episode_length_stats.push(episode_length)
         self._episode_return_stats.push(episode_return)
         self._steps_per_second_stats.push(steps_per_second)
 
-        self._running_statistics.update(
-            {
-                "mean_episode_length": self._episode_len_stats.mean(),
-                "max_episode_length": self._episode_len_stats.max(),
-                "min_episode_length": self._episode_len_stats.min(),
-                "var_episode_length": self._episode_len_stats.var(),
-                "std_episode_length": self._episode_len_stats.std(),
-                "mean_episode_return": self._episode_return_stats.mean(),
-                "max_episode_return": self._episode_return_stats.max(),
-                "min_episode_return": self._episode_return_stats.min(),
-                "var_episode_return": self._episode_return_stats.var(),
-                "std_episode_return": self._episode_return_stats.std(),
-                "mean_steps_per_second": self._steps_per_second_stats.mean(),
-                "max_steps_per_second": self._steps_per_second_stats.max(),
-                "min_steps_per_second": self._steps_per_second_stats.min(),
-                "var_steps_per_second": self._steps_per_second_stats.var(),
-                "std_steps_per_second": self._steps_per_second_stats.std(),
-            }
-        )
-        for agent, agent_return in agent_returns.items():
-            self._agents_stats[agent]["return"].push(agent_return)
-            mean_return = self._agents_stats[agent]["return"].mean()
-            max_return = self._agents_stats[agent]["return"].max()
-            min_return = self._agents_stats[agent]["return"].min()
-            var_return = self._agents_stats[agent]["return"].var()
-            std_return = self._agents_stats[agent]["return"].std()
+        for metric in self._metrics:
+            for stat in self._summary_stats:
+                self._running_statistics[f"{stat}_{metric}"] = self.__getattribute__(
+                    f"_{metric}_stats"
+                ).__getattribute__(stat)()
 
-            self._agent_loggers[agent].write(
-                {
-                    f"{agent}_mean_return": mean_return,
-                    f"{agent}_max_return": max_return,
-                    f"{agent}_min_return": min_return,
-                    f"{agent}_var_return": var_return,
-                    f"{agent}_std_return": std_return,
-                }
-            )
+        for agent, agent_return in agent_returns.items():
+            agent_running_statistics: Dict[str, float] = {}
+            self._agents_stats[agent]["return"].push(agent_return)
+            for stat in self._summary_stats:
+                agent_running_statistics[f"{agent}_{stat}_return"] = self._agents_stats[
+                    agent
+                ]["return"].__getattribute__(stat)()
+            self._agent_loggers[agent].write(agent_running_statistics)

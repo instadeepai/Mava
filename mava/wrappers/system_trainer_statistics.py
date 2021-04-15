@@ -52,10 +52,11 @@ class TrainerStatisticsBase:
         # I get the following error:
         # "TypeError: Can't instantiate abstract class ...
         # DetailedTrainerStatistics with abstract methods get_variables"
-        # So I hardcode the type here but this causes a type mismatch
-        # in the system code when returning the wrapped trainer.
+        # If I hardcode the type here it breaks the logging for some reason
+        # For now as is, there is a type mismatch in the system code when
+        # returning the wrapped trainer, but everything seems to work.
         # Need to find a solution to this.
-        self.__class__ = mava.Trainer
+        # self.__class__ = mava.Trainer
 
     def _create_loggers(self, keys: List[str]) -> None:
         raise NotImplementedError
