@@ -13,40 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): complete class for transformed mixing
-
+# TODO (StJohn): complete class for weighted mixing
+# https://github.com/oxwhirl/wqmix/tree/master/src/modules/mixers
 """Mixing for multi-agent RL systems"""
 
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
 
 
-class QTranBase(BaseMixingModule):
+class WeightedMixing(BaseMixingModule):
     """Multi-agent mixing architecture."""
+
     def __init__(
         self,
         architecture: BaseArchitecture,
     ) -> None:
-        """Initializes the mixer.
-        Args:
-            architecture: the BaseArchitecture used.
-        """
-        super(QTranBase, self).__init__()
-
         self._architecture = architecture
 
-
-
-class QTranAlt(BaseMixingModule):
-    """Multi-agent mixing architecture."""
-    def __init__(
-        self,
-        architecture: BaseArchitecture,
-    ) -> None:
-        """Initializes the mixer.
-        Args:
-            architecture: the BaseArchitecture used.
-        """
-        super(QTranAlt, self).__init__()
-
-        self._architecture = architecture
+    def some_mixing_function(self) -> None:
+        """Perform some mixing logic"""

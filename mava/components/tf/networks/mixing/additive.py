@@ -13,29 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn):
-#   - [] Complete class for monotonic mixing
-
-"""Mixing for multi-agent RL systems"""
+import tensorflow as tf
+from tensorflow import Tensor
 
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
 
 
-class MonotonicMixing(BaseMixingModule):
-    """Multi-agent monotonic mixing architecture.
-    This is the component which can be used to add monotonic mixing to an underlying
-    agent architecture. It currently supports generalised monotonic mixing using
-    hypernetworks (1 or 2 layers) for control of decomposition parameters (QMix)."""
+class AdditiveMixing(BaseMixingModule):
+    """Multi-agent monotonic mixing architecture."""
 
-    def __init__(
-        self,
-        architecture: BaseArchitecture,
-    ) -> None:
-        """Initializes the mixer.
-        Args:
-            architecture: the BaseArchitecture used.
-        """
-        super(MonotonicMixing, self).__init__()
+    def __init__(self, architecture: BaseArchitecture) -> None:
+        """Initializes the mixer."""
+        super(AdditiveMixing, self).__init__()
 
-        self._architecture = architecture
+    def __call__(self, q_values: Tensor) -> Tensor:
+        """Monotonic mixing logic."""
+        return tf.math.reduce_sum(q_values)
