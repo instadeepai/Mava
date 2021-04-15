@@ -52,6 +52,18 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
         self._logger = environment_loop._logger
         self._should_update = environment_loop._should_update
 
+    def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
+        raise NotImplementedError
+
+    def _compute_episode_statistics(
+        self,
+        agent_returns: Dict[str, float],
+        episode_return: float,
+        episode_length: float,
+        steps_per_second: float,
+    ) -> None:
+        raise NotImplementedError
+
     def run_episode(self) -> loggers.LoggingData:
         """Run one episode.
         Each episode is a loop which interacts first with the environment to get a
@@ -60,10 +72,87 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
         Returns:
             An instance of `loggers.LoggingData`.
         """
-        raise NotImplementedError
+
+        # Reset any counts and start the environment.
+        start_time = time.time()
+        episode_steps = 0
+
+        timestep = self._environment.reset()
+
+        # Make the first observation.
+        self._executor.observe_first(timestep)
+
+        rewards: Dict[str, float] = {}
+        episode_returns: Dict[str, float] = {}
+        for agent, spec in self._environment.reward_spec().items():
+            rewards.update({agent: generate_zeros_from_spec(spec)})
+            episode_returns.update({agent: generate_zeros_from_spec(spec)})
+
+        # For evaluation, this keeps track of the total undiscounted reward
+        # for each agent accumulated during the episode.
+        # multiagent_reward_spec = specs.Array((n_agents,), np.float32)
+        # episode_return = tree.map_structure(
+        #     generate_zeros_from_spec, multiagent_reward_spec
+        # )
+
+        # Run an episode.
+        while not timestep.last():
+
+            # Generate an action from the agent's policy and step the environment.
+            actions = self._get_actions(timestep)
+            timestep = self._environment.step(actions)
+
+            rewards = timestep.reward
+
+            # Have the agent observe the timestep and let the actor update itself.
+
+            self._executor.observe(actions, next_timestep=timestep)
+
+            if self._should_update:
+                self._executor.update()
+
+            # Book-keeping.
+            episode_steps += 1
+
+            # NOTE (Arnu): fix for when env returns empty dict at end of episode.
+            if not rewards:
+                rewards = {
+                    agent: generate_zeros_from_spec(spec)
+                    for agent, spec in self._environment.reward_spec().items()
+                }
+
+            self._compute_step_statistics(rewards)
+
+            # Equivalent to: episode_return += timestep.reward
+            # We capture the return value because if timestep.reward is a JAX
+            # DeviceArray, episode_return will not be mutated in-place. (In all other
+            # cases, the returned episode_return will be the same object as the
+            # argument episode_return.)
+            # episode_return = tree.map_structure(
+            #     operator.iadd, episode_return, np.array(list(rewards.values()))
+            # )
+            episode_returns = {
+                agent: episode_returns[agent] + reward
+                for agent, reward in rewards.items()
+            }
+
+        # Record counts.
+        counts = self._counter.increment(episodes=1, steps=episode_steps)
+
+        # Collect the results and combine with counts.
+        steps_per_second = episode_steps / (time.time() - start_time)
+        episode_return = np.mean(np.array(list(episode_returns.values())))
+
+        self._compute_episode_statistics(
+            episode_returns, episode_return, episode_steps, steps_per_second
+        )
+        self._running_statistics.update({"episode_length": episode_steps})
+        self._running_statistics.update(counts)
+
+        return self._running_statistics
 
 
-class DetailedStatistics(EnvironmentLoopStatisticsBase):
+class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
     def __init__(self, environment_loop: ParallelEnvironmentLoop):
         super().__init__(environment_loop)
 
@@ -87,6 +176,46 @@ class DetailedStatistics(EnvironmentLoopStatisticsBase):
             "var_steps_per_second": 0.0,
             "std_steps_per_second": 0.0,
         }
+
+    def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
+        pass
+
+    def _compute_episode_statistics(
+        self,
+        agent_returns: Dict[str, float],
+        episode_return: float,
+        episode_length: float,
+        steps_per_second: float,
+    ) -> None:
+
+        self._episode_len_stats.push(episode_length)
+        self._episode_return_stats.push(episode_return)
+        self._steps_per_second_stats.push(steps_per_second)
+
+        self._running_statistics.update(
+            {
+                "mean_episode_length": self._episode_len_stats.mean(),
+                "max_episode_length": self._episode_len_stats.max(),
+                "min_episode_length": self._episode_len_stats.min(),
+                "var_episode_length": self._episode_len_stats.var(),
+                "std_episode_length": self._episode_len_stats.std(),
+                "mean_episode_return": self._episode_return_stats.mean(),
+                "max_episode_return": self._episode_return_stats.max(),
+                "min_episode_return": self._episode_return_stats.min(),
+                "var_episode_return": self._episode_return_stats.var(),
+                "std_episode_return": self._episode_return_stats.std(),
+                "mean_steps_per_second": self._steps_per_second_stats.mean(),
+                "max_steps_per_second": self._steps_per_second_stats.max(),
+                "min_steps_per_second": self._steps_per_second_stats.min(),
+                "var_steps_per_second": self._steps_per_second_stats.var(),
+                "std_steps_per_second": self._steps_per_second_stats.std(),
+            }
+        )
+
+
+class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
+    def __init__(self, environment_loop: ParallelEnvironmentLoop):
+        super().__init__(environment_loop)
 
         self._agents_stats: Dict[str, Dict[str, RunningStatistics]] = {
             agent: {} for agent in self._environment.possible_agents
@@ -180,90 +309,3 @@ class DetailedStatistics(EnvironmentLoopStatisticsBase):
                     f"{agent}_std_return": std_return,
                 }
             )
-
-    def run_episode(self) -> loggers.LoggingData:
-        """Run one episode.
-        Each episode is a loop which interacts first with the environment to get a
-        dictionary of observations and then give those observations to the executor
-        in order to retrieve an action for each agent in the system.
-        Returns:
-            An instance of `loggers.LoggingData`.
-        """
-
-        # Reset any counts and start the environment.
-        start_time = time.time()
-        episode_steps = 0
-
-        timestep = self._environment.reset()
-
-        # Make the first observation.
-        self._executor.observe_first(timestep)
-
-        rewards: Dict[str, float] = {}
-        episode_returns: Dict[str, float] = {}
-        for agent, spec in self._environment.reward_spec().items():
-            rewards.update({agent: generate_zeros_from_spec(spec)})
-            episode_returns.update({agent: generate_zeros_from_spec(spec)})
-
-        # For evaluation, this keeps track of the total undiscounted reward
-        # for each agent accumulated during the episode.
-        # multiagent_reward_spec = specs.Array((n_agents,), np.float32)
-        # episode_return = tree.map_structure(
-        #     generate_zeros_from_spec, multiagent_reward_spec
-        # )
-
-        # Run an episode.
-        while not timestep.last():
-
-            # Generate an action from the agent's policy and step the environment.
-            actions = self._get_actions(timestep)
-            timestep = self._environment.step(actions)
-
-            rewards = timestep.reward
-
-            # Have the agent observe the timestep and let the actor update itself.
-
-            self._executor.observe(actions, next_timestep=timestep)
-
-            if self._should_update:
-                self._executor.update()
-
-            # Book-keeping.
-            episode_steps += 1
-
-            # NOTE (Arnu): fix for when env returns empty dict at end of episode.
-            if not rewards:
-                rewards = {
-                    agent: generate_zeros_from_spec(spec)
-                    for agent, spec in self._environment.reward_spec().items()
-                }
-
-            self._compute_step_statistics(rewards)
-
-            # Equivalent to: episode_return += timestep.reward
-            # We capture the return value because if timestep.reward is a JAX
-            # DeviceArray, episode_return will not be mutated in-place. (In all other
-            # cases, the returned episode_return will be the same object as the
-            # argument episode_return.)
-            # episode_return = tree.map_structure(
-            #     operator.iadd, episode_return, np.array(list(rewards.values()))
-            # )
-            episode_returns = {
-                agent: episode_returns[agent] + reward
-                for agent, reward in rewards.items()
-            }
-
-        # Record counts.
-        counts = self._counter.increment(episodes=1, steps=episode_steps)
-
-        # Collect the results and combine with counts.
-        steps_per_second = episode_steps / (time.time() - start_time)
-        episode_return = np.mean(np.array(list(episode_returns.values())))
-
-        self._compute_episode_statistics(
-            episode_returns, episode_return, episode_steps, steps_per_second
-        )
-        self._running_statistics.update({"episode_length": episode_steps})
-        self._running_statistics.update(counts)
-
-        return self._running_statistics
