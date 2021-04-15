@@ -26,7 +26,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import sonnet as snt
 from acme import types
-from acme.tf import tf2_variable_utils
+from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
 from mava.systems.tf.executors import RecurrentExecutor
