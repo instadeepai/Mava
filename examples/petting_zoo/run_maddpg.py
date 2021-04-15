@@ -33,8 +33,7 @@ from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
 from mava.utils.loggers import Logger
-from mava.wrappers.environments.pettingzoo import PettingZooParallelEnvWrapper
-from mava.wrappers.loops.statistics import DetailedPerAgentStatistics
+from mava.wrappers import DetailedPerAgentStatistics, PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")

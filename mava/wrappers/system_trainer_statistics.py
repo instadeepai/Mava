@@ -25,7 +25,7 @@ from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics
 
 
-class TrainerStatisticsBase(mava.Trainer):
+class TrainerStatisticsBase:
     """A parallel MARL environment loop.
     This takes `Environment` and `Executor` instances and coordinates their
     interaction. Executors are updated if `should_update=True`. This can be used as:

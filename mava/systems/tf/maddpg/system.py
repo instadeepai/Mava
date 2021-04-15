@@ -30,7 +30,7 @@ from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
-from mava.wrappers.systems.statistics import DetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass

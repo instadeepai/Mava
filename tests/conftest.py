@@ -26,7 +26,7 @@ from pettingzoo.utils.env import AECEnv, ParallelEnv
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
 from mava.utils.wrapper_utils import convert_np_type
-from mava.wrappers.environments.pettingzoo import (
+from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
