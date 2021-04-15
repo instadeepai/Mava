@@ -12,3 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Implementations of a IDQN agent."""
+
+from mava.systems.tf.madqn.idqn_system import IDQN
+from mava.systems.tf.madqn.training import IDQNTrainer

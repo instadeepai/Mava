@@ -12,7 +12,7 @@ from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
-from mava.systems.tf import idqn
+from mava.systems.tf import madqn
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
@@ -37,6 +37,7 @@ def make_environment(
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
+    epsilon: tf.Variable,
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
     shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
@@ -66,9 +67,6 @@ def make_networks(
             ]
         )
 
-        epsilon = tf.Variable(
-            0.1, trainable=False
-        )  # fixed for now. not sure where to update it. maybe in the learner
         behavior_network = snt.Sequential(
             [
                 q_network,
@@ -91,18 +89,18 @@ def make_networks(
 
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment(max_cycles=25)
+    environment = make_environment()
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    system_networks = make_networks(environment_spec)
+    epsilon = tf.Variable(1.0, trainable=False)
+    system_networks = make_networks(environment_spec, epsilon)
 
     # Construct the agent.
-    system = idqn.IDQN(
+    system = madqn.IDQN(
         environment_spec=environment_spec,
         q_networks=system_networks["q_networks"],
-        observation_networks=system_networks[
-            "observations"
-        ],  # pytype: disable=wrong-arg-types
+        observation_networks=system_networks["observations"],
         behavior_networks=system_networks["behaviors"],
+        epsilon=epsilon,
     )
 
     # Create the environment loop used for training.
