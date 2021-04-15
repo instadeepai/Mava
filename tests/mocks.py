@@ -26,7 +26,8 @@ from acme.testing.fakes import _generate_from_spec, _validate_spec
 
 from mava import core
 from mava.systems.system import System
-from mava.utils.wrapper_utils import OLT, convert_np_type, parameterized_restart
+from mava.types import OLT
+from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 
 """Mock Objects for Tests"""
 
@@ -178,6 +179,7 @@ class SequentialEnvironment(MockedEnvironment):
         self.possible_agents = agents
         self._specs = specs
         self.agent_selection = self.agents[0]
+        self.agent_step_counter = 0
 
     def agent_iter(self, n_agents: int) -> Iterator[str]:
         return iter(self.agents)
@@ -221,6 +223,38 @@ class SequentialEnvironment(MockedEnvironment):
     def _generate_fake_observation(self) -> OLT:
         return _generate_from_spec(self.observation_spec())
 
+    def step(self, action: Union[float, int, types.NestedArray]) -> dm_env.TimeStep:
+        # Return a reset timestep if we haven't touched the environment yet.
+        if not self._step:
+            return self.reset()
+
+        _validate_spec(self._spec.actions, action)
+
+        observation = self._generate_fake_observation()
+        reward = self._generate_fake_reward()
+        discount = self._generate_fake_discount()
+
+        self.agent_step_counter += 1
+
+        if self._episode_length and (self._step == self._episode_length):
+            # Only reset step once all all agents have taken their turn.
+            if self.agent_step_counter == len(self.agents):
+                self._step = 0
+                self.agent_step_counter = 0
+
+            # We can't use dm_env.termination directly because then the discount
+            # wouldn't necessarily conform to the spec (if eg. we want float32).
+            return dm_env.TimeStep(dm_env.StepType.LAST, reward, discount, observation)
+        else:
+            # Only update step counter once all agents have taken their turn.
+            if self.agent_step_counter == len(self.agents):
+                self._step += 1
+                self.agent_step_counter = 0
+
+            return dm_env.transition(
+                reward=reward, observation=observation, discount=discount
+            )
+
 
 """Class that updates functions for parallel environment.
 This class should be inherited with a MockedMAEnvironment. """
@@ -254,24 +288,23 @@ class ParallelEnvironment(MockedEnvironment):
         return observation_specs
 
     def _generate_fake_observation(self) -> Dict[str, OLT]:
-        observations = {}
-        for agent in self.agents:
-            fake_observation = _generate_from_spec(self.observation_spec()[agent])
-            observations[agent] = fake_observation
-        return observations
+        return _generate_from_spec(self.observation_spec())
 
     def reset(self) -> dm_env.TimeStep:
-        observations: Dict[str, Dict[str, OLT]] = {}
+        observations = {}
         for agent in self.agents:
             observation = self._generate_fake_observation()
             observations[agent] = observation
+
         rewards = {agent: convert_np_type("float32", 0) for agent in self.agents}
         discounts = {agent: convert_np_type("float32", 1) for agent in self.agents}
 
         self._step = 1
-        return parameterized_restart(rewards, discounts, observations)
+        return parameterized_restart(rewards, discounts, observations)  # type: ignore
 
-    def step(self, actions: Dict[str, Union[float, int]]) -> dm_env.TimeStep:
+    def step(
+        self, actions: Dict[str, Union[float, int, types.NestedArray]]
+    ) -> dm_env.TimeStep:
 
         # Return a reset timestep if we haven't touched the environment yet.
         if not self._step:

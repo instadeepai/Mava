@@ -22,7 +22,8 @@ from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
-from mava.utils.wrapper_utils import OLT, convert_np_type, parameterized_restart
+from mava.types import OLT
+from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 
 
 # TODO(Kale-ab): Check usage agents vs possible agents
@@ -58,25 +59,26 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
 
         observe, reward, done, info = self._environment.last()
 
-        agent = self._environment.agent_selection
-        if self._environment.dones[agent]:
+        # If current agent is done
+        if done:
             self._environment.step(None)
+            self._step_type = dm_env.StepType.LAST
         else:
             self._environment.step(action)
+            self._step_type = dm_env.StepType.MID
+
             # Update these vars so dm_env.TimeStep returned has
             # the last information.
             observe, reward, done, info = self._environment.last()
 
+        agent = self._environment.agent_selection
         # Convert rewards to match spec
         reward = convert_np_type(self.reward_spec()[agent].dtype, reward)
-
         observation = self._convert_observation(agent, observe, done)
 
+        # Reset if all agents are done
         if self._environment.env_done:
-            self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
-        else:
-            self._step_type = dm_env.StepType.MID
 
         return dm_env.TimeStep(
             observation=observation,
