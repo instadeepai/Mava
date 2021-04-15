@@ -16,6 +16,7 @@
 """Example running MADDPG on pettinzoo MPE environments."""
 
 import importlib
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
@@ -145,8 +146,20 @@ def main(_: Any) -> None:
     # create tf loggers
     base_dir = Path.cwd()
     log_dir = base_dir / "logs"
+    log_time_stamp = str(datetime.now())
+    system_logger = Logger(
+        label="system_trainer",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
     train_logger = Logger(
-        label="train_loop", directory=log_dir, to_terminal=True, to_tensorboard=True
+        label="train_loop",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
     )
 
     # Construct the agent.
@@ -158,7 +171,7 @@ def main(_: Any) -> None:
             "observations"
         ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
-        # logger=system_logger,
+        logger=system_logger,
     )
 
     # Create the environment loop used for training.

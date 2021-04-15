@@ -30,6 +30,7 @@ from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
+from mava.wrappers.systems.statistics import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -376,6 +377,12 @@ class MADDPG(system.System):
             logger=logger,
             checkpoint=checkpoint,
         )
+
+        # TODO (Arnu): fix mismatch in types between base trainer
+        # and wrapped trainer
+        trainer = DetailedTrainerStatistics(
+            trainer, metrics=["policy_loss", "critic_loss"]
+        )  # type: ignore
 
         super().__init__(
             executor=executor,
