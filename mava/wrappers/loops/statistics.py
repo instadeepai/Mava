@@ -23,6 +23,8 @@ from acme import types
 from acme.utils import loggers
 
 from mava.environment_loop import ParallelEnvironmentLoop
+
+# from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics, generate_zeros_from_spec
 
 
@@ -220,9 +222,11 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         self._agents_stats: Dict[str, Dict[str, RunningStatistics]] = {
             agent: {} for agent in self._environment.possible_agents
         }
+        # self._agent_loggers: Dict[str, loggers.Logger] = {}
 
         # statistics dictionary
         for agent in self._environment.possible_agents:
+            # self._agent_loggers[agent] = make_logger(label=agent, directory=)
             self._agents_stats[agent]["return"] = RunningStatistics(
                 f"{agent}_episode_return"
             )

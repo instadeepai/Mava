@@ -23,56 +23,80 @@ from acme.utils import loggers
 from mava.utils.loggers.tf_logger import TFSummaryLogger
 
 
-def path(log_dir: str, subdir: Optional[str] = None) -> str:
-    return log_dir + "/" + subdir if subdir else log_dir
+def path(log_dir: Path, subdir: Optional[str] = None) -> str:
+    return str(log_dir / subdir) if subdir else str(log_dir)
 
 
-def make_logger(
-    label: str,
-    directory: Path,
-    to_terminal: bool = True,
-    to_csv: bool = False,
-    to_tensorboard: bool = False,
-    time_delta: float = 1.0,
-    print_fn: Callable[[str], None] = print,
-    **kwargs: Any,
-) -> loggers.Logger:
-    """Build an Acme logger.
+class Logger:
+    def __init__(
+        self,
+        label: str,
+        directory: Path,
+        to_terminal: bool = True,
+        to_csv: bool = False,
+        to_tensorboard: bool = False,
+        time_delta: float = 1.0,
+        print_fn: Callable[[str], None] = print,
+        **kwargs: Any,
+    ):
+        self._label = label
+        self._directory = directory
+        self._logger = self.make_logger(
+            to_terminal, to_csv, to_tensorboard, time_delta, print_fn, **kwargs
+        )
 
-    Args:
-        label: Name to give to the logger.
-        directory: base directory for the  logging of the experiment.
-        to_terminal: to print the logs in the terminal.
-        to_csv: to save the logs in a csv file.
-        to_tensorboard: to write the logs tf-events.
-        to_wandb: whether to use wandb.
-        to_neptune: whether to use neptune.
-        time_delta: minimum elapsed time (in seconds) between logging events.
-        print_fn: function to call which acts like print.
+    def make_logger(
+        self,
+        to_terminal: bool,
+        to_csv: bool,
+        to_tensorboard: bool,
+        time_delta: float,
+        print_fn: Callable[[str], None],
+        **kwargs: Any,
+    ) -> loggers.Logger:
+        """Build an Acme logger.
 
-    Returns:
-        A logger (pipe) object that responds to logger.write(some_dict).
-    """
-    logger = []
+        Args:
+            label: Name to give to the logger.
+            directory: base directory for the  logging of the experiment.
+            to_terminal: to print the logs in the terminal.
+            to_csv: to save the logs in a csv file.
+            to_tensorboard: to write the logs tf-events.
+            to_wandb: whether to use wandb.
+            to_neptune: whether to use neptune.
+            time_delta: minimum elapsed time (in seconds) between logging events.
+            print_fn: function to call which acts like print.
 
-    if to_terminal:
-        logger += [loggers.TerminalLogger(label=label, print_fn=print_fn)]
+        Returns:
+            A logger (pipe) object that responds to logger.write(some_dict).
+        """
+        logger = []
 
-    if to_csv:
-        logger += [
-            loggers.CSVLogger(directory_or_file=path("csv"), label=label)
-        ]  # type: ignore
+        if to_terminal:
+            logger += [loggers.TerminalLogger(label=self._label, print_fn=print_fn)]
 
-    if to_tensorboard:
-        logger += [
-            TFSummaryLogger(logdir=path("tensorboard"), label=label)
-        ]  # type: ignore
+        if to_csv:
+            logger += [
+                loggers.CSVLogger(
+                    directory_or_file=path(self._directory, "csv"), label=self._label
+                )
+            ]  # type: ignore
 
-    if logger:
-        logger = loggers.Dispatcher(logger)
-        logger = loggers.NoneFilter(logger)
-        logger = loggers.TimeFilter(logger, time_delta)
-    else:
-        logger = loggers.NoOpLogger()
+        if to_tensorboard:
+            logger += [
+                TFSummaryLogger(
+                    logdir=path(self._directory, "tensorboard"), label=self._label
+                )
+            ]  # type: ignore
 
-    return logger
+        if logger:
+            logger = loggers.Dispatcher(logger)
+            logger = loggers.NoneFilter(logger)
+            logger = loggers.TimeFilter(logger, time_delta)
+        else:
+            logger = loggers.NoOpLogger()
+
+        return logger
+
+    def write(self, data: Any) -> None:
+        self._logger.write(data)

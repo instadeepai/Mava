@@ -31,7 +31,7 @@ from acme.tf import utils as tf2_utils
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
-from mava.utils.loggers import make_logger
+from mava.utils.loggers import Logger
 from mava.wrappers.environments.pettingzoo import PettingZooParallelEnvWrapper
 from mava.wrappers.loops.statistics import DetailedPerAgentStatistics
 
@@ -146,8 +146,9 @@ def main(_: Any) -> None:
     # logs_dir = "logs"
     # system_logger = TFSummaryLogger(f"{logs_dir}/system")
     base_dir = Path.cwd()
-    train_logger = make_logger(
-        label="train_loop", directory=base_dir, to_terminal=True, to_tensorboard=True
+    log_dir = base_dir / "logs"
+    train_logger = Logger(
+        label="train_loop", directory=log_dir, to_terminal=True, to_tensorboard=True
     )
     # eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
 
