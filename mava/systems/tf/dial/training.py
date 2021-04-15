@@ -24,7 +24,7 @@ from typing import Dict, List, Optional
 
 import reverb
 import sonnet as snt
-import tf
+import tensorflow as tf
 from acme.utils import counting, loggers
 
 import mava
