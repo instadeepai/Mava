@@ -15,16 +15,13 @@
 
 """helper functions for logging"""
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 from acme.utils import loggers
 
 from mava.utils.loggers.tf_logger import TFSummaryLogger
-
-
-def path(log_dir: Path, subdir: Optional[str] = None) -> str:
-    return str(log_dir / subdir) if subdir else str(log_dir)
 
 
 class Logger:
@@ -37,12 +34,21 @@ class Logger:
         to_tensorboard: bool = False,
         time_delta: float = 1.0,
         print_fn: Callable[[str], None] = print,
-        **kwargs: Any,
+        time_stamp: Optional[str] = None,
     ):
         self._label = label
         self._directory = directory
+        self._time_stamp = time_stamp if time_stamp else str(datetime.now())
         self._logger = self.make_logger(
-            to_terminal, to_csv, to_tensorboard, time_delta, print_fn, **kwargs
+            to_terminal, to_csv, to_tensorboard, time_delta, print_fn
+        )
+        self._logger_info = (
+            to_terminal,
+            to_csv,
+            to_tensorboard,
+            time_delta,
+            print_fn,
+            self._time_stamp,
         )
 
     def make_logger(
@@ -52,7 +58,6 @@ class Logger:
         to_tensorboard: bool,
         time_delta: float,
         print_fn: Callable[[str], None],
-        **kwargs: Any,
     ) -> loggers.Logger:
         """Build an Acme logger.
 
@@ -78,15 +83,13 @@ class Logger:
         if to_csv:
             logger += [
                 loggers.CSVLogger(
-                    directory_or_file=path(self._directory, "csv"), label=self._label
+                    directory_or_file=self._path("csv"), label=self._label
                 )
             ]  # type: ignore
 
         if to_tensorboard:
             logger += [
-                TFSummaryLogger(
-                    logdir=path(self._directory, "tensorboard"), label=self._label
-                )
+                TFSummaryLogger(logdir=self._path("tensorboard"), label=self._label)
             ]  # type: ignore
 
         if logger:
@@ -97,6 +100,13 @@ class Logger:
             logger = loggers.NoOpLogger()
 
         return logger
+
+    def _path(self, subdir: Optional[str] = None) -> str:
+        return (
+            str(self._directory / subdir / self._time_stamp / self._label)
+            if subdir
+            else str(self._directory / self._label)
+        )
 
     def write(self, data: Any) -> None:
         self._logger.write(data)

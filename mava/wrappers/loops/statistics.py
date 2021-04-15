@@ -23,6 +23,7 @@ from acme import types
 from acme.utils import loggers
 
 from mava.environment_loop import ParallelEnvironmentLoop
+from mava.utils.loggers import Logger
 
 # from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics, generate_zeros_from_spec
@@ -219,33 +220,42 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
     def __init__(self, environment_loop: ParallelEnvironmentLoop):
         super().__init__(environment_loop)
 
+        # get loop logger data
+        loop_label = self._logger._label
+        base_dir = self._logger._directory
+        (
+            to_terminal,
+            to_csv,
+            to_tensorboard,
+            time_delta,
+            print_fn,
+            time_stamp,
+        ) = self._logger._logger_info
+
+        self._agent_running_statistics: Dict[str, Dict[str, float]] = {}
         self._agents_stats: Dict[str, Dict[str, RunningStatistics]] = {
             agent: {} for agent in self._environment.possible_agents
         }
-        # self._agent_loggers: Dict[str, loggers.Logger] = {}
+        self._agent_loggers: Dict[str, loggers.Logger] = {}
 
         # statistics dictionary
         for agent in self._environment.possible_agents:
-            # self._agent_loggers[agent] = make_logger(label=agent, directory=)
+            agent_label = loop_label + "_" + agent
+            self._agent_loggers[agent] = Logger(
+                label=agent_label,
+                directory=base_dir,
+                to_terminal=to_terminal,
+                to_csv=to_csv,
+                to_tensorboard=to_tensorboard,
+                time_delta=time_delta,
+                print_fn=print_fn,
+                time_stamp=time_stamp,
+            )
             self._agents_stats[agent]["return"] = RunningStatistics(
                 f"{agent}_episode_return"
             )
             self._agents_stats[agent]["reward"] = RunningStatistics(
                 f"{agent}_episode_reward"
-            )
-            self._running_statistics.update(
-                {
-                    f"{agent}_mean_return": 0.0,
-                    f"{agent}_max_return": 0.0,
-                    f"{agent}_min_return": 0.0,
-                    f"{agent}_var_return": 0.0,
-                    f"{agent}_std_return": 0.0,
-                    f"{agent}_mean_episode_reward": 0.0,
-                    f"{agent}_max_episode_reward": 0.0,
-                    f"{agent}_min_episode_reward": 0.0,
-                    f"{agent}_var_episode_reward": 0.0,
-                    f"{agent}_std_episode_reward": 0.0,
-                }
             )
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
@@ -256,7 +266,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
             min_reward = self._agents_stats[agent]["reward"].min()
             var_reward = self._agents_stats[agent]["reward"].var()
             std_reward = self._agents_stats[agent]["reward"].std()
-            self._running_statistics.update(
+            self._agent_loggers[agent].write(
                 {
                     f"{agent}_mean_episode_reward": mean_reward,
                     f"{agent}_max_episode_reward": max_reward,
@@ -304,7 +314,8 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
             min_return = self._agents_stats[agent]["return"].min()
             var_return = self._agents_stats[agent]["return"].var()
             std_return = self._agents_stats[agent]["return"].std()
-            self._running_statistics.update(
+
+            self._agent_loggers[agent].write(
                 {
                     f"{agent}_mean_return": mean_return,
                     f"{agent}_max_return": max_return,
