@@ -28,8 +28,7 @@ from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import DecentralisedActorCritic
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
-from mava.systems.tf import executors
-from mava.systems.tf.ippo import training
+from mava.systems.tf.ippo import execution, training
 
 
 @dataclasses.dataclass
@@ -64,6 +63,7 @@ class IPPOConfig:
     policy_networks: Dict[str, snt.Module]
     critic_networks: Dict[str, snt.Module]
     observation_networks: Dict[str, snt.Module]
+    behavior_networks: Dict[str, snt.Module]
     shared_weights: bool = True
     target_update_period: int = 100
 
@@ -203,7 +203,7 @@ class IPPOBuilder(SystemBuilder):
 
         # TODO may need a custom executor
         # Create the actor which defines how we take actions.
-        return executors.FeedForwardExecutor(
+        return execution.FeedForwardExecutorLogits(
             policy_networks=policy_networks,
             shared_weights=shared_weights,
             variable_client=variable_client,
@@ -339,6 +339,7 @@ class IPPO(system.System):
                 policy_networks=policy_networks,
                 critic_networks=critic_networks,
                 observation_networks=observation_networks,
+                behavior_networks=behavior_networks,
                 shared_weights=shared_weights,
                 discount=discount,
                 clipping_epsilon=clipping_epsilon,
@@ -380,7 +381,7 @@ class IPPO(system.System):
             observation_networks=observation_networks,
             behavior_networks=behavior_networks,
             shared_weights=shared_weights,
-        ).create_system()
+        ).create_system()  # behavior_networks,
 
         # Create the actor which defines how we take actions.
         executor = builder.make_executor(networks["behaviors"], adder)

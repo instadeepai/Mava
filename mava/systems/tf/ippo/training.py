@@ -59,6 +59,7 @@ class IPPOTrainer(mava.Trainer):
         clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
+        num_steps: int = 5,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -111,6 +112,8 @@ class IPPOTrainer(mava.Trainer):
         self._entropy_cost = entropy_cost
         self._clipping_epsilon = clipping_epsilon
         self._lambda_gae = lambda_gae
+        # self._num_steps = num_steps
+        self._num_steps = tf.Variable(5, dtype=tf.int32)
 
         # Necessary to track when to update target networks.
         # self._num_steps = tf.Variable(0, dtype=tf.int32)
@@ -160,9 +163,10 @@ class IPPOTrainer(mava.Trainer):
                     "policy": self._policy_networks[agent_key],
                     "critic": self._critic_networks[agent_key],
                     "observation": self._observation_networks[agent_key],
-                    "target_policy": self._target_policy_networks[agent_key],
-                    "target_critic": self._target_critic_networks[agent_key],
-                    "target_observation": self._target_observation_networks[agent_key],
+                    # "target_policy": self._target_policy_networks[agent_key],
+                    # "target_critic": self._target_critic_networks[agent_key],
+                    # "target_observation":
+                    # self._target_observation_networks[agent_key],
                     "policy_optimizer": self._policy_optimizer,
                     "critic_optimizer": self._critic_optimizer,
                     "num_steps": self._num_steps,
@@ -170,10 +174,9 @@ class IPPOTrainer(mava.Trainer):
 
                 checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
                 checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=1,
-                    add_uid=False,
-                    directory=checkpointer_dir,
                     objects_to_save=objects_to_save,
+                    time_delta_minutes=1,
+                    directory=checkpointer_dir,
                     enable_checkpointing=True,
                 )
                 self._system_checkpointer[agent_key] = checkpointer

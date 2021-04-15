@@ -106,6 +106,8 @@ def make_networks(
         critic_network = snt.Sequential(
             [
                 # The multiplexer concatenates the observations/actions.
+                # TODO : seek a around not using actions here.
+                networks.CriticMultiplexer(),
                 networks.LayerNormMLP(
                     critic_networks_layer_sizes[key], activate_final=False
                 ),
@@ -179,6 +181,7 @@ def main(_: Any) -> None:
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
         # eval_loop.run(num_episodes=1)
+        print("hi")
 
 
 if __name__ == "__main__":

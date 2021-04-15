@@ -79,7 +79,7 @@ class FeedForwardExecutorLogits(core.Executor):
 
         self._prev_logits = logits
 
-        return action
+        return tf.cast(action, "int64")
 
     def select_action(
         self, agent: str, observation: types.NestedArray
