@@ -15,9 +15,6 @@
 
 """Example running MADDPG on pettinzoo MPE environments."""
 
-import importlib
-from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
@@ -28,30 +25,50 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from acme.utils.loggers import CSVLogger, TerminalLogger, base
+from acme.utils.loggers.tf_summary import TFSummaryLogger
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
-from mava.utils.loggers import Logger
-from mava.wrappers import DetailedPerAgentStatistics, PettingZooParallelEnvWrapper
+from mava.utils.debugging.make_env import make_debugging_env
+from mava.wrappers.debugging_envs import DebuggingEnvWrapper
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
+flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
 
 flags.DEFINE_integer(
     "num_episodes_per_eval",
-    10,
+    100,
     "Number of training episodes to run between evaluation " "episodes.",
 )
 
 
+class CustomLogger(base.Logger):
+    def __init__(self, logdir: str = "logs", label: str = "Custom"):
+        self.loggers = [
+            TerminalLogger(label="Environment Loop"),
+            CSVLogger(directory_or_file=logdir),
+        ]
+
+    def write(self, data: base.LoggingData) -> None:
+        if "loss" not in data and "push" not in data and "pull" not in data:
+            for logger in self.loggers:
+                logger.write(data)
+
+
 def make_environment(
-    env_class: str = "sisl", env_name: str = "multiwalker_v6", **kwargs: int
+    env_name: str = "simple_spread",
+    action_space: str = "continuous",
+    num_agents: int = 3,
+    render: bool = False,
 ) -> dm_env.Environment:
+
+    assert action_space == "continuous" or action_space == "discrete"
+
     """Creates a MPE environment."""
-    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
-    env = env_module.parallel_env(**kwargs)  # type: ignore
-    environment = PettingZooParallelEnvWrapper(env)
+    env_module = make_debugging_env(env_name, action_space, num_agents)
+    environment = DebuggingEnvWrapper(env_module, render=render)
     return environment
 
 
@@ -138,28 +155,17 @@ def make_networks(
 
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment(remove_on_fall=False)
+    environment = make_environment(
+        env_name="simple_spread", action_space="continuous", render=False
+    )
+
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
     system_networks = make_networks(environment_spec)
 
     # create tf loggers
-    base_dir = Path.cwd()
-    log_dir = base_dir / "logs"
-    log_time_stamp = str(datetime.now())
-    system_logger = Logger(
-        label="system_trainer",
-        directory=log_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=log_time_stamp,
-    )
-    train_logger = Logger(
-        label="train_loop",
-        directory=log_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=log_time_stamp,
-    )
+    logs_dir = "logs"
+    system_logger = TFSummaryLogger(f"{logs_dir}/system")
+    eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
 
     # Construct the agent.
     system = maddpg.MADDPG(
@@ -171,15 +177,13 @@ def main(_: Any) -> None:
         ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
         logger=system_logger,
+        checkpoint=False,
     )
 
     # Create the environment loop used for training.
     train_loop = ParallelEnvironmentLoop(
-        environment, system, logger=train_logger, label="train_loop"
+        environment, system, logger=CustomLogger(), label="train_loop"
     )
-
-    # Wrap training loop to compute and log detailed running statistics
-    train_loop = DetailedPerAgentStatistics(train_loop)
 
     # Create the evaluation policy.
     # NOTE: assumes weight sharing
@@ -198,12 +202,16 @@ def main(_: Any) -> None:
 
     # Create the evaluation actor and loop.
     eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
-    eval_env = make_environment(remove_on_fall=False)
-    eval_loop = ParallelEnvironmentLoop(eval_env, eval_actor, label="eval_loop")
+    eval_env = make_environment(
+        env_name="simple_spread", action_space="continuous", render=True
+    )
+    eval_loop = ParallelEnvironmentLoop(
+        eval_env, eval_actor, logger=eval_logger, label="eval_loop"
+    )
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        eval_loop.run(num_episodes=1)
+        eval_loop.run(num_episodes=4)
 
 
 if __name__ == "__main__":
