@@ -11,10 +11,15 @@ from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
+<<<<<<< HEAD
 from mava.environment_loops.pettingzoo import (  # type: ignore
     PettingZooParallelEnvironmentLoop,
 )
 from mava.systems.tf import idqn
+=======
+from mava.environment_loop import ParallelEnvironmentLoop
+from mava.systems.tf import madqn
+>>>>>>> feature/idqn
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
@@ -39,15 +44,17 @@ def make_environment(
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
+    epsilon: tf.Variable,
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
     shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
+
     specs = environment_spec.get_agent_specs()
+
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
-    specs = environment_spec.get_agent_specs()
     observation_networks = {}
     q_networks = {}
     behavior_networks = {}
@@ -67,9 +74,6 @@ def make_networks(
             ]
         )
 
-        epsilon = tf.Variable(
-            0.1, trainable=False
-        )  # fixed for now. not sure where to update it. maybe in the learner
         behavior_network = snt.Sequential(
             [
                 q_network,
@@ -92,24 +96,22 @@ def make_networks(
 
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment(max_cycles=25)
+    environment = make_environment()
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    system_networks = make_networks(environment_spec)
+    epsilon = tf.Variable(1.0, trainable=False)
+    system_networks = make_networks(environment_spec, epsilon)
 
     # Construct the agent.
-    system = idqn.IDQN(
+    system = madqn.IDQN(
         environment_spec=environment_spec,
         q_networks=system_networks["q_networks"],
-        observation_networks=system_networks[
-            "observations"
-        ],  # pytype: disable=wrong-arg-types
+        observation_networks=system_networks["observations"],
         behavior_networks=system_networks["behaviors"],
+        epsilon=epsilon,
     )
 
     # Create the environment loop used for training.
-    train_loop = PettingZooParallelEnvironmentLoop(
-        environment, system, label="train_loop"
-    )
+    train_loop = ParallelEnvironmentLoop(environment, system, label="train_loop")
 
     # TODO fix the eval loop
 
@@ -124,7 +126,7 @@ def main(_: Any) -> None:
     # # Create the evaluation actor and loop.
     # eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
     # eval_env = make_environment()
-    # eval_loop = PettingZooParallelEnvironmentLoop(
+    # eval_loop = ParallelEnvironmentLoop(
     #     eval_env, eval_actor, label="eval_loop"
     # )
 
