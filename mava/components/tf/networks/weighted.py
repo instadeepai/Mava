@@ -17,18 +17,14 @@
 # https://github.com/oxwhirl/wqmix/tree/master/src/modules/mixers
 """Mixing for multi-agent RL systems"""
 
-from mava.components.tf.architectures import BaseArchitecture
-from mava.components.tf.modules.mixing import BaseMixingModule
+import sonnet as snt
 
-
-class WeightedMixing(BaseMixingModule):
+class WeightedMixing(snt.Module):
     """Multi-agent mixing architecture."""
 
     def __init__(
         self,
-        architecture: BaseArchitecture,
     ) -> None:
-        self._architecture = architecture
 
     def some_mixing_function(self) -> None:
         """Perform some mixing logic"""

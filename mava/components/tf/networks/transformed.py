@@ -25,20 +25,13 @@ from typing import Optional, Tuple
 import sonnet as snt
 import tensorflow as tf
 
-from mava.components.tf.architectures import BaseArchitecture
-from mava.components.tf.modules.mixing import BaseMixingModule
-
-
-class QTranBase(BaseMixingModule):
+class QTranBase(snt.Module):
     """Multi-agent mixing architecture."""
 
     def __init__(
         self,
-        architecture: BaseArchitecture,
         n_agents: int,
         n_actions: int,
-        # Choice of underlying architecture.
-        # Can this be derived from Mava 'architecture' parameter?
         state_shape: Tuple,
         qtran_hidden_dim: int,
         rnn_hidden_dim: int,
@@ -47,7 +40,6 @@ class QTranBase(BaseMixingModule):
     ) -> None:
         """Initializes the mixer."""
         super(QTranBase, self).__init__()
-        self._architecture = architecture
 
         self._n_agents = n_agents
         self._n_actions = n_actions
@@ -183,11 +175,8 @@ class QTranBase(BaseMixingModule):
 class QTranAlt(BaseMixingModule):
     def __init__(
         self,
-        architecture: BaseArchitecture,
         n_agents: int,
         n_actions: int,
-        # Choice of underlying architecture.
-        # Can this be derived from Mava 'architecture' parameter?
         state_shape: Tuple,
         qtran_hidden_dim: int,
         rnn_hidden_dim: int,
@@ -196,7 +185,6 @@ class QTranAlt(BaseMixingModule):
     ) -> None:
         """Initializes the mixer."""
         super(QTranAlt, self).__init__()
-        self._architecture = architecture
 
         self._n_agents = n_agents
         self._n_actions = n_actions

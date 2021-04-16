@@ -13,64 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn):
-#   - [] Complete class for monotonic mixing
-#   - [] Generalise Qmixing to allow for different activations,
-#          hypernetwork structures etc.
-#   - [] Decide on whether to accept an 'args' term or receive each arg individually.
-#   - [] Think about how to default values.
+from typing import Dict
 
-# NOTE (StJohn): I'm still thinking about the structure in general. One of the biggest
-# design choices at the moment is how to structure what is passed to the __init__ when
-# instantiating vs what is passed to the forward functions.
-
-# Code inspired by PyMARL framework implementation
-# https://github.com/oxwhirl/pymarl/blob/master/src/modules/mixers/qmix.py
-
-"""Mixing for multi-agent RL systems"""
-
-from typing import Tuple
-
-import numpy as np
-import sonnet as snt
 import tensorflow as tf
+from tensorflow import Tensor
+import sonnet as snt
 
-from mava.components.tf.architectures import BaseArchitecture
-from mava.components.tf.modules.mixing import BaseMixingModule
-
-
-class MonotonicMixing(BaseMixingModule):
-    """Multi-agent monotonic mixing architecture.
-    This is the component which can be used to add monotonic mixing to an underlying
-    agent architecture. It currently supports generalised monotonic mixing using
-    hypernetworks (1 or 2 layers) for control of decomposition parameters (QMix)."""
-
+class HyperNetwork(snt.Model):
     def __init__(
         self,
-        architecture: BaseArchitecture,
-        state_shape: Tuple,
+        state_dim: int,
         n_agents: int,
-        qmix_hidden_dim: int,
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 64,
-    ) -> None:
+    ):  
         """Initializes the mixer.
         Args:
-            architecture: the BaseArchitecture used.
-            state_shape: The state shape as defined by the environment.
+            state_dim: The state dimension as defined by the environment.
             n_agents: The number of agents (i.e. Q-values) to mix.
             qmix_hidden_dim: Mixing layers hidden dimensions.
             num_hypernet_layers: Number of hypernetwork layers. Currently 1 or 2.
             hypernet_hidden_dim: The number of nodes in the hypernetwork hidden
                 layer. Relevant for num_hypernet_layers > 1.
         """
-        super(MonotonicMixing, self).__init__()
-
-        self._architecture = architecture
-
-        self._state_dim = int(np.prod(state_shape))  # Defined by the environment
-        self._n_agents = n_agents
-        self._qmix_hidden_dim = qmix_hidden_dim
+        self._state_dim = state_dim
+        self._n_agents = state_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
 
@@ -126,31 +93,11 @@ class MonotonicMixing(BaseMixingModule):
             ]
         )
 
-    def __call__(
-        self,
-        q_values: tf.Tensor,  # Check type
-        states: tf.Tensor,  # Check type
-    ) -> tf.Tensor:
-        """Monotonic mixing logic."""
+    def __call__(self, states: Tensor) -> Dict[str, float]:
+        hyperparams = {}
+        hyperparams["w1"] = tf.abs(self.hyper_w1(states))
+        hyperparams["b1"] = self.hyper_w1(states)
+        hyperparams["w2"] = tf.abs(self.hyper_w2(states))
+        hyperparams["b2"] = self.hyper_b2(states)
 
-        # Forward pass
-        episode_num = tf.size(q_values).numpy()  # Get int from 0D tensor length
-        states = tf.reshape(states, shape=(-1, self._state_dim))
-        q_values = tf.reshape(q_values, shape=(-1, 1, self._n_agents))
-
-        # First layer
-        w1 = tf.abs(self.hyper_w1(states))
-        b1 = self.hyper_w1(states)
-        w1 = tf.reshape(w1, shape=(-1, self._n_agents, self._qmix_hidden_dim))
-        b1 = tf.reshape(b1, shape=(-1, 1, self._qmix_hidden_dim))
-        hidden = tf.nn.elu(tf.matmul(q_values, w1) + b1)  # ELU -> Exp. linear unit
-
-        # Second layer
-        w2 = tf.abs(self.hyper_w2(states))
-        b2 = self.hyper_b2(states)
-        w2 = tf.reshape(w2, shape=(-1, self._qmix_hidden_dim, 1))
-        b2 = tf.reshape(b2, shape=(-1, 1, 1))
-
-        q_tot = tf.matmul(hidden, w2) + b2
-        q_tot = tf.reshape(q_tot, shape=(episode_num, -1, 1))
-        return q_tot
+        return hyperparams

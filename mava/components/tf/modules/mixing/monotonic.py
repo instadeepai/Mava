@@ -18,8 +18,14 @@
 
 """Mixing for multi-agent RL systems"""
 
+from typing import Dict, Tuple
+
+import numpy as np
+import sonnet as snt
+
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
+from mava.components.tf.networks.monotonic import MonotonicNetwork
 
 
 class MonotonicMixing(BaseMixingModule):
@@ -31,6 +37,11 @@ class MonotonicMixing(BaseMixingModule):
     def __init__(
         self,
         architecture: BaseArchitecture,
+        state_shape: Tuple,
+        n_agents: int,  # TODO Get this from architecture
+        qmix_hidden_dim: int,
+        num_hypernet_layers: int = 2,
+        hypernet_hidden_dim: int = 64,
     ) -> None:
         """Initializes the mixer.
         Args:
@@ -39,3 +50,27 @@ class MonotonicMixing(BaseMixingModule):
         super(MonotonicMixing, self).__init__()
 
         self._architecture = architecture
+
+        self._state_dim = int(np.prod(state_shape))  # Defined by the environment
+        self._n_agents = n_agents
+        self._qmix_hidden_dim = qmix_hidden_dim
+        self._num_hypernet_layers = num_hypernet_layers
+        self._hypernet_hidden_dim = hypernet_hidden_dim
+
+    def _create_mixing_layer(self) -> snt.Module:
+        """Modify and return system architecture given mixing structure."""
+        # Implement method from base class
+        self._mixed_network = MonotonicNetwork(
+            self._qmix_hidden_dim,
+            self._state_dim,
+            self._n_agents,
+            self._num_hypernet_layers,
+            self._hypernet_hidden_dim,
+        )
+        return self._mixed_network
+
+    def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
+        # Implement method from base class
+        networks = self._architecture.create_actor_variables()
+        networks["mixing_network"] = self._create_mixing_layer()
+        return networks

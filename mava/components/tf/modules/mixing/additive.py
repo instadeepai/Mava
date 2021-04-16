@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import tensorflow as tf
-from tensorflow import Tensor
+from typing import Dict
+
+import sonnet as snt
 
 from mava.components.tf.architectures.base import BaseArchitecture
 from mava.components.tf.modules.mixing.base import BaseMixingModule
+from mava.components.tf.networks.additive import AdditiveNetwork
 
 
 class AdditiveMixing(BaseMixingModule):
@@ -27,6 +29,14 @@ class AdditiveMixing(BaseMixingModule):
         """Initializes the mixer."""
         super(AdditiveMixing, self).__init__()
 
-    def __call__(self, q_values: Tensor) -> Tensor:
-        """Monotonic mixing logic."""
-        return tf.math.reduce_sum(q_values)
+        self._architecture = architecture
+
+    def _create_mixing_layer(self) -> snt.Module:
+        # Instantiate additive mixing network
+        return AdditiveNetwork()
+
+    def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
+        # Implement method from base class
+        networks = self._architecture.create_actor_variables()
+        networks["mixing_network"] = self._create_mixing_layer()
+        return networks

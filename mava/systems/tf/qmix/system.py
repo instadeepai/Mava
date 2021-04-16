@@ -31,7 +31,7 @@ from acme.utils import counting, loggers
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import DecentralisedActor
-from mava.components.tf.modules.mixing import AdditiveMixing
+from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
@@ -379,22 +379,18 @@ class QMIX(system.System):
         dataset = builder.make_dataset_iterator(replay_client)
 
         # Create system architecture
-        networks = DecentralisedActor(
+        architecture = DecentralisedActor(
             environment_spec=environment_spec,
             policy_networks=q_networks,
             observation_networks=observation_networks,
             behavior_networks=behavior_networks,
             shared_weights=shared_weights,
-        ).create_system()
+        )
+        # networks = architecture.create_system()
 
-        # Add monotonic mixing and get networks
-        # TODO (StJohn): create monotonic mixing module for Qmix
-        # See mava/components/tf/modules/mixing
-
-        # Testing out on VDN Mixing.
-        mixed_networks = AdditiveMixing(
-            architecture=networks,
-            # Q_values etc
+        # Augment network architecture by adding mixing layer network.
+        networks = MonotonicMixing(
+            architecture=architecture,
         ).create_system()
 
         # Create the actor which defines how we take actions.
@@ -402,9 +398,7 @@ class QMIX(system.System):
 
         # The learner updates the parameters (and initializes them).
         # TODO label these inputs properly
-        trainer = builder.make_trainer(
-            mixed_networks, dataset, counter, logger, checkpoint
-        )
+        trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
 
         super().__init__(
             executor=executor,

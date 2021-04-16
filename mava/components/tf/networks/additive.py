@@ -15,17 +15,17 @@
 
 import tensorflow as tf
 from tensorflow import Tensor
+import sonnet as snt
 
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
 
 
-class AdditiveMixing(BaseMixingModule):
+class AdditiveNetwork(snt.Module):
     """Multi-agent monotonic mixing architecture."""
 
-    def __init__(self, architecture: BaseArchitecture) -> None:
+    def __init__(self) -> None:
         """Initializes the mixer."""
-        super(AdditiveMixing, self).__init__()
 
     def __call__(self, q_values: Tensor) -> Tensor:
         """Monotonic mixing logic."""
