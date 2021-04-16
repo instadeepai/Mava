@@ -312,6 +312,15 @@ class BaseMADDPGTrainer(mava.Trainer):
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
+        # TODO: Try and resolve the problem with calling _transform_observations
+        #  for each agent even though it is the same calculation. It has its own
+        #  loop over all agents. Also, try and do a batch update of all networks
+        #  instead of the sequential updates that are currently done. This is
+        #  mostly to do with the shared networks between agents that are getting
+        #  updated sequentially. This might introduce some problem where agent
+        #  order determines the effect it has on shared network weights, which we
+        #  do not want.
+
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
 
