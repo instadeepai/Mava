@@ -21,14 +21,33 @@ from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
 
 
-class TransformedMixing(BaseMixingModule):
+class QTranBase(BaseMixingModule):
     """Multi-agent mixing architecture."""
 
     def __init__(
         self,
         architecture: BaseArchitecture,
     ) -> None:
+        """Initializes the mixer.
+        Args:
+            architecture: the BaseArchitecture used.
+        """
+        super(QTranBase, self).__init__()
+
         self._architecture = architecture
 
-    def some_mixing_function(self) -> None:
-        """Perform some mixing logic"""
+
+class QTranAlt(BaseMixingModule):
+    """Multi-agent mixing architecture."""
+
+    def __init__(
+        self,
+        architecture: BaseArchitecture,
+    ) -> None:
+        """Initializes the mixer.
+        Args:
+            architecture: the BaseArchitecture used.
+        """
+        super(QTranAlt, self).__init__()
+
+        self._architecture = architecture

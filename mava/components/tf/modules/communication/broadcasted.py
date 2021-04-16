@@ -17,6 +17,10 @@
 
 """Broadcasted communication for multi-agent RL systems"""
 
+from typing import Dict
+
+import sonnet as snt
+import tensorflow as tf
 
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.communication import BaseCommunicationModule
@@ -28,8 +32,53 @@ class BroadcastedCommunication(BaseCommunicationModule):
     def __init__(
         self,
         architecture: BaseArchitecture,
+        shared: bool = True,
+        channel_size: int = 4,
+        channel_noise: float = 0.0,
     ) -> None:
+        """Initializes the broadcaster communicator.
+        Args:
+            architecture: the BaseArchitecture used.
+            shared: if a shared communication channel is used.
+            channel_noise: stddev of normal noise in channel.
+        """
         self._architecture = architecture
+        self._shared = shared
+        self._channel_noise = channel_noise
 
-    def some_communication_function(self) -> None:
-        """Perform some communication logic"""
+    # def create_communication_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+    #     print(self._architecture)
+    #     pass
+
+    def create_system(
+        self,
+    ) -> Dict[str, Dict[str, snt.Module]]:
+        """Create system architecture with communication by modifying architecture."""
+        # networks = self.create_communication_variables()
+
+        return self._architecture.create_system()
+
+    def process_messages(
+        self,
+        messages: Dict[str, snt.Module],
+    ) -> Dict[str, snt.Module]:
+        """Initializes the broadcaster communicator.
+        Args:
+            messages: Dict of agent messages.
+        """
+        if self._shared:
+            # Sum of all messages
+            channel = tf.math.reduce_sum(tf.nest.flatten(messages), axis=0)
+            # Add channel noise if applicable
+            channel += tf.random.normal(
+                channel.shape, mean=0.0, stddev=self._channel_noise
+            )
+        else:
+            # Concat all messages (might need to retain ordering of dict)
+            channel = tf.concat(tf.nest.flatten(messages), axis=0)
+            # Add channel noise if applicable
+            channel += tf.random.normal(
+                channel.shape, mean=0.0, stddev=self._channel_noise
+            )
+
+        return {key: channel for key in messages}

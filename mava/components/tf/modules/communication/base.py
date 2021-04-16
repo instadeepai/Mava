@@ -31,9 +31,12 @@ class BaseCommunicationModule:
     """
 
     @abc.abstractmethod
-    def some_abstract_communication_function(self) -> Dict[str, Dict[str, snt.Module]]:
+    def process_messages(
+        self, messages: Dict[str, snt.Module]
+    ) -> Dict[str, snt.Module]:
         """Abstract communication function."""
 
     @abc.abstractmethod
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         """Create system architecture with communication."""
+        # create_system on base architecture
