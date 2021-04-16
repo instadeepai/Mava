@@ -13,6 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.systems.tf.dial.execution import DIALExecutor
-from mava.systems.tf.dial.system import DIAL  # type: ignore
-from mava.systems.tf.dial.training import DIALTrainer
+"""MARL system mixing modules."""
