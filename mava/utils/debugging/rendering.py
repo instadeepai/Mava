@@ -1,3 +1,5 @@
+# Adapted from https://github.com/openai/multiagent-particle-envs.
+
 """
 2D rendering framework
 """

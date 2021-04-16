@@ -1,3 +1,5 @@
+# Adapted from https://github.com/openai/multiagent-particle-envs.
+
 """
 Code for creating a multiagent environment with one of the scenarios listed
 in ./scenarios/.

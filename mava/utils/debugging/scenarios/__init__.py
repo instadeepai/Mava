@@ -1,3 +1,5 @@
+# Adapted from https://github.com/openai/multiagent-particle-envs.
+
 import importlib
 from typing import Any
 

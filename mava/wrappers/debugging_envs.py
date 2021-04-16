@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Wraps a PettingZoo MARL environment to be used as a dm_env environment."""
+"""Wraps a Debugging MARL environment to be used as a dm_env environment."""
 from typing import Any, Dict, Union
 
 import dm_env
@@ -26,7 +26,7 @@ from mava.utils.wrapper_utils import OLT, convert_np_type, parameterized_restart
 
 
 class DebuggingEnvWrapper(dm_env.Environment):
-    """Environment wrapper for PettingZoo MARL environments."""
+    """Environment wrapper for Debugging MARL environments."""
 
     # Note: we don't inherit from base.EnvironmentWrapper because that class
     # assumes that the wrapped environment is a dm_env.Environment.
@@ -105,8 +105,8 @@ class DebuggingEnvWrapper(dm_env.Environment):
             step_type=self._step_type,
         )
 
-    # Convert PettingZoo observation so it's dm_env compatible. Also, the list
-    # of legal actions must be converted to a legal actions mask.
+    # Convert Debugging environment observation so it's dm_env compatible.
+    # Also, the list of legal actions must be converted to a legal actions mask.
     def _convert_observations(
         self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
     ) -> Dict[str, OLT]:

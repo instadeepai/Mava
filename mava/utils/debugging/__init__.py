@@ -1,3 +1,5 @@
+# Adapted from https://github.com/openai/multiagent-particle-envs.
+
 from gym.envs.registration import register
 
 # Multiagent envs

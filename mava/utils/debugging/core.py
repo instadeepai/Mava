@@ -1,3 +1,5 @@
+# Adapted from https://github.com/openai/multiagent-particle-envs.
+
 from typing import List, Union
 
 import numpy as np
