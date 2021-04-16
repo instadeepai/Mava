@@ -380,9 +380,9 @@ class MADDPG(system.System):
 
         # TODO (Arnu): fix mismatch in types between base trainer
         # and wrapped trainer
-        trainer = DetailedTrainerStatistics(
+        trainer = DetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]
-        )  # type: ignore
+        )
 
         super().__init__(
             executor=executor,

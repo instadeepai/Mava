@@ -56,7 +56,7 @@ class TrainerStatisticsBase:
         # For now as is, there is a type mismatch in the system code when
         # returning the wrapped trainer, but everything seems to work.
         # Need to find a solution to this.
-        # self.__class__ = mava.Trainer
+        self.__class__ = mava.Trainer
 
     def _create_loggers(self, keys: List[str]) -> None:
         raise NotImplementedError
