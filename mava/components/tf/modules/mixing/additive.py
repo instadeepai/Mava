@@ -13,22 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): complete class for weighted mixing
-# https://github.com/oxwhirl/wqmix/tree/master/src/modules/mixers
-"""Mixing for multi-agent RL systems"""
+import tensorflow as tf
+from tensorflow import Tensor
 
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
 
 
-class WeightedMixing(BaseMixingModule):
-    """Multi-agent mixing architecture."""
+class AdditiveMixing(BaseMixingModule):
+    """Multi-agent monotonic mixing architecture."""
 
-    def __init__(
-        self,
-        architecture: BaseArchitecture,
-    ) -> None:
-        self._architecture = architecture
+    def __init__(self, architecture: BaseArchitecture) -> None:
+        """Initializes the mixer."""
+        super(AdditiveMixing, self).__init__()
 
-    def some_mixing_function(self) -> None:
-        """Perform some mixing logic"""
+    def __call__(self, q_values: Tensor) -> Tensor:
+        """Monotonic mixing logic."""
+        return tf.math.reduce_sum(q_values)
