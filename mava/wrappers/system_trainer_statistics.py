@@ -56,7 +56,7 @@ class TrainerStatisticsBase:
         # For now as is, there is a type mismatch in the system code when
         # returning the wrapped trainer, but everything seems to work.
         # Need to find a solution to this.
-        self.__class__ = mava.Trainer
+        # self.__class__ = mava.Trainer
 
     def _create_loggers(self, keys: List[str]) -> None:
         raise NotImplementedError
@@ -146,20 +146,14 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
                 self._networks_stats[key][metric] = RunningStatistics(f"{key}_{metric}")
 
     def _compute_statistics(self, data: Dict[str, Dict[str, float]]) -> None:
+        self._summary_stats = ["mean", "max", "min", "var", "std"]
+
         for network, datum in data.items():
             for key, val in datum.items():
+                network_running_statistics: Dict[str, float] = {}
                 self._networks_stats[network][key].push(val)
-                mean_val = self._networks_stats[network][key].mean()
-                max_val = self._networks_stats[network][key].max()
-                min_val = self._networks_stats[network][key].min()
-                var_val = self._networks_stats[network][key].var()
-                std_val = self._networks_stats[network][key].std()
-                self._network_loggers[network].write(
-                    {
-                        f"{network}_mean_{key}": mean_val,
-                        f"{network}_max_{key}": max_val,
-                        f"{network}_min_{key}": min_val,
-                        f"{network}_var_{key}": var_val,
-                        f"{network}_std_{key}": std_val,
-                    }
-                )
+                for stat in self._summary_stats:
+                    network_running_statistics[
+                        f"{network}_{stat}_{key}"
+                    ] = self._networks_stats[network][key].__getattribute__(stat)()
+                self._network_loggers[network].write(network_running_statistics)
