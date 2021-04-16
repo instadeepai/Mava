@@ -40,6 +40,8 @@ class MultiAgentEnv(gym.Env):
             self.agent_ids.append(agent_id)
             agent_dict[agent_id] = agent_list[a_i]
 
+        self.possible_agents = self.agent_ids
+
         self.num_agents = len(self.agent_ids)
         self.agents = agent_dict
 

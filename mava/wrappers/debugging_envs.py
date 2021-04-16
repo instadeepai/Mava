@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Wraps a Debugging MARL environment to be used as a dm_env environment."""
-from typing import Any, Dict, Union
+from typing import Dict
 
 import dm_env
 import numpy as np
@@ -22,46 +22,18 @@ from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 
 from mava.utils.debugging.environment import MultiAgentEnv
-from mava.utils.wrapper_utils import OLT, convert_np_type, parameterized_restart
+from mava.utils.wrapper_utils import OLT, convert_np_type
+from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 
-class DebuggingEnvWrapper(dm_env.Environment):
+class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Debugging MARL environments."""
 
     # Note: we don't inherit from base.EnvironmentWrapper because that class
     # assumes that the wrapped environment is a dm_env.Environment.
     def __init__(self, environment: MultiAgentEnv, render: bool = False):
-        self._environment = environment
-        self._reset_next_step = True
-        self.possible_agents = self._environment.agent_ids
         self.render = render
-
-    def reset(self) -> dm_env.TimeStep:
-        """Resets the episode."""
-        self._reset_next_step = False
-        self._step_type = dm_env.StepType.FIRST
-        discount_spec = self.discount_spec()
-        self._discounts = {
-            agent: convert_np_type(discount_spec[agent].dtype, 1)
-            for agent in self._environment.agent_ids
-        }
-        observe = self._environment.reset()
-
-        observations = self._convert_observations(
-            observe, {agent: False for agent in self.agent_ids}
-        )
-        rewards_spec = self.reward_spec()
-        rewards = {
-            agent: convert_np_type(rewards_spec[agent].dtype, 0)
-            for agent in self.agent_ids
-        }
-
-        discount_spec = self.discount_spec()
-        self._discounts = {
-            agent: convert_np_type(discount_spec[agent].dtype, 1)
-            for agent in self.agent_ids
-        }
-        return parameterized_restart(rewards, self._discounts, observations)
+        super().__init__(environment=environment)
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
@@ -144,44 +116,3 @@ class DebuggingEnvWrapper(dm_env.Environment):
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
-
-    def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
-        action_specs = {}
-        action_spaces = self._environment.action_spaces
-        for agent in self._environment.agent_ids:
-            action_specs[agent] = _convert_to_spec(action_spaces[agent])
-        return action_specs
-
-    def reward_spec(self) -> Dict[str, specs.Array]:
-        reward_specs = {}
-        for agent in self._environment.agent_ids:
-            reward_specs[agent] = specs.Array((), np.float32)
-
-        return reward_specs
-
-    def discount_spec(self) -> Dict[str, specs.BoundedArray]:
-        discount_specs = {}
-        for agent in self._environment.agent_ids:
-            discount_specs[agent] = specs.BoundedArray(
-                (), np.float32, minimum=0, maximum=1.0
-            )
-        return discount_specs
-
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
-        return {}
-
-    def seed(self, seed: int = None) -> None:
-        self._environment.seed(seed)
-
-    @property
-    def environment(self) -> MultiAgentEnv:
-        """Returns the wrapped environment."""
-        return self._environment
-
-    @property
-    def current_agent(self) -> Any:
-        return self._environment.agent_selection
-
-    def __getattr__(self, name: str) -> Any:
-        """Expose any other attributes of the underlying environment."""
-        return getattr(self._environment, name)
