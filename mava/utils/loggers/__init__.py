@@ -13,12 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.wrappers.environment_loop_statistics import (
-    DetailedEpisodeStatistics,
-    DetailedPerAgentStatistics,
-)
-from mava.wrappers.pettingzoo import (
-    PettingZooAECEnvWrapper,
-    PettingZooParallelEnvWrapper,
-)
-from mava.wrappers.system_trainer_statistics import DetailedTrainerStatistics
+from mava.utils.loggers.base import Logger
+from mava.utils.loggers.tf_logger import TFSummaryLogger
