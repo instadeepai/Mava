@@ -29,7 +29,7 @@ from acme.utils.loggers import CSVLogger, TerminalLogger, base
 from acme.utils.loggers.tf_summary import TFSummaryLogger
 
 from mava import specs as mava_specs
-from mava.environment_loops.debugging_envs import DebuggingEnvironmentLoop
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
 from mava.utils.debugging.make_env import make_debugging_env
 from mava.wrappers.debugging_envs import DebuggingEnvWrapper
@@ -187,7 +187,7 @@ def main(_: Any) -> None:
     )
 
     # Create the environment loop used for training.
-    train_loop = DebuggingEnvironmentLoop(
+    train_loop = ParallelEnvironmentLoop(
         environment, system, logger=CustomLogger(), label="train_loop"
     )
 
@@ -211,7 +211,7 @@ def main(_: Any) -> None:
     eval_env = make_environment(
         env_name="simple_spread", action_space="continuous", render=True
     )
-    eval_loop = DebuggingEnvironmentLoop(
+    eval_loop = ParallelEnvironmentLoop(
         eval_env, eval_actor, logger=eval_logger, label="eval_loop"
     )
 
