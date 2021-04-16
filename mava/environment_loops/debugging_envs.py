@@ -27,7 +27,6 @@ def get_good_simple_spread_action(
 ) -> Union[int, np.array]:
     import gym
 
-    # num_agents = len(environment.agents)
     diff = np.array(obs[5:7])
     if type(environment.action_spaces[agent_id]) == gym.spaces.discrete.Discrete:
         x, y = diff

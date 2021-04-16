@@ -1,4 +1,5 @@
 # Adapted from https://github.com/openai/multiagent-particle-envs.
+# TODO (dries): Try using this class directly from PettingZoo and delete this file.
 
 """
 2D rendering framework
@@ -173,18 +174,6 @@ class Transform(Attr):
 
     def set_scale(self, newx: float, newy: float) -> None:
         self.scale = (float(newx), float(newy))
-
-
-# class LineStyle(Attr):
-#     def __init__(self, style: ) -> None:
-#         self.style = style
-#
-#     def enable(self):
-#         glEnable(GL_LINE_STIPPLE)
-#         glLineStipple(1, self.style)
-#
-#     def disable(self):
-#         glDisable(GL_LINE_STIPPLE)
 
 
 class LineWidth(Attr):

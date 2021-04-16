@@ -1,4 +1,5 @@
 # Adapted from https://github.com/openai/multiagent-particle-envs.
+# TODO (dries): Try using this class directly from PettingZoo and delete this file.
 
 from mava.utils.debugging.core import World
 

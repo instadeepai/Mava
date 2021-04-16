@@ -1,4 +1,5 @@
 # Adapted from https://github.com/openai/multiagent-particle-envs.
+# TODO (dries): Try using this class directly from PettingZoo and delete this file.
 
 # An old version of OpenAI Gym's multi_discrete.py.
 # (Was getting affected by Gym updates)
@@ -42,9 +43,8 @@ class MultiDiscrete(gym.Space):
         self.num_discrete_space = self.low.shape[0]
 
     def sample(self) -> List[int]:
-        """ Returns a array with one sample from each discrete action space """
-        # For each row: round(random .* (max - min) + min, 0)
-        print("self.num_discrete_space: ", self.num_discrete_space)
+        """Returns a array with one sample from each discrete action space.
+        For each row:  round(random .* (max - min) + min, 0)"""
         random_array = np.random.RandomState().rand(self.num_discrete_space)
         return [
             int(x)

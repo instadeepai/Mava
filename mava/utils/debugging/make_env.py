@@ -1,4 +1,5 @@
 # Adapted from https://github.com/openai/multiagent-particle-envs.
+# TODO (dries): Try using this class directly from PettingZoo and delete this file.
 
 """
 Code for creating a multiagent environment with one of the scenarios listed
@@ -41,17 +42,7 @@ def make_debugging_env(
     # create world
     world = scenario.make_world(num_agents)
     # create multiagent environment
-    # if benchmark:
-    #     raise ValueError("Not used")
-    #     env = MultiAgentEnv(
-    #         world,
-    #         scenario.reset_world,
-    #         scenario.reward,
-    #         scenario.observation,
-    #         scenario.benchmark_data,
-    #         action_space=action_space,
-    #     )
-    # else:
+
     env = MultiAgentEnv(
         world,
         action_space,

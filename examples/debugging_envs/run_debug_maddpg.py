@@ -45,19 +45,14 @@ flags.DEFINE_integer(
 
 
 class CustomLogger(base.Logger):
-    def __init__(self, logdir: str = "dist_data", label: str = "Custom"):
+    def __init__(self, logdir: str = "logs", label: str = "Custom"):
         self.loggers = [
             TerminalLogger(label="Environment Loop"),
             CSVLogger(directory_or_file=logdir),
         ]
 
     def write(self, data: base.LoggingData) -> None:
-        if (
-            "loss" not in data
-            and "push" not in data
-            and "pull" not in data
-            and "player_0_critic_loss" not in data
-        ):
+        if "loss" not in data and "push" not in data and "pull" not in data:
             for logger in self.loggers:
                 logger.write(data)
 
@@ -170,7 +165,6 @@ def main(_: Any) -> None:
     # create tf loggers
     logs_dir = "logs"
     system_logger = TFSummaryLogger(f"{logs_dir}/system")
-    # train_logger = TFSummaryLogger(f"{logs_dir}/train_loop")
     eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
 
     # Construct the agent.
