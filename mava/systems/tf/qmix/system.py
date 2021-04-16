@@ -386,7 +386,6 @@ class QMIX(system.System):
             behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         )
-        # networks = architecture.create_system()
 
         # Augment network architecture by adding mixing layer network.
         networks = MonotonicMixing(

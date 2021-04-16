@@ -13,12 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sonnet as snt
 import tensorflow as tf
 from tensorflow import Tensor
-import sonnet as snt
-
-from mava.components.tf.architectures import BaseArchitecture
-from mava.components.tf.modules.mixing import BaseMixingModule
 
 
 class AdditiveNetwork(snt.Module):

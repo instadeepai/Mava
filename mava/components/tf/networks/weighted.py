@@ -18,13 +18,15 @@
 """Mixing for multi-agent RL systems"""
 
 import sonnet as snt
+import tensorflow as tf
+
 
 class WeightedMixing(snt.Module):
     """Multi-agent mixing architecture."""
 
-    def __init__(
-        self,
-    ) -> None:
+    def __init__(self) -> None:
+        return
 
-    def some_mixing_function(self) -> None:
+    def __call__(self) -> tf.Tensor:
         """Perform some mixing logic"""
+        return tf.constant(1)

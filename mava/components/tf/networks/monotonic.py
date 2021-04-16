@@ -29,13 +29,11 @@
 
 """Mixing for multi-agent RL systems"""
 
-from typing import Dict
-
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 
 from mava.components.tf.networks.hypernetwork import HyperNetwork
+
 
 class MonotonicNetwork(snt.Module):
     """Multi-agent monotonic mixing architecture.
@@ -47,7 +45,7 @@ class MonotonicNetwork(snt.Module):
         self,
         qmix_hidden_dim: int,
         state_dim: int,
-        n_agents: int, # TODO Get from architecture
+        n_agents: int,  # TODO Get from architecture
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 64,
     ) -> None:
@@ -78,7 +76,7 @@ class MonotonicNetwork(snt.Module):
     def __call__(
         self,
         q_values: tf.Tensor,  # Check type
-        states: tf.Tensor, # Check type
+        states: tf.Tensor,  # Check type
     ) -> tf.Tensor:
         """Monotonic mixing logic."""
         states = tf.reshape(states, shape=(-1, self._state_dim))

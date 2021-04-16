@@ -15,9 +15,10 @@
 
 from typing import Dict
 
+import sonnet as snt
 import tensorflow as tf
 from tensorflow import Tensor
-import sonnet as snt
+
 
 class HyperNetwork(snt.Model):
     def __init__(
@@ -26,7 +27,7 @@ class HyperNetwork(snt.Model):
         n_agents: int,
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 64,
-    ):  
+    ):
         """Initializes the mixer.
         Args:
             state_dim: The state dimension as defined by the environment.

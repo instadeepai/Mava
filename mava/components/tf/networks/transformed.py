@@ -25,6 +25,7 @@ from typing import Optional, Tuple
 import sonnet as snt
 import tensorflow as tf
 
+
 class QTranBase(snt.Module):
     """Multi-agent mixing architecture."""
 
@@ -172,7 +173,7 @@ class QTranBase(snt.Module):
         return q_outputs, v_outputs
 
 
-class QTranAlt(BaseMixingModule):
+class QTranAlt(snt.Module):
     def __init__(
         self,
         n_agents: int,
