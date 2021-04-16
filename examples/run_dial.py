@@ -44,6 +44,41 @@ flags.DEFINE_integer(
 )
 
 
+class DIAL_policy(snt.module):
+    def __init__(
+        self,
+        gru_hidden_size: int,
+        gru_layers: int,
+        task_mlp_size: Sequence,
+        message_mlp_size: Sequence,
+        output_mlp_size: Sequence,
+        name: str = None,
+    ):
+        super(DIAL_policy, self).__init__(name=name)
+        self.task_mlp = networks.LayerNormMLP(
+            task_mlp_size,
+            activate_final=True,
+        )
+
+        self.message_mlp = networks.LayerNormMLP(
+            message_mlp_size,
+            activate_final=True,
+        )
+
+        self.gru = snt.GRU(gru_hidden_size)
+
+        self.output_mlp = networks.LayerNormMLP(
+            output_mlp_size,
+            activate_final=True,
+        )
+
+        self._gru_layers = gru_layers
+
+    def __call__(self, x: snt.Module) -> snt.Module:
+
+        return x
+
+
 def make_environment(
     env_class: str = "sisl", env_name: str = "prison", **kwargs: int
 ) -> dm_env.Environment:
@@ -108,44 +143,26 @@ def make_networks(
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
-        policy_network_gru = snt.GRU(
+        policy_network = DIAL_policy(
             policy_network_gru_hidden_sizes[key],
-        )
-
-        policy_network_output_mlp = networks.LayerNormMLP(
-            policy_network_output_mlp_sizes[key],
-            activate_final=True,
-        )
-
-        policy_network_task_mlp = networks.LayerNormMLP(
+            policy_network_gru_layers[key],
             policy_network_task_mlp_sizes[key],
-            activate_final=True,
-        )
-
-        policy_network_message_mlp = networks.LayerNormMLP(
             policy_network_message_mlp_sizes[key],
-            activate_final=True,
+            policy_network_output_mlp_sizes[key],
         )
 
         # Create the behavior policy.
         behavior_network = snt.Sequential(
             [
                 observation_network,
-                policy_network_task_mlp,
-                policy_network_gru,
-                policy_network_output_mlp,
+                policy_network,
                 networks.ClippedGaussian(sigma),
                 networks.ClipToSpec(specs[key].actions + specs[key].messages),
             ]
         )
 
         observation_networks[key] = observation_network
-        policy_networks[key] = (
-            policy_network_task_mlp,
-            policy_network_message_mlp,
-            policy_network_gru,
-            policy_network_output_mlp,
-        )
+        policy_networks[key] = policy_network
         behavior_networks[key] = behavior_network
 
     return {
