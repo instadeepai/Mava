@@ -72,5 +72,5 @@ class MonotonicMixing(BaseMixingModule):
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         # Implement method from base class
         networks = self._architecture.create_actor_variables()
-        networks["mixing_network"] = self._create_mixing_layer()
+        networks["mixing"] = self._create_mixing_layer()
         return networks

@@ -27,9 +27,7 @@ from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
-from mava.environment_loops.pettingzoo import (  # type: ignore
-    PettingZooParallelEnvironmentLoop,
-)
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import qmix
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
@@ -129,9 +127,7 @@ def main(_: Any) -> None:
     )
 
     # Create the environment loop used for training.
-    train_loop = PettingZooParallelEnvironmentLoop(
-        environment, system, label="train_loop"
-    )
+    train_loop = ParallelEnvironmentLoop(environment, system, label="train_loop")
 
     # Create the evaluation policy.
     # NOTE: assumes weight sharing

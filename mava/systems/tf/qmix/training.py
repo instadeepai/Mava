@@ -14,10 +14,12 @@
 # limitations under the License.
 
 # TODO (StJohn): implement Qmix trainer
+#   - Write code for training the mixing networks.
 # Helper resources
 #   - single agent dqn learner in acme:
 #           https://github.com/deepmind/acme/blob/master/acme/agents/tf/dqn/learning.py
 #   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
+
 
 """Qmix trainer implementation."""
 
@@ -36,7 +38,7 @@ from acme.utils import counting, loggers
 import mava
 
 
-class BaseQmixTrainer(mava.Trainer):
+class QMIXTrainer(mava.Trainer):
     """QMIX trainer.
     This is the trainer component of a QMIX system. i.e. it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -48,38 +50,36 @@ class BaseQmixTrainer(mava.Trainer):
         agent_types: List[str],
         q_networks: Dict[str, snt.Module],
         target_q_networks: Dict[str, snt.Module],
-        discount: float,
+        observation_networks: Dict[str, snt.Module],
+        mixing_networks: Dict[str, snt.Module],
+        epsilon: tf.Variable,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        observation_networks: Dict[str, snt.Module],
-        target_observation_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
-        optimizer: snt.Optimizer = None,
-        clipping: bool = True,
-        counter: counting.Counter = None,
-        logger: loggers.Logger = None,
-        checkpoint: bool = True,
-    ) -> None:
-        """Initializes the learner.
-        Args:
-        """
+        shared_weights: bool,
+        optimizer: snt.Optimizer,
+        clipping: bool,
+        counter: counting.Counter,
+        logger: loggers.Logger,
+        checkpoint: bool,
+    ):
+
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
+        self._optimizer = optimizer
 
         # Store online and target networks.
         self._q_networks = q_networks
         self._target_q_networks = target_q_networks
-
         self._observation_networks = observation_networks
-        self._target_observation_networks = target_observation_networks
+        self._mixing_networks = mixing_networks
+        self._epsilon = epsilon
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger("trainer")
 
         # Other learner parameters.
-        self._discount = discount
         self._clipping = clipping
 
         # Necessary to track when to update target networks.
@@ -87,11 +87,7 @@ class BaseQmixTrainer(mava.Trainer):
         self._target_update_period = target_update_period
 
         # Create an iterator to go through the dataset.
-        # TODO(b/155086959): Fix type stubs and remove.
-        self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
-
-        # Create optimizers if they aren't given.
-        self._optimizer = optimizer or snt.optimizers.Adam(1e-4)
+        self._iterator = iter(dataset)
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
@@ -100,15 +96,9 @@ class BaseQmixTrainer(mava.Trainer):
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
-        # Expose the variables.
-        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
-            "q_network": {},
-        }
+        # Checkpointer
         self._system_checkpointer = {}
         for agent_key in self.unique_net_keys:
-            self._system_network_variables["q_network"][agent_key] = q_networks[
-                agent_key
-            ].variables
 
             checkpointer = tf2_savers.Checkpointer(
                 time_delta_minutes=5,
@@ -121,11 +111,13 @@ class BaseQmixTrainer(mava.Trainer):
                 },
                 enable_checkpointing=checkpoint,
             )
+
             self._system_checkpointer[agent_key] = checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.
+
         self._timestamp = None
 
     @tf.function
@@ -141,7 +133,7 @@ class BaseQmixTrainer(mava.Trainer):
                 for src, dest in zip(online_variables, target_variables):
                     dest.assign(src)
 
-            self._num_steps.assign_add(1)
+        self._num_steps.assign_add(1)
 
     @tf.function
     def _transform_observations(
@@ -154,7 +146,7 @@ class BaseQmixTrainer(mava.Trainer):
             o_tm1[agent] = self._observation_networks[agent_key](
                 state[agent].observation
             )
-            o_t[agent] = self._target_observation_networks[agent_key](
+            o_t[agent] = self._observation_networks[agent_key](
                 next_state[agent].observation
             )
             # This stop_gradient prevents gradients to propagate into the target
@@ -180,12 +172,20 @@ class BaseQmixTrainer(mava.Trainer):
 
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
+    def _decrement_epsilon(self) -> None:
+        self._epsilon.assign_sub(1e-3)
+        if self._epsilon < 0.01:
+            self._epsilon.assign(0.01)
+
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
 
         # Update the target networks
         self._update_target_networks()
+
+        # decrement epsilon
+        self._decrement_epsilon()
 
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
@@ -201,23 +201,20 @@ class BaseQmixTrainer(mava.Trainer):
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data that the agents persist in replay.
         o_tm1, a_tm1, _, r_t, d_t, o_t, _ = inputs.data
-        logged_losses: Dict[str, Dict[str, Any]] = {}
+        o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
 
+        # TODO Change the training procedure so that it corresponds to QMix training.
+
+        logged_losses: Dict[str, Dict[str, Any]] = {}
         for agent in self._agents:
+
             agent_key = self.agent_net_keys[agent]
 
-            # Cast the additional discount to match the environment discount dtype.
-            discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
-
-            with tf.GradientTape(persistent=True) as tape:
+            with tf.GradientTape() as tape:
                 # Maybe transform the observation before feeding into policy and critic.
                 # Transforming the observations this way at the start of the learning
                 # step effectively means that the policy and critic share observation
                 # network weights.
-                o_tm1_trans, o_t_trans = self._transform_observations(
-                    o_tm1, o_t
-                )  # TODO can this go outside
-                # the agent loop. duplicate work going on here
 
                 o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
                     o_tm1_trans, o_t_trans, a_tm1, agent
@@ -226,20 +223,13 @@ class BaseQmixTrainer(mava.Trainer):
                 q_tm1 = self._q_networks[agent](o_tm1_feed)
                 q_t = self._target_q_networks[agent](o_t_feed)
 
-                # Squeeze into the shape expected by the td_learning implementation.
-                q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
-                q_t = tf.squeeze(q_t, axis=-1)  # [B]
+                loss, _ = trfl.qlearning(q_tm1, a_tm1_feed, r_t[agent], d_t[agent], q_t)
 
-                loss, _ = trfl.qlearning(q_tm1, a_tm1_feed, discount, d_t[agent], q_t)
-
-                loss = tf.reduce_mean(loss, axis=[0])
+                loss = tf.reduce_mean(loss, axis=0)
 
             # Retrieve gradients
             q_network_variables = self._q_networks[agent_key].trainable_variables
             gradients = tape.gradient(loss, q_network_variables)
-
-            # Delete the tape manually because of the persistent=True flag.
-            del tape
 
             # Maybe clip gradients.
             if self._clipping:

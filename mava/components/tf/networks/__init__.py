@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.components.tf.modules.networks.additive import AdditiveMixing  # type: ignore
+from mava.components.tf.modules.networks.additive import AdditiveNetwork  # type: ignore
 from mava.components.tf.modules.networks.monotonic import (  # type: ignore
-    MonotonicMixing,
+    MonotonicNetwork,
 )
 from mava.components.tf.modules.networks.transformed import QTranAlt  # type: ignore
 from mava.components.tf.modules.networks.transformed import QTranBase  # type: ignore
