@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from typing import Any, Dict
+from unittest.mock import patch
 
 import dm_env
 import numpy as np
@@ -264,8 +265,44 @@ class TestEnvWrapper:
             curr_dm_timestep.step_type is dm_env.StepType.MID
         ), "Failed to update step type."
 
+    # Test we only step in our env once.
+    def test_step_1_valid_when_env_not_done(
+        self, env_spec: EnvSpec, helpers: Helpers
+    ) -> None:
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+
+        # Seed environment since we are sampling actions.
+        # We need to seed env and action space.
+        random_seed = 42
+        wrapped_env.seed(random_seed)
+        helpers.seed_action_space(wrapped_env, random_seed)
+
+        #  Get agent names from env
+        agents = wrapped_env.agents
+
+        _ = wrapped_env.reset()
+
+        # Parallel env_types
+        if env_spec.env_type == EnvType.Parallel:
+            test_agents_actions = {
+                agent: wrapped_env.action_spaces[agent].sample() for agent in agents
+            }
+            with patch.object(wrapped_env._environment, "step") as parallel_step:
+                parallel_step.return_value = None, None, None, None
+                _ = wrapped_env.step(test_agents_actions)
+                parallel_step.assert_called_once_with(test_agents_actions)
+
+        # Sequential env_types
+        elif env_spec.env_type == EnvType.Sequential:
+            for agent in agents:
+                with patch.object(wrapped_env._environment, "step") as seq_step:
+                    seq_step.return_value = None
+                    test_agent_action = wrapped_env.action_spaces[agent].sample()
+                    _ = wrapped_env.step(test_agent_action)
+                    seq_step.assert_called_once_with(test_agent_action)
+
     # Test if all agents are done, env is set to done
-    def test_step_1_invalid_when_env_done(
+    def test_step_2_invalid_when_env_done(
         self, env_spec: EnvSpec, helpers: Helpers, monkeypatch: MonkeyPatch
     ) -> None:
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
@@ -286,11 +323,12 @@ class TestEnvWrapper:
             test_agents_actions = {
                 agent: wrapped_env.action_spaces[agent].sample() for agent in agents
             }
-            # Mock being done
+
+            # Mock being done - sets self._environment.env_done to true.
+            # We can't mock env_done directly since it is a propertly.
+            monkeypatch.setattr(wrapped_env._environment, "agents", [], raising=False)
             monkeypatch.setattr(
-                wrapped_env._environment.aec_env,
-                "agents",
-                [],
+                wrapped_env._environment.aec_env, "agents", [], raising=False
             )
 
             curr_dm_timestep = wrapped_env.step(test_agents_actions)
