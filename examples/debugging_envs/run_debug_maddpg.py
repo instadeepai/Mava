@@ -15,6 +15,8 @@
 
 """Example running MADDPG on pettinzoo MPE environments."""
 
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
@@ -25,13 +27,13 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
-from acme.utils.loggers import CSVLogger, TerminalLogger, base
-from acme.utils.loggers.tf_summary import TFSummaryLogger
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
 from mava.utils.debugging.make_env import make_debugging_env
+from mava.utils.loggers import Logger
+from mava.wrappers import DetailedPerAgentStatistics
 from mava.wrappers.debugging_envs import DebuggingEnvWrapper
 
 FLAGS = flags.FLAGS
@@ -42,19 +44,6 @@ flags.DEFINE_integer(
     100,
     "Number of training episodes to run between evaluation " "episodes.",
 )
-
-
-class CustomLogger(base.Logger):
-    def __init__(self, logdir: str = "logs", label: str = "Custom"):
-        self.loggers = [
-            TerminalLogger(label="Environment Loop"),
-            CSVLogger(directory_or_file=logdir),
-        ]
-
-    def write(self, data: base.LoggingData) -> None:
-        if "loss" not in data and "push" not in data and "pull" not in data:
-            for logger in self.loggers:
-                logger.write(data)
 
 
 def make_environment(
@@ -163,9 +152,23 @@ def main(_: Any) -> None:
     system_networks = make_networks(environment_spec)
 
     # create tf loggers
-    logs_dir = "logs"
-    system_logger = TFSummaryLogger(f"{logs_dir}/system")
-    eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
+    base_dir = Path.cwd()
+    log_dir = base_dir / "logs"
+    log_time_stamp = str(datetime.now())
+    system_logger = Logger(
+        label="system_trainer",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
+    train_logger = Logger(
+        label="train_loop",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
 
     # Construct the agent.
     system = maddpg.MADDPG(
@@ -179,11 +182,13 @@ def main(_: Any) -> None:
         logger=system_logger,
         checkpoint=False,
     )
-
     # Create the environment loop used for training.
     train_loop = ParallelEnvironmentLoop(
-        environment, system, logger=CustomLogger(), label="train_loop"
+        environment, system, logger=train_logger, label="train_loop"
     )
+
+    # Wrap training loop to compute and log detailed running statistics
+    train_loop = DetailedPerAgentStatistics(train_loop)
 
     # Create the evaluation policy.
     # NOTE: assumes weight sharing
@@ -205,9 +210,7 @@ def main(_: Any) -> None:
     eval_env = make_environment(
         env_name="simple_spread", action_space="continuous", render=True
     )
-    eval_loop = ParallelEnvironmentLoop(
-        eval_env, eval_actor, logger=eval_logger, label="eval_loop"
-    )
+    eval_loop = ParallelEnvironmentLoop(eval_env, eval_actor, label="eval_loop")
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
