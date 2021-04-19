@@ -218,12 +218,8 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 for agent, reward in rewards.items()
             }
 
-        if self._environment.env_done:
-            self._environment.step(None)
-        else:
-            self._environment.step(actions)
-
-        observations = self._convert_observations(observations, dones)
+        if observations:
+            observations = self._convert_observations(observations, dones)
 
         if self._environment.env_done:
             self._step_type = dm_env.StepType.LAST
