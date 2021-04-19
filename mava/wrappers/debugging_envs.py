@@ -63,7 +63,8 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 for agent, reward in rewards.items()
             }
 
-        observations = self._convert_observations(observations, dones)
+        if observations:
+            observations = self._convert_observations(observations, dones)
 
         if self._environment.env_done:
             self._step_type = dm_env.StepType.LAST
