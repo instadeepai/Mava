@@ -202,11 +202,8 @@ class IDQNBuilder(SystemBuilder):
 
 
 class IDQN(system.System):
-    """MADDPG system.
-    This implements a single-process DDPG system. This is an actor-critic based
-    system that generates data via a behavior policy, inserts N-step transitions into
-    a replay buffer, and periodically updates the policies of each agent
-    (and as a result the behavior) by sampling uniformly from this buffer.
+    """IDQN system.
+    This implements a single-process DQN system. 
     """
 
     def __init__(
