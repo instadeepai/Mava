@@ -218,7 +218,7 @@ class IDQNBuilder(SystemBuilder):
 
 class IDQN(system.System):
     """IDQN system.
-    This implements a single-process DQN system. 
+    This implements a single-process DQN system.
     """
 
     def __init__(
