@@ -13,11 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADDPG on pettinzoo MPE environments."""
+"""Example running DIAL"""
 
-import importlib
-from datetime import datetime
-from pathlib import Path
+# import importlib
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
@@ -28,12 +26,13 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from acme.utils.loggers.tf_summary import TFSummaryLogger
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
-from mava.systems.tf import executors, maddpg
-from mava.utils.loggers import Logger
-from mava.wrappers import DetailedPerAgentStatistics, PettingZooParallelEnvWrapper
+from mava.systems.tf import dial
+
+# from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
@@ -45,20 +44,56 @@ flags.DEFINE_integer(
 )
 
 
+class DIAL_policy(snt.module):
+    def __init__(
+        self,
+        gru_hidden_size: int,
+        gru_layers: int,
+        task_mlp_size: Sequence,
+        message_mlp_size: Sequence,
+        output_mlp_size: Sequence,
+        name: str = None,
+    ):
+        super(DIAL_policy, self).__init__(name=name)
+        self.task_mlp = networks.LayerNormMLP(
+            task_mlp_size,
+            activate_final=True,
+        )
+
+        self.message_mlp = networks.LayerNormMLP(
+            message_mlp_size,
+            activate_final=True,
+        )
+
+        self.gru = snt.GRU(gru_hidden_size)
+
+        self.output_mlp = networks.LayerNormMLP(
+            output_mlp_size,
+            activate_final=True,
+        )
+
+        self._gru_layers = gru_layers
+
+    def __call__(self, x: snt.Module) -> snt.Module:
+
+        return x
+
+
 def make_environment(
-    env_class: str = "sisl", env_name: str = "multiwalker_v6", **kwargs: int
+    env_class: str = "sisl", env_name: str = "prison", **kwargs: int
 ) -> dm_env.Environment:
     """Creates a MPE environment."""
-    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
-    env = env_module.parallel_env(**kwargs)  # type: ignore
-    environment = PettingZooParallelEnvWrapper(env)
-    return environment
+    # ToDo (Kevin): Return environment wrapper
+    return None
 
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
-    critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
+    policy_network_gru_hidden_sizes: Union[Dict[str, int], int] = 128,
+    policy_network_gru_layers: Union[Dict[str, int], int] = 2,
+    policy_network_task_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
+    policy_network_message_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
+    policy_network_output_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128, 128),
     shared_weights: bool = True,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
@@ -70,36 +105,50 @@ def make_networks(
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
-    if isinstance(policy_networks_layer_sizes, Sequence):
-        policy_networks_layer_sizes = {
-            key: policy_networks_layer_sizes for key in specs.keys()
+    if isinstance(policy_network_gru_hidden_sizes, int):
+        policy_network_gru_hidden_sizes = {
+            key: policy_network_gru_hidden_sizes for key in specs.keys()
         }
-    if isinstance(critic_networks_layer_sizes, Sequence):
-        critic_networks_layer_sizes = {
-            key: critic_networks_layer_sizes for key in specs.keys()
+
+    if isinstance(policy_network_gru_layers, int):
+        policy_network_gru_layers = {
+            key: policy_network_gru_layers for key in specs.keys()
+        }
+
+    if isinstance(policy_network_task_mlp_sizes, Sequence):
+        policy_network_task_mlp_sizes = {
+            key: policy_network_task_mlp_sizes for key in specs.keys()
+        }
+
+    if isinstance(policy_network_message_mlp_sizes, Sequence):
+        policy_network_message_mlp_sizes = {
+            key: policy_network_message_mlp_sizes for key in specs.keys()
+        }
+
+    if isinstance(policy_network_output_mlp_sizes, Sequence):
+        policy_network_output_mlp_sizes = {
+            key: policy_network_output_mlp_sizes for key in specs.keys()
         }
 
     observation_networks = {}
     policy_networks = {}
     behavior_networks = {}
-    critic_networks = {}
     for key in specs.keys():
 
-        # Get total number of action dimensions from action spec.
+        # Get total number of action dimensions from action and message spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
+        num_dimensions += np.prod(specs[key].messages.shape, dtype=int)
 
         # Create the shared observation network
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
-        policy_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key], activate_final=True
-                ),
-                networks.NearZeroInitializedLinear(num_dimensions),
-                networks.TanhToSpec(specs[key].actions),
-            ]
+        policy_network = DIAL_policy(
+            policy_network_gru_hidden_sizes[key],
+            policy_network_gru_layers[key],
+            policy_network_task_mlp_sizes[key],
+            policy_network_message_mlp_sizes[key],
+            policy_network_output_mlp_sizes[key],
         )
 
         # Create the behavior policy.
@@ -108,29 +157,16 @@ def make_networks(
                 observation_network,
                 policy_network,
                 networks.ClippedGaussian(sigma),
-                networks.ClipToSpec(specs[key].actions),
+                networks.ClipToSpec(specs[key].actions + specs[key].messages),
             ]
         )
 
-        # Create the critic network.
-        critic_network = snt.Sequential(
-            [
-                # The multiplexer concatenates the observations/actions.
-                networks.CriticMultiplexer(),
-                networks.LayerNormMLP(
-                    critic_networks_layer_sizes[key], activate_final=False
-                ),
-                snt.Linear(1),
-            ]
-        )
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
-        critic_networks[key] = critic_network
         behavior_networks[key] = behavior_network
 
     return {
         "policies": policy_networks,
-        "critics": critic_networks,
         "observations": observation_networks,
         "behaviors": behavior_networks,
     }
@@ -143,29 +179,15 @@ def main(_: Any) -> None:
     system_networks = make_networks(environment_spec)
 
     # create tf loggers
-    base_dir = Path.cwd()
-    log_dir = base_dir / "logs"
-    log_time_stamp = str(datetime.now())
-    system_logger = Logger(
-        label="system_trainer",
-        directory=log_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=log_time_stamp,
-    )
-    train_logger = Logger(
-        label="train_loop",
-        directory=log_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=log_time_stamp,
-    )
+    logs_dir = "logs"
+    system_logger = TFSummaryLogger(f"{logs_dir}/system")
+    train_logger = TFSummaryLogger(f"{logs_dir}/train_loop")
+    eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
 
     # Construct the agent.
-    system = maddpg.MADDPG(
+    system = dial.DIAL(
         environment_spec=environment_spec,
         policy_networks=system_networks["policies"],
-        critic_networks=system_networks["critics"],
         observation_networks=system_networks[
             "observations"
         ],  # pytype: disable=wrong-arg-types
@@ -177,9 +199,6 @@ def main(_: Any) -> None:
     train_loop = ParallelEnvironmentLoop(
         environment, system, logger=train_logger, label="train_loop"
     )
-
-    # Wrap training loop to compute and log detailed running statistics
-    train_loop = DetailedPerAgentStatistics(train_loop)
 
     # Create the evaluation policy.
     # NOTE: assumes weight sharing
@@ -197,9 +216,11 @@ def main(_: Any) -> None:
     }
 
     # Create the evaluation actor and loop.
-    eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
+    eval_actor = dial.DIALExecutor(policy_networks=eval_policies)
     eval_env = make_environment(remove_on_fall=False)
-    eval_loop = ParallelEnvironmentLoop(eval_env, eval_actor, label="eval_loop")
+    eval_loop = ParallelEnvironmentLoop(
+        eval_env, eval_actor, logger=eval_logger, label="eval_loop"
+    )
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
