@@ -16,6 +16,8 @@
 """Example running MADDPG on pettinzoo MPE environments."""
 
 import importlib
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
@@ -28,9 +30,10 @@ from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
-from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
-from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+from mava.utils.loggers import Logger
+from mava.wrappers import DetailedPerAgentStatistics, PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
@@ -56,11 +59,17 @@ def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
-    shared_weights: bool = False,
+    shared_weights: bool = True,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
+
+    # Create agent_type specs
+    if shared_weights:
+        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
+        specs = type_specs
+
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
             key: policy_networks_layer_sizes for key in specs.keys()
@@ -70,7 +79,6 @@ def make_networks(
             key: critic_networks_layer_sizes for key in specs.keys()
         }
 
-    specs = environment_spec.get_agent_specs()
     observation_networks = {}
     policy_networks = {}
     behavior_networks = {}
@@ -134,6 +142,25 @@ def main(_: Any) -> None:
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
     system_networks = make_networks(environment_spec)
 
+    # create tf loggers
+    base_dir = Path.cwd()
+    log_dir = base_dir / "logs"
+    log_time_stamp = str(datetime.now())
+    system_logger = Logger(
+        label="system_trainer",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
+    train_logger = Logger(
+        label="train_loop",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
+
     # Construct the agent.
     system = maddpg.MADDPG(
         environment_spec=environment_spec,
@@ -143,14 +170,22 @@ def main(_: Any) -> None:
             "observations"
         ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
+        logger=system_logger,
     )
 
     # Create the environment loop used for training.
-    train_loop = PettingZooParallelEnvironmentLoop(
-        environment, system, label="train_loop"
+    train_loop = ParallelEnvironmentLoop(
+        environment, system, logger=train_logger, label="train_loop"
     )
 
+    # Wrap training loop to compute and log detailed running statistics
+    train_loop = DetailedPerAgentStatistics(train_loop)
+
     # Create the evaluation policy.
+    # NOTE: assumes weight sharing
+    specs = environment_spec.get_agent_specs()
+    type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
+    specs = type_specs
     eval_policies = {
         key: snt.Sequential(
             [
@@ -158,15 +193,13 @@ def main(_: Any) -> None:
                 system_networks["policies"][key],
             ]
         )
-        for key in environment_spec.get_agent_specs().keys()
+        for key in specs.keys()
     }
 
     # Create the evaluation actor and loop.
     eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
     eval_env = make_environment(remove_on_fall=False)
-    eval_loop = PettingZooParallelEnvironmentLoop(
-        eval_env, eval_actor, label="eval_loop"
-    )
+    eval_loop = ParallelEnvironmentLoop(eval_env, eval_actor, label="eval_loop")
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)

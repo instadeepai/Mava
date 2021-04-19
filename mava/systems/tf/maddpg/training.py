@@ -16,6 +16,7 @@
 
 """MADDPG trainer implementation."""
 import copy
+import os
 import time
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -62,6 +63,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "Checkpoints",
     ):
         """Initializes the learner.
         Args:
@@ -132,7 +134,6 @@ class BaseMADDPGTrainer(mava.Trainer):
             "critic": {},
             "policy": {},
         }
-        self._system_checkpointer = {}
         for agent_key in self.unique_net_keys:
             policy_network_to_expose = snt.Sequential(
                 [
@@ -149,21 +150,40 @@ class BaseMADDPGTrainer(mava.Trainer):
             self._system_network_variables["policy"][
                 agent_key
             ] = policy_network_to_expose.variables
-            checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=5,
-                objects_to_save={
+
+        # Create checkpointer
+        self._system_checkpointer = {}
+        if checkpoint:
+            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
+            #  of the last 11 calls to
+            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
+            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
+            #  expensive and the excessive number tracings could be due to (1)
+            #  creating @tf.function repeatedly in a loop, (2) passing tensors
+            #  with different shapes, (3) passing Python objects instead of tensors.
+            for agent_key in self.unique_net_keys:
+                objects_to_save = {
                     "counter": self._counter,
                     "policy": self._policy_networks[agent_key],
                     "critic": self._critic_networks[agent_key],
+                    "observation": self._observation_networks[agent_key],
                     "target_policy": self._target_policy_networks[agent_key],
                     "target_critic": self._target_critic_networks[agent_key],
+                    "target_observation": self._target_observation_networks[agent_key],
                     "policy_optimizer": self._policy_optimizer,
                     "critic_optimizer": self._critic_optimizer,
                     "num_steps": self._num_steps,
-                },
-                enable_checkpointing=checkpoint,
-            )
-            self._system_checkpointer[agent_key] = checkpointer
+                }
+
+                checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
+                checkpointer = tf2_savers.Checkpointer(
+                    time_delta_minutes=1,
+                    add_uid=False,
+                    directory=checkpointer_dir,
+                    objects_to_save=objects_to_save,
+                    enable_checkpointing=True,
+                )
+                self._system_checkpointer[agent_key] = checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -193,17 +213,15 @@ class BaseMADDPGTrainer(mava.Trainer):
 
     @tf.function
     def _transform_observations(
-        self, state: Dict[str, np.ndarray], next_state: Dict[str, np.ndarray]
+        self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         o_tm1 = {}
         o_t = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            o_tm1[agent] = self._observation_networks[agent_key](
-                state[agent].observation
-            )
+            o_tm1[agent] = self._observation_networks[agent_key](obs[agent].observation)
             o_t[agent] = self._target_observation_networks[agent_key](
-                next_state[agent].observation
+                next_obs[agent].observation
             )
             # This stop_gradient prevents gradients to propagate into the target
             # observation network. In addition, since the online policy network is
@@ -231,6 +249,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         o_t_trans: Dict[str, np.ndarray],
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
+        e_tm1: Dict[str, np.ndarray],
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
@@ -254,11 +273,11 @@ class BaseMADDPGTrainer(mava.Trainer):
         return dpg_a_t_feed
 
     @tf.function
-    def _policy_actions(self, next_state: Dict[str, np.ndarray]) -> Any:
+    def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            next_observation = next_state[agent]
+            next_observation = next_obs[agent]
             actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
 
@@ -281,32 +300,41 @@ class BaseMADDPGTrainer(mava.Trainer):
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
+        # e_tm1 [Optional] = extra data for timestep t-1
+        # that the agents persist in replay.
         # r_t = dictionary of rewards or rewards sequences
         #   (if using N step transitions) ensuing from actions a_tm1
         # d_t = environment discount ensuing from actions a_tm1.
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
-        # e_t [Optional] = extra data that the agents persist in replay.
-        o_tm1, a_tm1, r_t, d_t, o_t, e_t = inputs.data
+        # e_t [Optional] = extra data for timestep t that the agents persist in replay.
+        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
-        for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+        # Do forward passes through the networks and calculate the losses
+        with tf.GradientTape(persistent=True) as tape:
+            policy_losses = {}
+            critic_losses = {}
 
-            # Cast the additional discount to match the environment discount dtype.
-            discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
+            o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
+            a_t = self._policy_actions(o_t_trans)
 
-            with tf.GradientTape(persistent=True) as tape:
-                # Maybe transform the observation before feeding into policy and critic.
-                # Transforming the observations this way at the start of the learning
-                # step effectively means that the policy and critic share observation
-                # network weights.
-                o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-                a_t = self._policy_actions(o_t_trans)
+            for agent in self._agents:
+                agent_key = self.agent_net_keys[agent]
+
+                # Cast the additional discount to match the environment discount dtype.
+                discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
-                    o_tm1_trans, o_t_trans, a_tm1, a_t, e_t, agent
+                    o_tm1_trans=o_tm1_trans,
+                    o_t_trans=o_t_trans,
+                    a_tm1=a_tm1,
+                    a_t=a_t,
+                    e_tm1=e_tm1,
+                    e_t=e_t,
+                    agent=agent,
                 )
 
                 # Critic learning.
@@ -321,15 +349,10 @@ class BaseMADDPGTrainer(mava.Trainer):
                 critic_loss = trfl.td_learning(
                     q_tm1, r_t[agent], discount * d_t[agent], q_t
                 ).loss
-                critic_loss = tf.reduce_mean(critic_loss, axis=0)
 
                 # Actor learning.
                 o_t_agent_feed = o_t_trans[agent]
                 dpg_a_t = self._policy_networks[agent_key](o_t_agent_feed)
-
-                # TODO (dries): Move the dpg action updating to a function.
-                #  There is a variable overwrite error that needs to
-                #  be fixed for the code can be moved to a function.
 
                 # Get dpg actions
                 dpg_a_t_feed = self._get_dpg_feed(a_t, dpg_a_t, agent)
@@ -347,6 +370,14 @@ class BaseMADDPGTrainer(mava.Trainer):
                     clip_norm=self._clipping,
                 )
                 policy_loss = tf.reduce_mean(policy_loss, axis=0)
+                policy_losses[agent] = policy_loss
+
+                critic_loss = tf.reduce_mean(critic_loss, axis=0)
+                critic_losses[agent] = critic_loss
+
+        # Calculate the gradients and update the networks
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
 
             # Get trainable variables.
             policy_variables = (
@@ -367,11 +398,8 @@ class BaseMADDPGTrainer(mava.Trainer):
             #  Only call GradientTape.gradient inside the context if you actually want
             #  to trace the gradient in order to compute higher order derivatives.
             #  to trace the gradient in order to compute higher order derivatives.
-            policy_gradients = tape.gradient(policy_loss, policy_variables)
-            critic_gradients = tape.gradient(critic_loss, critic_variables)
-
-            # Delete the tape manually because of the persistent=True flag.
-            del tape
+            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
+            critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
             # Maybe clip gradients.
             if self._clipping:
@@ -382,10 +410,17 @@ class BaseMADDPGTrainer(mava.Trainer):
             self._policy_optimizer.apply(policy_gradients, policy_variables)
             self._critic_optimizer.apply(critic_gradients, critic_variables)
 
-            logged_losses[agent] = {
-                "critic_loss": critic_loss,
-                "policy_loss": policy_loss,
-            }
+            logged_losses.update(
+                {
+                    agent: {
+                        "critic_loss": critic_loss,
+                        "policy_loss": policy_loss,
+                    }
+                }
+            )
+
+        # Delete the tape manually because of the persistent=True flag.
+        del tape
 
         # Losses to track.
         return logged_losses
@@ -406,11 +441,13 @@ class BaseMADDPGTrainer(mava.Trainer):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        # Checkpoint and attempt to write the logs.
+        # Checkpoint the networks.
+        if len(self._system_checkpointer.keys()) > 0:
+            for agent_key in self.unique_net_keys:
+                checkpointer = self._system_checkpointer[agent_key]
+                checkpointer.save()
 
-        # NOTE (Arnu): ignoring checkpointing and logging for now
-        # self._checkpointer.save()
-        # self._logger.write(fetches)
+        self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
@@ -573,6 +610,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         o_t_trans: Dict[str, np.ndarray],
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
+        e_tm1: Dict[str, np.ndarray],
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
@@ -596,7 +634,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         # variables cannot be changed.
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
-
+        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
         return dpg_a_t_feed
 
 
@@ -678,15 +716,15 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         o_t_trans: Dict[str, np.ndarray],
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
+        e_tm1: Dict[str, np.ndarray],
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         # State based
-        o_tm1_feed = e_t["s_tm1"]
-        o_t_feed = e_t["s_t"]
+        o_tm1_feed = e_tm1["env_state"]
+        o_t_feed = e_t["env_state"]
         a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
         a_t_feed = tf.stack([x for x in a_t.values()], 1)
-
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     @tf.function
@@ -701,5 +739,6 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         # variables cannot be changed.
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
+        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
 
         return dpg_a_t_feed

@@ -30,6 +30,7 @@ from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
+from mava.wrappers import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -63,7 +64,7 @@ class MADDPGConfig:
     policy_networks: Dict[str, snt.Module]
     critic_networks: Dict[str, snt.Module]
     observation_networks: Dict[str, snt.Module]
-    shared_weights: bool = False
+    shared_weights: bool = True
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -277,7 +278,7 @@ class MADDPG(system.System):
         trainer_fn: Type[
             training.BaseMADDPGTrainer
         ] = training.DecentralisedMADDPGTrainer,
-        shared_weights: bool = False,
+        shared_weights: bool = True,
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -369,7 +370,19 @@ class MADDPG(system.System):
         executor = builder.make_executor(networks["behaviors"], adder)
 
         # The learner updates the parameters (and initializes them).
-        trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
+        trainer = builder.make_trainer(
+            networks=networks,
+            dataset=dataset,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+        )
+
+        # TODO (Arnu): fix mismatch in types between base trainer
+        # and wrapped trainer
+        trainer = DetailedTrainerStatistics(  # type: ignore
+            trainer, metrics=["policy_loss", "critic_loss"]
+        )
 
         super().__init__(
             executor=executor,

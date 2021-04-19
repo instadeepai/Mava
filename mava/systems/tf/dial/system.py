@@ -30,11 +30,11 @@ from acme.utils import counting, loggers
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import CentralisedActor
-from mava.components.tf.modules.communication import DifferentiableCommunication
+from mava.components.tf.modules.communication import BroadcastedCommunication
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
-from mava.systems.tf import executors
-from mava.systems.tf.dial import training
+from mava.systems.tf.dial.execution import DIALExecutor
+from mava.systems.tf.dial.training import DIALTrainer
 
 
 @dataclasses.dataclass
@@ -195,7 +195,7 @@ class DIALBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
-        return executors.RecurrentExecutor(
+        return DIALExecutor(
             policy_networks=policy_networks,
             shared_weights=shared_weights,
             variable_client=variable_client,
@@ -238,7 +238,7 @@ class DIALBuilder(SystemBuilder):
         policy_optimizer = snt.optimizers.Adam(learning_rate=learning_rate)
 
         # The learner updates the parameters (and initializes them).
-        trainer = training.DIALTrainer(
+        trainer = DIALTrainer(
             agents=agents,
             agent_types=agent_types,
             networks=networks["networks"],
@@ -375,7 +375,7 @@ class DIAL(system.System):
         # Add differentiable communication and get networks
         # TODO (Kevin): create differentiable communication module
         # See mava/components/tf/modules/communication
-        networks = DifferentiableCommunication(
+        networks = BroadcastedCommunication(
             architecture=architecture,
         ).create_system()
 

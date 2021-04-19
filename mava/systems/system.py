@@ -15,7 +15,7 @@
 
 """The base system interface."""
 
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Union
 
 import dm_env
 from acme import types
@@ -88,6 +88,15 @@ class System(mava.core.Executor, mava.core.VariableSource):
     ) -> None:
         self._num_observations += 1
         self._executor.observe(actions, next_timestep)
+
+    def agent_observe(
+        self,
+        agent: str,
+        action: Union[float, int, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
+    ) -> None:
+        self._num_observations += 1
+        self._executor.agent_observe(agent, action, next_timestep)
 
     def update(self) -> None:
         num_steps = _calculate_num_learner_steps(

@@ -1,9 +1,27 @@
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from typing import Any, Dict
+from unittest.mock import patch
+
 import dm_env
 import numpy as np
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
-from mava.utils.wrapper_utils import convert_np_type
+from mava import types
 from tests.conftest import EnvSpec, EnvType, Helpers, NPZ_EnvName
 
 """
@@ -16,6 +34,8 @@ This is meant to flexibily test various environments wrappers.
 
     For new environments - you might need to update the Helpers class in conftest.py.
 """
+
+# TODO (Kale-ab): Test dying agents.
 
 
 @pytest.mark.parametrize(
@@ -46,9 +66,9 @@ class TestEnvWrapper:
     #  Test initialization of env wrapper, which should have
     #   a nested environment, an observation and action space for each agent.
     def test_wrapper_initialization(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        env, num_agents = helpers.get_env(env_spec)
-        wrapper_func = helpers.get_wrapper(env_spec)
-        wrapped_env = wrapper_func(env)
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+        num_agents = len(wrapped_env.agents)
+
         props_which_should_not_be_none = [
             wrapped_env,
             wrapped_env.environment,
@@ -66,9 +86,8 @@ class TestEnvWrapper:
 
     # Test of reset of wrapper and that dm_env_timestep has basic props.
     def test_wrapper_env_reset(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        env, num_agents = helpers.get_env(env_spec)
-        wrapper_func = helpers.get_wrapper(env_spec)
-        wrapped_env = wrapper_func(env)
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+        num_agents = len(wrapped_env.agents)
 
         dm_env_timestep = wrapped_env.reset()
         props_which_should_not_be_none = [dm_env_timestep, dm_env_timestep.observation]
@@ -84,8 +103,7 @@ class TestEnvWrapper:
         ), "Failed to generate observation for all agents."
         assert wrapped_env._reset_next_step is False, "_reset_next_step not set."
 
-        assert dm_env_timestep.reward is None, "Failed to reset reward."
-        assert dm_env_timestep.discount is None, "Failed to reset discount."
+        helpers.assert_env_reset(wrapped_env, dm_env_timestep, env_spec)
 
     # Test that observations from petting zoo get converted to
     #   dm observations correctly. This only runs
@@ -93,9 +111,7 @@ class TestEnvWrapper:
     def test_covert_env_to_dm_env_0_no_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        env, num_agents = helpers.get_env(env_spec)
-        wrapper_func = helpers.get_wrapper(env_spec)
-        wrapped_env = wrapper_func(env)
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
 
         # Does the wrapper have the functions we want to test
         if hasattr(wrapped_env, "_convert_observations") or hasattr(
@@ -144,9 +160,7 @@ class TestEnvWrapper:
     def test_covert_env_to_dm_env_1_with_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        env, num_agents = helpers.get_env(env_spec)
-        wrapper_func = helpers.get_wrapper(env_spec)
-        wrapped_env = wrapper_func(env)
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
 
         # Does the wrapper have the functions we want to test
         if hasattr(wrapped_env, "_convert_observations") or hasattr(
@@ -209,9 +223,7 @@ class TestEnvWrapper:
     def test_step_0_valid_when_env_not_done(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        env, num_agents = helpers.get_env(env_spec)
-        wrapper_func = helpers.get_wrapper(env_spec)
-        wrapped_env = wrapper_func(env)
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
 
         # Seed environment since we are sampling actions.
         # We need to seed env and action space.
@@ -254,13 +266,11 @@ class TestEnvWrapper:
             curr_dm_timestep.step_type is dm_env.StepType.MID
         ), "Failed to update step type."
 
-    # Test if all agents are done, env is set to done
-    def test_step_1_invalid_when_env_done(
-        self, env_spec: EnvSpec, helpers: Helpers, monkeypatch: MonkeyPatch
+    # Test we only step in our env once.
+    def test_step_1_valid_when_env_not_done(
+        self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
-        env, num_agents = helpers.get_env(env_spec)
-        wrapper_func = helpers.get_wrapper(env_spec)
-        wrapped_env = wrapper_func(env)
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
 
         # Seed environment since we are sampling actions.
         # We need to seed env and action space.
@@ -278,50 +288,101 @@ class TestEnvWrapper:
             test_agents_actions = {
                 agent: wrapped_env.action_spaces[agent].sample() for agent in agents
             }
-            rewards_spec = wrapped_env.reward_spec()
-            expected_rewards = {
-                agent: convert_np_type(rewards_spec[agent].dtype, 0)
-                for agent in wrapped_env.agents
+            with patch.object(wrapped_env._environment, "step") as parallel_step:
+                parallel_step.return_value = None, None, None, None
+                _ = wrapped_env.step(test_agents_actions)
+                parallel_step.assert_called_once_with(test_agents_actions)
+
+        # Sequential env_types
+        elif env_spec.env_type == EnvType.Sequential:
+            for agent in agents:
+                with patch.object(wrapped_env._environment, "step") as seq_step:
+                    seq_step.return_value = None
+                    test_agent_action = wrapped_env.action_spaces[agent].sample()
+                    _ = wrapped_env.step(test_agent_action)
+                    seq_step.assert_called_once_with(test_agent_action)
+
+    # Test if all agents are done, env is set to done
+    def test_step_2_invalid_when_env_done(
+        self, env_spec: EnvSpec, helpers: Helpers, monkeypatch: MonkeyPatch
+    ) -> None:
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+
+        # Seed environment since we are sampling actions.
+        # We need to seed env and action space.
+        random_seed = 42
+        wrapped_env.seed(random_seed)
+        helpers.seed_action_space(wrapped_env, random_seed)
+
+        #  Get agent names from env
+        agents = wrapped_env.agents
+
+        _ = wrapped_env.reset()
+
+        # Parallel env_types
+        if env_spec.env_type == EnvType.Parallel:
+            test_agents_actions = {
+                agent: wrapped_env.action_spaces[agent].sample() for agent in agents
             }
-            # Mock being done
+
+            # Mock being done - sets self._environment.env_done to true.
+            # We can't mock env_done directly since it is a propertly.
+            monkeypatch.setattr(wrapped_env._environment, "agents", [], raising=False)
             monkeypatch.setattr(
-                wrapped_env._environment.aec_env,
-                "agents",
-                [],
+                wrapped_env._environment.aec_env, "agents", [], raising=False
             )
 
             curr_dm_timestep = wrapped_env.step(test_agents_actions)
 
-            assert helpers.compare_dicts(
-                curr_dm_timestep.reward, expected_rewards
-            ), "Failed to correctly set reward. "
+            helpers.assert_env_reset(wrapped_env, curr_dm_timestep, env_spec)
 
         # Sequential env_types
         elif env_spec.env_type == EnvType.Sequential:
-            for index, agent in enumerate(agents):
+            n_agents = wrapped_env.num_agents
+
+            # Mock functions to act like PZ environment is done
+            def mock_environment_last() -> Any:
+                observe = wrapped_env.observation_spaces[agent].sample()
+                reward = 0.0
+                done = True
+                info: Dict = {}
+                return observe, reward, done, info
+
+            def mock_step(action: types.Action) -> None:
+                return
+
+            # Mocks certain functions - if functions don't exist, error is not thrown.
+            monkeypatch.setattr(
+                wrapped_env._environment, "last", mock_environment_last, raising=False
+            )
+            monkeypatch.setattr(
+                wrapped_env._environment, "step", mock_step, raising=False
+            )
+
+            for index, (agent) in enumerate(wrapped_env.agent_iter(n_agents)):
                 test_agent_actions = wrapped_env.action_spaces[agent].sample()
 
-                # Mock being done when you reach final agent
-                if index == len(agents) - 1:
-                    expected_reward = convert_np_type(
-                        wrapped_env.reward_spec()[agent], 0
-                    )
-                    monkeypatch.setattr(
-                        wrapped_env._environment,
-                        "dones",
-                        {agent: True for agent in wrapped_env.agents},
-                    )
+                # Mock whole env being done when you reach final agent
+                if index == n_agents - 1:
                     monkeypatch.setattr(
                         wrapped_env._environment,
                         "agents",
                         [],
                     )
 
+                # Mock update has occurred in step
+                monkeypatch.setattr(
+                    wrapped_env._environment, "_has_updated", True, raising=False
+                )
+
                 curr_dm_timestep = wrapped_env.step(test_agent_actions)
 
-            assert curr_dm_timestep.reward == expected_reward and type(
-                curr_dm_timestep.reward
-            ) == type(expected_reward), "Failed to correctly set reward. "
+                # Check each agent is on last step
+                assert (
+                    curr_dm_timestep.step_type is dm_env.StepType.LAST
+                ), "Failed to update step type."
+
+            helpers.assert_env_reset(wrapped_env, curr_dm_timestep, env_spec)
 
         assert (
             wrapped_env._reset_next_step is True

@@ -66,7 +66,9 @@ class DecentralisedActor(BaseArchitecture):
             agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
 
             # Get observation spec for policy.
-            actor_obs_specs[agent_key] = self._agent_specs[agent_spec_key].observations
+            actor_obs_specs[agent_key] = self._agent_specs[
+                agent_spec_key
+            ].observations.observation
         return actor_obs_specs
 
     def create_actor_variables(self) -> Dict[str, Dict[str, snt.Module]]:
@@ -84,7 +86,7 @@ class DecentralisedActor(BaseArchitecture):
         # create policy variables for each agent
         for agent_key in self._actor_agent_keys:
 
-            obs_spec = actor_obs_specs[agent_key].observation
+            obs_spec = actor_obs_specs[agent_key]
             emb_spec = tf2_utils.create_variables(
                 self._observation_networks[agent_key], [obs_spec]
             )
@@ -162,7 +164,9 @@ class DecentralisedActorCritic(BaseActorCritic):
             agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
 
             # Get observation spec for policy.
-            actor_obs_specs[agent_key] = self._agent_specs[agent_spec_key].observations
+            actor_obs_specs[agent_key] = self._agent_specs[
+                agent_spec_key
+            ].observations.observation
         return actor_obs_specs
 
     def _get_critic_specs(
@@ -191,7 +195,7 @@ class DecentralisedActorCritic(BaseActorCritic):
         # create policy variables for each agent
         for agent_key in self._actor_agent_keys:
 
-            obs_spec = actor_obs_specs[agent_key].observation
+            obs_spec = actor_obs_specs[agent_key]
             emb_spec = tf2_utils.create_variables(
                 self._observation_networks[agent_key], [obs_spec]
             )

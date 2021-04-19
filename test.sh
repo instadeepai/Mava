@@ -40,7 +40,7 @@ N_CPU=$(grep -c ^processor /proc/cpuinfo)
 mypy mava
 
 # Run all tests.
-pytest -n "${N_CPU}" mava
+pytest -n "${N_CPU}" tests
 
 # Clean-up.
 deactivate

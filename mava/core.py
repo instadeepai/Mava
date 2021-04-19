@@ -65,7 +65,7 @@ class Executor(acme.Actor):
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
     ) -> None:
-        """Make an observation of timestep data from the environment.
+        """Make an observation of timestep data from parallel environment.
         Args:
         action: action taken in the environment.
         next_timestep: timestep produced by the environment given the action.
