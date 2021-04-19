@@ -90,7 +90,7 @@ class TrainerStatisticsBase:
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        # fetches.update(counts)
+        fetches.update(counts)
 
         # Checkpoint the networks.
         if len(self._system_checkpointer.keys()) > 0:
@@ -98,7 +98,7 @@ class TrainerStatisticsBase:
                 checkpointer = self._system_checkpointer[network_key]
                 checkpointer.save()
 
-        self._logger.write(counts)
+        self._logger.write(fetches)
 
 
 class DetailedTrainerStatistics(TrainerStatisticsBase):
