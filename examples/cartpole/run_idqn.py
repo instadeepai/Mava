@@ -13,13 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.wrappers.environment_loop_statistics import (
-    DetailedEpisodeStatistics,
-    DetailedPerAgentStatistics,
-)
-from mava.wrappers.pettingzoo import (
-    PettingZooAECEnvWrapper,
-    PettingZooParallelEnvWrapper,
-)
-from mava.wrappers.rllib_multi_agent_env import RLLibMultiAgentEnvWrapper
-from mava.wrappers.system_trainer_statistics import DetailedTrainerStatistics
+# pip install ray[rllib]
+from ray.rllib.env.multi_agent_env import make_multi_agent
+
+# from mava.environment_loop import ParallelEnvironmentLoop
+from mava.wrappers import RLLibMultiAgentEnvWrapper
+
+ma_cartpole_cls = make_multi_agent("CartPole-v1")
+ma_cartpole = ma_cartpole_cls({"num_agents": 2})
+wrapped_env = RLLibMultiAgentEnvWrapper(ma_cartpole)
