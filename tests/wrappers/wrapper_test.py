@@ -34,7 +34,7 @@ This is meant to flexibily test various environments wrappers.
     For new environments - you might need to update the Helpers class in conftest.py.
 """
 
-
+# TODO (Kale-ab): Test dying agents.
 @pytest.mark.parametrize(
     "env_spec",
     [
