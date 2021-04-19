@@ -34,6 +34,8 @@ class RLLibMultiAgentEnvWrapper(dm_env.Environment):
     def __init__(self, environment: MultiAgentEnv):
         self._environment = environment
         self._reset_next_step = True
+        self.num_agents = len(environment.agents)
+        self.possible_agents = [f"agent_{x}" for x in range(self.num_agents)]
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
@@ -47,10 +49,8 @@ class RLLibMultiAgentEnvWrapper(dm_env.Environment):
         self._discount: dict = {}
         reward: dict = {}
         for agent, discount in self.discount_spec().items():
-            self._discount[agent] = convert_np_type(
-                self.discount_spec()[agent].dtype, 1
-            )
-            reward[agent] = convert_np_type(self.reward_spec()[agent].dtype, 0)
+            self._discount[agent] = convert_np_type(np.float32, 1)
+            reward[agent] = convert_np_type(np.float32, 0)
 
         return parameterized_restart(reward, self._discount, observation)
 
@@ -63,7 +63,9 @@ class RLLibMultiAgentEnvWrapper(dm_env.Environment):
         observe, reward, done, info = self._environment.step(action)
 
         observation = self._convert_observation(observe, done)
-        reward = {f"agent_{k}": v for k, v in reward.items()}
+        reward = {
+            f"agent_{k}": np.asarray(v, dtype=np.float32) for k, v in reward.items()
+        }
 
         if done["__all__"]:
             self._step_type = dm_env.StepType.LAST
@@ -82,7 +84,9 @@ class RLLibMultiAgentEnvWrapper(dm_env.Environment):
     # of legal actions must be converted to a legal actions mask.
     def _convert_observation(self, observe: dict, done: dict) -> dict:
 
-        observe = {f"agent_{k}": v for k, v in observe.items()}
+        observe = {
+            f"agent_{k}": np.asarray(v, dtype=np.float32) for k, v in observe.items()
+        }
 
         dones: dict = {
             f"agent_{k}": np.asarray([v], dtype=np.float32) for k, v in done.items()
