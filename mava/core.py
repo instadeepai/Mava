@@ -20,7 +20,7 @@ similar to the `Actor` and `Learner` in Acme.
 """
 
 import abc
-from typing import Dict, List, Sequence, TypeVar, Union
+from typing import Dict, List, Sequence, TypeVar
 
 import acme
 
