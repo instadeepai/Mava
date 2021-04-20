@@ -264,7 +264,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
         extras_specs = environment_spec.get_extra_specs()
-
         obs_specs = {}
         act_specs = {}
         reward_specs = {}
