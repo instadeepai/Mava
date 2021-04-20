@@ -90,7 +90,7 @@ class TrainerStatisticsBase:
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        # fetches.update(counts)
+        fetches.update(counts)
 
         # Checkpoint the networks.
         if len(self._system_checkpointer.keys()) > 0:
@@ -98,16 +98,20 @@ class TrainerStatisticsBase:
                 checkpointer = self._system_checkpointer[network_key]
                 checkpointer.save()
 
-        self._logger.write(counts)
+        self._logger.write(fetches)
 
 
 class DetailedTrainerStatistics(TrainerStatisticsBase):
     def __init__(
-        self, trainer: mava.Trainer, metrics: List[str] = ["policy_loss"]
+        self,
+        trainer: mava.Trainer,
+        metrics: List[str] = ["policy_loss"],
+        summary_stats: List = ["mean", "max", "min", "var", "std"],
     ) -> None:
         super().__init__(trainer)
 
         self._metrics = metrics
+        self._summary_stats = summary_stats
 
     def _create_loggers(self, keys: List[str]) -> None:
 
@@ -146,11 +150,10 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
                 self._networks_stats[key][metric] = RunningStatistics(f"{key}_{metric}")
 
     def _compute_statistics(self, data: Dict[str, Dict[str, float]]) -> None:
-        self._summary_stats = ["mean", "max", "min", "var", "std"]
-
         for network, datum in data.items():
             for key, val in datum.items():
                 network_running_statistics: Dict[str, float] = {}
+                network_running_statistics[f"{network}_raw_{key}"] = val
                 self._networks_stats[network][key].push(val)
                 for stat in self._summary_stats:
                     network_running_statistics[
