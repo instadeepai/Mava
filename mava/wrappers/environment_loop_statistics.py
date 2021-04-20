@@ -16,7 +16,7 @@
 """Generic environment loop wrapper to track system statistics"""
 
 import time
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 from acme.utils import loggers
@@ -155,9 +155,13 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
 
 
 class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
-    def __init__(self, environment_loop: ParallelEnvironmentLoop):
+    def __init__(
+        self,
+        environment_loop: ParallelEnvironmentLoop,
+        summary_stats: List = ["mean", "max", "min", "var", "std"],
+    ):
         super().__init__(environment_loop)
-        self._summary_stats = ["mean", "max", "min", "var", "std"]
+        self._summary_stats = summary_stats
         self._metrics = ["episode_length", "episode_return", "steps_per_second"]
         self._running_statistics: Dict[str, float] = {}
         for metric in self._metrics:
