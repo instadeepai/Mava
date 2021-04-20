@@ -18,7 +18,10 @@ from typing import Dict
 import sonnet as snt
 
 from mava.components.tf.architectures import BaseArchitecture
-from mava.components.tf.modules.mixing import BaseMixingModule
+
+# For some reason I can't import BaseMixingModule without .base
+# Should the __init__ file not handle this?
+from mava.components.tf.modules.mixing.base import BaseMixingModule
 from mava.components.tf.networks.additive import AdditiveMixingNetwork
 
 

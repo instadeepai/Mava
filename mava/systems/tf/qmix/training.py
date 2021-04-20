@@ -30,7 +30,8 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tree
-import trfl
+
+# import trfl # will be used
 from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
@@ -51,7 +52,8 @@ class QMIXTrainer(mava.Trainer):
         q_networks: Dict[str, snt.Module],
         target_q_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
-        mixing_networks: Dict[str, snt.Module],
+        mixing_network: snt.Module,
+        target_mixing_network: snt.Module,
         epsilon: tf.Variable,
         target_update_period: int,
         dataset: tf.data.Dataset,
@@ -72,7 +74,8 @@ class QMIXTrainer(mava.Trainer):
         self._q_networks = q_networks
         self._target_q_networks = target_q_networks
         self._observation_networks = observation_networks
-        self._mixing_networks = mixing_networks
+        self._mixing_network = mixing_network
+        self._target_mixing_network = target_mixing_network
         self._epsilon = epsilon
 
         # General learner book-keeping and loggers.
@@ -129,9 +132,12 @@ class QMIXTrainer(mava.Trainer):
             target_variables = (*self._target_q_networks[key].variables,)
 
             # Make online -> target network update ops.
+            # TODO Move this if outside for...unless I'm misunderstanding?
             if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                 for src, dest in zip(online_variables, target_variables):
                     dest.assign(src)
+
+        # TODO Update target mixing network
 
         self._num_steps.assign_add(1)
 
@@ -182,6 +188,7 @@ class QMIXTrainer(mava.Trainer):
     ) -> Dict[str, Dict[str, Any]]:
 
         # Update the target networks
+        # TODO Update target mixing network in this function
         self._update_target_networks()
 
         # decrement epsilon
@@ -205,40 +212,36 @@ class QMIXTrainer(mava.Trainer):
 
         # TODO Change the training procedure so that it corresponds to QMix training.
 
-        logged_losses: Dict[str, Dict[str, Any]] = {}
+        # Collect all trainable variables for training all nets at once
+        trainable_variables = None
         for agent in self._agents:
+            if trainable_variables is None:
+                trainable_variables = self._q_networks[agent].trainable_variables
+            else:
+                trainable_variables += self._q_networks[agent].trainable_variables
+        trainable_variables += self._mixing_network.trainable_variables
 
-            agent_key = self.agent_net_keys[agent]
+        # logged_losses: Dict[str, Dict[str, Any]] = {}
 
-            with tf.GradientTape() as tape:
-                # Maybe transform the observation before feeding into policy and critic.
-                # Transforming the observations this way at the start of the learning
-                # step effectively means that the policy and critic share observation
-                # network weights.
+        with tf.GradientTape() as tape:
+            # TODO Define q_values and states
+            q_values = tf.Tensor
+            states = tf.Tensor
+            target_vals = self._target_mixing_network(q_values, states)
+            predicted_vals = self._mixing_network(q_values, states)
 
-                o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
-                    o_tm1_trans, o_t_trans, a_tm1, agent
-                )
+            # TODO Use trfl here.
+            # Generalise loss function. Maybe allow it to be passed in?
+            loss = tf.keras.losses.MeanSquaredError(target_vals, predicted_vals)
 
-                q_tm1 = self._q_networks[agent](o_tm1_feed)
-                q_t = self._target_q_networks[agent](o_t_feed)
+        gradients = tape.gradient(loss, trainable_variables)
+        if self._clipping:
+            gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+        self._optimizer.apply(gradients, trainable_variables)
 
-                loss, _ = trfl.qlearning(q_tm1, a_tm1_feed, r_t[agent], d_t[agent], q_t)
-
-                loss = tf.reduce_mean(loss, axis=0)
-
-            # Retrieve gradients
-            q_network_variables = self._q_networks[agent_key].trainable_variables
-            gradients = tape.gradient(loss, q_network_variables)
-
-            # Maybe clip gradients.
-            if self._clipping:
-                gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
-
-            # Apply gradients.
-            self._optimizer.apply(gradients, q_network_variables)
-
-            logged_losses[agent] = {"loss": loss}
+        # TODO
+        logged_losses = {}
+        logged_losses[agent] = {"loss": loss}
 
         return logged_losses
 

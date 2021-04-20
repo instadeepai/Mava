@@ -16,6 +16,7 @@
 # TODO (StJohn): finish Qmix
 
 """QMIX system implementation."""
+import copy
 import dataclasses
 from typing import Dict, Iterator, Optional, Type, Union
 
@@ -23,8 +24,6 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme import datasets
-
-# from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
 from mava import adders, core, specs
@@ -127,7 +126,9 @@ class QMIXBuilder(SystemBuilder):
     def make_dataset_iterator(
         self, replay_client: reverb.Client
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the system."""
+        """Create a dataset iterator to use for learning/updating the system.
+        Args:
+            replay_client: Reverb Client which points to the replay server."""
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
@@ -151,7 +152,7 @@ class QMIXBuilder(SystemBuilder):
 
     def make_executor(
         self,
-        policy_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
@@ -162,11 +163,13 @@ class QMIXBuilder(SystemBuilder):
                 this should be a callable which takes as input observations
                 and returns actions.
             adder: How data is recorded (e.g. added to replay).
+            variable_source: collection of (nested) numpy arrays. Contains
+                source variables as defined in mava.core.
         """
 
         # Create the executor which coordinates the actors.
         return executors.FeedForwardExecutor(
-            policy_networks=policy_networks,
+            policy_networks=behavior_networks,
             shared_weights=self._config.shared_weights,
             variable_client=None,
             adder=adder,
@@ -187,6 +190,7 @@ class QMIXBuilder(SystemBuilder):
           networks: struct describing the networks needed by the trainer; this can
             be specific to the trainer in question.
           dataset: iterator over samples from replay.
+          replay_client: Reverb Client which points to the replay server.
           counter: a Counter which allows for recording of counts (trainer steps,
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
@@ -195,7 +199,8 @@ class QMIXBuilder(SystemBuilder):
         q_networks = networks["q_networks"]
         target_q_networks = networks["target_q_networks"]
         observation_networks = networks["observation_networks"]
-        mixing_networks = networks["mixing_networks"]
+        mixing_network = networks["mixing_network"]
+        target_mixing_network = networks["target_mixing_network"]
 
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
@@ -210,7 +215,8 @@ class QMIXBuilder(SystemBuilder):
             q_networks=q_networks,
             target_q_networks=target_q_networks,
             observation_networks=observation_networks,
-            mixing_networks=mixing_networks,
+            mixing_network=mixing_network,
+            target_mixing_network=target_mixing_network,
             epsilon=self._config.epsilon,
             shared_weights=self._config.shared_weights,
             optimizer=optimizer,
@@ -336,7 +342,9 @@ class QMIX(system.System):
         q_networks = networks["policies"]
         target_q_networks = networks["target_policies"]
         observation_networks = networks["observations"]
-        mixing_networks = networks["mixing"]
+        mixing_network = networks["mixing"]
+        # TODO Should I move definition of target mixing into mixer?
+        target_mixing_network = copy.deepcopy(mixing_network)
 
         # Create the actor which defines how we take actions.
         executor = builder.make_executor(behavior_networks, adder)
@@ -345,7 +353,8 @@ class QMIX(system.System):
             "q_networks": q_networks,
             "target_q_networks": target_q_networks,
             "observation_networks": observation_networks,
-            "mixing_networks": mixing_networks,
+            "mixing_network": mixing_network,
+            "target_mixing_network": target_mixing_network,
         }
 
         # The trainer updates the parameters (and initializes them).

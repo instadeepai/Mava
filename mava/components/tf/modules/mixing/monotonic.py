@@ -61,6 +61,7 @@ class MonotonicMixing(BaseMixingModule):
         """Modify and return system architecture given mixing structure."""
         # Implement method from base class
         self._mixed_network = MonotonicMixingNetwork(
+            self._architecture,
             self._qmix_hidden_dim,
             self._state_dim,
             self._n_agents,
