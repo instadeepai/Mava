@@ -18,12 +18,12 @@ import tensorflow as tf
 from tensorflow import Tensor
 
 
-class AdditiveNetwork(snt.Module):
+class AdditiveMixingNetwork(snt.Module):
     """Multi-agent monotonic mixing architecture."""
 
     def __init__(self) -> None:
         """Initializes the mixer."""
-        super(AdditiveNetwork, self).__init__()
+        super(AdditiveMixingNetwork, self).__init__()
 
     def __call__(self, q_values: Tensor) -> Tensor:
         """Monotonic mixing logic."""

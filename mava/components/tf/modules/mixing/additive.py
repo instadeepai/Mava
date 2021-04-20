@@ -17,9 +17,9 @@ from typing import Dict
 
 import sonnet as snt
 
-from mava.components.tf.architectures.base import BaseArchitecture
-from mava.components.tf.modules.mixing.base import BaseMixingModule
-from mava.components.tf.networks.additive import AdditiveNetwork
+from mava.components.tf.architectures import BaseArchitecture
+from mava.components.tf.modules.mixing import BaseMixingModule
+from mava.components.tf.networks.additive import AdditiveMixingNetwork
 
 
 class AdditiveMixing(BaseMixingModule):
@@ -33,7 +33,7 @@ class AdditiveMixing(BaseMixingModule):
 
     def _create_mixing_layer(self) -> snt.Module:
         # Instantiate additive mixing network
-        return AdditiveNetwork()
+        return AdditiveMixingNetwork()
 
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         # Implement method from base class

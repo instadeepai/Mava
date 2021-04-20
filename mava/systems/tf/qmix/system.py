@@ -27,7 +27,7 @@ from acme import datasets
 # from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
-from mava import adders, core, specs  # , types
+from mava import adders, core, specs
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import DecentralisedActor
 from mava.components.tf.modules.mixing import MonotonicMixing

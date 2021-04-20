@@ -35,7 +35,7 @@ import tensorflow as tf
 from mava.components.tf.networks.hypernetwork import HyperNetwork
 
 
-class MonotonicNetwork(snt.Module):
+class MonotonicMixingNetwork(snt.Module):
     """Multi-agent monotonic mixing architecture.
     This is the component which can be used to add monotonic mixing to an underlying
     agent architecture. It currently supports generalised monotonic mixing using
@@ -59,7 +59,7 @@ class MonotonicNetwork(snt.Module):
             hypernet_hidden_dim: The number of nodes in the hypernetwork hidden
                 layer. Relevant for num_hypernet_layers > 1.
         """
-        super(MonotonicNetwork, self).__init__()
+        super(MonotonicMixingNetwork, self).__init__()
 
         self._qmix_hidden_dim = qmix_hidden_dim
         self._state_dim = state_dim

@@ -25,7 +25,7 @@ import sonnet as snt
 
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
-from mava.components.tf.networks.monotonic import MonotonicNetwork
+from mava.components.tf.networks.monotonic import MonotonicMixingNetwork
 
 
 class MonotonicMixing(BaseMixingModule):
@@ -60,7 +60,7 @@ class MonotonicMixing(BaseMixingModule):
     def _create_mixing_layer(self) -> snt.Module:
         """Modify and return system architecture given mixing structure."""
         # Implement method from base class
-        self._mixed_network = MonotonicNetwork(
+        self._mixed_network = MonotonicMixingNetwork(
             self._qmix_hidden_dim,
             self._state_dim,
             self._n_agents,
