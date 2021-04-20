@@ -20,6 +20,7 @@ from typing import Dict, Iterator, Optional, Type
 import reverb
 import sonnet as snt
 from acme import datasets
+from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
@@ -126,7 +127,17 @@ class MADDPGBuilder(SystemBuilder):
                 environment_spec
             )
         elif self._executer_fn == executors.RecurrentExecutor:
-            adder = reverb_adders.SequenceAdder.signature(environment_spec)
+            core_state_spec = {}
+            for agent in self._agents:
+                agent_type = agent.split("_")[0]
+                core_state_spec[agent] = (
+                    tf2_utils.squeeze_batch_dim(
+                        self._config.policy_networks[agent_type].initial_state(1)
+                    ),
+                )
+            adder = reverb_adders.SequenceAdder.signature(
+                environment_spec, core_state_spec
+            )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executer_fn)
 

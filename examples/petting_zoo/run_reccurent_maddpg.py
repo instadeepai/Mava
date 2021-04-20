@@ -200,7 +200,7 @@ def main(_: Any) -> None:
     type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
     specs = type_specs
     eval_policies = {
-        key: snt.Sequential(
+        key: snt.DeepRNN(
             [
                 system_networks["observations"][key],
                 system_networks["policies"][key],

@@ -239,6 +239,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         Returns:
             An instance of `loggers.LoggingData`.
         """
+
         # Reset any counts and start the environment.
         start_time = time.time()
         episode_steps = 0
@@ -249,10 +250,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._executor.observe_first(timestep)
 
         n_agents = self._environment.num_agents
-        rewards = {
-            agent: generate_zeros_from_spec(spec)
-            for agent, spec in self._environment.reward_spec().items()
-        }
 
         # For evaluation, this keeps track of the total undiscounted reward
         # for each agent accumulated during the episode.

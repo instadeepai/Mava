@@ -227,8 +227,6 @@ class ReverbParallelAdder(base.ParallelAdder):
         if next_timestep.last():
             self._start_of_episode = False
             self._write()
-
-            # print("LAST writing and reset.")
             self._write_last()
             self.reset()
         else:

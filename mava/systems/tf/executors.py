@@ -209,27 +209,23 @@ class RecurrentExecutor(core.Executor):
     ) -> None:
 
         # Re-initialize the RNN state.
-        for agent, networks in self._policy_networks.items():
+        assert type(self._policy_networks["walker"]) == snt.DeepRNN
+        for agent, _ in timestep.observation.items():
             # index network either on agent type or on agent id
             agent_key = agent.split("_")[0] if self._shared_weights else agent
             self._states[agent] = self._policy_networks[agent_key].initial_state(1)
 
         if self._adder is not None:
-            self._adder.add_first(timestep, extras)
-
             numpy_states = {
                 agent: tf2_utils.to_numpy_squeeze(_state)
                 for agent, _state in self._states.items()
             }
+
             if extras:
                 extras.update({"core_states": numpy_states})
                 self._adder.add_first(timestep, extras)
             else:
-                print("Calling adder..")
                 self._adder.add_first(timestep, numpy_states)
-
-        print("First adder call.")
-        exit()
 
     def observe(
         self,

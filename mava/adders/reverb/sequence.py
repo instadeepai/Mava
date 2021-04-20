@@ -20,16 +20,24 @@
 This implements adders which add sequences or partial trajectories.
 """
 
-from typing import Optional
+from typing import NamedTuple, Optional
 
 import reverb
 import tensorflow as tf
 import tree
-from acme import specs
+from acme import specs, types
 from acme.adders.reverb import utils
 from acme.utils import tree_utils
 
 from mava.adders.reverb import base
+from mava.adders.reverb import utils as mava_utils
+
+
+class StateSpecs(NamedTuple):
+    """Container for (observation, legal_actions, terminal) tuples."""
+
+    hidden: types.Nest
+    cell: types.Nest
 
 
 class SequenceAdder(base.ReverbParallelAdder):
@@ -85,7 +93,6 @@ class SequenceAdder(base.ReverbParallelAdder):
                 "Can't set pad_end_of_episode=True and break_end_of_episode=False at"
                 " the same time, since those behaviors are incompatible."
             )
-
         self._period = period
         self._step = 0
         self._pad_end_of_episode = pad_end_of_episode
@@ -100,15 +107,17 @@ class SequenceAdder(base.ReverbParallelAdder):
 
     def _write(self):
         # Append the previous step and increment number of steps written.
-        print("Obs: ", self._buffer[-1].observations["walker_0"].observation.shape)
-        print("Extra: ", self._buffer[-1].extras)
         self._writer.append(self._buffer[-1])
         self._step += 1
         self._maybe_add_priorities()
 
     def _write_last(self):
         # Create a final step.
-        final_step = utils.final_step_like(self._buffer[0], self._next_observations)
+        # TODO (Dries): Should self._next_observation be used
+        #  here? Should this function be used for sequential?
+        final_step = mava_utils.final_step_like(
+            self._buffer[0], self._next_observations
+        )
 
         # Append the final step.
         self._buffer.append(final_step)
@@ -179,6 +188,7 @@ class SequenceAdder(base.ReverbParallelAdder):
     def signature(
         cls,
         environment_spec: specs.EnvironmentSpec,
+        core_state_spec: tf.TypeSpec,
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
 
@@ -197,10 +207,10 @@ class SequenceAdder(base.ReverbParallelAdder):
         Returns:
           A `Step` whose leaf nodes are `tf.TensorSpec` objects.
         """
-
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
         extras_specs = environment_spec.get_extra_specs()
+        extras_specs["core_states"] = core_state_spec
         obs_specs = {}
         act_specs = {}
         reward_specs = {}
@@ -209,7 +219,6 @@ class SequenceAdder(base.ReverbParallelAdder):
             rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
                 agent_specs[agent].rewards, agent_specs[agent].discounts
             )
-
             obs_specs[agent] = agent_specs[agent].observations
             act_specs[agent] = agent_specs[agent].actions
             reward_specs[agent] = rewards_spec
