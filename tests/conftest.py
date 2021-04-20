@@ -27,11 +27,11 @@ from ray.rllib.env.multi_agent_env import make_multi_agent
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
 from mava.utils.wrapper_utils import convert_np_type
+from mava.wrappers import RLLibMultiAgentEnvWrapper
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
-from mava.wrappers import RLLibMultiAgentEnvWrapper
 from tests.enums import EnvSource, EnvSpec, EnvType, MockedEnvironments
 from tests.mocks import (
     ParallelMAContinuousEnvironment,
