@@ -15,8 +15,28 @@
 
 """Common types used throughout Mava."""
 
-from typing import Dict, Union
+from typing import Dict, NamedTuple, Union
 
+import numpy as np
+from acme import types
 from acme.utils import loggers
 
+
+class OLT(NamedTuple):
+    """Container for (observation, legal_actions, terminal) tuples."""
+
+    observation: types.Nest
+    legal_actions: types.Nest
+    terminal: types.Nest
+
+
 NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
+
+SingleAgentAction = Union[int, float, np.array]
+Action = Union[SingleAgentAction, Dict[str, SingleAgentAction]]
+
+SingleAgentReward = Union[int, float]
+Reward = Union[SingleAgentReward, Dict[str, SingleAgentReward]]
+Discount = Reward
+
+Observation = Union[OLT, Dict[str, OLT]]

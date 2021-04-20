@@ -16,6 +16,8 @@
 """Example running MADDPG on pettinzoo MPE environments."""
 
 import importlib
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
@@ -26,12 +28,12 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
-from acme.utils.loggers.tf_summary import TFSummaryLogger
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
-from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+from mava.utils.loggers import Logger
+from mava.wrappers import DetailedPerAgentStatistics, PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
@@ -141,10 +143,23 @@ def main(_: Any) -> None:
     system_networks = make_networks(environment_spec)
 
     # create tf loggers
-    logs_dir = "logs"
-    system_logger = TFSummaryLogger(f"{logs_dir}/system")
-    train_logger = TFSummaryLogger(f"{logs_dir}/train_loop")
-    eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
+    base_dir = Path.cwd()
+    log_dir = base_dir / "logs"
+    log_time_stamp = str(datetime.now())
+    system_logger = Logger(
+        label="system_trainer",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
+    train_logger = Logger(
+        label="train_loop",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
 
     # Construct the agent.
     system = maddpg.MADDPG(
@@ -162,6 +177,9 @@ def main(_: Any) -> None:
     train_loop = ParallelEnvironmentLoop(
         environment, system, logger=train_logger, label="train_loop"
     )
+
+    # Wrap training loop to compute and log detailed running statistics
+    train_loop = DetailedPerAgentStatistics(train_loop)
 
     # Create the evaluation policy.
     # NOTE: assumes weight sharing
@@ -181,9 +199,7 @@ def main(_: Any) -> None:
     # Create the evaluation actor and loop.
     eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
     eval_env = make_environment(remove_on_fall=False)
-    eval_loop = ParallelEnvironmentLoop(
-        eval_env, eval_actor, logger=eval_logger, label="eval_loop"
-    )
+    eval_loop = ParallelEnvironmentLoop(eval_env, eval_actor, label="eval_loop")
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)

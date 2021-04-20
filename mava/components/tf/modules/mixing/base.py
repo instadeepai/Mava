@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): complete base class for mixing
+# TODO (StJohn):
+#   - [] complete base class for mixing
 
 import abc
 from typing import Dict
@@ -32,7 +33,7 @@ class BaseMixingModule:
 
     @abc.abstractmethod
     def some_abstract_mixing_function(self) -> Dict[str, Dict[str, snt.Module]]:
-        """Abstract communication function."""
+        """Abstract mixing function."""
 
     @abc.abstractmethod
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:

@@ -83,9 +83,6 @@ class System(mava.core.Executor, mava.core.VariableSource):
     def observe_first(self, timestep: dm_env.TimeStep) -> None:
         self._executor.observe_first(timestep)
 
-    def agent_observe_first(self, agent: str, timestep: dm_env.TimeStep) -> None:
-        self._executor.agent_observe_first(agent, timestep)
-
     def observe(
         self, actions: Dict[str, types.NestedArray], next_timestep: dm_env.TimeStep
     ) -> None:
