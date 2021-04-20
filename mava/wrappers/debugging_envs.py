@@ -21,8 +21,9 @@ import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 
+from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv
-from mava.utils.wrapper_utils import OLT, convert_np_type
+from mava.utils.wrapper_utils import convert_np_type
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 
@@ -62,7 +63,8 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 for agent, reward in rewards.items()
             }
 
-        observations = self._convert_observations(observations, dones)
+        if observations:
+            observations = self._convert_observations(observations, dones)
 
         if self._environment.env_done:
             self._step_type = dm_env.StepType.LAST
