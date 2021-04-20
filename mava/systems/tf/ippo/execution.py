@@ -78,12 +78,14 @@ class FeedForwardExecutorLogits(core.Executor):
         action = tfd.Categorical(logits=logits).sample()
 
         self._prev_logits = logits
+        print("execution: Used Policy fn")
 
         return tf.cast(action, "int64")
 
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
+
         # Pass the observation through the policy network.
         action = self._policy(agent, observation.observation)
 
@@ -91,6 +93,7 @@ class FeedForwardExecutorLogits(core.Executor):
         # What happens in discrete vs cont case
 
         # Return a numpy array with squeezed out batch dimension.
+        print("execution: Used select action")
         return tf2_utils.to_numpy_squeeze(action)
 
     def observe_first(
@@ -147,6 +150,7 @@ class FeedForwardExecutorLogits(core.Executor):
             actions[agent] = tf2_utils.to_numpy_squeeze(action)
 
         # Return a numpy array with squeezed out batch dimension.
+
         return actions
 
     def update(self, wait: bool = False) -> None:

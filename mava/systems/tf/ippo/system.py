@@ -13,12 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG system implementation."""
+"""IPPO system implementation."""
 import dataclasses
 from typing import Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
+
+# import tensorflow as tf
 from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
@@ -65,7 +67,7 @@ class IPPOConfig:
     observation_networks: Dict[str, snt.Module]
     behavior_networks: Dict[str, snt.Module]
     shared_weights: bool = True
-    target_update_period: int = 100
+    target_update_period: int = 10  # Note: was 100
 
     # PPO stuff
     discount: float = 0.99
@@ -104,7 +106,7 @@ class IPPOBuilder(SystemBuilder):
     def __init__(
         self,
         config: IPPOConfig,
-        trainer_fn: Type[training.IPPOTrainer] = training.IPPOTrainer,
+        trainer_fn: Type[training.BaseIPPOTrainer] = training.IPPOTrainer,
     ):
         """Args:
         config: Configuration options for the MADDPG system.
@@ -117,12 +119,14 @@ class IPPOBuilder(SystemBuilder):
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
+        print("System: Initialised builder using Config")
 
     def make_replay_table(
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> reverb.Table.queue:
         """Create tables to insert data into."""
+        print("System: Accessed Replay Table")
         return reverb.Table.queue(
             name=self._config.replay_table_name,
             max_size=self._config.max_queue_size,
@@ -136,12 +140,14 @@ class IPPOBuilder(SystemBuilder):
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for learning/updating the system."""
+
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
         )
+        print("System: Constructed Dataset Iterator")
         return iter(dataset)
 
     def make_adder(
@@ -152,6 +158,7 @@ class IPPOBuilder(SystemBuilder):
         Args:
           replay_client: Reverb Client which points to the replay server.
         """
+        print("System: Made Adder")
         return reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
             client=replay_client,
@@ -173,6 +180,7 @@ class IPPOBuilder(SystemBuilder):
           adder: How data is recorded (e.g. added to replay).
           variable_source: A source providing the necessary executor parameters.
         """
+
         shared_weights = self._config.shared_weights
 
         variable_client = None
@@ -188,7 +196,7 @@ class IPPOBuilder(SystemBuilder):
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policy": variables},
-                update_period=1000,
+                update_period=10,  # from 1000
             )
 
             # Update variables
@@ -203,6 +211,7 @@ class IPPOBuilder(SystemBuilder):
 
         # TODO may need a custom executor
         # Create the actor which defines how we take actions.
+        print("System: Made Executor")
         return execution.FeedForwardExecutorLogits(
             policy_networks=policy_networks,
             shared_weights=shared_weights,
@@ -231,6 +240,7 @@ class IPPOBuilder(SystemBuilder):
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the trainer checkpoints itself.
         """
+
         agents = self._agents
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
@@ -256,6 +266,7 @@ class IPPOBuilder(SystemBuilder):
             # target_policy_networks=networks["target_policies"],
             # target_critic_networks=networks["target_critics"],
             # target_observation_networks=networks["target_observations"],
+            # num_steps=tf.Variable(0, dtype=tf.int32),
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
@@ -271,6 +282,7 @@ class IPPOBuilder(SystemBuilder):
             logger=logger,
             checkpoint=checkpoint,
         )
+        print("System: Made Trainer")
         return trainer
 
 
@@ -289,7 +301,7 @@ class IPPO(system.System):
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        trainer_fn: Type[training.IPPOTrainer] = training.IPPOTrainer,
+        trainer_fn: Type[training.BaseIPPOTrainer] = training.IPPOTrainer,
         shared_weights: bool = True,
         discount: float = 0.99,
         lambda_gae: float = 0.95,
@@ -394,7 +406,7 @@ class IPPO(system.System):
             logger=logger,
             checkpoint=checkpoint,
         )
-
+        print("system: Have constructed IPPO trainers and execs")
         super().__init__(
             executor=executor,
             trainer=trainer,

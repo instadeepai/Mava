@@ -32,7 +32,7 @@ from acme.utils import counting, loggers
 import mava
 
 
-class IPPOTrainer(mava.Trainer):
+class BaseIPPOTrainer(mava.Trainer):
     """IPPO trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -59,7 +59,6 @@ class IPPOTrainer(mava.Trainer):
         clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
-        num_steps: int = 5,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -113,7 +112,7 @@ class IPPOTrainer(mava.Trainer):
         self._clipping_epsilon = clipping_epsilon
         self._lambda_gae = lambda_gae
         # self._num_steps = num_steps
-        self._num_steps = tf.Variable(5, dtype=tf.int32)
+        self._num_steps = tf.Variable(0, dtype=tf.int32)
 
         # Necessary to track when to update target networks.
         # self._num_steps = tf.Variable(0, dtype=tf.int32)
@@ -169,7 +168,7 @@ class IPPOTrainer(mava.Trainer):
                     # self._target_observation_networks[agent_key],
                     "policy_optimizer": self._policy_optimizer,
                     "critic_optimizer": self._critic_optimizer,
-                    "num_steps": self._num_steps,
+                    # "num_steps": self._num_steps,
                 }
 
                 checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
@@ -180,6 +179,7 @@ class IPPOTrainer(mava.Trainer):
                     enable_checkpointing=True,
                 )
                 self._system_checkpointer[agent_key] = checkpointer
+            print("training: checkpointer done")
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -198,6 +198,7 @@ class IPPOTrainer(mava.Trainer):
             o_t[agent] = self._target_observation_networks[agent_key](
                 next_obs[agent].observation
             )
+            print("training: flow through transform obs")
             # This stop_gradient prevents gradients to propagate into the target
             # observation network. In addition, since the online policy network is
             # evaluated at o_t, this also means the policy loss does not influence
@@ -234,6 +235,7 @@ class IPPOTrainer(mava.Trainer):
         o_t_feed = o_t_trans[agent]
         a_tm1_feed = a_tm1[agent]
         a_t_feed = a_t[agent]
+        print("training: getting critic feed")
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     # TODO actor feed
@@ -248,6 +250,7 @@ class IPPOTrainer(mava.Trainer):
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
+        print("training: within step but outside gradient loop")
 
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
@@ -377,6 +380,7 @@ class IPPOTrainer(mava.Trainer):
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
+        print("getting variables")
         for network_type in names:
             variables[network_type] = {}
             for agent in self.unique_net_keys:
@@ -384,3 +388,85 @@ class IPPOTrainer(mava.Trainer):
                     self._system_network_variables[network_type][agent]
                 )
         return variables
+
+
+class IPPOTrainer(BaseIPPOTrainer):
+    """IPPO trainer.
+    This is the trainer component of a IPPO system. IE it takes a dataset as input
+    and implements update functionality to learn from this dataset.
+    """
+
+    def __init__(
+        self,
+        agents: List[str],
+        agent_types: List[str],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        # target_policy_networks: Dict[str, snt.Module],
+        # target_critic_networks: Dict[str, snt.Module],
+        discount: float,
+        target_update_period: int,
+        dataset: tf.data.Dataset,
+        observation_networks: Dict[str, snt.Module],
+        # target_observation_networks: Dict[str, snt.Module],
+        lambda_gae: float,
+        clipping_epsilon: float,
+        entropy_cost: float,
+        baseline_cost: float,
+        # num_steps: int,
+        shared_weights: bool = False,
+        policy_optimizer: snt.Optimizer = None,
+        critic_optimizer: snt.Optimizer = None,
+        clipping: bool = True,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
+    ):
+        """Initializes the learner.
+        Args:
+          policy_network: the online (optimized) policy.
+          critic_network: the online critic.
+          target_policy_network: the target policy (which lags behind the online
+            policy).
+          target_critic_network: the target critic.
+          discount: discount to use for TD updates.
+          target_update_period: number of learner steps to perform before updating
+            the target networks.
+          dataset: dataset to learn from, whether fixed or from a replay buffer
+            (see `acme.datasets.reverb.make_dataset` documentation).
+          observation_network: an optional online network to process observations
+            before the policy and the critic.
+          target_observation_network: the target observation network.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizer to be applied to the critic loss.
+          clipping: whether to clip gradients by global norm.
+          counter: counter object used to keep track of steps.
+          logger: logger object to be used by learner.
+          checkpoint: boolean indicating whether to checkpoint the learner.
+        """
+
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            # target_policy_networks=target_policy_networks,
+            # target_critic_networks=target_critic_networks,
+            discount=discount,
+            target_update_period=target_update_period,
+            dataset=dataset,
+            observation_networks=observation_networks,
+            # target_observation_networks=target_observation_networks,
+            shared_weights=shared_weights,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            clipping=clipping,
+            lambda_gae=lambda_gae,
+            clipping_epsilon=clipping_epsilon,
+            entropy_cost=entropy_cost,
+            baseline_cost=baseline_cost,
+            # num_steps=num_steps,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+        )
