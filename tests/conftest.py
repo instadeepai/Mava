@@ -22,6 +22,7 @@ import dm_env
 import numpy as np
 import pytest
 from pettingzoo.utils.env import AECEnv, ParallelEnv
+from ray.rllib.env.multi_agent_env import make_multi_agent
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
@@ -30,6 +31,7 @@ from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
+from mava.wrappers import RLLibMultiAgentEnvWrapper
 from tests.enums import EnvSource, EnvSpec, EnvType, MockedEnvironments
 from tests.mocks import (
     ParallelMAContinuousEnvironment,
@@ -55,14 +57,15 @@ class Helpers:
     @staticmethod
     def get_env(env_spec: EnvSpec) -> Tuple[Union[AECEnv, ParallelEnv], int]:
         env, num_agents = None, None
-        mod = importlib.import_module(env_spec.env_name)
         if env_spec.env_source == EnvSource.PettingZoo:
+            mod = importlib.import_module(env_spec.env_name)
             if env_spec.env_type == EnvType.Parallel:
                 env = mod.parallel_env()  # type: ignore
             elif env_spec.env_type == EnvType.Sequential:
                 env = mod.env()  # type: ignore
         elif env_spec.env_source == EnvSource.RLLibMultiEnv:
-            return NotImplemented()
+            ma_cls = make_multi_agent(env_spec.env_name)
+            env = ma_cls({"num_agents": 2})
         else:
             raise Exception("Env_spec is not valid.")
         env.reset()
@@ -81,7 +84,7 @@ class Helpers:
             elif env_spec.env_type == EnvType.Sequential:
                 wrapper = PettingZooAECEnvWrapper
         elif env_spec.env_source == EnvSource.RLLibMultiEnv:
-            return NotImplemented()
+            wrapper = RLLibMultiAgentEnvWrapper
         else:
             raise Exception("Env_spec is not valid.")
         return wrapper

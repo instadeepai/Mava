@@ -24,7 +24,6 @@ from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
-# pip install ray[rllib]
 from ray.rllib.env.multi_agent_env import make_multi_agent
 
 from mava import specs as mava_specs
