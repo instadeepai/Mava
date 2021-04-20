@@ -41,7 +41,7 @@ class MonotonicMixing(BaseMixingModule):
         n_agents: int,  # TODO Get this from architecture
         qmix_hidden_dim: int,
         num_hypernet_layers: int = 2,
-        hypernet_hidden_dim: int = 64,
+        hypernet_hidden_dim: int = 2,
     ) -> None:
         """Initializes the mixer.
         Args:

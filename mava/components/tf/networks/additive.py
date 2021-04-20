@@ -23,6 +23,7 @@ class AdditiveNetwork(snt.Module):
 
     def __init__(self) -> None:
         """Initializes the mixer."""
+        super(AdditiveNetwork, self).__init__()
 
     def __call__(self, q_values: Tensor) -> Tensor:
         """Monotonic mixing logic."""

@@ -32,17 +32,17 @@ from mava.systems.tf import qmix
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
+flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
 
 flags.DEFINE_integer(
     "num_episodes_per_eval",
-    10,
+    100,
     "Number of training episodes to run between evaluation " "episodes.",
 )
 
 
 def make_environment(
-    env_class: str = "sisl", env_name: str = "simple_v2", **kwargs: int
+    env_class: str = "mpe", env_name: str = "simple_v2", **kwargs: int
 ) -> dm_env.Environment:
     """Creates a MPE environment."""
     env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
@@ -60,9 +60,12 @@ def make_environment(
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64, 64),
+    epsilon: tf.Variable,
+    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
+    shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
+
     specs = environment_spec.get_agent_specs()
 
     # Convert Sequence to Dict of labled Sequences
@@ -72,7 +75,6 @@ def make_networks(
     observation_networks = {}
     q_networks = {}
     behavior_networks = {}
-    # TODO Initialise mixing networks here?
 
     for key in specs.keys():
         # Get total number of action dimensions from action spec.
@@ -87,7 +89,7 @@ def make_networks(
             ]
         )
 
-        epsilon = tf.Variable(1, trainable=False)  # Fixed for now.
+        # epsilon = tf.Variable(1, trainable=False)  # Fixed for now.
         behavior_network = snt.Sequential(
             [
                 q_network,
@@ -110,9 +112,10 @@ def make_networks(
 
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment(max_cycles=25)
+    environment = make_environment()
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    system_networks = make_networks(environment_spec)
+    epsilon = tf.Variable(1.0, trainable=False)
+    system_networks = make_networks(environment_spec, epsilon)
 
     # TODO Create loggers
 
@@ -120,10 +123,9 @@ def main(_: Any) -> None:
     system = qmix.QMIX(
         environment_spec=environment_spec,
         q_networks=system_networks["q_networks"],
-        observation_networks=system_networks[
-            "observations"
-        ],  # pytype: disable=wrong-arg-types
+        observation_networks=system_networks["observations"],
         behavior_networks=system_networks["behaviors"],
+        epsilon=epsilon,
     )
 
     # Create the environment loop used for training.

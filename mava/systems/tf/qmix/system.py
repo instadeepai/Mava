@@ -235,10 +235,7 @@ class QMIXBuilder(SystemBuilder):
 
 class QMIX(system.System):
     """QMIX system.
-    This implements a single-process QMIX system. This is an actor-critic based
-    system that generates data via a behavior policy, inserts N-step transitions into
-    a replay buffer, and periodically updates the policies of each agent
-    (and as a result the behavior) by sampling uniformly from this buffer.
+    This implements a single-process QMIX system.
     """
 
     def __init__(
@@ -363,9 +360,6 @@ class QMIX(system.System):
             "observation_networks": observation_networks,
             "mixing_networks": mixing_networks,
         }
-
-        # Create the actor which defines how we take actions.
-        executor = builder.make_executor(networks["policies"], adder)
 
         # The trainer updates the parameters (and initializes them).
         # TODO label these inputs properly

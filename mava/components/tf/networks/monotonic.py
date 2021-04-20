@@ -47,7 +47,7 @@ class MonotonicNetwork(snt.Module):
         state_dim: int,
         n_agents: int,  # TODO Get from architecture
         num_hypernet_layers: int = 2,
-        hypernet_hidden_dim: int = 64,
+        hypernet_hidden_dim: int = 2,
     ) -> None:
         """Initializes the mixer.
         Args:
@@ -59,6 +59,8 @@ class MonotonicNetwork(snt.Module):
             hypernet_hidden_dim: The number of nodes in the hypernetwork hidden
                 layer. Relevant for num_hypernet_layers > 1.
         """
+        super(MonotonicNetwork, self).__init__()
+
         self._qmix_hidden_dim = qmix_hidden_dim
         self._state_dim = state_dim
         self._n_agents = n_agents
