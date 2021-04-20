@@ -24,9 +24,10 @@ from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
 from mava import types
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
+from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 
-class RLLibMultiAgentEnvWrapper(dm_env.Environment):
+class RLLibMultiAgentEnvWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for RLLib MA environments."""
 
     # Note: we don't inherit from base.EnvironmentWrapper because that class
@@ -140,5 +141,5 @@ class RLLibMultiAgentEnvWrapper(dm_env.Environment):
             )
         return discount_specs
 
-    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+    def extra_spec(self) -> dict:
         return {}
