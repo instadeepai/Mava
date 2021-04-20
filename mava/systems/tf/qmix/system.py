@@ -45,34 +45,26 @@ class QMIXConfig:
     Args:
         environment_spec: description of the actions, observations, etc.
         q_networks: the online Q network (the one being optimized)
+        behavior_networks: the network responsible for data collection (learning).
         observation_networks: dictionary of optional networks to transform
                 the observations before they are fed into any network.
-        batch_size: batch size for updates.
-        prefetch_size: size to prefetch from replay.
-        target_update_period: number of learner steps to perform before updating
-            the target networks.
-        samples_per_insert: number of samples to take from replay for every insert
-            that is made.
-        min_replay_size: minimum replay size before updating. This and all
-            following arguments are related to dataset construction and will be
-            ignored if a dataset argument is passed.
-        max_replay_size: maximum replay size.
-        importance_sampling_exponent: power to which importance weights are raised
-            before normalizing.
-        priority_exponent: exponent used in prioritized sampling.
-        n_step: number of steps to squash into a single transition.
         epsilon: probability of taking a random action; ignored if a policy
             network is given.
-        learning_rate: learning rate for the q-network update.
-        discount: discount to use for TD updates.
-        logger: logger object to be used by learner.
-        checkpoint: boolean indicating whether to checkpoint the learner.
-        checkpoint_subpath: directory for the checkpoint.
-        policy_networks: if given, this will be used as the policy network.
-            Otherwise, an epsilon greedy policy using the online Q network will be
-            created. Policy network is used in the actor to sample actions.
-        max_gradient_norm: used for gradient clipping.
+        shared_weights: boolean determining whether shared weights is used.
+        target_update_period: number of learner steps to perform before updating
+            the target networks.
+        clipping: whether to clip gradients by global norm.
         replay_table_name: string indicating what name to give the replay table.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        prefetch_size: size to prefetch from replay.
+        batch_size: batch size for updates.
+        n_step: number of steps to squash into a single transition.
+        discount: discount to use for TD updates.
+        counter: counter object used to keep track of steps.
+        logger: logger object to be used by trainers.
+        checkpoint: boolean indicating whether to checkpoint the learner.
     """
 
     environment_spec: specs.MAEnvironmentSpec
@@ -236,6 +228,30 @@ class QMIXBuilder(SystemBuilder):
 class QMIX(system.System):
     """QMIX system.
     This implements a single-process QMIX system.
+    Args:
+        environment_spec: description of the actions, observations, etc.
+        q_networks: the online Q network (the one being optimized)
+        behavior_networks: the network responsible for data collection (learning).
+        observation_networks: dictionary of optional networks to transform
+                the observations before they are fed into any network.
+        epsilon: probability of taking a random action; ignored if a policy
+            network is given.
+        trainer_fn: the class used for training the agent and mixing networks.
+        shared_weights: boolean determining whether shared weights is used.
+        target_update_period: number of learner steps to perform before updating
+            the target networks.
+        clipping: whether to clip gradients by global norm.
+        replay_table_name: string indicating what name to give the replay table.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        prefetch_size: size to prefetch from replay.
+        batch_size: batch size for updates.
+        n_step: number of steps to squash into a single transition.
+        discount: discount to use for TD updates.
+        counter: counter object used to keep track of steps.
+        logger: logger object to be used by trainers.
+        checkpoint: boolean indicating whether to checkpoint the learner.
     """
 
     def __init__(
@@ -243,53 +259,24 @@ class QMIX(system.System):
         environment_spec: specs.MAEnvironmentSpec,
         q_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
-        epsilon: tf.Variable,
         observation_networks: Dict[str, snt.Module],
+        epsilon: tf.Variable,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         shared_weights: bool = False,
-        discount: float = 0.99,
-        replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
-        batch_size: int = 256,
-        prefetch_size: int = 4,
         target_update_period: int = 100,
+        clipping: bool = False,
+        replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
         max_replay_size: int = 1_000_000,
         samples_per_insert: float = 32.0,
+        prefetch_size: int = 4,
+        batch_size: int = 256,
         n_step: int = 5,
-        clipping: bool = False,
-        logger: loggers.Logger = None,
+        discount: float = 0.99,
         counter: counting.Counter = None,
+        logger: loggers.Logger = None,
         checkpoint: bool = False,
     ):
-        """Initialize the system.
-        Args:
-            environment_spec: description of the actions, observations, etc.
-            networks: the online Q network (the one being optimized)
-            batch_size: batch size for updates.
-            prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-                the target networks.
-            samples_per_insert: number of samples to take from replay for every insert
-                that is made.
-            min_replay_size: minimum replay size before updating. This and all
-                following arguments are related to dataset construction and will be
-                ignored if a dataset argument is passed.
-            max_replay_size: maximum replay size.
-            importance_sampling_exponent: power to which importance weights are raised
-                before normalizing.
-            priority_exponent: exponent used in prioritized sampling.
-            n_step: number of steps to squash into a single transition.
-            epsilon: probability of taking a random action; ignored if a policy
-                network is given.
-            learning_rate: learning rate for the q-network update.
-            discount: discount to use for TD updates.
-            logger: logger object to be used by learner.
-            checkpoint: boolean indicating whether to checkpoint the learner.
-            checkpoint_subpath: directory for the checkpoint.
-            policy_networks: if given, this will be used as the policy network.
-                Otherwise, an epsilon greedy policy using the online Q network will be
-                created. Policy network is used in the actor to sample actions.
-            max_gradient_norm: used for gradient clipping.
-            replay_table_name: string indicating what name to give the replay table."""
+        """Initialize the system."""
 
         builder = QMIXBuilder(
             QMIXConfig(
