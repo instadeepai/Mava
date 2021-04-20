@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import gym
 import numpy as np
@@ -33,12 +33,6 @@ class MultiAgentSwitchGame(gym.Env):
     def __init__(
         self,
         num_agents: int = 3,
-        reset_callback: Callable = None,
-        reward_callback: Callable = None,
-        observation_callback: Callable = None,
-        info_callback: Callable = None,
-        done_callback: Callable = None,
-        shared_viewer: bool = True,
     ) -> None:
 
         self._num_agents = num_agents
@@ -51,16 +45,8 @@ class MultiAgentSwitchGame(gym.Env):
             self.agent_ids.append(agent_id)
 
         self.possible_agents = self.agent_ids
-        # scenario callbacks
-        self._reset_callback = reset_callback
-        self._reward_callback = reward_callback
-        self._observation_callback = observation_callback
-        self._info_callback = info_callback
-        self._done_callback = done_callback
         # environment parameters
-
         self.max_time = 4 * self._num_agents - 6
-
         self.selected_agent = -1
 
     def step(
@@ -122,28 +108,19 @@ class MultiAgentSwitchGame(gym.Env):
 
     # get info used for benchmarking
     def _get_info(self, agent_id: str) -> Dict:
-        if self._info_callback is None:
-            return {}
-        return self._info_callback(agent_id)
+        return {}
 
     # get observation for a particular agent
     def _get_obs(self, a_i: int, agent_id: str) -> np.array:
-        if self._observation_callback is None:
-            return 1 if a_i == self.selected_agent else 0
-        return self._observation_callback(agent_id, a_i, self.world)
+        return 1 if a_i == self.selected_agent else 0
 
     # get dones for a particular agent
     # unused right now -- agents are allowed to go beyond the viewing screen
     def _get_done(self, agent_id: str) -> bool:
-        if self._done_callback is None:
-            return self.env_done
-        done = self._done_callback(agent_id)
-        return done
+        return self.env_done
 
     # get reward for a particular agent
     def _get_reward(self, a_i: int, agent_id: str) -> float:
-        if self._reward_callback is None:
-            if not self.env_done:
-                return 0.0
-            return 1.0 if self.seen_all and self.tell else -1.0
-        return self._reward_callback(agent_id, a_i, self.world)
+        if not self.env_done:
+            return 0.0
+        return 1.0 if self.seen_all and self.tell else -1.0
