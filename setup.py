@@ -39,7 +39,10 @@ tf_requirements = [
     "trfl",
 ]
 
-env_requirements = ["pettingzoo"]
+env_requirements = [
+    "pettingzoo",
+    "ray[rllib]",
+]
 
 testing_formatting_requirements = [
     "pre-commit",
