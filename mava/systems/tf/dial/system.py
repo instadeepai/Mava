@@ -73,6 +73,7 @@ class DIALConfig:
 
     environment_spec: specs.MAEnvironmentSpec
     networks: Dict[str, snt.Module]
+    shared_weights: bool = True
     batch_size: int = 256
     prefetch_size: int = 4
     target_update_period: int = 100
@@ -91,6 +92,8 @@ class DIALConfig:
     policy_networks: Optional[Dict[str, snt.Module]] = None
     max_gradient_norm: Optional[float] = None
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    counter: counting.Counter = None
+    clipping: bool = False
 
 
 class DIALBuilder(SystemBuilder):
@@ -241,8 +244,8 @@ class DIALBuilder(SystemBuilder):
         trainer = DIALTrainer(
             agents=agents,
             agent_types=agent_types,
-            networks=networks["networks"],
-            target_network=networks["target_networks"],
+            networks=networks["policies"],
+            target_network=networks["target_policies"],
             shared_weights=shared_weights,
             discount=discount,
             importance_sampling_exponent=importance_sampling_exponent,
@@ -272,7 +275,9 @@ class DIAL(system.System):
         self,
         environment_spec: specs.MAEnvironmentSpec,
         networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
+        shared_weights: bool = True,
         batch_size: int = 256,
         prefetch_size: int = 4,
         target_update_period: int = 100,
@@ -368,7 +373,9 @@ class DIAL(system.System):
         # see mava/components/tf/architectures
         architecture = CentralisedActor(
             environment_spec=environment_spec,
-            networks=networks,
+            policy_networks=networks,
+            observation_networks=observation_networks,
+            behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         )
 

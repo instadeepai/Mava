@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 import gym
 import numpy as np
+from gym import spaces
 
 """
 DIAL switch game implementation
@@ -40,9 +41,14 @@ class MultiAgentSwitchGame(gym.Env):
         self.env_done = False
         self.agent_ids = []
 
+        # spaces
+        self.action_spaces = {}
+        self.observation_spaces = {}
         for a_i in range(self._num_agents):
             agent_id = "agent_" + str(a_i)
             self.agent_ids.append(agent_id)
+            self.action_spaces[agent_id] = spaces.Discrete(2)
+            self.observation_spaces[agent_id] = spaces.Discrete(2)
 
         self.possible_agents = self.agent_ids
         # environment parameters
@@ -90,14 +96,11 @@ class MultiAgentSwitchGame(gym.Env):
 
     def reset(self) -> Dict[str, np.array]:
         # reset world
-        if self._reset_callback is not None:
-            self._reset_callback(self.world)
-        else:
-            self.agent_history: List[int] = []
-            self.n_seen = 0
-            self.time = 0
-            self.tell = False
-            self.selected_agent = np.random.randint(0, self._num_agents)
+        self.agent_history: List[int] = []
+        self.n_seen = 0
+        self.time = 0
+        self.tell = False
+        self.selected_agent = np.random.randint(0, self._num_agents)
 
         self.env_done = False
         # record observations for each agent

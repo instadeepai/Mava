@@ -20,11 +20,14 @@
 #   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
 
 """DIAL trainer implementation."""
-from typing import Dict, List, Optional
+import time
+from typing import Any, Dict, List, Optional, Sequence
 
+import numpy as np
 import reverb
 import sonnet as snt
 import tensorflow as tf
+from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
@@ -46,7 +49,7 @@ class DIALTrainer(mava.Trainer):
         huber_loss_parameter: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        shared_weights: bool = False,
+        shared_weights: bool = True,
         importance_sampling_exponent: float = None,
         policy_optimizer: snt.Optimizer = None,
         replay_client: Optional[reverb.Client] = None,
@@ -82,3 +85,43 @@ class DIALTrainer(mava.Trainer):
         # Store online and target networks.
         self._networks = networks
         self._target_networks = target_network
+
+        self._timestamp = None
+
+    def _step(self) -> Dict[str, Dict[str, Any]]:
+        # TODO Kevin: Implement DIAL trainer algorithm
+        return {}
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        # Compute elapsed time.
+        timestamp = time.time()
+        if self._timestamp:
+            elapsed_time = timestamp - self._timestamp
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        # Checkpoint the networks.
+        if len(self._system_checkpointer.keys()) > 0:
+            for agent_key in self.unique_net_keys:
+                checkpointer = self._system_checkpointer[agent_key]
+                checkpointer.save()
+
+        self._logger.write(fetches)
+
+    def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+        variables: Dict[str, Dict[str, np.ndarray]] = {}
+        for network_type in names:
+            variables[network_type] = {}
+            for agent in self.unique_net_keys:
+                variables[network_type][agent] = tf2_utils.to_numpy(
+                    self._system_network_variables[network_type][agent]
+                )
+        return variables

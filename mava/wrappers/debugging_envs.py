@@ -118,3 +118,31 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
+
+
+class SwitchGameWrapper(PettingZooParallelEnvWrapper):
+    """Environment wrapper for Debugging Switch environment."""
+
+    # Note: we don't inherit from base.EnvironmentWrapper because that class
+    # assumes that the wrapped environment is a dm_env.Environment.
+    def __init__(self, environment: MultiAgentEnv):
+        super().__init__(environment=environment)
+
+    def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
+        if self._reset_next_step:
+            return self.reset()
+
+        observations, rewards, dones, infos = self._environment.step(actions)
+
+        if self._environment.env_done:
+            self._step_type = dm_env.StepType.LAST
+            self._reset_next_step = True
+        else:
+            self._step_type = dm_env.StepType.MID
+
+        return dm_env.TimeStep(
+            observation=observations,
+            reward=rewards,
+            discount=self._discounts,
+            step_type=self._step_type,
+        )

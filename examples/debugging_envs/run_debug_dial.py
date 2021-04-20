@@ -31,6 +31,8 @@ from acme.utils.loggers.tf_summary import TFSummaryLogger
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import dial
+from mava.utils.debugging.environments import switch_game
+from mava.wrappers.debugging_envs import SwitchGameWrapper
 
 # from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
@@ -44,7 +46,7 @@ flags.DEFINE_integer(
 )
 
 
-class DIAL_policy(snt.module):
+class DIAL_policy(snt.Module):
     def __init__(
         self,
         gru_hidden_size: int,
@@ -80,11 +82,13 @@ class DIAL_policy(snt.module):
 
 
 def make_environment(
-    env_class: str = "sisl", env_name: str = "prison", **kwargs: int
+    env_name: str = "switch",
+    num_agents: int = 3,
 ) -> dm_env.Environment:
-    """Creates a MPE environment."""
-    # ToDo (Kevin): Return environment wrapper
-    return None
+    """Creates a SwitchGame environment."""
+    env_module = switch_game.MultiAgentSwitchGame(num_agents=num_agents)
+    environment = SwitchGameWrapper(env_module)
+    return environment
 
 
 def make_networks(
@@ -94,6 +98,7 @@ def make_networks(
     policy_network_task_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
     policy_network_message_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
     policy_network_output_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128, 128),
+    message_size: int = 1,
     shared_weights: bool = True,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
@@ -133,11 +138,12 @@ def make_networks(
     observation_networks = {}
     policy_networks = {}
     behavior_networks = {}
+
     for key in specs.keys():
 
         # Get total number of action dimensions from action and message spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
-        num_dimensions += np.prod(specs[key].messages.shape, dtype=int)
+        num_dimensions += np.prod(message_size, dtype=int)
 
         # Create the shared observation network
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
@@ -157,7 +163,7 @@ def make_networks(
                 observation_network,
                 policy_network,
                 networks.ClippedGaussian(sigma),
-                networks.ClipToSpec(specs[key].actions + specs[key].messages),
+                networks.ClipToSpec(specs[key].actions),
             ]
         )
 
@@ -174,7 +180,7 @@ def make_networks(
 
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment(remove_on_fall=False)
+    environment = make_environment()
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
     system_networks = make_networks(environment_spec)
 
@@ -187,12 +193,13 @@ def main(_: Any) -> None:
     # Construct the agent.
     system = dial.DIAL(
         environment_spec=environment_spec,
-        policy_networks=system_networks["policies"],
+        networks=system_networks["policies"],
         observation_networks=system_networks[
             "observations"
         ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
         logger=system_logger,
+        checkpoint=False,
     )
 
     # Create the environment loop used for training.
@@ -208,7 +215,6 @@ def main(_: Any) -> None:
     eval_policies = {
         key: snt.Sequential(
             [
-                system_networks["observations"][key],
                 system_networks["policies"][key],
             ]
         )
@@ -217,7 +223,7 @@ def main(_: Any) -> None:
 
     # Create the evaluation actor and loop.
     eval_actor = dial.DIALExecutor(policy_networks=eval_policies)
-    eval_env = make_environment(remove_on_fall=False)
+    eval_env = make_environment()
     eval_loop = ParallelEnvironmentLoop(
         eval_env, eval_actor, logger=eval_logger, label="eval_loop"
     )
