@@ -41,10 +41,10 @@ This is meant to flexibily test various environments wrappers.
 @pytest.mark.parametrize(
     "env_spec",
     [
-        EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Parallel),
-        EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
-        EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Parallel),
-        EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Sequential),
+        # EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Parallel),
+        # EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
+        # EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Parallel),
+        # EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Sequential),
         EnvSpec("CartPole-v1", EnvType.Parallel, EnvSource.RLLibMultiEnv),
     ],
 )
