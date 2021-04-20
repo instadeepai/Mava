@@ -53,11 +53,24 @@ class TestEnvWrapper:
     #   action_spaces and observation_spaces.
     def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, _ = helpers.get_env(env_spec)
+
+        action_space = None
+        if hasattr(env, "action_spaces"):
+            action_space = env.action_spaces
+        elif hasattr(env, "action_space"):
+            action_space = env.action_space
+
+        obs_space = None
+        if hasattr(env, "observation_spaces"):
+            obs_space = env.observation_spaces
+        elif hasattr(env, "observation_space"):
+            obs_space = env.observation_space
+
         props_which_should_not_be_none = [
             env,
             env.agents,
-            env.action_spaces or env.action_space,
-            env.observation_spaces or env.observation_space,
+            action_space,
+            obs_space,
         ]
         assert helpers.verify_all_props_not_none(
             props_which_should_not_be_none
