@@ -147,10 +147,11 @@ class RecurrentExecutor(core.Executor):
         # Store these for later use.
         self._adder = adder
         self._variable_client = variable_client
-        self._networks = policy_networks
+        self._policy_networks = policy_networks
         self._states: Dict[str, Any] = {}
         self._prev_states: Dict[str, Any] = {}
         self._store_recurrent_state = store_recurrent_state
+        self._shared_weights = shared_weights
 
     @tf.function
     def _policy(
@@ -167,7 +168,7 @@ class RecurrentExecutor(core.Executor):
         agent_key = agent.split("_")[0] if self._shared_weights else agent
 
         # Compute the policy, conditioned on the observation.
-        policy, new_state = self._networks[agent_key](batched_observation, state)
+        policy, new_state = self._policy_networks[agent_key](batched_observation, state)
 
         # Sample from the policy if it is stochastic.
         action = policy.sample() if isinstance(policy, tfd.Distribution) else policy
@@ -187,7 +188,9 @@ class RecurrentExecutor(core.Executor):
 
         # Initialize the RNN state if necessary.
         if self._states[agent] is None:
-            self._states[agent] = self._networks[agent].initial_state(1)
+            # index network either on agent type or on agent id
+            agent_key = agent.split("_")[0] if self._shared_weights else agent
+            self._states[agent] = self._policy_networks[agent_key].initial_state(1)
 
         # Step the recurrent policy forward given the current observation and state.
         policy_output, new_state = self._policy(
@@ -243,8 +246,10 @@ class RecurrentExecutor(core.Executor):
         actions = {}
         for agent, observation in observations.items():
             # Initialize the RNN state if necessary.
-            if self._states[agent] is None:
-                self._states[agent] = self._networks[agent].initial_state(1)
+            if agent not in self._states or self._states[agent] is None:
+                # index network either on agent type or on agent id
+                agent_key = agent.split("_")[0] if self._shared_weights else agent
+                self._states[agent] = self._policy_networks[agent_key].initial_state(1)
 
             # Step the recurrent policy forward given the current observation and state.
             policy_output, new_state = self._policy(
