@@ -67,6 +67,9 @@ class Helpers:
             ma_cls = make_multi_agent(env_spec.env_name)
             env = ma_cls({"num_agents": 2})
         else:
+            ma_cls = mod.make_multi_agent(env_spec.env_name)  # type: ignore
+            env = ma_cls({"num_agents": 2})
+        if env is None:
             raise Exception("Env_spec is not valid.")
         env.reset()
         num_agents = len(env.agents)
@@ -86,6 +89,8 @@ class Helpers:
         elif env_spec.env_source == EnvSource.RLLibMultiEnv:
             wrapper = RLLibMultiAgentEnvWrapper
         else:
+            wrapper = RLLibMultiAgentEnvWrapper
+        if wrapper is None:
             raise Exception("Env_spec is not valid.")
         return wrapper
 

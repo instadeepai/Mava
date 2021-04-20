@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Wraps a RLLib Multi-Agent environment to be used as a dm_env environment."""
-from typing import Dict
+from typing import Any, Dict
 
 import dm_env
 import numpy as np
@@ -37,6 +37,11 @@ class RLLibMultiAgentEnvWrapper(PettingZooParallelEnvWrapper):
         self._reset_next_step = True
         self.num_agents = len(environment.agents)
         self.possible_agents = [f"agent_{x}" for x in range(self.num_agents)]
+        self.agents = [f"agent_{x}" for x in range(self.num_agents)]
+        self.action_spaces = {agent: environment.action_space for agent in self.agents}
+        self.observation_spaces = {
+            agent: environment.observation_space for agent in self.agents
+        }
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
@@ -143,3 +148,14 @@ class RLLibMultiAgentEnvWrapper(PettingZooParallelEnvWrapper):
 
     def extra_spec(self) -> dict:
         return {}
+
+    def seed(self, seed: int = None) -> None:
+        environments = (
+            self._environment.agents
+        )  # RLLib stores envs as agents in MultiEnv
+        for env in environments:
+            env.seed(seed)
+
+    def __getattr__(self, name: str) -> Any:
+        """Expose any other attributes of the underlying environment."""
+        return getattr(self._environment, name)

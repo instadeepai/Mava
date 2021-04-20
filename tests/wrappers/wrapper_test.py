@@ -328,9 +328,10 @@ class TestEnvWrapper:
             # Mock being done - sets self._environment.env_done to true.
             # We can't mock env_done directly since it is a propertly.
             monkeypatch.setattr(wrapped_env._environment, "agents", [], raising=False)
-            monkeypatch.setattr(
-                wrapped_env._environment.aec_env, "agents", [], raising=False
-            )
+            if hasattr(wrapped_env, "aec_env"):
+                monkeypatch.setattr(
+                    wrapped_env._environment.aec_env, "agents", [], raising=False
+                )
 
             curr_dm_timestep = wrapped_env.step(test_agents_actions)
 

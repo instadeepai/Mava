@@ -249,8 +249,8 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
                 #  maybe have min and max for each action and clip the agents actions
                 #  accordingly
                 legals = np.ones(
-                    _convert_to_spec(self._environment.action_spaces[agent]).shape,
-                    dtype=self._environment.action_spaces[agent].dtype,
+                    _convert_to_spec(self.action_spaces[agent]).shape,
+                    dtype=self.action_spaces[agent].dtype,
                 )
             observations[agent] = types.OLT(
                 observation=observation,
