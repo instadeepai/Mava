@@ -81,14 +81,14 @@ class TFSummaryLogger(base.Logger):
     # https://stackoverflow.com/questions/6027558/flatten-nested-dictionaries-compressing-keys
     # Converts {'agent_0': {'critic_loss': 0.1, 'policy_loss': 0.2},...}
     #   to  {'agent_0_critic_loss':0.1,'agent_0_policy_loss':0.1 ,...}
-    def _flatten_dict(
-        self, parent_key: Union[str, Dict], dict_info: Dict, sep: str = "_"
-    ) -> Dict:
+    def _flatten_dict(self, parent_key: str, dict_info: Dict, sep: str = "_") -> Dict:
         items: List = []
         for k, v in dict_info.items():
             new_key = parent_key + sep + k if parent_key else k  # type: ignore
             if isinstance(v, dict):
-                items.extend(self._flatten_dict(v, new_key, sep=sep).items())
+                items.extend(
+                    self._flatten_dict(parent_key=new_key, dict_info=v, sep=sep).items()
+                )
             else:
                 items.append((new_key, v))
         return dict(items)
