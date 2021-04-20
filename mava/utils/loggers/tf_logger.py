@@ -15,6 +15,7 @@
 
 """Utilities for logging to the terminal."""
 import time
+from typing import Dict, List
 
 import tensorflow as tf
 from acme.utils.loggers import base
@@ -57,13 +58,39 @@ class TFSummaryLogger(base.Logger):
                     else:
                         self.scalar_summary(key, value)
                 else:
-                    self.scalar_summary(key, value)
+                    if isinstance(value, dict):
+                        self.dict_summary(key, value)
+                    else:
+                        self.scalar_summary(key, value)
             self._iter += 1
 
     def scalar_summary(self, key: str, value: float) -> None:
         tf.summary.scalar(f"{self.label}/{format_key(key)}", value, step=self._iter)
 
+    def dict_summary(self, key: str, value: Dict) -> None:
+        dict_info = self._flatten_dict(parent_key=key, dict_info=value)
+        for (k, v) in dict_info.items():
+            self.scalar_summary(k, v)
+
     def histogram_summary(self, key: str, value: Tensor) -> None:
         tf.summary.histogram(
             f"{self.label}/{format_key_histograms(key)}", value, step=self._iter
         )
+
+    # Flatten dict, adapted from
+    # https://stackoverflow.com/questions/6027558/flatten-nested-dictionaries-compressing-keys
+    # Converts {'agent_0': {'critic_loss': 0.1, 'policy_loss': 0.2},...}
+    #   to  {'agent_0_critic_loss':0.1,'agent_0_policy_loss':0.1 ,...}
+    def _flatten_dict(
+        self, parent_key: str, dict_info: Dict, sep: str = "_"
+    ) -> Dict[str, float]:
+        items: List = []
+        for k, v in dict_info.items():
+            new_key = parent_key + sep + k if parent_key else k  # type: ignore
+            if isinstance(v, dict):
+                items.extend(
+                    self._flatten_dict(parent_key=new_key, dict_info=v, sep=sep).items()
+                )
+            else:
+                items.append((new_key, v))
+        return dict(items)
