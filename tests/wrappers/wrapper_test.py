@@ -55,8 +55,8 @@ class TestEnvWrapper:
         props_which_should_not_be_none = [
             env,
             env.agents,
-            env.action_spaces,
-            env.observation_spaces,
+            env.action_spaces or env.action_space,
+            env.observation_spaces or env.observation_space,
         ]
         assert helpers.verify_all_props_not_none(
             props_which_should_not_be_none
