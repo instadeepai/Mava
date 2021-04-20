@@ -45,7 +45,6 @@ This is meant to flexibily test various environments wrappers.
         EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
         EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Parallel),
         EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Sequential),
-        EnvSpec("ray.rllib.env.multi_agent_env", EnvType.Parallel),
     ],
 )
 class TestEnvWrapper:

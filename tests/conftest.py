@@ -56,15 +56,10 @@ class Helpers:
     def get_env(env_spec: EnvSpec) -> Tuple[Union[AECEnv, ParallelEnv], int]:
         env, num_agents = None, None
         mod = importlib.import_module(env_spec.env_name)
-        # if "pettingzoo" in env_spec.env_name:
         if env_spec.env_type == EnvType.Parallel:
             env = mod.parallel_env()  # type: ignore
         elif env_spec.env_type == EnvType.Sequential:
             env = mod.env()  # type: ignore
-        # elif "rllib" in env_spec.env_name:
-        #     # ma_cartpole_cls = mod.make_multi_agent("CartPole-v1")
-        #     # env = ma_cartpole_cls({"num_agents": 4})
-        #     pass
         else:
             raise Exception("Env_spec is not valid.")
         env.reset()

@@ -46,7 +46,7 @@ def make_environment(
     env_class: str = "mpe", env_name: str = "simple_v2", **kwargs: int
 ) -> dm_env.Environment:
     """Creates a MPE environment."""
-    ma_cartpole_cls = make_multi_agent("CartPole-v1")
+    ma_cartpole_cls = make_multi_agent("LunarLander-v2")
     ma_cartpole = ma_cartpole_cls({"num_agents": 2})
     wrapped_env = RLLibMultiAgentEnvWrapper(ma_cartpole)
 
