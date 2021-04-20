@@ -15,7 +15,7 @@
 
 """Utilities for logging to the terminal."""
 import time
-from typing import Dict, List, Union
+from typing import Dict, List
 
 import tensorflow as tf
 from acme.utils.loggers import base
@@ -69,8 +69,8 @@ class TFSummaryLogger(base.Logger):
 
     def dict_summary(self, key: str, value: Dict) -> None:
         dict_info = self._flatten_dict(parent_key=key, dict_info=value)
-        for (key, value) in dict_info.items():
-            self.scalar_summary(key, value)
+        for (k, v) in dict_info.items():
+            self.scalar_summary(k, v)
 
     def histogram_summary(self, key: str, value: Tensor) -> None:
         tf.summary.histogram(
@@ -81,7 +81,9 @@ class TFSummaryLogger(base.Logger):
     # https://stackoverflow.com/questions/6027558/flatten-nested-dictionaries-compressing-keys
     # Converts {'agent_0': {'critic_loss': 0.1, 'policy_loss': 0.2},...}
     #   to  {'agent_0_critic_loss':0.1,'agent_0_policy_loss':0.1 ,...}
-    def _flatten_dict(self, parent_key: str, dict_info: Dict, sep: str = "_") -> Dict:
+    def _flatten_dict(
+        self, parent_key: str, dict_info: Dict, sep: str = "_"
+    ) -> Dict[str, float]:
         items: List = []
         for k, v in dict_info.items():
             new_key = parent_key + sep + k if parent_key else k  # type: ignore
