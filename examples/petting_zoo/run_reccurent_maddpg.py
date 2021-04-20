@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
+import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from absl import app, flags
@@ -85,7 +86,7 @@ def make_networks(
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
-        # num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
+        num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
         # Create the shared observation network
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
@@ -97,6 +98,7 @@ def make_networks(
                 snt.nets.MLP(policy_networks_layer_sizes[key]),
                 snt.LSTM(20),
                 snt.nets.MLP([128]),
+                networks.NearZeroInitializedLinear(num_dimensions),
                 networks.TanhToSpec(specs[key].actions),
             ]
         )

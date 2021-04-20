@@ -1,5 +1,4 @@
 """Generic executor implementations, using TensorFlow and Sonnet."""
-
 from typing import Any, Dict, Optional, Tuple
 
 import dm_env
@@ -148,10 +147,10 @@ class RecurrentExecutor(core.Executor):
         self._adder = adder
         self._variable_client = variable_client
         self._policy_networks = policy_networks
-        self._states: Dict[str, Any] = {}
-        self._prev_states: Dict[str, Any] = {}
         self._store_recurrent_state = store_recurrent_state
         self._shared_weights = shared_weights
+
+        self._states: Dict[str, Any] = {}
 
     @tf.function
     def _policy(
@@ -175,9 +174,9 @@ class RecurrentExecutor(core.Executor):
 
         return action, new_state
 
-    def _update_state(self, agent: str, new_state: types.NestedArray) -> None:
-        self._prev_states[agent] = self._states[agent]
-        self._states[agent] = new_state
+    # def _update_state(self, agent: str, new_state: types.NestedArray) -> None:
+    #     self._prev_states[agent] = self._states[agent]
+    #     self._states[agent] = new_state
 
     def select_action(
         self, agent: str, observation: types.NestedArray
@@ -206,13 +205,31 @@ class RecurrentExecutor(core.Executor):
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {"": ()},
+        extras: Optional[Dict[str, types.NestedArray]] = {},
     ) -> None:
-        if self._adder:
+
+        # Re-initialize the RNN state.
+        for agent, networks in self._policy_networks.items():
+            # index network either on agent type or on agent id
+            agent_key = agent.split("_")[0] if self._shared_weights else agent
+            self._states[agent] = self._policy_networks[agent_key].initial_state(1)
+
+        if self._adder is not None:
             self._adder.add_first(timestep, extras)
 
-        # Set the state to None so that we re-initialize at the next policy call.
-        self._states = {}
+            numpy_states = {
+                agent: tf2_utils.to_numpy_squeeze(_state)
+                for agent, _state in self._states.items()
+            }
+            if extras:
+                extras.update({"core_states": numpy_states})
+                self._adder.add_first(timestep, extras)
+            else:
+                print("Calling adder..")
+                self._adder.add_first(timestep, numpy_states)
+
+        print("First adder call.")
+        exit()
 
     def observe(
         self,
@@ -231,8 +248,8 @@ class RecurrentExecutor(core.Executor):
             return
 
         numpy_states = {
-            agent: tf2_utils.to_numpy_squeeze(prev_state)
-            for agent, prev_state in self._prev_states.items()
+            agent: tf2_utils.to_numpy_squeeze(_state)
+            for agent, _state in self._states.items()
         }
         if next_extras:
             next_extras.update({"core_states": numpy_states})
@@ -245,11 +262,6 @@ class RecurrentExecutor(core.Executor):
     ) -> Dict[str, types.NestedArray]:
         actions = {}
         for agent, observation in observations.items():
-            # Initialize the RNN state if necessary.
-            if agent not in self._states or self._states[agent] is None:
-                # index network either on agent type or on agent id
-                agent_key = agent.split("_")[0] if self._shared_weights else agent
-                self._states[agent] = self._policy_networks[agent_key].initial_state(1)
 
             # Step the recurrent policy forward given the current observation and state.
             policy_output, new_state = self._policy(
@@ -257,7 +269,8 @@ class RecurrentExecutor(core.Executor):
             )
 
             # Bookkeeping of recurrent states for the observe method.
-            self._update_state(agent, new_state)
+            self._states[agent] = new_state
+            # self._update_state(agent, new_state)
 
             # TODO Mask actions here using observation.legal_actions
             # What happens in discrete vs cont case

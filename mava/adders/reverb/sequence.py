@@ -26,11 +26,13 @@ import reverb
 import tensorflow as tf
 import tree
 from acme import specs
-from acme.adders.reverb import base, utils
+from acme.adders.reverb import utils
 from acme.utils import tree_utils
 
+from mava.adders.reverb import base
 
-class SequenceAdder(base.ReverbAdder):
+
+class SequenceAdder(base.ReverbParallelAdder):
     """An adder which adds sequences of fixed length."""
 
     def __init__(
@@ -75,11 +77,7 @@ class SequenceAdder(base.ReverbAdder):
             delta_encoded=delta_encoded,
             chunk_length=chunk_length,
             priority_fns=priority_fns,
-            # max_in_flight_items=max_in_flight_items,
-            # TODO (dries): Why does it complain when max_in_flight_items
-            #  is passed to base.ReverbAdder? It is probably that
-            #  max_in_flight_items is not in the latest release of acme
-            #  on 23 Oct 2020, but is in the latest code on the repo.
+            max_in_flight_items=max_in_flight_items,
         )
 
         if pad_end_of_episode and not break_end_of_episode:
@@ -102,6 +100,8 @@ class SequenceAdder(base.ReverbAdder):
 
     def _write(self):
         # Append the previous step and increment number of steps written.
+        print("Obs: ", self._buffer[-1].observations["walker_0"].observation.shape)
+        print("Extra: ", self._buffer[-1].extras)
         self._writer.append(self._buffer[-1])
         self._step += 1
         self._maybe_add_priorities()
@@ -216,10 +216,10 @@ class SequenceAdder(base.ReverbAdder):
             step_discount_specs[agent] = step_discounts_spec
 
         spec_step = base.Step(
-            observation=obs_specs,
-            action=act_specs,
-            reward=reward_specs,
-            discount=step_discount_specs,
+            observations=obs_specs,
+            actions=act_specs,
+            rewards=reward_specs,
+            discounts=step_discount_specs,
             start_of_episode=specs.Array(shape=(), dtype=bool),
             extras=extras_specs,
         )
