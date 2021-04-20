@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Example running IPPO on pettinzoo MPE environments."""
-
 import importlib
 from typing import Any, Dict, Mapping, Sequence, Union
 
@@ -26,7 +25,6 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
-from acme.utils.loggers.tf_summary import TFSummaryLogger
 
 from mava import specs as mava_specs
 from mava.environment_loop import (
@@ -56,6 +54,7 @@ def make_environment(
     env = env_module.parallel_env(**kwargs)  # type: ignore
     environment = PettingZooParallelEnvWrapper(env)
     print("in run script: make environment")
+
     return environment
 
 
@@ -146,12 +145,6 @@ def main(_: Any) -> None:
     print("environment specs", environment_spec)
     system_networks = make_networks(environment_spec)
 
-    # create tf loggers
-    logs_dir = "logs"
-    system_logger = TFSummaryLogger(f"{logs_dir}/system")
-    train_logger = TFSummaryLogger(f"{logs_dir}/train_loop")
-    # eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
-
     # Construct the agent.
     system = ippo.IPPO(
         environment_spec=environment_spec,
@@ -161,39 +154,15 @@ def main(_: Any) -> None:
             "observations"
         ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
-        logger=system_logger,
     )
 
     # Create the environment loop used for training.
     train_loop = PettingZooParallelEnvironmentLoop(
-        environment, system, logger=train_logger, label="train_loop"
+        environment, system, label="train_loop"
     )
-
-    # # Create the evaluation policy.
-    # # NOTE: assumes weight sharing
-    # specs = environment_spec.get_agent_specs()
-    # type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-    # specs = type_specs
-    # eval_policies = {
-    #     key: snt.Sequential(
-    #         [
-    #             system_networks["observations"][key],
-    #             system_networks["policies"][key],
-    #         ]
-    #     )
-    #     for key in specs.keys()
-    # }
-
-    # Create the evaluation actor and loop.
-    # eval_actor = executors.FeedForwardExecutorLogits(policy_networks=eval_policies)
-    # eval_env = make_environment()
-    # eval_loop = PettingZooParallelEnvironmentLoop(
-    #    eval_env, eval_actor, label="eval_loop"
-    # )
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        # eval_loop.run(num_episodes=1)
 
 
 if __name__ == "__main__":
