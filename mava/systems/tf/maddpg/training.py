@@ -297,6 +297,24 @@ class BaseMADDPGTrainer(mava.Trainer):
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
 
+        policy_losses, critic_losses, tape = self._forward_pass(inputs)
+
+        self._calc_gradients_update_network(policy_losses, critic_losses, tape)
+
+        # Log losses per agent
+        logged_losses: Dict[str, Dict[str, Any]] = {}
+        for agent in self._agents:
+            logged_losses.update(
+                {
+                    agent: {
+                        "critic_loss": critic_losses[agent],
+                        "policy_loss": policy_losses[agent],
+                    }
+                }
+            )
+        return logged_losses
+
+    def _forward_pass(self, inputs):
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -375,6 +393,9 @@ class BaseMADDPGTrainer(mava.Trainer):
                 critic_loss = tf.reduce_mean(critic_loss, axis=0)
                 critic_losses[agent] = critic_loss
 
+        return policy_losses, critic_losses, tape
+
+    def _calc_gradients_update_network(self, policy_losses, critic_losses, tape):
         # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -393,11 +414,8 @@ class BaseMADDPGTrainer(mava.Trainer):
             # Compute gradients.
             # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
             #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context (it causes the gradient ops to be
-            #  recorded on the tape, leading to increased CPU and memory usage).
-            #  Only call GradientTape.gradient inside the context if you actually want
-            #  to trace the gradient in order to compute higher order derivatives.
-            #  to trace the gradient in order to compute higher order derivatives.
+            #  than calling it outside the context.
+            # Caused by losses.dpg, which calls tape.gradient.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
@@ -409,21 +427,6 @@ class BaseMADDPGTrainer(mava.Trainer):
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
             self._critic_optimizer.apply(critic_gradients, critic_variables)
-
-            logged_losses.update(
-                {
-                    agent: {
-                        "critic_loss": critic_loss,
-                        "policy_loss": policy_loss,
-                    }
-                }
-            )
-
-        # Delete the tape manually because of the persistent=True flag.
-        del tape
-
-        # Losses to track.
-        return logged_losses
 
     def step(self) -> None:
         # Run the learning step.
