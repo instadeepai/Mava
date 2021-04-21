@@ -219,6 +219,7 @@ class QMIXTrainer(mava.Trainer):
                 trainable_variables = self._q_networks[agent].trainable_variables
             else:
                 trainable_variables += self._q_networks[agent].trainable_variables
+        # TODO Make sure mixing networks have inputs passed before calling trainable
         trainable_variables += self._mixing_network.trainable_variables
 
         with tf.GradientTape() as tape:
