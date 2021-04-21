@@ -39,7 +39,7 @@ tf_requirements = [
     "trfl",
 ]
 
-env_requirements = ["pettingzoo"]
+env_requirements = ["pettingzoo", "flatland-rl"]
 
 testing_formatting_requirements = [
     "pre-commit",
