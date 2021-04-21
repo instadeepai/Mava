@@ -23,7 +23,7 @@ into a single transition, simplifying to a simple transition adder when N=1.
 import copy
 import itertools
 import operator
-from typing import Optional
+from typing import Any, Optional, Tuple
 
 import numpy as np
 import reverb
@@ -200,7 +200,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             tree.map_structure(operator.imul, total_discount, step_discount)
 
         if extras:
-            transition = (
+            transition: Tuple[Any, ...] = (
                 observations,
                 actions,
                 extras,
@@ -208,7 +208,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
                 total_discount,
                 next_observations,
                 next_extras,
-            )  # type: ignore
+            )
         else:
             transition = (
                 observations,
@@ -216,7 +216,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
                 n_step_return,
                 total_discount,
                 next_observations,
-            )  # type: ignore
+            )
         # Create a list of steps.
         if self._final_step_placeholder is None:
             # utils.final_step_like is expensive (around 0.085ms) to run every time
