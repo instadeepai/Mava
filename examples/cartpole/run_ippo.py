@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running IPPO on pettinzoo MPE environments."""
+"""Example running IPPO on MA CartPole environment."""
 
 import importlib
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
@@ -31,9 +33,10 @@ from ray.rllib.env.multi_agent_env import make_multi_agent
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import ippo
+from mava.utils.loggers import Logger
 
 # from mava.systems.tf.ippo import execution as executors
-from mava.wrappers import RLLibMultiAgentEnvWrapper
+from mava.wrappers import DetailedPerAgentStatistics, RLLibMultiAgentEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 5000, "Number of training episodes to run for.")
@@ -59,7 +62,7 @@ def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
-    shared_weights: bool = True,
+    shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
@@ -108,7 +111,6 @@ def make_networks(
             [
                 # The multiplexer concatenates the observations/actions.
                 # TODO : seek a around not using actions here.
-                networks.CriticMultiplexer(),
                 networks.LayerNormMLP(
                     critic_networks_layer_sizes[key], activate_final=False
                 ),
@@ -133,6 +135,26 @@ def main(_: Any) -> None:
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
     system_networks = make_networks(environment_spec)
 
+    # create tf loggers
+    base_dir = Path.cwd()
+    log_dir = base_dir / "logs"
+    log_time_stamp = str(datetime.now())
+
+    system_logger = Logger(
+        label="system_trainer",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
+    train_logger = Logger(
+        label="train_loop",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
+
     # Construct the agent.
     system = ippo.IPPO(
         environment_spec=environment_spec,
@@ -142,11 +164,20 @@ def main(_: Any) -> None:
             "observations"
         ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
+        logger=system_logger,
+        max_queue_size=100,
+        batch_size=32,
     )
 
     # Create the environment loop used for training.
-    train_loop = ParallelEnvironmentLoop(environment, system, label="train_loop")
+    train_loop = ParallelEnvironmentLoop(
+        environment, system, logger=train_logger, label="train_loop"
+    )
 
+    # Wrap training loop to compute and log detailed running statistics
+    train_loop = DetailedPerAgentStatistics(train_loop)
+
+    # system._trainer.run()
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
 

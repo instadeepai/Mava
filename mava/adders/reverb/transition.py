@@ -249,6 +249,8 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     def signature(
         cls,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        # NOTE Acme adders have an extras_spec argument. Maybe we need one too?
+        extras_specs: tf.TypeSpec = None,
     ) -> tf.TypeSpec:
 
         # This function currently assumes that self._discount is a scalar.
@@ -263,7 +265,11 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
 
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
-        extras_specs = environment_spec.get_extra_specs()
+
+        # NOTE (Claude+Siphelele) if extras_spec is not given then set to the env default.
+        if not extras_specs:
+            extras_specs = environment_spec.get_extra_specs()
+        
         obs_specs = {}
         act_specs = {}
         reward_specs = {}

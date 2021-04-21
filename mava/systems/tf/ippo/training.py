@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 """IPPO trainer implementation."""
 import os
 import time
@@ -35,7 +34,7 @@ import mava
 class BaseIPPOTrainer(mava.Trainer):
     """IPPO trainer.
     This is the trainer component of a IPPO system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
+    and implements update functionality for each agent to learn from this dataset.
     """
 
     def __init__(
@@ -60,6 +59,7 @@ class BaseIPPOTrainer(mava.Trainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "Checkpoints",
     ):
+        # NOTE We still need to update this stub.
         """Initializes the learner.
         Args:
         policy_network: the online (optimized) policy.
@@ -90,11 +90,11 @@ class BaseIPPOTrainer(mava.Trainer):
         self._critic_networks = critic_networks
         self._observation_networks = observation_networks
 
-        # General learner book-keeping and loggers.
+        # General trainer book-keeping and loggers.
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger("trainer")
 
-        # Other learner parameters.
+        # Other trainer parameters.
         self._discount = discount
         self._clipping = clipping
         self._baseline_cost = baseline_cost
@@ -103,9 +103,9 @@ class BaseIPPOTrainer(mava.Trainer):
         self._lambda_gae = lambda_gae
         self._num_steps = tf.Variable(0, dtype=tf.int32)
 
-        # Create an iterator to go through the dataset.
-        # TODO(b/155086959): Fix type stubs and remove.
-        self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
+        # NOTE Do not wrap the dataset in iter() because it already has been.
+        # See make_dataset_iterator() in SystemBuilder.
+        self._iterator = dataset
 
         # Create optimizers if they aren't given.
         self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-3)
@@ -115,7 +115,6 @@ class BaseIPPOTrainer(mava.Trainer):
         self.agent_net_keys = {agent: agent for agent in self._agents}
         if self._shared_weights:
             self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
-
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Expose the variables.
@@ -125,22 +124,14 @@ class BaseIPPOTrainer(mava.Trainer):
         }
         for agent_key in self.unique_net_keys:
             self._system_network_variables["critic"][agent_key] = self._critic_networks[
-                agent_key
-            ].variables
+                agent_key].variables
             self._system_network_variables["policy"][agent_key] = self._policy_networks[
-                agent_key
-            ].variables
+                agent_key].variables
 
         # Create checkpointer
+        # NOTE (Siphelele+Claude) we are not sure how checkpointing works.
         self._system_checkpointer = {}
         if checkpoint:
-            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
-            #  of the last 11 calls to
-            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
-            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
-            #  expensive and the excessive number tracings could be due to (1)
-            #  creating @tf.function repeatedly in a loop, (2) passing tensors
-            #  with different shapes, (3) passing Python objects instead of tensors.
             for agent_key in self.unique_net_keys:
                 objects_to_save = {
                     "counter": self._counter,
@@ -174,55 +165,16 @@ class BaseIPPOTrainer(mava.Trainer):
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
             o_tm1[agent] = self._observation_networks[agent_key](obs[agent].observation)
-            o_t[agent] = self._target_observation_networks[agent_key](
+            o_t[agent] = self._observation_networks[agent_key](
                 next_obs[agent].observation
             )
-            # This stop_gradient prevents gradients to propagate into the target
-            # observation network. In addition, since the online policy network is
-            # evaluated at o_t, this also means the policy loss does not influence
-            # the observation network training.
-            o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
-
-            # TODO (dries): Why is there a stop gradient here? The target
-            #  will not be updated unless included into the
-            #  policy_variables or critic_variables sets.
-            #  One reason might be that it helps with preventing the observation
-            #  network from being updated from the policy_loss.
-            #  But why would we want that? Don't we want both the critic
-            #  and policy to update the observation network?
-            #  Or is it bad to have two optimisation processes optimising
-            #  the same set of weights? But the
-            #  StateBasedActorCritic will then not work as the critic
-            #  is not dependent on the behavior networks.
         return o_tm1, o_t
-
-    @tf.function
-    def _get_critic_feed(
-        self,
-        o_tm1_trans: Dict[str, np.ndarray],
-        o_t_trans: Dict[str, np.ndarray],
-        a_tm1: Dict[str, np.ndarray],
-        a_t: Dict[str, np.ndarray],
-        e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
-        agent: str,
-    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-
-        # Decentralised critic
-        o_tm1_feed = o_tm1_trans[agent]
-        o_t_feed = o_t_trans[agent]
-        a_tm1_feed = a_tm1[agent]
-        a_t_feed = a_t[agent]
-        return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
-
-    # TODO actor feed
 
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
 
-        # Get data from replay (dropping extras if any). Note there is no
-        # extra data here because we do not insert any into Reverb.
+        # Get data from replay.
         inputs = next(self._iterator)
 
         # Unpack input data as follows:
@@ -238,7 +190,7 @@ class BaseIPPOTrainer(mava.Trainer):
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
         o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-        prev_logits = e_t["logits"]
+        prev_logits = e_t['logits']
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
         for agent in self._agents:
@@ -300,9 +252,10 @@ class BaseIPPOTrainer(mava.Trainer):
                 )
 
                 # Entropy regulariser.
-                scale = 1.0 / tf.math.log(
-                    tf.convert_to_tensor(logits.shape[-1], dtype=float)
-                )
+                # scale = 1.0 / tf.math.log(
+                #     tf.convert_to_tensor(logits.shape[-1], dtype=float)
+                # )
+
                 entropy = trfl.policy_entropy_loss(pi_target)
                 entropy_loss = self._entropy_cost * entropy.loss
                 # policy_entropy = scale * tf.reduce_mean(entropy.extra.entropy)

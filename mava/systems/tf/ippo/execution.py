@@ -15,7 +15,7 @@
 
 """Executor for MAPPO systems, using Tensorflow and Sonnet."""
 
-from typing import Dict, Optional, Union
+from typing import Dict, Optional
 
 import dm_env
 import sonnet as snt
@@ -43,7 +43,8 @@ class MAPPOFeedForwardExecutor(core.Executor):
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        logits_spec: Dict[str, types.NestedArray],
+        shared_weights: bool = False,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
@@ -62,9 +63,10 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self._variable_client = variable_client
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights
-        self._prev_logits = None
+        self._prev_logits: Dict[str, types.NestedArray] = {}
+        self.logits_spec = logits_spec
 
-    @tf.function
+    # @tf.function
     def _policy(
         self, agent: str, observation: types.NestedTensor
     ) -> types.NestedTensor:
@@ -79,7 +81,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         logits = self._policy_networks[agent_key](batched_observation)
         action = tfd.Categorical(logits=logits).sample()
 
-        self._prev_logits = logits
+        self._prev_logits[agent_key] = tf.squeeze(logits).numpy()
 
         return tf.cast(action, "int64")
 
@@ -99,32 +101,11 @@ class MAPPOFeedForwardExecutor(core.Executor):
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {"": ()},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
+        extras["logits"] = self.logits_spec
         if self._adder:
             self._adder.add_first(timestep, extras)
-
-    # TODO(Kale-ab) - This is temp. This will be changed when doing seq adder.
-    def agent_observe_first(self, agent: str, timestep: dm_env.TimeStep) -> None:
-        if self._adder:
-            extras = {}
-            extras["agent_id"] = agent
-            self._adder.add_first(timestep, extras)
-
-    # TODO(Kale-ab) - This is temp. This will be changed when doing seq adder.
-    def agent_observe(
-        self,
-        agent: str,
-        action: Union[float, int, types.NestedArray],
-        next_timestep: dm_env.TimeStep,
-        extras: Optional[Dict] = {},
-    ) -> None:
-        if self._adder:
-            if not extras:
-                extras = {}
-            extras["agent_id"] = agent
-            extras["logits"] = self._prev_logits
-            self._adder.add(action, next_timestep, extras)
 
     def observe(
         self,
@@ -132,6 +113,9 @@ class MAPPOFeedForwardExecutor(core.Executor):
         next_timestep: dm_env.TimeStep,
         next_extras: Optional[Dict[str, types.NestedArray]] = {},
     ) -> None:
+
+        next_extras["logits"] = self._prev_logits
+
         if self._adder:
             if next_extras:
                 self._adder.add(actions, next_timestep, next_extras)

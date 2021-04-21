@@ -15,11 +15,12 @@
 
 """IPPO system implementation."""
 import dataclasses
-from typing import Dict, Iterator, Optional, Type
+from typing import Dict, Iterator, Optional, Tuple, Type
 
+import acme
+import numpy as np
 import reverb
 import sonnet as snt
-
 from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
@@ -62,7 +63,7 @@ class IPPOConfig:
     critic_networks: Dict[str, snt.Module]
     observation_networks: Dict[str, snt.Module]
     behavior_networks: Dict[str, snt.Module]
-    shared_weights: bool = True
+    shared_weights: bool = False
     discount: float = 0.99
     lambda_gae: float = 0.95
     clipping_epsilon: float = 0.2
@@ -71,7 +72,7 @@ class IPPOConfig:
     n_step: int = 5
     batch_size: int = 32
     prefetch_size: int = 4
-    max_queue_size: int = 100_000
+    max_queue_size: int = 256
     samples_per_insert: float = 32.0
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     clipping: bool = True
@@ -86,8 +87,7 @@ class IPPOBuilder(SystemBuilder):
     """Defines an interface for defining the components of an RL system.
       Implementations of this interface contain a complete specification of a
       concrete RL system. An instance of this class can be used to build an
-      RL system which interacts with the environment either locally or in a
-      distributed setup.
+      RL system which interacts with the environment locally.
       """
 
     def __init__(
@@ -96,28 +96,61 @@ class IPPOBuilder(SystemBuilder):
         trainer_fn: Type[training.BaseIPPOTrainer] = training.IPPOTrainer,
     ):
         """Args:
-        config: Configuration options for the IPPO system.
-        trainer_fn: Trainer module to use."""
+                config: Configuration options for the IPPO system.
+                trainer_fn: Trainer module for IPPO."""
 
         self._config = config
+        self._trainer_fn = trainer_fn
 
-        """ _agents: a list of the agent specs (ids).
+        """ _agents: a list of the agent ids.
             _agent_types: a list of the types of agents to be used."""
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
-        self._trainer_fn = trainer_fn
 
+    # NOTE This function makes the spec for IPPO. The extras should store logits.
+    def _make_extras_spec(self) -> Dict[str, acme.types.NestedArray]:
+        "Get the logits spec for the reverb table."
+        extras_spec = {}
+        logits_spec = {}
+        agent_keys = self._agent_types if self._config.shared_weights else self._agents
+        for agent_key in agent_keys:
+            agent_action_dim = self._config.environment_spec.get_agent_specs()[
+                agent_key].actions.num_values
+
+            # The logits spec set as numpy array with the same number of 
+            # values as the agents number of actions.
+            logits_spec[agent_key] = np.zeros(agent_action_dim, dtype=np.float32)
+
+        extras_spec['logits'] = logits_spec
+
+        return extras_spec
+        
     def make_replay_table(
         self,
-        environment_spec: specs.MAEnvironmentSpec,
+        # NOTE (Claude) Do we need to pass in the environment spec here?
+        # Can't we retrieve it through self._config.environment_spec?
+        environment_spec: specs.MAEnvironmentSpec, #
     ) -> reverb.Table.queue:
         """Create tables to insert data into."""
-        return reverb.Table.queue(
-            name=self._config.replay_table_name,
-            max_size=self._config.max_queue_size,
-            signature=reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec
-            ),
+
+        # Get logits spec to pass to the reverb table.
+        extras_spec = self._make_extras_spec()
+
+        return (
+            reverb.Table.queue(
+                name=self._config.replay_table_name,
+                max_size=self._config.max_queue_size,
+
+                # NOTE (Siphelele) ParallelNStepTransitionAdder.signiture() 
+                # modified to accept second argument logits_spec,
+                # which is used to initialise the 'extras' portion of the 
+                # reverb table. Maybe we need to modify ParallelNStepTransitionAdder
+                # to allow for arbitrary 'extras' spec?
+                # Acme adders seem to have an optional extra_spec argument!
+                signature=reverb_adders.ParallelNStepTransitionAdder.signature(
+                    environment_spec, extras_spec
+                ),
+            )
         )
 
     def make_dataset_iterator(
@@ -125,12 +158,13 @@ class IPPOBuilder(SystemBuilder):
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for learning/updating the system."""
-        dataset = datasets.make_reverb_dataset(
-            table=self._config.replay_table_name,
+        dataset = reverb.ReplayDataset.from_table_signature(
             server_address=replay_client.server_address,
-            batch_size=self._config.batch_size,
-            prefetch_size=self._config.prefetch_size,
+            table=self._config.replay_table_name,
+            max_in_flight_samples_per_worker=64
         )
+        dataset = dataset.batch(self._config.batch_size, drop_remainder=True)
+
         return iter(dataset)
 
     def make_adder(
@@ -139,10 +173,10 @@ class IPPOBuilder(SystemBuilder):
     ) -> Optional[adders.ParallelAdder]:
         """Create an adder which records data generated by the executor/environment.
         Args:
-          replay_client: Reverb Client which points to the replay server.
+            replay_client: Reverb Client which points to the replay server.
         """
         return reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+            priority_fns=None,
             client=replay_client,
             n_step=self._config.n_step,
             discount=self._config.discount,
@@ -156,15 +190,19 @@ class IPPOBuilder(SystemBuilder):
     ) -> core.Executor:
         """Create an executor instance.
         Args:
-          policy_networks: A struct of instance of all the different policy networks;
-           this should be a callable
-            which takes as input observations and returns actions.
-          adder: How data is recorded (e.g. added to replay).
-          variable_source: A source providing the necessary executor parameters.
+            policy_networks: A struct of instance of all the different policy networks;
+                this should be a callable which takes as input observations and
+                returns actions.
+            adder: How data is recorded (e.g. added to replay).
+            variable_source: A source providing the necessary executor parameters.
         """
 
-        shared_weights = self._config.shared_weights
+        # NOTE Get logits spec to pass to the executor. 
+        logits_spec = self._make_extras_spec()['logits']
 
+        # TODO We (Claude+Siphelele) are not sure how this variable_client 
+        # bit should work. 
+        shared_weights = self._config.shared_weights
         variable_client = None
         if variable_source:
             agent_keys = self._agent_types if shared_weights else self._agents
@@ -180,20 +218,16 @@ class IPPOBuilder(SystemBuilder):
                 variables={"policy": variables},
                 update_period=1000,
             )
-
-            # Update variables
-            # TODO: Is this needed? Probably not because
-            #  in acme they only update policy.variables.
-            # for agent in agent_keys:
-            #     policy_networks[agent].variables = variables[agent]
-
-            # Make sure not to use a random policy after checkpoint restoration by
-            # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
-        # Create the actor which defines how we take actions.
+        # NOTE (Claude+Siphelele) Create the executor which defines how agents take actions
+        # in the system. The MAPPO executor takes the logits_spec as an
+        # argument so that it can use it as a default value for the 
+        # 'extras' in the observe_first() method. We are not sure if this 
+        # is the best way to do things.
         return execution.MAPPOFeedForwardExecutor(
             policy_networks=policy_networks,
+            logits_spec=logits_spec,
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
@@ -220,7 +254,7 @@ class IPPOBuilder(SystemBuilder):
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the trainer checkpoints itself.
         """
-
+        # Trainer configurations
         agents = self._agents
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
@@ -235,7 +269,7 @@ class IPPOBuilder(SystemBuilder):
         policy_optimizer = snt.optimizers.Adam(learning_rate=1e-3)
         critic_optimizer = snt.optimizers.Adam(learning_rate=1e-3)
 
-        # The learner updates the parameters (and initializes them).
+        # Create a trainer for the system.
         trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
@@ -261,10 +295,10 @@ class IPPOBuilder(SystemBuilder):
 
 class IPPO(system.System):
     """IPPO system.
-    This implements a single-process PPO system. This is an actor-critic based
+    This implements a single-process IPPO system. This is an actor-critic based
     system that generates data via a behavior policy, inserts N-step transitions into
     a replay buffer, and periodically updates the policies of each agent
-    (and as a result the behavior) by sampling uniformly from this buffer.
+    (and as a result the behavior).
     """
 
     def __init__(
@@ -275,7 +309,7 @@ class IPPO(system.System):
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
         trainer_fn: Type[training.BaseIPPOTrainer] = training.IPPOTrainer,
-        shared_weights: bool = True,
+        shared_weights: bool = False,
         discount: float = 0.99,
         lambda_gae: float = 0.95,
         entropy_cost: float = 0.01,
@@ -283,7 +317,7 @@ class IPPO(system.System):
         clipping_epsilon: float = 0.2,
         batch_size: int = 256,
         prefetch_size: int = 4,
-        max_queue_size: int = 1000000,
+        max_queue_size: int = 256,
         samples_per_insert: float = 32.0,
         n_step: int = 5,
         clipping: bool = True,
@@ -303,12 +337,10 @@ class IPPO(system.System):
             discount: discount to use for TD updates.
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
-            min_replay_size: minimum replay size before updating.
             max_replay_size: maximum replay size.
             samples_per_insert: number of samples to take from replay for every insert
               that is made.
             n_step: number of steps to squash into a single transition.
-            sigma: standard deviation of zero-mean, Gaussian exploration noise.
             clipping: whether to clip gradients by global norm.
             logger: logger object to be used by trainers.
             counter: counter object used to keep track of steps.
@@ -344,7 +376,9 @@ class IPPO(system.System):
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_table(environment_spec=environment_spec)
+        replay_table = builder.make_replay_table(
+            environment_spec=environment_spec
+        )
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
@@ -362,12 +396,12 @@ class IPPO(system.System):
             observation_networks=observation_networks,
             behavior_networks=behavior_networks,
             shared_weights=shared_weights,
-        ).create_system()  # behavior_networks,
+        ).create_system()
 
         # Create the actor which defines how we take actions.
         executor = builder.make_executor(networks["behaviors"], adder)
 
-        # The learner updates the parameters (and initializes them).
+        # Create the trainer.
         trainer = builder.make_trainer(
             networks=networks,
             dataset=dataset,
