@@ -46,6 +46,7 @@ class RLLibMultiAgentEnvWrapper(PettingZooParallelEnvWrapper):
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
         self._reset_next_step = False
+        self.done = False
         self._step_type = dm_env.StepType.FIRST
 
         obs = self._environment.reset()
@@ -67,20 +68,29 @@ class RLLibMultiAgentEnvWrapper(PettingZooParallelEnvWrapper):
 
         action = {eval(k.split("_")[1]): v for k, v in action.items()}
         observe, reward, done, info = self._environment.step(action)
+        if observe:
+            observe = self._convert_observation(observe, done)
 
-        observation = self._convert_observation(observe, done)
-        reward = {
-            f"agent_{k}": np.asarray(v, dtype=np.float32) for k, v in reward.items()
-        }
+        if reward:
+            reward = {
+                f"agent_{k}": np.asarray(v, dtype=np.float32) for k, v in reward.items()
+            }
+        else:
+            reward = {
+                agent: np.asarray(0, dtype=np.float32) for agent in self.possible_agents
+            }
 
-        if done["__all__"]:
+        if done:
+            self.done = done["__all__"]
+
+        if self.done:
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
         else:
             self._step_type = dm_env.StepType.MID
 
         return dm_env.TimeStep(
-            observation=observation,
+            observation=observe,
             reward=reward,
             discount=self._discount,
             step_type=self._step_type,

@@ -340,7 +340,16 @@ class TestEnvWrapper:
 
             # Mock being done - sets self._environment.env_done to true.
             # We can't mock env_done directly since it is a propertly.
-            monkeypatch.setattr(wrapped_env._environment, "agents", [], raising=False)
+            if env_spec.env_source == EnvSource.PettingZoo:
+                monkeypatch.setattr(
+                    wrapped_env._environment, "agents", [], raising=False
+                )
+            elif env_spec.env_source == EnvSource.RLLibMultiEnv:
+                monkeypatch.setattr(wrapped_env, "done", True, raising=False)
+                monkeypatch.setattr(
+                    wrapped_env._environment, "done", {"__all__": True}, raising=False
+                )
+
             if hasattr(wrapped_env, "aec_env"):
                 monkeypatch.setattr(
                     wrapped_env._environment.aec_env, "agents", [], raising=False
