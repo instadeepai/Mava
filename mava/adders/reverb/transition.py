@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# # Adapted from
+# https://github.com/deepmind/acme/blob/master/acme/adders/reverb/transition.py
+
 """Transition adders.
 This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.

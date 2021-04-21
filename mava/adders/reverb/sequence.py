@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Adapted from
+# https://github.com/deepmind/acme/blob/master/acme/adders/reverb/sequence.py
+
 """Sequence adders.
 
 This implements adders which add sequences or partial trajectories.
