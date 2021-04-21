@@ -161,7 +161,7 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
                 self._network_loggers[network].write(network_running_statistics)
 
 
-class NetworkStatistics(TrainerWrapperBase):
+class NetworkStatisticsBase(TrainerWrapperBase):
     def __init__(
         self,
         trainer: mava.Trainer,
@@ -244,6 +244,75 @@ class NetworkStatistics(TrainerWrapperBase):
                 )
         self._network_loggers[agent].write(weights)
 
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+
+class NetworkStatistics(NetworkStatisticsBase):
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+        # Log only l2 norm by default.
+        gradient_norms: List = [2],
+        weight_norms: List = [2],
+    ) -> None:
+        super().__init__(trainer, gradient_norms, weight_norms)
+
+    def _step(
+        self,
+    ) -> Dict[str, Dict[str, Any]]:
+
+        # Update the target networks
+        self._update_target_networks()
+
+        # Get data from replay (dropping extras if any). Note there is no
+        # extra data here because we do not insert any into Reverb.
+        inputs = next(self._iterator)
+
+        policy_losses, tape = self._forward_pass(inputs)
+
+        self._calc_gradients_update_network(policy_losses, tape)
+
+    def _calc_gradients_update_network(self, policy_losses, tape):
+        # Calculate the gradients and update the networks
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
+
+            # Get trainable variables.
+            policy_variables = (
+                self._observation_networks[agent_key].trainable_variables
+                + self._policy_networks[agent_key].trainable_variables
+            )
+
+            # Compute gradients.
+            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
+
+            # Maybe clip gradients.
+            if self._clipping:
+                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
+
+            # Apply gradients.
+            self._policy_optimizer.apply(policy_gradients, policy_variables)
+
+            self._log_weights(agent, policy_variables)
+            self._log_gradients(
+                agent,
+                variables_names=[vars.name for vars in policy_variables],
+                gradients=policy_gradients,
+            )
+
+
+class NetworkStatisticsActorCritic(NetworkStatisticsBase):
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+        # Log only l2 norm by default.
+        gradient_norms: List = [2],
+        weight_norms: List = [2],
+    ) -> None:
+        super().__init__(trainer, gradient_norms, weight_norms)
+
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -276,10 +345,6 @@ class NetworkStatistics(TrainerWrapperBase):
             )
 
             # Compute gradients.
-            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
-            #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context.
-            # Caused by losses.dpg, which calls tape.gradient.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
@@ -305,7 +370,3 @@ class NetworkStatistics(TrainerWrapperBase):
                 variables_names=[vars.name for vars in critic_variables],
                 gradients=critic_gradients,
             )
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()

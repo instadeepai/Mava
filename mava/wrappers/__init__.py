@@ -23,5 +23,5 @@ from mava.wrappers.pettingzoo import (
 )
 from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
-    NetworkStatistics,
+    NetworkStatisticsActorCritic,
 )
