@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Executor for MAPPO systems, using Tensorflow and Sonnet."""
+
 from typing import Dict, Optional, Union
 
 import dm_env
@@ -30,7 +32,7 @@ from mava import adders, core
 tfd = tfp.distributions
 
 
-class FeedForwardExecutorLogits(core.Executor):
+class MAPPOFeedForwardExecutor(core.Executor):
     """A feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system
     which takes non-batched observations and outputs non-batched actions.
@@ -78,7 +80,6 @@ class FeedForwardExecutorLogits(core.Executor):
         action = tfd.Categorical(logits=logits).sample()
 
         self._prev_logits = logits
-        print("execution: Used Policy fn")
 
         return tf.cast(action, "int64")
 
@@ -93,7 +94,6 @@ class FeedForwardExecutorLogits(core.Executor):
         # What happens in discrete vs cont case
 
         # Return a numpy array with squeezed out batch dimension.
-        print("execution: Used select action")
         return tf2_utils.to_numpy_squeeze(action)
 
     def observe_first(
@@ -124,7 +124,7 @@ class FeedForwardExecutorLogits(core.Executor):
                 extras = {}
             extras["agent_id"] = agent
             extras["logits"] = self._prev_logits
-            self._adder.add(action, next_timestep, extras)  # type: ignore
+            self._adder.add(action, next_timestep, extras)
 
     def observe(
         self,

@@ -15,6 +15,6 @@
 
 """Implementations of a IPPO agent."""
 
-from mava.systems.tf.ippo.execution import FeedForwardExecutorLogits
+from mava.systems.tf.ippo.execution import MAPPOFeedForwardExecutor
 from mava.systems.tf.ippo.system import IPPO
 from mava.systems.tf.ippo.training import IPPOTrainer

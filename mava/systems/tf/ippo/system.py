@@ -20,7 +20,6 @@ from typing import Dict, Iterator, Optional, Type
 import reverb
 import sonnet as snt
 
-# import tensorflow as tf
 from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
@@ -46,8 +45,6 @@ class IPPOConfig:
             discount: discount to use for TD updates.
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-              the target networks.
             min_replay_size: minimum replay size before updating.
             max_replay_size: maximum replay size.
             samples_per_insert: number of samples to take from replay for every insert
@@ -60,34 +57,24 @@ class IPPOConfig:
             checkpoint: boolean indicating whether to checkpoint the trainers.
             replay_table_name: string indicating what name to give the replay table."""
 
-    # Network stuff
     environment_spec: specs.MAEnvironmentSpec
     policy_networks: Dict[str, snt.Module]
     critic_networks: Dict[str, snt.Module]
     observation_networks: Dict[str, snt.Module]
     behavior_networks: Dict[str, snt.Module]
     shared_weights: bool = True
-    target_update_period: int = 10  # Note: was 100
-
-    # PPO stuff
     discount: float = 0.99
     lambda_gae: float = 0.95
     clipping_epsilon: float = 0.2
     entropy_cost: float = 0.01
     baseline_cost: float = 0.5
-
-    # Reverb stuff
     n_step: int = 5
     batch_size: int = 32
     prefetch_size: int = 4
     max_queue_size: int = 100_000
     samples_per_insert: float = 32.0
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
-
-    # Gradient clipping
     clipping: bool = True
-
-    # Extra stuff
     logger: loggers.Logger = None
     counter: counting.Counter = None
     checkpoint: bool = True
@@ -109,7 +96,7 @@ class IPPOBuilder(SystemBuilder):
         trainer_fn: Type[training.BaseIPPOTrainer] = training.IPPOTrainer,
     ):
         """Args:
-        config: Configuration options for the MADDPG system.
+        config: Configuration options for the IPPO system.
         trainer_fn: Trainer module to use."""
 
         self._config = config
@@ -119,14 +106,12 @@ class IPPOBuilder(SystemBuilder):
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
-        print("System: Initialised builder using Config")
 
     def make_replay_table(
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> reverb.Table.queue:
         """Create tables to insert data into."""
-        print("System: Accessed Replay Table")
         return reverb.Table.queue(
             name=self._config.replay_table_name,
             max_size=self._config.max_queue_size,
@@ -140,14 +125,12 @@ class IPPOBuilder(SystemBuilder):
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for learning/updating the system."""
-
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
         )
-        print("System: Constructed Dataset Iterator")
         return iter(dataset)
 
     def make_adder(
@@ -158,7 +141,6 @@ class IPPOBuilder(SystemBuilder):
         Args:
           replay_client: Reverb Client which points to the replay server.
         """
-        print("System: Made Adder")
         return reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
             client=replay_client,
@@ -196,7 +178,7 @@ class IPPOBuilder(SystemBuilder):
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policy": variables},
-                update_period=10,  # from 1000
+                update_period=1000,
             )
 
             # Update variables
@@ -209,10 +191,8 @@ class IPPOBuilder(SystemBuilder):
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
-        # TODO may need a custom executor
         # Create the actor which defines how we take actions.
-        print("System: Made Executor")
-        return execution.FeedForwardExecutorLogits(
+        return execution.MAPPOFeedForwardExecutor(
             policy_networks=policy_networks,
             shared_weights=shared_weights,
             variable_client=variable_client,
@@ -250,7 +230,6 @@ class IPPOBuilder(SystemBuilder):
         baseline_cost = self._config.baseline_cost
         lambda_gae = self._config.lambda_gae
         clipping_epsilon = self._config.clipping_epsilon
-        target_update_period = self._config.target_update_period
 
         # Create optimizers.
         policy_optimizer = snt.optimizers.Adam(learning_rate=1e-3)
@@ -263,10 +242,6 @@ class IPPOBuilder(SystemBuilder):
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
             observation_networks=networks["observations"],
-            # target_policy_networks=networks["target_policies"],
-            # target_critic_networks=networks["target_critics"],
-            # target_observation_networks=networks["target_observations"],
-            # num_steps=tf.Variable(0, dtype=tf.int32),
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
@@ -276,13 +251,11 @@ class IPPOBuilder(SystemBuilder):
             clipping_epsilon=clipping_epsilon,
             clipping=clipping,
             discount=discount,
-            target_update_period=target_update_period,
             dataset=dataset,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
         )
-        print("System: Made Trainer")
         return trainer
 
 
@@ -310,7 +283,6 @@ class IPPO(system.System):
         clipping_epsilon: float = 0.2,
         batch_size: int = 256,
         prefetch_size: int = 4,
-        target_update_period: int = 100,
         max_queue_size: int = 1000000,
         samples_per_insert: float = 32.0,
         n_step: int = 5,
@@ -331,8 +303,6 @@ class IPPO(system.System):
             discount: discount to use for TD updates.
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-              the target networks.
             min_replay_size: minimum replay size before updating.
             max_replay_size: maximum replay size.
             samples_per_insert: number of samples to take from replay for every insert
@@ -360,7 +330,6 @@ class IPPO(system.System):
                 lambda_gae=lambda_gae,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
-                target_update_period=target_update_period,
                 max_queue_size=max_queue_size,
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
@@ -406,7 +375,6 @@ class IPPO(system.System):
             logger=logger,
             checkpoint=checkpoint,
         )
-        print("system: Have constructed IPPO trainers and execs")
         super().__init__(
             executor=executor,
             trainer=trainer,

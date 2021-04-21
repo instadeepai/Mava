@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Example running IPPO on pettinzoo MPE environments."""
+
 import importlib
 from typing import Any, Dict, Mapping, Sequence, Union
 
@@ -27,16 +28,14 @@ from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
-from mava.environment_loop import (
-    ParallelEnvironmentLoop as PettingZooParallelEnvironmentLoop,
-)
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import ippo
 
 # from mava.systems.tf.ippo import execution as executors
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
+flags.DEFINE_integer("num_episodes", 5000, "Number of training episodes to run for.")
 
 flags.DEFINE_integer(
     "num_episodes_per_eval",
@@ -49,12 +48,9 @@ def make_environment(
     env_class: str = "mpe", env_name: str = "simple_v2", **kwargs: int
 ) -> dm_env.Environment:
     """Creates a MPE environment."""
-
     env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
     env = env_module.parallel_env(**kwargs)  # type: ignore
     environment = PettingZooParallelEnvWrapper(env)
-    print("in run script: make environment")
-
     return environment
 
 
@@ -65,7 +61,6 @@ def make_networks(
     shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
-    print("in run script: make networks")
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
@@ -86,10 +81,7 @@ def make_networks(
     policy_networks = {}
     behavior_networks = {}
     critic_networks = {}
-    print("specs.keys() ", specs.keys())
-
     for key in specs.keys():
-        print("in run script: within the loop for specs.keys()")
 
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.num_values, dtype=int)
@@ -126,8 +118,6 @@ def make_networks(
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
         behavior_networks[key] = behavior_network
-        print("have created nets on run script")
-
     return {
         "policies": policy_networks,
         "critics": critic_networks,
@@ -137,12 +127,9 @@ def make_networks(
 
 
 def main(_: Any) -> None:
-
-    print("in the run script: main")
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment()
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    print("environment specs", environment_spec)
     system_networks = make_networks(environment_spec)
 
     # Construct the agent.
@@ -157,13 +144,11 @@ def main(_: Any) -> None:
     )
 
     # Create the environment loop used for training.
-    train_loop = PettingZooParallelEnvironmentLoop(
-        environment, system, label="train_loop"
-    )
+    train_loop = ParallelEnvironmentLoop(environment, system, label="train_loop")
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
 
 
-if __name__ == "__main__":
-    app.run(main)
+# if __name__ == "__main__":
+#     app.run(main)
