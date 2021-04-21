@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Wraps a Debugging MARL environment to be used as a dm_env environment."""
-from typing import Dict
+from typing import Dict, Tuple
 
 import dm_env
 import numpy as np
@@ -23,6 +23,7 @@ from acme.wrappers.gym_wrapper import _convert_to_spec
 
 from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv
+from mava.utils.debugging.environments.two_step import TwoStepEnv
 from mava.utils.wrapper_utils import convert_np_type
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
@@ -118,3 +119,45 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
+
+
+# TODO Change this env to inherit from PettingZooParallelEnvWrapper
+# This will make the code more complex. Not sure if worth doing at this
+# point. Perhaps rather have a general base class for wrappers.
+class TwoStepWrapper(dm_env.Environment):
+    """Wraps simple two-step matrix game from Qmix paper. Useful for
+    debugging and quick comparison of cooperative performance."""
+
+    def __init__(self) -> None:
+        self._environment = TwoStepEnv()
+        self._reset_next_step = False
+        self._ACTIONS = (0, 1)
+
+    def reset(self) -> dm_env.TimeStep:
+        self._reset_next_step = False
+        reset_state = self._environment.reset()
+        return dm_env.restart(reset_state)
+
+    def step(self, actions: Tuple[int, int]) -> dm_env.TimeStep:
+        """Steps the environment."""
+        observation, reward, done = self._environment.step(actions)
+
+        if done:
+            self.reset()
+            return dm_env.termination(reward=reward, observation=observation)
+
+        else:
+            self._reset_next_step = True  # There are only 2 timesteps
+            return dm_env.transition(reward=0.0, observation=observation)
+
+    def action_spec(self) -> specs.DiscreteArray:
+        return specs.DiscreteArray(
+            dtype=int, num_values=len(self._ACTIONS), name="action"
+        )
+
+    def observation_spec(self) -> specs.DiscreteArray:
+        return specs.DiscreteArray(
+            dtype=int,
+            num_values=3,  # Either initial state (0), 2A (1), or 2B (2)
+            name="action",
+        )
