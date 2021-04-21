@@ -16,29 +16,19 @@
 """Generic environment loop wrapper to track system statistics"""
 
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sequence
 
 from acme.utils import loggers
-
+import numpy as np
 import mava
 from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics
+import tensorflow as tf
 
 
-class TrainerStatisticsBase:
-    """A parallel MARL environment loop.
-    This takes `Environment` and `Executor` instances and coordinates their
-    interaction. Executors are updated if `should_update=True`. This can be used as:
-        loop = EnvironmentLoop(environment, executor)
-        loop.run(num_episodes)
-    A `Counter` instance can optionally be given in order to maintain counts
-    between different Mava components. If not given a local Counter will be
-    created to maintain counts between calls to the `run` method.
-    A `Logger` instance can also be passed in order to control the output of the
-    loop. If not given a platform-specific default logger will be used as defined
-    by utils.loggers.make_default_logger from acme. A string `label` can be passed
-    to easily change the label associated with the default logger; this is ignored
-    if a `Logger` instance is given.
+class TrainerWrapperBase(mava.Trainer):
+    """A base trainer statistic class that wrappers a trainer and logs
+    certain statistics.
     """
 
     def __init__(
@@ -46,17 +36,9 @@ class TrainerStatisticsBase:
         trainer: mava.Trainer,
     ) -> None:
         self._trainer = trainer
-        self._require_loggers = True
 
-        # NOTE (Arnu): if I try inheriting from mava.Trainer
-        # I get the following error:
-        # "TypeError: Can't instantiate abstract class ...
-        # DetailedTrainerStatistics with abstract methods get_variables"
-        # If I hardcode the type here it breaks the logging for some reason
-        # For now as is, there is a type mismatch in the system code when
-        # returning the wrapped trainer, but everything seems to work.
-        # Need to find a solution to this.
-        # self.__class__ = mava.Trainer
+    def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+        return self._trainer.get_variables(names)
 
     def _create_loggers(self, keys: List[str]) -> None:
         raise NotImplementedError
@@ -65,7 +47,23 @@ class TrainerStatisticsBase:
         raise NotImplementedError
 
     def __getattr__(self, attr: Any) -> Any:
-        return self._trainer.__getattribute__(attr)
+        # Check if current class has attr first
+        if hasattr(type(self), attr) is False:
+            return self._trainer.__getattribute__(attr)
+        return self.__getattribute__(attr)
+
+
+class TrainerStatisticsBase(TrainerWrapperBase):
+    """A base trainer statistic class that wrappers a trainer and logs
+    certain statistics.
+    """
+
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+    ) -> None:
+        super().__init__(trainer)
+        self._require_loggers = True
 
     def step(self) -> None:
         # Run the learning step.
@@ -159,4 +157,155 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
                     network_running_statistics[
                         f"{network}_{stat}_{key}"
                     ] = self._networks_stats[network][key].__getattribute__(stat)()
+
                 self._network_loggers[network].write(network_running_statistics)
+
+
+class NetworkStatistics(TrainerWrapperBase):
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+        # Log only l2 norm by default.
+        gradient_norms: List = [2],
+        weight_norms: List = [2],
+    ) -> None:
+        super().__init__(trainer)
+
+        self._network_loggers: Dict[str, loggers.Logger] = {}
+        self.gradient_norms = gradient_norms
+        self.weight_norms = weight_norms
+        self._create_loggers(self._agents)
+
+    def _create_loggers(self, keys) -> None:
+        trainer_label = self._logger._label
+        base_dir = self._logger._directory
+        (
+            to_terminal,
+            to_csv,
+            to_tensorboard,
+            time_delta,
+            print_fn,
+            time_stamp,
+        ) = self._logger._logger_info
+
+        trainer_label = f"{trainer_label}_networks_stats"
+        for key in keys:
+            network_label = trainer_label + "_" + key
+            self._network_loggers[key] = Logger(
+                label=network_label,
+                directory=base_dir,
+                to_terminal=False,
+                to_csv=False,
+                to_tensorboard=to_tensorboard,
+                print_fn=print_fn,
+                time_stamp=time_stamp,
+            )
+
+    # We are usually concerned with weights and grads of linear and conv layers.
+    # We have to currently use the name since it is a tf.var and we can't
+    # check layer type once already a tf.var.
+    # Log linear and conv weights and not bias units.
+    def _should_log(self, name):
+        if ("linear" in name.lower() or "conv" in name.lower()) and not (
+            "b:" in name.lower()
+        ):
+            return True
+        else:
+            return False
+
+    def _apply_norms(self, value, norms_list) -> Dict:
+        return_data = {}
+        for norm in norms_list:
+            return_data[norm] = tf.norm(value, ord=norm).numpy()
+        return return_data
+
+    def _log_gradients(self, agent, variables_names, gradients):
+        assert len(variables_names) == len(
+            gradients
+        ), "Variable names and gradients do not match"
+        grads = {}
+        for index, grad in enumerate(gradients):
+            variables_name = variables_names[index]
+            if self._should_log(variables_name):
+                grads[f"{variables_name}_grad"] = grad
+                grads[f"{variables_name}_grad_norm"] = self._apply_norms(
+                    grad, self.gradient_norms
+                )
+
+        self._network_loggers[agent].write(grads)
+
+    def _log_weights(self, agent, variables):
+        weights = {}
+        for weight in variables:
+            if self._should_log(weight.name):
+                weights[f"{weight.name}_weight"] = weight
+                weights[f"{weight.name}_weight_norm"] = self._apply_norms(
+                    weight, self.weight_norms
+                )
+        self._network_loggers[agent].write(weights)
+
+    def _step(
+        self,
+    ) -> Dict[str, Dict[str, Any]]:
+
+        # Update the target networks
+        self._update_target_networks()
+
+        # Get data from replay (dropping extras if any). Note there is no
+        # extra data here because we do not insert any into Reverb.
+        inputs = next(self._iterator)
+
+        policy_losses, critic_losses, tape = self._forward_pass(inputs)
+
+        self._calc_gradients_update_network(policy_losses, critic_losses, tape)
+
+    def _calc_gradients_update_network(self, policy_losses, critic_losses, tape):
+        # Calculate the gradients and update the networks
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
+
+            # Get trainable variables.
+            policy_variables = (
+                self._observation_networks[agent_key].trainable_variables
+                + self._policy_networks[agent_key].trainable_variables
+            )
+            critic_variables = (
+                # In this agent, the critic loss trains the observation network.
+                self._observation_networks[agent_key].trainable_variables
+                + self._critic_networks[agent_key].trainable_variables
+            )
+
+            # Compute gradients.
+            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
+            #  on a persistent tape inside its context is significantly less efficient
+            #  than calling it outside the context.
+            # Caused by losses.dpg, which calls tape.gradient.
+            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
+            critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
+
+            # Maybe clip gradients.
+            if self._clipping:
+                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
+                critic_gradients = tf.clip_by_global_norm(critic_gradients, 40.0)[0]
+
+            # Apply gradients.
+            self._policy_optimizer.apply(policy_gradients, policy_variables)
+            self._critic_optimizer.apply(critic_gradients, critic_variables)
+
+            self._log_weights(agent, policy_variables)
+            self._log_gradients(
+                agent,
+                variables_names=[vars.name for vars in policy_variables],
+                gradients=policy_gradients,
+            )
+
+            self._log_weights(agent, critic_variables)
+            self._log_gradients(
+                agent,
+                variables_names=[vars.name for vars in critic_variables],
+                gradients=critic_gradients,
+            )
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
