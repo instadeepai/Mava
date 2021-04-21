@@ -23,7 +23,6 @@ from gym import spaces
 A simple two-step cooperative matrix game for two agents. Adapted from
 Qmix paper https://arxiv.org/abs/1803.11485 and tensorflow implementation
 https://github.com/tocom242242/qmix_tf2/blob/master/two_step_env.py.
-
 Actions:
 0 or 1, corresponding to which matrix the agents choose for the next time
 step.

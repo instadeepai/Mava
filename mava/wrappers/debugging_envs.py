@@ -129,9 +129,6 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
         super().__init__(environment=environment)
         self._reset_next_step = False
 
-        self._ACTIONS = (0, 1)
-        # self.possible_agents = (0,1) # required for specs.py
-
     def reset(self) -> dm_env.TimeStep:
         self._reset_next_step = False
         reset_state = self._environment.reset()
@@ -148,18 +145,3 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
         else:
             self._reset_next_step = True  # There are only 2 timesteps
             return dm_env.transition(reward=0.0, observation=observation)
-
-    # def action_spec(self) -> specs.DiscreteArray:
-    #     return specs.DiscreteArray(
-    #         dtype=int, num_values=len(self._ACTIONS), name="action"
-    #     )
-
-    # def observation_spec(self) -> specs.DiscreteArray:
-    #     return specs.DiscreteArray(
-    #         dtype=int,
-    #         num_values=3,  # Either initial state (0), 2A (1), or 2B (2)
-    #         name="action",
-    #     )
-
-    # def extra_spec(self) -> Dict[str, specs.BoundedArray]:
-    #     return {}
