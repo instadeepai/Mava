@@ -103,16 +103,6 @@ def make_networks(
             ]
         )
 
-        # policy_network = snt.Sequential(
-        #     [
-        #         networks.LayerNormMLP(
-        #             policy_networks_layer_sizes[key], activate_final=True
-        #         ),
-        #         networks.NearZeroInitializedLinear(num_dimensions),
-        #         networks.TanhToSpec(specs[key].actions),
-        #     ]
-        # )
-
         # Create the behavior policy.
         behavior_network = snt.DeepRNN(
             [

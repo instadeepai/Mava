@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# mypy: ignore-errors
-
 """Transition adders.
 This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
@@ -223,20 +221,28 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             self._final_step_placeholder = mava_utils.final_step_like(
                 self._buffer[0], next_observations
             )
-        final_step: base.Step = self._final_step_placeholder._replace(
-            observations=next_observations
-        )
-        steps = list(self._buffer) + [final_step]
 
-        # Calculate the priority for this transition.
+        if next_observations is not None:
+            final_step: base.Step = self._final_step_placeholder._replace(
+                observations=next_observations
+            )
+            steps = list(self._buffer) + [final_step]
 
-        # NOTE (Arnu): removed because of errors
-        table_priorities = acme_utils.calculate_priorities(self._priority_fns, steps)
+            # Calculate the priority for this transition.
 
-        # Insert the transition into replay along with its priority.
-        self._writer.append(transition)
-        for table, priority in table_priorities.items():
-            self._writer.create_item(table=table, num_timesteps=1, priority=priority)
+            # NOTE (Arnu): removed because of errors
+            table_priorities = acme_utils.calculate_priorities(
+                self._priority_fns, steps
+            )
+
+            # Insert the transition into replay along with its priority.
+            self._writer.append(transition)
+            for table, priority in table_priorities.items():
+                self._writer.create_item(
+                    table=table, num_timesteps=1, priority=priority
+                )
+        else:
+            raise ValueError("next_observations cannot be None here.")
 
     def _write_last(self) -> None:
         # Drain the buffer until there are no transitions.
@@ -249,6 +255,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     def signature(
         cls,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        core_state_spec: tf.TypeSpec = None,
     ) -> tf.TypeSpec:
 
         # This function currently assumes that self._discount is a scalar.

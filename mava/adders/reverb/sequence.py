@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# mypy: ignore-errors
-
 """Sequence adders.
 
 This implements adders which add sequences or partial trajectories.
@@ -40,7 +38,7 @@ class StateSpecs(NamedTuple):
     cell: types.Nest
 
 
-class SequenceAdder(base.ReverbParallelAdder):
+class ParallelSequenceAdder(base.ReverbParallelAdder):
     """An adder which adds sequences of fixed length."""
 
     def __init__(
@@ -98,20 +96,20 @@ class SequenceAdder(base.ReverbParallelAdder):
         self._pad_end_of_episode = pad_end_of_episode
         self._break_end_of_episode = break_end_of_episode
 
-    def reset(self):
+    def reset(self) -> None:
         # If we do not break on end of episode, we should not reset the _step
         # counter, neither clear the buffer/writer.
         if self._break_end_of_episode:
             self._step = 0
             super().reset()
 
-    def _write(self):
+    def _write(self) -> None:
         # Append the previous step and increment number of steps written.
         self._writer.append(self._buffer[-1])
         self._step += 1
         self._maybe_add_priorities()
 
-    def _write_last(self):
+    def _write_last(self) -> None:
         # Create a final step.
         # TODO (Dries): Should self._next_observation be used
         #  here? Should this function be used for sequential?
@@ -131,7 +129,7 @@ class SequenceAdder(base.ReverbParallelAdder):
             # base.py has a check that on add_first self._next_observation should be
             # None, thus we need to clear it at the end of each episode.
             self._next_observations = None
-            return
+            return None
 
         # Determine the delta to the next time we would write a sequence.
         first_write = self._step <= self._max_sequence_length
@@ -162,7 +160,7 @@ class SequenceAdder(base.ReverbParallelAdder):
         # Write priorities for the sequence.
         self._maybe_add_priorities()
 
-    def _maybe_add_priorities(self):
+    def _maybe_add_priorities(self) -> None:
         if not (
             # Write the first time we hit the max sequence length...
             self._step == self._max_sequence_length

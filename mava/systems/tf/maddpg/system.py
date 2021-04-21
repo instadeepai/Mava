@@ -135,7 +135,7 @@ class MADDPGBuilder(SystemBuilder):
                         self._config.policy_networks[agent_type].initial_state(1)
                     ),
                 )
-            adder = reverb_adders.SequenceAdder.signature(
+            adder = reverb_adders.ParallelSequenceAdder.signature(
                 environment_spec, core_state_spec
             )
         else:
@@ -181,7 +181,7 @@ class MADDPGBuilder(SystemBuilder):
                 discount=self._config.discount,
             )
         elif self._executer_fn == executors.RecurrentExecutor:
-            adder = reverb_adders.SequenceAdder(
+            adder = reverb_adders.ParallelSequenceAdder(
                 priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
                 client=replay_client,
                 sequence_length=self._config.sequence_length,
