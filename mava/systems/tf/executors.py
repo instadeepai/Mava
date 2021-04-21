@@ -209,7 +209,6 @@ class RecurrentExecutor(core.Executor):
     ) -> None:
 
         # Re-initialize the RNN state.
-        assert type(self._policy_networks["walker"]) == snt.DeepRNN
         for agent, _ in timestep.observation.items():
             # index network either on agent type or on agent id
             agent_key = agent.split("_")[0] if self._shared_weights else agent
