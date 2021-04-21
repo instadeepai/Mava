@@ -26,27 +26,33 @@ Actions:
 step.
 """
 
+# NOTE (St John) I was in the process of making this a gym env. Will
+# wait to see how we decide to structure a base wrapper class. Don't
+# want to introduce tech debt by making this needlessly complex.
+
 
 class TwoStepEnv:
     def __init__(self) -> None:
         self.step_num = 0
         self.state = 0
         self.prev_state = 0
+        self.env_done = False
 
     def step(self, actions: Tuple[int, int]) -> Tuple[int, int, bool]:
         self.prev_state = copy.deepcopy(self.state)
+        self.env_done = True  # Assume state > 0
+
         if self.state == 0:
+            self.env_done = False
             if actions[0] == 0:
                 self.state = 1
-                return 1, 0, False
+                return 1, 0, self.env_done  # Go to 2A
             else:
                 self.state = 2
-                return 2, 0, False
-        elif self.state == 1:
-            self.state = 0
-            return self.state, 7, True
-        elif self.state == 2:
-            self.state = 0
+                return 2, 0, self.env_done  # Go to 2B
+        elif self.state == 1:  # State 2A
+            return self.state, 7, self.env_done
+        elif self.state == 2:  # State 2B
             if actions[0] == 0 and actions[1] == 0:
                 reward = 0
             elif actions[0] == 0 and actions[1] == 1:
@@ -55,9 +61,10 @@ class TwoStepEnv:
                 reward = 1
             elif actions[0] == 1 and actions[1] == 1:
                 reward = 8
-            return self.state, reward, True
+            return self.state, reward, self.env_done
         else:
             raise Exception("invalid state:{}".format(self.state))
 
-    def reset(self) -> None:
+    def reset(self) -> int:
         self.state = 0
+        return self.state

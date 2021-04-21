@@ -13,13 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.wrappers.debugging_envs import DebuggingEnvWrapper, TwoStepWrapper
-from mava.wrappers.environment_loop_statistics import (
-    DetailedEpisodeStatistics,
-    DetailedPerAgentStatistics,
-)
-from mava.wrappers.pettingzoo import (
-    PettingZooAECEnvWrapper,
-    PettingZooParallelEnvWrapper,
-)
-from mava.wrappers.system_trainer_statistics import DetailedTrainerStatistics
+from mava.utils.debugging.environments.switch_game import MultiAgentSwitchGame
+from mava.utils.debugging.environments.two_step import TwoStepEnv
