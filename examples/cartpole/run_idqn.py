@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import importlib
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
@@ -25,10 +24,13 @@ from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
+# pip install ray[rllib]
+from ray.rllib.env.multi_agent_env import make_multi_agent
+
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import madqn
-from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+from mava.wrappers import RLLibMultiAgentEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
@@ -44,10 +46,11 @@ def make_environment(
     env_class: str = "mpe", env_name: str = "simple_v2", **kwargs: int
 ) -> dm_env.Environment:
     """Creates a MPE environment."""
-    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
-    env = env_module.parallel_env(**kwargs)  # type: ignore
-    environment = PettingZooParallelEnvWrapper(env)
-    return environment
+    ma_cartpole_cls = make_multi_agent("CartPole-v1")
+    ma_cartpole = ma_cartpole_cls({"num_agents": 2})
+    wrapped_env = RLLibMultiAgentEnvWrapper(ma_cartpole)
+
+    return wrapped_env
 
 
 def make_networks(

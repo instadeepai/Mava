@@ -21,4 +21,5 @@ from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
+from mava.wrappers.rllib_multi_agent_env import RLLibMultiAgentEnvWrapper
 from mava.wrappers.system_trainer_statistics import DetailedTrainerStatistics
