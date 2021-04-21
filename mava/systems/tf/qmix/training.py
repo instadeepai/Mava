@@ -221,8 +221,6 @@ class QMIXTrainer(mava.Trainer):
                 trainable_variables += self._q_networks[agent].trainable_variables
         trainable_variables += self._mixing_network.trainable_variables
 
-        # logged_losses: Dict[str, Dict[str, Any]] = {}
-
         with tf.GradientTape() as tape:
             # TODO Define q_values and states
             q_values = tf.Tensor

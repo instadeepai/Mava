@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Example running Qmix on pettinzoo MPE environments."""
-import importlib
+# import importlib
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
@@ -29,7 +29,11 @@ from acme.tf import utils as tf2_utils
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import qmix
-from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+from mava.utils.debugging.environments.two_step import TwoStepEnv
+from mava.wrappers.debugging_envs import TwoStepWrapper
+
+# NOTE See next note.
+# from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
@@ -40,14 +44,21 @@ flags.DEFINE_integer(
     "Number of training episodes to run between evaluation " "episodes.",
 )
 
+# NOTE (St John) Will remove later. Currently debugging on two-step env.
+# def make_environment(
+#     env_class: str = "mpe", env_name: str = "simple_v2", **kwargs: int
+# ) -> dm_env.Environment:
+#     """Creates a MPE environment."""
+#     env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
+#     env = env_module.parallel_env(**kwargs)  # type: ignore
+#     environment = PettingZooParallelEnvWrapper(env)
+#     return environment
 
-def make_environment(
-    env_class: str = "mpe", env_name: str = "simple_v2", **kwargs: int
-) -> dm_env.Environment:
-    """Creates a MPE environment."""
-    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
-    env = env_module.parallel_env(**kwargs)  # type: ignore
-    environment = PettingZooParallelEnvWrapper(env)
+
+def make_environment() -> dm_env.Environment:
+    """Creates a two-step game environment."""
+    environment = TwoStepEnv()
+    environment = TwoStepWrapper(environment)
     return environment
 
 

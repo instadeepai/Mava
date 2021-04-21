@@ -16,6 +16,9 @@
 import copy
 from typing import Tuple
 
+import gym
+from gym import spaces
+
 """
 A simple two-step cooperative matrix game for two agents. Adapted from
 Qmix paper https://arxiv.org/abs/1803.11485 and tensorflow implementation
@@ -31,12 +34,26 @@ step.
 # want to introduce tech debt by making this needlessly complex.
 
 
-class TwoStepEnv:
+class TwoStepEnv(gym.Env):
     def __init__(self) -> None:
+
+        self.num_agents = 2
         self.step_num = 0
         self.state = 0
         self.prev_state = 0
         self.env_done = False
+
+        self.action_spaces = {}
+        self.observation_spaces = {}
+        self.agent_ids = []
+
+        for a_i in range(self.num_agents):
+            agent_id = "agent_" + str(a_i)
+            self.agent_ids.append(agent_id)
+            self.action_spaces[agent_id] = spaces.Discrete(2)
+            self.observation_spaces[agent_id] = spaces.Discrete(2)
+
+        self.possible_agents = self.agent_ids
 
     def step(self, actions: Tuple[int, int]) -> Tuple[int, int, bool]:
         self.prev_state = copy.deepcopy(self.state)

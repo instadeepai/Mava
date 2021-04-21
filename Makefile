@@ -16,7 +16,7 @@ DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 # Set example to run when using `make run`
 MADDPG=examples/petting_zoo/run_maddpg.py
 IDQN=examples/petting_zoo/run_idqn.py
-QMIX=examples/petting_zoo/run_qmix.py
+QMIX=examples/debugging_envs/run_qmix.py
 
 # make file commands
 run-maddpg:
