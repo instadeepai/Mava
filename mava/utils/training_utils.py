@@ -11,6 +11,7 @@ def checkpoint_networks(system_checkpointer: Dict) -> None:
         checkpointer.save()
 
 
+# Map critic and polic losses to dict, grouped by agent.
 def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
     assert len(policy_losses) > 0 and (
         len(critic_losses) == len(policy_losses)
@@ -24,3 +25,12 @@ def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
         }
 
     return logged_losses
+
+
+# Safely delete object from class.
+def safe_del(object_class: Any, attrname: str) -> None:
+    try:
+        if hasattr(object_class, attrname):
+            delattr(object_class, attrname)
+    except AttributeError:
+        pass

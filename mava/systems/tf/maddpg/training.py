@@ -302,9 +302,6 @@ class BaseMADDPGTrainer(mava.Trainer):
 
         self._backward()
 
-        if self.tape:
-            del self.tape
-
         # Log losses per agent
         return train_utils.map_losses_per_agent_ac(
             self.critic_losses, self.policy_losses
@@ -428,6 +425,8 @@ class BaseMADDPGTrainer(mava.Trainer):
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
             self._critic_optimizer.apply(critic_gradients, critic_variables)
+
+        train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
         # Run the learning step.

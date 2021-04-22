@@ -341,6 +341,8 @@ class NetworkStatistics(NetworkStatisticsBase):
     def _backward(self) -> None:
         policy_losses = self.policy_losses
         tape = self.tape
+        log_current_timestep = self._log_step()
+
         # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -361,7 +363,7 @@ class NetworkStatistics(NetworkStatisticsBase):
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
 
-            if self._log_step():
+            if log_current_timestep:
                 self._log_weights(label="Policy", agent=agent, weights=policy_variables)
                 self._log_gradients(
                     label="Policy",
@@ -369,6 +371,7 @@ class NetworkStatistics(NetworkStatisticsBase):
                     variables_names=[vars.name for vars in policy_variables],
                     gradients=policy_gradients,
                 )
+        train_utils.safe_del(self, "tape")
 
 
 class NetworkStatisticsActorCritic(NetworkStatisticsBase):
@@ -406,9 +409,6 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
 
         self._backward()
 
-        if self.tape:
-            del self.tape
-
         # Log losses per agent
         return train_utils.map_losses_per_agent_ac(
             self.critic_losses, self.policy_losses
@@ -419,6 +419,8 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
         policy_losses = self.policy_losses
         critic_losses = self.critic_losses
         tape = self.tape
+        log_current_timestep = self._log_step()
+
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
 
@@ -446,7 +448,7 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             self._policy_optimizer.apply(policy_gradients, policy_variables)
             self._critic_optimizer.apply(critic_gradients, critic_variables)
 
-            if self._log_step():
+            if log_current_timestep:
                 self._log_weights(label="Policy", agent=agent, weights=policy_variables)
                 self._log_gradients(
                     label="Policy",
@@ -462,3 +464,5 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
                     variables_names=[vars.name for vars in critic_variables],
                     gradients=critic_gradients,
                 )
+
+        train_utils.safe_del(self, "tape")
