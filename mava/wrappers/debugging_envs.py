@@ -129,11 +129,6 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
         super().__init__(environment=environment)
         self._reset_next_step = False
 
-    # def reset(self) -> dm_env.TimeStep:
-    #     self._reset_next_step = False
-    #     reset_state = self._environment.reset()
-    #     return dm_env.restart(reset_state)
-
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
         print("here")
@@ -158,29 +153,3 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
             discount=self._discounts,
             step_type=self._step_type,
         )
-
-    # def _convert_observations(
-    #     self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
-    # ) -> Dict[str, OLT]:
-    #     observations: Dict[str, OLT] = {}
-    #     for agent, observation in observes.items():
-    #         if isinstance(observation, dict) and "action_mask" in observation:
-    #             legals = observation["action_mask"]
-    #             observation = observation["observation"]
-    #         else:
-    #             # TODO Handle legal actions better for continous envs,
-    #             #  maybe have min and max for each action and clip the agents actions
-    #             #  accordingly
-    #             legals = np.ones(
-    #                 _convert_to_spec(self._environment.action_spaces[agent]).shape,
-    #                 dtype=self._environment.action_spaces[agent].dtype,
-    #             )
-
-    #         observation = np.array(observation, dtype=np.float32)
-    #         observations[agent] = OLT(
-    #             observation=np.asarray([observation[agent]], dtype=np.float32),
-    #             legal_actions=np.asarray([legals[agent]], dtype=np.float32),
-    #             terminal=np.asarray([dones[agent]], dtype=np.float32),
-    #         )
-
-    #     return observations
