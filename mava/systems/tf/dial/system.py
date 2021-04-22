@@ -29,7 +29,7 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import CentralisedActor
+from mava.components.tf.architectures import DecentralisedActor
 from mava.components.tf.modules.communication import BroadcastedCommunication
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
@@ -371,7 +371,7 @@ class DIAL(system.System):
         # Create system architecture
         # TODO (Kevin): create decentralised/centralised/networked actor architectures
         # see mava/components/tf/architectures
-        architecture = CentralisedActor(
+        architecture = DecentralisedActor(
             environment_spec=environment_spec,
             policy_networks=networks,
             observation_networks=observation_networks,

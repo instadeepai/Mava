@@ -16,7 +16,7 @@
 """Example running DIAL"""
 
 # import importlib
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import dm_env
 import numpy as np
@@ -46,7 +46,7 @@ flags.DEFINE_integer(
 )
 
 
-class DIAL_policy(snt.Module):
+class DIAL_policy(snt.RNNCore):
     def __init__(
         self,
         gru_hidden_size: int,
@@ -57,6 +57,8 @@ class DIAL_policy(snt.Module):
         name: str = None,
     ):
         super(DIAL_policy, self).__init__(name=name)
+        self._gru_hidden_size = gru_hidden_size
+
         self.task_mlp = networks.LayerNormMLP(
             task_mlp_size,
             activate_final=True,
@@ -76,9 +78,38 @@ class DIAL_policy(snt.Module):
 
         self._gru_layers = gru_layers
 
-    def __call__(self, x: snt.Module) -> snt.Module:
+    def initial_state(self, batch_size: int = 1) -> snt.Module:
+        return self.gru.initial_state(batch_size)
 
-        return x
+    def __call__(
+        self,
+        x: snt.Module,
+        state: Optional[snt.Module] = None,
+    ) -> snt.Module:
+        if state is None:
+            state = self.initial_state()
+
+        # Temporary return code: (action, message), state
+        return (
+            tf.random.uniform(
+                (x.shape[0], 2), minval=0, maxval=1, dtype=tf.dtypes.float32
+            ),
+            tf.random.uniform(
+                (x.shape[0], 1), minval=0, maxval=1, dtype=tf.dtypes.float32
+            ),
+        ), state
+
+        x = self.task_mlp(x)
+        # print(x.shape)
+        x, state = self.gru(x, state)
+        # print(x.shape)
+
+        x_output = self.output_mlp(x[:, -1])
+        x_message = self.message_mlp(x[:, -1])
+
+        # print(x.shape)
+        # print(':D')
+        return (x_output, x_message), state
 
 
 def make_environment(
@@ -91,13 +122,14 @@ def make_environment(
     return environment
 
 
+# TODO Kevin: Define message head node correctly
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     policy_network_gru_hidden_sizes: Union[Dict[str, int], int] = 128,
     policy_network_gru_layers: Union[Dict[str, int], int] = 2,
     policy_network_task_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    policy_network_message_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    policy_network_output_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128, 128),
+    policy_network_message_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128, 1),
+    policy_network_output_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128, 2),
     message_size: int = 1,
     shared_weights: bool = True,
     sigma: float = 0.3,
@@ -229,7 +261,9 @@ def main(_: Any) -> None:
     )
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
-        train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
+        # train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
+        train_loop.run(num_episodes=1)
+        return
         eval_loop.run(num_episodes=1)
 
 

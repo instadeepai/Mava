@@ -23,6 +23,7 @@ from acme.wrappers.gym_wrapper import _convert_to_spec
 
 from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv
+from mava.utils.debugging.environments.switch_game import MultiAgentSwitchGame
 from mava.utils.wrapper_utils import convert_np_type
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
@@ -125,7 +126,7 @@ class SwitchGameWrapper(PettingZooParallelEnvWrapper):
 
     # Note: we don't inherit from base.EnvironmentWrapper because that class
     # assumes that the wrapped environment is a dm_env.Environment.
-    def __init__(self, environment: MultiAgentEnv):
+    def __init__(self, environment: MultiAgentSwitchGame):
         super().__init__(environment=environment)
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:

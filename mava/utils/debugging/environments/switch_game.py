@@ -36,7 +36,7 @@ class MultiAgentSwitchGame(gym.Env):
         num_agents: int = 3,
     ) -> None:
 
-        self._num_agents = num_agents
+        self.num_agents = num_agents
         # Generate IDs and convert agent list to dictionary format.
         self.env_done = False
         self.agent_ids = []
@@ -44,7 +44,7 @@ class MultiAgentSwitchGame(gym.Env):
         # spaces
         self.action_spaces = {}
         self.observation_spaces = {}
-        for a_i in range(self._num_agents):
+        for a_i in range(self.num_agents):
             agent_id = "agent_" + str(a_i)
             self.agent_ids.append(agent_id)
             self.action_spaces[agent_id] = spaces.Discrete(2)
@@ -52,11 +52,11 @@ class MultiAgentSwitchGame(gym.Env):
 
         self.possible_agents = self.agent_ids
         # environment parameters
-        self.max_time = 4 * self._num_agents - 6
+        self.max_time = 4 * self.num_agents - 6
         self.selected_agent = -1
 
     def step(
-        self, action_n: Dict[str, int]
+        self, action_n: Dict[str, np.ndarray]
     ) -> Tuple[
         Dict[str, Union[np.array, Any]],
         Union[dict, Dict[str, Union[float, Any]]],
@@ -69,15 +69,15 @@ class MultiAgentSwitchGame(gym.Env):
 
         # set action for interrogated agent
         selected_agent_id = self.agent_ids[self.selected_agent]
-        action = action_n[selected_agent_id]
+        action = action_n[selected_agent_id].argmax()
         # advance world state
         self.agent_history.append(self.selected_agent)
-        self.seen_all = np.unique(self.agent_history).shape[0] == self._num_agents
+        self.seen_all = np.unique(self.agent_history).shape[0] == self.num_agents
         if action == 1:
             self.env_done = True
             self.tell = True
 
-        self.selected_agent = np.random.randint(0, self._num_agents)
+        self.selected_agent = np.random.randint(0, self.num_agents)
         self.time += 1
         if self.time >= self.max_time:
             self.env_done = True
@@ -100,7 +100,7 @@ class MultiAgentSwitchGame(gym.Env):
         self.n_seen = 0
         self.time = 0
         self.tell = False
-        self.selected_agent = np.random.randint(0, self._num_agents)
+        self.selected_agent = np.random.randint(0, self.num_agents)
 
         self.env_done = False
         # record observations for each agent
@@ -115,7 +115,7 @@ class MultiAgentSwitchGame(gym.Env):
 
     # get observation for a particular agent
     def _get_obs(self, a_i: int, agent_id: str) -> np.array:
-        return 1 if a_i == self.selected_agent else 0
+        return 1.0 if a_i == self.selected_agent else 0.0
 
     # get dones for a particular agent
     # unused right now -- agents are allowed to go beyond the viewing screen
