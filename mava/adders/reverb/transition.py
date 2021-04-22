@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# mypy: ignore-errors
+# # Adapted from
+# https://github.com/deepmind/acme/blob/master/acme/adders/reverb/transition.py
 
 """Transition adders.
 This implements an N-step transition adder which collapses trajectory sequences
@@ -22,7 +23,7 @@ into a single transition, simplifying to a simple transition adder when N=1.
 import copy
 import itertools
 import operator
-from typing import Optional
+from typing import Any, Optional, Tuple
 
 import numpy as np
 import reverb
@@ -199,7 +200,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             tree.map_structure(operator.imul, total_discount, step_discount)
 
         if extras:
-            transition = (
+            transition: Tuple[Any, ...] = (
                 observations,
                 actions,
                 extras,
@@ -207,7 +208,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
                 total_discount,
                 next_observations,
                 next_extras,
-            )  # type: ignore
+            )
         else:
             transition = (
                 observations,
@@ -215,7 +216,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
                 n_step_return,
                 total_discount,
                 next_observations,
-            )  # type: ignore
+            )
         # Create a list of steps.
         if self._final_step_placeholder is None:
             # utils.final_step_like is expensive (around 0.085ms) to run every time
@@ -223,20 +224,28 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             self._final_step_placeholder = mava_utils.final_step_like(
                 self._buffer[0], next_observations
             )
-        final_step: base.Step = self._final_step_placeholder._replace(
-            observations=next_observations
-        )
-        steps = list(self._buffer) + [final_step]
 
-        # Calculate the priority for this transition.
+        if next_observations is not None:
+            final_step: base.Step = self._final_step_placeholder._replace(
+                observations=next_observations
+            )
+            steps = list(self._buffer) + [final_step]
 
-        # NOTE (Arnu): removed because of errors
-        table_priorities = acme_utils.calculate_priorities(self._priority_fns, steps)
+            # Calculate the priority for this transition.
 
-        # Insert the transition into replay along with its priority.
-        self._writer.append(transition)
-        for table, priority in table_priorities.items():
-            self._writer.create_item(table=table, num_timesteps=1, priority=priority)
+            # NOTE (Arnu): removed because of errors
+            table_priorities = acme_utils.calculate_priorities(
+                self._priority_fns, steps
+            )
+
+            # Insert the transition into replay along with its priority.
+            self._writer.append(transition)
+            for table, priority in table_priorities.items():
+                self._writer.create_item(
+                    table=table, num_timesteps=1, priority=priority
+                )
+        else:
+            raise ValueError("next_observations cannot be None here.")
 
     def _write_last(self) -> None:
         # Drain the buffer until there are no transitions.
@@ -249,6 +258,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     def signature(
         cls,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        core_state_spec: tf.TypeSpec = None,
     ) -> tf.TypeSpec:
 
         # This function currently assumes that self._discount is a scalar.
