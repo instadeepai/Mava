@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-from typing import Tuple
+from typing import Any, Dict, Tuple, Union
 
 import gym
+import numpy as np
 from gym import spaces
 
 """
@@ -37,9 +37,7 @@ class TwoStepEnv(gym.Env):
     def __init__(self) -> None:
 
         self.num_agents = 2
-        self.step_num = 0
         self.state = 0
-        self.prev_state = 0
         self.env_done = False
 
         self.action_spaces = {}
@@ -49,38 +47,58 @@ class TwoStepEnv(gym.Env):
         for a_i in range(self.num_agents):
             agent_id = "agent_" + str(a_i)
             self.agent_ids.append(agent_id)
-            self.action_spaces[agent_id] = spaces.Discrete(2)
-            self.observation_spaces[agent_id] = spaces.Discrete(2)
+            self.action_spaces[agent_id] = spaces.Discrete(2)  # int64
+            self.observation_spaces[agent_id] = spaces.Box(0, 1, shape=(1,))  # float32
 
         self.possible_agents = self.agent_ids
 
-    def step(self, actions: Tuple[int, int]) -> Tuple[int, int, bool]:
-        self.prev_state = copy.deepcopy(self.state)
-        self.env_done = True  # Assume state > 0
+    def step(
+        self, action_n: Dict[str, np.ndarray]
+    ) -> Tuple[
+        Dict[str, Union[np.array, Any]],
+        Dict[str, Union[np.array, Any]],
+        bool,
+        Dict[str, Dict[Any, Any]],
+    ]:
+        obs_n = {}
+        reward_n = {}
+        # done_n = {}
 
         if self.state == 0:
             self.env_done = False
-            if actions[0] == 0:
+            reward_n = {"agent_0": 0.0, "agent_1": 0.0}
+            if action_n["agent_0"] == 0:
                 self.state = 1
-                return 1, 0, self.env_done  # Go to 2A
+                obs_n = {"agent_0": 1.0, "agent_1": 1.0}
+                return obs_n, reward_n, self.env_done, {}  # Go to 2A
             else:
                 self.state = 2
-                return 2, 0, self.env_done  # Go to 2B
+                obs_n = {"agent_0": 2.0, "agent_1": 2.0}
+                return obs_n, reward_n, self.env_done, {}  # Go to 2B
+
         elif self.state == 1:  # State 2A
-            return self.state, 7, self.env_done
+            self.env_done = True
+            self.state = 0
+            reward_n = {"agent_0": 7.0, "agent_1": 7.0}
+            return obs_n, reward_n, self.env_done, {}
+
         elif self.state == 2:  # State 2B
-            if actions[0] == 0 and actions[1] == 0:
-                reward = 0
-            elif actions[0] == 0 and actions[1] == 1:
-                reward = 1
-            elif actions[0] == 1 and actions[1] == 0:
-                reward = 1
-            elif actions[0] == 1 and actions[1] == 1:
-                reward = 8
-            return self.state, reward, self.env_done
+            self.env_done = True
+            self.state = 0
+            if action_n["agent_0"] == 0 and action_n["agent_1"] == 0:
+                reward_n = {"agent_0": 0.0, "agent_1": 0.0}
+            elif action_n["agent_0"] == 0 and action_n["agent_1"] == 1:
+                reward_n = {"agent_0": 1.0, "agent_1": 1.0}
+            elif action_n["agent_0"] == 1 and action_n["agent_1"] == 0:
+                reward_n = {"agent_0": 1.0, "agent_1": 1.0}
+            elif action_n["agent_0"] == 1 and action_n["agent_1"] == 1:
+                reward_n = {"agent_0": 8.0, "agent_1": 8.0}
+            return obs_n, reward_n, self.env_done, {}
+
         else:
             raise Exception("invalid state:{}".format(self.state))
 
-    def reset(self) -> int:
+    def reset(self) -> Dict[str, np.array]:
         self.state = 0
-        return self.state
+        obs_n = {"agent_0": 0.0, "agent_1": 0.0}
+        return obs_n
