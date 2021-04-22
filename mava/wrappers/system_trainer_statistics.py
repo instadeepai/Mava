@@ -406,6 +406,9 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
 
         self._backward()
 
+        if self.tape:
+            del self.tape
+
         # Log losses per agent
         return train_utils.map_losses_per_agent_ac(
             self.critic_losses, self.policy_losses
