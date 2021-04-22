@@ -23,10 +23,10 @@ from typing import Dict, Iterator, Optional, Type
 import reverb
 import sonnet as snt
 import tensorflow as tf
-from acme import datasets, types
+from acme import datasets
 from acme.utils import counting, loggers
 
-from mava import adders, core, specs
+from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import DecentralisedActor
 from mava.components.tf.modules.mixing import MonotonicMixing
