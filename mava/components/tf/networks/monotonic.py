@@ -47,7 +47,6 @@ class MonotonicMixingNetwork(snt.Module):
         architecture: BaseArchitecture,
         qmix_hidden_dim: int,
         state_dim: int,
-        n_agents: int,  # TODO Get from architecture
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 2,
     ) -> None:
@@ -63,10 +62,11 @@ class MonotonicMixingNetwork(snt.Module):
         """
         super(MonotonicMixingNetwork, self).__init__()
         self._architecture = architecture
-
         self._qmix_hidden_dim = qmix_hidden_dim
+        # TODO What is the most efficient way to get these from architecture?
         self._state_dim = state_dim
-        self._n_agents = n_agents
+        # self._n_agents = architecture._n_agents
+        self._n_agents = 2  # NOTE (St John) Hard coded for now
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
 

@@ -18,12 +18,12 @@
 """QMIX system implementation."""
 import copy
 import dataclasses
-from typing import Dict, Iterator, Optional, Type, Union
+from typing import Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
 import tensorflow as tf
-from acme import datasets
+from acme import datasets, types
 from acme.utils import counting, loggers
 
 from mava import adders, core, specs
@@ -34,8 +34,6 @@ from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.qmix import training
-
-NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
 
 
 @dataclasses.dataclass
@@ -100,10 +98,14 @@ class QMIXBuilder(SystemBuilder):
         self,
         config: QMIXConfig,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
-    ):
+    ) -> None:
         """Args:
-        _config: Configuration options for the MADDPG system.
-        _trainer_fn: Trainer module to use."""
+        _config: Configuration options for the QMIX system.
+
+        self._config = config
+        self._trainer_fn = trainer_fn
+        """
+
         self._config = config
         self._trainer_fn = trainer_fn
 
@@ -181,7 +183,7 @@ class QMIXBuilder(SystemBuilder):
         dataset: Iterator[reverb.ReplaySample],
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
-        logger: Optional[NestedLogger] = None,
+        logger: Optional[types.NestedLogger] = None,
         # TODO: eliminate checkpoint and move it outside.
         checkpoint: bool = False,
     ) -> core.Trainer:
@@ -332,9 +334,7 @@ class QMIX(system.System):
         # Augment network architecture by adding mixing layer network.
         networks = MonotonicMixing(
             architecture=architecture,
-            state_shape=(1, 1),
-            n_agents=5,  # TODO Get this from architecture
-            qmix_hidden_dim=2,
+            state_shape=(1,),
         ).create_system()
 
         # Retrieve networks

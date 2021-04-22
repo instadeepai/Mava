@@ -38,8 +38,7 @@ class MonotonicMixing(BaseMixingModule):
         self,
         architecture: BaseArchitecture,
         state_shape: Tuple,
-        n_agents: int,  # TODO Get this from architecture
-        qmix_hidden_dim: int,
+        qmix_hidden_dim: int = 2,
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 2,
     ) -> None:
@@ -50,9 +49,9 @@ class MonotonicMixing(BaseMixingModule):
         super(MonotonicMixing, self).__init__()
 
         self._architecture = architecture
-
         self._state_dim = int(np.prod(state_shape))  # Defined by the environment
-        self._n_agents = n_agents
+        # self._n_agents = architecture._n_agents
+        self._n_agents = 2  # NOTE (St John) Hard coded for now
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
@@ -64,7 +63,6 @@ class MonotonicMixing(BaseMixingModule):
             self._architecture,
             self._qmix_hidden_dim,
             self._state_dim,
-            self._n_agents,
             self._num_hypernet_layers,
             self._hypernet_hidden_dim,
         )

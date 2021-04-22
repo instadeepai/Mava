@@ -63,7 +63,7 @@ class QMIXTrainer(mava.Trainer):
         counter: counting.Counter,
         logger: loggers.Logger,
         checkpoint: bool,
-    ):
+    ) -> None:
 
         self._agents = agents
         self._agent_types = agent_types
@@ -224,8 +224,10 @@ class QMIXTrainer(mava.Trainer):
 
         with tf.GradientTape() as tape:
             # TODO Define q_values and states
-            q_values = tf.Tensor
-            states = tf.Tensor
+            q_values = 1
+            states = 1
+            q_values = tf.convert_to_tensor(q_values, dtype=tf.float32)
+            states = tf.convert_to_tensor(states, dtype=tf.float32)
             target_vals = self._target_mixing_network(q_values, states)
             predicted_vals = self._mixing_network(q_values, states)
 
