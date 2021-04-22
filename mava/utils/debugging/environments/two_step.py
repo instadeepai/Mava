@@ -57,7 +57,7 @@ class TwoStepEnv(gym.Env):
     ) -> Tuple[
         Dict[str, Union[np.array, Any]],
         Dict[str, Union[np.array, Any]],
-        bool,
+        Dict[str, Union[bool, Any]],
         Dict[str, Dict[Any, Any]],
     ]:
         obs_n = {}
@@ -67,24 +67,27 @@ class TwoStepEnv(gym.Env):
         if self.state == 0:
             self.env_done = False
             reward_n = {"agent_0": 0.0, "agent_1": 0.0}
+            done_n = {"agent_0": False, "agent_1": False}
             if action_n["agent_0"] == 0:
                 self.state = 1
                 obs_n = {"agent_0": 1.0, "agent_1": 1.0}
-                return obs_n, reward_n, self.env_done, {}  # Go to 2A
+                return obs_n, reward_n, done_n, {}  # Go to 2A
             else:
                 self.state = 2
                 obs_n = {"agent_0": 2.0, "agent_1": 2.0}
-                return obs_n, reward_n, self.env_done, {}  # Go to 2B
+                return obs_n, reward_n, done_n, {}  # Go to 2B
 
         elif self.state == 1:  # State 2A
             self.env_done = True
             self.state = 0
             reward_n = {"agent_0": 7.0, "agent_1": 7.0}
-            return obs_n, reward_n, self.env_done, {}
+            done_n = {"agent_0": True, "agent_1": True}
+            return obs_n, reward_n, done_n, {}
 
         elif self.state == 2:  # State 2B
             self.env_done = True
             self.state = 0
+            done_n = {"agent_0": True, "agent_1": True}
             if action_n["agent_0"] == 0 and action_n["agent_1"] == 0:
                 reward_n = {"agent_0": 0.0, "agent_1": 0.0}
             elif action_n["agent_0"] == 0 and action_n["agent_1"] == 1:
@@ -93,7 +96,7 @@ class TwoStepEnv(gym.Env):
                 reward_n = {"agent_0": 1.0, "agent_1": 1.0}
             elif action_n["agent_0"] == 1 and action_n["agent_1"] == 1:
                 reward_n = {"agent_0": 8.0, "agent_1": 8.0}
-            return obs_n, reward_n, self.env_done, {}
+            return obs_n, reward_n, done_n, {}
 
         else:
             raise Exception("invalid state:{}".format(self.state))
