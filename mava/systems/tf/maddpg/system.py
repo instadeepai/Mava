@@ -30,7 +30,7 @@ from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
-from mava.wrappers import DetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
 
 
 @dataclasses.dataclass
@@ -378,8 +378,10 @@ class MADDPG(system.System):
             checkpoint=checkpoint,
         )
 
-        # TODO (Arnu): fix mismatch in types between base trainer
-        # and wrapped trainer
+        # NB If using both NetworkStatistics and TrainerStatistics, order is important.
+        # NetworkStatistics need to appear before TrainerStatistics.
+        trainer = NetworkStatisticsActorCritic(trainer)
+
         trainer = DetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]
         )

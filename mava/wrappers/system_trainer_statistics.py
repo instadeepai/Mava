@@ -18,16 +18,18 @@
 import time
 from typing import Any, Dict, List, Sequence
 
-from acme.utils import loggers
 import numpy as np
+import tensorflow as tf
+from acme.utils import loggers
+
 import mava
+from mava.utils import training_utils as train_utils
 from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics
-import tensorflow as tf
 
 
 class TrainerWrapperBase(mava.Trainer):
-    """A base trainer statistic class that wrappers a trainer and logs
+    """A base trainer stats class that wrappers a trainer and logs
     certain statistics.
     """
 
@@ -43,21 +45,12 @@ class TrainerWrapperBase(mava.Trainer):
     def _create_loggers(self, keys: List[str]) -> None:
         raise NotImplementedError
 
-    def _compute_statistics(self, data: Dict[str, Dict[str, float]]) -> None:
-        raise NotImplementedError
-
-    def __getattr__(self, attr: Any) -> Any:
-        # Check if current class has attr first
-        if hasattr(type(self), attr) is False:
-            return self._trainer.__getattribute__(attr)
-        return self.__getattribute__(attr)
+    def __getattr__(self, name: str) -> Any:
+        """Expose any other attributes of the underlying trainer."""
+        return getattr(self._trainer, name)
 
 
 class TrainerStatisticsBase(TrainerWrapperBase):
-    """A base trainer statistic class that wrappers a trainer and logs
-    certain statistics.
-    """
-
     def __init__(
         self,
         trainer: mava.Trainer,
@@ -90,16 +83,14 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        # Checkpoint the networks.
-        if len(self._system_checkpointer.keys()) > 0:
-            for network_key in self.unique_net_keys:
-                checkpointer = self._system_checkpointer[network_key]
-                checkpointer.save()
+        train_utils.checkpoint_networks(self._system_checkpointer)
 
         self._logger.write(fetches)
 
 
 class DetailedTrainerStatistics(TrainerStatisticsBase):
+    """A trainer class that logs episode stats."""
+
     def __init__(
         self,
         trainer: mava.Trainer,
@@ -162,6 +153,12 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
 
 
 class NetworkStatisticsBase(TrainerWrapperBase):
+    """
+    A base class for logging network statistics.
+        gradient_norms: List of norms (see tf.norm.ord) to apply to grads.
+        weight_norms: List of norms (see tf.norm.ord) to apply to weights.
+    """
+
     def __init__(
         self,
         trainer: mava.Trainer,
@@ -176,7 +173,7 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         self.weight_norms = weight_norms
         self._create_loggers(self._agents)
 
-    def _create_loggers(self, keys) -> None:
+    def _create_loggers(self, keys: List[str]) -> None:
         trainer_label = self._logger._label
         base_dir = self._logger._directory
         (
@@ -201,11 +198,10 @@ class NetworkStatisticsBase(TrainerWrapperBase):
                 time_stamp=time_stamp,
             )
 
-    # We are usually concerned with weights and grads of linear and conv layers.
-    # We have to currently use the name since it is a tf.var and we can't
-    # check layer type once already a tf.var.
-    # Log linear and conv weights and not bias units.
-    def _should_log(self, name):
+    # Function determines which weight layers to log.
+    # We are usually only concerned with weights and grads of linear and conv layers.
+    def _should_log(self, name: str) -> bool:
+        # Log linear and conv weights and not bias units.
         if ("linear" in name.lower() or "conv" in name.lower()) and not (
             "b:" in name.lower()
         ):
@@ -213,13 +209,15 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         else:
             return False
 
-    def _apply_norms(self, value, norms_list) -> Dict:
+    def _apply_norms(self, value: tf.Tensor, norms_list: List) -> Dict:
         return_data = {}
         for norm in norms_list:
             return_data[norm] = tf.norm(value, ord=norm).numpy()
         return return_data
 
-    def _log_gradients(self, agent, variables_names, gradients):
+    def _log_gradients(
+        self, label: str, agent: str, variables_names: List, gradients: List
+    ) -> None:
         assert len(variables_names) == len(
             gradients
         ), "Variable names and gradients do not match"
@@ -227,26 +225,41 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         for index, grad in enumerate(gradients):
             variables_name = variables_names[index]
             if self._should_log(variables_name):
-                grads[f"{variables_name}_grad"] = grad
-                grads[f"{variables_name}_grad_norm"] = self._apply_norms(
+                grads[f"{label}/{variables_name}_grad"] = grad
+                grads[f"{label}/{variables_name}_grad_norm"] = self._apply_norms(
                     grad, self.gradient_norms
                 )
 
         self._network_loggers[agent].write(grads)
 
-    def _log_weights(self, agent, variables):
+    def _log_weights(self, label: str, agent: str, variables: List) -> None:
         weights = {}
         for weight in variables:
             if self._should_log(weight.name):
-                weights[f"{weight.name}_weight"] = weight
-                weights[f"{weight.name}_weight_norm"] = self._apply_norms(
+                weights[f"{label}/{weight.name}_weight"] = weight
+                weights[f"{label}/{weight.name}_weight_norm"] = self._apply_norms(
                     weight, self.weight_norms
                 )
         self._network_loggers[agent].write(weights)
 
     def step(self) -> None:
-        # Run the learning step.
         fetches = self._step()
+
+        # Compute elapsed time.
+        timestamp = time.time()
+        if self._timestamp:  # type: ignore
+            elapsed_time = timestamp - self._timestamp  # type: ignore
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        train_utils.checkpoint_networks(self._system_checkpointer)
+
+        self._logger.write(fetches)
 
 
 class NetworkStatistics(NetworkStatisticsBase):
@@ -274,7 +287,12 @@ class NetworkStatistics(NetworkStatisticsBase):
 
         self._calc_gradients_update_network(policy_losses, tape)
 
-    def _calc_gradients_update_network(self, policy_losses, tape):
+        # Log losses per agent
+        return policy_losses
+
+    def _calc_gradients_update_network(
+        self, policy_losses: Dict, tape: tf.GradientTape
+    ) -> None:
         # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -295,9 +313,10 @@ class NetworkStatistics(NetworkStatisticsBase):
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
 
-            self._log_weights(agent, policy_variables)
+            self._log_weights(label="Policy", agent=agent, variables=policy_variables)
             self._log_gradients(
-                agent,
+                label="Policy",
+                agent=agent,
                 variables_names=[vars.name for vars in policy_variables],
                 gradients=policy_gradients,
             )
@@ -328,7 +347,12 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
 
         self._calc_gradients_update_network(policy_losses, critic_losses, tape)
 
-    def _calc_gradients_update_network(self, policy_losses, critic_losses, tape):
+        # Log losses per agent
+        return train_utils.map_losses_per_agent_ac(critic_losses, policy_losses)
+
+    def _calc_gradients_update_network(
+        self, policy_losses: Dict, critic_losses: Dict, tape: tf.GradientTape
+    ) -> None:
         # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -357,16 +381,18 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             self._policy_optimizer.apply(policy_gradients, policy_variables)
             self._critic_optimizer.apply(critic_gradients, critic_variables)
 
-            self._log_weights(agent, policy_variables)
+            self._log_weights(label="Policy", agent=agent, variables=policy_variables)
             self._log_gradients(
-                agent,
+                label="Policy",
+                agent=agent,
                 variables_names=[vars.name for vars in policy_variables],
                 gradients=policy_gradients,
             )
 
-            self._log_weights(agent, critic_variables)
+            self._log_weights(label="Critic", agent=agent, variables=critic_variables)
             self._log_gradients(
-                agent,
+                label="Critic",
+                agent=agent,
                 variables_names=[vars.name for vars in critic_variables],
                 gradients=critic_gradients,
             )

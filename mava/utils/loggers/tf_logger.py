@@ -86,7 +86,11 @@ class TFSummaryLogger(base.Logger):
     ) -> Dict[str, float]:
         items: List = []
         for k, v in dict_info.items():
-            new_key = parent_key + sep + str(k) if parent_key else str(k)  # type: ignore
+            k = str(k)
+            if parent_key:
+                new_key = parent_key + sep + k
+            else:
+                new_key = k
             if isinstance(v, dict):
                 items.extend(
                     self._flatten_dict(parent_key=new_key, dict_info=v, sep=sep).items()

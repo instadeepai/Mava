@@ -31,6 +31,7 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.utils import training_utils as train_utils
 
 # NOTE (Arnu): in TF2 this should be the default
 # but for some reason it is not when I run it.
@@ -302,19 +303,9 @@ class BaseMADDPGTrainer(mava.Trainer):
         self._calc_gradients_update_network(policy_losses, critic_losses, tape)
 
         # Log losses per agent
-        logged_losses: Dict[str, Dict[str, Any]] = {}
-        for agent in self._agents:
-            logged_losses.update(
-                {
-                    agent: {
-                        "critic_loss": critic_losses[agent],
-                        "policy_loss": policy_losses[agent],
-                    }
-                }
-            )
-        return logged_losses
+        return train_utils.map_losses_per_agent_ac(critic_losses, policy_losses)
 
-    def _forward_pass(self, inputs):
+    def _forward_pass(self, inputs: Any) -> Tuple[Dict, Dict, tf.GradientTape]:
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -327,8 +318,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
-
-        logged_losses: Dict[str, Dict[str, Any]] = {}
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
@@ -395,7 +384,9 @@ class BaseMADDPGTrainer(mava.Trainer):
 
         return policy_losses, critic_losses, tape
 
-    def _calc_gradients_update_network(self, policy_losses, critic_losses, tape):
+    def _calc_gradients_update_network(
+        self, policy_losses: Dict, critic_losses: Dict, tape: tf.GradientTape
+    ) -> None:
         # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -444,11 +435,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        # Checkpoint the networks.
-        if len(self._system_checkpointer.keys()) > 0:
-            for agent_key in self.unique_net_keys:
-                checkpointer = self._system_checkpointer[agent_key]
-                checkpointer.save()
+        train_utils.checkpoint_networks(self._system_checkpointer)
 
         self._logger.write(fetches)
 
