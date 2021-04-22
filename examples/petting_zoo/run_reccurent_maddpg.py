@@ -32,9 +32,8 @@ from acme.tf import utils as tf2_utils
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
-from mava.systems.tf.maddpg.training import (  # DecentralisedRecurrentMADDPGTrainer
-    DecentralisedMADDPGTrainer,
-)
+from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
+
 from mava.utils.loggers import Logger
 from mava.wrappers import DetailedPerAgentStatistics, PettingZooParallelEnvWrapper
 
@@ -175,7 +174,7 @@ def main(_: Any) -> None:
             "observations"
         ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
-        trainer_fn=DecentralisedMADDPGTrainer,
+        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
         executer_fn=executors.RecurrentExecutor,
         logger=system_logger,
     )
