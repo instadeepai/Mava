@@ -109,10 +109,8 @@ def make_networks(
         # Create the critic network.
         critic_network = snt.Sequential(
             [
-                # The multiplexer concatenates the observations/actions.
-                # TODO : seek a around not using actions here.
                 networks.LayerNormMLP(
-                    critic_networks_layer_sizes[key], activate_final=False
+                    critic_networks_layer_sizes[key], activate_final=True
                 ),
                 snt.Linear(1),
             ]
@@ -130,10 +128,11 @@ def make_networks(
 
 
 def main(_: Any) -> None:
+    shared_weights = False
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment()
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    system_networks = make_networks(environment_spec)
+    system_networks = make_networks(environment_spec, shared_weights=shared_weights)
 
     # create tf loggers
     base_dir = Path.cwd()
@@ -165,8 +164,9 @@ def main(_: Any) -> None:
         ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
         logger=system_logger,
-        max_queue_size=100,
-        batch_size=32,
+        max_queue_size=10,
+        batch_size=5,
+        shared_weights=shared_weights,
     )
 
     # Create the environment loop used for training.

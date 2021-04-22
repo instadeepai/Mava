@@ -24,6 +24,7 @@ from mava.components.tf.architectures.centralised import (
 from mava.components.tf.architectures.decentralised import (
     DecentralisedActor,
     DecentralisedActorCritic,
+    DecentralisedValueActorCritic,
 )
 from mava.components.tf.architectures.state_based import (
     StateBasedActor,

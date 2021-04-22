@@ -124,9 +124,11 @@ class BaseIPPOTrainer(mava.Trainer):
         }
         for agent_key in self.unique_net_keys:
             self._system_network_variables["critic"][agent_key] = self._critic_networks[
-                agent_key].variables
+                agent_key
+            ].variables
             self._system_network_variables["policy"][agent_key] = self._policy_networks[
-                agent_key].variables
+                agent_key
+            ].variables
 
         # Create checkpointer
         # NOTE (Siphelele+Claude) we are not sure how checkpointing works.
@@ -177,6 +179,9 @@ class BaseIPPOTrainer(mava.Trainer):
         # Get data from replay.
         inputs = next(self._iterator)
 
+        # Make tensor time major
+        data = tf2_utils.batch_to_sequence(inputs.data)
+
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -188,15 +193,12 @@ class BaseIPPOTrainer(mava.Trainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
-        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = data
         o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-        prev_logits = e_t['logits']
+        prev_logits = e_t["logits"]
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
         for agent in self._agents:
-
-            # Cast the additional discount to match the environment discount dtype.
-            discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
 
             with tf.GradientTape(persistent=True) as tape:
                 # Maybe transform the observation before feeding into policy and critic.
@@ -205,33 +207,29 @@ class BaseIPPOTrainer(mava.Trainer):
                 # network weights.
 
                 logits = self._policy_networks[agent](o_tm1_trans[agent])
-                values = self._critic_networks[agent](o_tm1_trans[agent])
 
-                # critic loss
-                bootstrap_value = values[-1]
-                values = values[:-1]
+                v_tm1 = self._critic_networks[agent](o_tm1_trans[agent])
+                v_tm1 = tf.squeeze(v_tm1, axis=1)
 
-                td_loss, td_lambda_extra = trfl.td_lambda(
-                    state_values=values,
-                    rewards=r_t[agent],
-                    pcontinues=discount,
-                    bootstrap_value=bootstrap_value,
-                    lambda_=self._lambda_gae,
-                    name="CriticLoss",
+                v_t = self._critic_networks[agent](o_t_trans[agent])
+                v_t = tf.squeeze(v_t, axis=1)
+
+                td_loss, _ = trfl.td_learning(
+                    v_tm1=v_tm1,
+                    r_t=r_t[agent],
+                    pcont_t=d_t[agent],
+                    v_t=v_t,
+                    name="TDLoss",
                 )
 
                 # Do not use the loss provided by td_lambda as they sum the losses over
                 # the sequence length rather than averaging them.
-                critic_loss = self.baseline_cost * tf.reduce_mean(
-                    tf.square(td_lambda_extra.temporal_differences), name="CriticLoss"
-                )
+                critic_loss = tf.reduce_mean(td_loss)
 
                 # Compute importance weights
                 behaviour_logits = prev_logits[agent]
-                pi_behaviour = tfp.distributions.Categorical(
-                    logits=behaviour_logits[:-1]
-                )
-                pi_target = tfp.distributions.Categorical(logits=logits[:-1])
+                pi_behaviour = tfp.distributions.Categorical(logits=behaviour_logits)
+                pi_target = tfp.distributions.Categorical(logits=logits)
                 log_rhos = pi_target.log_prob(a_tm1[agent]) - pi_behaviour.log_prob(
                     a_tm1[agent]
                 )

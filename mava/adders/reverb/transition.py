@@ -269,7 +269,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # NOTE (Claude+Siphelele) if extras_spec is not given then set to the env default.
         if not extras_specs:
             extras_specs = environment_spec.get_extra_specs()
-        
+
         obs_specs = {}
         act_specs = {}
         reward_specs = {}

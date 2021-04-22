@@ -27,7 +27,7 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import DecentralisedActorCritic
+from mava.components.tf.architectures import DecentralisedValueActorCritic
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf.ippo import execution, training
@@ -96,8 +96,8 @@ class IPPOBuilder(SystemBuilder):
         trainer_fn: Type[training.BaseIPPOTrainer] = training.IPPOTrainer,
     ):
         """Args:
-                config: Configuration options for the IPPO system.
-                trainer_fn: Trainer module for IPPO."""
+        config: Configuration options for the IPPO system.
+        trainer_fn: Trainer module for IPPO."""
 
         self._config = config
         self._trainer_fn = trainer_fn
@@ -114,43 +114,42 @@ class IPPOBuilder(SystemBuilder):
         logits_spec = {}
         agent_keys = self._agent_types if self._config.shared_weights else self._agents
         for agent_key in agent_keys:
+            # NOTE how do you get the spec when there are shared_weights. IE spec per agent_type.
             agent_action_dim = self._config.environment_spec.get_agent_specs()[
-                agent_key].actions.num_values
+                agent_key
+            ].actions.num_values
 
-            # The logits spec set as numpy array with the same number of 
+            # The logits spec set as numpy array with the same number of
             # values as the agents number of actions.
             logits_spec[agent_key] = np.zeros(agent_action_dim, dtype=np.float32)
 
-        extras_spec['logits'] = logits_spec
+        extras_spec["logits"] = logits_spec
 
         return extras_spec
-        
+
     def make_replay_table(
         self,
         # NOTE (Claude) Do we need to pass in the environment spec here?
         # Can't we retrieve it through self._config.environment_spec?
-        environment_spec: specs.MAEnvironmentSpec, #
+        environment_spec: specs.MAEnvironmentSpec,  #
     ) -> reverb.Table.queue:
         """Create tables to insert data into."""
 
         # Get logits spec to pass to the reverb table.
         extras_spec = self._make_extras_spec()
 
-        return (
-            reverb.Table.queue(
-                name=self._config.replay_table_name,
-                max_size=self._config.max_queue_size,
-
-                # NOTE (Siphelele) ParallelNStepTransitionAdder.signiture() 
-                # modified to accept second argument logits_spec,
-                # which is used to initialise the 'extras' portion of the 
-                # reverb table. Maybe we need to modify ParallelNStepTransitionAdder
-                # to allow for arbitrary 'extras' spec?
-                # Acme adders seem to have an optional extra_spec argument!
-                signature=reverb_adders.ParallelNStepTransitionAdder.signature(
-                    environment_spec, extras_spec
-                ),
-            )
+        return reverb.Table.queue(
+            name=self._config.replay_table_name,
+            max_size=self._config.max_queue_size,
+            # NOTE (Siphelele) ParallelNStepTransitionAdder.signiture()
+            # modified to accept second argument logits_spec,
+            # which is used to initialise the 'extras' portion of the
+            # reverb table. Maybe we need to modify ParallelNStepTransitionAdder
+            # to allow for arbitrary 'extras' spec?
+            # Acme adders seem to have an optional extra_spec argument!
+            signature=reverb_adders.ParallelNStepTransitionAdder.signature(
+                environment_spec, extras_spec
+            ),
         )
 
     def make_dataset_iterator(
@@ -161,7 +160,7 @@ class IPPOBuilder(SystemBuilder):
         dataset = reverb.ReplayDataset.from_table_signature(
             server_address=replay_client.server_address,
             table=self._config.replay_table_name,
-            max_in_flight_samples_per_worker=64
+            max_in_flight_samples_per_worker=64,
         )
         dataset = dataset.batch(self._config.batch_size, drop_remainder=True)
 
@@ -197,11 +196,11 @@ class IPPOBuilder(SystemBuilder):
             variable_source: A source providing the necessary executor parameters.
         """
 
-        # NOTE Get logits spec to pass to the executor. 
-        logits_spec = self._make_extras_spec()['logits']
+        # NOTE Get logits spec to pass to the executor.
+        logits_spec = self._make_extras_spec()["logits"]
 
-        # TODO We (Claude+Siphelele) are not sure how this variable_client 
-        # bit should work. 
+        # TODO We (Claude+Siphelele) are not sure how this variable_client
+        # bit should work.
         shared_weights = self._config.shared_weights
         variable_client = None
         if variable_source:
@@ -222,8 +221,8 @@ class IPPOBuilder(SystemBuilder):
 
         # NOTE (Claude+Siphelele) Create the executor which defines how agents take actions
         # in the system. The MAPPO executor takes the logits_spec as an
-        # argument so that it can use it as a default value for the 
-        # 'extras' in the observe_first() method. We are not sure if this 
+        # argument so that it can use it as a default value for the
+        # 'extras' in the observe_first() method. We are not sure if this
         # is the best way to do things.
         return execution.MAPPOFeedForwardExecutor(
             policy_networks=policy_networks,
@@ -376,9 +375,7 @@ class IPPO(system.System):
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_table(
-            environment_spec=environment_spec
-        )
+        replay_table = builder.make_replay_table(environment_spec=environment_spec)
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
@@ -389,7 +386,7 @@ class IPPO(system.System):
         dataset = builder.make_dataset_iterator(replay_client)
 
         # Create the networks
-        networks = DecentralisedActorCritic(
+        networks = DecentralisedValueActorCritic(
             environment_spec=environment_spec,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
