@@ -298,14 +298,17 @@ class BaseMADDPGTrainer(mava.Trainer):
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
 
-        policy_losses, critic_losses, tape = self._forward_pass(inputs)
+        self._forward(inputs)
 
-        self._calc_gradients_update_network(policy_losses, critic_losses, tape)
+        self._backward()
 
         # Log losses per agent
-        return train_utils.map_losses_per_agent_ac(critic_losses, policy_losses)
+        return train_utils.map_losses_per_agent_ac(
+            self.critic_losses, self.policy_losses
+        )
 
-    def _forward_pass(self, inputs: Any) -> Tuple[Dict, Dict, tf.GradientTape]:
+    # Forward pass that calculates loss.
+    def _forward(self, inputs: Any) -> None:
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -382,12 +385,16 @@ class BaseMADDPGTrainer(mava.Trainer):
                 critic_loss = tf.reduce_mean(critic_loss, axis=0)
                 critic_losses[agent] = critic_loss
 
-        return policy_losses, critic_losses, tape
+        self.policy_losses = policy_losses
+        self.critic_losses = critic_losses
+        self.tape = tape
 
-    def _calc_gradients_update_network(
-        self, policy_losses: Dict, critic_losses: Dict, tape: tf.GradientTape
-    ) -> None:
+    # Backward pass that calculates gradients and updates network.
+    def _backward(self) -> None:
         # Calculate the gradients and update the networks
+        policy_losses = self.policy_losses
+        critic_losses = self.critic_losses
+        tape = self.tape
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
 

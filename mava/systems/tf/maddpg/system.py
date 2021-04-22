@@ -379,7 +379,7 @@ class MADDPG(system.System):
         )
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.
-        # NetworkStatistics need to appear before TrainerStatistics.
+        # NetworkStatistics needs to appear before TrainerStatistics.
         trainer = NetworkStatisticsActorCritic(trainer)
 
         trainer = DetailedTrainerStatistics(  # type: ignore

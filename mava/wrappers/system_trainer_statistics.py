@@ -152,19 +152,23 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
                 self._network_loggers[network].write(network_running_statistics)
 
 
+# TODO(Kale-ab): Is there a better way to do this?
+# Maybe using hooks or callbacks.
 class NetworkStatisticsBase(TrainerWrapperBase):
     """
     A base class for logging network statistics.
         gradient_norms: List of norms (see tf.norm.ord) to apply to grads.
         weight_norms: List of norms (see tf.norm.ord) to apply to weights.
+        log_interval: Log every [log_interval] learner steps.
     """
 
     def __init__(
         self,
         trainer: mava.Trainer,
         # Log only l2 norm by default.
-        gradient_norms: List = [2],
-        weight_norms: List = [2],
+        gradient_norms: List,
+        weight_norms: List,
+        log_interval: int,
     ) -> None:
         super().__init__(trainer)
 
@@ -172,6 +176,18 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         self.gradient_norms = gradient_norms
         self.weight_norms = weight_norms
         self._create_loggers(self._agents)
+        self.log_interval = log_interval
+
+    def _log_step(self) -> bool:
+        if (
+            self._counter
+            and self._counter._counts
+            and self._counter._counts.get("steps")
+            and self._counter._counts.get("steps") % self.log_interval == 0
+        ):
+            return True
+        else:
+            return False
 
     def _create_loggers(self, keys: List[str]) -> None:
         trainer_label = self._logger._label
@@ -200,7 +216,9 @@ class NetworkStatisticsBase(TrainerWrapperBase):
 
     # Function determines which weight layers to log.
     # We are usually only concerned with weights and grads of linear and conv layers.
-    def _should_log(self, name: str) -> bool:
+    # TODO(Kale-ab) Can we be more robust.
+    # Try getting layer type from self._policy_networks[agent_key]
+    def _log_data(self, name: str) -> bool:
         # Log linear and conv weights and not bias units.
         if ("linear" in name.lower() or "conv" in name.lower()) and not (
             "b:" in name.lower()
@@ -221,26 +239,46 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         assert len(variables_names) == len(
             gradients
         ), "Variable names and gradients do not match"
-        grads = {}
+        grads_dict = {}
+        # Log Grads per layer
         for index, grad in enumerate(gradients):
             variables_name = variables_names[index]
-            if self._should_log(variables_name):
-                grads[f"{label}/{variables_name}_grad"] = grad
-                grads[f"{label}/{variables_name}_grad_norm"] = self._apply_norms(
+            if self._log_data(variables_name):
+                grads_dict[f"{label}/{variables_name}_grad"] = grad
+                grads_dict[f"{label}/{variables_name}_grad_norm"] = self._apply_norms(
                     grad, self.gradient_norms
                 )
 
-        self._network_loggers[agent].write(grads)
+        # Log whole network grads
+        all_grads_flat = tf.concat([tf.reshape(grad, -1) for grad in gradients], axis=0)
+        grads_dict[f"{label}/network_grad"] = all_grads_flat
+        grads_dict[f"{label}/network_grad_norm"] = self._apply_norms(
+            all_grads_flat, self.gradient_norms
+        )
 
-    def _log_weights(self, label: str, agent: str, variables: List) -> None:
-        weights = {}
-        for weight in variables:
-            if self._should_log(weight.name):
-                weights[f"{label}/{weight.name}_weight"] = weight
-                weights[f"{label}/{weight.name}_weight_norm"] = self._apply_norms(
+        self._network_loggers[agent].write(grads_dict)
+
+    def _log_weights(self, label: str, agent: str, weights: List) -> None:
+        weights_dict = {}
+
+        # Log Weights per layer
+        for weight in weights:
+            if self._log_data(weight.name):
+                weights_dict[f"{label}/{weight.name}_weight"] = weight
+                weights_dict[f"{label}/{weight.name}_weight_norm"] = self._apply_norms(
                     weight, self.weight_norms
                 )
-        self._network_loggers[agent].write(weights)
+
+        # Log whole network weights
+        all_weights_flat = tf.concat(
+            [tf.reshape(weight, -1) for weight in weights], axis=0
+        )
+        weights_dict[f"{label}/weight_grad"] = all_weights_flat
+        weights_dict[f"{label}/weight_grad_norm"] = self._apply_norms(
+            all_weights_flat, self.gradient_norms
+        )
+
+        self._network_loggers[agent].write(weights_dict)
 
     def step(self) -> None:
         fetches = self._step()
@@ -263,36 +301,46 @@ class NetworkStatisticsBase(TrainerWrapperBase):
 
 
 class NetworkStatistics(NetworkStatisticsBase):
+    """
+    A class for logging network statistics.
+    This class assumes the trainer has the following:
+        _forward: Forward pass. Stores a policy loss and tf.GradientTape.
+        _backward: Updates network using policy loss and tf.GradientTape.
+    """
+
     def __init__(
         self,
         trainer: mava.Trainer,
         # Log only l2 norm by default.
         gradient_norms: List = [2],
         weight_norms: List = [2],
+        log_interval: int = 100,
     ) -> None:
-        super().__init__(trainer, gradient_norms, weight_norms)
+        super().__init__(trainer, gradient_norms, weight_norms, log_interval)
 
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
 
         # Update the target networks
-        self._update_target_networks()
+        # Trying not to assume off policy.
+        if hasattr(self, "_update_target_networks"):
+            self._update_target_networks()
 
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
 
-        policy_losses, tape = self._forward_pass(inputs)
+        self._forward(inputs)
 
-        self._calc_gradients_update_network(policy_losses, tape)
+        self._backward()
 
         # Log losses per agent
-        return policy_losses
+        return self.policy_losses
 
-    def _calc_gradients_update_network(
-        self, policy_losses: Dict, tape: tf.GradientTape
-    ) -> None:
+    def _backward(self) -> None:
+        policy_losses = self.policy_losses
+        tape = self.tape
         # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -313,47 +361,61 @@ class NetworkStatistics(NetworkStatisticsBase):
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
 
-            self._log_weights(label="Policy", agent=agent, variables=policy_variables)
-            self._log_gradients(
-                label="Policy",
-                agent=agent,
-                variables_names=[vars.name for vars in policy_variables],
-                gradients=policy_gradients,
-            )
+            if self._log_step():
+                self._log_weights(label="Policy", agent=agent, weights=policy_variables)
+                self._log_gradients(
+                    label="Policy",
+                    agent=agent,
+                    variables_names=[vars.name for vars in policy_variables],
+                    gradients=policy_gradients,
+                )
 
 
 class NetworkStatisticsActorCritic(NetworkStatisticsBase):
+    """
+    A class for logging network statistics.
+    This class assumes the trainer has the following:
+        _forward: Forward pass. Stores a policy loss, critic loss and tf.GradientTape.
+        _backward: Updates network using policy loss, critic loss and tf.GradientTape.
+    """
+
     def __init__(
         self,
         trainer: mava.Trainer,
         # Log only l2 norm by default.
         gradient_norms: List = [2],
         weight_norms: List = [2],
+        log_interval: int = 100,
     ) -> None:
-        super().__init__(trainer, gradient_norms, weight_norms)
+        super().__init__(trainer, gradient_norms, weight_norms, log_interval)
 
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
 
         # Update the target networks
-        self._update_target_networks()
+        # Trying not to assume off policy.
+        if hasattr(self, "_update_target_networks"):
+            self._update_target_networks()
 
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
 
-        policy_losses, critic_losses, tape = self._forward_pass(inputs)
+        self._forward(inputs)
 
-        self._calc_gradients_update_network(policy_losses, critic_losses, tape)
+        self._backward()
 
         # Log losses per agent
-        return train_utils.map_losses_per_agent_ac(critic_losses, policy_losses)
+        return train_utils.map_losses_per_agent_ac(
+            self.critic_losses, self.policy_losses
+        )
 
-    def _calc_gradients_update_network(
-        self, policy_losses: Dict, critic_losses: Dict, tape: tf.GradientTape
-    ) -> None:
+    def _backward(self) -> None:
         # Calculate the gradients and update the networks
+        policy_losses = self.policy_losses
+        critic_losses = self.critic_losses
+        tape = self.tape
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
 
@@ -381,18 +443,19 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             self._policy_optimizer.apply(policy_gradients, policy_variables)
             self._critic_optimizer.apply(critic_gradients, critic_variables)
 
-            self._log_weights(label="Policy", agent=agent, variables=policy_variables)
-            self._log_gradients(
-                label="Policy",
-                agent=agent,
-                variables_names=[vars.name for vars in policy_variables],
-                gradients=policy_gradients,
-            )
+            if self._log_step():
+                self._log_weights(label="Policy", agent=agent, weights=policy_variables)
+                self._log_gradients(
+                    label="Policy",
+                    agent=agent,
+                    variables_names=[vars.name for vars in policy_variables],
+                    gradients=policy_gradients,
+                )
 
-            self._log_weights(label="Critic", agent=agent, variables=critic_variables)
-            self._log_gradients(
-                label="Critic",
-                agent=agent,
-                variables_names=[vars.name for vars in critic_variables],
-                gradients=critic_gradients,
-            )
+                self._log_weights(label="Critic", agent=agent, weights=critic_variables)
+                self._log_gradients(
+                    label="Critic",
+                    agent=agent,
+                    variables_names=[vars.name for vars in critic_variables],
+                    gradients=critic_gradients,
+                )

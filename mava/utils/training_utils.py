@@ -1,4 +1,5 @@
-from typing import Dict, List, Any
+from typing import Any, Dict
+
 
 # Checkpoint the networks.
 def checkpoint_networks(system_checkpointer: Dict) -> None:
