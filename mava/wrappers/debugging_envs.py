@@ -133,6 +133,7 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
         """Steps the environment."""
         print("here")
         observations, rewards, dones, infos = self._environment.step(actions)
+        observations = self._convert_observations(observations, dones)
 
         if self._environment.env_done:
             self._step_type = dm_env.StepType.LAST
