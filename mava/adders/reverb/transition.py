@@ -222,7 +222,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             # utils.final_step_like is expensive (around 0.085ms) to run every time
             # so we cache its output.
             self._final_step_placeholder = mava_utils.final_step_like(
-                self._buffer[0], next_observations
+                self._buffer[0], next_observations, next_extras
             )
 
         if next_observations is not None:
