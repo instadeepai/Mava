@@ -125,7 +125,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         # The state of the adder is captured by a buffer of `buffer_size` steps
         # (generally SAR tuples) and one additional dangling observation.
         self._buffer: Deque = collections.deque(maxlen=buffer_size)
-        self._next_extras: Dict[str, types.NestedArray] = {}
+        self._next_extras: Union[None, Dict[str, types.NestedArray]] = None
         self._next_observations = None
         self._start_of_episode = False
 

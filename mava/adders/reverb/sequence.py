@@ -117,7 +117,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         # TODO (Dries): Should self._next_observation be used
         #  here? Should this function be used for sequential?
         final_step = mava_utils.final_step_like(
-            self._buffer[0], self._next_observations
+            self._buffer[0], self._next_observations, self._next_extras
         )
 
         # Append the final step.
@@ -132,6 +132,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             # base.py has a check that on add_first self._next_observation should be
             # None, thus we need to clear it at the end of each episode.
             self._next_observations = None
+            self._next_extras = None
             return None
 
         # Determine the delta to the next time we would write a sequence.
