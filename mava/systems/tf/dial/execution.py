@@ -24,6 +24,7 @@
 """DIAL executor implementation."""
 from typing import Any, Dict, Optional, Tuple
 
+import dm_env
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -77,6 +78,7 @@ class DIALExecutor(RecurrentExecutor):
         agent: str,
         observation: types.NestedTensor,
         state: types.NestedTensor,
+        message: types.NestedTensor,
     ) -> Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
@@ -86,9 +88,8 @@ class DIALExecutor(RecurrentExecutor):
         agent_key = agent.split("_")[0] if self._shared_weights else agent
 
         # Compute the policy, conditioned on the observation.
-        print(f"Executor: batched_observation.shape = {batched_observation.shape}")
         (action_policy, message_policy), new_state = self._policy_networks[agent_key](
-            batched_observation, state
+            batched_observation, state, message
         )
 
         # action_policy = policy[:,:-self._message_size]
@@ -108,8 +109,23 @@ class DIALExecutor(RecurrentExecutor):
 
         return action, message, new_state
 
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Optional[Dict[str, types.NestedArray]] = {},
+    ) -> None:
+        super().observe_first(timestep=timestep, extras=extras)
+
+        # Re-initialize the RNN state.
+        for agent, _ in timestep.observation.items():
+            # index network either on agent type or on agent id
+            # agent_key = agent.split("_")[0] if self._shared_weights else agent
+            self._messages[agent] = tf.zeros(self._message_size, dtype=tf.float32)
+
     def select_action(
-        self, agent: str, observation: types.NestedArray
+        self,
+        agent: str,
+        observation: types.NestedArray,
     ) -> Tuple[types.NestedArray, types.NestedArray]:
         """Get actions and messages of specific agent"""
 
@@ -135,11 +151,11 @@ class DIALExecutor(RecurrentExecutor):
         for agent, observation in observations.items():
 
             # Step the recurrent policy forward given the current observation and state.
-            # print("hmm")
-            # print(observation.observation)
-            # print(self._states[agent].shape)
             policy_output, message, new_state = self._policy(
-                agent, observation.observation, self._states[agent]
+                agent,
+                observation.observation,
+                self._states[agent],
+                self._messages[agent],
             )
 
             # Bookkeeping of recurrent states for the observe method.

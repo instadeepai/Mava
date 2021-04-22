@@ -19,7 +19,9 @@ from typing import Dict
 import dm_env
 import numpy as np
 from acme import specs
+from acme.specs import EnvironmentSpec
 from acme.wrappers.gym_wrapper import _convert_to_spec
+from gym import spaces
 
 from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv
@@ -147,3 +149,10 @@ class SwitchGameWrapper(PettingZooParallelEnvWrapper):
             discount=self._discounts,
             step_type=self._step_type,
         )
+
+    def extra_spec(self) -> Dict[str, EnvironmentSpec]:
+        return {
+            "messages": _convert_to_spec(
+                spaces.Box(-np.inf, np.inf, (1,), dtype=np.float32)
+            )
+        }

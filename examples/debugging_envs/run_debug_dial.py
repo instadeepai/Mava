@@ -24,6 +24,7 @@ import sonnet as snt
 import tensorflow as tf
 from absl import app, flags
 from acme import types
+from acme.specs import EnvironmentSpec
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
 from acme.utils.loggers.tf_summary import TFSummaryLogger
@@ -33,8 +34,6 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import dial
 from mava.utils.debugging.environments import switch_game
 from mava.wrappers.debugging_envs import SwitchGameWrapper
-
-# from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
@@ -49,14 +48,22 @@ flags.DEFINE_integer(
 class DIAL_policy(snt.RNNCore):
     def __init__(
         self,
+        action_spec: EnvironmentSpec,
+        message_spec: EnvironmentSpec,
         gru_hidden_size: int,
         gru_layers: int,
         task_mlp_size: Sequence,
-        message_mlp_size: Sequence,
+        message_in_mlp_size: Sequence,
+        message_out_mlp_size: Sequence,
         output_mlp_size: Sequence,
         name: str = None,
     ):
         super(DIAL_policy, self).__init__(name=name)
+        self._action_spec = action_spec
+        self._action_dim = np.prod(self._action_spec.shape, dtype=int)
+        self._message_spec = message_spec
+        self._message_dim = np.prod(self._message_spec.shape, dtype=int)
+
         self._gru_hidden_size = gru_hidden_size
 
         self.task_mlp = networks.LayerNormMLP(
@@ -64,16 +71,32 @@ class DIAL_policy(snt.RNNCore):
             activate_final=True,
         )
 
-        self.message_mlp = networks.LayerNormMLP(
-            message_mlp_size,
+        self.message_in_mlp = networks.LayerNormMLP(
+            message_in_mlp_size,
+            activate_final=True,
+        )
+
+        self.message_in_mlp = networks.LayerNormMLP(
+            message_out_mlp_size,
             activate_final=True,
         )
 
         self.gru = snt.GRU(gru_hidden_size)
 
-        self.output_mlp = networks.LayerNormMLP(
-            output_mlp_size,
-            activate_final=True,
+        self.output_mlp = snt.Sequential(
+            [
+                networks.LayerNormMLP(output_mlp_size, activate_final=True),
+                networks.NearZeroInitializedLinear(self._action_dim),
+                networks.TanhToSpec(self._action_spec),
+            ]
+        )
+
+        self.message_out_mlp = snt.Sequential(
+            [
+                networks.LayerNormMLP(message_out_mlp_size, activate_final=True),
+                networks.NearZeroInitializedLinear(self._message_dim),
+                networks.TanhToSpec(self._message_spec),
+            ]
         )
 
         self._gru_layers = gru_layers
@@ -85,30 +108,22 @@ class DIAL_policy(snt.RNNCore):
         self,
         x: snt.Module,
         state: Optional[snt.Module] = None,
+        message: Optional[snt.Module] = None,
     ) -> snt.Module:
         if state is None:
             state = self.initial_state()
+        if message is None:
+            message = tf.zeros(self._message_dim, dtype=tf.float32)
 
-        # Temporary return code: (action, message), state
-        return (
-            tf.random.uniform(
-                (x.shape[0], 2), minval=0, maxval=1, dtype=tf.dtypes.float32
-            ),
-            tf.random.uniform(
-                (x.shape[0], 1), minval=0, maxval=1, dtype=tf.dtypes.float32
-            ),
-        ), state
+        x_task = self.task_mlp(tf.dtypes.cast(x, tf.float32))
+        x_message = self.message_in_mlp(message)
+        x = tf.concat([x_task, x_message], axis=1)
 
-        x = self.task_mlp(x)
-        # print(x.shape)
         x, state = self.gru(x, state)
-        # print(x.shape)
 
         x_output = self.output_mlp(x[:, -1])
-        x_message = self.message_mlp(x[:, -1])
+        x_message = self.message_out_mlp(x[:, -1])
 
-        # print(x.shape)
-        # print(':D')
         return (x_output, x_message), state
 
 
@@ -128,14 +143,16 @@ def make_networks(
     policy_network_gru_hidden_sizes: Union[Dict[str, int], int] = 128,
     policy_network_gru_layers: Union[Dict[str, int], int] = 2,
     policy_network_task_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    policy_network_message_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128, 1),
-    policy_network_output_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128, 2),
+    policy_network_message_in_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
+    policy_network_message_out_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
+    policy_network_output_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
     message_size: int = 1,
     shared_weights: bool = True,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
+    extra_specs = environment_spec.get_extra_specs()
 
     # Create agent_type specs
     if shared_weights:
@@ -157,9 +174,14 @@ def make_networks(
             key: policy_network_task_mlp_sizes for key in specs.keys()
         }
 
-    if isinstance(policy_network_message_mlp_sizes, Sequence):
-        policy_network_message_mlp_sizes = {
-            key: policy_network_message_mlp_sizes for key in specs.keys()
+    if isinstance(policy_network_message_in_mlp_sizes, Sequence):
+        policy_network_message_in_mlp_sizes = {
+            key: policy_network_message_in_mlp_sizes for key in specs.keys()
+        }
+
+    if isinstance(policy_network_message_out_mlp_sizes, Sequence):
+        policy_network_message_out_mlp_sizes = {
+            key: policy_network_message_out_mlp_sizes for key in specs.keys()
         }
 
     if isinstance(policy_network_output_mlp_sizes, Sequence):
@@ -182,11 +204,14 @@ def make_networks(
 
         # Create the policy network.
         policy_network = DIAL_policy(
-            policy_network_gru_hidden_sizes[key],
-            policy_network_gru_layers[key],
-            policy_network_task_mlp_sizes[key],
-            policy_network_message_mlp_sizes[key],
-            policy_network_output_mlp_sizes[key],
+            action_spec=specs[key].actions,
+            message_spec=extra_specs["messages"],
+            gru_hidden_size=policy_network_gru_hidden_sizes[key],
+            gru_layers=policy_network_gru_layers[key],
+            task_mlp_size=policy_network_task_mlp_sizes[key],
+            message_in_mlp_size=policy_network_message_in_mlp_sizes[key],
+            message_out_mlp_size=policy_network_message_out_mlp_sizes[key],
+            output_mlp_size=policy_network_output_mlp_sizes[key],
         )
 
         # Create the behavior policy.
