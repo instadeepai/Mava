@@ -273,8 +273,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         all_weights_flat = tf.concat(
             [tf.reshape(weight, -1) for weight in weights], axis=0
         )
-        weights_dict[f"{label}/weight_grad"] = all_weights_flat
-        weights_dict[f"{label}/weight_grad_norm"] = self._apply_norms(
+        weights_dict[f"{label}/weight"] = all_weights_flat
+        weights_dict[f"{label}/weight_norm"] = self._apply_norms(
             all_weights_flat, self.gradient_norms
         )
 
