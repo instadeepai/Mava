@@ -233,7 +233,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
 
             # Calculate the priority for this transition.
 
-            # NOTE (Arnu): removed because of errors
             table_priorities = acme_utils.calculate_priorities(
                 self._priority_fns, steps
             )
