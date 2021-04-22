@@ -166,7 +166,7 @@ class ReverbParallelAdder(base.ParallelAdder):
     def add_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {"": ()},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Record the first observation of a trajectory."""
         if not timestep.first():
@@ -191,7 +191,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, types.NestedArray] = {"": ()},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Record an action and the following timestep."""
         if self._next_observations is None:

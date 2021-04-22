@@ -290,6 +290,9 @@ class BaseMADDPGTrainer(mava.Trainer):
         self,
     ) -> Dict[str, Dict[str, Any]]:
 
+        # TODO (dries): Use a memory profiler to determine what is causing
+        #  the memory leak during training.
+
         # Update the target networks
         self._update_target_networks()
 
