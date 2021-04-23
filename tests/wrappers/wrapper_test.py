@@ -53,7 +53,7 @@ class TestEnvWrapper:
     #   action_spaces and observation_spaces.
     def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, _ = helpers.get_env(env_spec)
-        props_which_should_not_be_none = [env]
+        props_which_should_not_be_none = [env,env.agents,env.possible_agents]
         assert helpers.verify_all_props_not_none(
             props_which_should_not_be_none
         ), "Failed to load module"
