@@ -175,7 +175,7 @@ def main(_: Any) -> None:
         ],  # pytype: disable=wrong-arg-types
         behavior_networks=system_networks["behaviors"],
         trainer_fn=DecentralisedRecurrentMADDPGTrainer,
-        executer_fn=executors.RecurrentExecutor,
+        executor_fn=executors.RecurrentExecutor,
         logger=system_logger,
     )
 

@@ -100,7 +100,7 @@ class MADDPGBuilder(SystemBuilder):
         trainer_fn: Type[
             training.BaseMADDPGTrainer
         ] = training.DecentralisedMADDPGTrainer,
-        executer_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
     ):
         """Args:
         config: Configuration options for the MADDPG system.
@@ -113,7 +113,7 @@ class MADDPGBuilder(SystemBuilder):
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
-        self._executer_fn = executer_fn
+        self._executor_fn = executor_fn
 
     def make_replay_table(
         self,
@@ -122,11 +122,11 @@ class MADDPGBuilder(SystemBuilder):
         """Create tables to insert data into."""
 
         # Select adder
-        if self._executer_fn == executors.FeedForwardExecutor:
+        if self._executor_fn == executors.FeedForwardExecutor:
             adder = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec
             )
-        elif self._executer_fn == executors.RecurrentExecutor:
+        elif self._executor_fn == executors.RecurrentExecutor:
             core_state_spec = {}
             for agent in self._agents:
                 agent_type = agent.split("_")[0]
@@ -139,7 +139,7 @@ class MADDPGBuilder(SystemBuilder):
                 environment_spec, core_state_spec
             )
         else:
-            raise NotImplementedError("Unknown executor type: ", self._executer_fn)
+            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
 
         return reverb.Table(
             name=self._config.replay_table_name,
@@ -173,14 +173,14 @@ class MADDPGBuilder(SystemBuilder):
         """
 
         # Select adder
-        if self._executer_fn == executors.FeedForwardExecutor:
+        if self._executor_fn == executors.FeedForwardExecutor:
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
                 client=replay_client,
                 n_step=self._config.n_step,
                 discount=self._config.discount,
             )
-        elif self._executer_fn == executors.RecurrentExecutor:
+        elif self._executor_fn == executors.RecurrentExecutor:
             adder = reverb_adders.ParallelSequenceAdder(
                 priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
                 client=replay_client,
@@ -188,7 +188,7 @@ class MADDPGBuilder(SystemBuilder):
                 period=self._config.period,
             )
         else:
-            raise NotImplementedError("Unknown executor type: ", self._executer_fn)
+            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
 
         return adder
 
@@ -235,7 +235,7 @@ class MADDPGBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
-        return self._executer_fn(
+        return self._executor_fn(
             policy_networks=policy_networks,
             shared_weights=shared_weights,
             variable_client=variable_client,
@@ -316,7 +316,7 @@ class MADDPG(system.System):
         trainer_fn: Type[
             training.BaseMADDPGTrainer
         ] = training.DecentralisedMADDPGTrainer,
-        executer_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         shared_weights: bool = True,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -381,7 +381,7 @@ class MADDPG(system.System):
                 replay_table_name=replay_table_name,
             ),
             trainer_fn=trainer_fn,
-            executer_fn=executer_fn,
+            executor_fn=executor_fn,
         )
 
         # Create a replay server to add data to. This uses no limiter behavior in
