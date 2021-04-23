@@ -1,26 +1,7 @@
-from abc import abstractmethod
-from typing import Iterator
+from abc import abstractmethod, abstractproperty
+from typing import Iterator, List
 
 import dm_env
-
-
-class SequentialEnvWrapper(dm_env.Environment):
-    """
-    Abstract class for sequential environment wrappers.
-    """
-
-    @abstractmethod
-    def agent_iter(self, max_iter: int) -> Iterator:
-        """
-        Returns an iterator that yields the current agent in the environment.
-            max_iter: Maximum amount of iterations (to limit infinite loops/iterations).
-        """
-
-    @abstractmethod
-    def env_done(self) -> bool:
-        """
-        Returns a bool indicating if all agents in env are done.
-        """
 
 
 class ParallelEnvWrapper(dm_env.Environment):
@@ -32,4 +13,23 @@ class ParallelEnvWrapper(dm_env.Environment):
     def env_done(self) -> bool:
         """
         Returns a bool indicating if all agents in env are done.
+        """
+
+    @abstractproperty
+    def agents(self) -> List:
+        """
+        Returns the active agents in the env.
+        """
+
+
+class SequentialEnvWrapper(ParallelEnvWrapper):
+    """
+    Abstract class for sequential environment wrappers.
+    """
+
+    @abstractmethod
+    def agent_iter(self, max_iter: int) -> Iterator:
+        """
+        Returns an iterator that yields the current agent in the env.
+            max_iter: Maximum number of iterations (to limit infinite loops/iterations).
         """
