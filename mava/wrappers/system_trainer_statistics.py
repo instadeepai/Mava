@@ -212,12 +212,13 @@ class NetworkStatisticsBase(TrainerWrapperBase):
                 to_tensorboard=to_tensorboard,
                 print_fn=print_fn,
                 time_stamp=time_stamp,
+                time_delta=0,
             )
 
     # Function determines which weight layers to log.
     # We are usually only concerned with weights and grads of linear and conv layers.
     # TODO(Kale-ab) Can we be more robust.
-    # Try getting layer type from self._policy_networks[agent_key]
+    # Try getting layer type from policy or critic networks
     def _log_data(self, name: str) -> bool:
         # Log linear and conv weights and not bias units.
         if ("linear" in name.lower() or "conv" in name.lower()) and not (
@@ -244,15 +245,15 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         for index, grad in enumerate(gradients):
             variables_name = variables_names[index]
             if self._log_data(variables_name):
-                grads_dict[f"{label}/{variables_name}_grad"] = grad
-                grads_dict[f"{label}/{variables_name}_grad_norm"] = self._apply_norms(
+                grads_dict[f"{label}_{variables_name}_grad"] = grad
+                grads_dict[f"{label}_{variables_name}_grad_norm"] = self._apply_norms(
                     grad, self.gradient_norms
                 )
 
         # Log whole network grads
         all_grads_flat = tf.concat([tf.reshape(grad, -1) for grad in gradients], axis=0)
-        grads_dict[f"{label}/network_grad"] = all_grads_flat
-        grads_dict[f"{label}/network_grad_norm"] = self._apply_norms(
+        grads_dict[f"{label}_wholenetwork_grad"] = all_grads_flat
+        grads_dict[f"{label}_wholenetwork_grad_norm"] = self._apply_norms(
             all_grads_flat, self.gradient_norms
         )
 
@@ -264,8 +265,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         # Log Weights per layer
         for weight in weights:
             if self._log_data(weight.name):
-                weights_dict[f"{label}/{weight.name}_weight"] = weight
-                weights_dict[f"{label}/{weight.name}_weight_norm"] = self._apply_norms(
+                weights_dict[f"{label}_{weight.name}_weight"] = weight
+                weights_dict[f"{label}_{weight.name}_weight_norm"] = self._apply_norms(
                     weight, self.weight_norms
                 )
 
@@ -273,8 +274,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         all_weights_flat = tf.concat(
             [tf.reshape(weight, -1) for weight in weights], axis=0
         )
-        weights_dict[f"{label}/weight"] = all_weights_flat
-        weights_dict[f"{label}/weight_norm"] = self._apply_norms(
+        weights_dict[f"{label}_wholenetwork_weight"] = all_weights_flat
+        weights_dict[f"{label}_wholenetwork_weight_norm"] = self._apply_norms(
             all_weights_flat, self.gradient_norms
         )
 

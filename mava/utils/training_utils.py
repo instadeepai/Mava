@@ -3,12 +3,10 @@ from typing import Any, Dict
 
 # Checkpoint the networks.
 def checkpoint_networks(system_checkpointer: Dict) -> None:
-    assert (
-        system_checkpointer is not None and len(system_checkpointer.keys()) > 0
-    ), "Invalid System Checkpointer."
-    for network_key in system_checkpointer.keys():
-        checkpointer = system_checkpointer[network_key]
-        checkpointer.save()
+    if system_checkpointer and len(system_checkpointer.keys()) > 0:
+        for network_key in system_checkpointer.keys():
+            checkpointer = system_checkpointer[network_key]
+            checkpointer.save()
 
 
 # Map critic and polic losses to dict, grouped by agent.
