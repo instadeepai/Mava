@@ -222,7 +222,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             # utils.final_step_like is expensive (around 0.085ms) to run every time
             # so we cache its output.
             self._final_step_placeholder = mava_utils.final_step_like(
-                self._buffer[0], next_observations
+                self._buffer[0], next_observations, next_extras
             )
 
         if next_observations is not None:
@@ -233,7 +233,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
 
             # Calculate the priority for this transition.
 
-            # NOTE (Arnu): removed because of errors
             table_priorities = acme_utils.calculate_priorities(
                 self._priority_fns, steps
             )
