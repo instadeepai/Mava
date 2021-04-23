@@ -293,7 +293,7 @@ class TestEnvWrapper:
             test_agents_actions = {
                 agent: wrapped_env.action_spaces[agent].sample() for agent in agents
             }
-            with patch.object(wrapped_env._environment, "step") as parallel_step:
+            with patch.object(wrapped_env, "step") as parallel_step:
                 parallel_step.return_value = None, None, None, None
                 _ = wrapped_env.step(test_agents_actions)
                 parallel_step.assert_called_once_with(test_agents_actions)
@@ -301,7 +301,7 @@ class TestEnvWrapper:
         # Sequential env_types
         elif env_spec.env_type == EnvType.Sequential:
             for agent in agents:
-                with patch.object(wrapped_env._environment, "step") as seq_step:
+                with patch.object(wrapped_env, "step") as seq_step:
                     seq_step.return_value = None
                     test_agent_action = wrapped_env.action_spaces[agent].sample()
                     _ = wrapped_env.step(test_agent_action)
@@ -330,8 +330,6 @@ class TestEnvWrapper:
                 agent: wrapped_env.action_spaces[agent].sample() for agent in agents
             }
 
-            # Mock being done - sets self._environment.env_done to true.
-            # We can't mock env_done directly since it is a propertly.
             monkeypatch.setattr(wrapped_env, "env_done", helpers.mock_done)
 
             curr_dm_timestep = wrapped_env.step(test_agents_actions)
@@ -339,6 +337,7 @@ class TestEnvWrapper:
             helpers.assert_env_reset(wrapped_env, curr_dm_timestep, env_spec)
 
         # Sequential env_types
+        # TODO (Kale-ab): Make this part below less reliant on PZ.
         elif env_spec.env_type == EnvType.Sequential:
             n_agents = wrapped_env.num_agents
 
