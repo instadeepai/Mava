@@ -18,12 +18,13 @@
 
 """DIAL system implementation."""
 import dataclasses
-from typing import Dict, Iterator, Optional
+from typing import Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme import datasets
+from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
@@ -36,6 +37,7 @@ from mava.components.tf.modules.communication import (
 )
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
+from mava.systems.tf import executors
 from mava.systems.tf.dial.execution import DIALExecutor
 from mava.systems.tf.dial.training import DIALTrainer
 
@@ -98,6 +100,8 @@ class DIALConfig:
     counter: counting.Counter = None
     clipping: bool = False
     communication_module: BaseCommunicationModule = BroadcastedCommunication
+    sequence_length: int = 1
+    period: int = 1
 
 
 class DIALBuilder(SystemBuilder):
@@ -110,9 +114,14 @@ class DIALBuilder(SystemBuilder):
       distributed setup.
       """
 
-    def __init__(self, config: DIALConfig):
+    def __init__(
+        self,
+        config: DIALConfig,
+        executor_fn: Type[core.Executor] = DIALExecutor,
+    ):
         """Args:
-        config: Configuration options for the DIAL system."""
+        config: Configuration options for the DIAL system.
+        executor_fn: Executor function to use"""
 
         self._config = config
 
@@ -120,21 +129,42 @@ class DIALBuilder(SystemBuilder):
             _agent_types: a list of the types of agents to be used."""
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
+        self._executor_fn = executor_fn
 
     def make_replay_table(
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> reverb.Table:
         """Create tables to insert data into."""
+
+        # Select adder
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+            adder = reverb_adders.ParallelNStepTransitionAdder.signature(
+                environment_spec
+            )
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
+            core_state_spec = {}
+            for agent in self._agents:
+                agent_type = agent.split("_")[0]
+                core_state_spec[agent] = (
+                    tf2_utils.squeeze_batch_dim(
+                        self._config.networks[agent_type].initial_state(1)
+                    ),
+                )
+            adder = reverb_adders.ParallelSequenceAdder.signature(
+                environment_spec, core_state_spec
+            )
+        else:
+            print(self._executor_fn)
+            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+
         return reverb.Table(
             name=self._config.replay_table_name,
-            sampler=reverb.selectors.Prioritized(self._config.priority_exponent),
+            sampler=reverb.selectors.Uniform(),
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
             rate_limiter=reverb.rate_limiters.MinSize(1),
-            signature=reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec
-            ),
+            signature=adder,
         )
 
     def make_dataset_iterator(
@@ -158,12 +188,26 @@ class DIALBuilder(SystemBuilder):
         Args:
           replay_client: Reverb Client which points to the replay server.
         """
-        return reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns={self._config.replay_table_name: lambda x: 1.0},
-            client=replay_client,
-            n_step=self._config.n_step,
-            discount=self._config.discount,
-        )
+
+        # Select adder
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+            adder = reverb_adders.ParallelNStepTransitionAdder(
+                priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+                client=replay_client,
+                n_step=self._config.n_step,
+                discount=self._config.discount,
+            )
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
+            adder = reverb_adders.ParallelSequenceAdder(
+                priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+                client=replay_client,
+                sequence_length=self._config.sequence_length,
+                period=self._config.period,
+            )
+        else:
+            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+
+        return adder
 
     def make_executor(
         self,
@@ -203,7 +247,7 @@ class DIALBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
-        return DIALExecutor(
+        return self._executor_fn(
             policy_networks=policy_networks,
             communication_module=communication_module,
             shared_weights=shared_weights,
@@ -283,6 +327,7 @@ class DIAL(system.System):
         networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         behavior_networks: Dict[str, snt.Module],
+        executor_fn: Type[core.Executor] = DIALExecutor,
         shared_weights: bool = True,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -361,7 +406,8 @@ class DIAL(system.System):
                 max_gradient_norm=max_gradient_norm,
                 replay_table_name=replay_table_name,
                 communication_module=communication_module,
-            )
+            ),
+            executor_fn=executor_fn,
         )
 
         # Create a replay server to add data to. This uses no limiter behavior in
@@ -396,7 +442,7 @@ class DIAL(system.System):
             channel_size=1,
         )
 
-        networks = communication_module.create_system()
+        networks = self._communication_module.create_system()
 
         # Create the actor which defines how we take actions.
         executor = builder.make_executor(

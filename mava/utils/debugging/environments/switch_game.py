@@ -56,7 +56,7 @@ class MultiAgentSwitchGame(gym.Env):
         self.selected_agent = -1
 
     def step(
-        self, action_n: Dict[str, np.ndarray]
+        self, action_n: Dict[str, int]
     ) -> Tuple[
         Dict[str, Union[np.array, Any]],
         Union[dict, Dict[str, Union[float, Any]]],
@@ -69,11 +69,11 @@ class MultiAgentSwitchGame(gym.Env):
 
         # set action for interrogated agent
         selected_agent_id = self.agent_ids[self.selected_agent]
-        action = action_n[selected_agent_id].argmax()
+        # action = action_n[selected_agent_id].argmax()
         # advance world state
         self.agent_history.append(self.selected_agent)
         self.seen_all = np.unique(self.agent_history).shape[0] == self.num_agents
-        if action == 1:
+        if action_n[selected_agent_id] == 1:
             self.env_done = True
             self.tell = True
 
@@ -115,11 +115,12 @@ class MultiAgentSwitchGame(gym.Env):
 
     # get observation for a particular agent
     def _get_obs(self, a_i: int, agent_id: str) -> np.array:
-        return (
-            np.array([1.0], dtype=np.float32)
-            if a_i == self.selected_agent
-            else np.array([0.0], dtype=np.float32)
-        )
+        # return (
+        #     np.array([1.0], dtype=np.float32)
+        #     if a_i == self.selected_agent
+        #     else np.array([0.0], dtype=np.float32)
+        # )
+        return 1 if a_i == self.selected_agent else 0
 
     # get dones for a particular agent
     # unused right now -- agents are allowed to go beyond the viewing screen
@@ -129,5 +130,9 @@ class MultiAgentSwitchGame(gym.Env):
     # get reward for a particular agent
     def _get_reward(self, a_i: int, agent_id: str) -> float:
         if not self.env_done:
-            return 0.0
-        return 1.0 if self.seen_all and self.tell else -1.0
+            return np.array(0.0, dtype=np.float32)
+        return (
+            np.array(1.0, dtype=np.float32)
+            if self.seen_all and self.tell
+            else np.array(-1.0, dtype=np.float32)
+        )

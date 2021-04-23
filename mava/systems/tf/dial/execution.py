@@ -95,15 +95,13 @@ class DIALExecutor(RecurrentExecutor):
             batched_observation, state, message
         )
 
-        # action_policy = policy[:,:-self._message_size]
-        # message_policy = policy[:,self._message_size:]
-
         # Sample from the policy if it is stochastic.
-        action = (
-            action_policy.sample()
-            if isinstance(action_policy, tfd.Distribution)
-            else action_policy
-        )
+        # action = (
+        #     action_policy.sample()
+        #     if isinstance(action_policy, tfd.Distribution)
+        #     else action_policy
+        # )
+        action = tf.argmax(action_policy)
         message = (
             message_policy.sample()
             if isinstance(message_policy, tfd.Distribution)

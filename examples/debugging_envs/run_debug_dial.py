@@ -28,6 +28,8 @@ from acme.specs import EnvironmentSpec
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
 from acme.utils.loggers.tf_summary import TFSummaryLogger
+from acme.wrappers.gym_wrapper import _convert_to_spec
+from gym import spaces
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
@@ -87,7 +89,7 @@ class DIAL_policy(snt.RNNCore):
             [
                 networks.LayerNormMLP(output_mlp_size, activate_final=True),
                 networks.NearZeroInitializedLinear(self._action_dim),
-                networks.TanhToSpec(self._action_spec),
+                # networks.TanhToSpec(self._action_spec),
             ]
         )
 
@@ -95,7 +97,7 @@ class DIAL_policy(snt.RNNCore):
             [
                 networks.LayerNormMLP(message_out_mlp_size, activate_final=True),
                 networks.NearZeroInitializedLinear(self._message_dim),
-                networks.TanhToSpec(self._message_spec),
+                # networks.TanhToSpec(self._message_spec),
             ]
         )
 
@@ -152,7 +154,7 @@ def make_networks(
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
-    extra_specs = environment_spec.get_extra_specs()
+    # extra_specs = environment_spec.get_extra_specs()
 
     # Create agent_type specs
     if shared_weights:
@@ -205,7 +207,9 @@ def make_networks(
         # Create the policy network.
         policy_network = DIAL_policy(
             action_spec=specs[key].actions,
-            message_spec=extra_specs["messages"],
+            message_spec=_convert_to_spec(
+                spaces.Box(-np.inf, np.inf, (1,), dtype=np.float32)
+            ),
             gru_hidden_size=policy_network_gru_hidden_sizes[key],
             gru_layers=policy_network_gru_layers[key],
             task_mlp_size=policy_network_task_mlp_sizes[key],
