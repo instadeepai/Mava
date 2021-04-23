@@ -169,6 +169,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         gradient_norms: List,
         weight_norms: List,
         log_interval: int,
+        log_weights: bool,
+        log_gradients: bool,
     ) -> None:
         super().__init__(trainer)
 
@@ -177,6 +179,12 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         self.weight_norms = weight_norms
         self._create_loggers(self._agents)
         self.log_interval = log_interval
+        self.log_weights = log_weights
+        self.log_gradients = log_gradients
+
+        assert (
+            self.log_weights is True or self.log_gradients is True
+        ), "Nothing is selected to be logged."
 
     def _log_step(self) -> bool:
         if (
@@ -276,7 +284,7 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         )
         weights_dict[f"{label}_wholenetwork_weight"] = all_weights_flat
         weights_dict[f"{label}_wholenetwork_weight_norm"] = self._apply_norms(
-            all_weights_flat, self.gradient_norms
+            all_weights_flat, self.weight_norms
         )
 
         self._network_loggers[agent].write(weights_dict)
@@ -316,8 +324,17 @@ class NetworkStatistics(NetworkStatisticsBase):
         gradient_norms: List = [2],
         weight_norms: List = [2],
         log_interval: int = 100,
+        log_weights: bool = True,
+        log_gradients: bool = True,
     ) -> None:
-        super().__init__(trainer, gradient_norms, weight_norms, log_interval)
+        super().__init__(
+            trainer,
+            gradient_norms,
+            weight_norms,
+            log_interval,
+            log_weights,
+            log_gradients,
+        )
 
     def _step(
         self,
@@ -365,13 +382,17 @@ class NetworkStatistics(NetworkStatisticsBase):
             self._policy_optimizer.apply(policy_gradients, policy_variables)
 
             if log_current_timestep:
-                self._log_weights(label="Policy", agent=agent, weights=policy_variables)
-                self._log_gradients(
-                    label="Policy",
-                    agent=agent,
-                    variables_names=[vars.name for vars in policy_variables],
-                    gradients=policy_gradients,
-                )
+                if self.log_weights:
+                    self._log_weights(
+                        label="Policy", agent=agent, weights=policy_variables
+                    )
+                if self.log_gradients:
+                    self._log_gradients(
+                        label="Policy",
+                        agent=agent,
+                        variables_names=[vars.name for vars in policy_variables],
+                        gradients=policy_gradients,
+                    )
         train_utils.safe_del(self, "tape")
 
 
@@ -390,8 +411,17 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
         gradient_norms: List = [2],
         weight_norms: List = [2],
         log_interval: int = 100,
+        log_weights: bool = True,
+        log_gradients: bool = True,
     ) -> None:
-        super().__init__(trainer, gradient_norms, weight_norms, log_interval)
+        super().__init__(
+            trainer,
+            gradient_norms,
+            weight_norms,
+            log_interval,
+            log_weights,
+            log_gradients,
+        )
 
     def _step(
         self,
@@ -450,20 +480,26 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             self._critic_optimizer.apply(critic_gradients, critic_variables)
 
             if log_current_timestep:
-                self._log_weights(label="Policy", agent=agent, weights=policy_variables)
-                self._log_gradients(
-                    label="Policy",
-                    agent=agent,
-                    variables_names=[vars.name for vars in policy_variables],
-                    gradients=policy_gradients,
-                )
+                if self.log_weights:
+                    self._log_weights(
+                        label="Policy", agent=agent, weights=policy_variables
+                    )
+                    self._log_weights(
+                        label="Critic", agent=agent, weights=critic_variables
+                    )
 
-                self._log_weights(label="Critic", agent=agent, weights=critic_variables)
-                self._log_gradients(
-                    label="Critic",
-                    agent=agent,
-                    variables_names=[vars.name for vars in critic_variables],
-                    gradients=critic_gradients,
-                )
+                if self.log_gradients:
+                    self._log_gradients(
+                        label="Policy",
+                        agent=agent,
+                        variables_names=[vars.name for vars in policy_variables],
+                        gradients=policy_gradients,
+                    )
+                    self._log_gradients(
+                        label="Critic",
+                        agent=agent,
+                        variables_names=[vars.name for vars in critic_variables],
+                        gradients=critic_gradients,
+                    )
 
         train_utils.safe_del(self, "tape")
