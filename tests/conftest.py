@@ -256,6 +256,10 @@ class Helpers:
                     dm_env_timestep.discount
                 ) == type(expected_discount), "Failed to reset discount."
 
+    @staticmethod
+    def mock_done() -> bool:
+        return True
+
 
 @typing.no_type_check
 @pytest.fixture

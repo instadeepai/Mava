@@ -52,12 +52,7 @@ class TestEnvWrapper:
     #   action_spaces and observation_spaces.
     def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, _ = helpers.get_env(env_spec)
-        props_which_should_not_be_none = [
-            env,
-            env.agents,
-            env.action_spaces,
-            env.observation_spaces,
-        ]
+        props_which_should_not_be_none = [env]
         assert helpers.verify_all_props_not_none(
             props_which_should_not_be_none
         ), "Failed to load module"
@@ -71,6 +66,10 @@ class TestEnvWrapper:
         props_which_should_not_be_none = [
             wrapped_env,
             wrapped_env.environment,
+            wrapped_env.observation_spec(),
+            wrapped_env.action_spec(),
+            wrapped_env.reward_spec(),
+            wrapped_env.discount_spec(),
         ]
 
         assert helpers.verify_all_props_not_none(
@@ -82,6 +81,12 @@ class TestEnvWrapper:
         assert (
             len(wrapped_env.action_spec()) == num_agents
         ), "Failed to generate action specs for all agents."
+        assert (
+            len(wrapped_env.reward_spec()) == num_agents
+        ), "Failed to generate reward specs for all agents."
+        assert (
+            len(wrapped_env.discount_spec()) == num_agents
+        ), "Failed to generate discount specs for all agents."
 
     # Test of reset of wrapper and that dm_env_timestep has basic props.
     def test_wrapper_env_reset(self, env_spec: EnvSpec, helpers: Helpers) -> None:
@@ -326,10 +331,7 @@ class TestEnvWrapper:
 
             # Mock being done - sets self._environment.env_done to true.
             # We can't mock env_done directly since it is a propertly.
-            monkeypatch.setattr(wrapped_env._environment, "agents", [], raising=False)
-            monkeypatch.setattr(
-                wrapped_env._environment.aec_env, "agents", [], raising=False
-            )
+            monkeypatch.setattr(wrapped_env, "env_done", helpers.mock_done)
 
             curr_dm_timestep = wrapped_env.step(test_agents_actions)
 
@@ -364,9 +366,9 @@ class TestEnvWrapper:
                 # Mock whole env being done when you reach final agent
                 if index == n_agents - 1:
                     monkeypatch.setattr(
-                        wrapped_env._environment,
-                        "agents",
-                        [],
+                        wrapped_env,
+                        "env_done",
+                        helpers.mock_done,
                     )
 
                 # Mock update has occurred in step
