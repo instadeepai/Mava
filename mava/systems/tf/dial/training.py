@@ -20,6 +20,7 @@
 #   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
 
 """DIAL trainer implementation."""
+import os
 import time
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -27,6 +28,7 @@ import numpy as np
 import reverb
 import sonnet as snt
 import tensorflow as tf
+from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
@@ -57,6 +59,7 @@ class DIALTrainer(mava.Trainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "Checkpoints",
         max_gradient_norm: Optional[float] = None,
     ):
         """Initializes the learner.
@@ -80,17 +83,106 @@ class DIALTrainer(mava.Trainer):
         """
 
         self._agents = agents
+        self._agent_types = agent_types
         self._shared_weights = shared_weights
 
         # Store online and target networks.
-        self._networks = networks
-        self._target_networks = target_network
+        self._policy_networks = networks
+        self._target_policy_networks = target_network
+
+        # self._observation_networks = observation_networks
+        # self._target_observation_networks = target_observation_networks
+
+        # General learner book-keeping and loggers.
+        self._counter = counter or counting.Counter()
+        self._logger = logger or loggers.make_default_logger("trainer")
+
+        # Other learner parameters.
+        self._discount = discount
+        self._clipping = clipping
+
+        # Necessary to track when to update target networks.
+        self._num_steps = tf.Variable(0, dtype=tf.int32)
+        self._target_update_period = target_update_period
+
+        # Create an iterator to go through the dataset.
+        # TODO(b/155086959): Fix type stubs and remove.
+        self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
+
+        # Create optimizers if they aren't given.
+        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
+
+        # Dictionary with network keys for each agent.
+        self.agent_net_keys = {agent: agent for agent in self._agents}
+        if self._shared_weights:
+            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
+
+        self.unique_net_keys = self._agent_types if shared_weights else self._agents
+
+        self._system_checkpointer = {}
+        if checkpoint:
+            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
+            #  of the last 11 calls to
+            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
+            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
+            #  expensive and the excessive number tracings could be due to (1)
+            #  creating @tf.function repeatedly in a loop, (2) passing tensors
+            #  with different shapes, (3) passing Python objects instead of tensors.
+            for agent_key in self.unique_net_keys:
+                objects_to_save = {
+                    "counter": self._counter,
+                    "policy": self._policy_networks[agent_key],
+                    "observation": self._observation_networks[agent_key],
+                    "target_policy": self._target_policy_networks[agent_key],
+                    "policy_optimizer": self._policy_optimizer,
+                    "num_steps": self._num_steps,
+                }
+
+                checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
+                checkpointer = tf2_savers.Checkpointer(
+                    time_delta_minutes=1,
+                    add_uid=False,
+                    directory=checkpointer_dir,
+                    objects_to_save=objects_to_save,
+                    enable_checkpointing=True,
+                )
+                self._system_checkpointer[agent_key] = checkpointer
 
         self._timestamp = None
 
+    @tf.function
+    def _update_target_networks(self) -> None:
+        for key in self.unique_net_keys:
+            # Update target network.
+            online_variables = (
+                # *self._observation_networks[key].variables,
+                *self._policy_networks[key].variables,
+            )
+            target_variables = (
+                # *self._target_observation_networks[key].variables,
+                *self._target_policy_networks[key].variables,
+            )
+
+            # Make online -> target network update ops.
+            if tf.math.mod(self._num_steps, self._target_update_period) == 0:
+                for src, dest in zip(online_variables, target_variables):
+                    dest.assign(src)
+            self._num_steps.assign_add(1)
+
     def _step(self) -> Dict[str, Dict[str, Any]]:
         # TODO Kevin: Implement DIAL trainer algorithm
-        return {}
+
+        # Update the target networks
+        self._update_target_networks()
+
+        inputs = next(self._iterator)
+
+        # [print(x, '\n') for x in inputs.data]
+        o_tm1, a_tm1, e_tm1, r_t, d_t, s_t = inputs.data
+        # o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+
+        logged_losses: Dict[str, Dict[str, Any]] = {}
+        return logged_losses
 
     def step(self) -> None:
         # Run the learning step.

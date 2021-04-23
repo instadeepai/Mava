@@ -75,7 +75,7 @@ class DIALExecutor(RecurrentExecutor):
         self._store_recurrent_state = store_recurrent_state
         self._communication_module = communication_module
 
-    @tf.function
+    # @tf.function
     def _policy(
         self,
         agent: str,
@@ -134,16 +134,22 @@ class DIALExecutor(RecurrentExecutor):
         if self._states[agent] is None:
             self._states[agent] = self._networks[agent].initial_state(1)
 
+        message_inputs = self._communication_module.process_messages(self._messages)
+
         # Step the recurrent policy forward given the current observation and state.
-        policy_output, new_state = self._policy(
-            agent, observation.observation, self._states[agent]
+        policy_output, message, new_state = self._policy(
+            agent,
+            observation.observation,
+            self._states[agent],
+            message_inputs[agent],
         )
 
         # Bookkeeping of recurrent states for the observe method.
-        self._update_state(agent, new_state)
+        self._states[agent] = new_state
+        self._messages[agent] = message
 
         # Return a numpy array with squeezed out batch dimension.
-        return tf2_utils.to_numpy_squeeze(policy_output).argmax()
+        return tf2_utils.to_numpy_squeeze(policy_output)
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]

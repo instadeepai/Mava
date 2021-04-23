@@ -38,11 +38,11 @@ from mava.utils.debugging.environments import switch_game
 from mava.wrappers.debugging_envs import SwitchGameWrapper
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
+flags.DEFINE_integer("num_episodes", 200, "Number of training episodes to run for.")
 
 flags.DEFINE_integer(
     "num_episodes_per_eval",
-    10,
+    30,
     "Number of training episodes to run between evaluation " "episodes.",
 )
 
@@ -273,14 +273,11 @@ def main(_: Any) -> None:
     specs = environment_spec.get_agent_specs()
     type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
     specs = type_specs
-    eval_policies = {
-        key: snt.Sequential(
-            [
-                system_networks["policies"][key],
-            ]
-        )
-        for key in specs.keys()
-    }
+    # eval_policies = {
+    #     system_networks["policies"][key]
+    #     for key in specs.keys()
+    # }
+    eval_policies = system_networks["policies"]
 
     # Create the evaluation actor and loop.
     eval_actor = dial.DIALExecutor(
@@ -293,9 +290,10 @@ def main(_: Any) -> None:
     )
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
-        # train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        train_loop.run(num_episodes=1)
-        return
+        train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
+        # train_loop.run(num_episodes=2)
+        # return
+        print(f"replay size: {FLAGS.num_episodes_per_eval*(_+1)}")
         eval_loop.run(num_episodes=1)
 
 

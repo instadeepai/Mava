@@ -79,11 +79,11 @@ class DIALConfig:
     environment_spec: specs.MAEnvironmentSpec
     networks: Dict[str, snt.Module]
     shared_weights: bool = True
-    batch_size: int = 256
+    batch_size: int = 1
     prefetch_size: int = 4
     target_update_period: int = 100
     samples_per_insert: float = 32.0
-    min_replay_size: int = 1000
+    min_replay_size: int = 1
     max_replay_size: int = 1000000
     importance_sampling_exponent: float = 0.2
     priority_exponent: float = 0.6
@@ -329,11 +329,11 @@ class DIAL(system.System):
         behavior_networks: Dict[str, snt.Module],
         executor_fn: Type[core.Executor] = DIALExecutor,
         shared_weights: bool = True,
-        batch_size: int = 256,
+        batch_size: int = 1,
         prefetch_size: int = 4,
         target_update_period: int = 100,
         samples_per_insert: float = 32.0,
-        min_replay_size: int = 1000,
+        min_replay_size: int = 1,
         max_replay_size: int = 1000000,
         importance_sampling_exponent: float = 0.2,
         priority_exponent: float = 0.6,
