@@ -35,7 +35,6 @@ step.
 
 class TwoStepEnv(gym.Env):
     def __init__(self) -> None:
-
         self.num_agents = 2
         self.state = 0
         self.env_done = False
@@ -60,48 +59,46 @@ class TwoStepEnv(gym.Env):
         Dict[str, Union[bool, Any]],
         Dict[str, Dict[Any, Any]],
     ]:
-        obs_n = {}
-        reward_n = {}
-        # done_n = {}
-
         if self.state == 0:
             self.env_done = False
-            reward_n = {"agent_0": 0.0, "agent_1": 0.0}
-            done_n = {"agent_0": False, "agent_1": False}
+            self.reward_n = {"agent_0": 0.0, "agent_1": 0.0}
+            self.done_n = {"agent_0": False, "agent_1": False}
             if action_n["agent_0"] == 0:
                 self.state = 1
-                obs_n = {"agent_0": 1.0, "agent_1": 1.0}
-                return obs_n, reward_n, done_n, {}  # Go to 2A
+                self.obs_n = {"agent_0": 1.0, "agent_1": 1.0}
+                return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2A
             else:
                 self.state = 2
-                obs_n = {"agent_0": 2.0, "agent_1": 2.0}
-                return obs_n, reward_n, done_n, {}  # Go to 2B
+                self.obs_n = {"agent_0": 2.0, "agent_1": 2.0}
+                return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2B
 
         elif self.state == 1:  # State 2A
             self.env_done = True
             self.state = 0
-            reward_n = {"agent_0": 7.0, "agent_1": 7.0}
-            done_n = {"agent_0": True, "agent_1": True}
-            return obs_n, reward_n, done_n, {}
+            self.reward_n = {"agent_0": 7.0, "agent_1": 7.0}
+            self.done_n = {"agent_0": True, "agent_1": True}
+            return self.obs_n, self.reward_n, self.done_n, {}
 
         elif self.state == 2:  # State 2B
             self.env_done = True
             self.state = 0
-            done_n = {"agent_0": True, "agent_1": True}
+            self.done_n = {"agent_0": True, "agent_1": True}
             if action_n["agent_0"] == 0 and action_n["agent_1"] == 0:
-                reward_n = {"agent_0": 0.0, "agent_1": 0.0}
+                self.reward_n = {"agent_0": 0.0, "agent_1": 0.0}
             elif action_n["agent_0"] == 0 and action_n["agent_1"] == 1:
-                reward_n = {"agent_0": 1.0, "agent_1": 1.0}
+                self.reward_n = {"agent_0": 1.0, "agent_1": 1.0}
             elif action_n["agent_0"] == 1 and action_n["agent_1"] == 0:
-                reward_n = {"agent_0": 1.0, "agent_1": 1.0}
+                self.reward_n = {"agent_0": 1.0, "agent_1": 1.0}
             elif action_n["agent_0"] == 1 and action_n["agent_1"] == 1:
-                reward_n = {"agent_0": 8.0, "agent_1": 8.0}
-            return obs_n, reward_n, done_n, {}
+                self.reward_n = {"agent_0": 8.0, "agent_1": 8.0}
+            return self.obs_n, self.reward_n, self.done_n, {}
 
         else:
             raise Exception("invalid state:{}".format(self.state))
 
     def reset(self) -> Dict[str, np.array]:
         self.state = 0
-        obs_n = {"agent_0": 0.0, "agent_1": 0.0}
-        return obs_n
+        self.reward_n = {}
+        self.done_n = {}
+        self.obs_n = {"agent_0": 0.0, "agent_1": 0.0}
+        return self.obs_n
