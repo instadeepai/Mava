@@ -31,13 +31,14 @@ This is meant to flexibily test various environments wrappers.
     It is parametrize by an EnvSpec object:
         env_name: [name of env]
         env_type: [EnvType.Parallel/EnvType.Sequential]
+        env_source: [What is source env - e.g. PettingZoo/RLLibMultiEnv]
+            - Used in confest to determine which envs and wrappers to load.
 
     For new environments - you might need to update the Helpers class in conftest.py.
 """
 
+
 # TODO (Kale-ab): Test dying agents.
-
-
 @pytest.mark.parametrize(
     "env_spec",
     [

@@ -130,7 +130,7 @@ def get_ma_environment(
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             base_class.__init__(self, *args, **kwargs)
             self.agents = ["agent_0", "agent_1", "agent_2"]
-            self.agents = self.agents
+            self.possible_agents = self.agents
             self.num_agents = len(self.agents)
 
             multi_agent_specs = {}
