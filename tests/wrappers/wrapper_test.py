@@ -50,10 +50,10 @@ This is meant to flexibily test various environments wrappers.
 )
 class TestEnvWrapper:
     # Test that we can load a env module and that it contains agents,
-    #   action_spaces and observation_spaces.
+    #   agents and possible_agents.
     def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
         env, _ = helpers.get_env(env_spec)
-        props_which_should_not_be_none = [env,env.agents,env.possible_agents]
+        props_which_should_not_be_none = [env, env.agents, env.possible_agents]
         assert helpers.verify_all_props_not_none(
             props_which_should_not_be_none
         ), "Failed to load module"
