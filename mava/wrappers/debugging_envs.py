@@ -127,11 +127,14 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
 
     def __init__(self, environment: TwoStepEnv) -> None:
         super().__init__(environment=environment)
-        self._reset_next_step = False
+        self._reset_next_step = True
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
-        print("here")
+        if self._reset_next_step:
+            self._reset_next_step = False
+            self.reset()
+
         observations, rewards, dones, infos = self._environment.step(actions)
         observations = self._convert_observations(observations, dones)
 
