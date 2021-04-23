@@ -125,7 +125,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         # The state of the adder is captured by a buffer of `buffer_size` steps
         # (generally SAR tuples) and one additional dangling observation.
         self._buffer: Deque = collections.deque(maxlen=buffer_size)
-        self._next_extras: Dict[str, types.NestedArray] = {}
+        self._next_extras: Union[None, Dict[str, types.NestedArray]] = None
         self._next_observations = None
         self._start_of_episode = False
 
@@ -166,7 +166,7 @@ class ReverbParallelAdder(base.ParallelAdder):
     def add_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {"": ()},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Record the first observation of a trajectory."""
         if not timestep.first():
@@ -191,7 +191,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, types.NestedArray] = {"": ()},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Record an action and the following timestep."""
         if self._next_observations is None:
@@ -227,8 +227,6 @@ class ReverbParallelAdder(base.ParallelAdder):
         if next_timestep.last():
             self._start_of_episode = False
             self._write()
-
-            # print("LAST writing and reset.")
             self._write_last()
             self.reset()
         else:
@@ -242,7 +240,7 @@ class ReverbParallelAdder(base.ParallelAdder):
     def signature(
         cls,
         environment_spec: mava_specs.MAEnvironmentSpec,
-        extras_spec: Dict[str, types.NestedSpec] = {"": ()},
+        core_state_spec: tf.TypeSpec,
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
         Signatures are useful for validating data types and shapes, see Reverb's
@@ -252,9 +250,9 @@ class ReverbParallelAdder(base.ParallelAdder):
             structures with leaf nodes that have `.shape` and `.dtype` attributes.
             This should come from the environment that will be used to generate
             the data inserted into the Reverb table.
-          extras_spec: A nested structure with leaf nodes that have `.shape` and
+          core_state_spec: A nested structure with leaf nodes that have `.shape` and
             `.dtype` attributes. The structure (and shapes/dtypes) of this must
-            be the same as the `extras` passed into `ReverbAdder.add`.
+            be the same as the `core_state` passed into `ReverbAdder.add`.
         Returns:
           A `Step` whose leaf nodes are `tf.TensorSpec` objects.
         """

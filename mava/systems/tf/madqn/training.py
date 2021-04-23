@@ -248,7 +248,7 @@ class IDQNTrainer(mava.Trainer):
 
         # NOTE (Arnu): ignoring checkpointing and logging for now
         # self._checkpointer.save()
-        # self._logger.write(fetches)
+        self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
