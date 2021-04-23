@@ -1,5 +1,5 @@
-from abc import abstractmethod, abstractproperty
-from typing import Iterator, List
+from abc import abstractmethod
+from typing import Any, Iterator, List
 
 import dm_env
 
@@ -15,10 +15,18 @@ class ParallelEnvWrapper(dm_env.Environment):
         Returns a bool indicating if all agents in env are done.
         """
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def agents(self) -> List:
         """
         Returns the active agents in the env.
+        """
+
+    @property
+    @abstractmethod
+    def possible_agents(self) -> List:
+        """
+        Returns all the possible agents in the env.
         """
 
 
@@ -32,4 +40,11 @@ class SequentialEnvWrapper(ParallelEnvWrapper):
         """
         Returns an iterator that yields the current agent in the env.
             max_iter: Maximum number of iterations (to limit infinite loops/iterations).
+        """
+
+    @property
+    @abstractmethod
+    def current_agent(self) -> Any:
+        """
+        Returns the current selected agent.
         """

@@ -83,7 +83,7 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         episode_steps = 0
 
         timestep = self._environment.reset()
-        agent = self._environment.agent_selection
+        agent = self._environment.current_agent
 
         # Broadcast timestep for all agents - to use parallel adder.
         # TODO (Kale-ab) : Make more robust -this could cause issues
