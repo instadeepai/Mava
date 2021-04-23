@@ -253,15 +253,15 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         for index, grad in enumerate(gradients):
             variables_name = variables_names[index]
             if self._log_data(variables_name):
-                grads_dict[f"{label}_{variables_name}_grad"] = grad
-                grads_dict[f"{label}_{variables_name}_grad_norm"] = self._apply_norms(
+                grads_dict[f"{label}/{variables_name}_grad"] = grad
+                grads_dict[f"{label}/{variables_name}_grad_norm"] = self._apply_norms(
                     grad, self.gradient_norms
                 )
 
         # Log whole network grads
         all_grads_flat = tf.concat([tf.reshape(grad, -1) for grad in gradients], axis=0)
-        grads_dict[f"{label}_wholenetwork_grad"] = all_grads_flat
-        grads_dict[f"{label}_wholenetwork_grad_norm"] = self._apply_norms(
+        grads_dict[f"{label}/wholenetwork_grad"] = all_grads_flat
+        grads_dict[f"{label}/wholenetwork_grad_norm"] = self._apply_norms(
             all_grads_flat, self.gradient_norms
         )
 
@@ -273,8 +273,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         # Log Weights per layer
         for weight in weights:
             if self._log_data(weight.name):
-                weights_dict[f"{label}_{weight.name}_weight"] = weight
-                weights_dict[f"{label}_{weight.name}_weight_norm"] = self._apply_norms(
+                weights_dict[f"{label}/{weight.name}_weight"] = weight
+                weights_dict[f"{label}/{weight.name}_weight_norm"] = self._apply_norms(
                     weight, self.weight_norms
                 )
 
@@ -282,8 +282,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         all_weights_flat = tf.concat(
             [tf.reshape(weight, -1) for weight in weights], axis=0
         )
-        weights_dict[f"{label}_wholenetwork_weight"] = all_weights_flat
-        weights_dict[f"{label}_wholenetwork_weight_norm"] = self._apply_norms(
+        weights_dict[f"{label}/wholenetwork_weight"] = all_weights_flat
+        weights_dict[f"{label}/wholenetwork_weight_norm"] = self._apply_norms(
             all_weights_flat, self.weight_norms
         )
 
