@@ -279,7 +279,10 @@ def main(_: Any) -> None:
     }
 
     # Create the evaluation actor and loop.
-    eval_actor = dial.DIALExecutor(policy_networks=eval_policies)
+    eval_actor = dial.DIALExecutor(
+        policy_networks=eval_policies,
+        communication_module=system._communication_module,
+    )
     eval_env = make_environment()
     eval_loop = ParallelEnvironmentLoop(
         eval_env, eval_actor, logger=eval_logger, label="eval_loop"

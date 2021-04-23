@@ -137,6 +137,9 @@ class SwitchGameWrapper(PettingZooParallelEnvWrapper):
 
         observations, rewards, dones, infos = self._environment.step(actions)
 
+        if observations:
+            observations = self._convert_observations(observations, dones)
+
         if self._environment.env_done:
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True

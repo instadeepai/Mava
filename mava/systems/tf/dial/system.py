@@ -30,7 +30,10 @@ from acme.utils import counting, loggers
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import DecentralisedActor
-from mava.components.tf.modules.communication import BroadcastedCommunication
+from mava.components.tf.modules.communication import (
+    BaseCommunicationModule,
+    BroadcastedCommunication,
+)
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf.dial.execution import DIALExecutor
@@ -94,6 +97,7 @@ class DIALConfig:
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     counter: counting.Counter = None
     clipping: bool = False
+    communication_module: BaseCommunicationModule = BroadcastedCommunication
 
 
 class DIALBuilder(SystemBuilder):
@@ -164,6 +168,7 @@ class DIALBuilder(SystemBuilder):
     def make_executor(
         self,
         policy_networks: Dict[str, snt.Module],
+        communication_module: BaseCommunicationModule,
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
@@ -200,6 +205,7 @@ class DIALBuilder(SystemBuilder):
         # Create the actor which defines how we take actions.
         return DIALExecutor(
             policy_networks=policy_networks,
+            communication_module=communication_module,
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
@@ -297,6 +303,7 @@ class DIAL(system.System):
         policy_networks: Optional[Dict[str, snt.Module]] = None,
         max_gradient_norm: Optional[float] = None,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
+        communication_module: BaseCommunicationModule = BroadcastedCommunication,
     ):
         """Initialize the system.
         Args:
@@ -353,6 +360,7 @@ class DIAL(system.System):
                 policy_networks=policy_networks,
                 max_gradient_norm=max_gradient_norm,
                 replay_table_name=replay_table_name,
+                communication_module=communication_module,
             )
         )
 
@@ -382,12 +390,20 @@ class DIAL(system.System):
         # Add differentiable communication and get networks
         # TODO (Kevin): create differentiable communication module
         # See mava/components/tf/modules/communication
-        networks = BroadcastedCommunication(
+        self._communication_module = communication_module(
             architecture=architecture,
-        ).create_system()
+            shared=True,
+            channel_size=1,
+        )
+
+        networks = communication_module.create_system()
 
         # Create the actor which defines how we take actions.
-        executor = builder.make_executor(networks["policies"], adder)
+        executor = builder.make_executor(
+            policy_networks=networks["policies"],
+            adder=adder,
+            communication_module=self._communication_module,
+        )
 
         # The learner updates the parameters (and initializes them).
         trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)

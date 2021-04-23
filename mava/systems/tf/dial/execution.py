@@ -33,6 +33,7 @@ from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.systems.tf.executors import RecurrentExecutor
 
 tfd = tfp.distributions
@@ -44,6 +45,7 @@ class DIALExecutor(RecurrentExecutor):
     def __init__(
         self,
         policy_networks: Dict[str, snt.RNNCore],
+        communication_module: BaseCommunicationModule,
         message_size: int = 1,
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
@@ -71,6 +73,7 @@ class DIALExecutor(RecurrentExecutor):
         self._prev_states: Dict[str, Any] = {}
         self._prev_messages: Dict[str, Any] = {}
         self._store_recurrent_state = store_recurrent_state
+        self._communication_module = communication_module
 
     @tf.function
     def _policy(
@@ -148,6 +151,9 @@ class DIALExecutor(RecurrentExecutor):
         self, observations: Dict[str, types.NestedArray]
     ) -> Dict[str, types.NestedArray]:
         actions = {}
+
+        message_inputs = self._communication_module.process_messages(self._messages)
+
         for agent, observation in observations.items():
 
             # Step the recurrent policy forward given the current observation and state.
@@ -155,7 +161,7 @@ class DIALExecutor(RecurrentExecutor):
                 agent,
                 observation.observation,
                 self._states[agent],
-                self._messages[agent],
+                message_inputs[agent],
             )
 
             # Bookkeeping of recurrent states for the observe method.
