@@ -36,9 +36,9 @@ TASKS = {
 
 
 def make_environment(
+    evaluation: bool = False,
     env_type: str = "sisl",
     env_name: str = "multiwalker_v6",
-    evaluation: bool = False,
     **kwargs: int,
 ) -> dm_env.Environment:
     """Wraps an Pettingzoo environment.

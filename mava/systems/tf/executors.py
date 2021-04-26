@@ -81,7 +81,7 @@ class FeedForwardExecutor(core.Executor):
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {"": ()},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         if self._adder:
             self._adder.add_first(timestep, extras)
@@ -104,7 +104,7 @@ class FeedForwardExecutor(core.Executor):
         actions = {}
         for agent, observation in observations.items():
             # Pass the observation through the policy network.
-            action = self._policy(agent, observation.observation)
+            action = self._policy(agent, observation)
             # TODO Mask actions here using observation.legal_actions
             # What happens in discrete vs cont case
             actions[agent] = tf2_utils.to_numpy_squeeze(action)

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import dataclasses
-from typing import Dict, Iterator, Optional, Type
+from typing import Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -95,21 +95,37 @@ class MADQNBuilder(SystemBuilder):
         self._trainer_fn = trainer_fn
         self._executor_fn = executer_fn
 
-    def make_replay_table(
+    def make_replay_tables(
         self,
         environment_spec: specs.EnvironmentSpec,
-    ) -> reverb.Table:
-        """Create tables to insert data into."""
-        return reverb.Table(
+    ) -> List[reverb.Table]:
+        if self._config.samples_per_insert is None:
+            # We will take a samples_per_insert ratio of None to mean that there is
+            # no limit, i.e. this only implies a min size limit.
+            limiter = reverb.rate_limiters.MinSize(self._config.min_replay_size)
+
+        else:
+            # Create enough of an error buffer to give a 10% tolerance in rate.
+            samples_per_insert_tolerance = 0.1 * self._config.samples_per_insert
+            error_buffer = self._config.min_replay_size * samples_per_insert_tolerance
+            limiter = reverb.rate_limiters.SampleToInsertRatio(
+                min_size_to_sample=self._config.min_replay_size,
+                samples_per_insert=self._config.samples_per_insert,
+                error_buffer=error_buffer,
+            )
+
+        replay_table = reverb.Table(
             name=self._config.replay_table_name,
             sampler=reverb.selectors.Uniform(),
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
-            rate_limiter=reverb.rate_limiters.MinSize(self._config.batch_size),
+            rate_limiter=limiter,
             signature=reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec
             ),
         )
+
+        return [replay_table]
 
     def make_dataset_iterator(
         self, replay_client: reverb.Client
@@ -178,9 +194,8 @@ class MADQNBuilder(SystemBuilder):
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the trainer checkpoints itself.
         """
-        q_networks = networks["q_networks"]
-        target_q_networks = networks["target_q_networks"]
-        observation_networks = networks["observation_networks"]
+        q_networks = networks["observation_networks"]
+        target_q_networks = networks["target_observation_networks"]
 
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
@@ -194,7 +209,6 @@ class MADQNBuilder(SystemBuilder):
             agent_types=agent_types,
             q_networks=q_networks,
             target_q_networks=target_q_networks,
-            observation_networks=observation_networks,
             epsilon=self._config.epsilon,
             shared_weights=self._config.shared_weights,
             optimizer=optimizer,
@@ -217,9 +231,8 @@ class BaseMADQN(system.System):
         self,
         environment_spec: specs.MAEnvironmentSpec,
         q_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
         epsilon: tf.Variable,
-        observation_networks: Dict[str, snt.Module],
         trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
         shared_weights: bool = False,
         discount: float = 0.99,
@@ -281,7 +294,7 @@ class BaseMADQN(system.System):
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_table(environment_spec)
+        replay_table = builder.make_replay_tables(environment_spec)
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
@@ -295,24 +308,22 @@ class BaseMADQN(system.System):
         networks = self._create_architecture(
             environment_spec=environment_spec,
             q_networks=q_networks,
-            observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
+            policy_networks=policy_networks,
             shared_weights=shared_weights,
         )
 
         # Retrieve networks
-        behavior_networks = networks["behaviors"]
-        q_networks = networks["policies"]
-        target_q_networks = networks["target_policies"]
-        observation_networks = networks["observations"]
+        q_networks = networks["observations"]
+        target_q_networks = networks["target_observations"]
+        policy_networks = networks["policies"]
 
         # Create the actor which defines how we take actions.
-        executor = builder.make_executor(behavior_networks, adder)
+        executor = builder.make_executor(policy_networks, adder)
 
         trainer_networks = {
             "q_networks": q_networks,
             "target_q_networks": target_q_networks,
-            "observation_networks": observation_networks,
+            "policy_networks": policy_networks,
         }
 
         # The trainer updates the network variables.
@@ -329,8 +340,7 @@ class BaseMADQN(system.System):
         self,
         environment_spec: specs.MAEnvironmentSpec,
         q_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
         shared_weights: bool,
     ) -> Dict[str, snt.Module]:
         raise NotImplementedError
@@ -345,9 +355,8 @@ class IDQN(BaseMADQN):
         self,
         environment_spec: specs.MAEnvironmentSpec,
         q_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
         epsilon: tf.Variable,
-        observation_networks: Dict[str, snt.Module],
         trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
         shared_weights: bool = False,
         discount: float = 0.99,
@@ -393,8 +402,7 @@ class IDQN(BaseMADQN):
         super().__init__(
             environment_spec=environment_spec,
             q_networks=q_networks,
-            behavior_networks=behavior_networks,
-            observation_networks=observation_networks,
+            policy_networks=policy_networks,
             shared_weights=shared_weights,
             discount=discount,
             epsilon=epsilon,
@@ -416,14 +424,12 @@ class IDQN(BaseMADQN):
         self,
         environment_spec: specs.MAEnvironmentSpec,
         q_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
         shared_weights: bool,
     ) -> Dict[str, snt.Module]:
         return DecentralisedActor(
             environment_spec=environment_spec,
-            policy_networks=q_networks,
-            observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
+            observation_networks=q_networks,
+            policy_networks=policy_networks,
             shared_weights=shared_weights,
         ).create_system()

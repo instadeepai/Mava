@@ -35,16 +35,14 @@ class CentralisedActor(DecentralisedActor):
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
-        policy_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
         shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
-            policy_networks=policy_networks,
             observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
+            policy_networks=policy_networks,
             shared_weights=shared_weights,
         )
 
@@ -81,18 +79,16 @@ class CentralisedCritic(DecentralisedActorCritic):
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
+            observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         )
 
@@ -139,19 +135,17 @@ class CentralisedActorCritic(CentralisedActor, CentralisedCritic):  # type: igno
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = True,
     ):
 
         CentralisedCritic.__init__(
             self,
             environment_spec=environment_spec,
+            observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         )

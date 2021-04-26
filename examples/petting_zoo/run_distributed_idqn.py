@@ -16,21 +16,19 @@
 """Example running MADQN on the pettingzoo environment."""
 
 
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any, Mapping
 
 import launchpad as lp
-import sonnet as snt
 import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
-from acme.utils import lp_utils
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import NetworkWithMaskedEpsilonGreedy
 from mava.systems.tf import madqn
-
-from . import helpers
+from mava.utils import lp_utils
+from mava.utils.environments import pettingzoo_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -47,9 +45,8 @@ flags.DEFINE_string(
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    epsilon: tf.Variable,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
-    shared_weights: bool = False,
+    epsilon: tf.Variable = tf.Variable(0.05, trainable=False),
+    shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
 
@@ -60,44 +57,32 @@ def make_networks(
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
-
-    observation_networks = {}
     q_networks = {}
-    behavior_networks = {}
+    policy_networks = {}
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
 
-        # Create the shared observation network
-        observation_network = networks.ResNetTorso()
+        # Create the q-value network.
+        q_network = networks.DQNAtariNetwork(num_dimensions)
 
-        # Create the policy network.
-        q_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(q_networks_layer_sizes[key], activate_final=True),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
-        )
+        # Epsilon greedy policy network
+        policy_network = NetworkWithMaskedEpsilonGreedy(q_network, epsilon=epsilon)
 
-        behavior_network = NetworkWithMaskedEpsilonGreedy(q_network, epsilon=epsilon)
-
-        observation_networks[key] = observation_network
         q_networks[key] = q_network
-        behavior_networks[key] = behavior_network
-
+        policy_networks[key] = policy_network
     return {
         "q_networks": q_networks,
-        "observations": observation_networks,
-        "behaviors": behavior_networks,
+        "policies": policy_networks,
     }
 
 
 def main(_: Any) -> None:
     environment_factory = lp_utils.partial_kwargs(
-        helpers.make_environment, env_type=FLAGS.env_type, env_class=FLAGS.env_name
+        pettingzoo_utils.make_environment,
+        env_type=FLAGS.env_type,
+        env_name=FLAGS.env_name,
     )
 
     program = madqn.DistributedMADQN(

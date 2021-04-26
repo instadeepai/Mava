@@ -23,7 +23,6 @@ import trfl
 from absl import app, flags
 from acme import types
 from acme.tf import networks
-from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
@@ -63,16 +62,12 @@ def make_networks(
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
-    observation_networks = {}
+    policy_networks = {}
     q_networks = {}
-    behavior_networks = {}
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
-
-        # Create the shared observation network
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
         q_network = snt.Sequential(
@@ -82,7 +77,7 @@ def make_networks(
             ]
         )
 
-        behavior_network = snt.Sequential(
+        policy_network = snt.Sequential(
             [
                 q_network,
                 lambda q: tf.cast(
@@ -91,14 +86,12 @@ def make_networks(
             ]
         )
 
-        observation_networks[key] = observation_network
         q_networks[key] = q_network
-        behavior_networks[key] = behavior_network
+        policy_networks[key] = policy_network
 
     return {
         "q_networks": q_networks,
-        "observations": observation_networks,
-        "behaviors": behavior_networks,
+        "policies": policy_networks,
     }
 
 
@@ -113,8 +106,7 @@ def main(_: Any) -> None:
     system = madqn.IDQN(
         environment_spec=environment_spec,
         q_networks=system_networks["q_networks"],
-        observation_networks=system_networks["observations"],
-        behavior_networks=system_networks["behaviors"],
+        policy_networks=system_networks["policies"],
         epsilon=epsilon,
     )
 

@@ -49,16 +49,14 @@ class NetworkedActor(DecentralisedActor, NetworkedSystem):
         self,
         network_spec: Dict[str, np.ndarray],
         environment_spec: specs.MAEnvironmentSpec,
-        policy_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
         shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
-            policy_networks=policy_networks,
             observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
+            policy_networks=policy_networks,
             shared_weights=shared_weights,
         )
 

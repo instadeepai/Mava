@@ -32,9 +32,8 @@ class DecentralisedActor(BaseArchitecture):
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
-        policy_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
         shared_weights: bool = True,
     ):
         self._env_spec = environment_spec
@@ -43,9 +42,8 @@ class DecentralisedActor(BaseArchitecture):
         self._agent_specs = self._env_spec.get_agent_specs()
         self._agent_type_specs = self._env_spec.get_agent_type_specs()
 
-        self._policy_networks = policy_networks
         self._observation_networks = observation_networks
-        self._behavior_networks = behavior_networks
+        self._policy_networks = policy_networks
         self._shared_weights = shared_weights
         self._actor_agent_keys = (
             self._agent_types if self._shared_weights else self._agents
@@ -105,7 +103,6 @@ class DecentralisedActor(BaseArchitecture):
 
         actor_networks["policies"] = self._policy_networks
         actor_networks["observations"] = self._observation_networks
-        actor_networks["behaviors"] = self._behavior_networks
         actor_networks["target_policies"] = self._target_policy_networks
         actor_networks["target_observations"] = self._target_observation_networks
 
@@ -124,10 +121,9 @@ class DecentralisedActorCritic(BaseActorCritic):
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = True,
     ):
         self._env_spec = environment_spec
@@ -136,10 +132,9 @@ class DecentralisedActorCritic(BaseActorCritic):
         self._agent_specs = self._env_spec.get_agent_specs()
         self._agent_type_specs = self._env_spec.get_agent_type_specs()
 
+        self._observation_networks = observation_networks
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
-        self._observation_networks = observation_networks
-        self._behavior_networks = behavior_networks
         self._shared_weights = shared_weights
         self._actor_agent_keys = (
             self._agent_types if self._shared_weights else self._agents
@@ -214,7 +209,6 @@ class DecentralisedActorCritic(BaseActorCritic):
 
         actor_networks["policies"] = self._policy_networks
         actor_networks["observations"] = self._observation_networks
-        actor_networks["behaviors"] = self._behavior_networks
         actor_networks["target_policies"] = self._target_policy_networks
         actor_networks["target_observations"] = self._target_observation_networks
 

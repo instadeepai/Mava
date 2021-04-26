@@ -22,15 +22,17 @@ import dm_env
 import launchpad as lp
 import reverb
 import sonnet as snt
-from acme import specs
+from acme import specs as acme_specs
 from acme.tf import savers as tf2_savers
-from acme.utils import counting, loggers, lp_utils
+from acme.utils import counting, loggers
 
 import mava
 from mava import core
+from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedActor
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import system, training
+from mava.utils import lp_utils
 
 
 class DistributedMADQN:
@@ -39,13 +41,13 @@ class DistributedMADQN:
     def __init__(
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
-        network_factory: Callable[[specs.BoundedArray], Dict[str, snt.Module]],
+        network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         architecture: Type[DecentralisedActor] = DecentralisedActor,
         trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
-        environment_spec: specs.MAEnvironmentSpec = None,
+        environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
         epsilon: float = 0.05,
         batch_size: int = 256,
@@ -58,7 +60,7 @@ class DistributedMADQN:
         discount: float = 0.99,
         policy_optimizer: snt.Optimizer = None,
         target_update_period: int = 100,
-        max_executor_steps: int = None,
+        max_executor_steps: int = 10000,
         log_every: float = 10.0,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -66,7 +68,7 @@ class DistributedMADQN:
     ):
 
         if not environment_spec:
-            environment_spec = specs.make_environment_spec(environment_factory(False))
+            environment_spec = mava_specs.MAEnvironmentSpec(environment_factory(False))
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -103,7 +105,7 @@ class DistributedMADQN:
 
     def replay(self) -> Any:
         """The replay storage."""
-        return self._builder.make_replay_table(self._environment_spec)
+        return self._builder.make_replay_tables(self._environment_spec)
 
     def counter(self) -> Any:
         return tf2_savers.CheckpointingRunner(
@@ -121,22 +123,19 @@ class DistributedMADQN:
         """The Trainer part of the system."""
 
         # Create the networks to optimize (online)
-        networks = self._network_factory(self._environment_spec.actions)
+        networks = self._network_factory(self._environment_spec)
 
         # Create system architecture with target networks.
         system_networks = self._architecture(
             environment_spec=self._environment_spec,
-            policy_networks=networks["q_networks"],
-            observation_networks=networks["observations"],
-            behavior_networks=networks["behaviors"],
+            observation_networks=networks["q_networks"],
+            policy_networks=networks["policies"],
             shared_weights=self._shared_weights,
         ).create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
-        logger = loggers.make_default_logger(
-            "trainer", time_delta=self._log_every, steps_key="trainer_steps"
-        )
+        logger = loggers.make_default_logger("trainer", time_delta=self._log_every)
 
         return self._builder.make_trainer(
             networks=system_networks,
@@ -154,14 +153,13 @@ class DistributedMADQN:
         """The executor process."""
 
         # Create the behavior policy.
-        networks = self._network_factory(self._environment_spec.actions)
+        networks = self._network_factory(self._environment_spec)
 
         # Create system architecture with target networks.
         executor_networks = self._architecture(
             environment_spec=self._environment_spec,
-            policy_networks=networks["q_networks"],
-            observation_networks=networks["observations"],
-            behavior_networks=networks["behaviors"],
+            observation_networks=networks["q_networks"],
+            policy_networks=networks["policies"],
             shared_weights=self._shared_weights,
         ).create_system()
 
@@ -181,7 +179,6 @@ class DistributedMADQN:
             "executor",
             save_data=False,
             time_delta=self._log_every,
-            steps_key="executor_steps",
         )
 
         # Create the loop to connect environment and executor.
@@ -196,22 +193,21 @@ class DistributedMADQN:
         """The evaluation process."""
 
         # Create the behavior policy.
-        networks = self._network_factory(self._environment_spec.actions)
+        networks = self._network_factory(self._environment_spec)
         # networks.init(self._environment_spec)
         # policy_network = networks.make_policy(self._environment_spec)
 
         # Create system architecture with target networks.
         executor_networks = self._architecture(
             environment_spec=self._environment_spec,
-            policy_networks=networks["q_networks"],
-            observation_networks=networks["observations"],
-            behavior_networks=networks["behaviors"],
+            observation_networks=networks["q_networks"],
+            policy_networks=networks["policies"],
             shared_weights=self._shared_weights,
         ).create_system()
 
         # Create the agent.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["behaviors"],
+            policy_networks=executor_networks["policies"],
             variable_source=variable_source,
         )
 
@@ -223,7 +219,6 @@ class DistributedMADQN:
         logger = logger or loggers.make_default_logger(
             "evaluator",
             time_delta=self._log_every,
-            steps_key="evaluator_steps",
         )
 
         # Create the run loop and return it.
