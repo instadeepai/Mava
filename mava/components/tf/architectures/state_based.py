@@ -24,12 +24,12 @@ from acme import specs as acme_specs
 
 from mava import specs as mava_specs
 from mava.components.tf.architectures.decentralised import (
-    DecentralisedActor,
-    DecentralisedActorCritic,
+    DecentralisedPolicyActor,
+    DecentralisedQValueActorCritic,
 )
 
 
-class StateBasedActor(DecentralisedActor):
+class StateBasedPolicyActor(DecentralisedPolicyActor):
     """Multi-agent actor architecture using
     environment state information."""
 
@@ -71,7 +71,7 @@ class StateBasedActor(DecentralisedActor):
         return actor_obs_specs
 
 
-class StateBasedCritic(DecentralisedActorCritic):
+class StateBasedQValueCritic(DecentralisedQValueActorCritic):
     """Multi-agent actor critic architecture with a critic using
     environment state information."""
 
@@ -125,7 +125,9 @@ class StateBasedCritic(DecentralisedActorCritic):
         return critic_obs_specs, critic_act_specs
 
 
-class StateBasedActorCritic(StateBasedActor, StateBasedCritic):  # type: ignore
+class StateBasedQValueActorCritic(  # type: ignore
+    StateBasedPolicyActor, StateBasedQValueCritic
+):
     """Multi-agent actor critic architecture where both actor policies
     and critics use environment state information"""
 
@@ -138,7 +140,7 @@ class StateBasedActorCritic(StateBasedActor, StateBasedCritic):  # type: ignore
         shared_weights: bool = True,
     ):
 
-        StateBasedCritic.__init__(
+        StateBasedQValueCritic.__init__(
             self,
             environment_spec=environment_spec,
             observation_networks=observation_networks,

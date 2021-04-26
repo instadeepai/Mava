@@ -24,7 +24,7 @@ import sonnet as snt
 from acme import specs as acme_specs
 
 from mava import specs
-from mava.components.tf.architectures.decentralised import DecentralisedActor
+from mava.components.tf.architectures.decentralised import DecentralisedPolicyActor
 
 
 def fully_connected_network_spec(agents: List[str]) -> Dict[str, np.ndarray]:
@@ -42,7 +42,7 @@ class NetworkedSystem:
         """Create network structure specifying connection between agents"""
 
 
-class NetworkedActor(DecentralisedActor, NetworkedSystem):
+class NetworkedPolicyActor(DecentralisedPolicyActor, NetworkedSystem):
     """Networked multi-agent actor critic architecture."""
 
     def __init__(

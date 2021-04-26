@@ -24,7 +24,7 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import DecentralisedActor
+from mava.components.tf.architectures import DecentralisedValueActor
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
@@ -313,8 +313,8 @@ class BaseMADQN(system.System):
         )
 
         # Retrieve networks
-        q_networks = networks["observations"]
-        target_q_networks = networks["target_observations"]
+        q_networks = networks["values"]
+        target_q_networks = networks["target_values"]
         policy_networks = networks["policies"]
 
         # Create the actor which defines how we take actions.
@@ -427,9 +427,9 @@ class IDQN(BaseMADQN):
         policy_networks: Dict[str, snt.Module],
         shared_weights: bool,
     ) -> Dict[str, snt.Module]:
-        return DecentralisedActor(
+        return DecentralisedValueActor(
             environment_spec=environment_spec,
-            observation_networks=q_networks,
+            value_networks=q_networks,
             policy_networks=policy_networks,
             shared_weights=shared_weights,
         ).create_system()

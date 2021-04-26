@@ -29,7 +29,7 @@ from acme.utils import counting, loggers
 import mava
 from mava import core
 from mava import specs as mava_specs
-from mava.components.tf.architectures import DecentralisedActor
+from mava.components.tf.architectures import DecentralisedValueActor
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import system, training
 from mava.utils import lp_utils
@@ -42,7 +42,7 @@ class DistributedMADQN:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
-        architecture: Type[DecentralisedActor] = DecentralisedActor,
+        architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         num_executors: int = 1,
@@ -128,7 +128,7 @@ class DistributedMADQN:
         # Create system architecture with target networks.
         system_networks = self._architecture(
             environment_spec=self._environment_spec,
-            observation_networks=networks["q_networks"],
+            value_networks=networks["q_networks"],
             policy_networks=networks["policies"],
             shared_weights=self._shared_weights,
         ).create_system()
@@ -158,7 +158,7 @@ class DistributedMADQN:
         # Create system architecture with target networks.
         executor_networks = self._architecture(
             environment_spec=self._environment_spec,
-            observation_networks=networks["q_networks"],
+            value_networks=networks["q_networks"],
             policy_networks=networks["policies"],
             shared_weights=self._shared_weights,
         ).create_system()
@@ -200,7 +200,7 @@ class DistributedMADQN:
         # Create system architecture with target networks.
         executor_networks = self._architecture(
             environment_spec=self._environment_spec,
-            observation_networks=networks["q_networks"],
+            value_networks=networks["q_networks"],
             policy_networks=networks["policies"],
             shared_weights=self._shared_weights,
         ).create_system()

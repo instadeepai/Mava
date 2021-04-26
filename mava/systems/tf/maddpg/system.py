@@ -26,7 +26,7 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import DecentralisedActorCritic
+from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
@@ -398,7 +398,7 @@ class MADDPG(system.System):
         dataset = builder.make_dataset_iterator(replay_client)
 
         # Create the networks
-        networks = DecentralisedActorCritic(
+        networks = DecentralisedQValueActorCritic(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
