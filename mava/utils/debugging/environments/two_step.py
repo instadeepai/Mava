@@ -73,15 +73,15 @@ class TwoStepEnv(gym.Env):
             if action_n["agent_0"] == 0:
                 self.state = 1
                 self.obs_n = {
-                    "agent_0": np.array(1.0, dtype=np.float32),
-                    "agent_1": np.array(1.0, dtype=np.float32),
+                    "agent_0": np.array([1.0], dtype=np.float32),
+                    "agent_1": np.array([1.0], dtype=np.float32),
                 }
                 return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2A
             else:
                 self.state = 2
                 self.obs_n = {
-                    "agent_0": np.array(2.0, dtype=np.float32),
-                    "agent_1": np.array(2.0, dtype=np.float32),
+                    "agent_0": np.array([2.0], dtype=np.float32),
+                    "agent_1": np.array([2.0], dtype=np.float32),
                 }
                 return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2B
 
@@ -129,7 +129,7 @@ class TwoStepEnv(gym.Env):
         self.reward_n = {}
         self.done_n = {}
         self.obs_n = {
-            "agent_0": np.array(0.0, dtype=np.float32),
-            "agent_1": np.array(0.0, dtype=np.float32),
+            "agent_0": np.array([0.0], dtype=np.float32),
+            "agent_1": np.array([0.0], dtype=np.float32),
         }
         return self.obs_n
