@@ -38,9 +38,9 @@ class DistributedMADQN:
 
     def __init__(
         self,
-        architecture: Type[DecentralisedActor],
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[specs.BoundedArray], Dict[str, snt.Module]],
+        architecture: Type[DecentralisedActor] = DecentralisedActor,
         trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         num_executors: int = 1,
@@ -61,6 +61,8 @@ class DistributedMADQN:
         max_executor_steps: int = None,
         log_every: float = 10.0,
         counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = False,
     ):
 
         if not environment_spec:
@@ -92,6 +94,8 @@ class DistributedMADQN:
                 n_step=n_step,
                 clipping=clipping,
                 counter=counter,
+                logger=logger,
+                checkpoint=checkpoint,
             ),
             trainer_fn=trainer_fn,
             executer_fn=executor_fn,
@@ -117,12 +121,14 @@ class DistributedMADQN:
         """The Trainer part of the system."""
 
         # Create the networks to optimize (online)
-        online_networks = self._network_factory(self._environment_spec.actions)
+        networks = self._network_factory(self._environment_spec.actions)
 
         # Create system architecture with target networks.
         system_networks = self._architecture(
             environment_spec=self._environment_spec,
-            online_networks=online_networks,
+            policy_networks=networks["q_networks"],
+            observation_networks=networks["observations"],
+            behavior_networks=networks["behaviors"],
             shared_weights=self._shared_weights,
         ).create_system()
 

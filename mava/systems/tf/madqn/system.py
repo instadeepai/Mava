@@ -20,13 +20,12 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme import datasets
-from acme.utils import counting
+from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-
-# from mava.components.tf.architectures import DecentralisedActor
-# from mava.systems import system
+from mava.components.tf.architectures import DecentralisedActor
+from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import training
@@ -68,6 +67,8 @@ class MADQNConfig:
     discount: float
     policy_optimizer: snt.Optimizer
     counter: counting.Counter
+    logger: loggers.Logger
+    checkpoint: bool
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
@@ -209,219 +210,220 @@ class MADQNBuilder(SystemBuilder):
 
 
 # TODO (Arnu): fix single process version to work with new design
-# class BaseMADQN(system.System):
-#     """Base MADQN system."""
+class BaseMADQN(system.System):
+    """Base MADQN system."""
 
-#     def __init__(
-#         self,
-#         environment_spec: specs.MAEnvironmentSpec,
-#         q_networks: Dict[str, snt.Module],
-#         behavior_networks: Dict[str, snt.Module],
-#         epsilon: tf.Variable,
-#         observation_networks: Dict[str, snt.Module],
-#         trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
-#         shared_weights: bool = False,
-#         discount: float = 0.99,
-#         policy_optimizer: snt.Optimizer = None,
-#         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
-#         batch_size: int = 256,
-#         prefetch_size: int = 4,
-#         target_update_period: int = 100,
-#         min_replay_size: int = 1000,
-#         max_replay_size: int = 1_000_000,
-#         samples_per_insert: float = 32.0,
-#         n_step: int = 5,
-#         clipping: bool = False,
-#         logger: loggers.Logger = None,
-#         counter: counting.Counter = None,
-#         checkpoint: bool = False,
-#     ):
+    def __init__(
+        self,
+        environment_spec: specs.MAEnvironmentSpec,
+        q_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
+        epsilon: tf.Variable,
+        observation_networks: Dict[str, snt.Module],
+        trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
+        shared_weights: bool = False,
+        discount: float = 0.99,
+        policy_optimizer: snt.Optimizer = None,
+        replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
+        batch_size: int = 256,
+        prefetch_size: int = 4,
+        target_update_period: int = 100,
+        min_replay_size: int = 1000,
+        max_replay_size: int = 1_000_000,
+        samples_per_insert: float = 32.0,
+        n_step: int = 5,
+        clipping: bool = False,
+        logger: loggers.Logger = None,
+        counter: counting.Counter = None,
+        checkpoint: bool = False,
+    ):
 
-#         """Initialize the system.
-#         Args:
-#             discount: discount to use for TD updates.
-#             batch_size: batch size for updates.
-#             prefetch_size: size to prefetch from replay.
-#             target_update_period: number of learner steps to perform before updating
-#               the target networks.
-#             min_replay_size: minimum replay size before updating.
-#             max_replay_size: maximum replay size.
-#             samples_per_insert: number of samples to take from replay for every insert
-#               that is made.
-#             n_step: number of steps to squash into a single transition.
-#             clipping: whether to clip gradients by global norm.
-#             logger: logger object to be used by trainers.
-#             counter: counter object used to keep track of steps.
-#             checkpoint: boolean indicating whether to checkpoint the trainers.
-#             replay_table_name: string indicating what name to give the
-#               replay table."""
+        """Initialize the system.
+        Args:
+            discount: discount to use for TD updates.
+            batch_size: batch size for updates.
+            prefetch_size: size to prefetch from replay.
+            target_update_period: number of learner steps to perform before updating
+              the target networks.
+            min_replay_size: minimum replay size before updating.
+            max_replay_size: maximum replay size.
+            samples_per_insert: number of samples to take from replay for every insert
+              that is made.
+            n_step: number of steps to squash into a single transition.
+            clipping: whether to clip gradients by global norm.
+            logger: logger object to be used by trainers.
+            counter: counter object used to keep track of steps.
+            checkpoint: boolean indicating whether to checkpoint the trainers.
+            replay_table_name: string indicating what name to give the
+              replay table."""
 
-#         builder = MADQNBuilder(
-#             MADQNConfig(
-#                 shared_weights=shared_weights,
-#                 discount=discount,
-#                 policy_optimizer=policy_optimizer,
-#                 epsilon=epsilon,
-#                 batch_size=batch_size,
-#                 prefetch_size=prefetch_size,
-#                 target_update_period=target_update_period,
-#                 min_replay_size=min_replay_size,
-#                 max_replay_size=max_replay_size,
-#                 samples_per_insert=samples_per_insert,
-#                 n_step=n_step,
-#                 clipping=clipping,
-#                 logger=logger,
-#                 counter=counter,
-#                 checkpoint=checkpoint,
-#                 replay_table_name=replay_table_name,
-#             )
-#         )
+        builder = MADQNBuilder(
+            MADQNConfig(
+                environment_spec=environment_spec,
+                shared_weights=shared_weights,
+                discount=discount,
+                policy_optimizer=policy_optimizer,
+                epsilon=epsilon,
+                batch_size=batch_size,
+                prefetch_size=prefetch_size,
+                target_update_period=target_update_period,
+                min_replay_size=min_replay_size,
+                max_replay_size=max_replay_size,
+                samples_per_insert=samples_per_insert,
+                n_step=n_step,
+                clipping=clipping,
+                logger=logger,
+                counter=counter,
+                checkpoint=checkpoint,
+                replay_table_name=replay_table_name,
+            )
+        )
 
-#         # Create a replay server to add data to. This uses no limiter behavior in
-#         # order to allow the Agent interface to handle it.
-#         replay_table = builder.make_replay_table(environment_spec)
-#         self._server = reverb.Server([replay_table], port=None)
-#         replay_client = reverb.Client(f"localhost:{self._server.port}")
+        # Create a replay server to add data to. This uses no limiter behavior in
+        # order to allow the Agent interface to handle it.
+        replay_table = builder.make_replay_table(environment_spec)
+        self._server = reverb.Server([replay_table], port=None)
+        replay_client = reverb.Client(f"localhost:{self._server.port}")
 
-#         # The adder is used to insert observations into replay.
-#         adder = builder.make_adder(replay_client)
+        # The adder is used to insert observations into replay.
+        adder = builder.make_adder(replay_client)
 
-#         # The dataset provides an interface to sample from replay.
-#         dataset = builder.make_dataset_iterator(replay_client)
+        # The dataset provides an interface to sample from replay.
+        dataset = builder.make_dataset_iterator(replay_client)
 
-#         # Create the networks according to specified architecture
-#         networks = self._create_architecture(
-#             environment_spec=environment_spec,
-#             q_networks=q_networks,
-#             observation_networks=observation_networks,
-#             behavior_networks=behavior_networks,
-#             shared_weights=shared_weights,
-#         )
+        # Create the networks according to specified architecture
+        networks = self._create_architecture(
+            environment_spec=environment_spec,
+            q_networks=q_networks,
+            observation_networks=observation_networks,
+            behavior_networks=behavior_networks,
+            shared_weights=shared_weights,
+        )
 
-#         # Retrieve networks
-#         behavior_networks = networks["behaviors"]
-#         q_networks = networks["policies"]
-#         target_q_networks = networks["target_policies"]
-#         observation_networks = networks["observations"]
+        # Retrieve networks
+        behavior_networks = networks["behaviors"]
+        q_networks = networks["policies"]
+        target_q_networks = networks["target_policies"]
+        observation_networks = networks["observations"]
 
-#         # Create the actor which defines how we take actions.
-#         executor = builder.make_executor(behavior_networks, adder)
+        # Create the actor which defines how we take actions.
+        executor = builder.make_executor(behavior_networks, adder)
 
-#         trainer_networks = {
-#             "q_networks": q_networks,
-#             "target_q_networks": target_q_networks,
-#             "observation_networks": observation_networks,
-#         }
+        trainer_networks = {
+            "q_networks": q_networks,
+            "target_q_networks": target_q_networks,
+            "observation_networks": observation_networks,
+        }
 
-#         # The trainer updates the network variables.
-#         trainer = builder.make_trainer(trainer_networks, dataset)
+        # The trainer updates the network variables.
+        trainer = builder.make_trainer(trainer_networks, dataset)
 
-#         super().__init__(
-#             executor=executor,
-#             trainer=trainer,
-#             min_observations=max(batch_size, min_replay_size),
-#             observations_per_step=float(batch_size) / samples_per_insert,
-#         )
+        super().__init__(
+            executor=executor,
+            trainer=trainer,
+            min_observations=max(batch_size, min_replay_size),
+            observations_per_step=float(batch_size) / samples_per_insert,
+        )
 
-#     def _create_architecture(
-#         self,
-#         environment_spec: specs.MAEnvironmentSpec,
-#         q_networks: Dict[str, snt.Module],
-#         observation_networks: Dict[str, snt.Module],
-#         behavior_networks: Dict[str, snt.Module],
-#         shared_weights: bool,
-#     ) -> Dict[str, snt.Module]:
-#         raise NotImplementedError
+    def _create_architecture(
+        self,
+        environment_spec: specs.MAEnvironmentSpec,
+        q_networks: Dict[str, snt.Module],
+        observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
+        shared_weights: bool,
+    ) -> Dict[str, snt.Module]:
+        raise NotImplementedError
 
 
-# class IDQN(BaseMADQN):
-#     """Indepedent MADQN system.
-#     This implements a single-process independent MADQN system.
-#     """
+class IDQN(BaseMADQN):
+    """Indepedent MADQN system.
+    This implements a single-process independent MADQN system.
+    """
 
-#     def __init__(
-#         self,
-#         environment_spec: specs.MAEnvironmentSpec,
-#         q_networks: Dict[str, snt.Module],
-#         behavior_networks: Dict[str, snt.Module],
-#         epsilon: tf.Variable,
-#         observation_networks: Dict[str, snt.Module],
-#         trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
-#         shared_weights: bool = False,
-#         discount: float = 0.99,
-#         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
-#         batch_size: int = 256,
-#         prefetch_size: int = 4,
-#         target_update_period: int = 100,
-#         max_replay_size: int = 1_000_000,
-#         samples_per_insert: float = 32.0,
-#         n_step: int = 5,
-#         clipping: bool = False,
-#         logger: loggers.Logger = None,
-#         counter: counting.Counter = None,
-#         checkpoint: bool = False,
-#     ):
+    def __init__(
+        self,
+        environment_spec: specs.MAEnvironmentSpec,
+        q_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
+        epsilon: tf.Variable,
+        observation_networks: Dict[str, snt.Module],
+        trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
+        shared_weights: bool = False,
+        discount: float = 0.99,
+        replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
+        batch_size: int = 256,
+        prefetch_size: int = 4,
+        target_update_period: int = 100,
+        max_replay_size: int = 1_000_000,
+        samples_per_insert: float = 32.0,
+        n_step: int = 5,
+        clipping: bool = False,
+        logger: loggers.Logger = None,
+        counter: counting.Counter = None,
+        checkpoint: bool = False,
+    ):
 
-#         """Initialize the system.
-#         Args:
-#             environment_spec: description of the actions, observations, etc.
-#             policy_networks: the online (optimized) policies for each agent in
-#                 the system.
-#             critic_networks: the online critic for each agent in the system.
-#             observation_networks: dictionary of optional networks to transform
-#                 the observations before they are fed into any network.
-#             discount: discount to use for TD updates.
-#             batch_size: batch size for updates.
-#             prefetch_size: size to prefetch from replay.
-#             target_update_period: number of learner steps to perform before updating
-#               the target networks.
-#             min_replay_size: minimum replay size before updating.
-#             max_replay_size: maximum replay size.
-#             samples_per_insert: number of samples to take from replay for every insert
-#               that is made.
-#             n_step: number of steps to squash into a single transition.
-#             sigma: standard deviation of zero-mean, Gaussian exploration noise.
-#             clipping: whether to clip gradients by global norm.
-#             logger: logger object to be used by trainers.
-#             counter: counter object used to keep track of steps.
-#             checkpoint: boolean indicating whether to checkpoint the trainers.
-#             replay_table_name: string indicating what name to give
-#                  the replay table."""
+        """Initialize the system.
+        Args:
+            environment_spec: description of the actions, observations, etc.
+            policy_networks: the online (optimized) policies for each agent in
+                the system.
+            critic_networks: the online critic for each agent in the system.
+            observation_networks: dictionary of optional networks to transform
+                the observations before they are fed into any network.
+            discount: discount to use for TD updates.
+            batch_size: batch size for updates.
+            prefetch_size: size to prefetch from replay.
+            target_update_period: number of learner steps to perform before updating
+              the target networks.
+            min_replay_size: minimum replay size before updating.
+            max_replay_size: maximum replay size.
+            samples_per_insert: number of samples to take from replay for every insert
+              that is made.
+            n_step: number of steps to squash into a single transition.
+            sigma: standard deviation of zero-mean, Gaussian exploration noise.
+            clipping: whether to clip gradients by global norm.
+            logger: logger object to be used by trainers.
+            counter: counter object used to keep track of steps.
+            checkpoint: boolean indicating whether to checkpoint the trainers.
+            replay_table_name: string indicating what name to give
+                 the replay table."""
 
-#         super().__init__(
-#             environment_spec=environment_spec,
-#             q_networks=q_networks,
-#             behavior_networks=behavior_networks,
-#             observation_networks=observation_networks,
-#             shared_weights=shared_weights,
-#             discount=discount,
-#             epsilon=epsilon,
-#             batch_size=batch_size,
-#             prefetch_size=prefetch_size,
-#             target_update_period=target_update_period,
-#             max_replay_size=max_replay_size,
-#             samples_per_insert=samples_per_insert,
-#             n_step=n_step,
-#             clipping=clipping,
-#             logger=logger,
-#             counter=counter,
-#             checkpoint=checkpoint,
-#             replay_table_name=replay_table_name,
-#             trainer_fn=trainer_fn,
-#         )
+        super().__init__(
+            environment_spec=environment_spec,
+            q_networks=q_networks,
+            behavior_networks=behavior_networks,
+            observation_networks=observation_networks,
+            shared_weights=shared_weights,
+            discount=discount,
+            epsilon=epsilon,
+            batch_size=batch_size,
+            prefetch_size=prefetch_size,
+            target_update_period=target_update_period,
+            max_replay_size=max_replay_size,
+            samples_per_insert=samples_per_insert,
+            n_step=n_step,
+            clipping=clipping,
+            logger=logger,
+            counter=counter,
+            checkpoint=checkpoint,
+            replay_table_name=replay_table_name,
+            trainer_fn=trainer_fn,
+        )
 
-#     def _create_architecture(
-#         self,
-#         environment_spec: specs.MAEnvironmentSpec,
-#         q_networks: Dict[str, snt.Module],
-#         observation_networks: Dict[str, snt.Module],
-#         behavior_networks: Dict[str, snt.Module],
-#         shared_weights: bool,
-#     ) -> Dict[str, snt.Module]:
-#         return DecentralisedActor(
-#             environment_spec=environment_spec,
-#             policy_networks=q_networks,
-#             observation_networks=observation_networks,
-#             behavior_networks=behavior_networks,
-#             shared_weights=shared_weights,
-#         ).create_system()
+    def _create_architecture(
+        self,
+        environment_spec: specs.MAEnvironmentSpec,
+        q_networks: Dict[str, snt.Module],
+        observation_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
+        shared_weights: bool,
+    ) -> Dict[str, snt.Module]:
+        return DecentralisedActor(
+            environment_spec=environment_spec,
+            policy_networks=q_networks,
+            observation_networks=observation_networks,
+            behavior_networks=behavior_networks,
+            shared_weights=shared_weights,
+        ).create_system()
