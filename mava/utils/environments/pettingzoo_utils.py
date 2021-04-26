@@ -18,15 +18,14 @@
 import importlib
 
 import dm_env
+import numpy as np
 import supersuit
 
 from mava.wrappers import PettingZooParallelEnvWrapper
 
 
 def make_parallel_atari_environment(
-    evaluation: bool = False,
-    env_name: str = "multiwalker_v6",
-    **kwargs: int,
+    evaluation: bool = False, env_name: str = "maze_craze_v2", **kwargs: int
 ) -> dm_env.Environment:
     """Wraps an Pettingzoo environment.
 
@@ -60,6 +59,9 @@ def make_parallel_atari_environment(
     # allow agent to see everything on the screen
     # despite Atari's flickering screen problem
     env = supersuit.frame_stack_v1(env, 4)
+
+    # set dtype to float32
+    env = supersuit.dtype_v0(env, np.float32)
 
     # cast to parallel environment
     environment = PettingZooParallelEnvWrapper(env)

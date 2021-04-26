@@ -13,5 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.components.tf.networks.atari import MADQNAtariNetwork
-from mava.components.tf.networks.epsilon_greedy import NetworkWithMaskedEpsilonGreedy
+import tensorflow as tf
+from acme.tf.network import DQNAtariNetwork
+
+from mava.types import OLT
+
+
+class MADQNAtariNetwork(DQNAtariNetwork):
+    """A feed-forward network for use with Ape-X DQN.
+    See https://arxiv.org/pdf/1803.00933.pdf for more information.
+    """
+
+    def __init__(self, num_actions: int):
+        super().__init__(name="madqn_atari_network")
+
+    def __call__(self, inputs: OLT) -> tf.Tensor:
+        return self._network(inputs.observation)

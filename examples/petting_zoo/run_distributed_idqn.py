@@ -22,10 +22,12 @@ import launchpad as lp
 import tensorflow as tf
 from absl import app, flags
 from acme import types
-from acme.tf import networks
 
 from mava import specs as mava_specs
-from mava.components.tf.networks import NetworkWithMaskedEpsilonGreedy
+from mava.components.tf.networks import (
+    MADQNAtariNetwork,
+    NetworkWithMaskedEpsilonGreedy,
+)
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
@@ -60,7 +62,7 @@ def make_networks(
         num_dimensions = specs[key].actions.num_values
 
         # Create the q-value network.
-        q_network = networks.DQNAtariNetwork(num_dimensions)
+        q_network = MADQNAtariNetwork(num_dimensions)
 
         # Epsilon greedy policy network
         policy_network = NetworkWithMaskedEpsilonGreedy(q_network, epsilon=epsilon)

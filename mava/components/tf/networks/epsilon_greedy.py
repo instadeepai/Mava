@@ -112,7 +112,7 @@ class NetworkWithMaskedEpsilonGreedy(snt.Module):
 
     def __call__(self, observation: mava_types.OLT) -> tf.Tensor:
         # tf.print("INSIDE eps:", observation["legals"], summarize=-1)
-        q = self._network(observation.observation)
+        q = self._network(observation)
         return tf.cast(
             epsilon_greedy(
                 q,
