@@ -32,11 +32,6 @@ from mava.utils.environments import pettingzoo_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_type",
-    "atari",
-    "Pettingzoo environment type, e.g. atari (str).",
-)
-flags.DEFINE_string(
     "env_name",
     "maze_craze_v2",
     "Pettingzoo environment name, e.g. pong (str).",
@@ -80,8 +75,7 @@ def make_networks(
 
 def main(_: Any) -> None:
     environment_factory = lp_utils.partial_kwargs(
-        pettingzoo_utils.make_environment,
-        env_type=FLAGS.env_type,
+        pettingzoo_utils.make_parallel_atari_environment,
         env_name=FLAGS.env_name,
     )
 

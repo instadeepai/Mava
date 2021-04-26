@@ -18,26 +18,13 @@
 import importlib
 
 import dm_env
+import supersuit
 
 from mava.wrappers import PettingZooParallelEnvWrapper
 
-TASKS = {
-    "debug": ["MountainCarContinuous-v0"],
-    "default": [
-        "HalfCheetah-v2",
-        "Hopper-v2",
-        "InvertedDoublePendulum-v2",
-        "InvertedPendulum-v2",
-        "Reacher-v2",
-        "Swimmer-v2",
-        "Walker2d-v2",
-    ],
-}
 
-
-def make_environment(
+def make_parallel_atari_environment(
     evaluation: bool = False,
-    env_type: str = "sisl",
     env_name: str = "multiwalker_v6",
     **kwargs: int,
 ) -> dm_env.Environment:
@@ -53,7 +40,27 @@ def make_environment(
     """
     del evaluation
 
-    env_module = importlib.import_module(f"pettingzoo.{env_type}.{env_name}")
+    env_module = importlib.import_module(f"pettingzoo.atari.{env_name}")
     env = env_module.parallel_env(**kwargs)  # type: ignore
+
+    env = supersuit.max_observation_v0(env, 2)
+
+    # Preprocessing
+    # repeat_action_probability is set to 0.25
+    # to introduce non-determinism to the system
+    env = supersuit.sticky_actions_v0(env, repeat_action_probability=0.25)
+
+    # skip frames for faster processing and less control
+    # to be compatable with gym, use frame_skip(env, (2,5))
+    env = supersuit.frame_skip_v0(env, 4)
+
+    # downscale observation for faster processing
+    env = supersuit.resize_v0(env, 84, 84)
+
+    # allow agent to see everything on the screen
+    # despite Atari's flickering screen problem
+    env = supersuit.frame_stack_v1(env, 4)
+
+    # cast to parallel environment
     environment = PettingZooParallelEnvWrapper(env)
     return environment

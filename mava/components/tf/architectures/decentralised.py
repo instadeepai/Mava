@@ -49,7 +49,6 @@ class DecentralisedValueActor(BaseArchitecture):
             self._agent_types if self._shared_weights else self._agents
         )
         self._n_agents = len(self._agents)
-        self._embed_specs: Dict[str, Any] = {}
 
         self._create_target_networks()
 
@@ -79,11 +78,13 @@ class DecentralisedValueActor(BaseArchitecture):
 
         # get actor specs
         actor_obs_specs = self._get_actor_specs()
+        print(actor_obs_specs)
 
         # create policy variables for each agent
         for agent_key in self._actor_agent_keys:
 
             obs_spec = actor_obs_specs[agent_key]
+            print(obs_spec)
 
             # Create variables for value and policy networks.
             tf2_utils.create_variables(self._value_networks[agent_key], [obs_spec])
