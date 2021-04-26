@@ -15,6 +15,7 @@
 
 """Implementations of a QMIX agent."""
 
+from mava.systems.tf.qmix.execution import QMIXFeedForwardExecutor
 from mava.systems.tf.qmix.system import QMIX  # type: ignore
 from mava.systems.tf.qmix.training import QMIXTrainer
 

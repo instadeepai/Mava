@@ -100,7 +100,6 @@ def make_networks(
             ]
         )
 
-        # epsilon = tf.Variable(1, trainable=False)  # Fixed for now.
         behavior_network = snt.Sequential(
             [
                 q_network,
@@ -125,7 +124,7 @@ def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment()
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    epsilon = tf.Variable(1.0, trainable=False)
+    epsilon = tf.Variable(1.0, trainable=False)  # float
     system_networks = make_networks(environment_spec, epsilon)
 
     # TODO Create loggers

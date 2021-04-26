@@ -32,8 +32,7 @@ from mava.components.tf.architectures import DecentralisedActor
 from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
-from mava.systems.tf import executors
-from mava.systems.tf.qmix import training
+from mava.systems.tf.qmix import execution, training
 
 
 @dataclasses.dataclass
@@ -169,8 +168,7 @@ class QMIXBuilder(SystemBuilder):
                 source variables as defined in mava.core.
         """
 
-        # Create the executor which coordinates the actors.
-        return executors.FeedForwardExecutor(
+        return execution.QMIXFeedForwardExecutor(
             policy_networks=behavior_networks,
             shared_weights=self._config.shared_weights,
             variable_client=None,
