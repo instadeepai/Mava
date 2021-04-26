@@ -84,7 +84,6 @@ class SystemBuilder(abc.ABC):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[NestedLogger] = None,
-        # TODO: eliminate checkpoint and move it outside.
         checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.

@@ -45,17 +45,17 @@ class IDQNTrainer(mava.Trainer):
         target_update_period: int,
         dataset: tf.data.Dataset,
         shared_weights: bool,
-        optimizer: snt.Optimizer,
-        clipping: bool,
-        counter: counting.Counter,
-        logger: loggers.Logger,
-        checkpoint: bool,
+        optimizer: snt.Optimizer = None,
+        clipping: bool = True,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
     ):
 
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
-        self._optimizer = optimizer
+        self._optimizer = optimizer or snt.optimizers.Adam(1e-4)
 
         # Store online and target networks.
         self._q_networks = q_networks
