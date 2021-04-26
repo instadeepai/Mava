@@ -23,15 +23,18 @@ from gym import spaces
 A simple two-step cooperative matrix game for two agents. Adapted from
 Qmix paper https://arxiv.org/abs/1803.11485 and tensorflow implementation
 https://github.com/tocom242242/qmix_tf2/blob/master/two_step_env.py.
+
 Actions:
-0 or 1, corresponding to which matrix the agents choose for the next time
+0 or 1 - corresponds with which matrix the agents choose for the next time
 step.
+
+Observations:
+0, 1 or 2 - corresponds with which state the system of agents is in. Both
+agents in the system will always have the same state. System starts in 
+state 0 and moves to state 1 or state 2 depending on the actions of agent
+1 in the first timestep. System state resets after both agents act in 
+timestep 2.
 """
-
-# NOTE (St John) I was in the process of making this a gym env. Will
-# wait to see how we decide to structure a base wrapper class. Don't
-# want to introduce tech debt by making this needlessly complex.
-
 
 class TwoStepEnv(gym.Env):
     def __init__(self) -> None:
@@ -52,30 +55,42 @@ class TwoStepEnv(gym.Env):
         self.possible_agents = self.agent_ids
 
     def step(
-        self, action_n: Dict[str, np.ndarray]
+        self, action_n: Dict[str, int]
     ) -> Tuple[
         Dict[str, Union[np.array, Any]],
-        Dict[str, Union[np.array, Any]],
-        Dict[str, Union[bool, Any]],
-        Dict[str, Dict[Any, Any]],
+        Union[dict, Dict[str, Union[float, Any]]],
+        Dict[str, Any],
+        Dict[str, dict],
     ]:
         if self.state == 0:
             self.env_done = False
-            self.reward_n = {"agent_0": 0.0, "agent_1": 0.0}
+            self.reward_n = {
+                "agent_0": np.array(0.0, dtype=np.float32),
+                "agent_1": np.array(0.0, dtype=np.float32),
+            }
             self.done_n = {"agent_0": False, "agent_1": False}
             if action_n["agent_0"] == 0:
                 self.state = 1
-                self.obs_n = {"agent_0": 1.0, "agent_1": 1.0}
+                self.obs_n = {
+                    "agent_0": np.array(1.0, dtype=np.float32),
+                    "agent_1": np.array(1.0, dtype=np.float32),
+                }
                 return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2A
             else:
                 self.state = 2
-                self.obs_n = {"agent_0": 2.0, "agent_1": 2.0}
+                self.obs_n = {
+                    "agent_0": np.array(2.0, dtype=np.float32),
+                    "agent_1": np.array(2.0, dtype=np.float32),
+                }
                 return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2B
 
         elif self.state == 1:  # State 2A
             self.env_done = True
             self.state = 0
-            self.reward_n = {"agent_0": 7.0, "agent_1": 7.0}
+            self.reward_n = {
+                "agent_0": np.array(7.0, dtype=np.float32),
+                "agent_1": np.array(7.0, dtype=np.float32),
+            }
             self.done_n = {"agent_0": True, "agent_1": True}
             return self.obs_n, self.reward_n, self.done_n, {}
 
@@ -84,13 +99,25 @@ class TwoStepEnv(gym.Env):
             self.state = 0
             self.done_n = {"agent_0": True, "agent_1": True}
             if action_n["agent_0"] == 0 and action_n["agent_1"] == 0:
-                self.reward_n = {"agent_0": 0.0, "agent_1": 0.0}
+                self.reward_n = {
+                    "agent_0": np.array(0.0, dtype=np.float32),
+                    "agent_1": np.array(0.0, dtype=np.float32),
+                }
             elif action_n["agent_0"] == 0 and action_n["agent_1"] == 1:
-                self.reward_n = {"agent_0": 1.0, "agent_1": 1.0}
+                self.reward_n = {
+                    "agent_0": np.array(1.0, dtype=np.float32),
+                    "agent_1": np.array(1.0, dtype=np.float32),
+                }
             elif action_n["agent_0"] == 1 and action_n["agent_1"] == 0:
-                self.reward_n = {"agent_0": 1.0, "agent_1": 1.0}
+                self.reward_n = {
+                    "agent_0": np.array(1.0, dtype=np.float32),
+                    "agent_1": np.array(1.0, dtype=np.float32),
+                }
             elif action_n["agent_0"] == 1 and action_n["agent_1"] == 1:
-                self.reward_n = {"agent_0": 8.0, "agent_1": 8.0}
+                self.reward_n = {
+                    "agent_0": np.array(8.0, dtype=np.float32),
+                    "agent_1": np.array(8.0, dtype=np.float32),
+                }
             return self.obs_n, self.reward_n, self.done_n, {}
 
         else:
@@ -100,5 +127,8 @@ class TwoStepEnv(gym.Env):
         self.state = 0
         self.reward_n = {}
         self.done_n = {}
-        self.obs_n = {"agent_0": 0.0, "agent_1": 0.0}
+        self.obs_n = {
+            "agent_0": np.array(0.0, dtype=np.float32),
+            "agent_1": np.array(0.0, dtype=np.float32),
+        }
         return self.obs_n
