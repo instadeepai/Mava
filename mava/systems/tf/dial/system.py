@@ -146,11 +146,14 @@ class DIALBuilder(SystemBuilder):
             core_state_spec = {}
             for agent in self._agents:
                 agent_type = agent.split("_")[0]
-                core_state_spec[agent] = (
-                    tf2_utils.squeeze_batch_dim(
+                core_state_spec[agent] = {
+                    "state": tf2_utils.squeeze_batch_dim(
                         self._config.networks[agent_type].initial_state(1)
                     ),
-                )
+                    "message": tf2_utils.squeeze_batch_dim(
+                        self._config.networks[agent_type].initial_message(1)
+                    ),
+                }
             adder = reverb_adders.ParallelSequenceAdder.signature(
                 environment_spec, core_state_spec
             )

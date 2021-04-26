@@ -106,6 +106,9 @@ class DIAL_policy(snt.RNNCore):
     def initial_state(self, batch_size: int = 1) -> snt.Module:
         return self.gru.initial_state(batch_size)
 
+    def initial_message(self, batch_size: int = 1) -> snt.Module:
+        return tf.zeros(self._message_dim, dtype=tf.float32)
+
     def __call__(
         self,
         x: snt.Module,
@@ -207,6 +210,7 @@ def make_networks(
         # Create the policy network.
         policy_network = DIAL_policy(
             action_spec=specs[key].actions,
+            # message_spec=extra_specs[key + '_0'],
             message_spec=_convert_to_spec(
                 spaces.Box(-np.inf, np.inf, (1,), dtype=np.float32)
             ),

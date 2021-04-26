@@ -154,3 +154,11 @@ class SwitchGameWrapper(PettingZooParallelEnvWrapper):
             discount=self._discounts,
             step_type=self._step_type,
         )
+
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        return {
+            # agent: _convert_to_spec(
+            #     spaces.Box(-np.inf, np.inf, (1,), dtype=np.float32)
+            # )
+            # for agent in self._environment.agent_ids
+        }

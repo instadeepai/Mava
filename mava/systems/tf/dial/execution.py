@@ -115,13 +115,57 @@ class DIALExecutor(RecurrentExecutor):
         timestep: dm_env.TimeStep,
         extras: Optional[Dict[str, types.NestedArray]] = {},
     ) -> None:
-        super().observe_first(timestep=timestep, extras=extras)
 
         # Re-initialize the RNN state.
         for agent, _ in timestep.observation.items():
             # index network either on agent type or on agent id
-            # agent_key = agent.split("_")[0] if self._shared_weights else agent
-            self._messages[agent] = tf.zeros(self._message_size, dtype=tf.float32)
+            agent_key = agent.split("_")[0] if self._shared_weights else agent
+            self._states[agent] = self._policy_networks[agent_key].initial_state(1)
+            self._messages[agent] = self._policy_networks[agent_key].initial_message(1)
+
+        if self._adder is not None:
+            numpy_states = {
+                agent: {
+                    "state": tf2_utils.to_numpy_squeeze(_state),
+                    "message": tf2_utils.to_numpy_squeeze(self._messages[agent]),
+                }
+                for agent, _state in self._states.items()
+            }
+
+            if extras:
+                extras.update({"core_states": numpy_states})
+                self._adder.add_first(timestep, extras)
+            else:
+                self._adder.add_first(timestep, numpy_states)
+
+    def observe(
+        self,
+        actions: Dict[str, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
+        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+    ) -> None:
+        if not self._adder:
+            return
+
+        if not self._store_recurrent_state:
+            if next_extras:
+                self._adder.add(actions, next_timestep, next_extras)
+            else:
+                self._adder.add(actions, next_timestep)
+            return
+
+        numpy_states = {
+            agent: {
+                "state": tf2_utils.to_numpy_squeeze(_state),
+                "message": tf2_utils.to_numpy_squeeze(self._messages[agent]),
+            }
+            for agent, _state in self._states.items()
+        }
+        if next_extras:
+            next_extras.update({"core_states": numpy_states})
+            self._adder.add(actions, next_timestep, next_extras)
+        else:
+            self._adder.add(actions, next_timestep, numpy_states)
 
     def select_action(
         self,

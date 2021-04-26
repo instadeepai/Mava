@@ -18,6 +18,7 @@
 #   - single agent dqn learner in acme:
 #           https://github.com/deepmind/acme/blob/master/acme/agents/tf/dqn/learning.py
 #   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
+#   - https://github.com/deepmind/acme/agents/tf/r2d2/learning.py
 
 """DIAL trainer implementation."""
 import os
@@ -28,6 +29,7 @@ import numpy as np
 import reverb
 import sonnet as snt
 import tensorflow as tf
+import tree
 from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
@@ -177,9 +179,22 @@ class DIALTrainer(mava.Trainer):
 
         inputs = next(self._iterator)
 
-        # [print(x, '\n') for x in inputs.data]
-        o_tm1, a_tm1, e_tm1, r_t, d_t, s_t = inputs.data
-        # o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+        data = tree.map_structure(
+            lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
+        )
+        data = tf2_utils.batch_to_sequence(data)
+
+        observations, actions, rewards, discounts, done, extra = data
+
+        core_states = tree.map_structure(lambda x: x[0], extra["core_states"])
+        print(core_states)
+
+        for agent_id in observations.keys():
+            agent_input = observations[agent_id]
+            message = core_states[agent_id]["message"]
+            state = core_states[agent_id]["state"]
+
+            print(agent_input, message, state)
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
         return logged_losses
