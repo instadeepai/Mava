@@ -30,7 +30,7 @@ from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
-from tests.enums import EnvSpec, EnvType, MockedEnvironments
+from tests.enums import EnvSource, EnvSpec, EnvType, MockedEnvironments
 from tests.mocks import (
     ParallelMAContinuousEnvironment,
     ParallelMADiscreteEnvironment,
@@ -55,15 +55,16 @@ class Helpers:
     @staticmethod
     def get_env(env_spec: EnvSpec) -> Tuple[Union[AECEnv, ParallelEnv], int]:
         env, num_agents = None, None
-        mod = importlib.import_module(env_spec.env_name)
-        if env_spec.env_type == EnvType.Parallel:
-            env = mod.parallel_env()  # type: ignore
-        elif env_spec.env_type == EnvType.Sequential:
-            env = mod.env()  # type: ignore
+        if env_spec.env_source == EnvSource.PettingZoo:
+            mod = importlib.import_module(env_spec.env_name)
+            if env_spec.env_type == EnvType.Parallel:
+                env = mod.parallel_env()  # type: ignore
+            elif env_spec.env_type == EnvType.Sequential:
+                env = mod.env()  # type: ignore
         else:
             raise Exception("Env_spec is not valid.")
-        env.reset()
-        num_agents = len(env.agents)
+        env.reset()  # type: ignore
+        num_agents = len(env.agents)  # type: ignore
         return env, num_agents
 
     # Returns a wrapper function.
@@ -72,10 +73,11 @@ class Helpers:
         env_spec: EnvSpec,
     ) -> dm_env.Environment:
         wrapper = None
-        if env_spec.env_type == EnvType.Parallel:
-            wrapper = PettingZooParallelEnvWrapper
-        elif env_spec.env_type == EnvType.Sequential:
-            wrapper = PettingZooAECEnvWrapper
+        if env_spec.env_source == EnvSource.PettingZoo:
+            if env_spec.env_type == EnvType.Parallel:
+                wrapper = PettingZooParallelEnvWrapper
+            elif env_spec.env_type == EnvType.Sequential:
+                wrapper = PettingZooAECEnvWrapper
         else:
             raise Exception("Env_spec is not valid.")
         return wrapper
@@ -255,6 +257,10 @@ class Helpers:
                 assert dm_env_timestep.discount == expected_discount and type(
                     dm_env_timestep.discount
                 ) == type(expected_discount), "Failed to reset discount."
+
+    @staticmethod
+    def mock_done() -> bool:
+        return True
 
 
 @typing.no_type_check
