@@ -30,11 +30,12 @@ step.
 
 Observations:
 0, 1 or 2 - corresponds with which state the system of agents is in. Both
-agents in the system will always have the same state. System starts in 
+agents in the system will always have the same state. System starts in
 state 0 and moves to state 1 or state 2 depending on the actions of agent
-1 in the first timestep. System state resets after both agents act in 
+1 in the first timestep. System state resets after both agents act in
 timestep 2.
 """
+
 
 class TwoStepEnv(gym.Env):
     def __init__(self) -> None:
