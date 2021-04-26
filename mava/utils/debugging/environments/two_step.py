@@ -30,11 +30,12 @@ step.
 
 Observations:
 0, 1 or 2 - corresponds with which state the system of agents is in. Both
-agents in the system will always have the same state. System starts in 
+agents in the system will always have the same state. System starts in
 state 0 and moves to state 1 or state 2 depending on the actions of agent
-1 in the first timestep. System state resets after both agents act in 
+1 in the first timestep. System state resets after both agents act in
 timestep 2.
 """
+
 
 class TwoStepEnv(gym.Env):
     def __init__(self) -> None:
@@ -72,15 +73,15 @@ class TwoStepEnv(gym.Env):
             if action_n["agent_0"] == 0:
                 self.state = 1
                 self.obs_n = {
-                    "agent_0": np.array(1.0, dtype=np.float32),
-                    "agent_1": np.array(1.0, dtype=np.float32),
+                    "agent_0": np.array([1.0], dtype=np.float32),
+                    "agent_1": np.array([1.0], dtype=np.float32),
                 }
                 return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2A
             else:
                 self.state = 2
                 self.obs_n = {
-                    "agent_0": np.array(2.0, dtype=np.float32),
-                    "agent_1": np.array(2.0, dtype=np.float32),
+                    "agent_0": np.array([2.0], dtype=np.float32),
+                    "agent_1": np.array([2.0], dtype=np.float32),
                 }
                 return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2B
 
@@ -128,7 +129,7 @@ class TwoStepEnv(gym.Env):
         self.reward_n = {}
         self.done_n = {}
         self.obs_n = {
-            "agent_0": np.array(0.0, dtype=np.float32),
-            "agent_1": np.array(0.0, dtype=np.float32),
+            "agent_0": np.array([0.0], dtype=np.float32),
+            "agent_1": np.array([0.0], dtype=np.float32),
         }
         return self.obs_n
