@@ -187,7 +187,6 @@ class BaseMADDPGTrainer(mava.Trainer):
                     enable_checkpointing=True,
                 )
                 self._system_checkpointer[agent_key] = checkpointer
-
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.

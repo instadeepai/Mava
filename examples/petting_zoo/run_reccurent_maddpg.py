@@ -33,7 +33,6 @@ from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
 from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
-
 from mava.utils.loggers import Logger
 from mava.wrappers import DetailedPerAgentStatistics, PettingZooParallelEnvWrapper
 
