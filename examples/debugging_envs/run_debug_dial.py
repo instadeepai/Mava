@@ -107,7 +107,7 @@ class DIAL_policy(snt.RNNCore):
         return self.gru.initial_state(batch_size)
 
     def initial_message(self, batch_size: int = 1) -> snt.Module:
-        return tf.zeros(self._message_dim, dtype=tf.float32)
+        return tf.zeros([batch_size, self._message_dim], dtype=tf.float32)
 
     def __call__(
         self,
