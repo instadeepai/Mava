@@ -16,6 +16,11 @@
 from enum import Enum
 
 
+class EnvSource(str, Enum):
+    PettingZoo = "pettingzoo"
+    RLLibMultiEnv = "rllibmultienv"
+
+
 class MockedEnvironments(str, Enum):
     Mocked_Dicrete = "discrete_mock"
     Mocked_Continous = "continous_mock"
@@ -27,6 +32,12 @@ class EnvType(Enum):
 
 
 class EnvSpec:
-    def __init__(self, env_name: str, env_type: EnvType):
+    def __init__(
+        self,
+        env_name: str,
+        env_type: EnvType,
+        env_source: EnvSource = EnvSource.PettingZoo,
+    ):
         self.env_name = env_name
         self.env_type = env_type
+        self.env_source = env_source
