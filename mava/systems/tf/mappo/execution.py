@@ -13,14 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Siphelele): implement MAPPO executor (if required)
-# Helper resources
-#   - single agent generic actors in acme:
-#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/actors.py
-#   - single agent custom actor for Impala in acme:
-#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/impala/acting.py
-#   - multi-agent generic executors in mava: mava/systems/tf/executors.py
-
 from typing import Any, Dict, Optional, Tuple
 
 import dm_env
@@ -53,6 +45,7 @@ class MAPPORecurrentExecutor(core.Executor):
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
+
         """Initializes the executor.
         Args:
           networks: the (recurrent) policy to run for each agent in the system.
@@ -61,8 +54,8 @@ class MAPPORecurrentExecutor(core.Executor):
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
             of the policies to the executor copy (in case they are separate).
-          store_recurrent_state: Whether to pass the recurrent state to the adder.
         """
+
         # Store these for later use.
         self._adder = adder
         self._variable_client = variable_client
@@ -96,10 +89,7 @@ class MAPPORecurrentExecutor(core.Executor):
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
 
-        # TODO Mask actions here using observation.legal_actions
-        # What happens in discrete vs cont case
-
-        # index network either on agent type or on agent id
+        # Index network either on agent type or on agent id.
         agent_key = agent.split("_")[0] if self._shared_weights else agent
 
         # Initialize the RNN state if necessary.
@@ -127,9 +117,9 @@ class MAPPORecurrentExecutor(core.Executor):
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Dict[str, types.NestedArray]:
+
         actions = {}
         for agent, observation in observations.items():
-
             action = self.select_action(agent, observation)
             actions[agent] = action
 
@@ -143,7 +133,7 @@ class MAPPORecurrentExecutor(core.Executor):
 
         # Set the state to None so that we re-initialize at the next policy call.
         for agent, _ in timestep.observation.items():
-            # index either on agent type or on agent id
+            # Index either on agent type or on agent id
             agent_key = agent.split("_")[0] if self._shared_weights else agent
             self._states[agent_key] = None
 

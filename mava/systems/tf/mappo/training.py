@@ -13,12 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Siphelele): implement MAPPO trainer
-# Helper resources
-#   - single agent impala learner in acme:
-#       https://github.com/deepmind/acme/blob/master/acme/agents/tf/impala/learning.py
-#   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
-
 """MAPPO trainer implementation."""
 import time
 from typing import Any, Dict, List, Optional, Sequence
@@ -39,8 +33,8 @@ tfd = tfp.distributions
 
 
 class MAPPOTrainer(mava.Trainer):
-    """MADDPG trainer.
-    This is the trainer component of a MADDPG system. IE it takes a dataset as input
+    """MAPPO trainer.
+    This is the trainer component of a MAPPO system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
 
@@ -67,25 +61,25 @@ class MAPPOTrainer(mava.Trainer):
     ):
         """Initializes the learner.
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents: a list of the agent specs (ids).
+            agent_types: a list of the types of agents to be used.
+            shared_weights: ...
+            networks: dictionary of networks each with a value head and logits head.
+            discount: discount to use for TD updates.
+            dataset: dataset to learn from, whether fixed or from a replay buffer
+                (see `acme.datasets.reverb.make_dataset` documentation).
+            critic_learning_rate: ...
+            policy_learning_rate: ...
+            lambda_gae: ...
+            clipping_espilon: ...
+            entropy_cost: ...
+            baseline_cost: ...
+            max_abs_reward: ...
+            max_gradient_norm: ...
+            clipping: whether to clip gradients by global norm.
+            counter: counter object used to keep track of steps.
+            logger: logger object to be used by learner.
+            checkpoint: boolean indicating whether to checkpoint the learner.
         """
 
         self._agents = agents
@@ -119,7 +113,6 @@ class MAPPOTrainer(mava.Trainer):
             self._max_abs_reward = tf.convert_to_tensor(max_abs_reward)
             self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
 
-        # TODO Create checkpointer
         self._system_checkpointer: Dict[Any, Any] = {}
 
         # Do not record timestamps until after the first learning step is done.
@@ -282,6 +275,7 @@ class MAPPOTrainer(mava.Trainer):
         return metrics
 
     def step(self) -> None:
+
         # Run the learning step.
         fetches = self._step()
 

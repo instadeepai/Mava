@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADDPG on pettinzoo MPE environments."""
+"""Example running MAPPO on multi-agent CartPole."""
+
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
@@ -25,14 +26,14 @@ from absl import app, flags
 from acme.tf import networks
 from ray.rllib.env.multi_agent_env import make_multi_agent
 
+# Testing, remove later.
+from rllib_wrapper import RLLibMultiAgentEnvWrapper
+
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import mappo
 from mava.utils.loggers import Logger
 from mava.wrappers import DetailedPerAgentStatistics
-
-# Testing, remove later
-from rllib_wrapper import RLLibMultiAgentEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
@@ -41,9 +42,11 @@ flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run 
 def make_environment(
     env_name: str = "CartPole-v1", num_agents: int = 2, **kwargs: int
 ) -> dm_env.Environment:
+
     """Creates a MPE environment."""
+
     ma_cls = make_multi_agent(env_name)
-    ma_env = ma_cls({"num_agents": num_agents})  # type: ignore
+    ma_env = ma_cls({"num_agents": num_agents})
     wrapped_env = RLLibMultiAgentEnvWrapper(ma_env)
     return wrapped_env
 
@@ -52,10 +55,12 @@ def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     shared_weights: bool = False,
 ) -> Dict[str, snt.RNNCore]:
+
     """Creates networks used by the agents."""
+
     specs = environment_spec.get_agent_specs()
 
-    # Create agent_type specs
+    # Create agent_type specs.
     if shared_weights:
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
@@ -82,12 +87,13 @@ def make_networks(
 
 
 def main(_: Any) -> None:
+
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment()
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
     all_networks = make_networks(environment_spec)
 
-    # create tf loggers
+    # Create tf loggers.
     base_dir = Path.cwd()
     log_dir = base_dir / "logs"
     log_time_stamp = str(datetime.now())
@@ -123,7 +129,7 @@ def main(_: Any) -> None:
         environment, system, logger=train_logger, label="train_loop"
     )
 
-    # Wrap training loop to compute and log detailed running statistics
+    # Wrap training loop to compute and log detailed running statistics.
     train_loop = DetailedPerAgentStatistics(train_loop)
 
     train_loop.run(num_episodes=FLAGS.num_episodes)
