@@ -112,12 +112,16 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         self._step += 1
         self._maybe_add_priorities()
 
+    # NOTE we changed how final_step_like works
     def _write_last(self) -> None:
         # Create a final step.
         # TODO (Dries): Should self._next_observation be used
         #  here? Should this function be used for sequential?
+        # final_step = mava_utils.final_step_like(
+        #     self._buffer[0], self._next_observations, self._next_extras
+        # )
         final_step = mava_utils.final_step_like(
-            self._buffer[0], self._next_observations, self._next_extras
+            self._buffer[0], self._next_observations
         )
 
         # Append the final step.
@@ -186,11 +190,13 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         for table_name, priority in table_priorities.items():
             self._writer.create_item(table_name, num_steps, priority)
 
+    # NOTE make this generic extra_spec
     @classmethod
     def signature(
         cls,
         environment_spec: specs.EnvironmentSpec,
-        core_state_spec: tf.TypeSpec,
+        # core_state_spec: tf.TypeSpec,
+        extras_spec: tf.TypeSpec = None,
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
 
@@ -211,8 +217,8 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         """
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
-        extras_specs = environment_spec.get_extra_specs()
-        extras_specs["core_states"] = core_state_spec
+        # extras_specs = environment_spec.get_extra_specs()
+        # extras_specs["core_states"] = core_state_spec
         obs_specs = {}
         act_specs = {}
         reward_specs = {}
@@ -226,12 +232,15 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             reward_specs[agent] = rewards_spec
             step_discount_specs[agent] = step_discounts_spec
 
+        if extras_spec is None:
+            extras_spec = {}
+
         spec_step = base.Step(
             observations=obs_specs,
             actions=act_specs,
             rewards=reward_specs,
             discounts=step_discount_specs,
             start_of_episode=specs.Array(shape=(), dtype=bool),
-            extras=extras_specs,
+            extras=extras_spec,
         )
         return tree.map_structure_with_path(base.spec_like_to_tensor_spec, spec_step)

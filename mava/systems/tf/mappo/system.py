@@ -13,27 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# type: ignore
-
-# TODO (Siphelele): finish MAPPO system
-
 """MAPPO system implementation."""
 import dataclasses
-from typing import Dict, Iterator, Optional
+from typing import Callable, Dict, Iterator, Optional
 
 import reverb
 import sonnet as snt
-from acme import datasets
+import tensorflow as tf
+from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import CentralisedActorCritic
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
-from mava.systems.tf import executors
-from mava.systems.tf.mappo import training
+from mava.systems.tf.mappo import execution, training
 
 
 @dataclasses.dataclass
@@ -57,19 +52,22 @@ class MAPPOConfig:
     """
 
     environment_spec: specs.EnvironmentSpec
-    networks: Dict[str, snt.Module]
+    networks: Dict[str, snt.RNNCore]
     sequence_length: int
     sequence_period: int
     counter: counting.Counter = None
     logger: loggers.Logger = None
+    shared_weights: bool = False
     discount: float = 0.99
-    max_queue_size: int = 100000
+    max_queue_size: int = 100_000
     batch_size: int = 16
-    learning_rate: float = 1e-3
+    critic_learning_rate: float = 1e-3
+    policy_learning_rate: float = 1e-3
     entropy_cost: float = 0.01
     baseline_cost: float = 0.5
     max_abs_reward: Optional[float] = None
     max_gradient_norm: Optional[float] = None
+    checkpoint: bool = True
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
@@ -99,10 +97,25 @@ class MAPPOBuilder(SystemBuilder):
         environment_spec: specs.MAEnvironmentSpec,
     ) -> reverb.Table:
         """Create tables to insert data into."""
+        agent_specs = environment_spec.get_agent_specs()
+
+        core_states = {}
+        logits = {}
+        for agent in self._agents:
+            core_states[agent] = self._config.networks[agent].initial_state(1)
+            num_actions = agent_specs[agent].actions.num_values
+            logits[agent] = tf.ones(shape=(1, num_actions), dtype=tf.float32)
+
+        extras_spec = {"core_states": core_states, "logits": logits}
+
+        extras_spec = tf2_utils.squeeze_batch_dim(extras_spec)
+
         return reverb.Table.queue(
             name=self._config.replay_table_name,
             max_size=self._config.max_queue_size,
-            signature=adders.ParallelSequenceAdder.signature(environment_spec),
+            signature=reverb_adders.ParallelSequenceAdder.signature(
+                environment_spec, extras_spec=extras_spec
+            ),
         )
 
     def make_dataset_iterator(
@@ -110,11 +123,21 @@ class MAPPOBuilder(SystemBuilder):
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for learning/updating the system."""
-        dataset = datasets.make_reverb_dataset(
+        # dataset = datasets.make_reverb_dataset(
+        #     server_address=replay_client.server_address,
+        #     batch_size=self._config.batch_size,
+        #     sequence_length=self._config.sequence_length,
+        # )
+        # NOTE we dont do the above to avoid interleaving and prefetching.
+        # See Alex's note on Ridl
+        dataset = reverb.ReplayDataset.from_table_signature(
             server_address=replay_client.server_address,
-            batch_size=self._config.batch_size,
+            table=self._config.replay_table_name,
+            max_in_flight_samples_per_worker=1,
             sequence_length=self._config.sequence_length,
+            emit_timesteps=False,
         )
+        dataset = dataset.batch(self._config.batch_size, drop_remainder=True)
         return iter(dataset)
 
     def make_adder(
@@ -133,7 +156,7 @@ class MAPPOBuilder(SystemBuilder):
 
     def make_executor(
         self,
-        policy_networks: Dict[str, snt.Module],
+        networks: Dict[str, snt.RNNCore],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
@@ -154,7 +177,7 @@ class MAPPOBuilder(SystemBuilder):
             # Create policy variables
             variables = {}
             for agent in agent_keys:
-                variables[agent] = policy_networks[agent].variables
+                variables[agent] = networks[agent].variables
 
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
@@ -168,8 +191,8 @@ class MAPPOBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
-        return executors.RecurrentExecutor(
-            policy_networks=policy_networks,
+        return execution.MAPPORecurrentExecutor(
+            networks=networks,
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
@@ -177,7 +200,7 @@ class MAPPOBuilder(SystemBuilder):
 
     def make_trainer(
         self,
-        networks: Dict[str, Dict[str, snt.Module]],
+        networks: Dict[str, snt.RNNCore],
         dataset: Iterator[reverb.ReplaySample],
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
@@ -200,11 +223,9 @@ class MAPPOBuilder(SystemBuilder):
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
         discount = self._config.discount
-        sequence_length = self._config.sequence_length
-        sequence_period = self._config.sequence_period
         max_gradient_norm = self._config.max_gradient_norm
-        learning_rate = self._config.learning_rate
-        max_queue_size = self._config.max_queue_size
+        critic_learning_rate = self._config.critic_learning_rate
+        policy_learning_rate = self._config.policy_learning_rate
         entropy_cost = self._config.entropy_cost
         baseline_cost = self._config.baseline_cost
         max_abs_reward = self._config.max_abs_reward
@@ -213,15 +234,14 @@ class MAPPOBuilder(SystemBuilder):
         trainer = training.MAPPOTrainer(
             agents=agents,
             agent_types=agent_types,
-            networks=networks["networks"],
             shared_weights=shared_weights,
-            sequence_length=sequence_length,
-            sequence_period=sequence_period,
+            networks=networks,
+            dataset=dataset,
             counter=counter,
             logger=logger,
             discount=discount,
-            max_queue_size=max_queue_size,
-            learning_rate=learning_rate,
+            critic_learning_rate=critic_learning_rate,
+            policy_learning_rate=policy_learning_rate,
             entropy_cost=entropy_cost,
             baseline_cost=baseline_cost,
             max_abs_reward=max_abs_reward,
@@ -248,9 +268,10 @@ class MAPPO(system.System):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         discount: float = 0.99,
-        max_queue_size: int = 100000,
+        max_queue_size: int = 100_000,
         batch_size: int = 16,
-        learning_rate: float = 1e-3,
+        critic_learning_rate: float = 1e-3,
+        policy_learning_rate: float = 1e-3,
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
         max_abs_reward: Optional[float] = None,
@@ -287,7 +308,8 @@ class MAPPO(system.System):
                 discount=discount,
                 max_queue_size=max_queue_size,
                 batch_size=batch_size,
-                learning_rate=learning_rate,
+                critic_learning_rate=critic_learning_rate,
+                policy_learning_rate=policy_learning_rate,
                 entropy_cost=entropy_cost,
                 baseline_cost=baseline_cost,
                 max_abs_reward=max_abs_reward,
@@ -303,24 +325,23 @@ class MAPPO(system.System):
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
+        self._can_sample: Callable[[], bool] = lambda: replay_table.can_sample(
+            batch_size
+        )
+
         # The adder is used to insert observations into replay.
         adder = builder.make_adder(replay_client)
 
         # The dataset provides an interface to sample from replay.
         dataset = builder.make_dataset_iterator(replay_client)
 
-        # Create system architecture
-        networks = CentralisedActorCritic(
-            environment_spec=environment_spec,
-            networks=networks,
-            shared_weights=shared_weights,
-        ).create_system()
-
-        # Create the actor which defines how we take actions.
-        executor = builder.make_executor(networks["policies"], adder)
+        # Create the executor which defines how we take actions.
+        executor = builder.make_executor(networks, adder)
 
         # The learner updates the parameters (and initializes them).
-        trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
+        trainer = builder.make_trainer(
+            networks, dataset, counter=counter, logger=logger, checkpoint=checkpoint
+        )
 
         super().__init__(
             executor=executor,
@@ -328,3 +349,11 @@ class MAPPO(system.System):
             min_observations=batch_size,
             observations_per_step=batch_size,
         )
+
+    def update(self) -> None:
+        learner_step = False
+        while self._can_sample():
+            self._trainer.step()
+            learner_step = True
+        if learner_step:
+            self._executor.update()
