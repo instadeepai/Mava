@@ -91,32 +91,3 @@ def epsilon_greedy_action_selector(
         policy = tfp.distributions.Categorical(probs=probs)
 
     return tf.cast(policy.sample(), "int64")
-
-
-class NetworkWithMaskedEpsilonGreedy(snt.Module):
-    """Epsilon greedy sampling with action masking on network outputs."""
-
-    def __init__(self, epsilon: Optional[tf.Tensor] = None):
-        """Initialize the network and epsilon.
-        Usage:
-          Wrap an observation in a dictionary in your environment as follows:
-            observation <-- {"your_key_for_observation": observation,
-                             "legal_actions_mask": your_action_mask_tensor}
-        and update your network to use 'observation["your_key_for_observation"]'
-        rather than 'observation'.
-        Args:
-          network: the online Q network (the one being optimized)
-          epsilon: probability of taking a random action.
-        """
-        super().__init__()
-        self._epsilon = epsilon
-
-    def __call__(self, q_values: tf.Tensor, legal_actions: tf.Tensor) -> tf.Tensor:
-        return tf.cast(
-            epsilon_greedy_action_selector(
-                q_values,
-                epsilon=self._epsilon,
-                legal_actions_mask=legal_actions,
-            ).sample(),
-            "int64",
-        )
