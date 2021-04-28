@@ -43,10 +43,10 @@ env_requirements = ["pettingzoo"]
 
 testing_formatting_requirements = [
     "pre-commit",
-    "mypy",
+    "mypy==0.812",
     "pytest-xdist",
-    "flake8",
-    "black",
+    "flake8==3.9.1",
+    "black==21.4b1",
     "pytest-cov",
 ]
 
