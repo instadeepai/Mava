@@ -25,6 +25,7 @@ import sonnet as snt
 from absl import app, flags
 from acme import types
 from acme.tf import networks
+from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
@@ -95,21 +96,18 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
-        # Create the observation network.
-        observation_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(
-                    observation_networks_layer_sizes[key], activate_final=True
-                ),
-                networks.NearZeroInitializedLinear(num_dimensions),
-                networks.TanhToSpec(specs[key].actions),
-            ]
-        )
+        # Create the shared observation network; here simply a state-less operation.
+        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
         policy_network = snt.Sequential(
             [
                 observation_network,
+                networks.LayerNormMLP(
+                    observation_networks_layer_sizes[key], activate_final=True
+                ),
+                networks.NearZeroInitializedLinear(num_dimensions),
+                networks.TanhToSpec(specs[key].actions),
                 networks.ClippedGaussian(sigma),
                 networks.ClipToSpec(specs[key].actions),
             ]
