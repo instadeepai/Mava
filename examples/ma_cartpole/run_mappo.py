@@ -113,7 +113,8 @@ def main(_: Any) -> None:
         sequence_length=10,
         sequence_period=5,
         batch_size=64,
-        baseline_cost=0.1,
+        baseline_cost=0.01,
+        critic_learning_rate=5e-4,
         logger=system_logger,
     )
 

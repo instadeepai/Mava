@@ -59,6 +59,7 @@ class MAPPOConfig:
     logger: loggers.Logger = None
     shared_weights: bool = False
     discount: float = 0.99
+    lambda_gae: float = 0.95
     max_queue_size: int = 100_000
     batch_size: int = 16
     critic_learning_rate: float = 1e-3
@@ -223,6 +224,7 @@ class MAPPOBuilder(SystemBuilder):
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
         discount = self._config.discount
+        lambda_gae = self._config.lambda_gae
         max_gradient_norm = self._config.max_gradient_norm
         critic_learning_rate = self._config.critic_learning_rate
         policy_learning_rate = self._config.policy_learning_rate
@@ -240,6 +242,7 @@ class MAPPOBuilder(SystemBuilder):
             counter=counter,
             logger=logger,
             discount=discount,
+            lambda_gae=lambda_gae,
             critic_learning_rate=critic_learning_rate,
             policy_learning_rate=policy_learning_rate,
             entropy_cost=entropy_cost,
@@ -268,6 +271,7 @@ class MAPPO(system.System):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         discount: float = 0.99,
+        lambda_gae: float = 0.95,
         max_queue_size: int = 100_000,
         batch_size: int = 16,
         critic_learning_rate: float = 1e-3,
@@ -306,6 +310,7 @@ class MAPPO(system.System):
                 counter=counter,
                 logger=logger,
                 discount=discount,
+                lambda_gae=lambda_gae,
                 max_queue_size=max_queue_size,
                 batch_size=batch_size,
                 critic_learning_rate=critic_learning_rate,
