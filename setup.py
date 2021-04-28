@@ -45,8 +45,8 @@ testing_formatting_requirements = [
     "pre-commit",
     "mypy",
     "pytest-xdist",
-    "flake8=3.9.1",
-    "black=21.4b1",
+    "flake8==3.9.1",
+    "black==21.4b1",
     "pytest-cov",
 ]
 
