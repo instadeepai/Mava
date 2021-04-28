@@ -24,6 +24,7 @@ from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.components.tf.architectures import BaseActorCritic, BaseArchitecture
+from mava.types import OLT
 
 
 class DecentralisedValueActor(BaseArchitecture):
@@ -57,7 +58,7 @@ class DecentralisedValueActor(BaseArchitecture):
         self._target_value_networks = copy.deepcopy(self._value_networks)
         self._target_policy_networks = copy.deepcopy(self._policy_networks)
 
-    def _get_actor_specs(self) -> Dict[str, acme_specs.Array]:
+    def _get_actor_specs(self) -> Dict[str, OLT]:
         actor_obs_specs = {}
         for agent_key in self._actor_agent_keys:
             agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key

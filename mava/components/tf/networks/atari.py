@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import tensorflow as tf
-from acme.tf.network import DQNAtariNetwork
+from acme.tf.networks import DQNAtariNetwork
 
 from mava.types import OLT
 
@@ -25,7 +25,7 @@ class MADQNAtariNetwork(DQNAtariNetwork):
     """
 
     def __init__(self, num_actions: int):
-        super().__init__(name="madqn_atari_network")
+        super().__init__(num_actions)
 
     def __call__(self, inputs: OLT) -> tf.Tensor:
         return self._network(inputs.observation)

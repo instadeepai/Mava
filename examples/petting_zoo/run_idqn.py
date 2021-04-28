@@ -13,70 +13,67 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import importlib
-from typing import Any, Dict, Mapping, Sequence, Union
+"""Example running MADQN on the pettingzoo environment."""
 
-import dm_env
+
+from typing import Any, Mapping
+
+import launchpad as lp
 import sonnet as snt
 import tensorflow as tf
 import trfl
 from absl import app, flags
 from acme import types
-from acme.tf import networks
+from acme.tf.networks import DQNAtariNetwork
 
 from mava import specs as mava_specs
-from mava.environment_loop import ParallelEnvironmentLoop
+
+# from mava.components.tf.networks import NetworkWithMaskedEpsilonGreedy
 from mava.systems.tf import madqn
-from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+from mava.utils import lp_utils
+from mava.utils.environments import pettingzoo_utils
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
-
-flags.DEFINE_integer(
-    "num_episodes_per_eval",
-    100,
-    "Number of training episodes to run between evaluation " "episodes.",
+flags.DEFINE_string(
+    "env_name",
+    "maze_craze_v2",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
-
-
-def make_environment(
-    env_class: str = "mpe", env_name: str = "simple_v2", **kwargs: int
-) -> dm_env.Environment:
-    """Creates a MPE environment."""
-    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
-    env = env_module.parallel_env(**kwargs)  # type: ignore
-    environment = PettingZooParallelEnvWrapper(env)
-    return environment
+flags.DEFINE_string(
+    "game_version",
+    "race",
+    "Pettingzoo environment name, e.g. pong (str).",
+)
 
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    epsilon: tf.Variable,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
-    shared_weights: bool = False,
+    epsilon: tf.Variable = tf.Variable(0.05, trainable=False),
+    shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
 
     specs = environment_spec.get_agent_specs()
 
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
+    # Create agent_type specs
+    if shared_weights:
+        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
+        specs = type_specs
 
-    policy_networks = {}
     q_networks = {}
+    policy_networks = {}
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
 
-        # Create the policy network.
-        q_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(q_networks_layer_sizes[key], activate_final=True),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
-        )
+        # Create the q-value network.
+        q_network = DQNAtariNetwork(num_dimensions)
 
+        # TODO (Arnu): find a general way to support legal actions
+        # policy_network = NetworkWithMaskedEpsilonGreedy(q_network, epsilon=epsilon)
+
+        # Epsilon greedy policy network
         policy_network = snt.Sequential(
             [
                 q_network,
@@ -88,7 +85,6 @@ def make_networks(
 
         q_networks[key] = q_network
         policy_networks[key] = policy_network
-
     return {
         "q_networks": q_networks,
         "policies": policy_networks,
@@ -96,43 +92,27 @@ def make_networks(
 
 
 def main(_: Any) -> None:
-    # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment()
-    environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    epsilon = tf.Variable(1.0, trainable=False)
-    system_networks = make_networks(environment_spec, epsilon)
 
-    # Construct the agent.
-    system = madqn.IDQN(
-        environment_spec=environment_spec,
-        q_networks=system_networks["q_networks"],
-        policy_networks=system_networks["policies"],
-        epsilon=epsilon,
+    # set loggers info
+    base_dir = Path.cwd()
+    log_dir = base_dir / "logs"
+    log_time_stamp = str(datetime.now())
+
+    log_info = (log_dir, log_time_stamp)
+
+    environment_factory = lp_utils.partial_kwargs(
+        pettingzoo_utils.make_parallel_atari_environment,
+        env_name=FLAGS.env_name,
     )
 
-    # Create the environment loop used for training.
-    train_loop = ParallelEnvironmentLoop(environment, system, label="train_loop")
+    program = madqn.MADQN(
+        environment_factory=environment_factory,
+        network_factory=lp_utils.partial_kwargs(make_networks),
+        num_executors=2,
+        log_info=log_info,
+    ).build()
 
-    # TODO fix the eval loop
-
-    # Create the evaluation policy.
-    # eval_policies = {
-    #     key: snt.Sequential(
-    #         [system_networks["q_networks"][key], lambda q: tf.math.argmax(q, axis=1)]
-    #     )
-    #     for key in environment_spec.get_agent_specs().keys()
-    # }
-
-    # # Create the evaluation actor and loop.
-    # eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
-    # eval_env = make_environment()
-    # eval_loop = ParallelEnvironmentLoop(
-    #     eval_env, eval_actor, label="eval_loop"
-    # )
-
-    for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
-        train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        # eval_loop.run(num_episodes=1)
+    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
 
 
 if __name__ == "__main__":

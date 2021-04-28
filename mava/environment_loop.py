@@ -267,8 +267,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             rewards = timestep.reward
 
-            # Have the agent observe the timestep and let the actor update itself.
-
+            # Have the agent observe the timestep and let the actor update itself
             self._executor.observe(actions, next_timestep=timestep)
 
             if self._should_update:

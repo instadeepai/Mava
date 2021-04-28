@@ -25,7 +25,7 @@ from mava.wrappers import PettingZooParallelEnvWrapper
 
 
 def make_parallel_atari_environment(
-    evaluation: bool = False, env_name: str = "maze_craze_v2", **kwargs: int
+    evaluation: bool = False, env_name: str = "maze_craze_v2"
 ) -> dm_env.Environment:
     """Wraps an Pettingzoo environment.
 
@@ -40,7 +40,9 @@ def make_parallel_atari_environment(
     del evaluation
 
     env_module = importlib.import_module(f"pettingzoo.atari.{env_name}")
-    env = env_module.parallel_env(**kwargs)  # type: ignore
+
+    # TODO (Arnu): find a way to pass kwargs when using lp_utils
+    env = env_module.parallel_env(game_version="race")  # type: ignore
 
     env = supersuit.max_observation_v0(env, 2)
 

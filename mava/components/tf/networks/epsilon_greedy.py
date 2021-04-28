@@ -60,6 +60,9 @@ def epsilon_greedy(
         action_values = tfv1.convert_to_tensor(action_values)
         epsilon = tfv1.convert_to_tensor(epsilon, dtype=action_values.dtype)
 
+        # convert mask to float
+        legal_actions_mask = tfv1.cast(legal_actions_mask, dtype=tf.float32)
+
         # We compute the action space dynamically.
         num_actions = tfv1.cast(tfv1.shape(action_values)[-1], action_values.dtype)
 

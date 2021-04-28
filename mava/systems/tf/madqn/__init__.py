@@ -15,6 +15,5 @@
 
 """Implementations of a IDQN agent."""
 
-from mava.systems.tf.madqn.distributed_system import DistributedMADQN
-from mava.systems.tf.madqn.system import IDQN
+from mava.systems.tf.madqn.system import MADQN
 from mava.systems.tf.madqn.training import IDQNTrainer

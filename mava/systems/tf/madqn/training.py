@@ -129,8 +129,8 @@ class IDQNTrainer(mava.Trainer):
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
 
-        o_tm1_feed = o_tm1_trans[agent]
-        o_t_feed = o_t_trans[agent]
+        o_tm1_feed = o_tm1_trans[agent].observation
+        o_t_feed = o_t_trans[agent].observation
         a_tm1_feed = a_tm1[agent]
 
         return o_tm1_feed, o_t_feed, a_tm1_feed
@@ -180,8 +180,8 @@ class IDQNTrainer(mava.Trainer):
                     o_tm1, o_t, a_tm1, agent
                 )
 
-                q_tm1 = self._q_networks[agent](o_tm1_feed)
-                q_t = self._target_q_networks[agent](o_t_feed)
+                q_tm1 = self._q_networks[agent_key](o_tm1_feed)
+                q_t = self._target_q_networks[agent_key](o_t_feed)
 
                 loss, _ = trfl.qlearning(q_tm1, a_tm1_feed, r_t[agent], d_t[agent], q_t)
 
