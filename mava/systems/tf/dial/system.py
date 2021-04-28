@@ -23,7 +23,6 @@ from typing import Dict, Iterator, Optional, Type
 import reverb
 import sonnet as snt
 import tensorflow as tf
-from acme import datasets
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
@@ -100,7 +99,7 @@ class DIALConfig:
     counter: counting.Counter = None
     clipping: bool = False
     communication_module: BaseCommunicationModule = BroadcastedCommunication
-    sequence_length: int = 1
+    sequence_length: int = 2
     period: int = 1
 
 
@@ -161,26 +160,52 @@ class DIALBuilder(SystemBuilder):
             print(self._executor_fn)
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
 
-        return reverb.Table(
+        # return reverb.Table(
+        #     name=self._config.replay_table_name,
+        #     sampler=reverb.selectors.Uniform(),
+        #     remover=reverb.selectors.Fifo(),
+        #     max_size=self._config.max_replay_size,
+        #     rate_limiter=reverb.rate_limiters.MinSize(1),
+        #     signature=adder,
+        # )
+
+        return reverb.Table.queue(
             name=self._config.replay_table_name,
-            sampler=reverb.selectors.Uniform(),
-            remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
-            rate_limiter=reverb.rate_limiters.MinSize(1),
             signature=adder,
         )
+
+    # def make_dataset_iterator(
+    #     self,
+    #     replay_client: reverb.Client,
+    # ) -> Iterator[reverb.ReplaySample]:
+    #     """Create a dataset iterator to use for learning/updating the system."""
+    #     dataset = datasets.make_reverb_dataset(
+    #         table=self._config.replay_table_name,
+    #         server_address=replay_client.server_address,
+    #         batch_size=self._config.batch_size,
+    #         prefetch_size=self._config.prefetch_size,
+    #     )
+    #     return iter(dataset)
 
     def make_dataset_iterator(
         self,
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for learning/updating the system."""
-        dataset = datasets.make_reverb_dataset(
-            table=self._config.replay_table_name,
+        # dataset = datasets.make_reverb_dataset(
+        #     server_address=replay_client.server_address,
+        #     batch_size=self._config.batch_size,
+        #     sequence_length=self._config.sequence_length,
+        # )
+        dataset = reverb.ReplayDataset.from_table_signature(
             server_address=replay_client.server_address,
-            batch_size=self._config.batch_size,
-            prefetch_size=self._config.prefetch_size,
+            table=self._config.replay_table_name,
+            max_in_flight_samples_per_worker=1,
+            sequence_length=self._config.sequence_length,
+            emit_timesteps=False,
         )
+        dataset = dataset.batch(self._config.batch_size, drop_remainder=True)
         return iter(dataset)
 
     def make_adder(
@@ -332,11 +357,11 @@ class DIAL(system.System):
         behavior_networks: Dict[str, snt.Module],
         executor_fn: Type[core.Executor] = DIALExecutor,
         shared_weights: bool = True,
-        batch_size: int = 4,
+        batch_size: int = 16,
         prefetch_size: int = 4,
         target_update_period: int = 100,
         samples_per_insert: float = 32.0,
-        min_replay_size: int = 1,
+        min_replay_size: int = 100,
         max_replay_size: int = 1000000,
         importance_sampling_exponent: float = 0.2,
         priority_exponent: float = 0.6,

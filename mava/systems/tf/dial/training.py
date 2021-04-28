@@ -178,25 +178,98 @@ class DIALTrainer(mava.Trainer):
         self._update_target_networks()
 
         inputs = next(self._iterator)
+        # print(inputs)
+        # raise AssertionError
 
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
         )
         data = tf2_utils.batch_to_sequence(data)
 
+        # print(data)
+        # raise AssertionError
+
         observations, actions, rewards, discounts, done, extra = data
 
-        core_states = tree.map_structure(lambda x: x[0], extra["core_states"])
-        print(core_states)
+        # print('core')
+        # print(extra["core_states"])
+        # core_states = tree.map_structure(lambda x: x[0], extra["core_states"])
+        core_states = extra["core_states"]
+        # print(core_states)
 
-        for agent_id in observations.keys():
-            agent_input = observations[agent_id]
-            message = core_states[agent_id]["message"]
-            state = core_states[agent_id]["state"]
+        # Need to loop backwards through time
+        # for t=T to 1, -1 do
 
-            print(agent_input, message, state)
-
+        bs = actions["agent_0"].shape[1]
         logged_losses: Dict[str, Dict[str, Any]] = {}
+        agent_type = self._agent_types[0]
+
+        with tf.GradientTape(persistent=True) as tape:
+            total_loss = {}
+
+            # for each batch
+            for b in range(bs):
+                total_loss[b] = tf.zeros(1)
+                for agent_id in observations.keys():
+                    # All at timestep t
+                    agent_input = observations[agent_id].observation[
+                        :, b
+                    ]  # (sequence,batch,1)
+                    message = core_states[agent_id]["message"][
+                        :, b
+                    ]  # (sequence,batch,)
+                    state = core_states[agent_id]["state"][:, b]  # (sequence,batch,128)
+                    # action = actions[agent_id][:, b]  # (sequence,batch,1)
+                    reward = rewards[agent_id][:, b]  # (sequence,batch,1)
+                    discount = discounts[agent_id][0, b]  # (sequence,batch,1)
+                    terminal = done[0, b]
+
+                    y_action = reward[0]
+                    y_message = reward[0]
+                    if not terminal:
+                        batched_observation = tf2_utils.add_batch_dim(agent_input[0])
+                        batched_state = tf2_utils.add_batch_dim(state[0])
+                        batched_message = tf2_utils.add_batch_dim(message[0])
+
+                        (q_t, m_t), s = self._target_policy_networks[agent_type](
+                            batched_observation, batched_state, batched_message
+                        )
+                        y_action += discount * q_t[tf.argmax(q_t)[0]]
+                        y_message += discount * m_t[tf.argmax(m_t)[0]]
+
+                    batched_observation = tf2_utils.add_batch_dim(agent_input[1])
+                    batched_state = tf2_utils.add_batch_dim(state[1])
+                    batched_message = tf2_utils.add_batch_dim(message[1])
+
+                    (q_t1, m_t1), s = self._policy_networks[agent_type](
+                        batched_observation, batched_state, batched_message
+                    )
+
+                    td_action = y_action - q_t1[tf.argmax(q_t1)[0]]
+                    td_comm = y_message - m_t1[tf.argmax(m_t1)[0]]
+
+                    total_loss[b] += td_action ** 2 + td_comm ** 2
+
+        for b in range(bs):
+            policy_variables = self._policy_networks[agent_type].trainable_variables
+            policy_gradients = tape.gradient(total_loss[b], policy_variables)
+            if self._clipping:
+                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
+
+            # Apply gradients.
+            self._policy_optimizer.apply(policy_gradients, policy_variables)
+
+            logged_losses.update(
+                {
+                    agent_type: {
+                        "policy_loss": total_loss[b],
+                    }
+                }
+            )
+
+        # print(total_loss)
+        # raise AssertionError
+
         return logged_losses
 
     def step(self) -> None:
