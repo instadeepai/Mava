@@ -14,4 +14,7 @@
 # limitations under the License.
 
 from mava.components.tf.networks.atari import MADQNAtariNetwork
-from mava.components.tf.networks.epsilon_greedy import NetworkWithMaskedEpsilonGreedy
+from mava.components.tf.networks.epsilon_greedy import (
+    NetworkWithMaskedEpsilonGreedy,
+    epsilon_greedy_action_selector,
+)

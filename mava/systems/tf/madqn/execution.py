@@ -44,7 +44,7 @@ class FeedForwardMADQNExecutor(core.Executor):
     def __init__(
         self,
         q_networks: Dict[str, snt.Module],
-        action_selector: Dict[str, snt.Module],
+        action_selectors: Dict[str, snt.Module],
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -63,7 +63,7 @@ class FeedForwardMADQNExecutor(core.Executor):
         self._adder = adder
         self._variable_client = variable_client
         self._q_networks = q_networks
-        self._action_selector = action_selector
+        self._action_selectors = action_selectors
         self._shared_weights = shared_weights
 
     @tf.function
@@ -76,6 +76,7 @@ class FeedForwardMADQNExecutor(core.Executor):
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
+        batched_legals = tf2_utils.add_batch_dim(legal_actions)
 
         # index network either on agent type or on agent id
         agent_key = agent.split("_")[0] if self._shared_weights else agent
@@ -84,9 +85,14 @@ class FeedForwardMADQNExecutor(core.Executor):
         q_values = self._q_networks[agent_key](batched_observation)
 
         # select legal action
-        action = self._action_selector[agent_key](q_values, legal_actions)
+        action = self._action_selectors[agent_key](q_values, batched_legals)
 
         return action
+
+    def select_action(
+        self, agent: str, observation: types.NestedArray
+    ) -> types.NestedArray:
+        raise NotImplementedError
 
     def observe_first(
         self,

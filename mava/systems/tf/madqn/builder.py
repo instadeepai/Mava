@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import dataclasses
-from typing import Dict, Iterator, List, Optional, Type
+from typing import Any, Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -24,9 +24,7 @@ from acme.utils import counting
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.systems.builders import SystemBuilder
-from mava.systems.tf import executors
-from mava.systems.tf.madqn import training
+from mava.systems.tf.madqn import execution, training
 from mava.wrappers import DetailedTrainerStatistics
 
 
@@ -65,7 +63,7 @@ class MADQNConfig:
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
-class MADQNBuilder(SystemBuilder):
+class MADQNBuilder:
     """Builder for MADDPG which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an RL system.
@@ -79,7 +77,7 @@ class MADQNBuilder(SystemBuilder):
         self,
         config: MADQNConfig,
         trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
-        executer_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executer_fn: Type[core.Executor] = execution.FeedForwardMADQNExecutor,
     ):
         """Args:
         _config: Configuration options for the MADDPG system.
@@ -147,7 +145,8 @@ class MADQNBuilder(SystemBuilder):
 
     def make_executor(
         self,
-        policy_networks: Dict[str, snt.Module],
+        q_networks: Dict[str, snt.Module],
+        action_selectors: Dict[str, Any],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
@@ -162,7 +161,8 @@ class MADQNBuilder(SystemBuilder):
 
         # Create the executor which coordinates the actors.
         return self._executor_fn(
-            policy_networks=policy_networks,
+            q_networks=q_networks,
+            action_selectors=action_selectors,
             shared_weights=self._config.shared_weights,
             variable_client=None,
             adder=adder,

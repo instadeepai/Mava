@@ -26,6 +26,7 @@ import sonnet as snt
 from absl import app, flags
 from acme import types
 from acme.tf import networks
+from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop

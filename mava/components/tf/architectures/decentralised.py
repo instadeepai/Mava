@@ -34,7 +34,6 @@ class DecentralisedValueActor(BaseArchitecture):
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
         value_networks: Dict[str, snt.Module],
-        policy_networks: Dict[str, snt.Module],
         shared_weights: bool = True,
     ):
         self._env_spec = environment_spec
@@ -44,7 +43,6 @@ class DecentralisedValueActor(BaseArchitecture):
         self._agent_type_specs = self._env_spec.get_agent_type_specs()
 
         self._value_networks = value_networks
-        self._policy_networks = policy_networks
         self._shared_weights = shared_weights
         self._actor_agent_keys = (
             self._agent_types if self._shared_weights else self._agents
@@ -56,7 +54,6 @@ class DecentralisedValueActor(BaseArchitecture):
     def _create_target_networks(self) -> None:
         # create target behaviour networks
         self._target_value_networks = copy.deepcopy(self._value_networks)
-        self._target_policy_networks = copy.deepcopy(self._policy_networks)
 
     def _get_actor_specs(self) -> Dict[str, OLT]:
         actor_obs_specs = {}
@@ -74,7 +71,6 @@ class DecentralisedValueActor(BaseArchitecture):
         actor_networks: Dict[str, Dict[str, snt.Module]] = {
             "values": {},
             "target_values": {},
-            "policies": {},
         }
 
         # get actor specs
@@ -87,7 +83,6 @@ class DecentralisedValueActor(BaseArchitecture):
 
             # Create variables for value and policy networks.
             tf2_utils.create_variables(self._value_networks[agent_key], [obs_spec])
-            tf2_utils.create_variables(self._policy_networks[agent_key], [obs_spec])
 
             # create target value network variables
             tf2_utils.create_variables(
@@ -96,7 +91,6 @@ class DecentralisedValueActor(BaseArchitecture):
 
         actor_networks["values"] = self._value_networks
         actor_networks["target_values"] = self._target_value_networks
-        actor_networks["policies"] = self._policy_networks
 
         return actor_networks
 

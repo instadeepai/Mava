@@ -21,12 +21,12 @@ import dm_env
 import launchpad as lp
 import sonnet as snt
 import tensorflow as tf
-import trfl
 from absl import app, flags
 from acme import types
 from acme.tf import networks
 
 from mava import specs as mava_specs
+from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.debugging.make_env import make_debugging_env
@@ -76,8 +76,15 @@ def make_networks(
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
-    policy_networks = {}
+    def action_selector_fn(
+        q_values: types.NestedTensor, legal_actions: types.NestedTensor
+    ) -> types.NestedTensor:
+        return epsilon_greedy_action_selector(
+            action_values=q_values, legal_actions_mask=legal_actions
+        )
+
     q_networks = {}
+    action_selectors = {}
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
@@ -91,21 +98,15 @@ def make_networks(
             ]
         )
 
-        policy_network = snt.Sequential(
-            [
-                q_network,
-                lambda q: tf.cast(
-                    trfl.epsilon_greedy(q, epsilon=epsilon).sample(), "int64"
-                ),
-            ]
-        )
+        # epsilon greedy action selector
+        action_selector = action_selector_fn
 
         q_networks[key] = q_network
-        policy_networks[key] = policy_network
+        action_selectors[key] = action_selector
 
     return {
         "q_networks": q_networks,
-        "policies": policy_networks,
+        "action_selectors": action_selectors,
     }
 
 

@@ -25,12 +25,10 @@ import tensorflow.compat.v1 as tfv1
 import tensorflow_probability as tfp
 from acme import types as acme_types
 
-from mava import types as mava_types
 
-
-def epsilon_greedy(
+def epsilon_greedy_action_selector(
     action_values: acme_types.NestedArray,
-    epsilon: tf.Tensor,
+    epsilon: tf.Tensor = tf.Variable(0.05, trainable=False),
     legal_actions_mask: acme_types.NestedArray = None,
 ) -> tfp.distributions.Categorical:
     """Computes an epsilon-greedy distribution over actions.
@@ -58,6 +56,7 @@ def epsilon_greedy(
 
         # Convert inputs to Tensors if they aren't already.
         action_values = tfv1.convert_to_tensor(action_values)
+
         epsilon = tfv1.convert_to_tensor(epsilon, dtype=action_values.dtype)
 
         # convert mask to float
@@ -91,13 +90,13 @@ def epsilon_greedy(
         # Make the policy object.
         policy = tfp.distributions.Categorical(probs=probs)
 
-    return policy
+    return tf.cast(policy.sample(), "int64")
 
 
 class NetworkWithMaskedEpsilonGreedy(snt.Module):
     """Epsilon greedy sampling with action masking on network outputs."""
 
-    def __init__(self, network: snt.Module, epsilon: Optional[tf.Tensor] = None):
+    def __init__(self, epsilon: Optional[tf.Tensor] = None):
         """Initialize the network and epsilon.
         Usage:
           Wrap an observation in a dictionary in your environment as follows:
@@ -110,17 +109,14 @@ class NetworkWithMaskedEpsilonGreedy(snt.Module):
           epsilon: probability of taking a random action.
         """
         super().__init__()
-        self._network = network
         self._epsilon = epsilon
 
-    def __call__(self, observation: mava_types.OLT) -> tf.Tensor:
-        # tf.print("INSIDE eps:", observation["legals"], summarize=-1)
-        q = self._network(observation)
+    def __call__(self, q_values: tf.Tensor, legal_actions: tf.Tensor) -> tf.Tensor:
         return tf.cast(
-            epsilon_greedy(
-                q,
+            epsilon_greedy_action_selector(
+                q_values,
                 epsilon=self._epsilon,
-                legal_actions_mask=observation.legal_actions,
+                legal_actions_mask=legal_actions,
             ).sample(),
             "int64",
         )

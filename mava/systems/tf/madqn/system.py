@@ -32,8 +32,7 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.environment_loop import ParallelEnvironmentLoop
-from mava.systems.tf import executors
-from mava.systems.tf.madqn import builder, training
+from mava.systems.tf.madqn import builder, execution, training
 from mava.utils import lp_utils
 from mava.utils.loggers import Logger
 from mava.wrappers import DetailedPerAgentStatistics
@@ -49,7 +48,7 @@ class MADQN:
         log_info: Tuple,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
-        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executor_fn: Type[core.Executor] = execution.FeedForwardMADQNExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -132,7 +131,6 @@ class MADQN:
         system_networks = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            policy_networks=networks["policies"],
             shared_weights=self._shared_weights,
         ).create_system()
 
@@ -172,13 +170,13 @@ class MADQN:
         executor_networks = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            policy_networks=networks["policies"],
             shared_weights=self._shared_weights,
         ).create_system()
 
         # Create the executor.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            q_networks=executor_networks["values"],
+            action_selectors=networks["action_selectors"],
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
         )
@@ -223,13 +221,13 @@ class MADQN:
         executor_networks = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            policy_networks=networks["policies"],
             shared_weights=self._shared_weights,
         ).create_system()
 
         # Create the agent.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            q_networks=executor_networks["values"],
+            action_selectors=networks["action_selectors"],
             variable_source=variable_source,
         )
 
