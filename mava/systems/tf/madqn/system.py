@@ -67,9 +67,6 @@ class MADQN:
         target_update_period: int = 100,
         log_every: float = 10.0,
         max_executor_steps: int = None,
-        counter: counting.Counter = None,
-        logger: loggers.Logger = None,
-        checkpoint: bool = False,
     ):
 
         if not environment_spec:
@@ -85,7 +82,6 @@ class MADQN:
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
-        self._executor_ids = []
 
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
@@ -102,9 +98,6 @@ class MADQN:
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
                 clipping=clipping,
-                counter=counter,
-                logger=logger,
-                checkpoint=checkpoint,
             ),
             trainer_fn=trainer_fn,
             executer_fn=executor_fn,

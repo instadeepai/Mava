@@ -20,7 +20,7 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme import datasets
-from acme.utils import counting, loggers
+from acme.utils import counting
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
@@ -47,9 +47,6 @@ class MADQNConfig:
             n_step: number of steps to squash into a single transition.
             sigma: standard deviation of zero-mean, Gaussian exploration noise.
             clipping: whether to clip gradients by global norm.
-            logger: logger object to be used by trainers.
-            counter: counter object used to keep track of steps.
-            checkpoint: boolean indicating whether to checkpoint the trainers.
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
@@ -65,9 +62,6 @@ class MADQNConfig:
     n_step: int
     discount: float
     policy_optimizer: snt.Optimizer
-    counter: counting.Counter
-    logger: loggers.Logger
-    checkpoint: bool
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
@@ -219,6 +213,6 @@ class MADQNBuilder(SystemBuilder):
             checkpoint=checkpoint,
         )
 
-        trainer = DetailedTrainerStatistics(trainer)
+        trainer = DetailedTrainerStatistics(trainer)  # type: ignore
 
         return trainer
