@@ -17,9 +17,6 @@
 
 """Adaptation of trfl epsilon_greedy with legal action masking."""
 
-from typing import Optional
-
-import sonnet as snt
 import tensorflow as tf
 import tensorflow.compat.v1 as tfv1
 import tensorflow_probability as tfp
