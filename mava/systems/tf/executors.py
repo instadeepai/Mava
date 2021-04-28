@@ -78,23 +78,19 @@ class FeedForwardExecutor(core.Executor):
         # Return a numpy array with squeezed out batch dimension.
         return tf2_utils.to_numpy_squeeze(action)
 
-    def observe_first(
-        self,
-        timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {"": ()},
-    ) -> None:
+    def observe_first(self, timestep: dm_env.TimeStep) -> None:
         if self._adder:
-            self._adder.add_first(timestep, extras)
+            self._adder.add_first(timestep)
 
     def observe(
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+        extras: Optional[Dict[str, types.NestedArray]] = {},
     ) -> None:
         if self._adder:
-            if next_extras:
-                self._adder.add(actions, next_timestep, next_extras)
+            if extras:
+                self._adder.add(actions, next_timestep, extras)
             else:
                 self._adder.add(actions, next_timestep)
 
