@@ -117,7 +117,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         # TODO (Dries): Should self._next_observation be used
         #  here? Should this function be used for sequential?
         final_step = mava_utils.final_step_like(
-            self._buffer[0], self._next_observations, self._next_extras
+            self._buffer[0], self._next_observations
         )
 
         # Append the final step.
@@ -190,7 +190,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
     def signature(
         cls,
         environment_spec: specs.EnvironmentSpec,
-        core_state_spec: tf.TypeSpec,
+        extras_spec: tf.TypeSpec = {},
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
 
@@ -211,8 +211,6 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         """
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
-        extras_specs = environment_spec.get_extra_specs()
-        extras_specs["core_states"] = core_state_spec
         obs_specs = {}
         act_specs = {}
         reward_specs = {}
@@ -232,6 +230,6 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             rewards=reward_specs,
             discounts=step_discount_specs,
             start_of_episode=specs.Array(shape=(), dtype=bool),
-            extras=extras_specs,
+            extras=extras_spec,
         )
         return tree.map_structure_with_path(base.spec_like_to_tensor_spec, spec_step)
