@@ -59,7 +59,7 @@ class Logger:
         time_delta: float,
         print_fn: Callable[[str], None],
     ) -> loggers.Logger:
-        """Build an Mava logger.
+        """Build a Mava logger.
 
         Args:
             label: Name to give to the logger.
