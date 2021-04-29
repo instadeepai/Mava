@@ -76,7 +76,7 @@ def make_networks(
             [
                 snt.Flatten(),
                 snt.LSTM(20),
-                snt.nets.MLP([50, 50]),
+                snt.nets.MLP([50]),
                 networks.PolicyValueHead(num_actions),
             ]
         )
@@ -116,11 +116,12 @@ def main(_: Any) -> None:
     system = mappo.MAPPO(
         environment_spec=environment_spec,
         networks=all_networks,
-        sequence_length=2,
-        sequence_period=1,
+        sequence_length=10,
+        sequence_period=2,
         batch_size=64,
-        baseline_cost=0.001,
-        critic_learning_rate=5e-4,
+        baseline_cost=0.0001,
+        critic_learning_rate=1e-3,
+        policy_learning_rate=1e-3,
         logger=system_logger,
     )
 

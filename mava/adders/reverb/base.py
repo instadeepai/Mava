@@ -88,6 +88,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         chunk_length: Optional[int] = None,
         priority_fns: Optional[PriorityFnMapping] = None,
         max_in_flight_items: Optional[int] = 25,
+        use_next_extras: bool = True,
     ):
         """Initialize a ReverbAdder instance.
         Args:
@@ -116,6 +117,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         self._delta_encoded = delta_encoded
         self._chunk_length = chunk_length
         self._max_in_flight_items = max_in_flight_items
+        self._use_next_extras = use_next_extras
 
         # This is exposed as the _writer property in such a way that it will create
         # a new writer automatically whenever the internal __writer is None. Users
@@ -164,9 +166,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         self._next_observations = None
 
     def add_first(
-        self,
-        timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = None,
+        self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
     ) -> None:
         """Record the first observation of a trajectory."""
         if not timestep.first():
@@ -186,17 +186,14 @@ class ReverbParallelAdder(base.ParallelAdder):
         self._next_observations = timestep.observation
         self._start_of_episode = True
 
-        self._next_extras = extras
-        if self._next_extras:
-            self._use_next_extras = True
-        else:
-            self._use_next_extras = False
+        if self._use_next_extras:
+            self._next_extras = extras
 
     def add(
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Record an action and the following timestep."""
         if self._next_observations is None:
@@ -215,9 +212,7 @@ class ReverbParallelAdder(base.ParallelAdder):
                     lambda d: np.broadcast_to(next_timestep.discount, np.shape(d)),
                     self._buffer[-1].discount,
                 )
-
         if self._use_next_extras:
-            # Add the timestep to the buffer.
             self._buffer.append(
                 Step(
                     observations=self._next_observations,
@@ -228,8 +223,8 @@ class ReverbParallelAdder(base.ParallelAdder):
                     extras=self._next_extras,
                 )
             )
+            self._next_extras = next_extras
         else:
-            # Add the timestep to the buffer.
             self._buffer.append(
                 Step(
                     observations=self._next_observations,
@@ -237,7 +232,7 @@ class ReverbParallelAdder(base.ParallelAdder):
                     rewards=next_timestep.reward,
                     discounts=discount,
                     start_of_episode=self._start_of_episode,
-                    extras=extras,
+                    extras=next_extras,
                 )
             )
 
@@ -250,8 +245,6 @@ class ReverbParallelAdder(base.ParallelAdder):
         else:
             # Record the next observation and write.
             self._next_observations = next_timestep.observation
-            if self._use_next_extras:
-                self._next_extras = extras
             self._start_of_episode = False
             self._write()
 

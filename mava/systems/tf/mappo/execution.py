@@ -144,18 +144,16 @@ class MAPPORecurrentExecutor(core.Executor):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, types.NestedArray] = {},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         if not self._adder:
             return
 
-        next_extras.update(
-            {"logits": self._prev_logits, "core_states": self._prev_states}
-        )
+        extras.update({"logits": self._prev_logits, "core_states": self._prev_states})
 
-        next_extras = tf2_utils.to_numpy_squeeze(next_extras)
+        extras = tf2_utils.to_numpy_squeeze(extras)
 
-        self._adder.add(actions, next_timestep, next_extras)
+        self._adder.add(actions, next_timestep, extras)
 
     def update(self, wait: bool = False) -> None:
         if self._variable_client:

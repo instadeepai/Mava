@@ -100,7 +100,7 @@ class MAPPOBuilder(SystemBuilder):
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
 
-    def make_replay_table(
+    def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> reverb.Table:
@@ -157,6 +157,7 @@ class MAPPOBuilder(SystemBuilder):
             client=replay_client,
             period=self._config.sequence_period,
             sequence_length=self._config.sequence_length,
+            use_next_extras=False,
         )
 
     def make_executor(
@@ -338,7 +339,7 @@ class MAPPO(system.System):
         )
 
         # Create a replay server to add data to.
-        replay_table = builder.make_replay_table(environment_spec=environment_spec)
+        replay_table = builder.make_replay_tables(environment_spec=environment_spec)
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
