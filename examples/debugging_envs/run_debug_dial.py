@@ -196,7 +196,6 @@ def make_networks(
 
     observation_networks = {}
     policy_networks = {}
-    behavior_networks = {}
 
     for key in specs.keys():
 
@@ -222,24 +221,12 @@ def make_networks(
             output_mlp_size=policy_network_output_mlp_sizes[key],
         )
 
-        # Create the behavior policy.
-        behavior_network = snt.Sequential(
-            [
-                observation_network,
-                policy_network,
-                networks.ClippedGaussian(sigma),
-                networks.ClipToSpec(specs[key].actions),
-            ]
-        )
-
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
-        behavior_networks[key] = behavior_network
 
     return {
         "policies": policy_networks,
         "observations": observation_networks,
-        "behaviors": behavior_networks,
     }
 
 
@@ -262,7 +249,6 @@ def main(_: Any) -> None:
         observation_networks=system_networks[
             "observations"
         ],  # pytype: disable=wrong-arg-types
-        behavior_networks=system_networks["behaviors"],
         logger=system_logger,
         checkpoint=False,
     )

@@ -29,7 +29,7 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import DecentralisedActor
+from mava.components.tf.architectures import DecentralisedPolicyActor
 from mava.components.tf.modules.communication import (
     BaseCommunicationModule,
     BroadcastedCommunication,
@@ -130,7 +130,7 @@ class DIALBuilder(SystemBuilder):
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._executor_fn = executor_fn
 
-    def make_replay_table(
+    def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> reverb.Table:
@@ -354,7 +354,6 @@ class DIAL(system.System):
         environment_spec: specs.MAEnvironmentSpec,
         networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
         executor_fn: Type[core.Executor] = DIALExecutor,
         shared_weights: bool = True,
         batch_size: int = 16,
@@ -440,7 +439,7 @@ class DIAL(system.System):
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_table(environment_spec=environment_spec)
+        replay_table = builder.make_replay_tables(environment_spec=environment_spec)
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
@@ -457,11 +456,10 @@ class DIAL(system.System):
         # Create system architecture
         # TODO (Kevin): create decentralised/centralised/networked actor architectures
         # see mava/components/tf/architectures
-        architecture = DecentralisedActor(
+        architecture = DecentralisedPolicyActor(
             environment_spec=environment_spec,
             policy_networks=networks,
             observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         )
 
