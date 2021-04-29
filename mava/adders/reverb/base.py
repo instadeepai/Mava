@@ -163,11 +163,10 @@ class ReverbParallelAdder(base.ParallelAdder):
         self._buffer.clear()
         self._next_observations = None
 
-    # NOTE Looking at Acme, I think this may be wrong.
     def add_first(
         self,
         timestep: dm_env.TimeStep,
-        # extras: Dict[str, types.NestedArray] = {},
+        extras: Dict[str, types.NestedArray] = None,
     ) -> None:
         """Record the first observation of a trajectory."""
         if not timestep.first():
@@ -185,15 +184,14 @@ class ReverbParallelAdder(base.ParallelAdder):
 
         # Record the next observation.
         self._next_observations = timestep.observation
-        # self._next_extras = extras
+        self._next_extras = extras
         self._start_of_episode = True
 
     def add(
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        # next_extras: Dict[str, types.NestedArray] = {},
-        extras: Dict[str, types.NestedArray] = {},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Record an action and the following timestep."""
         if self._next_observations is None:
@@ -213,18 +211,30 @@ class ReverbParallelAdder(base.ParallelAdder):
                     self._buffer[-1].discount,
                 )
 
-        # Add the timestep to the buffer.
-        self._buffer.append(
-            Step(
-                observations=self._next_observations,
-                actions=actions,
-                rewards=next_timestep.reward,
-                discounts=discount,
-                start_of_episode=self._start_of_episode,
-                # extras=self._next_extras,
-                extras=extras,
+        if self._next_extras is not None:
+            # Add the timestep to the buffer.
+            self._buffer.append(
+                Step(
+                    observations=self._next_observations,
+                    actions=actions,
+                    rewards=next_timestep.reward,
+                    discounts=discount,
+                    start_of_episode=self._start_of_episode,
+                    extras=self._next_extras,
+                )
             )
-        )
+        else:
+            # Add the timestep to the buffer.
+            self._buffer.append(
+                Step(
+                    observations=self._next_observations,
+                    actions=actions,
+                    rewards=next_timestep.reward,
+                    discounts=discount,
+                    start_of_episode=self._start_of_episode,
+                    extras=next_extras,
+                )
+            )
 
         # Write the last "dangling" observation.
         if next_timestep.last():
@@ -235,17 +245,15 @@ class ReverbParallelAdder(base.ParallelAdder):
         else:
             # Record the next observation and write.
             self._next_observations = next_timestep.observation
-            # self._next_extras = next_extras
+            self._next_extras = next_extras
             self._start_of_episode = False
             self._write()
 
-    # NOTE make generic extras_spec
     @abc.abstractmethod
     def signature(
         cls,
         environment_spec: mava_specs.MAEnvironmentSpec,
-        # core_state_spec: tf.TypeSpec,
-        extras_spec: tf.TypeSpec = None,
+        core_state_spec: tf.TypeSpec,
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
         Signatures are useful for validating data types and shapes, see Reverb's

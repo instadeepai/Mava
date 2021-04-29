@@ -128,7 +128,7 @@ class MAPPORecurrentExecutor(core.Executor):
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Optional[Dict[str, types.NestedArray]] = {},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
 
         # Set the state to None so that we re-initialize at the next policy call.
@@ -144,16 +144,18 @@ class MAPPORecurrentExecutor(core.Executor):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         if not self._adder:
             return
 
-        extras = {"logits": self._prev_logits, "core_states": self._prev_states}
+        next_extras.update(
+            {"logits": self._prev_logits, "core_states": self._prev_states}
+        )
 
-        extras = tf2_utils.to_numpy_squeeze(extras)
+        next_extras = tf2_utils.to_numpy_squeeze(next_extras)
 
-        self._adder.add(actions, next_timestep, extras)
+        self._adder.add(actions, next_timestep, next_extras)
 
     def update(self, wait: bool = False) -> None:
         if self._variable_client:

@@ -26,14 +26,14 @@ from absl import app, flags
 from acme.tf import networks
 from ray.rllib.env.multi_agent_env import make_multi_agent
 
-# Testing, remove later.
-from rllib_wrapper import RLLibMultiAgentEnvWrapper
-
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import mappo
 from mava.utils.loggers import Logger
 from mava.wrappers import DetailedPerAgentStatistics
+
+# Testing, remove later.
+from rllib_multi_env_wrapper import RLLibMultiAgentEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
@@ -116,10 +116,10 @@ def main(_: Any) -> None:
     system = mappo.MAPPO(
         environment_spec=environment_spec,
         networks=all_networks,
-        sequence_length=10,
-        sequence_period=5,
+        sequence_length=2,
+        sequence_period=1,
         batch_size=64,
-        baseline_cost=0.01,
+        baseline_cost=0.001,
         critic_learning_rate=5e-4,
         logger=system_logger,
     )
