@@ -34,7 +34,7 @@ from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
 
 class MockedExecutor(ActorMock, core.Executor):
-    """ Mock Exexutor Class."""
+    """Mock Exexutor Class."""
 
     def __init__(self, spec: specs.EnvironmentSpec):
         super().__init__(spec)
@@ -91,7 +91,7 @@ class MockedExecutor(ActorMock, core.Executor):
 
 
 class MockedSystem(MockedExecutor, System):
-    """Mocked System Class. """
+    """Mocked System Class."""
 
     def __init__(
         self,

@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mava.wrappers.debugging_envs import DebuggingEnvWrapper
 from mava.wrappers.environment_loop_statistics import (
     DetailedEpisodeStatistics,
     DetailedPerAgentStatistics,

@@ -23,11 +23,9 @@ from typing import Any, Dict, Mapping, Sequence, Union
 import dm_env
 import numpy as np
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
-from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
@@ -58,7 +56,11 @@ def make_environment(
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
+    observation_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+        256,
+        256,
+        256,
+    ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
     sigma: float = 0.3,
@@ -71,9 +73,9 @@ def make_networks(
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
-    if isinstance(policy_networks_layer_sizes, Sequence):
-        policy_networks_layer_sizes = {
-            key: policy_networks_layer_sizes for key in specs.keys()
+    if isinstance(observation_networks_layer_sizes, Sequence):
+        observation_networks_layer_sizes = {
+            key: observation_networks_layer_sizes for key in specs.keys()
         }
     if isinstance(critic_networks_layer_sizes, Sequence):
         critic_networks_layer_sizes = {
@@ -82,21 +84,17 @@ def make_networks(
 
     observation_networks = {}
     policy_networks = {}
-    behavior_networks = {}
     critic_networks = {}
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
-        # Create the shared observation network
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
-
-        # Create the policy network.
-        policy_network = snt.DeepRNN(
+        # Create the observation network.
+        observation_network = snt.DeepRNN(
             [
                 snt.Flatten(),
-                snt.nets.MLP(policy_networks_layer_sizes[key]),
+                snt.nets.MLP(observation_networks_layer_sizes[key]),
                 snt.LSTM(20),
                 snt.nets.MLP([128]),
                 networks.NearZeroInitializedLinear(num_dimensions),
@@ -104,11 +102,10 @@ def make_networks(
             ]
         )
 
-        # Create the behavior policy.
-        behavior_network = snt.DeepRNN(
+        # Create the policy network.
+        policy_network = snt.DeepRNN(
             [
                 observation_network,
-                policy_network,
                 networks.ClippedGaussian(sigma),
                 networks.ClipToSpec(specs[key].actions),
             ]
@@ -129,13 +126,11 @@ def make_networks(
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
-        behavior_networks[key] = behavior_network
 
     return {
+        "observations": observation_networks,
         "policies": policy_networks,
         "critics": critic_networks,
-        "observations": observation_networks,
-        "behaviors": behavior_networks,
     }
 
 
@@ -172,7 +167,6 @@ def main(_: Any) -> None:
         observation_networks=system_networks[
             "observations"
         ],  # pytype: disable=wrong-arg-types
-        behavior_networks=system_networks["behaviors"],
         trainer_fn=DecentralisedRecurrentMADDPGTrainer,
         executor_fn=executors.RecurrentExecutor,
         logger=system_logger,

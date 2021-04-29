@@ -24,27 +24,25 @@ from acme import specs as acme_specs
 
 from mava import specs as mava_specs
 from mava.components.tf.architectures.decentralised import (
-    DecentralisedActor,
-    DecentralisedActorCritic,
+    DecentralisedPolicyActor,
+    DecentralisedQValueActorCritic,
 )
 
 
-class CentralisedActor(DecentralisedActor):
+class CentralisedPolicyActor(DecentralisedPolicyActor):
     """Centralised multi-agent actor architecture."""
 
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
-        policy_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
         shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
-            policy_networks=policy_networks,
             observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
+            policy_networks=policy_networks,
             shared_weights=shared_weights,
         )
 
@@ -75,24 +73,22 @@ class CentralisedActor(DecentralisedActor):
         return actor_obs_specs
 
 
-class CentralisedCritic(DecentralisedActorCritic):
+class CentralisedQValueCritic(DecentralisedQValueActorCritic):
     """Centralised multi-agent actor critic architecture."""
 
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = True,
     ):
         super().__init__(
             environment_spec=environment_spec,
+            observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         )
 
@@ -133,25 +129,25 @@ class CentralisedCritic(DecentralisedActorCritic):
 
 # TODO (Arnu): remove mypy type ignore once we can handle type checking for
 # nested/multiple inheritance
-class CentralisedActorCritic(CentralisedActor, CentralisedCritic):  # type: ignore
+class CentralisedQValueActorCritic(  # type: ignore
+    CentralisedPolicyActor, CentralisedQValueCritic
+):
     """Centralised multi-agent actor critic architecture."""
 
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
         shared_weights: bool = True,
     ):
 
-        CentralisedCritic.__init__(
+        CentralisedQValueCritic.__init__(
             self,
             environment_spec=environment_spec,
+            observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         )
