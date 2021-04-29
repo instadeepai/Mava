@@ -15,6 +15,7 @@
 
 
 """MADDPG trainer implementation."""
+
 import copy
 import os
 import time
@@ -801,6 +802,13 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         self._agent_types = agent_types
         self._shared_weights = shared_weights
 
+        # Dictionary with network keys for each agent.
+        self.agent_net_keys = {agent: agent for agent in self._agents}
+        if self._shared_weights:
+            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
+
+        self.unique_net_keys = self._agent_types if shared_weights else self._agents
+
         # Store online and target networks.
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
@@ -829,13 +837,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # Create optimizers if they aren't given.
         self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-4)
         self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
-
-        # Dictionary with network keys for each agent.
-        self.agent_net_keys = {agent: agent for agent in self._agents}
-        if self._shared_weights:
-            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
-
-        self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -996,11 +997,16 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
             target_trans_obs = target_obs_trans[agent]
-            agent_core_state = target_core_state[agent]
+            # TODO (dries): Why is there an extra tuple
+            #  wrapping that needs to be removed?
+            agent_core_state = target_core_state[agent][0]
             transposed_obs = tf2_utils.batch_to_sequence(target_trans_obs)
-            actions[agent] = self._target_policy_networks[agent_key](
-                transposed_obs, agent_core_state
+            outputs, updated_states = snt.static_unroll(
+                self._target_policy_networks[agent_key],
+                transposed_obs,
+                agent_core_state,
             )
+            actions[agent] = tf2_utils.batch_to_sequence(outputs)
         return actions
 
     # def _covert_observations
@@ -1022,9 +1028,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
 
-        data = tree.map_structure(
-            lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, sample.data
-        )
+        # Is this still needed?
+        data = sample.data
 
         # Note (dries): The unused variable is start_of_episodes.
         observations, actions, rewards, discounts, _, extras = (
@@ -1036,18 +1041,24 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             data.extras,
         )
 
-        # batch_size, unused = actions.values()[0].shape
+        # batch_size = 256
+        # sequence_length = 20
+        # action_size = 4
 
         # Get initial state for the LSTM, either from replay or simply use zeros.
-        core_state = tree.map_structure(lambda x: x[0], extras["core_state"])
+        # seq_extras = tf2_utils.batch_to_sequence(extras)
+        seq_extras = extras
+
+        # Extract the first state in the sequence.
+        core_state = tree.map_structure(lambda s: s[:, 0, :], seq_extras["core_states"])
         target_core_state = tree.map_structure(tf.identity, core_state)
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            policy_losses = {}
-            critic_losses = {}
+            policy_losses: Dict[str, tf.Tensor] = {}
+            critic_losses: Dict[str, tf.Tensor] = {}
 
             # Note (dries): We are assuming that only the policy network
             # is recurrent and not the observation network.
@@ -1101,11 +1112,16 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 ).loss
 
                 # Actor learning.
-                o_t_agent_feed = target_obs_trans[agent]
-                transposed_obs = tf2_utils.batch_to_sequence(o_t_agent_feed)
-                dpg_actions = self._policy_networks[agent_key](
-                    transposed_obs, core_state[agent]
+                obs_agent_feed = target_obs_trans[agent]
+                agent_core_state = core_state[agent][0]
+                transposed_obs = tf2_utils.batch_to_sequence(obs_agent_feed)
+                outputs, updated_states = snt.static_unroll(
+                    self._policy_networks[agent_key], transposed_obs, agent_core_state
                 )
+                dpg_actions = tf2_utils.batch_to_sequence(outputs)
+
+                print("dpg_actions: ", dpg_actions)
+                exit()
 
                 # Get dpg actions
                 dpg_actions_feed = self._get_dpg_feed(
@@ -1170,8 +1186,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             logged_losses.update(
                 {
                     agent: {
-                        "critic_loss": critic_loss,
-                        "policy_loss": policy_loss,
+                        "critic_loss": critic_losses[agent],
+                        "policy_loss": policy_losses[agent],
                     }
                 }
             )

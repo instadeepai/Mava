@@ -155,11 +155,17 @@ class MADDPGBuilder(SystemBuilder):
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for learning/updating the system."""
+
+        sequence_length = None
+        if self._executor_fn == executors.RecurrentExecutor:
+            sequence_length = self._config.sequence_length
+
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
+            sequence_length=sequence_length,
         )
         return iter(dataset)
 

@@ -79,6 +79,15 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             at the same time. See `reverb.Writer.writer` for more info.
         """
 
+        if delta_encoded:
+            NotImplementedError(
+                "Note (dries): Delta encoding has not been verified to "
+                "work in Mava yet. If you want to use delta encoding"
+                " first verify that it is working and then contribute "
+                "the update with a working example of delta encoding"
+                " to the Mava repo."
+            )
+
         super().__init__(
             client=client,
             buffer_size=sequence_length,
