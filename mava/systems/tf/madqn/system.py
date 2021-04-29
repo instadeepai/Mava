@@ -69,7 +69,9 @@ class MADQN:
     ):
 
         if not environment_spec:
-            environment_spec = mava_specs.MAEnvironmentSpec(environment_factory(False))
+            environment_spec = mava_specs.MAEnvironmentSpec(
+                environment_factory(evaluation=False)  # type: ignore
+            )
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -125,7 +127,9 @@ class MADQN:
         log_dir, log_time_stamp = self._log_info
 
         # Create the networks to optimize (online)
-        networks = self._network_factory(self._environment_spec)
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec
+        )
 
         # Create system architecture with target networks.
         system_networks = self._architecture(
@@ -164,7 +168,9 @@ class MADQN:
         log_dir, log_time_stamp = self._log_info
 
         # Create the behavior policy.
-        networks = self._network_factory(self._environment_spec)
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec
+        )
 
         # Create system architecture with target networks.
         executor_networks = self._architecture(
@@ -181,8 +187,9 @@ class MADQN:
             variable_source=variable_source,
         )
 
+        # TODO (Arnu): figure out why factory function are giving type errors
         # Create the environment.
-        environment = self._environment_factory(False)
+        environment = self._environment_factory(evaluation=False)  # type: ignore
 
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
@@ -215,7 +222,9 @@ class MADQN:
         log_dir, log_time_stamp = self._log_info
 
         # Create the behavior policy.
-        networks = self._network_factory(self._environment_spec)
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec
+        )
 
         # Create system architecture with target networks.
         executor_networks = self._architecture(
@@ -232,7 +241,7 @@ class MADQN:
         )
 
         # Make the environment.
-        environment = self._environment_factory(True)
+        environment = self._environment_factory(evaluation=True)  # type: ignore
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
