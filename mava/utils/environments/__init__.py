@@ -12,32 +12,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from enum import Enum
-
-
-class EnvSource(str, Enum):
-    PettingZoo = "pettingzoo"
-    RLLibMultiEnv = "rllibmultienv"
-
-
-class MockedEnvironments(str, Enum):
-    Mocked_Dicrete = "discrete_mock"
-    Mocked_Continous = "continous_mock"
-
-
-class EnvType(Enum):
-    Sequential = 1
-    Parallel = 2
-
-
-class EnvSpec:
-    def __init__(
-        self,
-        env_name: str,
-        env_type: EnvType,
-        env_source: EnvSource = EnvSource.PettingZoo,
-    ):
-        self.env_name = env_name
-        self.env_type = env_type
-        self.env_source = env_source
