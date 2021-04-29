@@ -19,7 +19,6 @@ from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-import tree
 import trfl
 from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
@@ -40,27 +39,25 @@ class IDQNTrainer(mava.Trainer):
         agent_types: List[str],
         q_networks: Dict[str, snt.Module],
         target_q_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
         epsilon: tf.Variable,
         target_update_period: int,
         dataset: tf.data.Dataset,
         shared_weights: bool,
-        optimizer: snt.Optimizer,
-        clipping: bool,
-        counter: counting.Counter,
-        logger: loggers.Logger,
-        checkpoint: bool,
+        optimizer: snt.Optimizer = None,
+        clipping: bool = True,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
     ):
 
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
-        self._optimizer = optimizer
+        self._optimizer = optimizer or snt.optimizers.Adam(1e-4)
 
         # Store online and target networks.
         self._q_networks = q_networks
         self._target_q_networks = target_q_networks
-        self._observation_networks = observation_networks
         self._epsilon = epsilon
 
         # General learner book-keeping and loggers.
@@ -124,28 +121,6 @@ class IDQNTrainer(mava.Trainer):
         self._num_steps.assign_add(1)
 
     @tf.function
-    def _transform_observations(
-        self, state: Dict[str, np.ndarray], next_state: Dict[str, np.ndarray]
-    ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        o_tm1 = {}
-        o_t = {}
-        for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
-            o_tm1[agent] = self._observation_networks[agent_key](
-                state[agent].observation
-            )
-            o_t[agent] = self._observation_networks[agent_key](
-                next_state[agent].observation
-            )
-            # This stop_gradient prevents gradients to propagate into the target
-            # observation network. In addition, since the online policy network is
-            # evaluated at o_t, this also means the policy loss does not influence
-            # the observation network training.
-            o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
-
-        return o_tm1, o_t
-
-    @tf.function
     def _get_feed(
         self,
         o_tm1_trans: Dict[str, np.ndarray],
@@ -154,8 +129,8 @@ class IDQNTrainer(mava.Trainer):
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
 
-        o_tm1_feed = o_tm1_trans[agent]
-        o_t_feed = o_t_trans[agent]
+        o_tm1_feed = o_tm1_trans[agent].observation
+        o_t_feed = o_t_trans[agent].observation
         a_tm1_feed = a_tm1[agent]
 
         return o_tm1_feed, o_t_feed, a_tm1_feed
@@ -189,7 +164,6 @@ class IDQNTrainer(mava.Trainer):
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data that the agents persist in replay.
         o_tm1, a_tm1, _, r_t, d_t, o_t, _ = inputs.data
-        o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
         for agent in self._agents:
@@ -203,11 +177,11 @@ class IDQNTrainer(mava.Trainer):
                 # network weights.
 
                 o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
-                    o_tm1_trans, o_t_trans, a_tm1, agent
+                    o_tm1, o_t, a_tm1, agent
                 )
 
-                q_tm1 = self._q_networks[agent](o_tm1_feed)
-                q_t = self._target_q_networks[agent](o_t_feed)
+                q_tm1 = self._q_networks[agent_key](o_tm1_feed)
+                q_t = self._target_q_networks[agent_key](o_t_feed)
 
                 loss, _ = trfl.qlearning(q_tm1, a_tm1_feed, r_t[agent], d_t[agent], q_t)
 
