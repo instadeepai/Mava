@@ -81,7 +81,7 @@ class FeedForwardExecutor(core.Executor):
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {"": ()},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         if self._adder:
             self._adder.add_first(timestep, extras)
