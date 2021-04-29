@@ -15,7 +15,7 @@
 
 import importlib
 import typing
-from typing import Dict, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import acme
 import dm_env
@@ -25,6 +25,7 @@ from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
+from mava.types import OLT, Observation
 from mava.utils.wrapper_utils import convert_np_type
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
@@ -53,8 +54,8 @@ class Helpers:
 
     # Return an env - currently Pettingzoo envs.
     @staticmethod
-    def get_env(env_spec: EnvSpec) -> Tuple[Union[AECEnv, ParallelEnv], int]:
-        env, num_agents = None, None
+    def get_env(env_spec: EnvSpec) -> Union[AECEnv, ParallelEnv]:
+        env = None
         if env_spec.env_source == EnvSource.PettingZoo:
             mod = importlib.import_module(env_spec.env_name)
             if env_spec.env_type == EnvType.Parallel:
@@ -64,8 +65,7 @@ class Helpers:
         else:
             raise Exception("Env_spec is not valid.")
         env.reset()  # type: ignore
-        num_agents = len(env.agents)  # type: ignore
-        return env, num_agents
+        return env
 
     # Returns a wrapper function.
     @staticmethod
@@ -168,7 +168,7 @@ class Helpers:
     # Returns a wrapped env and specs
     @staticmethod
     def get_wrapped_env(
-        env_spec: EnvSpec,
+        env_spec: EnvSpec, **kwargs: Any
     ) -> Tuple[dm_env.Environment, acme.specs.EnvironmentSpec]:
 
         specs = None
@@ -176,10 +176,11 @@ class Helpers:
             wrapped_env = Helpers.get_mocked_env(env_spec)
             specs = wrapped_env._specs
         else:
-            env, num_agents = Helpers.get_env(env_spec)
+            env = Helpers.get_env(env_spec)
             wrapper_func = Helpers.get_wrapper_function(env_spec)
-            wrapped_env = wrapper_func(env)
+            wrapped_env = wrapper_func(env, **kwargs)
             specs = Helpers.get_pz_env_spec(wrapped_env)._specs
+        wrapped_env.reset()  # type : ignore
         return wrapped_env, specs
 
     # Returns a petting zoo environment spec.
@@ -257,6 +258,25 @@ class Helpers:
                 assert dm_env_timestep.discount == expected_discount and type(
                     dm_env_timestep.discount
                 ) == type(expected_discount), "Failed to reset discount."
+
+    @staticmethod
+    def verify_observations_are_normalized(
+        observations: Observation, agents: List, env_spec: EnvSpec
+    ) -> None:
+        if env_spec.env_type == EnvType.Parallel and isinstance(  # type: ignore
+            observations, Dict[str, OLT]
+        ):
+            for agent in agents:
+                assert (
+                    observations[agent].observation.min() >= 0
+                    and observations[agent].observation.max() <= 1
+                ), "Failed to normalize observations."
+
+        elif env_spec.env_type == EnvType.Sequential and isinstance(observations, OLT):
+            assert (
+                observations.observation.min() >= 0
+                and observations.observation.max() <= 1
+            ), "Failed to normalize observations."
 
     @staticmethod
     def mock_done() -> bool:
