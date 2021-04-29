@@ -17,7 +17,6 @@
 # https://github.com/deepmind/acme/blob/master/acme/adders/reverb/sequence.py
 
 """Sequence adders.
-
 This implements adders which add sequences or partial trajectories.
 """
 
@@ -57,7 +56,6 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         max_in_flight_items: Optional[int] = 25,
     ):
         """Makes a SequenceAdder instance.
-
         Args:
           client: See docstring for BaseAdder.
           sequence_length: The fixed length of sequences we wish to add.
@@ -117,7 +115,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         # TODO (Dries): Should self._next_observation be used
         #  here? Should this function be used for sequential?
         final_step = mava_utils.final_step_like(
-            self._buffer[0], self._next_observations
+            self._buffer[0], self._next_observations, self._next_extras
         )
 
         # Append the final step.
@@ -190,13 +188,11 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
     def signature(
         cls,
         environment_spec: specs.EnvironmentSpec,
-        extras_spec: tf.TypeSpec = {},
+        extras_spec: tf.TypeSpec,
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
-
         Signatures are useful for validating data types and shapes, see Reverb's
         documentation for details on how they are used.
-
         Args:
           environment_spec: A `specs.EnvironmentSpec` whose fields are nested
             structures with leaf nodes that have `.shape` and `.dtype` attributes.
@@ -205,12 +201,13 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
           extras_spec: A nested structure with leaf nodes that have `.shape` and
             `.dtype` attributes. The structure (and shapes/dtypes) of this must
             be the same as the `extras` passed into `ReverbAdder.add`.
-
         Returns:
           A `Step` whose leaf nodes are `tf.TensorSpec` objects.
         """
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
+        env_extras_spec = environment_spec.get_extra_specs()
+        extras_spec.update(env_extras_spec)
         obs_specs = {}
         act_specs = {}
         reward_specs = {}
