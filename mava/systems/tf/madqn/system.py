@@ -127,9 +127,9 @@ class MADQN:
         log_dir, log_time_stamp = self._log_info
 
         # Create the networks to optimize (online)
-        networks = self._network_factory(
+        networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec
-        )  # type: ignore
+        )
 
         # Create system architecture with target networks.
         system_networks = self._architecture(
@@ -168,9 +168,9 @@ class MADQN:
         log_dir, log_time_stamp = self._log_info
 
         # Create the behavior policy.
-        networks = self._network_factory(
+        networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec
-        )  # type: ignore
+        )
 
         # Create system architecture with target networks.
         executor_networks = self._architecture(
@@ -222,8 +222,8 @@ class MADQN:
         log_dir, log_time_stamp = self._log_info
 
         # Create the behavior policy.
-        networks = self._network_factory(
-            environment_spec=self._environment_spec  # type: ignore
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec
         )
 
         # Create system architecture with target networks.
