@@ -21,7 +21,6 @@ import time
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
-
 import reverb
 import sonnet as snt
 import tensorflow as tf
@@ -925,12 +924,15 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     def _transform_observations(
         self, observations: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        # Note (dries): We are assuming that only the policy network is recurrent and not the observation network.
+        # Note (dries): We are assuming that only the policy network
+        # is recurrent and not the observation network.
         obs_trans = {}
         obs_target_trans = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            obs_trans[agent] = self._observation_networks[agent_key](observations[agent].observation)
+            obs_trans[agent] = self._observation_networks[agent_key](
+                observations[agent].observation
+            )
             obs_target_trans[agent] = self._target_observation_networks[agent_key](
                 observations[agent].observation
             )
@@ -938,7 +940,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             # observation network. In addition, since the online policy network is
             # evaluated at o_t, this also means the policy loss does not influence
             # the observation network training.
-            obs_target_trans[agent] = tree.map_structure(tf.stop_gradient, obs_target_trans[agent])
+            obs_target_trans[agent] = tree.map_structure(
+                tf.stop_gradient, obs_target_trans[agent]
+            )
 
             # TODO (dries): Why is there a stop gradient here? The target
             #  will not be updated unless included into the
@@ -974,7 +978,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     @tf.function
     def _get_dpg_feed(
         self,
-        a_t: Dict[str, np.ndarray],
+        target_actions: Dict[str, np.ndarray],
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
@@ -983,12 +987,20 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         return dpg_a_t_feed
 
     @tf.function
-    def _policy_actions(self, target_obs_trans: Dict[str, np.ndarray]) -> Any:
+    def _policy_actions(
+        self,
+        target_obs_trans: Dict[str, np.ndarray],
+        target_core_state: Dict[str, np.ndarray],
+    ) -> Any:
         actions = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
             target_trans_obs = target_obs_trans[agent]
-            actions[agent] = self._target_policy_networks[agent_key](target_trans_obs)
+            agent_core_state = target_core_state[agent]
+            transposed_obs = tf2_utils.batch_to_sequence(target_trans_obs)
+            actions[agent] = self._target_policy_networks[agent_key](
+                transposed_obs, agent_core_state
+            )
         return actions
 
     # def _covert_observations
@@ -1011,19 +1023,23 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         sample: reverb.ReplaySample = next(self._iterator)
 
         data = tree.map_structure(
-            lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, sample.data)
-        data = tf2_utils.batch_to_sequence(data)
-        observations, actions, rewards, discounts, unused_start_of_episodes, extras = (data.observation,
-                                                            data.action,
-                                                            data.reward,
-                                                            data.discount,
-                                                            data.start_of_episodes,
-                                                            data.extras)
+            lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, sample.data
+        )
 
-        unused_sequence_length, batch_size = actions.values()[0].shape
+        # Note (dries): The unused variable is start_of_episodes.
+        observations, actions, rewards, discounts, _, extras = (
+            data.observations,
+            data.actions,
+            data.rewards,
+            data.discounts,
+            data.start_of_episode,
+            data.extras,
+        )
+
+        # batch_size, unused = actions.values()[0].shape
 
         # Get initial state for the LSTM, either from replay or simply use zeros.
-        core_state = tree.map_structure(lambda x: x[0], extras['core_state'])
+        core_state = tree.map_structure(lambda x: x[0], extras["core_state"])
         target_core_state = tree.map_structure(tf.identity, core_state)
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
@@ -1033,19 +1049,25 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             policy_losses = {}
             critic_losses = {}
 
-            # Note (dries): We are assuming that only the policy network is recurrent and not the observation network.
+            # Note (dries): We are assuming that only the policy network
+            # is recurrent and not the observation network.
             obs_trans, target_obs_trans = self._transform_observations(observations)
-            target_actions = self._policy_actions(target_obs_trans)
+            target_actions = self._policy_actions(target_obs_trans, target_core_state)
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
-                # discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
+                discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
 
                 # Get critic feed
-                obs_trans_feed, target_obs_trans_feed, action_feed, target_actions_feed = self._get_critic_feed(
+                (
+                    obs_trans_feed,
+                    target_obs_trans_feed,
+                    action_feed,
+                    target_actions_feed,
+                ) = self._get_critic_feed(
                     obs_trans=obs_trans,
                     target_obs_trans=target_obs_trans,
                     actions=actions,
@@ -1056,44 +1078,50 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
                 # Critic learning.
                 q_values = self._critic_networks[agent_key](obs_trans_feed, action_feed)
-                target_q_values = self._target_critic_networks[agent_key](target_obs_trans_feed, target_actions_feed)
+                target_q_values = self._target_critic_networks[agent_key](
+                    target_obs_trans_feed, target_actions_feed
+                )
 
                 # Squeeze into the shape expected by the td_learning implementation.
-                q_values = tf.squeeze(q_values, axis=-1)  # [B]
-                target_q_values = tf.squeeze(target_q_values, axis=-1)  # [B]
+                # TODO: Check if this is indexing correct
+                q_values = tf.squeeze(q_values, axis=-1)[:-1]  # [B]
+                target_q_values = tf.squeeze(target_q_values, axis=-1)[1:]  # [B]
 
                 # Critic loss.
                 # Compute the transformed n-step loss.
+                # TODO: Check if this is indexing is correct
                 rewards = tree.map_structure(lambda x: x[:-1], rewards)
                 discounts = tree.map_structure(lambda x: x[:-1], discounts)
-                critic_loss, _ = losses.transformed_n_step_loss(
-                    qs=q_values,
-                    targnet_qs=target_q_values,
-                    actions=actions,
-                    rewards=rewards,
-                    pcontinues=discounts * self._discount,
-                    target_policy_probs=target_policy_probs,
-                    bootstrap_n=self._n_step,
-                )
-
-                print("Working until here.")
-                exit()
+                # Critic loss.
+                critic_loss = trfl.td_learning(
+                    q_values,
+                    rewards[agent],
+                    discount * discounts[agent],
+                    target_q_values,
+                ).loss
 
                 # Actor learning.
-                o_t_agent_feed = o_t_trans[agent]
-                dpg_a_t = self._policy_networks[agent_key](o_t_agent_feed)
+                o_t_agent_feed = target_obs_trans[agent]
+                transposed_obs = tf2_utils.batch_to_sequence(o_t_agent_feed)
+                dpg_actions = self._policy_networks[agent_key](
+                    transposed_obs, core_state[agent]
+                )
 
                 # Get dpg actions
-                dpg_a_t_feed = self._get_dpg_feed(a_t, dpg_a_t, agent)
+                dpg_actions_feed = self._get_dpg_feed(
+                    target_actions, dpg_actions, agent
+                )
 
                 # Get dpg Q values.
-                dpg_q_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
+                dpg_q_values = self._critic_networks[agent_key](
+                    target_obs_trans_feed, dpg_actions_feed
+                )
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
                 dqda_clipping = 1.0 if self._clipping else None
                 policy_loss = losses.dpg(
-                    dpg_q_t,
-                    dpg_a_t,
+                    dpg_q_values,
+                    dpg_actions_feed,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
                     clip_norm=self._clipping,
