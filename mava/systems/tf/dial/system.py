@@ -18,7 +18,7 @@
 
 """DIAL system implementation."""
 import dataclasses
-from typing import Dict, Iterator, Optional, Type
+from typing import Callable, Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -444,6 +444,10 @@ class DIAL(system.System):
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
+        self._can_sample: Callable[[], bool] = lambda: replay_table.can_sample(
+            batch_size
+        )
+
         # The adder is used to insert observations into replay.
         adder = builder.make_adder(replay_client)
 
@@ -488,3 +492,26 @@ class DIAL(system.System):
             min_observations=max(batch_size, min_replay_size),
             observations_per_step=float(batch_size) / samples_per_insert,
         )
+
+    def update(self) -> None:
+        learner_step = False
+        while self._can_sample():
+            self._trainer.step()
+            learner_step = True
+        if learner_step:
+            self._executor.update()
+
+    # def update(self) -> None:
+    #     num_steps = _calculate_num_learner_steps(
+    #         num_observations=self._num_observations,
+    #         min_observations=self._min_observations,
+    #         observations_per_step=self._observations_per_step,
+    #     )
+    #     for _ in range(num_steps):
+    #         if not self._can_sample():
+    #             break
+    #         # Run learner steps (usually means gradient steps).
+    #         self._trainer.step()
+    #     if num_steps > 0:
+    #         # Update the actor weights when learner updates.
+    #         self._executor.update()

@@ -76,7 +76,7 @@ class MultiAgentSwitchGame(gym.Env):
         if action_n[selected_agent_id] == 1:
             self.env_done = True
             self.tell = True
-
+        # print(action_n[selected_agent_id])
         self.selected_agent = np.random.randint(0, self.num_agents)
         self.time += 1
         if self.time >= self.max_time:

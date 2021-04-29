@@ -42,7 +42,7 @@ flags.DEFINE_integer("num_episodes", 200, "Number of training episodes to run fo
 
 flags.DEFINE_integer(
     "num_episodes_per_eval",
-    30,
+    50,
     "Number of training episodes to run between evaluation " "episodes.",
 )
 
@@ -88,7 +88,7 @@ class DIAL_policy(snt.RNNCore):
         self.output_mlp = snt.Sequential(
             [
                 networks.LayerNormMLP(output_mlp_size, activate_final=True),
-                networks.NearZeroInitializedLinear(self._action_dim),
+                networks.NearZeroInitializedLinear(2),
                 # networks.TanhToSpec(self._action_spec),
             ]
         )
@@ -295,10 +295,7 @@ def main(_: Any) -> None:
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        # train_loop.run(num_episodes=2)
-        # return
-        print(f"replay size: {FLAGS.num_episodes_per_eval*(_+1)}")
-        eval_loop.run(num_episodes=1)
+        eval_loop.run(num_episodes=2)
 
 
 if __name__ == "__main__":
