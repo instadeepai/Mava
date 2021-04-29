@@ -921,6 +921,16 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                     dest.assign(src)
             self._num_steps.assign_add(1)
 
+    def _combine_dim(self, tensor: tf.Tensor) -> tf.Tensor:
+        if len(tensor.shape) == 3:
+            b_size, l_size, _ = tensor.shape
+            return tf.reshape(tensor, [b_size * l_size, -1]), b_size, l_size
+        else:
+            return tf.reshape(tensor, [-1])
+
+    def _extract_dim(self, tensor: tf.Tensor, b_size: int, l_size: int) -> tf.Tensor:
+        return tf.reshape(tensor, [b_size, l_size, -1])
+
     @tf.function
     def _transform_observations(
         self, observations: Dict[str, np.ndarray]
@@ -931,12 +941,21 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         obs_target_trans = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            obs_trans[agent] = self._observation_networks[agent_key](
+
+            reshaped_obs, b_size, l_size = self._combine_dim(
                 observations[agent].observation
             )
-            obs_target_trans[agent] = self._target_observation_networks[agent_key](
-                observations[agent].observation
+
+            obs_trans[agent] = self._extract_dim(
+                self._observation_networks[agent_key](reshaped_obs), b_size, l_size
             )
+
+            obs_target_trans[agent] = self._extract_dim(
+                self._target_observation_networks[agent_key](reshaped_obs),
+                b_size,
+                l_size,
+            )
+
             # This stop_gradient prevents gradients to propagate into the target
             # observation network. In addition, since the online policy network is
             # evaluated at o_t, this also means the policy loss does not influence
@@ -956,6 +975,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             #  the same set of weights? But the
             #  StateBasedActorCritic will then not work as the critic
             #  is not dependent on the behavior networks.
+
         return obs_trans, obs_target_trans
 
     @tf.function
@@ -994,18 +1014,22 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         target_core_state: Dict[str, np.ndarray],
     ) -> Any:
         actions = {}
+
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
             target_trans_obs = target_obs_trans[agent]
             # TODO (dries): Why is there an extra tuple
             #  wrapping that needs to be removed?
             agent_core_state = target_core_state[agent][0]
+
             transposed_obs = tf2_utils.batch_to_sequence(target_trans_obs)
+
             outputs, updated_states = snt.static_unroll(
                 self._target_policy_networks[agent_key],
                 transposed_obs,
                 agent_core_state,
             )
+
             actions[agent] = tf2_utils.batch_to_sequence(outputs)
         return actions
 
@@ -1044,7 +1068,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # batch_size = 256
         # sequence_length = 20
         # action_size = 4
-
         # Get initial state for the LSTM, either from replay or simply use zeros.
         # seq_extras = tf2_utils.batch_to_sequence(extras)
         seq_extras = extras
@@ -1062,7 +1085,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
             # Note (dries): We are assuming that only the policy network
             # is recurrent and not the observation network.
+
             obs_trans, target_obs_trans = self._transform_observations(observations)
+
             target_actions = self._policy_actions(target_obs_trans, target_core_state)
 
             for agent in self._agents:
@@ -1088,26 +1113,33 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 )
 
                 # Critic learning.
-                q_values = self._critic_networks[agent_key](obs_trans_feed, action_feed)
+                obs_comb, _, _ = self._combine_dim(obs_trans_feed)
+                act_comb, _, _ = self._combine_dim(action_feed)
+                q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+
+                obs_comb, _, _ = self._combine_dim(target_obs_trans_feed)
+                act_comb, _, _ = self._combine_dim(target_actions_feed)
                 target_q_values = self._target_critic_networks[agent_key](
-                    target_obs_trans_feed, target_actions_feed
+                    obs_comb, act_comb
                 )
 
                 # Squeeze into the shape expected by the td_learning implementation.
-                # TODO: Check if this is indexing correct
                 q_values = tf.squeeze(q_values, axis=-1)[:-1]  # [B]
                 target_q_values = tf.squeeze(target_q_values, axis=-1)[1:]  # [B]
 
                 # Critic loss.
                 # Compute the transformed n-step loss.
-                # TODO: Check if this is indexing is correct
-                rewards = tree.map_structure(lambda x: x[:-1], rewards)
-                discounts = tree.map_structure(lambda x: x[:-1], discounts)
+                agent_rewards = self._combine_dim(rewards[agent])
+                agent_discounts = self._combine_dim(discounts[agent])
+
+                agent_rewards = tree.map_structure(lambda x: x[:-1], agent_rewards)
+                agent_discounts = tree.map_structure(lambda x: x[:-1], agent_discounts)
+
                 # Critic loss.
                 critic_loss = trfl.td_learning(
                     q_values,
-                    rewards[agent],
-                    discount * discounts[agent],
+                    agent_rewards,
+                    discount * agent_discounts,
                     target_q_values,
                 ).loss
 
@@ -1354,7 +1386,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
           logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.
         """
-
+        NotImplementedError("Not implemented yet.")
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -1460,7 +1492,7 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
           logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.
         """
-
+        NotImplementedError("Not implemented yet.")
         super().__init__(
             agents=agents,
             agent_types=agent_types,
