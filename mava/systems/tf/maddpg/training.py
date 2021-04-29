@@ -1124,6 +1124,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 )
 
                 # Squeeze into the shape expected by the td_learning implementation.
+                # TODO: No! This will not work. Need to move
+                #  in sequence format not flattened.
                 q_values = tf.squeeze(q_values, axis=-1)[:-1]  # [B]
                 target_q_values = tf.squeeze(target_q_values, axis=-1)[1:]  # [B]
 
