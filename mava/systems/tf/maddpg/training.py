@@ -416,8 +416,8 @@ class BaseMADDPGTrainer(mava.Trainer):
             logged_losses.update(
                 {
                     agent: {
-                        "critic_loss": critic_loss,
-                        "policy_loss": policy_loss,
+                        "critic_loss": critic_losses[agent],
+                        "policy_loss": policy_losses[agent],
                     }
                 }
             )
