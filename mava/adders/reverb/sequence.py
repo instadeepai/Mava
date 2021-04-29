@@ -54,6 +54,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         pad_end_of_episode: bool = True,
         break_end_of_episode: bool = True,
         max_in_flight_items: Optional[int] = 25,
+        use_next_extras: bool = True,
     ):
         """Makes a SequenceAdder instance.
         Args:
@@ -85,6 +86,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             chunk_length=chunk_length,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
+            use_next_extras=use_next_extras,
         )
 
         if pad_end_of_episode and not break_end_of_episode:
@@ -114,9 +116,14 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         # Create a final step.
         # TODO (Dries): Should self._next_observation be used
         #  here? Should this function be used for sequential?
-        final_step = mava_utils.final_step_like(
-            self._buffer[0], self._next_observations, self._next_extras
-        )
+        if self._use_next_extras:
+            final_step = mava_utils.final_step_like(
+                self._buffer[0], self._next_observations, self.next_extras
+            )
+        else:
+            final_step = mava_utils.final_step_like(
+                self._buffer[0], self._next_observations
+            )
 
         # Append the final step.
         self._buffer.append(final_step)
