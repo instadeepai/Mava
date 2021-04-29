@@ -184,14 +184,19 @@ class ReverbParallelAdder(base.ParallelAdder):
 
         # Record the next observation.
         self._next_observations = timestep.observation
-        self._next_extras = extras
         self._start_of_episode = True
+
+        self._next_extras = extras
+        if self._next_extras:
+            self._use_next_extras = True
+        else:
+            self._use_next_extras = False
 
     def add(
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Dict[str, types.NestedArray] = {},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Record an action and the following timestep."""
         if self._next_observations is None:
@@ -211,7 +216,7 @@ class ReverbParallelAdder(base.ParallelAdder):
                     self._buffer[-1].discount,
                 )
 
-        if self._next_extras is not None:
+        if self._use_next_extras:
             # Add the timestep to the buffer.
             self._buffer.append(
                 Step(
@@ -232,7 +237,7 @@ class ReverbParallelAdder(base.ParallelAdder):
                     rewards=next_timestep.reward,
                     discounts=discount,
                     start_of_episode=self._start_of_episode,
-                    extras=next_extras,
+                    extras=extras,
                 )
             )
 
@@ -245,7 +250,8 @@ class ReverbParallelAdder(base.ParallelAdder):
         else:
             # Record the next observation and write.
             self._next_observations = next_timestep.observation
-            self._next_extras = next_extras
+            if self._use_next_extras:
+                self._next_extras = extras
             self._start_of_episode = False
             self._write()
 
@@ -253,7 +259,7 @@ class ReverbParallelAdder(base.ParallelAdder):
     def signature(
         cls,
         environment_spec: mava_specs.MAEnvironmentSpec,
-        core_state_spec: tf.TypeSpec,
+        extras_spec: tf.TypeSpec,
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
         Signatures are useful for validating data types and shapes, see Reverb's
