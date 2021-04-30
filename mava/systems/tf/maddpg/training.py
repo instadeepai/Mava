@@ -365,6 +365,7 @@ class BaseMADDPGTrainer(mava.Trainer):
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
                 dqda_clipping = 1.0 if self._clipping else None
+
                 policy_loss = losses.dpg(
                     dpg_q_t,
                     dpg_a_t,
@@ -637,6 +638,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         # variables cannot be changed.
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
+        # TODO (dries): Should this not be stacked like in the recurrent case?
         tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
         return dpg_a_t_feed
 
@@ -742,6 +744,7 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         # variables cannot be changed.
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
+        # TODO (dries): Should this not be stacked like in the recurrent case?
         tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
 
         return dpg_a_t_feed
@@ -922,10 +925,14 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             self._num_steps.assign_add(1)
 
     def _combine_dim(self, tensor: tf.Tensor) -> tf.Tensor:
-        if len(tensor.shape) == 3:
+        if len(tensor.shape) == 4:
+            b_size, l_size, o_size, s_size = tensor.shape
+            return tf.reshape(tensor, [b_size * l_size, o_size, s_size]), b_size, l_size
+        elif len(tensor.shape) == 3:
             b_size, l_size, _ = tensor.shape
             return tf.reshape(tensor, [b_size * l_size, -1]), b_size, l_size
         else:
+            assert len(tensor.shape) == 2
             return tf.reshape(tensor, [-1])
 
     def _extract_dim(self, tensor: tf.Tensor, b_size: int, l_size: int) -> tf.Tensor:
@@ -1000,12 +1007,12 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     def _get_dpg_feed(
         self,
         target_actions: Dict[str, np.ndarray],
-        dpg_a_t: np.ndarray,
+        dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
         # Decentralised DPG
-        dpg_a_t_feed = dpg_a_t
-        return dpg_a_t_feed
+        dpg_actions_feed = dpg_actions
+        return dpg_actions_feed
 
     @tf.function
     def _policy_actions(
@@ -1030,7 +1037,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 transposed_obs,
                 agent_core_state,
             )
-
             actions[agent] = tf2_utils.batch_to_sequence(outputs)
         return actions
 
@@ -1113,15 +1119,14 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 )
 
                 # Critic learning.
-
                 # Remove the last sequence step for the normal network
-                obs_comb, _, _ = self._combine_dim(obs_trans_feed[:, :-1, :])
-                act_comb, _, _ = self._combine_dim(action_feed[:, :-1, :])
+                obs_comb, _, _ = self._combine_dim(obs_trans_feed[:, :-1])
+                act_comb, _, _ = self._combine_dim(action_feed[:, :-1])
                 q_values = self._critic_networks[agent_key](obs_comb, act_comb)
 
                 # Remove first sequence step for the target
-                obs_comb, _, _ = self._combine_dim(target_obs_trans_feed[:, 1:, :])
-                act_comb, _, _ = self._combine_dim(target_actions_feed[:, 1:, :])
+                obs_comb, _, _ = self._combine_dim(target_obs_trans_feed[:, 1:])
+                act_comb, _, _ = self._combine_dim(target_actions_feed[:, 1:])
                 target_q_values = self._target_critic_networks[agent_key](
                     obs_comb, act_comb
                 )
@@ -1151,6 +1156,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 outputs, updated_states = snt.static_unroll(
                     self._policy_networks[agent_key], transposed_obs, agent_core_state
                 )
+
                 dpg_actions = tf2_utils.batch_to_sequence(outputs)
 
                 # Get dpg actions
@@ -1167,6 +1173,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 # dpg_q_values = tf.squeeze(dpg_q_values, axis=-1)  # [B]
 
                 dqda_clipping = 1.0 if self._clipping else None
+
                 policy_loss = losses.dpg(
                     dpg_q_values,
                     act_comb,
@@ -1416,6 +1423,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         actions: Dict[str, np.ndarray],
         target_actions: Dict[str, np.ndarray],
         extras: Dict[str, np.ndarray],
+        agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # Centralised based
@@ -1428,17 +1436,20 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
     @tf.function
     def _get_dpg_feed(
         self,
-        a_t: Dict[str, np.ndarray],
-        dpg_a_t: np.ndarray,
+        actions: Dict[str, np.ndarray],
+        dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
-        dpg_a_t_feed = copy.copy(a_t)
-        dpg_a_t_feed[agent] = dpg_a_t
-        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
-        return dpg_a_t_feed
+        dpg_actions_feed = copy.copy(actions)
+        dpg_actions_feed[agent] = dpg_actions
+        dpg_actions_feed = tf.squeeze(
+            tf.stack([x for x in dpg_actions_feed.values()], -1)
+        )
+        tree.map_structure(tf.stop_gradient, dpg_actions_feed)
+        return dpg_actions_feed
 
 
 class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
@@ -1519,6 +1530,7 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         actions: Dict[str, np.ndarray],
         target_actions: Dict[str, np.ndarray],
         extras: Dict[str, np.ndarray],
+        agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # State based
@@ -1531,15 +1543,17 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
     @tf.function
     def _get_dpg_feed(
         self,
-        a_t: Dict[str, np.ndarray],
-        dpg_a_t: np.ndarray,
+        actions: Dict[str, np.ndarray],
+        dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
-        dpg_a_t_feed = copy.copy(a_t)
-        dpg_a_t_feed[agent] = dpg_a_t
-        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
-
-        return dpg_a_t_feed
+        dpg_actions_feed = copy.copy(actions)
+        dpg_actions_feed[agent] = dpg_actions
+        dpg_actions_feed = tf.squeeze(
+            tf.stack([x for x in dpg_actions_feed.values()], -1)
+        )
+        tree.map_structure(tf.stop_gradient, dpg_actions_feed)
+        return dpg_actions_feed
