@@ -27,12 +27,14 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from supersuit import black_death_v1, pad_action_space_v0, pad_observations_v0
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
 from mava.utils.loggers import Logger
 from mava.wrappers import DetailedPerAgentStatistics, PettingZooParallelEnvWrapper
+from mava.wrappers.env_preprocess_wrappers import StandardizeObservationPar
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
@@ -50,7 +52,15 @@ def make_environment(
     """Creates a MPE environment."""
     env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
     env = env_module.parallel_env(**kwargs)  # type: ignore
-    environment = PettingZooParallelEnvWrapper(env)
+    environment = PettingZooParallelEnvWrapper(
+        environment=env,
+        env_preprocess_wrappers=[
+            (black_death_v1, None),
+            (pad_action_space_v0, None),
+            (pad_observations_v0, None),
+            (StandardizeObservationPar, None),
+        ],
+    )
     return environment
 
 
