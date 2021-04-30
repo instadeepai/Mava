@@ -275,8 +275,8 @@ class QMIX(system.System):
         max_replay_size: int = 1_000_000,
         samples_per_insert: float = 32.0,
         prefetch_size: int = 4,
-        batch_size: int = 256,
-        n_step: int = 5,
+        batch_size: int = 32,
+        n_step: int = 1,
         discount: float = 0.99,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -332,7 +332,7 @@ class QMIX(system.System):
         # Augment network architecture by adding mixing layer network.
         networks = MonotonicMixing(
             architecture=architecture,
-            state_shape=(1,),
+            environment_spec=environment_spec,
         ).create_system()
 
         # Retrieve networks

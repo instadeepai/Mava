@@ -72,13 +72,12 @@ def make_environment() -> dm_env.Environment:
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     epsilon: tf.Variable,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
+    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64,),
     shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
 
     specs = environment_spec.get_agent_specs()
-
     # Convert Sequence to Dict of labled Sequences
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
@@ -112,7 +111,7 @@ def make_networks(
         observation_networks[key] = observation_network
         q_networks[key] = q_network
         behavior_networks[key] = behavior_network
-
+    print(q_networks)
     return {
         "q_networks": q_networks,
         "observations": observation_networks,

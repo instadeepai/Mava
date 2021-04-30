@@ -29,6 +29,8 @@
 
 """Mixing for multi-agent RL systems"""
 
+from typing import Dict
+
 import sonnet as snt
 import tensorflow as tf
 
@@ -45,10 +47,11 @@ class MonotonicMixingNetwork(snt.Module):
     def __init__(
         self,
         architecture: BaseArchitecture,
+        agent_networks: Dict[str, snt.Module],
         qmix_hidden_dim: int,
         state_dim: int,
         num_hypernet_layers: int = 2,
-        hypernet_hidden_dim: int = 2,
+        hypernet_hidden_dim: int = 0,
     ) -> None:
         """Initializes the mixer.
         Args:
@@ -62,6 +65,7 @@ class MonotonicMixingNetwork(snt.Module):
         """
         super(MonotonicMixingNetwork, self).__init__()
         self._architecture = architecture
+        self._agent_networks = agent_networks
         self._qmix_hidden_dim = qmix_hidden_dim
         # TODO What is the most efficient way to get these from architecture?
         self._state_dim = state_dim
@@ -72,42 +76,37 @@ class MonotonicMixingNetwork(snt.Module):
 
         # Create hypernetwork
         self._hypernetworks = HyperNetwork(
-            self._state_dim,
-            self._n_agents,
+            self._agent_networks,
+            self._qmix_hidden_dim,
             self._num_hypernet_layers,
             self._hypernet_hidden_dim,
         )
 
+    # TODO (St John) I need to set up states so that it is a global state
+    # This should be of shape [batch_size, 3] for my env. This is assuming
+    # I take global state as a one-hot input. e.g. State 2 => (0,0,1) has
+    # dim=3.
+
     def __call__(
         self,
-        q_values: tf.Tensor,  # Check type
-        states: tf.Tensor,  # Check type
+        q_values: tf.Tensor,  # [batch_size, n_actions*n_agents] = [B,4]
+        states: tf.Tensor,  # [batch_size, one_hot_state_dim = 3]
     ) -> tf.Tensor:
         """Monotonic mixing logic."""
-        states = tf.reshape(states, shape=(-1, self._state_dim))
-        q_values = tf.reshape(q_values, shape=(-1, 1, self._n_agents))
-        episode_num = tf.size(q_values).numpy()  # Get int from 0D tensor length
+
+        # Expand dimensions to [B, 1, n_actions*n_agents] = [B,1,4] for matmul
+        q_values = tf.expand_dims(q_values, axis=1)
 
         self._hyperparams = self._hypernetworks(states)
-        self._hyperparams["w1"] = tf.reshape(
-            self._hyperparams["w1"], shape=(-1, self._n_agents, self._qmix_hidden_dim)
-        )
-        self._hyperparams["b1"] = tf.reshape(
-            self._hyperparams["b1"], shape=(-1, 1, self._qmix_hidden_dim)
-        )
-        self._hyperparams["w2"] = tf.reshape(
-            self._hyperparams["w2"], shape=(-1, self._qmix_hidden_dim, 1)
-        )
-        self._hyperparams["b2"] = tf.reshape(self._hyperparams["b2"], shape=(-1, 1, 1))
 
         # For convenience
-        w1 = self._hyperparams["w1"]
-        b1 = self._hyperparams["b1"]
-        w2 = self._hyperparams["w2"]
-        b2 = self._hyperparams["b2"]
+        w1 = self._hyperparams["w1"]  # [B, 4, qmix_hidden_dim]
+        b1 = self._hyperparams["b1"]  # [B, 1, qmix_hidden_dim]
+        w2 = self._hyperparams["w2"]  # [B, qmix_hidden_dim, 1]
+        b2 = self._hyperparams["b2"]  # [B, 1, 1]
 
-        hidden = tf.nn.elu(tf.matmul(q_values, w1) + b1)  # ELU -> Exp. linear unit
+        # ELU -> Exp. linear unit
+        hidden = tf.nn.elu(tf.matmul(q_values, w1) + b1)  # [B, 1, qmix_hidden_dim]
 
-        q_tot = tf.matmul(hidden, w2) + b2
-        q_tot = tf.reshape(q_tot, shape=(episode_num, -1, 1))
-        return q_tot
+        q_tot = tf.matmul(hidden, w2) + b2  # [B, 1, 1]
+        return q_tot  # [B, 1, 1]
