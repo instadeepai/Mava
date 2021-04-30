@@ -1387,7 +1387,6 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
           logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.
         """
-        NotImplementedError("Not implemented yet.")
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -1412,21 +1411,19 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
     @tf.function
     def _get_critic_feed(
         self,
-        o_tm1_trans: Dict[str, np.ndarray],
-        o_t_trans: Dict[str, np.ndarray],
-        a_tm1: Dict[str, np.ndarray],
-        a_t: Dict[str, np.ndarray],
-        e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
-        agent: str,
+        obs_trans: Dict[str, np.ndarray],
+        target_obs_trans: Dict[str, np.ndarray],
+        actions: Dict[str, np.ndarray],
+        target_actions: Dict[str, np.ndarray],
+        extras: Dict[str, np.ndarray],
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # Centralised based
-        o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
-        o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
-        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        a_t_feed = tf.stack([x for x in a_t.values()], 1)
-        return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
+        obs_trans_feed = tf.stack([x for x in obs_trans.values()], -1)
+        target_obs_trans_feed = tf.stack([x for x in target_obs_trans.values()], -1)
+        action_feed = tf.stack([x for x in actions.values()], -1)
+        target_actions_feed = tf.stack([x for x in target_actions.values()], -1)
+        return obs_trans_feed, target_obs_trans_feed, action_feed, target_actions_feed
 
     @tf.function
     def _get_dpg_feed(
@@ -1493,7 +1490,6 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
           logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.
         """
-        NotImplementedError("Not implemented yet.")
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -1518,20 +1514,19 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
     @tf.function
     def _get_critic_feed(
         self,
-        o_tm1_trans: Dict[str, np.ndarray],
-        o_t_trans: Dict[str, np.ndarray],
-        a_tm1: Dict[str, np.ndarray],
-        a_t: Dict[str, np.ndarray],
-        e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
-        agent: str,
+        obs_trans: Dict[str, np.ndarray],
+        target_obs_trans: Dict[str, np.ndarray],
+        actions: Dict[str, np.ndarray],
+        target_actions: Dict[str, np.ndarray],
+        extras: Dict[str, np.ndarray],
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+
         # State based
-        o_tm1_feed = e_tm1["env_state"]
-        o_t_feed = e_t["env_state"]
-        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        a_t_feed = tf.stack([x for x in a_t.values()], 1)
-        return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
+        obs_trans_feed = extras["env_state"]
+        target_obs_trans_feed = extras["env_state"]
+        action_feed = tf.stack([x for x in actions.values()], -1)
+        target_actions_feed = tf.stack([x for x in target_actions.values()], -1)
+        return obs_trans_feed, target_obs_trans_feed, action_feed, target_actions_feed
 
     @tf.function
     def _get_dpg_feed(
