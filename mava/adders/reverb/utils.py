@@ -24,29 +24,17 @@ def final_step_like(
 ) -> base.Step:
     """Return a list of steps with the final step zero-filled."""
     # Make zero-filled components so we can fill out the last step.
-    if next_extras:
-        zero_action, zero_reward, zero_discount = tree.map_structure(
-            acme_utils.zeros_like, (step.actions, step.rewards, step.discounts)
-        )
-        return base.Step(
-            observations=next_observations,
-            actions=zero_action,
-            rewards=zero_reward,
-            discounts=zero_discount,
-            start_of_episode=False,
-            extras=next_extras,
-        )
-    else:
-        zero_action, zero_reward, zero_discount, zero_extras = tree.map_structure(
-            acme_utils.zeros_like,
-            (step.actions, step.rewards, step.discounts, step.extras),
-        )
-        # Return a final step that only has next_observation.
-        return base.Step(
-            observations=next_observations,
-            actions=zero_action,
-            rewards=zero_reward,
-            discounts=zero_discount,
-            start_of_episode=False,
-            extras=zero_extras,
-        )
+    zero_action, zero_reward, zero_discount = tree.map_structure(
+        acme_utils.zeros_like, (step.actions, step.rewards, step.discounts)
+    )
+
+    return base.Step(
+        observations=next_observations,
+        actions=zero_action,
+        rewards=zero_reward,
+        discounts=zero_discount,
+        start_of_episode=False,
+        extras=next_extras
+        if next_extras
+        else tree.map_structure(acme_utils.zeros_like, step.extras),
+    )

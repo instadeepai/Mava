@@ -116,14 +116,12 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         # Create a final step.
         # TODO (Dries): Should self._next_observation be used
         #  here? Should this function be used for sequential?
-        if self._use_next_extras:
-            final_step = mava_utils.final_step_like(
-                self._buffer[0], self._next_observations, self.next_extras
-            )
-        else:
-            final_step = mava_utils.final_step_like(
-                self._buffer[0], self._next_observations
-            )
+
+        final_step = mava_utils.final_step_like(
+            self._buffer[0],
+            self._next_observations,
+            self.next_extras if self._use_next_extras else None,
+        )
 
         # Append the final step.
         self._buffer.append(final_step)
