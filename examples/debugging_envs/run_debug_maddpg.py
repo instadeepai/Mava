@@ -22,7 +22,6 @@ from typing import Any, Dict, Mapping, Sequence, Union
 import dm_env
 import numpy as np
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
@@ -63,7 +62,11 @@ def make_environment(
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+        256,
+        256,
+        256,
+    ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
     sigma: float = 0.3,
@@ -87,32 +90,24 @@ def make_networks(
 
     observation_networks = {}
     policy_networks = {}
-    behavior_networks = {}
     critic_networks = {}
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
-        # Create the shared observation network
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
+        # Create the shared observation network; here simply a state-less operation.
+        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
         policy_network = snt.Sequential(
             [
+                observation_network,
                 networks.LayerNormMLP(
                     policy_networks_layer_sizes[key], activate_final=True
                 ),
                 networks.NearZeroInitializedLinear(num_dimensions),
                 networks.TanhToSpec(specs[key].actions),
-            ]
-        )
-
-        # Create the behavior policy.
-        behavior_network = snt.Sequential(
-            [
-                observation_network,
-                policy_network,
                 networks.ClippedGaussian(sigma),
                 networks.ClipToSpec(specs[key].actions),
             ]
@@ -132,13 +127,11 @@ def make_networks(
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
-        behavior_networks[key] = behavior_network
 
     return {
         "policies": policy_networks,
         "critics": critic_networks,
         "observations": observation_networks,
-        "behaviors": behavior_networks,
     }
 
 
@@ -178,7 +171,6 @@ def main(_: Any) -> None:
         observation_networks=system_networks[
             "observations"
         ],  # pytype: disable=wrong-arg-types
-        behavior_networks=system_networks["behaviors"],
         logger=system_logger,
         checkpoint=False,
     )
