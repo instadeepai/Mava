@@ -1016,6 +1016,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         actions = {}
 
         for agent in self._agents:
+            time.time()
             agent_key = self.agent_net_keys[agent]
             target_trans_obs = target_obs_trans[agent]
             # TODO (dries): Why is there an extra tuple
@@ -1024,7 +1025,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
             transposed_obs = tf2_utils.batch_to_sequence(target_trans_obs)
 
-            outputs, updated_states = snt.static_unroll(
+            outputs, _ = snt.static_unroll(
                 self._target_policy_networks[agent_key],
                 transposed_obs,
                 agent_core_state,
@@ -1051,8 +1052,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
         # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
-
-        # Is this still needed?
         data = sample.data
 
         # Note (dries): The unused variable is start_of_episodes.
@@ -1068,15 +1067,16 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # batch_size = 256
         # sequence_length = 20
         # action_size = 4
-        # Get initial state for the LSTM, either from replay or simply use zeros.
-        # seq_extras = tf2_utils.batch_to_sequence(extras)
-        seq_extras = extras
-
-        # Extract the first state in the sequence.
-        core_state = tree.map_structure(lambda s: s[:, 0, :], seq_extras["core_states"])
+        # Get initial state for the LSTM from replay and
+        # extract the first state in the sequence..
+        core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
         target_core_state = tree.map_structure(tf.identity, core_state)
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
+
+        # TODO (dries): Take out all the data_points that does not need
+        #  to be processed here at the start. Therefore it does not have
+        #  to be done later on and saves processing time.
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
@@ -1113,29 +1113,28 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 )
 
                 # Critic learning.
-                obs_comb, _, _ = self._combine_dim(obs_trans_feed)
-                act_comb, _, _ = self._combine_dim(action_feed)
+
+                # Remove the last sequence step for the normal network
+                obs_comb, _, _ = self._combine_dim(obs_trans_feed[:, :-1, :])
+                act_comb, _, _ = self._combine_dim(action_feed[:, :-1, :])
                 q_values = self._critic_networks[agent_key](obs_comb, act_comb)
 
-                obs_comb, _, _ = self._combine_dim(target_obs_trans_feed)
-                act_comb, _, _ = self._combine_dim(target_actions_feed)
+                # Remove first sequence step for the target
+                obs_comb, _, _ = self._combine_dim(target_obs_trans_feed[:, 1:, :])
+                act_comb, _, _ = self._combine_dim(target_actions_feed[:, 1:, :])
                 target_q_values = self._target_critic_networks[agent_key](
                     obs_comb, act_comb
                 )
 
                 # Squeeze into the shape expected by the td_learning implementation.
-                # TODO: No! This will not work. Need to move
-                #  in sequence format not flattened.
-                q_values = tf.squeeze(q_values, axis=-1)[:-1]  # [B]
-                target_q_values = tf.squeeze(target_q_values, axis=-1)[1:]  # [B]
+                q_values = tf.squeeze(q_values, axis=-1)  # [B]
+                target_q_values = tf.squeeze(target_q_values, axis=-1)  # [B]
 
                 # Critic loss.
                 # Compute the transformed n-step loss.
-                agent_rewards = self._combine_dim(rewards[agent])
-                agent_discounts = self._combine_dim(discounts[agent])
-
-                agent_rewards = tree.map_structure(lambda x: x[:-1], agent_rewards)
-                agent_discounts = tree.map_structure(lambda x: x[:-1], agent_discounts)
+                agent_rewards = self._combine_dim(rewards[agent][:, :-1])
+                # TODO (dries): Is discounts correct? Or should it be [:, :-1]
+                agent_discounts = self._combine_dim(discounts[agent][:, 1:])
 
                 # Critic loss.
                 critic_loss = trfl.td_learning(
@@ -1154,28 +1153,28 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 )
                 dpg_actions = tf2_utils.batch_to_sequence(outputs)
 
-                print("dpg_actions: ", dpg_actions)
-                exit()
-
                 # Get dpg actions
                 dpg_actions_feed = self._get_dpg_feed(
                     target_actions, dpg_actions, agent
                 )
 
                 # Get dpg Q values.
-                dpg_q_values = self._critic_networks[agent_key](
-                    target_obs_trans_feed, dpg_actions_feed
-                )
+                obs_comb, _, _ = self._combine_dim(target_obs_trans_feed)
+                act_comb, _, _ = self._combine_dim(dpg_actions_feed)
+                dpg_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
+                # dpg_q_values = tf.squeeze(dpg_q_values, axis=-1)  # [B]
+
                 dqda_clipping = 1.0 if self._clipping else None
                 policy_loss = losses.dpg(
                     dpg_q_values,
-                    dpg_actions_feed,
+                    act_comb,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
                     clip_norm=self._clipping,
                 )
+
                 policy_loss = tf.reduce_mean(policy_loss, axis=0)
                 policy_losses[agent] = policy_loss
 
