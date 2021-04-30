@@ -224,10 +224,6 @@ class ReverbParallelAdder(base.ParallelAdder):
             )
         )
 
-        # Possibly store next_extras
-        if self._use_next_extras:
-            self._next_extras = next_extras
-
         # Write the last "dangling" observation.
         if next_timestep.last():
             self._start_of_episode = False
@@ -236,6 +232,9 @@ class ReverbParallelAdder(base.ParallelAdder):
             self.reset()
         else:
             # Record the next observation and write.
+            # Possibly store next_extras
+            if self._use_next_extras:
+                self._next_extras = next_extras
             self._next_observations = next_timestep.observation
             self._start_of_episode = False
             self._write()
