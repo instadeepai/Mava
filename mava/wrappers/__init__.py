@@ -15,7 +15,6 @@
 
 
 from mava.wrappers.debugging_envs import DebuggingEnvWrapper, TwoStepWrapper
-
 from mava.wrappers.environment_loop_statistics import (
     DetailedEpisodeStatistics,
     DetailedPerAgentStatistics,

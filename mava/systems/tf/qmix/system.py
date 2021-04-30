@@ -28,7 +28,7 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import DecentralisedActor
+from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
@@ -108,7 +108,7 @@ class QMIXBuilder(SystemBuilder):
         self._config = config
         self._trainer_fn = trainer_fn
 
-    def make_replay_table(
+    def make_replay_tables(
         self,
         environment_spec: specs.EnvironmentSpec,
     ) -> reverb.Table:
@@ -198,7 +198,6 @@ class QMIXBuilder(SystemBuilder):
         """
         q_networks = networks["q_networks"]
         target_q_networks = networks["target_q_networks"]
-        observation_networks = networks["observation_networks"]
         mixing_network = networks["mixing_network"]
         target_mixing_network = networks["target_mixing_network"]
 
@@ -214,7 +213,6 @@ class QMIXBuilder(SystemBuilder):
             agent_types=agent_types,
             q_networks=q_networks,
             target_q_networks=target_q_networks,
-            observation_networks=observation_networks,
             mixing_network=mixing_network,
             target_mixing_network=target_mixing_network,
             epsilon=self._config.epsilon,
@@ -310,7 +308,7 @@ class QMIX(system.System):
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_table(environment_spec)
+        replay_table = builder.make_replay_tables(environment_spec)
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
@@ -321,11 +319,9 @@ class QMIX(system.System):
         dataset = builder.make_dataset_iterator(replay_client)
 
         # Create system architecture
-        architecture = DecentralisedActor(
+        architecture = DecentralisedValueActor(
             environment_spec=environment_spec,
-            policy_networks=q_networks,
-            observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
+            value_networks=q_networks,
             shared_weights=shared_weights,
         )
 
@@ -350,7 +346,6 @@ class QMIX(system.System):
         trainer_networks = {
             "q_networks": q_networks,
             "target_q_networks": target_q_networks,
-            "observation_networks": observation_networks,
             "mixing_network": mixing_network,
             "target_mixing_network": target_mixing_network,
         }

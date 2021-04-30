@@ -29,7 +29,6 @@ from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-import tree
 from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
@@ -49,7 +48,6 @@ class QMIXTrainer(mava.Trainer):
         agent_types: List[str],
         q_networks: Dict[str, snt.Module],
         target_q_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
         mixing_network: snt.Module,
         target_mixing_network: snt.Module,
         epsilon: tf.Variable,
@@ -71,7 +69,6 @@ class QMIXTrainer(mava.Trainer):
         # Store online and target networks.
         self._q_networks = q_networks
         self._target_q_networks = target_q_networks
-        self._observation_networks = observation_networks
         self._mixing_network = mixing_network
         self._target_mixing_network = target_mixing_network
         self._epsilon = epsilon
@@ -140,28 +137,6 @@ class QMIXTrainer(mava.Trainer):
         self._num_steps.assign_add(1)
 
     @tf.function
-    def _transform_observations(
-        self, state: Dict[str, np.ndarray], next_state: Dict[str, np.ndarray]
-    ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        o_tm1 = {}
-        o_t = {}
-        for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
-            o_tm1[agent] = self._observation_networks[agent_key](
-                state[agent].observation
-            )
-            o_t[agent] = self._observation_networks[agent_key](
-                next_state[agent].observation
-            )
-            # This stop_gradient prevents gradients to propagate into the target
-            # observation network. In addition, since the online policy network is
-            # evaluated at o_t, this also means the policy loss does not influence
-            # the observation network training.
-            o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
-
-        return o_tm1, o_t
-
-    @tf.function
     def _get_feed(
         self,
         o_tm1_trans: Dict[str, np.ndarray],
@@ -206,7 +181,6 @@ class QMIXTrainer(mava.Trainer):
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data that the agents persist in replay.
         o_tm1, a_tm1, _, r_t, d_t, o_t, _ = inputs.data
-        o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
 
         # Rename for convenience
         # rewards = r_t
@@ -215,7 +189,6 @@ class QMIXTrainer(mava.Trainer):
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
             # a_t = self._policy_actions(o_t_trans)
 
             batched_q_values = []
@@ -224,7 +197,7 @@ class QMIXTrainer(mava.Trainer):
                 agent_key = self.agent_net_keys[agent]
 
                 o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
-                    o_tm1_trans, o_t_trans, a_tm1, agent
+                    o_tm1, o_t, a_tm1, agent
                 )
                 # TODO Should these be switched? i.e. Target get next observation
                 q_t = self._target_q_networks[agent](o_t_feed)
@@ -262,12 +235,8 @@ class QMIXTrainer(mava.Trainer):
         # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-
             # Get trainable variables.
-            trainable_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._q_networks[agent_key].trainable_variables
-            )
+            trainable_variables = self._q_networks[agent_key].trainable_variables
 
         trainable_variables += self._mixing_network.trainable_variables
 
