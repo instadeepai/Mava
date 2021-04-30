@@ -212,29 +212,21 @@ class ReverbParallelAdder(base.ParallelAdder):
                     lambda d: np.broadcast_to(next_timestep.discount, np.shape(d)),
                     self._buffer[-1].discount,
                 )
+
+        self._buffer.append(
+            Step(
+                observations=self._next_observations,
+                actions=actions,
+                rewards=next_timestep.reward,
+                discounts=discount,
+                start_of_episode=self._start_of_episode,
+                extras=self._next_extras if self._use_next_extras else next_extras,
+            )
+        )
+
+        # Possibly store next_extras
         if self._use_next_extras:
-            self._buffer.append(
-                Step(
-                    observations=self._next_observations,
-                    actions=actions,
-                    rewards=next_timestep.reward,
-                    discounts=discount,
-                    start_of_episode=self._start_of_episode,
-                    extras=self._next_extras,
-                )
-            )
             self._next_extras = next_extras
-        else:
-            self._buffer.append(
-                Step(
-                    observations=self._next_observations,
-                    actions=actions,
-                    rewards=next_timestep.reward,
-                    discounts=discount,
-                    start_of_episode=self._start_of_episode,
-                    extras=next_extras,
-                )
-            )
 
         # Write the last "dangling" observation.
         if next_timestep.last():
