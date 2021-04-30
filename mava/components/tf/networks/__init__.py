@@ -13,8 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from mava.components.tf.networks.additive import AdditiveMixingNetwork  # type: ignore
 from mava.components.tf.networks.monotonic import MonotonicMixingNetwork  # type: ignore
 from mava.components.tf.networks.transformed import QTranAlt  # type: ignore
 from mava.components.tf.networks.transformed import QTranBase  # type: ignore
 from mava.components.tf.networks.weighted import WeightedMixing  # type: ignore
+from mava.components.tf.networks.epsilon_greedy import epsilon_greedy_action_selector
+

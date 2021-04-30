@@ -12,22 +12,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""MARL system architectural components."""
-
-from mava.components.tf.architectures.base import BaseActorCritic, BaseArchitecture
-from mava.components.tf.architectures.centralised import (
-    CentralisedPolicyActor,
-    CentralisedQValueActorCritic,
-    CentralisedQValueCritic,
-)
-from mava.components.tf.architectures.decentralised import (
-    DecentralisedPolicyActor,
-    DecentralisedQValueActorCritic,
-    DecentralisedValueActor,
-)
-from mava.components.tf.architectures.state_based import (
-    StateBasedPolicyActor,
-    StateBasedQValueActorCritic,
-    StateBasedQValueCritic,
-)
