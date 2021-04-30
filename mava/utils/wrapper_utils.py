@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import dm_env
 import numpy as np
@@ -8,10 +8,6 @@ from dm_env import specs
 from typing_extensions import TypedDict
 
 from mava import types
-from mava.wrappers.pettingzoo import (
-    PettingZooAECEnvWrapper,
-    PettingZooParallelEnvWrapper,
-)
 
 SeqTimestepDict = TypedDict(
     "SeqTimestepDict",
@@ -84,9 +80,9 @@ def convert_seq_timestep_and_actions_to_parallel(
 
 
 def apply_env_wrapper_preprocessers(
-    environment: Union[PettingZooAECEnvWrapper, PettingZooParallelEnvWrapper],
+    environment: Any,
     env_preprocess_wrappers: List,
-) -> Union[PettingZooAECEnvWrapper, PettingZooParallelEnvWrapper]:
+) -> Any:
     if env_preprocess_wrappers and isinstance(env_preprocess_wrappers, List):
         for (env_wrapper, params) in env_preprocess_wrappers:
             if params:

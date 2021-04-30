@@ -42,6 +42,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         self,
         environment: AECEnv,
         env_preprocess_wrappers: Optional[List] = [
+            # (env_preprocessor, dict_with_preprocessor_params)
             (black_death_v1, None),
             (pad_action_space_v0, None),
             (pad_observations_v0, None),
@@ -204,6 +205,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         self,
         environment: ParallelEnv,
         env_preprocess_wrappers: Optional[List] = [
+            # (env_preprocessor, dict_with_preprocessor_params)
             (black_death_v1, None),
             (pad_action_space_v0, None),
             (pad_observations_v0, None),

@@ -20,7 +20,6 @@ import dm_env
 import numpy as np
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
-from supersuit import dtype_v0, normalize_obs_v0
 
 from mava import types
 from tests.conftest import EnvSpec, EnvType, Helpers
@@ -389,51 +388,3 @@ class TestEnvWrapper:
         assert (
             curr_dm_timestep.step_type is dm_env.StepType.LAST
         ), "Failed to update step type."
-
-    @pytest.mark.parametrize(
-        "specific_spec",
-        [
-            EnvSpec("pettingzoo.atari.pong_v1", EnvType.Parallel),
-            EnvSpec("pettingzoo.atari.pong_v1", EnvType.Sequential),
-        ],
-    )
-    def test_preprocess_wrapper_obs_normalize(
-        self,
-        env_spec: EnvSpec,
-        specific_spec: EnvSpec,
-        helpers: Helpers,
-        monkeypatch: MonkeyPatch,
-    ) -> None:
-
-        del env_spec
-        wrapped_env, _ = helpers.get_wrapped_env(
-            specific_spec,
-            env_preprocess_wrappers=[
-                (dtype_v0, {"dtype": np.float32}),
-                (normalize_obs_v0, None),
-            ],
-        )
-        initial_dm_env_timestep = wrapped_env.reset()
-
-        agents = wrapped_env.agents
-
-        helpers.verify_observations_are_normalized(
-            initial_dm_env_timestep.observation, agents, specific_spec
-        )
-
-        # Parallel env_types
-        if specific_spec.env_type == EnvType.Parallel:
-            test_agents_actions = {
-                agent: wrapped_env.action_spaces[agent].sample() for agent in agents
-            }
-            curr_dm_timestep = wrapped_env.step(test_agents_actions)
-
-        # Sequential env_types
-        elif specific_spec.env_type == EnvType.Sequential:
-            for agent in agents:
-                test_agent_actions = wrapped_env.action_spaces[agent].sample()
-                curr_dm_timestep = wrapped_env.step(test_agent_actions)
-
-        helpers.verify_observations_are_normalized(
-            curr_dm_timestep.observation, agents, specific_spec
-        )
