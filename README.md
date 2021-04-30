@@ -106,7 +106,7 @@ Alternatively, examples can be run directly from the command line without first 
    pip install .[tf]
    ```
 
-4. Finally, to install a few example environments (including [pettingzoo],
+4. To install a few example environments (including [pettingzoo],
    [openspiel], and [flatland]):
 
    ```bash
@@ -118,7 +118,18 @@ Alternatively, examples can be run directly from the command line without first 
    pip install .[envs]
    ```
 
-5. **Optional**: To install [CUDA toolkit](https://docs.nvidia.com/cuda/) for NVIDIA GPU support, download [here](https://anaconda.org/anaconda/cudatoolkit). Alternatively, for anaconda users:
+5. **Optional**: To install ROM files for Atari-Py using AutoROM (https://github.com/PettingZoo-Team/AutoROM).
+   ```
+   pip install autorom && AutoROM
+   ```
+   Then follow the on-screen instructions.
+
+   You might also need to download unrar:
+   ```
+   sudo apt-get install unrar
+   ```
+
+6. **Optional**: To install [CUDA toolkit](https://docs.nvidia.com/cuda/) for NVIDIA GPU support, download [here](https://anaconda.org/anaconda/cudatoolkit). Alternatively, for anaconda users:
 
     ```bash
     conda install -c anaconda cudatoolkit

@@ -23,6 +23,8 @@ jobs:
           pip install --upgrade pip setuptools
           pip install .
           pip install .[tf,envs,reverb,testing_formatting]
+          # For atari envs
+          pip install autorom && echo y | AutoROM && sudo apt-get install unrar
       - name: Format code
         run: |
           # Check code follows black formatting.
