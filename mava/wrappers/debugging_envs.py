@@ -20,6 +20,7 @@ import dm_env
 import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
+from gym import spaces
 
 from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv
@@ -128,6 +129,13 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
     def __init__(self, environment: TwoStepEnv) -> None:
         super().__init__(environment=environment)
         self._reset_next_step = True
+        self.action_spaces = {}
+        self.observation_spaces = {}
+        self.agent_ids = self.environment.agent_ids
+
+        for agent_id in self.agent_ids:
+            self.action_spaces[agent_id] = spaces.Discrete(2)  # int64
+            self.observation_spaces[agent_id] = spaces.Box(0, 1, shape=(1,))  # float32
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""

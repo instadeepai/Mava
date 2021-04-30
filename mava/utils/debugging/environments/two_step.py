@@ -17,7 +17,6 @@ from typing import Any, Dict, Tuple, Union
 
 import gym
 import numpy as np
-from gym import spaces
 
 """
 A simple two-step cooperative matrix game for two agents. Adapted from
@@ -40,20 +39,28 @@ timestep 2.
 class TwoStepEnv(gym.Env):
     def __init__(self) -> None:
         self.num_agents = 2
-        self.state = 0
-        self.env_done = False
-
-        self.action_spaces = {}
-        self.observation_spaces = {}
+        self.reset()
         self.agent_ids = []
 
         for a_i in range(self.num_agents):
             agent_id = "agent_" + str(a_i)
             self.agent_ids.append(agent_id)
-            self.action_spaces[agent_id] = spaces.Discrete(2)  # int64
-            self.observation_spaces[agent_id] = spaces.Box(0, 1, shape=(1,))  # float32
 
         self.possible_agents = self.agent_ids
+
+    def reset(self) -> Dict[str, np.array]:
+        self.state = 0
+        self.reward_n = {
+            "agent_0": np.array(0.0, dtype=np.float32),
+            "agent_1": np.array(0.0, dtype=np.float32),
+        }
+        self.env_done = False
+        self.done_n = {"agent_0": False, "agent_1": False}
+        self.obs_n = {
+            "agent_0": np.array([0.0], dtype=np.float32),
+            "agent_1": np.array([0.0], dtype=np.float32),
+        }
+        return self.obs_n
 
     def step(
         self, action_n: Dict[str, int]
@@ -64,12 +71,6 @@ class TwoStepEnv(gym.Env):
         Dict[str, dict],
     ]:
         if self.state == 0:
-            self.env_done = False
-            self.reward_n = {
-                "agent_0": np.array(0.0, dtype=np.float32),
-                "agent_1": np.array(0.0, dtype=np.float32),
-            }
-            self.done_n = {"agent_0": False, "agent_1": False}
             if action_n["agent_0"] == 0:
                 self.state = 1
                 self.obs_n = {
@@ -123,13 +124,3 @@ class TwoStepEnv(gym.Env):
 
         else:
             raise Exception("invalid state:{}".format(self.state))
-
-    def reset(self) -> Dict[str, np.array]:
-        self.state = 0
-        self.reward_n = {}
-        self.done_n = {}
-        self.obs_n = {
-            "agent_0": np.array([0.0], dtype=np.float32),
-            "agent_1": np.array([0.0], dtype=np.float32),
-        }
-        return self.obs_n
