@@ -170,7 +170,7 @@ class TestEnvPreprocessWrapper:
                     )
 
     # Test custom reward shaping function
-    def test_preprocess_wrapper_reward_custom_function(
+    def test_preprocess_wrapper_reward_1_custom_function(
         self,
         env_spec: EnvSpec,
         helpers: Helpers,

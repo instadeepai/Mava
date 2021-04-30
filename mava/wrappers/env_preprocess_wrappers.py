@@ -114,13 +114,12 @@ class StandardizeObservation:
         )
         state_std = state_std * alpha + observation.std() * (1 - alpha)  # type:ignore
 
-        steps = num_steps
         # If steps is zero, this would result in div by zero error.
-        if steps == 0:
-            steps = 1
+        if num_steps == 0:
+            num_steps = 1
 
-        unbiased_mean = state_mean / (1 - pow(alpha, steps))
-        unbiased_std = state_std / (1 - pow(alpha, steps))
+        unbiased_mean = state_mean / (1 - pow(alpha, num_steps))
+        unbiased_std = state_std / (1 - pow(alpha, num_steps))
 
         self._internal_state[agent]["state_mean"] = state_mean
         self._internal_state[agent]["state_std"] = state_std
