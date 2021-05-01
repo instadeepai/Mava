@@ -925,6 +925,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             self._num_steps.assign_add(1)
 
     def _combine_dim(self, tensor: tf.Tensor) -> tf.Tensor:
+        # TODO (dries): Use the following instead:
+        #  dims = tensor.shape[:2]
+        #  snt.merge_leading_dims(tensor, num_dims=2)
         if len(tensor.shape) == 4:
             b_size, l_size, o_size, s_size = tensor.shape
             return tf.reshape(tensor, [b_size * l_size, o_size, s_size]), b_size, l_size
@@ -1134,8 +1137,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
                 # Critic loss.
                 # Compute the transformed n-step loss.
-                agent_rewards = self._combine_dim(rewards[agent][:, :-1])
-                # TODO (dries): Is discounts correct? Or should it be [:, :-1]
+                # TODO (dries): Is discounts and rewards correct?
+                #  Or should it be [:, :-1]?
+                agent_rewards = self._combine_dim(rewards[agent][:, 1:])
                 agent_discounts = self._combine_dim(discounts[agent][:, 1:])
 
                 # Critic loss.
@@ -1148,6 +1152,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
                 # Actor learning.
                 obs_agent_feed = target_obs_trans[agent]
+                # TODO (dries): Why is there an extra tuple?
                 agent_core_state = core_state[agent][0]
                 transposed_obs = tf2_utils.batch_to_sequence(obs_agent_feed)
                 outputs, updated_states = snt.static_unroll(
