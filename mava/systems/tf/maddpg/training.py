@@ -1070,9 +1070,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             data.extras,
         )
 
-        # batch_size = 256
-        # sequence_length = 20
-        # action_size = 4
         # Get initial state for the LSTM from replay and
         # extract the first state in the sequence..
         core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])

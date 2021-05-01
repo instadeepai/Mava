@@ -129,7 +129,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         final_step = mava_utils.final_step_like(
             self._buffer[0],
             self._next_observations,
-            self.next_extras if self._use_next_extras else None,
+            self._next_extras if self._use_next_extras else None,
         )
 
         # Append the final step.

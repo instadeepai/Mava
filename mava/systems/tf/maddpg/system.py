@@ -123,7 +123,7 @@ class MADDPGBuilder(SystemBuilder):
 
         # Select adder
         if self._executor_fn == executors.FeedForwardExecutor:
-            adder = reverb_adders.ParallelNStepTransitionAdder.signature(
+            adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec
             )
         elif self._executor_fn == executors.RecurrentExecutor:
@@ -135,8 +135,8 @@ class MADDPGBuilder(SystemBuilder):
                         self._config.policy_networks[agent_type].initial_state(1)
                     ),
                 )
-            adder = reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec, core_state_spec
+            adder_sig = reverb_adders.ParallelSequenceAdder.signature(
+                environment_spec, {"core_states": core_state_spec}
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
@@ -148,7 +148,7 @@ class MADDPGBuilder(SystemBuilder):
                 remover=reverb.selectors.Fifo(),
                 max_size=self._config.max_replay_size,
                 rate_limiter=reverb.rate_limiters.MinSize(1),
-                signature=adder,
+                signature=adder_sig,
             )
         ]
 
