@@ -260,8 +260,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
 
         # Log whole network grads
         all_grads_flat = tf.concat([tf.reshape(grad, -1) for grad in gradients], axis=0)
-        grads_dict[f"{label}grad/wholenetwork"] = all_grads_flat
-        grads_dict[f"{label}gradnorm/wholenetwork"] = self._apply_norms(
+        grads_dict[f"{label}/grad/wholenetwork"] = all_grads_flat
+        grads_dict[f"{label}/gradnorm/wholenetwork"] = self._apply_norms(
             all_grads_flat, self.gradient_norms
         )
 
