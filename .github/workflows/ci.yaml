@@ -26,6 +26,9 @@ jobs:
           pip install .[tf,envs,reverb,testing_formatting]
           # For atari envs
           pip install autorom && echo y | AutoROM && sudo apt-get install unrar
+          # Open CV
+          RUN apt-get update
+          RUN apt-get install ffmpeg libsm6 libxext6  -y
       - name: Format code
         run: |
           # Check code follows black formatting.
