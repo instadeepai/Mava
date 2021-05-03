@@ -131,10 +131,10 @@ Alternatively, examples can be run directly from the command line without first 
 
 
 6. **Optional**: To install opencv for [Supersuit](https://github.com/PettingZoo-Team/SuperSuit) environment wrappers.
-```
-RUN apt-get update
-RUN apt-get install ffmpeg libsm6 libxext6  -y
-```
+    ```
+    sudo apt-get update
+    sudo apt-get install ffmpeg libsm6 libxext6  -y
+    ```
 
 7. **Optional**: To install [CUDA toolkit](https://docs.nvidia.com/cuda/) for NVIDIA GPU support, download [here](https://anaconda.org/anaconda/cudatoolkit). Alternatively, for anaconda users:
 
