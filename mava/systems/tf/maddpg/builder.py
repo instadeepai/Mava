@@ -28,7 +28,7 @@ from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
-from mava.wrappers import DetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
 
 
 @dataclasses.dataclass
@@ -314,8 +314,8 @@ class MADDPGBuilder(SystemBuilder):
         # NetworkStatistics needs to appear before TrainerStatistics.
         # trainer = NetworkStatisticsActorCritic(trainer)
 
-        trainer = DetailedTrainerStatistics(  # type: ignore
-            trainer, metrics=["policy_loss", "critic_loss"]
-        )
+        # trainer = DetailedTrainerStatistics(  # type: ignore
+        #     trainer, metrics=["policy_loss", "critic_loss"]
+        # )
 
         return trainer
