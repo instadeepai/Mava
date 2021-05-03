@@ -88,6 +88,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         chunk_length: Optional[int] = None,
         priority_fns: Optional[PriorityFnMapping] = None,
         max_in_flight_items: Optional[int] = 25,
+        use_next_extras: bool = True,
     ):
         """Initialize a ReverbAdder instance.
         Args:
@@ -116,6 +117,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         self._delta_encoded = delta_encoded
         self._chunk_length = chunk_length
         self._max_in_flight_items = max_in_flight_items
+        self._use_next_extras = use_next_extras
 
         # This is exposed as the _writer property in such a way that it will create
         # a new writer automatically whenever the internal __writer is None. Users
@@ -164,9 +166,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         self._next_observations = None
 
     def add_first(
-        self,
-        timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {},
+        self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
     ) -> None:
         """Record the first observation of a trajectory."""
         if not timestep.first():
@@ -184,8 +184,10 @@ class ReverbParallelAdder(base.ParallelAdder):
 
         # Record the next observation.
         self._next_observations = timestep.observation
-        self._next_extras = extras
         self._start_of_episode = True
+
+        if self._use_next_extras:
+            self._next_extras = extras
 
     def add(
         self,
@@ -211,7 +213,6 @@ class ReverbParallelAdder(base.ParallelAdder):
                     self._buffer[-1].discount,
                 )
 
-        # Add the timestep to the buffer.
         self._buffer.append(
             Step(
                 observations=self._next_observations,
@@ -219,7 +220,7 @@ class ReverbParallelAdder(base.ParallelAdder):
                 rewards=next_timestep.reward,
                 discounts=discount,
                 start_of_episode=self._start_of_episode,
-                extras=self._next_extras,
+                extras=self._next_extras if self._use_next_extras else next_extras,
             )
         )
 
@@ -231,8 +232,10 @@ class ReverbParallelAdder(base.ParallelAdder):
             self.reset()
         else:
             # Record the next observation and write.
+            # Possibly store next_extras
+            if self._use_next_extras:
+                self._next_extras = next_extras
             self._next_observations = next_timestep.observation
-            self._next_extras = next_extras
             self._start_of_episode = False
             self._write()
 
@@ -240,7 +243,7 @@ class ReverbParallelAdder(base.ParallelAdder):
     def signature(
         cls,
         environment_spec: mava_specs.MAEnvironmentSpec,
-        core_state_spec: tf.TypeSpec,
+        extras_spec: tf.TypeSpec,
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
         Signatures are useful for validating data types and shapes, see Reverb's
