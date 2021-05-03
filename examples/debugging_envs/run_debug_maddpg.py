@@ -155,20 +155,7 @@ def main(_: Any) -> None:
         log_info=log_info,
     ).build()
 
-    (trainer_node,) = program.groups["trainer"]
-
-    trainer_node.disable_run()
-
-    lp.launch(program, launch_type="test_mt")
-
-    trainer = trainer_node.create_handle().dereference()
-
-    for _ in range(5):
-        trainer.step()
-
-    # print(dir(trainer.step()))
-
-    # lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
 
 
 if __name__ == "__main__":
