@@ -38,11 +38,11 @@ from mava.utils.debugging.environments import switch_game
 from mava.wrappers.debugging_envs import SwitchGameWrapper
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 200, "Number of training episodes to run for.")
+flags.DEFINE_integer("num_episodes", 3000, "Number of training episodes to run for.")
 
 flags.DEFINE_integer(
     "num_episodes_per_eval",
-    50,
+    200,
     "Number of training episodes to run between evaluation " "episodes.",
 )
 

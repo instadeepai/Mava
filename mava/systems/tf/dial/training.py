@@ -171,6 +171,37 @@ class DIALTrainer(mava.Trainer):
                     dest.assign(src)
             self._num_steps.assign_add(1)
 
+    @tf.function
+    def _policy_actions_messages(
+        self,
+        target_obs_trans: Dict[str, np.ndarray],
+        target_core_state: Dict[str, np.ndarray],
+        target_core_message: Dict[str, np.ndarray],
+    ) -> Any:
+        actions = {}
+        messages = {}
+
+        for agent in self._agents:
+            time.time()
+            agent_key = self.agent_net_keys[agent]
+            target_trans_obs = target_obs_trans[agent]
+            # TODO (dries): Why is there an extra tuple
+            #  wrapping that needs to be removed?
+            agent_core_state = target_core_state[agent][0]
+            agent_core_message = target_core_message[agent][0]
+
+            transposed_obs = tf2_utils.batch_to_sequence(target_trans_obs)
+
+            (output_actions, output_messages), _ = snt.static_unroll(
+                self._target_policy_networks[agent_key],
+                transposed_obs,
+                agent_core_state,
+                agent_core_message,
+            )
+            actions[agent] = tf2_utils.batch_to_sequence(output_actions)
+            messages[agent] = tf2_utils.batch_to_sequence(output_messages)
+        return actions, messages
+
     def _step(self) -> Dict[str, Dict[str, Any]]:
         # TODO Kevin: Implement DIAL trainer algorithm
 
@@ -199,6 +230,8 @@ class DIALTrainer(mava.Trainer):
         # for t=T to 1, -1 do
 
         bs = actions["agent_0"].shape[1]
+        T = actions["agent_0"].shape[0]
+
         logged_losses: Dict[str, Dict[str, Any]] = {}
         agent_type = self._agent_types[0]
 
@@ -208,45 +241,56 @@ class DIALTrainer(mava.Trainer):
             # for each batch
             for b in range(bs):
                 total_loss[b] = tf.zeros(1)
-                for agent_id in observations.keys():
-                    # All at timestep t
-                    agent_input = observations[agent_id].observation[
-                        :, b
-                    ]  # (sequence,batch,1)
-                    message = core_states[agent_id]["message"][
-                        :, b
-                    ]  # (sequence,batch,)
-                    state = core_states[agent_id]["state"][:, b]  # (sequence,batch,128)
-                    action = actions[agent_id][:, b]  # (sequence,batch,1)
-                    reward = rewards[agent_id][:, b]  # (sequence,batch,1)
-                    discount = discounts[agent_id][0, b]  # (sequence,batch,1)
-                    terminal = done[0, b]
+                for t in range(T - 1, 0, -1):  # Should it be (T,1,-1)?
+                    for agent_id in observations.keys():
+                        # All at timestep t
+                        agent_input = observations[agent_id].observation[:, b]
+                        # (sequence,batch,1)
+                        message = core_states[agent_id]["message"][:, b]
+                        # (sequence,batch,)
+                        state = core_states[agent_id]["state"][:, b]
+                        # (sequence,batch,128)
+                        action = actions[agent_id][:, b]
+                        # (sequence,batch,1)
+                        reward = rewards[agent_id][:, b]
+                        # (sequence,batch,1)
+                        # discount = discounts[agent_id][t, b]
+                        discount = tf.cast(
+                            self._discount, dtype=discounts[agent_id][t, b].dtype
+                        )
+                        # (sequence,batch,1)
+                        terminal = done[t, b]
 
-                    y_action = reward[0]
-                    y_message = reward[0]
-                    if not terminal:
-                        batched_observation = tf2_utils.add_batch_dim(agent_input[0])
-                        batched_state = tf2_utils.add_batch_dim(state[0])
-                        batched_message = tf2_utils.add_batch_dim(message[0])
+                        # print(discount)
+                        y_action = reward[t]
+                        y_message = reward[t]
+                        if not terminal:
+                            batched_observation = tf2_utils.add_batch_dim(
+                                agent_input[t]
+                            )
+                            batched_state = tf2_utils.add_batch_dim(state[t])
+                            batched_message = tf2_utils.add_batch_dim(message[t])
 
-                        (q_t, m_t), s = self._target_policy_networks[agent_type](
+                            (q_t, m_t), s = self._target_policy_networks[agent_type](
+                                batched_observation, batched_state, batched_message
+                            )
+                            y_action += discount * q_t[0][action[t]]
+                            y_message += discount * m_t[tf.argmax(m_t)[0]]
+
+                        batched_observation = tf2_utils.add_batch_dim(
+                            agent_input[t - 1]
+                        )
+                        batched_state = tf2_utils.add_batch_dim(state[t - 1])
+                        batched_message = tf2_utils.add_batch_dim(message[t - 1])
+
+                        (q_t1, m_t1), s = self._policy_networks[agent_type](
                             batched_observation, batched_state, batched_message
                         )
-                        y_action += discount * q_t[0][action[0]]
-                        y_message += discount * m_t[tf.argmax(m_t)[0]]
 
-                    batched_observation = tf2_utils.add_batch_dim(agent_input[1])
-                    batched_state = tf2_utils.add_batch_dim(state[1])
-                    batched_message = tf2_utils.add_batch_dim(message[1])
+                        td_action = y_action - q_t1[0][action[t - 1]]
+                        td_comm = y_message - m_t1[tf.argmax(m_t1)[0]]
 
-                    (q_t1, m_t1), s = self._policy_networks[agent_type](
-                        batched_observation, batched_state, batched_message
-                    )
-
-                    td_action = y_action - q_t1[0][action[1]]
-                    td_comm = y_message - m_t1[tf.argmax(m_t1)[0]]
-
-                    total_loss[b] += td_action ** 2 + td_comm ** 2
+                        total_loss[b] += td_action ** 2 + td_comm ** 2
 
         for b in range(bs):
             policy_variables = self._policy_networks[agent_type].trainable_variables

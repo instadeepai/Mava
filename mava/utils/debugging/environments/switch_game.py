@@ -48,7 +48,10 @@ class MultiAgentSwitchGame(gym.Env):
             agent_id = "agent_" + str(a_i)
             self.agent_ids.append(agent_id)
             self.action_spaces[agent_id] = spaces.Discrete(2)
-            self.observation_spaces[agent_id] = spaces.Discrete(2)
+            # self.observation_spaces[agent_id] = spaces.Discrete(2)
+            self.observation_spaces[agent_id] = spaces.Box(
+                low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32
+            )
 
         self.possible_agents = self.agent_ids
         # environment parameters
@@ -120,7 +123,9 @@ class MultiAgentSwitchGame(gym.Env):
         #     if a_i == self.selected_agent
         #     else np.array([0.0], dtype=np.float32)
         # )
-        return 1 if a_i == self.selected_agent else 0
+        # return 1 if a_i == self.selected_agent else 0
+        selected = 1.0 if a_i == self.selected_agent else 0.0
+        return np.array([selected, self.time], dtype=np.float32)
 
     # get dones for a particular agent
     # unused right now -- agents are allowed to go beyond the viewing screen
