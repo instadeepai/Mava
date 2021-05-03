@@ -1102,7 +1102,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 # Cast the additional discount to match
                 # the environment discount dtype.
                 discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
-
                 # Get critic feed
                 (
                     obs_trans_feed,
@@ -1138,11 +1137,19 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 # Critic loss.
                 # Compute the transformed n-step loss.
                 # TODO (dries): Is discounts and rewards correct?
-                #  Or should it be [:, :-1]?
-                agent_rewards = self._combine_dim(rewards[agent][:, 1:])
-                agent_discounts = self._combine_dim(discounts[agent][:, 1:])
+                #  Or should it be [:, 1:]?
+
+                # print("agent_rewards: ", rewards[agent][0, 1:])
+                # print("agent_discounts: ", discounts[agent][0, 1:])
+
+                agent_rewards = self._combine_dim(rewards[agent][:, :-1])
+                agent_discounts = self._combine_dim(discounts[agent][:, :-1])
+
+                # print("Discounts all 1: ", np.all(agent_discounts == 1.0))
+                # print("Rewards all 0: ", np.all(agent_rewards == 0.0))
 
                 # Critic loss.
+                # TODO (dries): Change the critic losses to n step return losses?
                 critic_loss = trfl.td_learning(
                     q_values,
                     agent_rewards,
