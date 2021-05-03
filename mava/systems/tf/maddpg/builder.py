@@ -310,6 +310,12 @@ class MADDPGBuilder(SystemBuilder):
             checkpoint=checkpoint,
         )
 
-        trainer = DetailedTrainerStatistics(trainer)  # type: ignore
+        # NB If using both NetworkStatistics and TrainerStatistics, order is important.
+        # NetworkStatistics needs to appear before TrainerStatistics.
+        # trainer = NetworkStatisticsActorCritic(trainer)
+
+        trainer = DetailedTrainerStatistics(  # type: ignore
+            trainer, metrics=["policy_loss", "critic_loss"]
+        )
 
         return trainer
