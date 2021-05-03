@@ -64,13 +64,17 @@ class MonotonicMixing(BaseMixingModule):
         specs = self._environment_spec.get_agent_specs()
 
         # TODO What is the best way to get the input shapes for create variables?
+        # Get this from agent networks directly?
+
         observation_specs = list(specs.values())[0].observations.observation
         action_specs = list(specs.values())[0].actions
-
+        print(observation_specs)
+        print(action_specs)
+        self._num_agents = len(self._agent_networks)
         self._state_dim = int(np.prod(observation_specs.shape))
         self._action_dim = int(np.prod(action_specs.shape))
         print(self._action_dim)
-
+        print(self._state_dim)
         state_spec = tf.TensorSpec(self._state_dim)
         q_value_spec = tf.TensorSpec(self._state_dim * self._action_dim)
 
@@ -83,13 +87,15 @@ class MonotonicMixing(BaseMixingModule):
             self._num_hypernet_layers,
             self._hypernet_hidden_dim,
         )
-
+        print("Create Variables Monotonic Q:", q_value_spec)
+        print("Create Variables Monotonic S:", state_spec)
         tf2_utils.create_variables(self._mixed_network, [q_value_spec, state_spec])
         return self._mixed_network
 
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         # Implement method from base class
         networks = self._architecture.create_actor_variables()
-        self._agent_networks = networks["policies"]
+        self._agent_networks = networks["values"]
         networks["mixing"] = self._create_mixing_layer()
+        networks["target_mixing"] = self._create_mixing_layer()  # or deep copy?
         return networks

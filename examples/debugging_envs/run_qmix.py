@@ -132,8 +132,8 @@ def main(_: Any) -> None:
     system = qmix.QMIX(
         environment_spec=environment_spec,
         q_networks=system_networks["q_networks"],
-        observation_networks=system_networks["observations"],
-        behavior_networks=system_networks["behaviors"],
+        # observation_networks=system_networks["observations"],
+        # behavior_networks=system_networks["behaviors"],
         epsilon=epsilon,
     )
 

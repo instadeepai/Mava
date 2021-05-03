@@ -65,8 +65,6 @@ class QMIXConfig:
 
     environment_spec: specs.MAEnvironmentSpec
     q_networks: Dict[str, snt.Module]
-    behavior_networks: Dict[str, snt.Module]
-    observation_networks: Dict[str, snt.Module]
     epsilon: tf.Variable
     shared_weights: bool
     target_update_period: int
@@ -262,8 +260,6 @@ class QMIX(system.System):
         self,
         environment_spec: specs.MAEnvironmentSpec,
         q_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
         epsilon: tf.Variable,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         shared_weights: bool = False,
@@ -286,8 +282,6 @@ class QMIX(system.System):
             QMIXConfig(
                 environment_spec=environment_spec,
                 q_networks=q_networks,
-                behavior_networks=behavior_networks,
-                observation_networks=observation_networks,
                 shared_weights=shared_weights,
                 discount=discount,
                 epsilon=epsilon,
@@ -332,16 +326,15 @@ class QMIX(system.System):
         ).create_system()
 
         # Retrieve networks
-        behavior_networks = networks["behaviors"]
-        q_networks = networks["policies"]
-        target_q_networks = networks["target_policies"]
-        observation_networks = networks["observations"]
-        mixing_network = networks["mixing"]
+        q_networks = networks["values"]
+        target_q_networks = networks["target_values"]
+
         # TODO Should I move definition of target mixing into mixer?
+        mixing_network = networks["mixing"]
         target_mixing_network = copy.deepcopy(mixing_network)
 
         # Create the actor which defines how we take actions.
-        executor = builder.make_executor(behavior_networks, adder)
+        executor = builder.make_executor(q_networks, adder)
 
         trainer_networks = {
             "q_networks": q_networks,

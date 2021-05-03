@@ -49,8 +49,9 @@ class HyperNetwork(snt.Module):
 
         # Calculate other necessary variables
         self._n_agents = len(agent_networks)
-        self._n_actions = list(agent_networks.values())[0]._layers._layer_sizes[-1]
-        print(self._agent_output_dim)
+        # TODO Generalise this
+        # self._n_actions = list(agent_networks.values())[0]._layers._layer_sizes[-1]
+        self._n_actions = 2
 
         # Set up hypernetwork configuration
         if self._num_hypernet_layers == 1:
@@ -76,6 +77,8 @@ class HyperNetwork(snt.Module):
     def __call__(
         self, states: Tensor  # [batch_size=B, self._state_dim=3]
     ) -> Dict[str, float]:
+        print(states)
+        print("Hypernet Call:", states.shape)
         w1 = tf.abs(
             self.hyper_w1(states)
         )  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
