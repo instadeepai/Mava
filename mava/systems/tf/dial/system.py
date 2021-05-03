@@ -78,7 +78,7 @@ class DIALConfig:
     environment_spec: specs.MAEnvironmentSpec
     networks: Dict[str, snt.Module]
     shared_weights: bool = True
-    batch_size: int = 4
+    batch_size: int = 1
     prefetch_size: int = 4
     target_update_period: int = 100
     samples_per_insert: float = 32.0
@@ -99,7 +99,7 @@ class DIALConfig:
     counter: counting.Counter = None
     clipping: bool = False
     communication_module: BaseCommunicationModule = BroadcastedCommunication
-    sequence_length: int = 2
+    sequence_length: int = 10
     period: int = 1
 
 
@@ -153,21 +153,12 @@ class DIALBuilder(SystemBuilder):
                         self._config.networks[agent_type].initial_message(1)
                     ),
                 }
-            adder = reverb_adders.ParallelSequenceAdder.signature(
+            adder = reverb_adders.ParallelEpisodeAdder.signature(
                 environment_spec, core_state_spec
             )
         else:
             print(self._executor_fn)
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
-
-        # return reverb.Table(
-        #     name=self._config.replay_table_name,
-        #     sampler=reverb.selectors.Uniform(),
-        #     remover=reverb.selectors.Fifo(),
-        #     max_size=self._config.max_replay_size,
-        #     rate_limiter=reverb.rate_limiters.MinSize(1),
-        #     signature=adder,
-        # )
 
         return reverb.Table.queue(
             name=self._config.replay_table_name,
@@ -175,34 +166,16 @@ class DIALBuilder(SystemBuilder):
             signature=adder,
         )
 
-    # def make_dataset_iterator(
-    #     self,
-    #     replay_client: reverb.Client,
-    # ) -> Iterator[reverb.ReplaySample]:
-    #     """Create a dataset iterator to use for learning/updating the system."""
-    #     dataset = datasets.make_reverb_dataset(
-    #         table=self._config.replay_table_name,
-    #         server_address=replay_client.server_address,
-    #         batch_size=self._config.batch_size,
-    #         prefetch_size=self._config.prefetch_size,
-    #     )
-    #     return iter(dataset)
-
     def make_dataset_iterator(
         self,
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for learning/updating the system."""
-        # dataset = datasets.make_reverb_dataset(
-        #     server_address=replay_client.server_address,
-        #     batch_size=self._config.batch_size,
-        #     sequence_length=self._config.sequence_length,
-        # )
         dataset = reverb.ReplayDataset.from_table_signature(
             server_address=replay_client.server_address,
             table=self._config.replay_table_name,
             max_in_flight_samples_per_worker=1,
-            sequence_length=self._config.sequence_length,
+            # sequence_length=self._config.sequence_length,
             emit_timesteps=False,
         )
         dataset = dataset.batch(self._config.batch_size, drop_remainder=True)
@@ -226,11 +199,11 @@ class DIALBuilder(SystemBuilder):
                 discount=self._config.discount,
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
-            adder = reverb_adders.ParallelSequenceAdder(
+            adder = reverb_adders.ParallelEpisodeAdder(
                 priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
                 client=replay_client,
-                sequence_length=self._config.sequence_length,
-                period=self._config.period,
+                max_sequence_length=self._config.sequence_length,
+                # period=self._config.period,
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
@@ -356,7 +329,7 @@ class DIAL(system.System):
         observation_networks: Dict[str, snt.Module],
         executor_fn: Type[core.Executor] = DIALExecutor,
         shared_weights: bool = True,
-        batch_size: int = 16,
+        batch_size: int = 1,
         prefetch_size: int = 4,
         target_update_period: int = 100,
         samples_per_insert: float = 32.0,
@@ -498,18 +471,3 @@ class DIAL(system.System):
             learner_step = True
         if learner_step:
             self._executor.update()
-
-    # def update(self) -> None:
-    #     num_steps = _calculate_num_learner_steps(
-    #         num_observations=self._num_observations,
-    #         min_observations=self._min_observations,
-    #         observations_per_step=self._observations_per_step,
-    #     )
-    #     for _ in range(num_steps):
-    #         if not self._can_sample():
-    #             break
-    #         # Run learner steps (usually means gradient steps).
-    #         self._trainer.step()
-    #     if num_steps > 0:
-    #         # Update the actor weights when learner updates.
-    #         self._executor.update()

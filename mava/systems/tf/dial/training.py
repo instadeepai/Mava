@@ -178,8 +178,6 @@ class DIALTrainer(mava.Trainer):
         self._update_target_networks()
 
         inputs = next(self._iterator)
-        # print(inputs)
-        # raise AssertionError
 
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
