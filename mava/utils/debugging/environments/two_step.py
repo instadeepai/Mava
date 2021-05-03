@@ -68,7 +68,7 @@ class TwoStepEnv(gym.Env):
         Dict[str, Union[np.array, Any]],
         Union[dict, Dict[str, Union[float, Any]]],
         Dict[str, Any],
-        Dict[str, dict],
+        Dict[str, Any],
     ]:
         if self.state == 0:
             if action_n["agent_0"] == 0:
@@ -77,14 +77,24 @@ class TwoStepEnv(gym.Env):
                     "agent_0": np.array([1.0], dtype=np.float32),
                     "agent_1": np.array([1.0], dtype=np.float32),
                 }
-                return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2A
+                return (
+                    self.obs_n,
+                    self.reward_n,
+                    self.done_n,
+                    {"s_t": self.state},
+                )  # Go to 2A
             else:
                 self.state = 2
                 self.obs_n = {
                     "agent_0": np.array([2.0], dtype=np.float32),
                     "agent_1": np.array([2.0], dtype=np.float32),
                 }
-                return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2B
+                return (
+                    self.obs_n,
+                    self.reward_n,
+                    self.done_n,
+                    {"s_t": self.state},
+                )  # Go to 2B
 
         elif self.state == 1:  # State 2A
             self.env_done = True
@@ -94,7 +104,7 @@ class TwoStepEnv(gym.Env):
                 "agent_1": np.array(7.0, dtype=np.float32),
             }
             self.done_n = {"agent_0": True, "agent_1": True}
-            return self.obs_n, self.reward_n, self.done_n, {}
+            return self.obs_n, self.reward_n, self.done_n, {"s_t": self.state}
 
         elif self.state == 2:  # State 2B
             self.env_done = True
@@ -120,7 +130,7 @@ class TwoStepEnv(gym.Env):
                     "agent_0": np.array(8.0, dtype=np.float32),
                     "agent_1": np.array(8.0, dtype=np.float32),
                 }
-            return self.obs_n, self.reward_n, self.done_n, {}
+            return self.obs_n, self.reward_n, self.done_n, {"s_t": self.state}
 
         else:
             raise Exception("invalid state:{}".format(self.state))

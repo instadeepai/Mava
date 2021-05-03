@@ -61,35 +61,32 @@ class MonotonicMixing(BaseMixingModule):
 
     def _create_mixing_layer(self) -> snt.Module:
         """Modify and return system architecture given mixing structure."""
-        specs = self._environment_spec.get_agent_specs()
+        agent_specs = self._environment_spec.get_agent_specs()  # noqa F841
+        state_specs = self._environment_spec.get_extra_specs()
+        state_specs = np.array(state_specs["s_t"])
 
-        # TODO What is the best way to get the input shapes for create variables?
-        # Get this from agent networks directly?
+        # TODO I want to be able to get the number of inputs to the q_networks using
+        # specs if possible.
+        # observation_specs = list(agent_specs.values())[0].observations.observation
 
-        observation_specs = list(specs.values())[0].observations.observation
-        action_specs = list(specs.values())[0].actions
-        print(observation_specs)
-        print(action_specs)
         self._num_agents = len(self._agent_networks)
-        self._state_dim = int(np.prod(observation_specs.shape))
-        self._action_dim = int(np.prod(action_specs.shape))
-        print(self._action_dim)
-        print(self._state_dim)
-        state_spec = tf.TensorSpec(self._state_dim)
-        q_value_spec = tf.TensorSpec(self._state_dim * self._action_dim)
+        # self._obs_dim = int(np.prod(observation_specs.shape))
+        self._obs_dim = 2  # NOTE Currently hard coded to 2 but need to generalise
+
+        q_value_dim = tf.TensorSpec(self._obs_dim * self._num_agents)
 
         # Implement method from base class
         self._mixed_network = MonotonicMixingNetwork(
             self._architecture,
             self._agent_networks,
             self._qmix_hidden_dim,
-            self._state_dim,
+            self._obs_dim,
             self._num_hypernet_layers,
             self._hypernet_hidden_dim,
         )
-        print("Create Variables Monotonic Q:", q_value_spec)
-        print("Create Variables Monotonic S:", state_spec)
-        tf2_utils.create_variables(self._mixed_network, [q_value_spec, state_spec])
+        print("Create Variables Monotonic Q:", q_value_dim)
+        print("Create Variables Monotonic S:", state_specs)
+        tf2_utils.create_variables(self._mixed_network, [q_value_dim, state_specs])
         return self._mixed_network
 
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:

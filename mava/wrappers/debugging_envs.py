@@ -129,13 +129,17 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
     def __init__(self, environment: TwoStepEnv) -> None:
         super().__init__(environment=environment)
         self._reset_next_step = True
-        self.action_spaces = {}
-        self.observation_spaces = {}
-        self.agent_ids = self.environment.agent_ids
 
-        for agent_id in self.agent_ids:
-            self.action_spaces[agent_id] = spaces.Discrete(2)  # int64
-            self.observation_spaces[agent_id] = spaces.Box(0, 1, shape=(1,))  # float32
+        # TODO Do I need these? Seems like they should be handled in PettingZoo wrapper
+        self.environment.action_spaces = {}
+        self.environment.observation_spaces = {}
+        self.environment.extra_specs = spaces.Discrete(3)  # Global state 1, 2, or 3
+
+        for agent_id in self.environment.agent_ids:
+            self.environment.action_spaces[agent_id] = spaces.Discrete(2)  # int64
+            self.environment.observation_spaces[agent_id] = spaces.Box(
+                0, 1, shape=(1,)
+            )  # float32
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
@@ -159,3 +163,6 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
             discount=self._discounts,
             step_type=self._step_type,
         )
+
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        return {"s_t": self.environment.extra_specs}
