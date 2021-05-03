@@ -83,7 +83,12 @@ class HyperNetwork(snt.Module):
             self.hyper_w1(states)
         )  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
         w1 = tf.reshape(
-            w1, (-1, self._n_actions * self._n_agents, self._qmix_hidden_dim)
+            w1,
+            (
+                -1,
+                self._n_actions * self._n_agents,
+                self._qmix_hidden_dim,
+            ),  # Expects 256
         )  # [B, n_actions*n_agents, qmix_hidden_dim] = [B, 4, qmix_hidden_dim]
 
         b1 = self.hyper_b1(states)  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]

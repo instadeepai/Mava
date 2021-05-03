@@ -96,7 +96,6 @@ class MonotonicMixingNetwork(snt.Module):
 
         # Expand dimensions to [B, 1, n_actions*n_agents] = [B,1,4] for matmul
         q_values = tf.expand_dims(q_values, axis=1)
-
         self._hyperparams = self._hypernetworks(states)
 
         # For convenience

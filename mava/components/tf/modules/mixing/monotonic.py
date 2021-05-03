@@ -20,7 +20,6 @@
 
 from typing import Dict
 
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme.tf import utils as tf2_utils
@@ -63,7 +62,10 @@ class MonotonicMixing(BaseMixingModule):
         """Modify and return system architecture given mixing structure."""
         agent_specs = self._environment_spec.get_agent_specs()  # noqa F841
         state_specs = self._environment_spec.get_extra_specs()
-        state_specs = np.array(state_specs["s_t"])
+        state_specs = state_specs["s_t"]
+
+        # TODO Currently hard coded to 2 but need to generaliseca
+        state_specs = tf.TensorSpec(shape=(3,))
 
         # TODO I want to be able to get the number of inputs to the q_networks using
         # specs if possible.
@@ -71,7 +73,9 @@ class MonotonicMixing(BaseMixingModule):
 
         self._num_agents = len(self._agent_networks)
         # self._obs_dim = int(np.prod(observation_specs.shape))
-        self._obs_dim = 2  # NOTE Currently hard coded to 2 but need to generalise
+
+        # TODO Currently hard coded to 2 but need to generalise
+        self._obs_dim = 2
 
         q_value_dim = tf.TensorSpec(self._obs_dim * self._num_agents)
 
@@ -84,8 +88,13 @@ class MonotonicMixing(BaseMixingModule):
             self._num_hypernet_layers,
             self._hypernet_hidden_dim,
         )
+
+        # TODO Change state spec size to be the size of the one-hot
+        # representation.
+
         print("Create Variables Monotonic Q:", q_value_dim)
         print("Create Variables Monotonic S:", state_specs)
+        # tf2_utils.create_variables(self._mixed_network._hypernetworks, [state_specs])
         tf2_utils.create_variables(self._mixed_network, [q_value_dim, state_specs])
         return self._mixed_network
 
