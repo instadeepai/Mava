@@ -22,4 +22,7 @@ from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
-from mava.wrappers.system_trainer_statistics import DetailedTrainerStatistics
+from mava.wrappers.system_trainer_statistics import (
+    DetailedTrainerStatistics,
+    NetworkStatisticsActorCritic,
+)
