@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
+import launchpad as lp
 import numpy as np
 import sonnet as snt
 from absl import app, flags
@@ -28,11 +29,9 @@ from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
-from mava.environment_loop import ParallelEnvironmentLoop
-from mava.systems.tf import executors, maddpg
+from mava.systems.tf import maddpg
+from mava.utils import lp_utils
 from mava.utils.debugging.make_env import make_debugging_env
-from mava.utils.loggers import Logger
-from mava.wrappers import DetailedPerAgentStatistics
 from mava.wrappers.debugging_envs import DebuggingEnvWrapper
 
 FLAGS = flags.FLAGS
@@ -46,11 +45,14 @@ flags.DEFINE_integer(
 
 
 def make_environment(
+    evaluation: bool = False,
     env_name: str = "simple_spread",
     action_space: str = "continuous",
     num_agents: int = 3,
     render: bool = False,
 ) -> dm_env.Environment:
+
+    del evaluation
 
     assert action_space == "continuous" or action_space == "discrete"
 
@@ -136,77 +138,37 @@ def make_networks(
 
 
 def main(_: Any) -> None:
-    # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment(
-        env_name="simple_spread", action_space="continuous", render=False
-    )
 
-    environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    system_networks = make_networks(environment_spec)
-
-    # create tf loggers
+    # set loggers info
     base_dir = Path.cwd()
     log_dir = base_dir / "logs"
     log_time_stamp = str(datetime.now())
-    system_logger = Logger(
-        label="system_trainer",
-        directory=log_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=log_time_stamp,
-    )
-    train_logger = Logger(
-        label="train_loop",
-        directory=log_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=log_time_stamp,
-    )
 
-    # Construct the agent.
-    system = maddpg.MADDPG(
-        environment_spec=environment_spec,
-        policy_networks=system_networks["policies"],
-        critic_networks=system_networks["critics"],
-        observation_networks=system_networks[
-            "observations"
-        ],  # pytype: disable=wrong-arg-types
-        logger=system_logger,
-        checkpoint=False,
-    )
-    # Create the environment loop used for training.
-    train_loop = ParallelEnvironmentLoop(
-        environment, system, logger=train_logger, label="train_loop"
-    )
+    log_info = (log_dir, log_time_stamp)
 
-    # Wrap training loop to compute and log detailed running statistics
-    train_loop = DetailedPerAgentStatistics(train_loop)
+    environment_factory = lp_utils.partial_kwargs(make_environment)
 
-    # Create the evaluation policy.
-    # NOTE: assumes weight sharing
-    specs = environment_spec.get_agent_specs()
-    type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-    specs = type_specs
-    eval_policies = {
-        key: snt.Sequential(
-            [
-                system_networks["observations"][key],
-                system_networks["policies"][key],
-            ]
-        )
-        for key in specs.keys()
-    }
+    program = maddpg.MADDPG(
+        environment_factory=environment_factory,
+        network_factory=lp_utils.partial_kwargs(make_networks),
+        num_executors=2,
+        log_info=log_info,
+    ).build()
 
-    # Create the evaluation actor and loop.
-    eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
-    eval_env = make_environment(
-        env_name="simple_spread", action_space="continuous", render=True
-    )
-    eval_loop = ParallelEnvironmentLoop(eval_env, eval_actor, label="eval_loop")
+    (trainer_node,) = program.groups["trainer"]
 
-    for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
-        train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        eval_loop.run(num_episodes=4)
+    trainer_node.disable_run()
+
+    lp.launch(program, launch_type="test_mt")
+
+    trainer = trainer_node.create_handle().dereference()
+
+    for _ in range(5):
+        trainer.step()
+
+    # print(dir(trainer.step()))
+
+    # lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
 
 
 if __name__ == "__main__":

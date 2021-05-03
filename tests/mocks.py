@@ -107,7 +107,7 @@ class MockedSystem(MockedExecutor, System):
         for agent in self._specs.keys():
             self.variables[network_type][agent] = np.random.rand(5, 5)
 
-    def get_variables(self, names: Dict[str, Sequence[str]]) -> Dict[str, List[Any]]:
+    def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, Any]]:
         variables: Dict = {}
         for network_type in names:
             variables[network_type] = {}

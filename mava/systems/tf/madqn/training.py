@@ -81,6 +81,19 @@ class IDQNTrainer(mava.Trainer):
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
+        # Expose the variables.
+        value_networks_to_expose = {}
+        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
+            "values": {},
+        }
+        for agent_key in self.unique_net_keys:
+            value_network_to_expose = self._target_q_networks[agent_key]
+            value_networks_to_expose[agent_key] = value_network_to_expose
+
+            self._system_network_variables["values"][
+                agent_key
+            ] = value_network_to_expose.variables
+
         # Checkpointer
         self._system_checkpointer = {}
         for agent_key in self.unique_net_keys:

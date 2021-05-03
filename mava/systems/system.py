@@ -15,7 +15,7 @@
 
 """The base system interface."""
 
-from typing import Dict, List, Sequence, Union
+from typing import Dict, Sequence, Union
 
 import dm_env
 from acme import types
@@ -112,8 +112,8 @@ class System(mava.core.Executor, mava.core.VariableSource):
             self._executor.update()
 
     def get_variables(
-        self, names: Dict[str, Sequence[str]]
-    ) -> Dict[str, List[types.NestedArray]]:
+        self, names: Sequence[str]
+    ) -> Dict[str, Dict[str, types.NestedArray]]:
         return self._trainer.get_variables(names)
 
 
