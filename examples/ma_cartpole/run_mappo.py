@@ -23,10 +23,9 @@ import dm_env
 import numpy as np
 import sonnet as snt
 from absl import app, flags
-from acme.tf import networks
 from ray.rllib.env.multi_agent_env import make_multi_agent
 
-from mava import specs as mava_specs
+import mava.specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import mappo
 from mava.utils.loggers import Logger
@@ -40,7 +39,7 @@ flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run 
 
 
 def make_environment(
-    env_name: str = "CartPole-v1", num_agents: int = 2, **kwargs: int
+    env_name: str = "CartPole-v1", num_agents: int = 1, **kwargs: int
 ) -> dm_env.Environment:
 
     """Creates a MPE environment."""
@@ -53,10 +52,13 @@ def make_environment(
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
+    recurrent: bool = False,
     shared_weights: bool = False,
-) -> Dict[str, snt.RNNCore]:
+) -> Dict[str, snt.Module]:
 
     """Creates networks used by the agents."""
+
+    # TODO handle observation networks.
 
     specs = environment_spec.get_agent_specs()
 
@@ -65,23 +67,55 @@ def make_networks(
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
-    all_networks: Dict = {}
+    all_networks: Dict = {"policies": {}, "critics": {}}
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
+        # TODO make compatible with continuous actions.
         num_actions = np.prod(specs[key].actions.num_values, dtype=int)
 
-        # Create the network.
-        network = snt.DeepRNN(
-            [
-                snt.Flatten(),
-                snt.LSTM(20),
-                snt.nets.MLP([50]),
-                networks.PolicyValueHead(num_actions),
-            ]
-        )
+        # TODO make this if/else statement more compact.
+        if recurrent:
+            # Create the policy network.
+            policy_network = snt.DeepRNN(
+                [
+                    snt.Flatten(),
+                    snt.LSTM(20),
+                    snt.nets.MLP([50]),
+                    snt.Linear(num_actions),
+                ]
+            )
 
-        all_networks[key] = network
+            # Create the critic network.
+            critic_network = snt.DeepRNN(
+                [
+                    snt.Flatten(),
+                    snt.LSTM(20),
+                    snt.nets.MLP([50]),
+                    snt.Linear(1),
+                ]
+            )
+        else:
+            # Create the policy network.
+            policy_network = snt.Sequential(
+                [
+                    snt.Flatten(),
+                    snt.nets.MLP([50]),
+                    snt.Linear(num_actions),
+                ]
+            )
+
+            # Create the critic network.
+            critic_network = snt.Sequential(
+                [
+                    snt.Flatten(),
+                    snt.nets.MLP([50]),
+                    snt.Linear(1),
+                ]
+            )
+
+        all_networks["policies"][key] = policy_network
+        all_networks["critics"][key] = critic_network
 
     return all_networks
 
@@ -117,11 +151,8 @@ def main(_: Any) -> None:
         environment_spec=environment_spec,
         networks=all_networks,
         sequence_length=10,
-        sequence_period=2,
-        batch_size=64,
-        baseline_cost=0.0001,
-        critic_learning_rate=1e-3,
-        policy_learning_rate=1e-3,
+        sequence_period=5,
+        shared_weights=False,
         logger=system_logger,
     )
 

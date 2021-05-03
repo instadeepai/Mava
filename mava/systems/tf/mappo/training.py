@@ -15,7 +15,7 @@
 
 """MAPPO trainer implementation."""
 import time
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 import numpy as np
 import reverb
@@ -40,31 +40,29 @@ class MAPPOTrainer(mava.Trainer):
 
     def __init__(
         self,
-        agents: List[str],
-        agent_types: List[str],
-        shared_weights: bool,
-        networks: Dict[str, snt.RNNCore],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
-        critic_learning_rate: float,
-        policy_learning_rate: float,
+        shared_weights: bool,
+        critic_learning_rate: float = 1e-3,
+        policy_learning_rate: float = 1e-3,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
-        clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.0,
         baseline_cost: float = 1.0,
+        clipping_epsilon: float = 0.2,
         max_abs_reward: Optional[float] = None,
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
+        checkpoint: bool = False,
         checkpoint_subpath: str = "Checkpoints",
     ):
         """Initializes the learner.
         Args:
-            agents: a list of the agent specs (ids).
-            agent_types: a list of the types of agents to be used.
+            policy_networks: ...
+            critic_networks: ...
             shared_weights: ...
-            networks: dictionary of networks each with a value head and logits head.
             discount: discount to use for TD updates.
             dataset: dataset to learn from, whether fixed or from a replay buffer
                 (see `acme.datasets.reverb.make_dataset` documentation).
@@ -81,21 +79,18 @@ class MAPPOTrainer(mava.Trainer):
             logger: logger object to be used by learner.
             checkpoint: boolean indicating whether to checkpoint the learner.
         """
-
-        self._agents = agents
-        self._agent_types = agent_types
         self._shared_weights = shared_weights
 
-        # Store networks and get optimizers.
-        self._networks = networks
+        # Store networks.
+        self._policy_networks = policy_networks
+        self._critic_networks = critic_networks
+        self._is_recurrent = isinstance(list(policy_networks.values())[0], snt.DeepRNN)
+
+        # Get optimizers
         self._policy_optimizer = snt.optimizers.Adam(learning_rate=policy_learning_rate)
         self._critic_optimizer = snt.optimizers.Adam(learning_rate=critic_learning_rate)
 
-        # General learner book-keeping and loggers.
-        self._counter = counter or counting.Counter()
-        self._logger = logger or loggers.make_default_logger("trainer")
-
-        # Other learner parameters.
+        # Other trainer parameters.
         self._discount = discount
         self._entropy_cost = entropy_cost
         self._baseline_cost = baseline_cost
@@ -110,9 +105,13 @@ class MAPPOTrainer(mava.Trainer):
             max_abs_reward = np.inf
         if max_gradient_norm is None:
             max_gradient_norm = 1e10  # A very large number. Infinity results in NaNs.
-            self._max_abs_reward = tf.convert_to_tensor(max_abs_reward)
-            self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
 
+        self._max_abs_reward = tf.convert_to_tensor(max_abs_reward)
+        self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+
+        # General learner book-keeping and loggers.
+        self._counter = counter or counting.Counter()
+        self._logger = logger or loggers.make_default_logger("trainer")
         self._system_checkpointer: Dict[Any, Any] = {}
 
         # Do not record timestamps until after the first learning step is done.
@@ -140,39 +139,59 @@ class MAPPOTrainer(mava.Trainer):
             data.extras,
         )
 
-        # Get core states and logits
-        all_core_states = extras["core_states"]
+        # Get logits and possibly core_states
         all_logits = extras["logits"]
+        if self._is_recurrent:
+            all_core_states = extras["core_states"]
 
         metrics: Dict[str, Dict[str, Any]] = {}
         # Do forward passes through the networks and calculate the losses
-        for agent in self._agents:
+        for agent in all_obs.keys():
 
-            obs, acts, rews, discs, behaviour_logits, core_states = (
+            obs, acts, rews, discs, behaviour_logits = (
                 all_obs[agent],
                 all_acts[agent],
                 all_rews[agent],
                 all_discs[agent],
                 all_logits[agent],
-                all_core_states[agent],
             )
 
+            # Get agent core_states
+            if self._is_recurrent:
+                core_states = all_core_states[agent]
+                core_states = tree.map_structure(lambda s: s[0], core_states)
+
             # Chop off final timestep for bootstrapping value
-            acts = acts[:-1]
             rews = rews[:-1]
             discs = discs[:-1]
 
-            core_states = tree.map_structure(lambda s: s[0], core_states)
-
             # Get agent network
             agent_key = agent.split("_")[0] if self._shared_weights else agent
-            network = self._networks[agent_key]
+            policy_network = self._policy_networks[agent_key]
+            critic_network = self._critic_networks[agent_key]
 
             with tf.GradientTape(persistent=True) as tape:
-                # Unroll current policy over observations.
-                (logits, values), _ = snt.static_unroll(
-                    network, obs.observation, core_states
-                )
+                if self._is_recurrent:
+                    # Unroll current policy over observations.
+                    logits, _ = snt.static_unroll(
+                        policy_network, obs.observation, core_states
+                    )
+
+                    # Unroll current value network over observations.
+                    values, _ = snt.static_unroll(
+                        critic_network, obs.observation, core_states
+                    )
+                    values = tf.squeeze(values)
+                else:
+                    # Reshape inputs
+                    dims = obs.observation.shape[:2]
+                    obs = snt.merge_leading_dims(obs.observation, num_dims=2)
+                    logits = policy_network(obs)
+                    values = critic_network(obs)
+
+                    # reshape the outputs
+                    logits = tf.reshape(logits, (*dims, -1), name="policy")
+                    values = tf.reshape(values, dims, name="value")
 
                 # Values along the sequence T
                 bootstrap_value = values[-1]
@@ -197,15 +216,15 @@ class MAPPOTrainer(mava.Trainer):
 
                 # Do not use the loss provided by td_lambda as they sum the losses over
                 # the sequence length rather than averaging them.
-                critic_loss = self._baseline_cost * tf.reduce_mean(
+                critic_loss = tf.reduce_mean(
                     tf.square(td_lambda_extra.temporal_differences), name="CriticLoss"
                 )
 
                 # Compute importance sampling weights: current policy / behavior policy.
-                pi_behaviour = tfd.Categorical(logits=behaviour_logits[:-1])
-                pi_target = tfd.Categorical(logits=logits[:-1])
+                pi_behaviour = tfd.Categorical(logits=behaviour_logits)
+                pi_target = tfd.Categorical(logits=logits)
                 log_rhos = pi_target.log_prob(acts) - pi_behaviour.log_prob(acts)
-                importance_ratio = tf.exp(log_rhos)
+                importance_ratio = tf.exp(log_rhos)[:-1]
                 clipped_importance_ratio = tf.clip_by_value(
                     importance_ratio,
                     1.0 - self._clipping_epsilon,
@@ -223,11 +242,13 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 # Entropy regularization.
+                # TODO verify that this entropy regularization
+                # works as we expect.
                 scale = 1.0 / tf.math.log(
                     tf.convert_to_tensor(logits.shape[-1], dtype=float)
                 )
                 entropy = trfl.policy_entropy_loss(pi_target)
-                entropy_loss = self._entropy_cost * entropy.loss
+                entropy_loss = self._entropy_cost * entropy.loss[:-1]
                 policy_entropy = scale * tf.reduce_mean(entropy.extra.entropy)
 
                 # Combine weighted sum of actor & entropy regularization.
@@ -236,8 +257,12 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
             # Compute gradients.
-            critic_grads = tape.gradient(critic_loss, network.trainable_variables)
-            policy_grads = tape.gradient(policy_loss, network.trainable_variables)
+            critic_grads = tape.gradient(
+                critic_loss, critic_network.trainable_variables
+            )
+            policy_grads = tape.gradient(
+                policy_loss, policy_network.trainable_variables
+            )
             del tape
 
             # Optionally apply clipping.
@@ -249,8 +274,12 @@ class MAPPOTrainer(mava.Trainer):
             )
 
             # Apply gradients.
-            self._critic_optimizer.apply(critic_grads, network.trainable_variables)
-            self._policy_optimizer.apply(policy_grads, network.trainable_variables)
+            self._critic_optimizer.apply(
+                critic_grads, critic_network.trainable_variables
+            )
+            self._policy_optimizer.apply(
+                policy_grads, policy_network.trainable_variables
+            )
 
             metrics.update(
                 {

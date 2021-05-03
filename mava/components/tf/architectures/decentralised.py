@@ -327,3 +327,22 @@ class DecentralisedQValueActorCritic(BaseActorCritic):
         critic_networks = self.create_critic_variables()
         networks.update(critic_networks)
         return networks
+
+
+class DecentralisedValueActorCritic(DecentralisedQValueActorCritic):
+    def __init__(
+        self,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        shared_weights: bool = True,
+    ):
+
+        super().__init__(
+            environment_spec=environment_spec,
+            observation_networks=observation_networks,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            shared_weights=shared_weights,
+        )
