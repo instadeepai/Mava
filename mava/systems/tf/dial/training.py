@@ -241,7 +241,10 @@ class DIALTrainer(mava.Trainer):
             # for each batch
             for b in range(bs):
                 total_loss[b] = tf.zeros(1)
+                # For t=T to 1, -1 do
                 for t in range(T - 1, 0, -1):  # Should it be (T,1,-1)?
+
+                    # For each agent a do
                     for agent_id in observations.keys():
                         # All at timestep t
                         agent_input = observations[agent_id].observation[:, b]
@@ -261,9 +264,11 @@ class DIALTrainer(mava.Trainer):
                         # (sequence,batch,1)
                         terminal = done[t, b]
 
-                        # print(discount)
+                        # y_t_a = r_t
                         y_action = reward[t]
                         y_message = reward[t]
+
+                        # y_t_a = r_t + discount * max_u Q(t)
                         if not terminal:
                             batched_observation = tf2_utils.add_batch_dim(
                                 agent_input[t]
@@ -277,6 +282,7 @@ class DIALTrainer(mava.Trainer):
                             y_action += discount * q_t[0][action[t]]
                             y_message += discount * m_t[tf.argmax(m_t)[0]]
 
+                        # d_Q_t_a = y_t_a - Q(t-1)
                         batched_observation = tf2_utils.add_batch_dim(
                             agent_input[t - 1]
                         )
@@ -288,6 +294,11 @@ class DIALTrainer(mava.Trainer):
                         )
 
                         td_action = y_action - q_t1[0][action[t - 1]]
+
+                        # d_theta = d_theta + d_Q_t_a ^ 2
+                        total_loss[b] += td_action ** 2
+
+                        # Communication grads
                         td_comm = y_message - m_t1[tf.argmax(m_t1)[0]]
 
                         total_loss[b] += td_action ** 2 + td_comm ** 2
