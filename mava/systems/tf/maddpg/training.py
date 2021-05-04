@@ -33,6 +33,7 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.utils import training_utils as train_utils
 
 # NOTE (Arnu): in TF2 this should be the default
 # but for some reason it is not when I run it.
@@ -300,6 +301,17 @@ class BaseMADDPGTrainer(mava.Trainer):
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
 
+        self._forward(inputs)
+
+        self._backward()
+
+        # Log losses per agent
+        return train_utils.map_losses_per_agent_ac(
+            self.critic_losses, self.policy_losses
+        )
+
+    # Forward pass that calculates loss.
+    def _forward(self, inputs: Any) -> None:
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -312,8 +324,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
-
-        logged_losses: Dict[str, Dict[str, Any]] = {}
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
@@ -379,7 +389,16 @@ class BaseMADDPGTrainer(mava.Trainer):
                 critic_loss = tf.reduce_mean(critic_loss, axis=0)
                 critic_losses[agent] = critic_loss
 
+        self.policy_losses = policy_losses
+        self.critic_losses = critic_losses
+        self.tape = tape
+
+    # Backward pass that calculates gradients and updates network.
+    def _backward(self) -> None:
         # Calculate the gradients and update the networks
+        policy_losses = self.policy_losses
+        critic_losses = self.critic_losses
+        tape = self.tape
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
 
@@ -397,11 +416,8 @@ class BaseMADDPGTrainer(mava.Trainer):
             # Compute gradients.
             # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
             #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context (it causes the gradient ops to be
-            #  recorded on the tape, leading to increased CPU and memory usage).
-            #  Only call GradientTape.gradient inside the context if you actually want
-            #  to trace the gradient in order to compute higher order derivatives.
-            #  to trace the gradient in order to compute higher order derivatives.
+            #  than calling it outside the context.
+            # Caused by losses.dpg, which calls tape.gradient.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
@@ -413,21 +429,7 @@ class BaseMADDPGTrainer(mava.Trainer):
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
             self._critic_optimizer.apply(critic_gradients, critic_variables)
-
-            logged_losses.update(
-                {
-                    agent: {
-                        "critic_loss": critic_losses[agent],
-                        "policy_loss": policy_losses[agent],
-                    }
-                }
-            )
-
-        # Delete the tape manually because of the persistent=True flag.
-        del tape
-
-        # Losses to track.
-        return logged_losses
+        train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
         # Run the learning step.
@@ -445,11 +447,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        # Checkpoint the networks.
-        if len(self._system_checkpointer.keys()) > 0:
-            for agent_key in self.unique_net_keys:
-                checkpointer = self._system_checkpointer[agent_key]
-                checkpointer.save()
+        train_utils.checkpoint_networks(self._system_checkpointer)
 
         self._logger.write(fetches)
 
@@ -1055,13 +1053,24 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     ) -> Dict[str, Dict[str, Any]]:
         # TODO (dries): Use a memory profiler to determine what is causing
         #  the memory leak during training.
-
         # Update the target networks
         self._update_target_networks()
 
         # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
-        data = sample.data
+
+        self._forward(sample)
+
+        self._backward()
+
+        # Log losses per agent
+        return train_utils.map_losses_per_agent_ac(
+            self.critic_losses, self.policy_losses
+        )
+
+    # Forward pass that calculates loss.
+    def _forward(self, inputs: Any) -> None:
+        data = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
         observations, actions, rewards, discounts, _, extras = (
@@ -1077,8 +1086,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # extract the first state in the sequence..
         core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
         target_core_state = tree.map_structure(tf.identity, core_state)
-
-        logged_losses: Dict[str, Dict[str, Any]] = {}
 
         # TODO (dries): Take out all the data_points that does not need
         #  to be processed here at the start. Therefore it does not have
@@ -1197,6 +1204,17 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 critic_loss = tf.reduce_mean(critic_loss, axis=0)
                 critic_losses[agent] = critic_loss
 
+        self.policy_losses = policy_losses
+        self.critic_losses = critic_losses
+        self.tape = tape
+
+    # Backward pass that calculates gradients and updates network.
+    def _backward(self) -> None:
+        # Calculate the gradients and update the networks
+        policy_losses = self.policy_losses
+        critic_losses = self.critic_losses
+        tape = self.tape
+
         # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -1232,20 +1250,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             self._policy_optimizer.apply(policy_gradients, policy_variables)
             self._critic_optimizer.apply(critic_gradients, critic_variables)
 
-            logged_losses.update(
-                {
-                    agent: {
-                        "critic_loss": critic_losses[agent],
-                        "policy_loss": policy_losses[agent],
-                    }
-                }
-            )
-
-        # Delete the tape manually because of the persistent=True flag.
-        del tape
-
-        # Losses to track.
-        return logged_losses
+        train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
         # Run the learning step.
