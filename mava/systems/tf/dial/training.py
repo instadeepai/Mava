@@ -229,8 +229,8 @@ class DIALTrainer(mava.Trainer):
         # Need to loop backwards through time
         # for t=T to 1, -1 do
 
-        bs = actions["agent_0"].shape[1]
-        T = actions["agent_0"].shape[0]
+        bs = actions[self._agents[0]].shape[1]
+        T = actions[self._agents[0]].shape[0]
 
         logged_losses: Dict[str, Dict[str, Any]] = {}
         agent_type = self._agent_types[0]
@@ -301,7 +301,7 @@ class DIALTrainer(mava.Trainer):
                         # Communication grads
                         td_comm = y_message - m_t1[tf.argmax(m_t1)[0]]
 
-                        total_loss[b] += td_action ** 2 + td_comm ** 2
+                        total_loss[b] += td_comm ** 2
 
         for b in range(bs):
             policy_variables = self._policy_networks[agent_type].trainable_variables
