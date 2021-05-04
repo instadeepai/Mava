@@ -74,11 +74,14 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         else:
             self._step_type = dm_env.StepType.MID
 
-        return dm_env.TimeStep(
-            observation=observations,
-            reward=rewards,
-            discount=self._discounts,
-            step_type=self._step_type,
+        return (
+            dm_env.TimeStep(
+                observation=observations,
+                reward=rewards,
+                discount=self._discounts,
+                step_type=self._step_type,
+            ),
+            {},
         )
 
     # Convert Debugging environment observation so it's dm_env compatible.
