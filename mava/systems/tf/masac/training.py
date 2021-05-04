@@ -25,12 +25,12 @@ import sonnet as snt
 import tensorflow as tf
 import tree
 import trfl
-from acme.tf import losses
 from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+
 
 class BaseMASACTrainer(mava.Trainer):
     """MASAC trainer.
@@ -42,6 +42,7 @@ class BaseMASACTrainer(mava.Trainer):
         self,
         agents: List[str],
         agent_types: List[str],
+        action_size: int,
         policy_networks: Dict[str, snt.Module],
         critic_Q_1_networks: Dict[str, snt.Module],
         critic_Q_2_networks: Dict[str, snt.Module],
@@ -49,10 +50,14 @@ class BaseMASACTrainer(mava.Trainer):
         target_policy_networks: Dict[str, snt.Module],
         target_critic_V_networks: Dict[str, snt.Module],
         discount: float,
+        tau: float,
+        temperature: float,
         target_update_period: int,
+        policy_update_frequency: int,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        soft_target_update: bool = False,
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_V_optimizer: snt.Optimizer = None,
@@ -76,6 +81,10 @@ class BaseMASACTrainer(mava.Trainer):
           discount: discount to use for TD updates.
           target_update_period: number of learner steps to perform before updating
             the target networks.
+          soft_target_update: determines wether to use soft or hard target update
+          tau: parameter for soft target update
+          policy_update_frequncy: controls the frequency of updating the policy
+          temperature: parameter for controlling SAC
           dataset: dataset to learn from, whether fixed or from a replay buffer
             (see `acme.datasets.reverb.make_dataset` documentation).
           observation_network: an optional online network to process observations
@@ -97,7 +106,7 @@ class BaseMASACTrainer(mava.Trainer):
 
         # Store online and target networks.
         self._policy_networks = policy_networks
-        self._critic_V_networks = critic__V_networks
+        self._critic_V_networks = critic_V_networks
         self._critic_Q_1_networks = critic_Q_1_networks
         self._critic_Q_2_networks = critic_Q_2_networks
         self._target_policy_networks = target_policy_networks
@@ -105,6 +114,12 @@ class BaseMASACTrainer(mava.Trainer):
 
         self._observation_networks = observation_networks
         self._target_observation_networks = target_observation_networks
+
+        # Temperature
+        self._temperature = temperature
+
+        # Policy update frequency
+        self._policy_update_frequency = policy_update_frequency
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
@@ -117,16 +132,18 @@ class BaseMASACTrainer(mava.Trainer):
         # Necessary to track when to update target networks.
         self._num_steps = tf.Variable(0, dtype=tf.int32)
         self._target_update_period = target_update_period
+        self._soft_target_update = soft_target_update
+        self._tau = tau
 
         # Create an iterator to go through the dataset.
         # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         # Create optimizers if they aren't given.
-        self._critic_V_optimizer = critic_V_optimizer or snt.optimizers.Adam(1e-4)
-        self._critic_Q_1_optimizer = critic_Q_1_optimizer or snt.optimizers.Adam(1e-4)
-        self._critic_Q_2_optimizer = critic_Q_2_optimizer or snt.optimizers.Adam(1e-4)
-        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
+        self._critic_V_optimizer = critic_V_optimizer or snt.optimizers.Adam(3e-4)
+        self._critic_Q_1_optimizer = critic_Q_1_optimizer or snt.optimizers.Adam(3e-4)
+        self._critic_Q_2_optimizer = critic_Q_2_optimizer or snt.optimizers.Adam(3e-4)
+        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(3e-4)
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
@@ -208,3 +225,459 @@ class BaseMASACTrainer(mava.Trainer):
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.
         self._timestamp = None
+
+    @tf.function
+    def _update_target_networks(self) -> None:
+        for key in self.unique_net_keys:
+            # Update target network.
+            online_variables = (
+                *self._observation_networks[key].variables,
+                *self._critic_V_networks[key].variables,
+                *self._policy_networks[key].variables,
+            )
+            target_variables = (
+                *self._target_observation_networks[key].variables,
+                *self._target_critic_V_networks[key].variables,
+                *self._target_policy_networks[key].variables,
+            )
+
+            # Make online -> target network update ops.
+            if self._soft_target_update:
+                for src, dest in zip(online_variables, target_variables):
+                    dest.assign(
+                        tf.math.add(
+                            tf.math.multiply(self._tau, src),
+                            tf.math.multiply(dest, 1.0 - self.tau),
+                        )
+                    )
+            else:
+                if tf.math.mod(self._num_steps, self._target_update_period) == 0:
+                    for src, dest in zip(online_variables, target_variables):
+                        dest.assign(src)
+            self._num_steps.assign_add(1)
+
+    @tf.function
+    def _transform_observations(
+        self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+        o_tm1 = {}
+        o_t = {}
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
+            o_tm1[agent] = self._observation_networks[agent_key](obs[agent].observation)
+            o_t[agent] = self._target_observation_networks[agent_key](
+                next_obs[agent].observation
+            )
+            # This stop_gradient prevents gradients to propagate into the target
+            # observation network. In addition, since the online policy network is
+            # evaluated at o_t, this also means the policy loss does not influence
+            # the observation network training.
+            o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
+
+            # TODO (dries): Why is there a stop gradient here? The target
+            #  will not be updated unless included into the
+            #  policy_variables or critic_variables sets.
+            #  One reason might be that it helps with preventing the observation
+            #  network from being updated from the policy_loss.
+            #  But why would we want that? Don't we want both the critic
+            #  and policy to update the observation network?
+            #  Or is it bad to have two optimisation processes optimising
+            #  the same set of weights? But the
+            #  StateBasedActorCritic will then not work as the critic
+            #  is not dependent on the behavior networks.
+        return o_tm1, o_t
+
+    @tf.function
+    def _get_critic_feed(
+        self,
+        o_tm1_trans: Dict[str, np.ndarray],
+        o_t_trans: Dict[str, np.ndarray],
+        a_tm1: Dict[str, np.ndarray],
+        a_t: Dict[str, np.ndarray],
+        e_tm1: Dict[str, np.ndarray],
+        e_t: Dict[str, np.array],
+        agent: str,
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+
+        # Centralised based
+        o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
+        o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
+        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
+        a_t_feed = tf.stack([x for x in a_t.values()], 1)
+        return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
+
+    @tf.function
+    def _get_dpg_feed(
+        self,
+        a_t: Dict[str, np.ndarray],
+        dpg_a_t: np.ndarray,
+        agent: str,
+    ) -> tf.Tensor:
+        # Centralised and StateBased DPG
+        # Note (dries): Copy has to be made because the input
+        # variables cannot be changed.
+        dpg_a_t_feed = copy.copy(a_t)
+        dpg_a_t_feed[agent] = dpg_a_t
+        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
+        return dpg_a_t_feed
+
+    @tf.function
+    def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
+        actions = {}
+        log_probs = {}
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
+            next_observation = next_obs[agent]
+            actions[agent], log_probs[agent] = self._target_policy_networks[agent_key](
+                next_observation
+            )
+        return actions, log_probs
+
+    # NOTE (Arnu): the decorator below was causing this _step() function not
+    # to be called by the step() function below. Removing it makes the code
+    # work. The docs on tf.function says it is useful for speed improvements
+    # but as far as I can see, we can go ahead without it. At least for now.
+    # @tf.function
+    def _step(
+        self,
+    ) -> Dict[str, Dict[str, Any]]:
+
+        # Update the target networks
+        self._update_target_networks()
+
+        # Get data from replay (dropping extras if any). Note there is no
+        # extra data here because we do not insert any into Reverb.
+        inputs = next(self._iterator)
+
+        # Unpack input data as follows:
+        # o_tm1 = dictionary of observations one for each agent
+        # a_tm1 = dictionary of actions taken from obs in o_tm1
+        # e_tm1 [Optional] = extra data for timestep t-1
+        # that the agents persist in replay.
+        # r_t = dictionary of rewards or rewards sequences
+        #   (if using N step transitions) ensuing from actions a_tm1
+        # d_t = environment discount ensuing from actions a_tm1.
+        #   This discount is applied to future rewards after r_t.
+        # o_t = dictionary of next observations or next observation sequences
+        # e_t [Optional] = extra data for timestep t that the agents persist in replay.
+        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+
+        logged_losses: Dict[str, Dict[str, Any]] = {}
+
+        # Do forward passes through the networks and calculate the losses
+        with tf.GradientTape(persistent=True) as tape:
+            policy_losses = {}
+            critic_V_losses = {}
+            critic_Q_1_losses = {}
+            critic_Q_2_losses = {}
+
+            o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
+            a_t, log_prob = self._policy_actions(o_t_trans)
+
+            for agent in self._agents:
+                agent_key = self.agent_net_keys[agent]
+
+                # Cast the additional discount to match the environment discount dtype.
+                discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
+
+                # Get critic feed
+                o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
+                    o_tm1_trans=o_tm1_trans,
+                    o_t_trans=o_t_trans,
+                    a_tm1=a_tm1,
+                    a_t=a_t,
+                    e_tm1=e_tm1,
+                    e_t=e_t,
+                    agent=agent,
+                )
+
+                # Critic Q Learning
+                q_1_pred = self._critic_Q_1_networks[agent_key](o_tm1_feed, a_tm1_feed)
+                q_2_pred = self._critic_Q_2_networks[agent_key](o_tm1_feed, a_tm1_feed)
+                v_target = self._target_critic_V_networks[agent_key](o_t_feed)
+
+                # Squeeze into the shape expected by the td_learning implementation.
+                q_1_pred = tf.squeeze(q_1_pred, axis=-1)  # [B]
+                q_2_pred = tf.squeeze(q_2_pred, axis=-1)  # [B]
+
+                q_1_loss = trfl.td_learning(
+                    q_1_pred, r_t[agent], discount * d_t[agent], v_target
+                ).loss
+                q_2_loss = trfl.td_learning(
+                    q_2_pred, r_t[agent], discount * d_t[agent], v_target
+                ).loss
+                critic_Q_1_losses[agent] = q_1_loss
+                critic_Q_2_losses[agent] = q_2_loss
+
+                v_pred = self._critic_V_networks[agent_key](o_tm1_feed)
+                q_pred = tf.math.minimum(
+                    self._critic_Q_1_networks[agent_key](o_tm1_feed, a_t[agent]),
+                    self._critic_Q_2_networks[agent_key](o_tm1_feed, a_t[agent]),
+                )
+                v_targ = tf.math.subtract(
+                    q_pred, tf.math.multiply(self.temperature, log_prob[agent])
+                )
+                v_loss = tf.reduce_mean(tf.square(v_pred - v_targ), axis=0)
+                critic_V_losses[agent] = v_loss
+
+                # # Critic learning.
+                # q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
+                # q_t = self._target_critic_networks[agent_key](o_t_feed, a_t_feed)
+
+                # # Squeeze into the shape expected by the td_learning implementation.
+                # q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
+                # q_t = tf.squeeze(q_t, axis=-1)  # [B]
+
+                # # Critic loss.
+                # critic_loss = trfl.td_learning(
+                #     q_tm1, r_t[agent], discount * d_t[agent], q_t
+                # ).loss
+
+                # Actor Learning
+                advantage = q_pred - v_pred
+                actor_loss = tf.reduce_mean(
+                    tf.subtract(
+                        tf.multiply(self._temperature, log_prob[agent]), advantage
+                    ),
+                    axis=0,
+                )
+                policy_losses[agent] = actor_loss
+
+                # # Actor learning.
+                # o_t_agent_feed = o_t_trans[agent]
+                # dpg_a_t = self._policy_networks[agent_key](o_t_agent_feed)
+
+                # # Get dpg actions
+                # dpg_a_t_feed = self._get_dpg_feed(a_t, dpg_a_t, agent)
+
+                # # Get dpg Q values.
+                # dpg_q_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
+
+                # # Actor loss. If clipping is true use dqda clipping and clip the norm.
+                # dqda_clipping = 1.0 if self._clipping else None
+                # policy_loss = losses.dpg(
+                #     dpg_q_t,
+                #     dpg_a_t,
+                #     tape=tape,
+                #     dqda_clipping=dqda_clipping,
+                #     clip_norm=self._clipping,
+                # )
+                # policy_loss = tf.reduce_mean(policy_loss, axis=0)
+                # policy_losses[agent] = policy_loss
+
+                # critic_loss = tf.reduce_mean(critic_loss, axis=0)
+                # critic_losses[agent] = critic_loss
+
+        # Calculate the gradients and update the networks
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
+
+            # Get trainable variables.
+            policy_variables = (
+                self._observation_networks[agent_key].trainable_variables
+                + self._policy_networks[agent_key].trainable_variables
+            )
+            critic_V_variables = (
+                # In this agent, the critic loss trains the observation network.
+                self._observation_networks[agent_key].trainable_variables
+                + self._critic_V_networks[agent_key].trainable_variables
+            )
+
+            critic_Q_1_variables = (
+                # In this agent, the critic loss trains the observation network.
+                self._observation_networks[agent_key].trainable_variables
+                + self._critic_Q_1_networks[agent_key].trainable_variables
+            )
+
+            critic_Q_2_variables = (
+                # In this agent, the critic loss trains the observation network.
+                self._observation_networks[agent_key].trainable_variables
+                + self._critic_Q_2_networks[agent_key].trainable_variables
+            )
+
+            # Compute gradients.
+            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
+            #  on a persistent tape inside its context is significantly less efficient
+            #  than calling it outside the context (it causes the gradient ops to be
+            #  recorded on the tape, leading to increased CPU and memory usage).
+            #  Only call GradientTape.gradient inside the context if you actually want
+            #  to trace the gradient in order to compute higher order derivatives.
+            #  to trace the gradient in order to compute higher order derivatives.
+            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
+            critic_V_gradients = tape.gradient(
+                critic_V_losses[agent], critic_V_variables
+            )
+            critic_Q_1_gradients = tape.gradient(
+                critic_Q_1_losses[agent], critic_Q_1_variables
+            )
+            critic_Q_2_gradients = tape.gradient(
+                critic_Q_2_losses[agent], critic_Q_2_variables
+            )
+
+            # Maybe clip gradients.
+            if self._clipping:
+                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
+                critic_V_gradients = tf.clip_by_global_norm(critic_V_gradients, 40.0)[0]
+                critic_Q_1_gradients = tf.clip_by_global_norm(
+                    critic_Q_1_gradients, 40.0
+                )[0]
+                critic_Q_2_gradients = tf.clip_by_global_norm(
+                    critic_Q_2_gradients, 40.0
+                )[0]
+
+            # Apply gradients.
+            self._policy_optimizer.apply(policy_gradients, policy_variables)
+            self._critic_V_optimizer.apply(critic_V_gradients, critic_V_variables)
+            self._critic_Q_1_optimizer.apply(critic_Q_1_gradients, critic_Q_1_variables)
+            self._critic_Q_2_optimizer.apply(critic_Q_2_gradients, critic_Q_2_variables)
+
+            logged_losses.update(
+                {
+                    agent: {
+                        "critic_V_loss": v_loss,
+                        "critic_Q_1_loss": q_1_loss,
+                        "critic_Q_2_loss": q_2_loss,
+                        "policy_loss": actor_loss,
+                    }
+                }
+            )
+
+        # Delete the tape manually because of the persistent=True flag.
+        del tape
+
+        # Losses to track.
+        return logged_losses
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        # Compute elapsed time.
+        timestamp = time.time()
+        if self._timestamp:
+            elapsed_time = timestamp - self._timestamp
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        # Checkpoint the networks.
+        if len(self._system_checkpointer.keys()) > 0:
+            for agent_key in self.unique_net_keys:
+                checkpointer = self._system_checkpointer[agent_key]
+                checkpointer.save()
+
+        self._logger.write(fetches)
+
+    def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+        variables: Dict[str, Dict[str, np.ndarray]] = {}
+        for network_type in names:
+            variables[network_type] = {}
+            for agent in self.unique_net_keys:
+                variables[network_type][agent] = tf2_utils.to_numpy(
+                    self._system_network_variables[network_type][agent]
+                )
+        return variables
+
+
+class CentralisedMASACTrainer(BaseMASACTrainer):
+    """MASAC trainer.
+    This is the trainer component of a MASAC system. IE it takes a dataset as input
+    and implements update functionality to learn from this dataset.
+    """
+
+    def __init__(
+        self,
+        agents: List[str],
+        agent_types: List[str],
+        action_size: int,
+        policy_networks: Dict[str, snt.Module],
+        critic_Q_1_networks: Dict[str, snt.Module],
+        critic_Q_2_networks: Dict[str, snt.Module],
+        critic_V_networks: Dict[str, snt.Module],
+        target_policy_networks: Dict[str, snt.Module],
+        target_critic_V_networks: Dict[str, snt.Module],
+        discount: float,
+        tau: float,
+        temperature: float,
+        target_update_period: int,
+        policy_update_frequency: int,
+        dataset: tf.data.Dataset,
+        observation_networks: Dict[str, snt.Module],
+        target_observation_networks: Dict[str, snt.Module],
+        soft_target_update: bool = False,
+        shared_weights: bool = False,
+        policy_optimizer: snt.Optimizer = None,
+        critic_V_optimizer: snt.Optimizer = None,
+        critic_Q_1_optimizer: snt.Optimizer = None,
+        critic_Q_2_optimizer: snt.Optimizer = None,
+        clipping: bool = True,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
+        checkpoint_subpath: str = "Checkpoints",
+    ):
+        """Initializes the learner.
+        Args:
+          policy_network: the online (optimized) policy.
+          critic_V_network: the online critic for predicting state values.
+          critic_Q_1_network: the online critic for predicting state-action values.
+          critic_Q_2_network: the online critic for predicting state-action values.
+          target_policy_network: the target policy (which lags behind the online
+            policy).
+          target_critic_V_network: the target critic for predicting state values.
+          discount: discount to use for TD updates.
+          target_update_period: number of learner steps to perform before updating
+            the target networks.
+          soft_target_update: determines wether to use soft or hard target update
+          tau: parameter for soft target update
+          policy_update_frequncy: controls the frequency of updating the policy
+          temperature: parameter for controlling SAC
+          dataset: dataset to learn from, whether fixed or from a replay buffer
+            (see `acme.datasets.reverb.make_dataset` documentation).
+          observation_network: an optional online network to process observations
+            before the policy and the critic.
+          target_observation_network: the target observation network.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_V_optimizer: the optimizer to be applied to the critic_V loss.
+          critic_Q_1_optimizer: the optimizer to be applied to the critic_Q_1 loss.
+          critic_Q_2_optimizer: the optimizer to be applied to the critic_Q_2 loss.
+          clipping: whether to clip gradients by global norm.
+          counter: counter object used to keep track of steps.
+          logger: logger object to be used by learner.
+          checkpoint: boolean indicating whether to checkpoint the learner.
+        """
+
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            action_size=action_size,
+            policy_networks=policy_networks,
+            critic_Q_1_networks=critic_Q_1_networks,
+            critic_Q_2_networks=critic_Q_2_networks,
+            critic_V_networks=critic_V_networks,
+            target_policy_networks=target_policy_networks,
+            target_critic_V_networks=target_critic_V_networks,
+            discount=discount,
+            tau=tau,
+            temperature=temperature,
+            target_update_period=target_update_period,
+            policy_update_frequency=policy_update_frequency,
+            dataset=dataset,
+            observation_networks=observation_networks,
+            target_observation_networks=target_observation_networks,
+            soft_target_update=soft_target_update,
+            shared_weights=shared_weights,
+            policy_optimizer=policy_optimizer,
+            critic_V_optimizer=critic_V_optimizer,
+            critic_Q_1_optimizer=critic_Q_1_optimizer,
+            critic_Q_2_optimizer=critic_Q_2_optimizer,
+            clipping=clipping,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+        )
