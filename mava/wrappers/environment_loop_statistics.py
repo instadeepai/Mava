@@ -79,10 +79,10 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
         start_time = time.time()
         episode_steps = 0
 
-        timestep = self._environment.reset()
+        timestep, env_extras = self._environment.reset()
 
         # Make the first observation.
-        self._executor.observe_first(timestep)
+        self._executor.observe_first(timestep, extras=env_extras)
 
         rewards: Dict[str, float] = {}
         episode_returns: Dict[str, float] = {}
@@ -102,13 +102,14 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
 
             # Generate an action from the agent's policy and step the environment.
             actions = self._get_actions(timestep)
-            timestep = self._environment.step(actions)
+            timestep, env_extras = self._environment.step(actions)
 
             rewards = timestep.reward
 
             # Have the agent observe the timestep and let the actor update itself.
-
-            self._executor.observe(actions, next_timestep=timestep)
+            self._executor.observe(
+                actions, next_timestep=timestep, next_extras=env_extras
+            )
 
             if self._should_update:
                 self._executor.update()
