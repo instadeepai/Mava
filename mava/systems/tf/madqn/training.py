@@ -149,7 +149,7 @@ class IDQNTrainer(mava.Trainer):
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
     def _decrement_epsilon(self) -> None:
-        self._epsilon.assign_sub(1e-3)
+        self._epsilon.assign_sub(0.01)
         if self._epsilon < 0.01:
             self._epsilon.assign(0.01)
 
