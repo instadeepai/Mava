@@ -83,7 +83,7 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         episode_steps = 0
 
         timestep = self._environment.reset()
-        agent = self._environment.agent_selection
+        agent = self._environment.current_agent
 
         # Broadcast timestep for all agents - to use parallel adder.
         # TODO (Kale-ab) : Make more robust -this could cause issues
@@ -239,6 +239,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         Returns:
             An instance of `loggers.LoggingData`.
         """
+
         # Reset any counts and start the environment.
         start_time = time.time()
         episode_steps = 0
@@ -249,10 +250,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._executor.observe_first(timestep)
 
         n_agents = self._environment.num_agents
-        rewards = {
-            agent: generate_zeros_from_spec(spec)
-            for agent, spec in self._environment.reward_spec().items()
-        }
 
         # For evaluation, this keeps track of the total undiscounted reward
         # for each agent accumulated during the episode.
@@ -270,8 +267,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             rewards = timestep.reward
 
-            # Have the agent observe the timestep and let the actor update itself.
-
+            # Have the agent observe the timestep and let the actor update itself
             self._executor.observe(actions, next_timestep=timestep)
 
             if self._should_update:

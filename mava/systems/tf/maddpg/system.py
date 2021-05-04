@@ -15,22 +15,23 @@
 
 """MADDPG system implementation."""
 import dataclasses
-from typing import Dict, Iterator, Optional, Type
+from typing import Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
 from acme import datasets
+from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import DecentralisedActorCritic
+from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
-from mava.wrappers import DetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
 
 
 @dataclasses.dataclass
@@ -73,6 +74,8 @@ class MADDPGConfig:
     max_replay_size: int = 1000000
     samples_per_insert: float = 32.0
     n_step: int = 5
+    sequence_length: int = 20
+    period: int = 20
     sigma: float = 0.3
     clipping: bool = True
     logger: loggers.Logger = None
@@ -97,6 +100,7 @@ class MADDPGBuilder(SystemBuilder):
         trainer_fn: Type[
             training.BaseMADDPGTrainer
         ] = training.DecentralisedMADDPGTrainer,
+        executer_fn: Type[core.Executor] = executors.FeedForwardExecutor,
     ):
         """Args:
         config: Configuration options for the MADDPG system.
@@ -109,22 +113,44 @@ class MADDPGBuilder(SystemBuilder):
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
+        self._executer_fn = executer_fn
 
-    def make_replay_table(
+    def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
-    ) -> reverb.Table:
+    ) -> List[reverb.Table]:
         """Create tables to insert data into."""
-        return reverb.Table(
-            name=self._config.replay_table_name,
-            sampler=reverb.selectors.Uniform(),
-            remover=reverb.selectors.Fifo(),
-            max_size=self._config.max_replay_size,
-            rate_limiter=reverb.rate_limiters.MinSize(1),
-            signature=reverb_adders.ParallelNStepTransitionAdder.signature(
+
+        # Select adder
+        if self._executer_fn == executors.FeedForwardExecutor:
+            adder = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec
-            ),
-        )
+            )
+        elif self._executer_fn == executors.RecurrentExecutor:
+            core_state_spec = {}
+            for agent in self._agents:
+                agent_type = agent.split("_")[0]
+                core_state_spec[agent] = (
+                    tf2_utils.squeeze_batch_dim(
+                        self._config.policy_networks[agent_type].initial_state(1)
+                    ),
+                )
+            adder = reverb_adders.ParallelSequenceAdder.signature(
+                environment_spec, core_state_spec
+            )
+        else:
+            raise NotImplementedError("Unknown executor type: ", self._executer_fn)
+
+        return [
+            reverb.Table(
+                name=self._config.replay_table_name,
+                sampler=reverb.selectors.Uniform(),
+                remover=reverb.selectors.Fifo(),
+                max_size=self._config.max_replay_size,
+                rate_limiter=reverb.rate_limiters.MinSize(1),
+                signature=adder,
+            )
+        ]
 
     def make_dataset_iterator(
         self,
@@ -147,12 +173,26 @@ class MADDPGBuilder(SystemBuilder):
         Args:
           replay_client: Reverb Client which points to the replay server.
         """
-        return reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
-            client=replay_client,
-            n_step=self._config.n_step,
-            discount=self._config.discount,
-        )
+
+        # Select adder
+        if self._executer_fn == executors.FeedForwardExecutor:
+            adder = reverb_adders.ParallelNStepTransitionAdder(
+                priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+                client=replay_client,
+                n_step=self._config.n_step,
+                discount=self._config.discount,
+            )
+        elif self._executer_fn == executors.RecurrentExecutor:
+            adder = reverb_adders.ParallelSequenceAdder(
+                priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+                client=replay_client,
+                sequence_length=self._config.sequence_length,
+                period=self._config.period,
+            )
+        else:
+            raise NotImplementedError("Unknown executor type: ", self._executer_fn)
+
+        return adder
 
     def make_executor(
         self,
@@ -197,7 +237,7 @@ class MADDPGBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
-        return executors.FeedForwardExecutor(
+        return self._executer_fn(
             policy_networks=policy_networks,
             shared_weights=shared_weights,
             variable_client=variable_client,
@@ -274,10 +314,10 @@ class MADDPG(system.System):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
-        behavior_networks: Dict[str, snt.Module],
         trainer_fn: Type[
             training.BaseMADDPGTrainer
         ] = training.DecentralisedMADDPGTrainer,
+        executer_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         shared_weights: bool = True,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -342,12 +382,13 @@ class MADDPG(system.System):
                 replay_table_name=replay_table_name,
             ),
             trainer_fn=trainer_fn,
+            executer_fn=executer_fn,
         )
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_table(environment_spec=environment_spec)
-        self._server = reverb.Server([replay_table], port=None)
+        replay_tables = builder.make_replay_tables(environment_spec=environment_spec)
+        self._server = reverb.Server(replay_tables, port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
         # The adder is used to insert observations into replay.
@@ -357,17 +398,16 @@ class MADDPG(system.System):
         dataset = builder.make_dataset_iterator(replay_client)
 
         # Create the networks
-        networks = DecentralisedActorCritic(
+        networks = DecentralisedQValueActorCritic(
             environment_spec=environment_spec,
+            observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            observation_networks=observation_networks,
-            behavior_networks=behavior_networks,
             shared_weights=shared_weights,
         ).create_system()
 
         # Create the actor which defines how we take actions.
-        executor = builder.make_executor(networks["behaviors"], adder)
+        executor = builder.make_executor(networks["policies"], adder)
 
         # The learner updates the parameters (and initializes them).
         trainer = builder.make_trainer(
@@ -378,8 +418,10 @@ class MADDPG(system.System):
             checkpoint=checkpoint,
         )
 
-        # TODO (Arnu): fix mismatch in types between base trainer
-        # and wrapped trainer
+        # NB If using both NetworkStatistics and TrainerStatistics, order is important.
+        # NetworkStatistics needs to appear before TrainerStatistics.
+        trainer = NetworkStatisticsActorCritic(trainer)
+
         trainer = DetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]
         )

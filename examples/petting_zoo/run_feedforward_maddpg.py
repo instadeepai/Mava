@@ -15,6 +15,7 @@
 
 """Example running MADDPG on pettinzoo MPE environments."""
 
+import importlib
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
@@ -30,33 +31,26 @@ from acme.tf import utils as tf2_utils
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
-from mava.utils.debugging.make_env import make_debugging_env
 from mava.utils.loggers import Logger
-from mava.wrappers import DetailedPerAgentStatistics
-from mava.wrappers.debugging_envs import DebuggingEnvWrapper
+from mava.wrappers import DetailedPerAgentStatistics, PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
+flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
 
 flags.DEFINE_integer(
     "num_episodes_per_eval",
-    100,
+    10,
     "Number of training episodes to run between evaluation " "episodes.",
 )
 
 
 def make_environment(
-    env_name: str = "simple_spread",
-    action_space: str = "continuous",
-    num_agents: int = 3,
-    render: bool = False,
+    env_class: str = "sisl", env_name: str = "multiwalker_v6", **kwargs: int
 ) -> dm_env.Environment:
-
-    assert action_space == "continuous" or action_space == "discrete"
-
     """Creates a MPE environment."""
-    env_module = make_debugging_env(env_name, action_space, num_agents)
-    environment = DebuggingEnvWrapper(env_module, render=render)
+    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
+    env = env_module.parallel_env(**kwargs)  # type: ignore
+    environment = PettingZooParallelEnvWrapper(env)
     return environment
 
 
@@ -137,10 +131,7 @@ def make_networks(
 
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment(
-        env_name="simple_spread", action_space="continuous", render=False
-    )
-
+    environment = make_environment(remove_on_fall=False)
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
     system_networks = make_networks(environment_spec)
 
@@ -172,8 +163,8 @@ def main(_: Any) -> None:
             "observations"
         ],  # pytype: disable=wrong-arg-types
         logger=system_logger,
-        checkpoint=False,
     )
+
     # Create the environment loop used for training.
     train_loop = ParallelEnvironmentLoop(
         environment, system, logger=train_logger, label="train_loop"
@@ -199,14 +190,12 @@ def main(_: Any) -> None:
 
     # Create the evaluation actor and loop.
     eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
-    eval_env = make_environment(
-        env_name="simple_spread", action_space="continuous", render=True
-    )
+    eval_env = make_environment(remove_on_fall=False)
     eval_loop = ParallelEnvironmentLoop(eval_env, eval_actor, label="eval_loop")
 
     for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
         train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        eval_loop.run(num_episodes=4)
+        eval_loop.run(num_episodes=1)
 
 
 if __name__ == "__main__":

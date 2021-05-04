@@ -39,14 +39,18 @@ tf_requirements = [
     "trfl",
 ]
 
-env_requirements = ["pettingzoo"]
+env_requirements = ["pettingzoo", "multi_agent_ale_py", "supersuit"]
+
+launchpad_requirements = [
+    "dm-launchpad",
+]
 
 testing_formatting_requirements = [
     "pre-commit",
-    "mypy",
+    "mypy==0.812",
     "pytest-xdist",
-    "flake8",
-    "black",
+    "flake8==3.9.1",
+    "black==21.4b1",
     "pytest-cov",
 ]
 
@@ -90,6 +94,7 @@ setup(
         "tf": tf_requirements,
         "envs": env_requirements,
         "reverb": reverb_requirements,
+        "launchpad": launchpad_requirements,
         "testing_formatting": testing_formatting_requirements,
     },
     classifiers=[
