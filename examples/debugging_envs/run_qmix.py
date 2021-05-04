@@ -111,7 +111,7 @@ def make_networks(
         observation_networks[key] = observation_network
         q_networks[key] = q_network
         behavior_networks[key] = behavior_network
-    print(q_networks)
+
     return {
         "q_networks": q_networks,
         "observations": observation_networks,

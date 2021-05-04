@@ -92,9 +92,6 @@ class MonotonicMixing(BaseMixingModule):
         # TODO Change state spec size to be the size of the one-hot
         # representation.
 
-        print("Create Variables Monotonic Q:", q_value_dim)
-        print("Create Variables Monotonic S:", state_specs)
-        # tf2_utils.create_variables(self._mixed_network._hypernetworks, [state_specs])
         tf2_utils.create_variables(self._mixed_network, [q_value_dim, state_specs])
         return self._mixed_network
 

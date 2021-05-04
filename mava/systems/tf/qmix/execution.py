@@ -61,6 +61,6 @@ class QMIXFeedForwardExecutor(executors.FeedForwardExecutor):
 
         # Sample from the policy if it is stochastic.
         # action = policy.sample() if isinstance(policy, tfd.Distribution) else policy
-        action = tf.argmax(policy)
+        action = tf.argmax(policy, axis=1)
 
         return action

@@ -63,7 +63,7 @@ class HyperNetwork(snt.Module):
             self.hyper_w1 = snt.nets.MLP(
                 output_sizes=[
                     self._hypernet_hidden_dim,
-                    self._qmix_hidden_dim,
+                    self._qmix_hidden_dim * self._n_agents * self._n_actions,
                 ]
             )
             self.hyper_w2 = snt.nets.MLP(
@@ -77,18 +77,13 @@ class HyperNetwork(snt.Module):
     def __call__(
         self, states: Tensor  # [batch_size=B, self._state_dim=3]
     ) -> Dict[str, float]:
-        print(states)
-        print("Hypernet Call:", states.shape)
+
         w1 = tf.abs(
             self.hyper_w1(states)
         )  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
         w1 = tf.reshape(
             w1,
-            (
-                -1,
-                self._n_actions * self._n_agents,
-                self._qmix_hidden_dim,
-            ),  # Expects 256
+            (-1, self._n_actions * self._n_agents, self._qmix_hidden_dim),
         )  # [B, n_actions*n_agents, qmix_hidden_dim] = [B, 4, qmix_hidden_dim]
 
         b1 = self.hyper_b1(states)  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
