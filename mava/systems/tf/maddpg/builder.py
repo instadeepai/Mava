@@ -312,10 +312,11 @@ class MADDPGBuilder(SystemBuilder):
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.
         # NetworkStatistics needs to appear before TrainerStatistics.
-        # trainer = NetworkStatisticsActorCritic(trainer)
+        # TODO(Kale-ab/Arnu): need to fix wrapper type issues
+        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
 
-        # trainer = DetailedTrainerStatistics(  # type: ignore
-        #     trainer, metrics=["policy_loss", "critic_loss"]
-        # )
+        trainer = DetailedTrainerStatistics(  # type: ignore
+            trainer, metrics=["policy_loss", "critic_loss"]
+        )
 
         return trainer
