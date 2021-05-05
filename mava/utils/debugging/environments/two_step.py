@@ -48,7 +48,9 @@ class TwoStepEnv(gym.Env):
 
         self.possible_agents = self.agent_ids
 
-    def reset(self) -> Dict[str, np.array]:
+    def reset(
+        self,
+    ) -> Tuple[Dict[str, Union[np.array, Any]], Dict[str, Any]]:
         self.state = 0
         self.reward_n = {
             "agent_0": np.array(0.0, dtype=np.float32),
@@ -60,7 +62,7 @@ class TwoStepEnv(gym.Env):
             "agent_0": np.array([0.0], dtype=np.float32),
             "agent_1": np.array([0.0], dtype=np.float32),
         }
-        return self.obs_n
+        return self.obs_n, {"s_t": np.array(self.state, dtype=np.int64)}
 
     def step(
         self, action_n: Dict[str, int]
@@ -68,7 +70,7 @@ class TwoStepEnv(gym.Env):
         Dict[str, Union[np.array, Any]],
         Union[dict, Dict[str, Union[float, Any]]],
         Dict[str, Any],
-        Dict[str, dict],
+        Dict[str, Any],
     ]:
         if self.state == 0:
             if action_n["agent_0"] == 0:
@@ -77,14 +79,24 @@ class TwoStepEnv(gym.Env):
                     "agent_0": np.array([1.0], dtype=np.float32),
                     "agent_1": np.array([1.0], dtype=np.float32),
                 }
-                return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2A
+                return (
+                    self.obs_n,
+                    self.reward_n,
+                    self.done_n,
+                    {"s_t": np.array(self.state, dtype=np.int64)},
+                )  # Go to 2A
             else:
                 self.state = 2
                 self.obs_n = {
                     "agent_0": np.array([2.0], dtype=np.float32),
                     "agent_1": np.array([2.0], dtype=np.float32),
                 }
-                return self.obs_n, self.reward_n, self.done_n, {}  # Go to 2B
+                return (
+                    self.obs_n,
+                    self.reward_n,
+                    self.done_n,
+                    {"s_t": np.array(self.state, dtype=np.int64)},
+                )  # Go to 2B
 
         elif self.state == 1:  # State 2A
             self.env_done = True
@@ -94,7 +106,12 @@ class TwoStepEnv(gym.Env):
                 "agent_1": np.array(7.0, dtype=np.float32),
             }
             self.done_n = {"agent_0": True, "agent_1": True}
-            return self.obs_n, self.reward_n, self.done_n, {}
+            return (
+                self.obs_n,
+                self.reward_n,
+                self.done_n,
+                {"s_t": np.array(self.state, dtype=np.int64)},
+            )
 
         elif self.state == 2:  # State 2B
             self.env_done = True
@@ -120,7 +137,12 @@ class TwoStepEnv(gym.Env):
                     "agent_0": np.array(8.0, dtype=np.float32),
                     "agent_1": np.array(8.0, dtype=np.float32),
                 }
-            return self.obs_n, self.reward_n, self.done_n, {}
+            return (
+                self.obs_n,
+                self.reward_n,
+                self.done_n,
+                {"s_t": np.array(self.state, dtype=np.int64)},
+            )
 
         else:
             raise Exception("invalid state:{}".format(self.state))
