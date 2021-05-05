@@ -88,8 +88,8 @@ class DIALConfig:
     priority_exponent: float = 0.6
     n_step: int = 5
     epsilon: Optional[tf.Tensor] = None
-    learning_rate: float = 1e-3
-    discount: float = 0.99
+    learning_rate: float = 5e-4
+    discount: float = 1.0
     logger: loggers.Logger = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
@@ -260,6 +260,7 @@ class DIALBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
+        communication_module: BaseCommunicationModule,
         huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
@@ -289,7 +290,8 @@ class DIALBuilder(SystemBuilder):
         importance_sampling_exponent = self._config.importance_sampling_exponent
 
         # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=learning_rate)
+        # policy_optimizer = snt.optimizers.Adam(learning_rate=learning_rate)
+        policy_optimizer = snt.optimizers.RMSProp(learning_rate, momentum=0.95)
 
         # The learner updates the parameters (and initializes them).
         trainer = DIALTrainer(
@@ -310,6 +312,7 @@ class DIALBuilder(SystemBuilder):
             logger=logger,
             checkpoint=checkpoint,
             max_gradient_norm=max_gradient_norm,
+            communication_module=communication_module,
         )
         return trainer
 
@@ -339,8 +342,8 @@ class DIAL(system.System):
         priority_exponent: float = 0.6,
         n_step: int = 5,
         epsilon: Optional[tf.Tensor] = None,
-        learning_rate: float = 1e-3,
-        discount: float = 0.99,
+        learning_rate: float = 5e-4,
+        discount: float = 1.0,
         logger: loggers.Logger = None,
         counter: counting.Counter = None,
         checkpoint: bool = True,
@@ -405,7 +408,6 @@ class DIAL(system.System):
                 policy_networks=policy_networks,
                 max_gradient_norm=max_gradient_norm,
                 replay_table_name=replay_table_name,
-                communication_module=communication_module,
             ),
             executor_fn=executor_fn,
         )
@@ -443,6 +445,7 @@ class DIAL(system.System):
             architecture=architecture,
             shared=True,
             channel_size=1,
+            channel_noise=2,
         )
 
         networks = self._communication_module.create_system()
@@ -455,7 +458,14 @@ class DIAL(system.System):
         )
 
         # The learner updates the parameters (and initializes them).
-        trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
+        trainer = builder.make_trainer(
+            networks=networks,
+            dataset=dataset,
+            counter=counter,
+            logger=None,
+            checkpoint=checkpoint,
+            communication_module=self._communication_module,
+        )
 
         super().__init__(
             executor=executor,

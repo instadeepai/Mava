@@ -35,6 +35,7 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.components.tf.modules.communication import BaseCommunicationModule
 
 
 class DIALTrainer(mava.Trainer):
@@ -53,6 +54,7 @@ class DIALTrainer(mava.Trainer):
         huber_loss_parameter: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
+        communication_module: BaseCommunicationModule,
         shared_weights: bool = True,
         importance_sampling_exponent: float = None,
         policy_optimizer: snt.Optimizer = None,
@@ -87,6 +89,7 @@ class DIALTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
+        self._communication_module = communication_module
 
         # Store online and target networks.
         self._policy_networks = networks
@@ -258,12 +261,9 @@ class DIALTrainer(mava.Trainer):
                 # For all time-steps
                 for t in range(0, T, 1):
 
-                    # This should use the module
-                    channel[t - 1] = tf.math.reduce_sum(
-                        tf.nest.flatten(messages[t - 1]), axis=0
-                    )
-                    # Add channel noise if applicable
-
+                    channel[t - 1] = self._communication_module.process_messages(
+                        messages[t - 1]
+                    )[self._agents[0]]
                     messages[t] = {}
                     states[t] = {}
 
