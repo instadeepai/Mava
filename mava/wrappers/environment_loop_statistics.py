@@ -81,8 +81,13 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
 
         timestep = self._environment.reset()
 
+        if type(timestep) == tuple:
+            timestep, env_extras = timestep
+        else:
+            env_extras = {}
+
         # Make the first observation.
-        self._executor.observe_first(timestep)
+        self._executor.observe_first(timestep, extras=env_extras)
 
         rewards: Dict[str, float] = {}
         episode_returns: Dict[str, float] = {}
@@ -104,11 +109,17 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
             actions = self._get_actions(timestep)
             timestep = self._environment.step(actions)
 
+            if type(timestep) == tuple:
+                timestep, env_extras = timestep
+            else:
+                env_extras = {}
+
             rewards = timestep.reward
 
             # Have the agent observe the timestep and let the actor update itself.
-
-            self._executor.observe(actions, next_timestep=timestep)
+            self._executor.observe(
+                actions, next_timestep=timestep, next_extras=env_extras
+            )
 
             if self._should_update:
                 self._executor.update()
