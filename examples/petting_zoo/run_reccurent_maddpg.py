@@ -31,7 +31,6 @@ from mava.systems.tf import executors, maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
 
-
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(

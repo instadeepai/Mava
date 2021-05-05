@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import dataclasses
-from typing import Dict, Iterator, List, Optional, Type, Any
+from typing import Any, Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
