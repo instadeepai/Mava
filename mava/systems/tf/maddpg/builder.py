@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import dataclasses
-from typing import Dict, Iterator, List, Optional, Type
+from typing import Dict, Iterator, List, Optional, Type, Any
 
 import reverb
 import sonnet as snt
@@ -95,12 +95,14 @@ class MADDPGBuilder(SystemBuilder):
             training.BaseMADDPGTrainer
         ] = training.DecentralisedMADDPGTrainer,
         executer_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        extras: Dict[str, Any] = {},
     ):
         """Args:
         config: Configuration options for the MADDPG system.
         trainer_fn: Trainer module to use."""
 
         self._config = config
+        self._extras = extras
 
         """ _agents: a list of the agent specs (ids).
             _agent_types: a list of the types of agents to be used."""
@@ -121,20 +123,9 @@ class MADDPGBuilder(SystemBuilder):
                 environment_spec
             )
         elif self._executer_fn == executors.RecurrentExecutor:
-            raise NotImplementedError("Unknown executor type: ", self._executer_fn)
-            # TODO (Dries): can we move getting the core_state_spec
-            # out of the builder?
-            # core_state_spec = {}
-            # for agent in self._agents:
-            #     agent_type = agent.split("_")[0]
-            #     core_state_spec[agent] = (
-            #         tf2_utils.squeeze_batch_dim(
-            #             self._config.policy_networks[agent_type].initial_state(1)
-            #         ),
-            #     )
-            # adder = reverb_adders.ParallelSequenceAdder.signature(
-            #     environment_spec, core_state_spec
-            # )
+            adder = reverb_adders.ParallelSequenceAdder.signature(
+                environment_spec, self._extras["core_state_specs"]
+            )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executer_fn)
 
@@ -188,14 +179,14 @@ class MADDPGBuilder(SystemBuilder):
         # Select adder
         if self._executer_fn == executors.FeedForwardExecutor:
             adder = reverb_adders.ParallelNStepTransitionAdder(
-                priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+                priority_fns=None,
                 client=replay_client,
                 n_step=self._config.n_step,
                 discount=self._config.discount,
             )
         elif self._executer_fn == executors.RecurrentExecutor:
             adder = reverb_adders.ParallelSequenceAdder(
-                priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+                priority_fns=None,
                 client=replay_client,
                 sequence_length=self._config.sequence_length,
                 period=self._config.period,
