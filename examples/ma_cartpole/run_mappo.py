@@ -17,42 +17,48 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
+import acme.tf.networks as networks
 import dm_env
 import numpy as np
 import sonnet as snt
+import tensorflow as tf
+import tensorflow_probability as tfp
 from absl import app, flags
-from ray.rllib.env.multi_agent_env import make_multi_agent
 
 import mava.specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import mappo
+from mava.utils.debugging.make_env import make_debugging_env
 from mava.utils.loggers import Logger
 from mava.wrappers import DetailedPerAgentStatistics
-
-# Testing, remove later.
-from rllib_multi_env_wrapper import RLLibMultiAgentEnvWrapper
+from mava.wrappers.debugging_envs import DebuggingEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
 
 
 def make_environment(
-    env_name: str = "CartPole-v1", num_agents: int = 1, **kwargs: int
+    env_name: str = "simple_spread",
+    action_space: str = "continuous",
+    num_agents: int = 3,
+    render: bool = False,
 ) -> dm_env.Environment:
 
-    """Creates a MPE environment."""
+    assert action_space == "continuous" or action_space == "discrete"
 
-    ma_cls = make_multi_agent(env_name)
-    ma_env = ma_cls({"num_agents": num_agents})
-    wrapped_env = RLLibMultiAgentEnvWrapper(ma_env)
-    return wrapped_env
+    """Creates a MPE environment."""
+    env_module = make_debugging_env(env_name, action_space, num_agents)
+    environment = DebuggingEnvWrapper(env_module, render=render)
+    return environment
 
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
+    layer_sizes: Tuple = (100,),
     recurrent: bool = False,
+    recurrent_layer_size: int = 20,
     shared_weights: bool = False,
 ) -> Dict[str, snt.Module]:
 
@@ -60,62 +66,60 @@ def make_networks(
 
     # TODO handle observation networks.
 
-    specs = environment_spec.get_agent_specs()
-
     # Create agent_type specs.
+    specs = environment_spec.get_agent_specs()
     if shared_weights:
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
     all_networks: Dict = {"policies": {}, "critics": {}}
-    for key in specs.keys():
+    for agent_type, spec in specs.items():
 
-        # Get total number of action dimensions from action spec.
-        # TODO make compatible with continuous actions.
-        num_actions = np.prod(specs[key].actions.num_values, dtype=int)
+        policy_network_layers = []
+        critic_network_layers = []
 
-        # TODO make this if/else statement more compact.
-        if recurrent:
-            # Create the policy network.
-            policy_network = snt.DeepRNN(
-                [
-                    snt.Flatten(),
-                    snt.LSTM(20),
-                    snt.nets.MLP([50]),
-                    snt.Linear(num_actions),
-                ]
-            )
+        critic_network_layers += [
+            networks.LayerNormMLP(layer_sizes, activate_final=True),
+            networks.NearZeroInitializedLinear(1),
+        ]
 
-            # Create the critic network.
-            critic_network = snt.DeepRNN(
-                [
-                    snt.Flatten(),
-                    snt.LSTM(20),
-                    snt.nets.MLP([50]),
-                    snt.Linear(1),
-                ]
-            )
+        # Note: The discrete case must be placed first as it inherits from BoundedArray.
+        if isinstance(spec.actions, dm_env.specs.DiscreteArray):  # discreet
+            num_actions = spec.actions.num_values
+            policy_network_layers += [
+                networks.LayerNormMLP(
+                    layer_sizes + (num_actions,), activate_final=False
+                ),
+                tf.keras.layers.Lambda(
+                    lambda logits: tfp.distributions.Categorical(logits=logits)
+                ),
+            ]
+        elif isinstance(spec.actions, dm_env.specs.BoundedArray):  # continuous
+            num_actions = np.prod(spec.actions.shape, dtype=int)
+            policy_network_layers += [
+                networks.LayerNormMLP(layer_sizes, activate_final=True),
+                networks.MultivariateNormalDiagHead(num_dimensions=num_actions),
+                networks.TanhToSpec(spec.actions),
+            ]
         else:
-            # Create the policy network.
-            policy_network = snt.Sequential(
-                [
-                    snt.Flatten(),
-                    snt.nets.MLP([50]),
-                    snt.Linear(num_actions),
-                ]
-            )
+            raise ValueError(f"Unknown action_spec type, got {spec.actions}.")
 
-            # Create the critic network.
-            critic_network = snt.Sequential(
-                [
-                    snt.Flatten(),
-                    snt.nets.MLP([50]),
-                    snt.Linear(1),
-                ]
-            )
+        if recurrent:
+            policy_network_layers = [
+                snt.LSTM(recurrent_layer_size)
+            ] + policy_network_layers
+            critic_network_layers = [
+                snt.LSTM(recurrent_layer_size)
+            ] + critic_network_layers
 
-        all_networks["policies"][key] = policy_network
-        all_networks["critics"][key] = critic_network
+            policy_network = snt.DeepRNN(policy_network_layers)
+            critic_network = snt.DeepRNN(critic_network_layers)
+        else:
+            policy_network = snt.Sequential(policy_network_layers)
+            critic_network = snt.Sequential(critic_network_layers)
+
+        all_networks["policies"][agent_type] = policy_network
+        all_networks["critics"][agent_type] = critic_network
 
     return all_networks
 
@@ -125,7 +129,7 @@ def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment()
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    all_networks = make_networks(environment_spec)
+    all_networks = make_networks(environment_spec, recurrent=False)
 
     # Create tf loggers.
     base_dir = Path.cwd()
@@ -150,8 +154,10 @@ def main(_: Any) -> None:
     system = mappo.MAPPO(
         environment_spec=environment_spec,
         networks=all_networks,
-        sequence_length=10,
-        sequence_period=5,
+        sequence_length=5,
+        sequence_period=1,
+        entropy_cost=0.0,
+        policy_learning_rate=1e-4,
         shared_weights=False,
         logger=system_logger,
     )

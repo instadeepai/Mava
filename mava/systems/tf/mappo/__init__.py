@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.systems.tf.mappo.execution import MAPPORecurrentExecutor
+from mava.systems.tf.mappo.execution import (
+    MAPPOFeedForwardExecutor,
+    MAPPORecurrentExecutor,
+)
 from mava.systems.tf.mappo.system import MAPPO
 from mava.systems.tf.mappo.training import MAPPOTrainer

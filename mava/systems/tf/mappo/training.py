@@ -79,11 +79,16 @@ class MAPPOTrainer(mava.Trainer):
             logger: logger object to be used by learner.
             checkpoint: boolean indicating whether to checkpoint the learner.
         """
+
+        # Stoe shared_weights
         self._shared_weights = shared_weights
 
         # Store networks.
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
+
+        # Check if networks are recurrent and store in variable
+        # for easy use later.
         self._is_recurrent = isinstance(list(policy_networks.values())[0], snt.DeepRNN)
 
         # Get optimizers
@@ -140,7 +145,7 @@ class MAPPOTrainer(mava.Trainer):
         )
 
         # Get logits and possibly core_states
-        all_logits = extras["logits"]
+        all_log_probs = extras["log_probs"]
         if self._is_recurrent:
             all_core_states = extras["core_states"]
 
@@ -148,12 +153,12 @@ class MAPPOTrainer(mava.Trainer):
         # Do forward passes through the networks and calculate the losses
         for agent in all_obs.keys():
 
-            obs, acts, rews, discs, behaviour_logits = (
+            obs, acts, rews, discs, behaviour_log_probs = (
                 all_obs[agent],
                 all_acts[agent],
                 all_rews[agent],
                 all_discs[agent],
-                all_logits[agent],
+                all_log_probs[agent],
             )
 
             # Get agent core_states
@@ -166,14 +171,16 @@ class MAPPOTrainer(mava.Trainer):
             discs = discs[:-1]
 
             # Get agent network
-            agent_key = agent.split("_")[0] if self._shared_weights else agent
-            policy_network = self._policy_networks[agent_key]
-            critic_network = self._critic_networks[agent_key]
+            network_key = agent.split("_")[0] if self._shared_weights else agent
+            policy_network = self._policy_networks[network_key]
+            critic_network = self._critic_networks[network_key]
 
             with tf.GradientTape(persistent=True) as tape:
                 if self._is_recurrent:
+                    # TODO Fix the recurrent case.
+
                     # Unroll current policy over observations.
-                    logits, _ = snt.static_unroll(
+                    policy, _ = snt.static_unroll(
                         policy_network, obs.observation, core_states
                     )
 
@@ -186,11 +193,11 @@ class MAPPOTrainer(mava.Trainer):
                     # Reshape inputs
                     dims = obs.observation.shape[:2]
                     obs = snt.merge_leading_dims(obs.observation, num_dims=2)
-                    logits = policy_network(obs)
+                    policy = policy_network(obs)
                     values = critic_network(obs)
 
                     # reshape the outputs
-                    logits = tf.reshape(logits, (*dims, -1), name="policy")
+                    policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
                     values = tf.reshape(values, dims, name="value")
 
                 # Values along the sequence T
@@ -221,9 +228,7 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 # Compute importance sampling weights: current policy / behavior policy.
-                pi_behaviour = tfd.Categorical(logits=behaviour_logits)
-                pi_target = tfd.Categorical(logits=logits)
-                log_rhos = pi_target.log_prob(acts) - pi_behaviour.log_prob(acts)
+                log_rhos = policy.log_prob(acts) - behaviour_log_probs
                 importance_ratio = tf.exp(log_rhos)[:-1]
                 clipped_importance_ratio = tf.clip_by_value(
                     importance_ratio,
@@ -236,25 +241,24 @@ class MAPPOTrainer(mava.Trainer):
                 mean, variance = tf.nn.moments(gae, axes=[0, 1], keepdims=True)
                 normalized_gae = (gae - mean) / tf.sqrt(variance)
 
-                policy_gradient_loss = -tf.minimum(
-                    tf.multiply(importance_ratio, normalized_gae),
-                    tf.multiply(clipped_importance_ratio, normalized_gae),
+                policy_gradient_loss = tf.reduce_mean(
+                    -tf.minimum(
+                        tf.multiply(importance_ratio, normalized_gae),
+                        tf.multiply(clipped_importance_ratio, normalized_gae),
+                    ),
+                    name="PolicyGradientLoss",
                 )
 
-                # Entropy regularization.
-                # TODO verify that this entropy regularization
-                # works as we expect.
-                scale = 1.0 / tf.math.log(
-                    tf.convert_to_tensor(logits.shape[-1], dtype=float)
-                )
-                entropy = trfl.policy_entropy_loss(pi_target)
-                entropy_loss = self._entropy_cost * entropy.loss[:-1]
-                policy_entropy = scale * tf.reduce_mean(entropy.extra.entropy)
+                # Entropy regularization. Only implemented for categorical dist.
+                try:
+                    policy_entropy = tf.reduce_mean(policy.entropy())
+                except NotImplementedError:
+                    policy_entropy = tf.convert_to_tensor(0.0)
+
+                entropy_loss = -self._entropy_cost * policy_entropy
 
                 # Combine weighted sum of actor & entropy regularization.
-                policy_loss = tf.reduce_mean(
-                    policy_gradient_loss + entropy_loss, name="PolicyLoss"
-                )
+                policy_loss = policy_gradient_loss + entropy_loss
 
             # Compute gradients.
             critic_grads = tape.gradient(
@@ -328,6 +332,7 @@ class MAPPOTrainer(mava.Trainer):
 
         self._logger.write(fetches)
 
+    # TODO this function needs to be fixed to use policy_networks and critic_networks.
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         variables["network"] = {}

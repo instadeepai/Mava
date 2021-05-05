@@ -62,42 +62,42 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights
 
-        self._prev_logits: Dict[str, Any] = {
-            net_key: None for net_key in policy_networks.keys()
-        }
+        self._prev_log_probs: Dict[str, Any] = {}
 
     def _policy(
         self,
-        agent_key: str,
+        agent: str,
         observation: types.NestedTensor,
     ) -> Tuple[types.NestedTensor, types.NestedTensor]:
+        # Index network either on agent type or on agent id.
+        network_key = agent.split("_")[0] if self._shared_weights else agent
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
-        observation = tf2_utils.add_batch_dim(observation)
+        observation = tf2_utils.add_batch_dim(observation.observation)
 
         # Compute the policy, conditioned on the observation.
-        logits = self._policy_networks[agent_key](observation)
+        policy = self._policy_networks[network_key](observation)
 
-        return logits
+        # Sample from the policy and compute the log likelihood.
+        action = policy.sample()
+        log_prob = policy.log_prob(action)
+
+        # Cast for compatibility with reverb.
+        # smaple() returns a 'int32', which is a problem.
+        if isinstance(policy, tfp.distributions.Categorical):
+            action = tf.cast(action, "int64")
+
+        return log_prob, action
 
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
 
-        # Index network either on agent type or on agent id.
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
-
         # Step the recurrent policy/value network forward
         # given the current observation and state.
-        logits = self._policy(agent_key, observation.observation)
+        self._prev_log_probs[agent], action = self._policy(agent, observation)
 
-        # Bookkeeping of logits.
-        self._prev_logits[agent_key] = logits
-
-        # Sample action
-        # TODO allow for continuous actions
-        action = tfd.Categorical(logits).sample()
-        action = tf.cast(action, dtype="int64")
+        # Return a numpy array with squeezed out batch dimension.
         action = tf2_utils.to_numpy_squeeze(action)
 
         return action
@@ -132,7 +132,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         if not self._adder:
             return
 
-        next_extras.update({"logits": self._prev_logits})
+        next_extras.update({"log_probs": self._prev_log_probs})
 
         next_extras = tf2_utils.to_numpy_squeeze(next_extras)
 
@@ -177,53 +177,51 @@ class MAPPORecurrentExecutor(MAPPOFeedForwardExecutor):
             shared_weights=shared_weights,
         )
 
-        self._states: Dict[str, Any] = {
-            net_key: None for net_key in policy_networks.keys()
-        }
-        self._prev_states: Dict[str, Any] = {
-            net_key: None for net_key in policy_networks.keys()
-        }
+        self._states: Dict[str, Any] = {}
+        self._prev_states: Dict[str, Any] = {}
 
     def _recurrent_policy(
         self,
-        agent_key: str,
+        agent: str,
         observation: types.NestedTensor,
         state: types.NestedTensor,
-    ) -> Tuple[types.NestedTensor, types.NestedTensor]:
+    ) -> Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
+        # Index network either on agent type or on agent id.
+        network_key = agent.split("_")[0] if self._shared_weights else agent
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
-        observation = tf2_utils.add_batch_dim(observation)
+        observation = tf2_utils.add_batch_dim(observation.observation)
 
         # Compute the policy, conditioned on the observation.
-        logits, new_state = self._policy_networks[agent_key](observation, state)
+        policy, new_state = self._policy_networks[network_key](observation, state)
 
-        return logits, new_state
+        # Sample from the policy and compute the log likelihood.
+        action = policy.sample()
+        log_probs = policy.log_prob(action)
+
+        return log_probs, action, new_state
 
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
 
-        # Index network either on agent type or on agent id.
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
-
         # Initialize the RNN state if necessary.
-        if self._states[agent] is None:
-            self._states[agent] = self._policy_networks[agent_key].initial_state(1)
+        if not bool(self._states) or self._states[agent] is None:
+            # Index network either on agent type or on agent id.
+            network_key = agent.split("_")[0] if self._shared_weights else agent
+            self._states[agent] = self._policy_networks[network_key].initial_state(1)
 
         # Step the recurrent policy/value network forward
         # given the current observation and state.
-        logits, new_state = self._recurrent_policy(
-            agent_key, observation.observation, self._states[agent]
+        self._prev_log_probs[agent], action, new_state = self._recurrent_policy(
+            agent, observation, self._states[agent]
         )
 
         # Bookkeeping of recurrent states for the observe method.
-        self._prev_logits[agent_key] = logits
-        self._prev_states[agent_key] = self._states[agent_key]
-        self._states[agent_key] = new_state
+        self._prev_states[agent] = self._states[agent]
+        self._states[agent] = new_state
 
-        # Sample action
-        action = tfd.Categorical(logits).sample()
-        action = tf.cast(action, dtype="int64")
+        # Return a numpy array with squeezed out batch dimension.
         action = tf2_utils.to_numpy_squeeze(action)
 
         return action
@@ -236,9 +234,7 @@ class MAPPORecurrentExecutor(MAPPOFeedForwardExecutor):
 
         # Set the state to None so that we re-initialize at the next policy call.
         for agent, _ in timestep.observation.items():
-            # Index either on agent type or on agent id
-            agent_key = agent.split("_")[0] if self._shared_weights else agent
-            self._states[agent_key] = None
+            self._states[agent] = None
 
         if self._adder:
             self._adder.add_first(timestep)
@@ -253,7 +249,7 @@ class MAPPORecurrentExecutor(MAPPOFeedForwardExecutor):
             return
 
         next_extras.update(
-            {"logits": self._prev_logits, "core_states": self._prev_states}
+            {"log_probs": self._prev_log_probs, "core_states": self._prev_states}
         )
 
         next_extras = tf2_utils.to_numpy_squeeze(next_extras)

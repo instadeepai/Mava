@@ -25,7 +25,7 @@ from mava.adders import reverb as reverb_adders
 
 # from mava.components.tf.architectures import DecentralisedValueActorCritic
 from mava.systems import system
-from mava.systems.tf.mappo import builder, execution
+from mava.systems.tf.mappo import builder
 
 
 class MAPPO(system.System):
@@ -82,12 +82,6 @@ class MAPPO(system.System):
         checkpoint: ...
         replay_table_name: string indicating what name to give the replay table."""
 
-        # TODO Check instance of networks to set executor properly.
-        if isinstance(list(networks["policies"].values())[0], snt.DeepRNN):
-            executor_fn = execution.MAPPORecurrentExecutor
-        else:
-            executor_fn = execution.MAPPOFeedForwardExecutor
-
         self._builder = builder.MAPPOBuilder(
             config=builder.MAPPOConfig(
                 environment_spec=environment_spec,
@@ -108,7 +102,6 @@ class MAPPO(system.System):
                 sequence_period=sequence_period,
             ),
             networks=networks,
-            executer_fn=executor_fn,
         )
 
         # Create a replay server to add data to.

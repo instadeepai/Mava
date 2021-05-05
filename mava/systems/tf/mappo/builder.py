@@ -15,7 +15,7 @@
 
 """MAPPO builder and config."""
 import dataclasses
-from typing import Dict, Iterator, Optional, Type
+from typing import Dict, Iterator, Optional
 
 import reverb
 import sonnet as snt
@@ -84,20 +84,20 @@ class MAPPOBuilder(SystemBuilder):
         self,
         config: MAPPOConfig,
         networks: Dict[str, snt.Module],
-        executer_fn: Type[
-            execution.MAPPOFeedForwardExecutor
-        ] = execution.MAPPOFeedForwardExecutor,
     ):
         """Args:
         config: Configuration options for the MAPPO system.
         policy_networks: ...
         trainer_fn: ...
-        executor_fn: ...
         """
 
         self._config = config
         self._networks = networks
-        self._executor_fn = executer_fn
+
+        if isinstance(list(networks["policies"].values())[0], snt.DeepRNN):
+            self._executor_fn = execution.MAPPORecurrentExecutor
+        else:
+            self._executor_fn = execution.MAPPOFeedForwardExecutor
 
     def make_replay_tables(
         self,
@@ -107,27 +107,23 @@ class MAPPOBuilder(SystemBuilder):
         policy_networks = self._networks["policies"]
         agent_specs = environment_spec.get_agent_specs()
         extras_spec: Dict[str, Dict[str, acme_types.NestedArray]] = (
-            {"logits": {}, "core_states": {}}
+            {"log_probs": {}, "core_states": {}}
             if self._executor_fn == execution.MAPPORecurrentExecutor
-            else {"logits": {}}
+            else {"log_probs": {}}
         )
-        # TODO there is a bit of duplication of work going on here.
-        # This should be fixed in the future.
-        for agent, spec in agent_specs.items():
-            # Get the network key for proper indexing
-            network_key = agent.split("_")[0] if self._config.shared_weights else agent
 
-            # Make dummy logits
-            # TODO This only supports discreet actions at the moment.
-            # We should allow for continuous actions in the future.
-            num_actions = agent_specs[agent].actions.num_values
-            extras_spec["logits"][network_key] = tf.ones(
-                shape=(1, num_actions), dtype=tf.float32
-            )
+        for agent, spec in agent_specs.items():
+            # Make dummy log_probs
+            extras_spec["log_probs"][agent] = tf.ones(shape=(1,), dtype=tf.float32)
 
             # Possibly make dummy core state
             if self._executor_fn == execution.MAPPORecurrentExecutor:
-                extras_spec["core_states"][network_key] = policy_networks[
+                # Get the network key for proper indexing
+                network_key = (
+                    agent.split("_")[0] if self._config.shared_weights else agent
+                )
+
+                extras_spec["core_states"][agent] = policy_networks[
                     network_key
                 ].initial_state(1)
 
