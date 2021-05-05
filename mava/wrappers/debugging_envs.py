@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Wraps a Debugging MARL environment to be used as a dm_env environment."""
-from typing import Dict
+from typing import Dict, Tuple
 
 import dm_env
 import numpy as np
@@ -25,7 +25,7 @@ from gym import spaces
 from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv
 from mava.utils.debugging.environments.two_step import TwoStepEnv
-from mava.utils.wrapper_utils import convert_np_type
+from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 
