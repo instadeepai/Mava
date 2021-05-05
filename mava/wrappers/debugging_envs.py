@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Wraps a Debugging MARL environment to be used as a dm_env environment."""
-from typing import Dict
+from typing import Dict, Tuple
 
 import dm_env
 import numpy as np
@@ -22,11 +22,13 @@ from acme import specs
 
 # from acme.specs import EnvironmentSpec
 from acme.wrappers.gym_wrapper import _convert_to_spec
+from gym import spaces
 
 from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv
 from mava.utils.debugging.environments.switch_game import MultiAgentSwitchGame
-from mava.utils.wrapper_utils import convert_np_type
+from mava.utils.debugging.environments.two_step import TwoStepEnv
+from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 # from gym import spaces
@@ -162,3 +164,83 @@ class SwitchGameWrapper(PettingZooParallelEnvWrapper):
             # )
             # for agent in self._environment.agent_ids
         }
+
+
+class TwoStepWrapper(PettingZooParallelEnvWrapper):
+    """Wraps simple two-step matrix game from Qmix paper. Useful for
+    debugging and quick comparison of cooperative performance."""
+
+    def __init__(self, environment: TwoStepEnv) -> None:
+        super().__init__(environment=environment)
+        self._reset_next_step = True
+
+        # TODO Do I need these? Seems like they should be handled in PettingZoo wrapper
+        self.environment.action_spaces = {}
+        self.environment.observation_spaces = {}
+        self.environment.extra_specs = {
+            "s_t": spaces.Discrete(3)
+        }  # Global state 1, 2, or 3
+
+        for agent_id in self.environment.agent_ids:
+            self.environment.action_spaces[agent_id] = spaces.Discrete(2)  # int64
+            self.environment.observation_spaces[agent_id] = spaces.Box(
+                0, 1, shape=(1,)
+            )  # float32
+
+    def step(self, actions: Dict[str, np.array]) -> Tuple[dm_env.TimeStep, np.array]:
+        """Steps the environment."""
+        if self._reset_next_step:
+            self._reset_next_step = False
+            self.reset()
+
+        observations, rewards, dones, state_infos = self._environment.step(actions)
+        if observations:
+            observations = self._convert_observations(observations, dones)
+
+        if self._environment.env_done:
+            self._step_type = dm_env.StepType.LAST
+            self._reset_next_step = True
+        else:
+            self._step_type = dm_env.StepType.MID
+
+        return (
+            dm_env.TimeStep(
+                observation=observations,
+                reward=rewards,
+                discount=self._discounts,
+                step_type=self._step_type,
+            ),
+            state_infos,
+        )
+
+    def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
+        """Resets the episode."""
+        self._reset_next_step = False
+        self._step_type = dm_env.StepType.FIRST
+        discount_spec = self.discount_spec()
+        self._discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self._environment.possible_agents
+        }
+        observe, state_infos = self._environment.reset()
+        observations = self._convert_observations(
+            observe, {agent: False for agent in self.possible_agents}
+        )
+        rewards_spec = self.reward_spec()
+        rewards = {
+            agent: convert_np_type(rewards_spec[agent].dtype, 0)
+            for agent in self.possible_agents
+        }
+
+        discount_spec = self.discount_spec()
+        self._discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self.possible_agents
+        }
+        return (
+            parameterized_restart(rewards, self._discounts, observations),
+            state_infos,
+        )
+
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        return self.environment.extra_specs
