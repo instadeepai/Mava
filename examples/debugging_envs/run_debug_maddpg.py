@@ -104,7 +104,6 @@ def make_networks(
         # Create the policy network.
         policy_network = snt.Sequential(
             [
-                observation_network,
                 networks.LayerNormMLP(
                     policy_networks_layer_sizes[key], activate_final=True
                 ),
