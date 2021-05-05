@@ -77,7 +77,7 @@ def make_environment(
     """
     del evaluation
 
-    env_module = importlib.import_module(f"pettingzoo.{env_type}.{env_name}")
+    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
 
     # TODO (Arnu): find a way to pass kwargs when using lp_utils
     if env_type == "parallel":

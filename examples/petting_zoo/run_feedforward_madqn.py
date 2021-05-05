@@ -20,29 +20,28 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import launchpad as lp
-import sonnet as snt
 import tensorflow as tf
-import trfl
 from absl import app, flags
 from acme import types
 from acme.tf.networks import DQNAtariNetwork
 
 from mava import specs as mava_specs
-
-# from mava.components.tf.networks import NetworkWithMaskedEpsilonGreedy
+from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
 
 FLAGS = flags.FLAGS
+
+flags.DEFINE_string(
+    "env_class",
+    "atari",
+    "Pettingzoo environment class, e.g. atari (str).",
+)
+
 flags.DEFINE_string(
     "env_name",
     "maze_craze_v2",
-    "Pettingzoo environment name, e.g. pong (str).",
-)
-flags.DEFINE_string(
-    "game_version",
-    "race",
     "Pettingzoo environment name, e.g. pong (str).",
 )
 
@@ -61,8 +60,15 @@ def make_networks(
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
+    def action_selector_fn(
+        q_values: types.NestedTensor, legal_actions: types.NestedTensor
+    ) -> types.NestedTensor:
+        return epsilon_greedy_action_selector(
+            action_values=q_values, legal_actions_mask=legal_actions
+        )
+
     q_networks = {}
-    policy_networks = {}
+    action_selectors = {}
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
@@ -71,24 +77,15 @@ def make_networks(
         # Create the q-value network.
         q_network = DQNAtariNetwork(num_dimensions)
 
-        # TODO (Arnu): find a general way to support legal actions
-        # policy_network = NetworkWithMaskedEpsilonGreedy(q_network, epsilon=epsilon)
-
-        # Epsilon greedy policy network
-        policy_network = snt.Sequential(
-            [
-                q_network,
-                lambda q: tf.cast(
-                    trfl.epsilon_greedy(q, epsilon=epsilon).sample(), "int64"
-                ),
-            ]
-        )
+        # epsilon greedy action selector
+        action_selector = action_selector_fn
 
         q_networks[key] = q_network
-        policy_networks[key] = policy_network
+        action_selectors[key] = action_selector
+
     return {
         "q_networks": q_networks,
-        "policies": policy_networks,
+        "action_selectors": action_selectors,
     }
 
 
@@ -103,12 +100,15 @@ def main(_: Any) -> None:
 
     environment_factory = lp_utils.partial_kwargs(
         pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
     )
 
+    network_factory = lp_utils.partial_kwargs(make_networks)
+
     program = madqn.MADQN(
         environment_factory=environment_factory,
-        network_factory=lp_utils.partial_kwargs(make_networks),
+        network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
     ).build()
