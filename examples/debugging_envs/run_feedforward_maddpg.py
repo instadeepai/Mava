@@ -19,7 +19,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
-import dm_env
 import launchpad as lp
 import numpy as np
 import sonnet as snt
@@ -31,35 +30,19 @@ from acme.tf import utils as tf2_utils
 from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
-from mava.utils.debugging.make_env import make_debugging_env
-from mava.wrappers.debugging_envs import DebuggingEnvWrapper
+from mava.utils.environments import debugging_utils
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
-
-flags.DEFINE_integer(
-    "num_episodes_per_eval",
-    100,
-    "Number of training episodes to run between evaluation " "episodes.",
+flags.DEFINE_string(
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
 )
-
-
-def make_environment(
-    evaluation: bool = False,
-    env_name: str = "simple_spread",
-    action_space: str = "continuous",
-    num_agents: int = 3,
-    render: bool = False,
-) -> dm_env.Environment:
-
-    del evaluation
-
-    assert action_space == "continuous" or action_space == "discrete"
-
-    """Creates a MPE environment."""
-    env_module = make_debugging_env(env_name, action_space, num_agents)
-    environment = DebuggingEnvWrapper(env_module, render=render)
-    return environment
+flags.DEFINE_string(
+    "action_space",
+    "continuous",
+    "Environment action space type (str).",
+)
 
 
 def make_networks(
@@ -145,15 +128,25 @@ def main(_: Any) -> None:
 
     log_info = (log_dir, log_time_stamp)
 
-    environment_factory = lp_utils.partial_kwargs(make_environment)
+    # environment
+    environment_factory = lp_utils.partial_kwargs(
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+    )
 
+    # networks
+    network_factory = lp_utils.partial_kwargs(make_networks)
+
+    # distributed program
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
-        network_factory=lp_utils.partial_kwargs(make_networks),
+        network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
     ).build()
 
+    # launch
     lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
 
 

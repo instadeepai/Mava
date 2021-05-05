@@ -12,18 +12,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Adders for Reverb replay buffers."""
-
-# pylint: disable=unused-import
-
-from mava.adders.reverb.base import (
-    DEFAULT_PRIORITY_TABLE,
-    PriorityFn,
-    PriorityFnInput,
-    ReverbParallelAdder,
-    Step,
-)
-from mava.adders.reverb.episode import ParallelEpisodeAdder
-from mava.adders.reverb.sequence import ParallelSequenceAdder
-from mava.adders.reverb.transition import ParallelNStepTransitionAdder

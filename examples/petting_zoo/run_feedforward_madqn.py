@@ -13,55 +13,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Example running MADQN on the pettingzoo environment."""
+
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any, Mapping
 
-import dm_env
 import launchpad as lp
-import sonnet as snt
 import tensorflow as tf
 from absl import app, flags
 from acme import types
-from acme.tf import networks
+from acme.tf.networks import DQNAtariNetwork
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.debugging.make_env import make_debugging_env
-from mava.wrappers.debugging_envs import DebuggingEnvWrapper
+from mava.utils.environments import pettingzoo_utils
 
 FLAGS = flags.FLAGS
+
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
+    "env_class",
+    "atari",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 
-
-def make_environment(
-    evaluation: bool,
-    env_name: str = "simple_spread",
-    action_space: str = "discrete",
-    num_agents: int = 3,
-    render: bool = False,
-) -> dm_env.Environment:
-
-    assert action_space == "continuous" or action_space == "discrete"
-
-    del evaluation
-
-    """Creates a MPE environment."""
-    env_module = make_debugging_env(env_name, action_space, num_agents)
-    environment = DebuggingEnvWrapper(env_module, render=render)
-    return environment
+flags.DEFINE_string(
+    "env_name",
+    "maze_craze_v2",
+    "Pettingzoo environment name, e.g. pong (str).",
+)
 
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    epsilon: tf.Variable = tf.Variable(1.0, trainable=False),
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
+    epsilon: tf.Variable = tf.Variable(0.05, trainable=False),
     shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -72,9 +59,6 @@ def make_networks(
     if shared_weights:
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
-
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
     def action_selector_fn(
         q_values: types.NestedTensor, legal_actions: types.NestedTensor
@@ -90,13 +74,8 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
 
-        # Create the policy network.
-        q_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(q_networks_layer_sizes[key], activate_final=True),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
-        )
+        # Create the q-value network.
+        q_network = DQNAtariNetwork(num_dimensions)
 
         # epsilon greedy action selector
         action_selector = action_selector_fn
@@ -120,12 +99,16 @@ def main(_: Any) -> None:
     log_info = (log_dir, log_time_stamp)
 
     environment_factory = lp_utils.partial_kwargs(
-        make_environment, env_name=FLAGS.env_name
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
+        env_name=FLAGS.env_name,
     )
+
+    network_factory = lp_utils.partial_kwargs(make_networks)
 
     program = madqn.MADQN(
         environment_factory=environment_factory,
-        network_factory=lp_utils.partial_kwargs(make_networks),
+        network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
     ).build()

@@ -23,6 +23,7 @@ import reverb
 import sonnet as snt
 from acme import specs as acme_specs
 from acme.tf import savers as tf2_savers
+from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
@@ -118,6 +119,9 @@ class MADDPG(system.System):
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
 
+        if executer_fn == executors.RecurrentExecutor:
+            extras = self._get_extras()
+
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
@@ -135,7 +139,24 @@ class MADDPG(system.System):
             ),
             trainer_fn=trainer_fn,
             executer_fn=executer_fn,
+            extras=extras,
         )
+
+    def _get_extras(self) -> Any:
+        agents = self._config.environment_spec.get_agent_ids()
+        core_state_specs = {}
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec
+        )
+        for agent in agents:
+            agent_type = agent.split("_")[0]
+            core_state_specs[agent] = (
+                tf2_utils.squeeze_batch_dim(
+                    networks["policies"][agent_type].initial_state(1)
+                ),
+            )
+        extras = {"core_state_specs": core_state_specs}
+        return extras
 
     def replay(self) -> Any:
         """The replay storage."""
