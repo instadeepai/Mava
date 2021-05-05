@@ -41,7 +41,7 @@ flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run 
 
 def make_environment(
     env_name: str = "simple_spread",
-    action_space: str = "discrete",
+    action_space: str = "continuous",
     num_agents: int = 3,
     render: bool = False,
 ) -> dm_env.Environment:
@@ -56,7 +56,10 @@ def make_environment(
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    layer_sizes: Tuple = (100,),
+    layer_sizes: Tuple = (
+        256,
+        256,
+    ),
     recurrent: bool = False,
     recurrent_layer_size: int = 20,
     shared_weights: bool = False,
@@ -154,8 +157,8 @@ def main(_: Any) -> None:
     system = mappo.MAPPO(
         environment_spec=environment_spec,
         networks=all_networks,
-        sequence_length=5,
-        sequence_period=1,
+        sequence_length=10,
+        sequence_period=5,
         entropy_cost=0.0,
         shared_weights=False,
         logger=system_logger,
