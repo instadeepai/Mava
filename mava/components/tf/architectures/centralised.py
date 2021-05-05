@@ -26,6 +26,7 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures.decentralised import (
     DecentralisedPolicyActor,
     DecentralisedQValueActorCritic,
+    DecentralisedSoftQValueActorCritic,
 )
 
 
@@ -127,6 +128,132 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
         return critic_obs_specs, critic_act_specs
 
 
+class CentralisedSoftQValueCritic(DecentralisedSoftQValueActorCritic):
+    """Centralised multi-agent soft actor critic architecture."""
+
+    def __init__(
+        self,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
+        critic_V_networks: Dict[str, snt.Module],
+        critic_Q_1_networks: Dict[str, snt.Module],
+        critic_Q_2_networks: Dict[str, snt.Module],
+        shared_weights: bool = True,
+    ):
+        super().__init__(
+            environment_spec=environment_spec,
+            observation_networks=observation_networks,
+            policy_networks=policy_networks,
+            critic_V_networks=critic_V_networks,
+            critic_Q_1_networks=critic_Q_1_networks,
+            critic_Q_2_networks=critic_Q_2_networks,
+            shared_weights=shared_weights,
+        )
+
+    def _get_critic_V_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        obs_specs_per_type: Dict[str, acme_specs.Array] = {}
+        action_specs_per_type: Dict[str, acme_specs.Array] = {}
+
+        agents_by_type = self._env_spec.get_agents_by_type()
+
+        for agent_type, agents in agents_by_type.items():
+            critic_V_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            critic_V_obs_shape.insert(0, len(agents))
+            obs_specs_per_type[agent_type] = tf.TensorSpec(
+                shape=critic_V_obs_shape,
+                dtype=tf.dtypes.float32,
+            )
+
+            critic_V_act_shape = list(
+                copy.copy(self._agent_specs[agents[0]].actions.shape)
+            )
+            critic_V_act_shape.insert(0, len(agents))
+            action_specs_per_type[agent_type] = tf.TensorSpec(
+                shape=critic_V_act_shape,
+                dtype=tf.dtypes.float32,
+            )
+
+        critic_V_obs_specs = {}
+        critic_V_act_specs = {}
+        for agent_key in self._critic_V_agent_keys:
+            agent_type = agent_key.split("_")[0]
+            # Get observation and action spec for critic_V.
+            critic_V_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+            critic_V_act_specs[agent_key] = action_specs_per_type[agent_type]
+        return critic_V_obs_specs, critic_V_act_specs
+
+    def _get_critic_Q_1_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        obs_specs_per_type: Dict[str, acme_specs.Array] = {}
+        action_specs_per_type: Dict[str, acme_specs.Array] = {}
+
+        agents_by_type = self._env_spec.get_agents_by_type()
+
+        for agent_type, agents in agents_by_type.items():
+            critic_Q_1_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            critic_Q_1_obs_shape.insert(0, len(agents))
+            obs_specs_per_type[agent_type] = tf.TensorSpec(
+                shape=critic_Q_1_obs_shape,
+                dtype=tf.dtypes.float32,
+            )
+
+            critic_Q_1_act_shape = list(
+                copy.copy(self._agent_specs[agents[0]].actions.shape)
+            )
+            critic_Q_1_act_shape.insert(0, len(agents))
+            action_specs_per_type[agent_type] = tf.TensorSpec(
+                shape=critic_Q_1_act_shape,
+                dtype=tf.dtypes.float32,
+            )
+
+        critic_Q_1_obs_specs = {}
+        critic_Q_1_act_specs = {}
+        for agent_key in self._critic_Q_1_agent_keys:
+            agent_type = agent_key.split("_")[0]
+            # Get observation and action spec for critic_Q_1.
+            critic_Q_1_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+            critic_Q_1_act_specs[agent_key] = action_specs_per_type[agent_type]
+        return critic_Q_1_obs_specs, critic_Q_1_act_specs
+
+    def _get_critic_Q_2_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        obs_specs_per_type: Dict[str, acme_specs.Array] = {}
+        action_specs_per_type: Dict[str, acme_specs.Array] = {}
+
+        agents_by_type = self._env_spec.get_agents_by_type()
+
+        for agent_type, agents in agents_by_type.items():
+            critic_Q_2_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            critic_Q_2_obs_shape.insert(0, len(agents))
+            obs_specs_per_type[agent_type] = tf.TensorSpec(
+                shape=critic_Q_2_obs_shape,
+                dtype=tf.dtypes.float32,
+            )
+
+            critic_Q_2_act_shape = list(
+                copy.copy(self._agent_specs[agents[0]].actions.shape)
+            )
+            critic_Q_2_act_shape.insert(0, len(agents))
+            action_specs_per_type[agent_type] = tf.TensorSpec(
+                shape=critic_Q_2_act_shape,
+                dtype=tf.dtypes.float32,
+            )
+
+        critic_Q_2_obs_specs = {}
+        critic_Q_2_act_specs = {}
+        for agent_key in self._critic_Q_2_agent_keys:
+            agent_type = agent_key.split("_")[0]
+            # Get observation and action spec for critic_Q_2.
+            critic_Q_2_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+            critic_Q_2_act_specs[agent_key] = action_specs_per_type[agent_type]
+        return critic_Q_2_obs_specs, critic_Q_2_act_specs
+
+
 # TODO (Arnu): remove mypy type ignore once we can handle type checking for
 # nested/multiple inheritance
 class CentralisedQValueActorCritic(  # type: ignore
@@ -149,5 +276,35 @@ class CentralisedQValueActorCritic(  # type: ignore
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
+            shared_weights=shared_weights,
+        )
+
+
+# TODO (Arnu): remove mypy type ignore once we can handle type checking for
+# nested/multiple inheritance
+class CentralisedSoftQValueActorCritic(  # type: ignore
+    CentralisedPolicyActor, CentralisedSoftQValueCritic
+):
+    """Centralised multi-agent soft actor critic architecture."""
+
+    def __init__(
+        self,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
+        critic_V_networks: Dict[str, snt.Module],
+        critic_Q_1_networks: Dict[str, snt.Module],
+        critic_Q_2_networks: Dict[str, snt.Module],
+        shared_weights: bool = True,
+    ):
+
+        CentralisedSoftQValueCritic.__init__(
+            self,
+            environment_spec=environment_spec,
+            observation_networks=observation_networks,
+            policy_networks=policy_networks,
+            critic_V_networks=critic_V_networks,
+            critic_Q_1_networks=critic_Q_1_networks,
+            critic_Q_2_networks=critic_Q_2_networks,
             shared_weights=shared_weights,
         )

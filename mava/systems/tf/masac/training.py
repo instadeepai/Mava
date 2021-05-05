@@ -42,7 +42,6 @@ class BaseMASACTrainer(mava.Trainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        action_size: int,
         policy_networks: Dict[str, snt.Module],
         critic_Q_1_networks: Dict[str, snt.Module],
         critic_Q_2_networks: Dict[str, snt.Module],
@@ -593,7 +592,6 @@ class CentralisedMASACTrainer(BaseMASACTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        action_size: int,
         policy_networks: Dict[str, snt.Module],
         critic_Q_1_networks: Dict[str, snt.Module],
         critic_Q_2_networks: Dict[str, snt.Module],
@@ -654,7 +652,6 @@ class CentralisedMASACTrainer(BaseMASACTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            action_size=action_size,
             policy_networks=policy_networks,
             critic_Q_1_networks=critic_Q_1_networks,
             critic_Q_2_networks=critic_Q_2_networks,

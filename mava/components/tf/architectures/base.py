@@ -47,3 +47,23 @@ class BaseActorCritic(BaseArchitecture):
     @abc.abstractmethod
     def create_critic_variables(self) -> Dict[str, Dict[str, snt.Module]]:
         """Create network variables for critics in the system."""
+
+
+class BaseSoftActorCritic(BaseArchitecture):
+    """Base class for MARL Soft Actor critic architectures.
+    Objects which implement this interface provide a set of functions
+    to create systems according to a specific architectural design,
+    e.g. decentralised, centralised or networked.
+    """
+
+    @abc.abstractmethod
+    def create_critic_V_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+        """Create network variables for critics in the system."""
+
+    @abc.abstractmethod
+    def create_critic_Q_1_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+        """Create network variables for Q value critics in the system."""
+
+    @abc.abstractmethod
+    def create_critic_Q_2_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+        """Create network variables for Q value critics in the system."""
