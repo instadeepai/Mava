@@ -99,4 +99,3 @@ class MonotonicMixing(BaseMixingModule):
         networks["mixing"] = self._create_mixing_layer()
         networks["target_mixing"] = self._create_mixing_layer()  # or deep copy?
         return networks
-
