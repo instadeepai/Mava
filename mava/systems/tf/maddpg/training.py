@@ -923,21 +923,11 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             self._num_steps.assign_add(1)
 
     def _combine_dim(self, tensor: tf.Tensor) -> tf.Tensor:
-        # TODO (dries): Use the following instead:
-        #  dims = tensor.shape[:2]
-        #  snt.merge_leading_dims(tensor, num_dims=2)
-        if len(tensor.shape) == 4:
-            b_size, l_size, o_size, s_size = tensor.shape
-            return tf.reshape(tensor, [b_size * l_size, o_size, s_size]), b_size, l_size
-        elif len(tensor.shape) == 3:
-            b_size, l_size, _ = tensor.shape
-            return tf.reshape(tensor, [b_size * l_size, -1]), b_size, l_size
-        else:
-            assert len(tensor.shape) == 2
-            return tf.reshape(tensor, [-1])
+        dims = tensor.shape[:2]
+        return snt.merge_leading_dims(tensor, num_dims=2), dims
 
-    def _extract_dim(self, tensor: tf.Tensor, b_size: int, l_size: int) -> tf.Tensor:
-        return tf.reshape(tensor, [b_size, l_size, -1])
+    def _extract_dim(self, tensor: tf.Tensor, dims: tf.Tensor) -> tf.Tensor:
+        return tf.reshape(tensor, [dims[0], dims[1], -1])
 
     @tf.function
     def _transform_observations(
@@ -950,18 +940,15 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
 
-            reshaped_obs, b_size, l_size = self._combine_dim(
-                observations[agent].observation
-            )
+            reshaped_obs, dims = self._combine_dim(observations[agent].observation)
 
             obs_trans[agent] = self._extract_dim(
-                self._observation_networks[agent_key](reshaped_obs), b_size, l_size
+                self._observation_networks[agent_key](reshaped_obs), dims
             )
 
             obs_target_trans[agent] = self._extract_dim(
                 self._target_observation_networks[agent_key](reshaped_obs),
-                b_size,
-                l_size,
+                dims,
             )
 
             # This stop_gradient prevents gradients to propagate into the target
@@ -1040,8 +1027,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             )
             actions[agent] = tf2_utils.batch_to_sequence(outputs)
         return actions
-
-    # def _covert_observations
 
     # NOTE (Arnu): the decorator below was causing this _step() function not
     # to be called by the step() function below. Removing it makes the code
@@ -1126,13 +1111,13 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
                 # Critic learning.
                 # Remove the last sequence step for the normal network
-                obs_comb, _, _ = self._combine_dim(obs_trans_feed[:, :-1])
-                act_comb, _, _ = self._combine_dim(action_feed[:, :-1])
+                obs_comb, _ = self._combine_dim(obs_trans_feed[:, :-1])
+                act_comb, _ = self._combine_dim(action_feed[:, :-1])
                 q_values = self._critic_networks[agent_key](obs_comb, act_comb)
 
                 # Remove first sequence step for the target
-                obs_comb, _, _ = self._combine_dim(target_obs_trans_feed[:, 1:])
-                act_comb, _, _ = self._combine_dim(target_actions_feed[:, 1:])
+                obs_comb, _ = self._combine_dim(target_obs_trans_feed[:, 1:])
+                act_comb, _ = self._combine_dim(target_actions_feed[:, 1:])
                 target_q_values = self._target_critic_networks[agent_key](
                     obs_comb, act_comb
                 )
@@ -1146,14 +1131,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 # TODO (dries): Is discounts and rewards correct?
                 #  Or should it be [:, 1:]?
 
-                # print("agent_rewards: ", rewards[agent][0, 1:])
-                # print("agent_discounts: ", discounts[agent][0, 1:])
-
-                agent_rewards = self._combine_dim(rewards[agent][:, :-1])
-                agent_discounts = self._combine_dim(discounts[agent][:, :-1])
-
-                # print("Discounts all 1: ", np.all(agent_discounts == 1.0))
-                # print("Rewards all 0: ", np.all(agent_rewards == 0.0))
+                agent_rewards, _ = self._combine_dim(rewards[agent][:, :-1])
+                agent_discounts, _ = self._combine_dim(discounts[agent][:, :-1])
 
                 # Critic loss.
                 # TODO (dries): Change the critic losses to n step return losses?
@@ -1181,8 +1160,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 )
 
                 # Get dpg Q values.
-                obs_comb, _, _ = self._combine_dim(target_obs_trans_feed)
-                act_comb, _, _ = self._combine_dim(dpg_actions_feed)
+                obs_comb, _ = self._combine_dim(target_obs_trans_feed)
+                act_comb, _ = self._combine_dim(dpg_actions_feed)
                 dpg_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
