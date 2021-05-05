@@ -53,20 +53,27 @@ class MockedExecutor(ActorMock, core.Executor):
     ) -> Union[float, int]:
         return _generate_from_spec(self._spec[agent].actions)
 
-    def observe_first(self, timestep: dm_env.TimeStep) -> None:
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
         for agent, observation_spec in self._specs.items():
             _validate_spec(
                 observation_spec.observations,
                 timestep.observation[agent],
             )
+        if extras:
+            _validate_spec(extras)
 
     def agent_observe_first(self, agent: str, timestep: dm_env.TimeStep) -> None:
         _validate_spec(self._spec[agent].observations, timestep.observation)
 
     def observe(
         self,
-        action: types.NestedArray,
+        action: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
 
         for agent, observation_spec in self._spec.items():
@@ -77,6 +84,8 @@ class MockedExecutor(ActorMock, core.Executor):
                 _validate_spec(
                     observation_spec.observations, next_timestep.observation[agent]
                 )
+        if next_extras:
+            _validate_spec(next_extras)
 
     def agent_observe(
         self,
