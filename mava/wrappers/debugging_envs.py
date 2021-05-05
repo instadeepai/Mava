@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Wraps a Debugging MARL environment to be used as a dm_env environment."""
-from typing import Dict
+from typing import Dict, Tuple
 
 import dm_env
 import numpy as np
@@ -25,7 +25,7 @@ from gym import spaces
 from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv
 from mava.utils.debugging.environments.two_step import TwoStepEnv
-from mava.utils.wrapper_utils import convert_np_type
+from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 
@@ -74,14 +74,11 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         else:
             self._step_type = dm_env.StepType.MID
 
-        return (
-            dm_env.TimeStep(
-                observation=observations,
-                reward=rewards,
-                discount=self._discounts,
-                step_type=self._step_type,
-            ),
-            {},
+        return dm_env.TimeStep(
+            observation=observations,
+            reward=rewards,
+            discount=self._discounts,
+            step_type=self._step_type,
         )
 
     # Convert Debugging environment observation so it's dm_env compatible.
@@ -136,7 +133,9 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
         # TODO Do I need these? Seems like they should be handled in PettingZoo wrapper
         self.environment.action_spaces = {}
         self.environment.observation_spaces = {}
-        self.environment.extra_specs = spaces.Discrete(3)  # Global state 1, 2, or 3
+        self.environment.extra_specs = {
+            "s_t": spaces.Discrete(3)
+        }  # Global state 1, 2, or 3
 
         for agent_id in self.environment.agent_ids:
             self.environment.action_spaces[agent_id] = spaces.Discrete(2)  # int64
@@ -144,13 +143,13 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
                 0, 1, shape=(1,)
             )  # float32
 
-    def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
+    def step(self, actions: Dict[str, np.array]) -> Tuple[dm_env.TimeStep, np.array]:
         """Steps the environment."""
         if self._reset_next_step:
             self._reset_next_step = False
             self.reset()
 
-        observations, rewards, dones, infos = self._environment.step(actions)
+        observations, rewards, dones, state_infos = self._environment.step(actions)
         if observations:
             observations = self._convert_observations(observations, dones)
 
@@ -160,12 +159,44 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
         else:
             self._step_type = dm_env.StepType.MID
 
-        return dm_env.TimeStep(
-            observation=observations,
-            reward=rewards,
-            discount=self._discounts,
-            step_type=self._step_type,
+        return (
+            dm_env.TimeStep(
+                observation=observations,
+                reward=rewards,
+                discount=self._discounts,
+                step_type=self._step_type,
+            ),
+            state_infos,
+        )
+
+    def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
+        """Resets the episode."""
+        self._reset_next_step = False
+        self._step_type = dm_env.StepType.FIRST
+        discount_spec = self.discount_spec()
+        self._discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self._environment.possible_agents
+        }
+        observe, state_infos = self._environment.reset()
+        observations = self._convert_observations(
+            observe, {agent: False for agent in self.possible_agents}
+        )
+        rewards_spec = self.reward_spec()
+        rewards = {
+            agent: convert_np_type(rewards_spec[agent].dtype, 0)
+            for agent in self.possible_agents
+        }
+
+        discount_spec = self.discount_spec()
+        self._discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self.possible_agents
+        }
+        return (
+            parameterized_restart(rewards, self._discounts, observations),
+            state_infos,
         )
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
-        return {"s_t": self.environment.extra_specs}
+        return self.environment.extra_specs

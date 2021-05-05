@@ -77,7 +77,6 @@ class HyperNetwork(snt.Module):
     def __call__(
         self, states: Tensor  # [batch_size=B, self._state_dim=3]
     ) -> Dict[str, float]:
-
         w1 = tf.abs(
             self.hyper_w1(states)
         )  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]

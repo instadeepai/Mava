@@ -23,7 +23,7 @@
 
 """Qmix trainer implementation."""
 
-import time
+# import time
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
@@ -34,6 +34,7 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.utils import training_utils as train_utils
 
 
 class QMIXTrainer(mava.Trainer):
@@ -156,82 +157,80 @@ class QMIXTrainer(mava.Trainer):
         if self._epsilon < 0.01:
             self._epsilon.assign(0.01)
 
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-
-        # Update the target networks
-        # TODO Update target mixing network in this function
-        self._update_target_networks()
-
-        # decrement epsilon
-        self._decrement_epsilon()
-
-        # Get data from replay (dropping extras if any). Note there is no
-        # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
-
+    def _forward(self, inputs: Any) -> None:
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
+        # e_tm1 [Optional] = extra data that the agents persist in replay.
         # r_t = dictionary of rewards or rewards sequences
         #   (if using N step transitions) ensuing from actions a_tm1
         # d_t = environment discount ensuing from actions a_tm1.
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
-        # e_t [Optional] = extra data that the agents persist in replay.
-        o_tm1, a_tm1, _, r_t, d_t, o_t, _ = inputs.data
+        # e_t = [Optional] = extra data that the agents persist in replay.
+        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
 
-        # Rename for convenience
-        # rewards = r_t
-        # observations = o_tm1_trans
-        # next_observations = o_t_trans
+        # Global state (for hypernetwork) one-hot encoded
+        s_tm1 = tf.one_hot(e_tm1["s_t"], depth=3)  # TODO Get depth from state specs
+        s_t = tf.one_hot(e_t["s_t"], depth=3)
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
             # a_t = self._policy_actions(o_t_trans)
 
-            batched_q_values = []
-            batched_target_q_values = []
+            q_tm1 = []  # Q vals
+            q_t = []  # Target Q vals
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
 
                 o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
                     o_tm1, o_t, a_tm1, agent
                 )
-                # TODO Should these be switched? i.e. Target get next observation
-                q_t = self._target_q_networks[agent](o_t_feed)
-                q_tm1 = self._q_networks[agent](o_tm1_feed)  # [batch_size, num_actions]
+
+                # print("Batch state:", s_tm1, "\n") # NOTE Shouldn't these all be 0s?
+                # print("Batch next state:", s_t, "\n")
+                # print("Obs feed:", o_t_feed.observation, "\n")
+
+                # [B, num_actions]
+                q_tm1_agent = self._q_networks[agent_key](o_tm1_feed.observation)
+                q_t_agent = self._target_q_networks[agent_key](o_t_feed.observation)
 
                 # TODO Should I rather use policy to select my q_val than just max?
-                batched_target_q_values.append(q_t)  # Take only the best q_val
-                batched_q_values.append(q_tm1)  # [batch_size, num_actions] = [32,2]
+                q_tm1.append(q_tm1_agent)  # [B, num_actions] = [32,2]
+                q_t.append(q_t_agent)  # Take only the best q_val
 
-            # [batch_size, num_actions*num_agents] = [32,4]
-            batched_target_q_values = tf.concat(batched_target_q_values, axis=1)
-            batched_q_values = tf.concat(batched_q_values, axis=1)
+            # [B, num_actions*num_agents] = [32,4]
+            q_tm1 = tf.concat(q_tm1, axis=1)
+            q_t = tf.concat(q_t, axis=1)
 
-            # This should have dimension [num_agents, B, num_actions]
-
-            # TODO Get global states from env. They are same for simple debugging env.
-            global_next_state = tf.zeros(10)
-            global_state = tf.zeros(10)
-            q_tot_mixed = self._mixing_network(batched_q_values, global_next_state)
-            q_tot_target_mixed = self._target_mixing_network(
-                batched_target_q_values, global_state
-            )
+            q_tot_mixed = self._mixing_network(q_tm1, s_tm1)  # [B, 1, 1]
+            q_tot_target_mixed = self._target_mixing_network(q_t, s_t)  # [B, 1, 1]
+            # print("Q mixed:", q_tot_mixed)
 
             # Cast the additional discount to match the environment discount dtype.
-            discount = tf.cast(self._discount, dtype=d_t.dtype)
+            # discount = tf.cast(self._discount, dtype=d_t.dtype)
 
             # Calculate Q loss.
             # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
+            discount = 0.99  # TODO Generalise
+
+            # TODO Case where agents have different rewards?
+            r_t = tf.reshape(r_t["agent_0"], shape=(-1, 1))
+            # print("r_t.shape:",r_t.shape)
+            # print("Q_t.shape:",tf.reduce_max(q_tot_target_mixed, axis=1).shape)
             target = tf.stop_gradient(
                 r_t + discount * tf.reduce_max(q_tot_target_mixed, axis=1)
             )
+            target = tf.reshape(target, (-1, 1, 1))
+            # print("Target shape:",target.shape)
             td_error = target - q_tot_mixed
-            loss = 0.5 * tf.square(td_error)
+            # print("TD shape:", td_error.shape)
 
+            self.loss = 0.5 * tf.square(td_error)
+            # print(self.loss.shape)
+            self.tape = tape
+
+    def _backward(self) -> None:
         # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -241,36 +240,49 @@ class QMIXTrainer(mava.Trainer):
         trainable_variables += self._mixing_network.trainable_variables
 
         # Compute gradients.
-        gradients = tape.gradient(loss, trainable_variables)
+        gradients = self.tape.gradient(self.loss, trainable_variables)
 
         # Maybe clip gradients.
         if self._clipping:
             gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
 
         # Apply gradients.
-        self.optimizer.apply(gradients, trainable_variables)
+        self._optimizer.apply(gradients, trainable_variables)
 
         # Delete the tape manually because of the persistent=True flag.
-        del tape
+        train_utils.safe_del(self, "tape")
 
-        # Return total system loss
-        return loss
+    def _step(
+        self,
+    ) -> Dict[str, Dict[str, Any]]:
+        # Update the target networks
+        # TODO Update target mixing network in this function
+        self._update_target_networks()
+        self._decrement_epsilon()
+
+        inputs = next(self._iterator)
+
+        self._forward(inputs)
+        self._backward()
+
+        return self.loss  # Return total system loss
 
     def step(self) -> None:
         # Run the learning step.
-        fetches = self._step()
+        # fetches = self._step()
+        self._step()
 
         # Compute elapsed time.
-        timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
+        # timestamp = time.time()
+        # if self._timestamp:
+        #     elapsed_time = timestamp - self._timestamp
+        # else:
+        #     elapsed_time = 0
+        # self._timestamp = timestamp  # type: ignore
 
         # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
+        # counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        # fetches.update(counts)
 
         # Checkpoint and attempt to write the logs.
 

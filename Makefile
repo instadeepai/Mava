@@ -14,8 +14,8 @@ IMAGE=instadeepct/mava:latest
 DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 
 # Set example to run when using `make run`
-MADDPG=examples/petting_zoo/run_maddpg.py
-IDQN=examples/petting_zoo/run_idqn.py
+MADDPG=examples/debugging_envs/run_debug_maddpg.py
+IDQN=examples/debugging_envs/run_debug_idqn.py
 QMIX=examples/debugging_envs/run_qmix.py
 
 # make file commands
