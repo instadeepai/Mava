@@ -49,8 +49,9 @@ class HyperNetwork(snt.Module):
 
         # Calculate other necessary variables
         self._n_agents = len(agent_networks)
-        self._n_actions = list(agent_networks.values())[0]._layers._layer_sizes[-1]
-        print(self._agent_output_dim)
+        # TODO Generalise this
+        # self._n_actions = list(agent_networks.values())[0]._layers._layer_sizes[-1]
+        self._n_actions = 2
 
         # Set up hypernetwork configuration
         if self._num_hypernet_layers == 1:
@@ -62,7 +63,7 @@ class HyperNetwork(snt.Module):
             self.hyper_w1 = snt.nets.MLP(
                 output_sizes=[
                     self._hypernet_hidden_dim,
-                    self._qmix_hidden_dim,
+                    self._qmix_hidden_dim * self._n_agents * self._n_actions,
                 ]
             )
             self.hyper_w2 = snt.nets.MLP(
@@ -80,7 +81,8 @@ class HyperNetwork(snt.Module):
             self.hyper_w1(states)
         )  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
         w1 = tf.reshape(
-            w1, (-1, self._n_actions * self._n_agents, self._qmix_hidden_dim)
+            w1,
+            (-1, self._n_actions * self._n_agents, self._qmix_hidden_dim),
         )  # [B, n_actions*n_agents, qmix_hidden_dim] = [B, 4, qmix_hidden_dim]
 
         b1 = self.hyper_b1(states)  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
