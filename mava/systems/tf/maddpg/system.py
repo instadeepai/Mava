@@ -121,6 +121,8 @@ class MADDPG(system.System):
 
         if executer_fn == executors.RecurrentExecutor:
             extras = self._get_extras()
+        else:
+            extras = {}
 
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
