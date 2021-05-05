@@ -244,6 +244,6 @@ class MADQNBuilder:
             checkpoint=checkpoint,
         )
 
-        trainer = DetailedTrainerStatistics(trainer)  # type: ignore
+        trainer = DetailedTrainerStatistics(trainer, metrics=["loss"])  # type: ignore
 
         return trainer

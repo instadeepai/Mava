@@ -30,7 +30,7 @@ from acme.tf import utils as tf2_utils
 from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
+from mava.utils.environments import debugging_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -131,7 +131,7 @@ def main(_: Any) -> None:
 
     # environment
     environment_factory = lp_utils.partial_kwargs(
-        pettingzoo_utils.make_environment,
+        debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
     )
