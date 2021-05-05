@@ -17,6 +17,10 @@
 # https://github.com/oxwhirl/wqmix/tree/master/src/modules/mixers
 """Mixing for multi-agent RL systems"""
 
+from typing import Dict
+
+import sonnet as snt
+
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
 
@@ -30,5 +34,11 @@ class WeightedMixing(BaseMixingModule):
     ) -> None:
         self._architecture = architecture
 
-    def some_mixing_function(self) -> None:
-        """Perform some mixing logic"""
+    def create_mixing_layer(self) -> Dict[str, Dict[str, snt.Module]]:
+        # Implement method from base class
+        # TODO Call mixing network from networks folder.
+        return {}
+
+    def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
+        # Implement method from base class
+        return {}
