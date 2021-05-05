@@ -291,9 +291,6 @@ class BaseMADDPGTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-        # TODO (dries): Use a memory profiler to determine what is causing
-        #  the memory leak during training.
-
         # Update the target networks
         self._update_target_networks()
 
@@ -636,7 +633,6 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         # variables cannot be changed.
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
-        # TODO (dries): Should this not be stacked like in the recurrent case?
         tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
         return dpg_a_t_feed
 
@@ -742,7 +738,6 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         # variables cannot be changed.
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
-        # TODO (dries): Should this not be stacked like in the recurrent case?
         tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
 
         return dpg_a_t_feed
@@ -1036,8 +1031,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-        # TODO (dries): Use a memory profiler to determine what is causing
-        #  the memory leak during training.
         # Update the target networks
         self._update_target_networks()
 
