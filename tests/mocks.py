@@ -73,7 +73,7 @@ class MockedExecutor(ActorMock, core.Executor):
         self,
         action: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extra: Dict[str, types.NestedArray] = {},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
 
         for agent, observation_spec in self._spec.items():
@@ -84,8 +84,8 @@ class MockedExecutor(ActorMock, core.Executor):
                 _validate_spec(
                     observation_spec.observations, next_timestep.observation[agent]
                 )
-        if next_extra:
-            _validate_spec(next_extra)
+        if next_extras:
+            _validate_spec(next_extras)
 
     def agent_observe(
         self,
