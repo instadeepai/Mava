@@ -240,18 +240,70 @@ class DIALTrainer(mava.Trainer):
 
             # for each batch
             for b in range(bs):
+                # Unroll episode and store states, messages
+                messages = {
+                    -1: {
+                        agent_id: core_states[agent_id]["message"][:, b][0]
+                        for agent_id in self._agents
+                    }
+                }  # index of time t
+                channel = {}
+                states = {
+                    -1: {
+                        agent_id: core_states[agent_id]["state"][:, b][0]
+                        for agent_id in self._agents
+                    }
+                }  # index of time t
+
+                # For all time-steps
+                for t in range(0, T, 1):
+
+                    # This should use the module
+                    channel[t - 1] = tf.math.reduce_sum(
+                        tf.nest.flatten(messages[t - 1]), axis=0
+                    )
+                    # Add channel noise if applicable
+
+                    messages[t] = {}
+                    states[t] = {}
+
+                    # For each agent
+                    for agent_id in self._agents:
+                        # Agent input at time t
+                        obs_in = observations[agent_id].observation[:, b][t]
+                        state_in = states[t - 1][agent_id]
+                        message_in = channel[t - 1]
+
+                        batched_observation = tf2_utils.add_batch_dim(obs_in)
+                        batched_state = tf2_utils.add_batch_dim(state_in)
+                        batched_message = tf2_utils.add_batch_dim(message_in)
+
+                        (q_t, m_t), s_t = self._policy_networks[agent_type](
+                            batched_observation, batched_state, batched_message
+                        )
+
+                        messages[t][agent_id] = m_t[0]
+                        states[t][agent_id] = s_t[0]
+
+                channel[t] = tf.math.reduce_sum(tf.nest.flatten(messages[t]), axis=0)
+
+                # Backtrack episode
                 total_loss[b] = tf.zeros(1)
                 # For t=T to 1, -1 do
                 for t in range(T - 1, 0, -1):  # Should it be (T,1,-1)?
 
                     # For each agent a do
-                    for agent_id in observations.keys():
+                    for agent_id in self._agents:
                         # All at timestep t
                         agent_input = observations[agent_id].observation[:, b]
                         # (sequence,batch,1)
-                        message = core_states[agent_id]["message"][:, b]
+                        # message = core_states[agent_id]["message"][:, b]
+                        next_message = channel[t]
+                        message = channel[t - 1]
                         # (sequence,batch,)
-                        state = core_states[agent_id]["state"][:, b]
+                        # state = core_states[agent_id]["state"][:, b]
+                        next_state = states[t][agent_id]
+                        state = states[t - 1][agent_id]
                         # (sequence,batch,128)
                         action = actions[agent_id][:, b]
                         # (sequence,batch,1)
@@ -273,8 +325,8 @@ class DIALTrainer(mava.Trainer):
                             batched_observation = tf2_utils.add_batch_dim(
                                 agent_input[t]
                             )
-                            batched_state = tf2_utils.add_batch_dim(state[t])
-                            batched_message = tf2_utils.add_batch_dim(message[t])
+                            batched_state = tf2_utils.add_batch_dim(next_state)
+                            batched_message = tf2_utils.add_batch_dim(next_message)
 
                             (q_t, m_t), s = self._target_policy_networks[agent_type](
                                 batched_observation, batched_state, batched_message
@@ -286,8 +338,8 @@ class DIALTrainer(mava.Trainer):
                         batched_observation = tf2_utils.add_batch_dim(
                             agent_input[t - 1]
                         )
-                        batched_state = tf2_utils.add_batch_dim(state[t - 1])
-                        batched_message = tf2_utils.add_batch_dim(message[t - 1])
+                        batched_state = tf2_utils.add_batch_dim(state)
+                        batched_message = tf2_utils.add_batch_dim(message)
 
                         (q_t1, m_t1), s = self._policy_networks[agent_type](
                             batched_observation, batched_state, batched_message

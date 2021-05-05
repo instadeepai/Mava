@@ -103,7 +103,7 @@ class DIALExecutor(RecurrentExecutor):
         # )
         # print(action_policy)
         action = tf.argmax(action_policy, axis=1)
-        if tf.random.uniform([]) < 0.5:
+        if tf.random.uniform([]) < 0.2:
             action = tf.random.uniform([1], 0, 2, dtype=tf.dtypes.int64)
         # print(action)
         message = (
