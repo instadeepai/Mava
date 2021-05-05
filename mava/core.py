@@ -63,6 +63,7 @@ class Executor(acme.Actor):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Make an observation of timestep data from parallel environment.
         Args:
