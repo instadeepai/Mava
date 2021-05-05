@@ -24,6 +24,7 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme import datasets
+from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
@@ -95,6 +96,7 @@ class QMIXBuilder(SystemBuilder):
         self,
         config: QMIXConfig,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
+        executer_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
     ) -> None:
         """Args:
         _config: Configuration options for the QMIX system.
@@ -105,10 +107,13 @@ class QMIXBuilder(SystemBuilder):
 
         self._config = config
         self._trainer_fn = trainer_fn
+        self._agents = self._config.environment_spec.get_agent_ids()
+        self._agent_types = self._config.environment_spec.get_agent_types()
+        self._executer_fn = executer_fn
 
     def make_replay_tables(
         self,
-        environment_spec: specs.EnvironmentSpec,
+        environment_spec: specs.MAEnvironmentSpec,
     ) -> reverb.Table:
         """Create tables to insert data into."""
         return reverb.Table(
@@ -166,7 +171,31 @@ class QMIXBuilder(SystemBuilder):
                 source variables as defined in mava.core.
         """
 
-        return execution.QMIXFeedForwardExecutor(
+        shared_weights = self._config.shared_weights
+
+        variable_client = None
+        if variable_source:
+            agent_keys = self._agent_types if shared_weights else self._agents
+
+            # Create policy variables
+            variables = {}
+            for agent in agent_keys:
+                variables[agent] = behavior_networks[agent].variables
+
+            # Get new policy variables
+            variable_client = variable_utils.VariableClient(
+                client=variable_source,
+                variables={"policy": variables},
+                update_period=1000,
+            )
+
+            # Make sure not to use a random policy after checkpoint restoration by
+            # assigning variables before running the environment loop.
+            variable_client.update_and_wait()
+
+        # Create the actor which defines how we take actions.
+
+        return self._executer_fn(
             policy_networks=behavior_networks,
             shared_weights=self._config.shared_weights,
             variable_client=None,
