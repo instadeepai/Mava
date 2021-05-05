@@ -41,7 +41,7 @@ flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run 
 
 def make_environment(
     env_name: str = "simple_spread",
-    action_space: str = "continuous",
+    action_space: str = "discrete",
     num_agents: int = 3,
     render: bool = False,
 ) -> dm_env.Environment:
@@ -157,7 +157,6 @@ def main(_: Any) -> None:
         sequence_length=5,
         sequence_period=1,
         entropy_cost=0.0,
-        policy_learning_rate=1e-4,
         shared_weights=False,
         logger=system_logger,
     )
