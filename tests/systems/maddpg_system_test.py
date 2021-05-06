@@ -17,32 +17,20 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Dict, Mapping, Sequence, Union
 
 import launchpad as lp
 import numpy as np
 import sonnet as snt
-from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
+import mava
 from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-
-FLAGS = flags.FLAGS
-flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "continuous",
-    "Environment action space type (str).",
-)
 
 
 def make_networks(
@@ -119,38 +107,48 @@ def make_networks(
     }
 
 
-def main(_: Any) -> None:
+class TestMADDPG:
+    """Simple integration/smoke test for MADDPG."""
 
-    # TODO(Arnu): make logging optional, currently log_info
-    # is required for all systems
-    # set loggers info
-    base_dir = Path.cwd()
-    log_dir = base_dir / "logs"
-    log_time_stamp = str(datetime.now())
+    def test_maddpg_on_debugging_env(self) -> None:
+        """Tests that the system can run on the simple spread
+        debugging environment without crashing."""
 
-    log_info = (log_dir, log_time_stamp)
+        # set loggers info
+        base_dir = Path.cwd()
+        log_dir = base_dir / "logs"
+        log_time_stamp = str(datetime.now())
 
-    # environment
-    environment_factory = lp_utils.partial_kwargs(
-        debugging_utils.make_environment,
-        env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
-    )
+        log_info = (log_dir, log_time_stamp)
 
-    # networks
-    network_factory = lp_utils.partial_kwargs(make_networks)
+        # environment
+        environment_factory = lp_utils.partial_kwargs(
+            debugging_utils.make_environment,
+            env_name="simple_spread",
+            action_space="continuous",
+        )
 
-    # distributed program
-    program = maddpg.MADDPG(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
-        num_executors=2,
-        log_info=log_info,
-    ).build()
+        # networks
+        network_factory = lp_utils.partial_kwargs(make_networks)
 
-    # launch
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+        # system
+        system = maddpg.MADDPG(
+            environment_factory=environment_factory,
+            network_factory=network_factory,
+            log_info=log_info,
+            num_executors=2,
+            batch_size=32,
+            min_replay_size=32,
+            max_replay_size=1000,
+        )
+        program = system.build()
 
+        (trainer_node,) = program.groups["trainer"]
+        trainer_node.disable_run()
 
-if __name__ == "__main__":
-    app.run(main)
+        lp.launch(program, launch_type="test_mt")
+
+        trainer: mava.Trainer = trainer_node.create_handle().dereference()
+
+        for _ in range(5):
+            trainer.step()
