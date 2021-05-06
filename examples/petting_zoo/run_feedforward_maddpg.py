@@ -31,12 +31,11 @@ from supersuit import black_death_v1, pad_observations_v0
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors, maddpg
+from mava.utils import lp_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import Logger
 from mava.wrappers import DetailedPerAgentStatistics, PettingZooParallelEnvWrapper
 from mava.wrappers.env_preprocess_wrappers import StandardizeObservationParallel
-from mava.systems.tf import maddpg
-from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
 
 FLAGS = flags.FLAGS
 
