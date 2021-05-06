@@ -131,22 +131,7 @@ def main(_: Any) -> None:
     log_dir = base_dir / "logs"
     log_time_stamp = str(datetime.now())
 
-<<<<<<< HEAD
     log_info = (log_dir, log_time_stamp)
-=======
-    # Construct the agent.
-    system = maddpg.MADDPG(
-        environment_spec=environment_spec,
-        policy_networks=system_networks["policies"],
-        critic_networks=system_networks["critics"],
-        observation_networks=system_networks[
-            "observations"
-        ],  # pytype: disable=wrong-arg-types
-        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
-        executor_fn=executors.RecurrentExecutor,
-        logger=system_logger,
-    )
->>>>>>> b00fe17da92e6dd47c5c6136f1fde07b795295fc
 
     environment_factory = lp_utils.partial_kwargs(
         pettingzoo_utils.make_environment,
