@@ -78,6 +78,15 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             at the same time. See `reverb.Writer.writer` for more info.
         """
 
+        if delta_encoded:
+            NotImplementedError(
+                "Note (dries): Delta encoding has not been verified to "
+                "work in Mava yet. If you want to use delta encoding"
+                " first verify that it is working and then contribute "
+                "the update with a working example of delta encoding"
+                " to the Mava repo."
+            )
+
         super().__init__(
             client=client,
             buffer_size=sequence_length,
@@ -120,7 +129,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         final_step = mava_utils.final_step_like(
             self._buffer[0],
             self._next_observations,
-            self.next_extras if self._use_next_extras else None,
+            self._next_extras if self._use_next_extras else None,
         )
 
         # Append the final step.
