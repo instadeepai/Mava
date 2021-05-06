@@ -17,6 +17,10 @@
 
 """Mixing for multi-agent RL systems"""
 
+from typing import Dict
+
+import sonnet as snt
+
 from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
 
@@ -36,6 +40,15 @@ class QTranBase(BaseMixingModule):
 
         self._architecture = architecture
 
+    def create_mixing_layer(self) -> Dict[str, Dict[str, snt.Module]]:
+        # Implement method from base class
+        # TODO Call mixing network from networks folder.
+        return {}
+
+    def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
+        # Implement method from base class
+        return {}
+
 
 class QTranAlt(BaseMixingModule):
     """Multi-agent mixing architecture."""
@@ -51,3 +64,12 @@ class QTranAlt(BaseMixingModule):
         super(QTranAlt, self).__init__()
 
         self._architecture = architecture
+
+    def create_mixing_layer(self) -> Dict[str, Dict[str, snt.Module]]:
+        # Implement method from base class
+        # TODO Call mixing network from networks folder.
+        return {}
+
+    def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
+        # Implement method from base class
+        return {}

@@ -32,9 +32,10 @@ class BaseMixingModule:
     """
 
     @abc.abstractmethod
-    def some_abstract_mixing_function(self) -> Dict[str, Dict[str, snt.Module]]:
-        """Abstract mixing function."""
+    def _create_mixing_layer(self) -> snt.Module:
+        """Abstract function for adding an arbitrary mixing layer to a
+        given architecture."""
 
     @abc.abstractmethod
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
-        """Create system architecture with mixing."""
+        """Create/update system architecture with specified mixing."""
