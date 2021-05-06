@@ -17,10 +17,10 @@ from typing import Any, Dict, Union
 
 import gym
 import numpy as np
-from pettingzoo.utils.conversions import ParallelEnv as ParallelEnvPettingZoo
 from pettingzoo.utils.wrappers import OrderEnforcingWrapper as PettingzooWrapper
 from supersuit.aec_wrappers import ObservationWrapper as SequentialObservationWrapper
 from supersuit.parallel_wrappers import ObservationWrapper as ParallelObservationWrapper
+from supersuit.parallel_wrappers import ParallelWraper as ParallelEnvPettingZoo
 
 from mava.types import Observation, Reward
 from mava.utils.wrapper_utils import RunningMeanStd
@@ -232,11 +232,20 @@ class StandardizeReward:
             self._internal_state = load_params
         else:
             params = {}
+            gamma_dict = None
+            if hasattr(self, "_discounts"):
+                gamma_dict = self._discount  # type: ignore
+
             for agent in self.env.possible_agents:  # type:ignore
+                if gamma_dict:
+                    gamma = gamma_dict[agent]
+                else:
+                    gamma = 1
+
                 params[agent] = {
                     "return": 0,
                     "ret_rms": RunningMeanStd(shape=()),
-                    "gamma": 1,
+                    "gamma": gamma,
                 }
             self._internal_state = params
 
@@ -341,6 +350,6 @@ class StandardizeRewardParallel(
     def step(self, actions: Dict) -> Any:
         obs, rew, done, info = super().step(actions)
         rew = {
-            agent: self._get_updated_reward(agent, obs) for agent, rew in rew.items()
+            agent: self._get_updated_reward(agent, rew) for agent, rew in rew.items()
         }
         return obs, rew, done, info

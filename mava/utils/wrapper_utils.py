@@ -145,7 +145,7 @@ class RunningStatistics:
         return np.sqrt(self.var())
 
 
-# From https://github.com/DLR-RM/stable-baselines3/blob/237223f834fe9b8143ea24235d087c4e32addd2f/stable_baselines3/common/running_mean_std.py # noqa: E501
+# Adapted From https://github.com/DLR-RM/stable-baselines3/blob/237223f834fe9b8143ea24235d087c4e32addd2f/stable_baselines3/common/running_mean_std.py # noqa: E501
 class RunningMeanStd(object):
     def __init__(self, epsilon: float = 1e-4, shape: Tuple[int, ...] = ()):
         """
@@ -158,11 +158,16 @@ class RunningMeanStd(object):
         self.var = np.ones(shape, np.float64)
         self.count = epsilon
 
-    def update(self, arr: np.ndarray) -> None:
-        print(arr)
+    def update_batch(self, arr: np.ndarray) -> None:
         batch_mean = np.mean(arr, axis=0)
         batch_var = np.var(arr, axis=0)
         batch_count = arr.shape[0]
+        self.update_from_moments(batch_mean, batch_var, batch_count)
+
+    def update(self, arr: np.ndarray) -> None:
+        batch_mean = np.mean(arr)
+        batch_var = np.var(arr)
+        batch_count = 1
         self.update_from_moments(batch_mean, batch_var, batch_count)
 
     def update_from_moments(

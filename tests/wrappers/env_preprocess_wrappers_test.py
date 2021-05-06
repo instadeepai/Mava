@@ -130,6 +130,7 @@ class TestEnvPreprocessWrapper:
                     )
 
     # Test normalizing rewards to be within range 0.2 and 1
+    # TODO(Kale-ab): Test more than min and max.
     def test_preprocess_wrapper_reward_0_normalize(
         self,
         env_spec: EnvSpec,
