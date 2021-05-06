@@ -245,7 +245,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         episode_steps = 0
 
         timestep = self._environment.reset()
-
         if type(timestep) == tuple:
             timestep, env_extras = timestep
         else:

@@ -13,4 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MARL system mixing modules."""
+# TODO (StJohn): complete class for weighted mixing
+# https://github.com/oxwhirl/wqmix/tree/master/src/modules/mixers
+"""Mixing for multi-agent RL systems"""
+
+import sonnet as snt
+import tensorflow as tf
+
+
+class WeightedMixing(snt.Module):
+    """Multi-agent mixing architecture."""
+
+    def __init__(self) -> None:
+        return
+
+    def __call__(self) -> tf.Tensor:
+        """Perform some mixing logic"""
+        return tf.constant(1)
