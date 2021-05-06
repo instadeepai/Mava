@@ -120,9 +120,6 @@ class DIAL_policy(snt.RNNCore):
         if message is None:
             message = tf.zeros(self._message_dim, dtype=tf.float32)
 
-        state = tf.zeros_like(state)
-        message = tf.zeros_like(message)
-
         x_task = self.task_mlp(x)
         x_message = self.message_in_mlp(message)
         x = tf.concat([x_task, x_message], axis=1)

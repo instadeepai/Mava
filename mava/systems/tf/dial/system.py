@@ -240,7 +240,7 @@ class DIALBuilder(SystemBuilder):
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policy": variables},
-                update_period=1000,
+                update_period=10,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -334,13 +334,13 @@ class DIAL(system.System):
         shared_weights: bool = True,
         batch_size: int = 1,
         prefetch_size: int = 4,
-        target_update_period: int = 100,
+        target_update_period: int = 10,
         samples_per_insert: float = 32.0,
         min_replay_size: int = 100,
         max_replay_size: int = 1000000,
         importance_sampling_exponent: float = 0.2,
         priority_exponent: float = 0.6,
-        n_step: int = 5,
+        n_step: int = 1,
         epsilon: Optional[tf.Tensor] = None,
         learning_rate: float = 5e-4,
         discount: float = 1.0,
