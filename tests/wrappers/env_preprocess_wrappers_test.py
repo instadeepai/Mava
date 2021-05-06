@@ -16,11 +16,13 @@
 import numpy as np
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
-from supersuit import clip_reward_v0, dtype_v0, normalize_obs_v0, reward_lambda_v0
+from supersuit import dtype_v0, normalize_obs_v0, reward_lambda_v0
 
 from mava.wrappers.env_preprocess_wrappers import (
-    StandardizeObservationPar,
-    StandardizeObservationSeq,
+    StandardizeObservationParallel,
+    StandardizeObservationSequential,
+    StandardizeRewardParallel,
+    StandardizeRewardSequential,
 )
 from tests.conftest import EnvSpec, EnvType, Helpers
 
@@ -89,11 +91,11 @@ class TestEnvPreprocessWrapper:
 
         # Parallel env_types
         if env_spec.env_type == EnvType.Parallel:
-            StandardizeObservation = StandardizeObservationPar
+            StandardizeObservation = StandardizeObservationParallel
 
         # Sequential env_types
         elif env_spec.env_type == EnvType.Sequential:
-            StandardizeObservation = StandardizeObservationSeq
+            StandardizeObservation = StandardizeObservationSequential
 
         wrapped_env, _ = helpers.get_wrapped_env(
             env_spec,
@@ -137,11 +139,20 @@ class TestEnvPreprocessWrapper:
 
         min = 0.2
         max = 1
+
+        # Parallel env_types
+        if env_spec.env_type == EnvType.Parallel:
+            StandardizeReward = StandardizeRewardParallel
+
+        # Sequential env_types
+        elif env_spec.env_type == EnvType.Sequential:
+            StandardizeReward = StandardizeRewardSequential
+
         wrapped_env, _ = helpers.get_wrapped_env(
             env_spec,
             env_preprocess_wrappers=[
                 (dtype_v0, {"dtype": np.float32}),
-                (clip_reward_v0, {"lower_bound": min, "upper_bound": max}),
+                (StandardizeReward, {"lower_bound": min, "upper_bound": max}),
             ],
         )
 

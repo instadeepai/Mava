@@ -13,18 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, Union
 
 import gym
-from supersuit.aec_wrappers import ObservationWrapper as SeqObservationWrapper
-from supersuit.parallel_wrappers import ObservationWrapper as ParObservationWrapper
+import numpy as np
+from pettingzoo.utils.conversions import ParallelEnv as ParallelEnvPettingZoo
+from pettingzoo.utils.wrappers import OrderEnforcingWrapper as PettingzooWrapper
+from supersuit.aec_wrappers import ObservationWrapper as SequentialObservationWrapper
+from supersuit.parallel_wrappers import ObservationWrapper as ParallelObservationWrapper
 
-from mava.types import Observation
+from mava.types import Observation, Reward
+from mava.utils.wrapper_utils import RunningMeanStd
+from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
 
+# TODO(Kale-ab): Make wrapper more general
+# Should Works across any SequentialEnvWrapper or ParallelEnvWrapper.
 """
 GYM Preprocess Wrappers.
 
@@ -34,6 +41,10 @@ Other gym preprocess wrappers:
 """
 
 PettingZooEnv = Union[PettingZooAECEnvWrapper, PettingZooParallelEnvWrapper]
+GeneralEnv = Union[
+    PettingZooAECEnvWrapper,
+    PettingZooParallelEnvWrapper,
+]
 
 
 class StandardizeObservationGym(gym.ObservationWrapper):
@@ -78,11 +89,18 @@ class StandardizeObservation:
     Standardize observations
     Ensures mean of 0 and standard deviation of 1 (unit variance) for obs.
     Adapted from https://github.com/ikostrikov/pytorch-a3c/blob/e898f7514a03de73a2bf01e7b0f17a6f93963389/envs.py # noqa: E501
+
+        :env Env to wrap.
+        :load_params Params to load.
+        :alpha To avoid division by zero.
     """
 
-    def __init__(self, env: PettingZooEnv = None, load_params: Dict = None):
-        self._ini_params(load_params)
+    def __init__(
+        self, env: PettingZooEnv = None, load_params: Dict = None, alpha: float = 0.999
+    ):
         self.env = env
+        self.alpha = alpha
+        self._ini_params(load_params)
 
     def _ini_params(self, load_params: Dict = None) -> None:
         if load_params:
@@ -93,52 +111,56 @@ class StandardizeObservation:
                 params[agent] = {
                     "state_mean": 0,
                     "state_std": 0,
-                    "alpha": 0.9999,
                     "num_steps": 0,
                 }
             self._internal_state = params
 
     def _get_updated_observation(
         self,
-        agent: List,
+        agent: str,
         observation: Observation,
     ) -> Observation:
 
         state_mean = self._internal_state[agent].get("state_mean")
         state_std = self._internal_state[agent].get("state_std")
-        alpha = self._internal_state[agent].get("alpha")
         num_steps = self._internal_state[agent].get("num_steps")
 
-        state_mean = state_mean * alpha + observation.mean() * (  # type:ignore
-            1 - alpha
+        state_mean = state_mean * self.alpha + observation.mean() * (  # type:ignore
+            1 - self.alpha
         )
-        state_std = state_std * alpha + observation.std() * (1 - alpha)  # type:ignore
+        state_std = state_std * self.alpha + observation.std() * (  # type:ignore
+            1 - self.alpha
+        )
 
         # If steps is zero, this would result in div by zero error.
         if num_steps == 0:
             num_steps = 1
 
-        unbiased_mean = state_mean / (1 - pow(alpha, num_steps))
-        unbiased_std = state_std / (1 - pow(alpha, num_steps))
+        unbiased_mean = state_mean / (1 - pow(self.alpha, num_steps))
+        unbiased_std = state_std / (1 - pow(self.alpha, num_steps))
 
         self._internal_state[agent]["state_mean"] = state_mean
         self._internal_state[agent]["state_std"] = state_std
-        self._internal_state[agent]["alpha"] = alpha
 
         return (observation - unbiased_mean) / (unbiased_std + 1e-8)
 
 
-class StandardizeObservationSeq(SeqObservationWrapper, StandardizeObservation):
+class StandardizeObservationSequential(
+    SequentialObservationWrapper, StandardizeObservation
+):
     """Standardize Obs in Sequential Env"""
 
-    def __init__(self, env: PettingZooEnv) -> None:
-        super().__init__(env)
+    def __init__(
+        self, env: PettingZooEnv, load_params: Dict = None, alpha: float = 0.999
+    ) -> None:
+        SequentialObservationWrapper.__init__(self, env)
+        StandardizeObservation.__init__(self, env, load_params, alpha)
 
     def reset(self) -> None:
         self._ini_params()
         super().reset()
 
-    def _modify_observation(self, agent: List, observation: Observation) -> Observation:
+    def _modify_observation(self, agent: str, observation: Observation) -> Observation:
         self._internal_state[agent]["num_steps"] = (
             int(self._internal_state[agent]["num_steps"]) + 1
         )
@@ -151,17 +173,22 @@ class StandardizeObservationSeq(SeqObservationWrapper, StandardizeObservation):
         return
 
 
-class StandardizeObservationPar(ParObservationWrapper, StandardizeObservation):
+class StandardizeObservationParallel(
+    ParallelObservationWrapper, StandardizeObservation
+):
     """Standardize Obs in Parallel Env"""
 
-    def __init__(self, env: PettingZooEnv) -> None:
-        super().__init__(env)
+    def __init__(
+        self, env: PettingZooEnv, load_params: Dict = None, alpha: float = 0.999
+    ) -> None:
+        ParallelObservationWrapper.__init__(self, env)
+        StandardizeObservation.__init__(self, env, load_params, alpha)
 
-    def reset(self) -> None:
+    def reset(self) -> Any:
         self._ini_params()
         return super().reset()
 
-    def _modify_observation(self, agent: List, observation: Observation) -> Observation:
+    def _modify_observation(self, agent: str, observation: Observation) -> Observation:
         self._internal_state[agent]["num_steps"] = (
             int(self._internal_state[agent]["num_steps"]) + 1
         )
@@ -172,3 +199,148 @@ class StandardizeObservationPar(ParObservationWrapper, StandardizeObservation):
 
     def _modify_spaces(self) -> None:
         return
+
+
+class StandardizeReward:
+    """
+    Standardize rewards
+    We rescale rewards, but don't shift the mean - http://joschu.net/docs/nuts-and-bolts.pdf .
+    Adapted from https://github.com/DLR-RM/stable-baselines3/blob/237223f834fe9b8143ea24235d087c4e32addd2f/stable_baselines3/common/vec_env/vec_normalize.py # noqa: E501
+        :env Env to wrap.
+        :load_params Params to load.
+        :upper_bound: Max value for discounted reward.
+        :lower_bound: Min value for discounted reward.
+        :alpha To avoid division by zero.
+    """
+
+    def __init__(
+        self,
+        env: PettingZooAECEnvWrapper = None,
+        load_params: Dict = None,
+        lower_bound: float = -10.0,
+        upper_bound: float = 10.0,
+        alpha: float = 0.999,
+    ):
+        self._ini_params(load_params)
+        self.env = env
+        self.upper_bound = upper_bound
+        self.lower_bound = lower_bound
+        self.alpha = alpha
+
+    def _ini_params(self, load_params: Dict = None) -> None:
+        if load_params:
+            self._internal_state = load_params
+        else:
+            params = {}
+            for agent in self.env.possible_agents:  # type:ignore
+                params[agent] = {
+                    "return": 0,
+                    "ret_rms": RunningMeanStd(shape=()),
+                    "gamma": 1,
+                }
+            self._internal_state = params
+
+    def _update_reward(self, agent: str, reward: Reward) -> None:
+        """Update reward normalization statistics."""
+        agent_dict = self._internal_state[agent]
+        ret = agent_dict["return"]
+        gamma = agent_dict["gamma"]
+        ret_rms = agent_dict["ret_rms"]
+
+        ret = ret * gamma + reward
+        ret_rms.update(ret)
+
+        self._internal_state[agent] = agent_dict
+
+    def normalize_reward(self, agent: str, reward: Reward) -> Reward:
+        """
+        Normalize rewards using rewards statistics.
+        Calling this method does not update statistics.
+        """
+        agent_dict = self._internal_state[agent]
+        ret_rms = agent_dict["ret_rms"]
+        reward = np.clip(
+            reward / np.sqrt(ret_rms.var + self.alpha),
+            self.lower_bound,
+            self.upper_bound,
+        )
+        return reward
+
+    def _get_updated_reward(
+        self,
+        agent: str,
+        reward: Reward,
+    ) -> Reward:
+
+        # TODO(Kale-ab): We should only call self._update_reward during training.
+        self._update_reward(agent, reward)
+        reward = self.normalize_reward(agent, reward)
+        return reward
+
+
+class StandardizeRewardSequential(PettingzooWrapper, StandardizeReward):
+    def __init__(
+        self,
+        env: SequentialEnvWrapper,
+        load_params: Dict = None,
+        lower_bound: float = -10.0,
+        upper_bound: float = 10.0,
+        alpha: float = 0.999,
+    ) -> None:
+        PettingzooWrapper.__init__(self, env)
+        StandardizeReward.__init__(
+            self, env, load_params, lower_bound, upper_bound, alpha
+        )
+
+    def reset(self) -> None:
+        self._ini_params()
+        super().reset()
+        self._ini_params()
+        self.rewards = {
+            agent: self._get_updated_reward(agent, reward)
+            for agent, reward in self.rewards.items()  # type: ignore
+        }
+        self.__cumulative_rewards = {a: 0 for a in self.agents}
+        self._accumulate_rewards()
+
+    def step(self, action: np.ndarray) -> None:
+        agent = self.env.agent_selection  # type: ignore
+        super().step(action)
+        self.rewards = {
+            agent: self._get_updated_reward(agent, reward)
+            for agent, reward in self.rewards.items()
+        }
+        self.__cumulative_rewards[agent] = 0
+        self._cumulative_rewards = self.__cumulative_rewards
+        self._accumulate_rewards()
+
+
+class StandardizeRewardParallel(
+    ParallelEnvPettingZoo,
+    StandardizeReward,
+):
+    def __init__(
+        self,
+        env: ParallelEnvWrapper,
+        load_params: Dict = None,
+        lower_bound: float = -10.0,
+        upper_bound: float = 10.0,
+        alpha: float = 0.999,
+    ) -> None:
+        ParallelEnvPettingZoo.__init__(self, env)
+        StandardizeReward.__init__(
+            self, env, load_params, lower_bound, upper_bound, alpha
+        )
+
+    def reset(self) -> Observation:
+        self._ini_params()
+        obs = self.env.reset()  # type: ignore
+        self.agents = self.env.agents  # type: ignore
+        return obs
+
+    def step(self, actions: Dict) -> Any:
+        obs, rew, done, info = super().step(actions)
+        rew = {
+            agent: self._get_updated_reward(agent, obs) for agent, rew in rew.items()
+        }
+        return obs, rew, done, info
