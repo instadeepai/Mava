@@ -145,7 +145,7 @@ class MADDPG(system.System):
         )
 
     def _get_extras(self) -> Any:
-        agents = self._config.environment_spec.get_agent_ids()
+        agents = self._environment_spec.get_agent_ids()
         core_state_specs = {}
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec
