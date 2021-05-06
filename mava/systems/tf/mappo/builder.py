@@ -83,7 +83,6 @@ class MAPPOBuilder(SystemBuilder):
     def __init__(
         self,
         config: MAPPOConfig,
-        networks: Dict[str, snt.Module],
     ):
         """Args:
         config: Configuration options for the MAPPO system.
@@ -92,40 +91,18 @@ class MAPPOBuilder(SystemBuilder):
         """
 
         self._config = config
-        self._networks = networks
-
-        if isinstance(list(networks["policies"].values())[0], snt.DeepRNN):
-            self._executor_fn = execution.MAPPORecurrentExecutor
-        else:
-            self._executor_fn = execution.MAPPOFeedForwardExecutor
 
     def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> reverb.Table:
         """Create tables to insert data into."""
-        policy_networks = self._networks["policies"]
         agent_specs = environment_spec.get_agent_specs()
-        extras_spec: Dict[str, Dict[str, acme_types.NestedArray]] = (
-            {"log_probs": {}, "core_states": {}}
-            if self._executor_fn == execution.MAPPORecurrentExecutor
-            else {"log_probs": {}}
-        )
+        extras_spec: Dict[str, Dict[str, acme_types.NestedArray]] = {"log_probs": {}}
 
         for agent, spec in agent_specs.items():
             # Make dummy log_probs
             extras_spec["log_probs"][agent] = tf.ones(shape=(1,), dtype=tf.float32)
-
-            # Possibly make dummy core state
-            if self._executor_fn == execution.MAPPORecurrentExecutor:
-                # Get the network key for proper indexing
-                network_key = (
-                    agent.split("_")[0] if self._config.shared_weights else agent
-                )
-
-                extras_spec["core_states"][agent] = policy_networks[
-                    network_key
-                ].initial_state(1)
 
         # Squeeze the batch dim.
         extras_spec = tf2_utils.squeeze_batch_dim(extras_spec)
@@ -210,7 +187,7 @@ class MAPPOBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the executor which defines how agents take actions.
-        return self._executor_fn(
+        return execution.MAPPOFeedForwardExecutor(
             policy_networks=policy_networks,
             shared_weights=self._config.shared_weights,
             variable_client=variable_client,
@@ -243,6 +220,7 @@ class MAPPOBuilder(SystemBuilder):
 
         # The learner updates the parameters (and initializes them).
         trainer = training.MAPPOTrainer(
+            agents=self._config.environment_spec.get_agent_ids(),
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             dataset=dataset,

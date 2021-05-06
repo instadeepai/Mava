@@ -15,19 +15,18 @@
 
 """MAPPO trainer implementation."""
 import time
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
-import reverb
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
-import tree
 import trfl
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.utils import training_utils as train_utils
 
 tfd = tfp.distributions
 
@@ -40,6 +39,7 @@ class MAPPOTrainer(mava.Trainer):
 
     def __init__(
         self,
+        agents: List[Any],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
@@ -79,17 +79,15 @@ class MAPPOTrainer(mava.Trainer):
             logger: logger object to be used by learner.
             checkpoint: boolean indicating whether to checkpoint the learner.
         """
+        # Store agents.
+        self._agents = agents
 
-        # Stoe shared_weights
+        # Stoe shared_weights.
         self._shared_weights = shared_weights
 
         # Store networks.
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
-
-        # Check if networks are recurrent and store in variable
-        # for easy use later.
-        self._is_recurrent = isinstance(list(policy_networks.values())[0], snt.DeepRNN)
 
         # Get optimizers
         self._policy_optimizer = snt.optimizers.Adam(learning_rate=policy_learning_rate)
@@ -124,14 +122,25 @@ class MAPPOTrainer(mava.Trainer):
         # fill the replay buffer.
         self._timestamp = None
 
-    # @tf.function
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
 
-        # Get batch of data from replay
-        inputs: reverb.ReplaySample = next(self._iterator)
+        # Get data from replay.
+        inputs = next(self._iterator)
 
+        self._forward(inputs)
+
+        self._backward()
+
+        # Log losses per agent
+        return train_utils.map_losses_per_agent_ac(
+            self.critic_losses, self.policy_losses
+        )
+
+    # Forward pass that calculates loss.
+    def _forward(self, inputs: Any) -> None:
         # Convert to sequence data
         data = tf2_utils.batch_to_sequence(inputs.data)
 
@@ -144,63 +153,47 @@ class MAPPOTrainer(mava.Trainer):
             data.extras,
         )
 
-        # Get logits and possibly core_states
+        # Get log_probs.
         all_log_probs = extras["log_probs"]
-        if self._is_recurrent:
-            all_core_states = extras["core_states"]
 
-        metrics: Dict[str, Dict[str, Any]] = {}
-        # Do forward passes through the networks and calculate the losses
-        for agent in all_obs.keys():
+        # Store losses.
+        policy_losses: Dict[str, Any] = {}
+        critic_losses: Dict[str, Any] = {}
 
-            obs, acts, rews, discs, behaviour_log_probs = (
-                all_obs[agent],
-                all_acts[agent],
-                all_rews[agent],
-                all_discs[agent],
-                all_log_probs[agent],
-            )
+        with tf.GradientTape(persistent=True) as tape:
 
-            # Get agent core_states
-            if self._is_recurrent:
-                core_states = all_core_states[agent]
-                core_states = tree.map_structure(lambda s: s[0], core_states)
+            # TODO Possibly transform observations with Observation networks.
 
-            # Chop off final timestep for bootstrapping value
-            rews = rews[:-1]
-            discs = discs[:-1]
+            for agent in self._agents:
 
-            # Get agent network
-            network_key = agent.split("_")[0] if self._shared_weights else agent
-            policy_network = self._policy_networks[network_key]
-            critic_network = self._critic_networks[network_key]
+                obs, acts, rews, discs, behaviour_log_probs = (
+                    all_obs[agent],
+                    all_acts[agent],
+                    all_rews[agent],
+                    all_discs[agent],
+                    all_log_probs[agent],
+                )
 
-            with tf.GradientTape(persistent=True) as tape:
-                if self._is_recurrent:
-                    # TODO Fix the recurrent case.
+                # Chop off final timestep for bootstrapping value
+                rews = rews[:-1]
+                discs = discs[:-1]
 
-                    # Unroll current policy over observations.
-                    policy, _ = snt.static_unroll(
-                        policy_network, obs.observation, core_states
-                    )
+                # Get agent network
+                network_key = agent.split("_")[0] if self._shared_weights else agent
+                policy_network = self._policy_networks[network_key]
+                critic_network = self._critic_networks[network_key]
 
-                    # Unroll current value network over observations.
-                    values, _ = snt.static_unroll(
-                        critic_network, obs.observation, core_states
-                    )
-                    values = tf.squeeze(values)
-                else:
-                    # Reshape inputs
-                    dims = obs.observation.shape[:2]
-                    obs = snt.merge_leading_dims(obs.observation, num_dims=2)
-                    policy = policy_network(obs)
-                    values = critic_network(obs)
+                # Reshape inputs.
+                dims = obs.observation.shape[:2]
+                obs = snt.merge_leading_dims(obs.observation, num_dims=2)
+                policy = policy_network(obs)
+                values = critic_network(obs)
 
-                    # reshape the outputs
-                    policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
-                    values = tf.reshape(values, dims, name="value")
+                # Reshape the outputs.
+                policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
+                values = tf.reshape(values, dims, name="value")
 
-                # Values along the sequence T
+                # Values along the sequence T.
                 bootstrap_value = values[-1]
                 state_values = values[:-1]
 
@@ -260,52 +253,46 @@ class MAPPOTrainer(mava.Trainer):
                 # Combine weighted sum of actor & entropy regularization.
                 policy_loss = policy_gradient_loss + entropy_loss
 
-            # Compute gradients.
-            critic_grads = tape.gradient(
-                critic_loss, critic_network.trainable_variables
-            )
-            policy_grads = tape.gradient(
-                policy_loss, policy_network.trainable_variables
-            )
-            del tape
+                policy_losses[agent] = policy_loss
+                critic_losses[agent] = critic_loss
+
+        self.policy_losses = policy_losses
+        self.critic_losses = critic_losses
+        self.tape = tape
+
+    # Backward pass that calculates gradients and updates network.
+    def _backward(self) -> None:
+        # Calculate the gradients and update the networks
+        policy_losses = self.policy_losses
+        critic_losses = self.critic_losses
+        tape = self.tape
+
+        for agent in self._agents:
+            # Get network_key.
+            network_key = agent.split("_")[0] if self._shared_weights else agent
+
+            # Get trainable variables.
+            # TODO add in observation network trainable variables.
+            policy_variables = self._policy_networks[network_key].trainable_variables
+            critic_variables = self._critic_networks[network_key].trainable_variables
+
+            # Get gradients.
+            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
+            critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
             # Optionally apply clipping.
             critic_grads, critic_norm = tf.clip_by_global_norm(
-                critic_grads, self._max_gradient_norm
+                critic_gradients, self._max_gradient_norm
             )
             policy_grads, policy_norm = tf.clip_by_global_norm(
-                policy_grads, self._max_gradient_norm
+                policy_gradients, self._max_gradient_norm
             )
 
             # Apply gradients.
-            self._critic_optimizer.apply(
-                critic_grads, critic_network.trainable_variables
-            )
-            self._policy_optimizer.apply(
-                policy_grads, policy_network.trainable_variables
-            )
+            self._critic_optimizer.apply(critic_grads, critic_variables)
+            self._policy_optimizer.apply(policy_grads, policy_variables)
 
-            metrics.update(
-                {
-                    agent: {
-                        "policy_loss": policy_loss,
-                        "critic_loss": critic_loss,
-                        "entropy_loss": tf.reduce_mean(entropy_loss),
-                        "policy_entropy": policy_entropy,
-                        "policy_gradient_loss": tf.reduce_mean(policy_gradient_loss),
-                        "advantage": tf.reduce_mean(gae),
-                        "state_value": tf.reduce_mean(state_values),
-                        "temporal_difference": tf.reduce_mean(
-                            td_lambda_extra.temporal_differences
-                        ),
-                        "returns": tf.reduce_mean(td_lambda_extra.discounted_returns),
-                        "policy_grad_norm": policy_norm,
-                        "critic_grad_norm": critic_norm,
-                    }
-                }
-            )
-
-        return metrics
+        train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
 

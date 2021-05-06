@@ -30,6 +30,7 @@ from absl import app, flags
 import mava.specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import mappo
+from mava.systems.tf.mappo import execution
 from mava.utils.debugging.make_env import make_debugging_env
 from mava.utils.loggers import Logger
 from mava.wrappers import DetailedPerAgentStatistics
@@ -37,6 +38,15 @@ from mava.wrappers.debugging_envs import DebuggingEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
+
+flags.DEFINE_integer(
+    "num_episodes_per_eval",
+    10,
+    "Number of training episodes to run between evaluation " "episodes.",
+)
+
+SHARED_WEIGHTS = False
+ACTION_SPACE = "continuous"
 
 
 def make_environment(
@@ -56,12 +66,7 @@ def make_environment(
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    layer_sizes: Tuple = (
-        256,
-        256,
-    ),
-    recurrent: bool = False,
-    recurrent_layer_size: int = 20,
+    layer_sizes: Tuple = (50, 50),
     shared_weights: bool = False,
 ) -> Dict[str, snt.Module]:
 
@@ -107,32 +112,21 @@ def make_networks(
         else:
             raise ValueError(f"Unknown action_spec type, got {spec.actions}.")
 
-        if recurrent:
-            policy_network_layers = [
-                snt.LSTM(recurrent_layer_size)
-            ] + policy_network_layers
-            critic_network_layers = [
-                snt.LSTM(recurrent_layer_size)
-            ] + critic_network_layers
-
-            policy_network = snt.DeepRNN(policy_network_layers)
-            critic_network = snt.DeepRNN(critic_network_layers)
-        else:
-            policy_network = snt.Sequential(policy_network_layers)
-            critic_network = snt.Sequential(critic_network_layers)
-
-        all_networks["policies"][agent_type] = policy_network
-        all_networks["critics"][agent_type] = critic_network
+        all_networks["policies"][agent_type] = snt.Sequential(policy_network_layers)
+        all_networks["critics"][agent_type] = snt.Sequential(critic_network_layers)
 
     return all_networks
 
 
 def main(_: Any) -> None:
 
+    # TODO make use of the architectures component in mava.
+    # It isnt used here at the moment.
+
     # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment()
+    environment = make_environment(action_space=ACTION_SPACE)
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    all_networks = make_networks(environment_spec, recurrent=False)
+    system_networks = make_networks(environment_spec, shared_weights=SHARED_WEIGHTS)
 
     # Create tf loggers.
     base_dir = Path.cwd()
@@ -156,11 +150,13 @@ def main(_: Any) -> None:
     # Construct the agent.
     system = mappo.MAPPO(
         environment_spec=environment_spec,
-        networks=all_networks,
+        networks=system_networks,
+        shared_weights=SHARED_WEIGHTS,
         sequence_length=10,
         sequence_period=5,
-        entropy_cost=0.0,
-        shared_weights=False,
+        entropy_cost=0.001,
+        policy_learning_rate=1e-4,
+        critic_learning_rate=1e-4,
         logger=system_logger,
     )
 
@@ -172,7 +168,24 @@ def main(_: Any) -> None:
     # Wrap training loop to compute and log detailed running statistics.
     train_loop = DetailedPerAgentStatistics(train_loop)
 
-    train_loop.run(num_episodes=FLAGS.num_episodes)
+    # Create the evaluation policy.
+    # TODO add in observation network.
+    eval_policies = {}
+    for network_key, network in system_networks["policies"].items():
+        eval_policies[network_key] = network
+
+    # Create the evaluation actor and loop.
+    eval_actor = execution.MAPPOFeedForwardExecutor(
+        policy_networks=eval_policies, shared_weights=SHARED_WEIGHTS
+    )
+    eval_env = make_environment(
+        env_name="simple_spread", action_space=ACTION_SPACE, render=True
+    )
+    eval_loop = ParallelEnvironmentLoop(eval_env, eval_actor, label="eval_loop")
+
+    for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
+        train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
+        eval_loop.run(num_episodes=4)
 
 
 if __name__ == "__main__":

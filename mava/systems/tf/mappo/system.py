@@ -101,7 +101,6 @@ class MAPPO(system.System):
                 sequence_length=sequence_length,
                 sequence_period=sequence_period,
             ),
-            networks=networks,
         )
 
         # Create a replay server to add data to.
