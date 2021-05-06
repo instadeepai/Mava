@@ -30,7 +30,6 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme.tf import savers as tf2_savers
-from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
@@ -292,10 +291,11 @@ class QMIXTrainer(mava.Trainer):
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
-        for network_type in names:
-            variables[network_type] = {}
-            for agent in self.unique_net_keys:
-                variables[network_type][agent] = tf2_utils.to_numpy(
-                    self._system_network_variables[network_type][agent]
-                )
+
+        variables["mixing"] = self._mixing_network.variables  # Also hypernet vars
+        variables["q_networks"] = {}  # or behaviour
+
+        for key in self.unique_net_keys:
+            variables["q_networks"][key] += self._q_networks[key].variables
+
         return variables
