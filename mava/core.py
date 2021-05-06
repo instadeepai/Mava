@@ -20,11 +20,10 @@ similar to the `Actor` and `Learner` in Acme.
 """
 
 import abc
-from typing import Dict, List, Sequence, TypeVar
+import itertools
+from typing import Dict, Generic, Optional, Sequence, TypeVar
 
 import acme
-
-# Internal imports.
 import dm_env
 from acme import types
 
@@ -76,7 +75,7 @@ class Executor(acme.Actor):
 # Internal class.
 
 
-class VariableSource(acme.VariableSource):
+class VariableSource(abc.ABC):
     """Abstract source of variables.
     Objects which implement this interface provide a source of variables, returned
     as a collection of (nested) numpy arrays. Generally this will be used to
@@ -85,8 +84,8 @@ class VariableSource(acme.VariableSource):
 
     @abc.abstractmethod
     def get_variables(
-        self, names: Dict[str, Sequence[str]]
-    ) -> Dict[str, List[types.NestedArray]]:
+        self, names: Sequence[str]
+    ) -> Dict[str, Dict[str, types.NestedArray]]:
         """Return the named variables as a collection of (nested) numpy arrays.
         Args:
         names: args where each name is a string identifying a predefined subset of
@@ -97,7 +96,27 @@ class VariableSource(acme.VariableSource):
         """
 
 
-class Trainer(acme.Learner):
+class Worker(abc.ABC):
+    """An interface for (potentially) distributed workers."""
+
+    @abc.abstractmethod
+    def run(self) -> None:
+        """Runs the worker."""
+
+
+class Saveable(abc.ABC, Generic[T]):
+    """An interface for saveable objects."""
+
+    @abc.abstractmethod
+    def save(self) -> T:
+        """Returns the state from the object to be saved."""
+
+    @abc.abstractmethod
+    def restore(self, state: T) -> None:
+        """Given the state, restores the object."""
+
+
+class Trainer(VariableSource, Worker, Saveable):
     """Abstract learner object.
     This corresponds to an object which implements a learning loop. A single step
     of learning should be implemented via the `step` method and this step
@@ -110,3 +129,21 @@ class Trainer(acme.Learner):
     Data will be read from this dataset asynchronously and this is primarily
     useful when the dataset is filled by an external process.
     """
+
+    @abc.abstractmethod
+    def step(self) -> None:
+        """Perform an update step of the learner's parameters."""
+
+    def run(self, num_steps: Optional[int] = None) -> None:
+        """Run the update loop; typically an infinite loop which calls step."""
+
+        iterator = range(num_steps) if num_steps is not None else itertools.count()
+
+        for _ in iterator:
+            self.step()
+
+    def save(self) -> T:
+        raise NotImplementedError('Method "save" is not implemented.')
+
+    def restore(self, state: T) -> None:
+        raise NotImplementedError('Method "restore" is not implemented.')
