@@ -65,7 +65,10 @@ class StepsLimiter:
     """Process that terminates an experiment when `max_steps` is reached."""
 
     def __init__(
-        self, counter: counting.Counter, max_steps: int, steps_key: str = "actor_steps"
+        self,
+        counter: counting.Counter,
+        max_steps: int,
+        steps_key: str = "executor_steps",
     ):
         self._counter = counter
         self._max_steps = max_steps

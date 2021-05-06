@@ -101,8 +101,14 @@ class BaseMADDPGTrainer(mava.Trainer):
         self._target_policy_networks = target_policy_networks
         self._target_critic_networks = target_critic_networks
 
-        self._observation_networks = observation_networks
-        self._target_observation_networks = target_observation_networks
+        # Ensure obs and target networks are sonnet modules
+        self._observation_networks = {
+            k: tf2_utils.to_sonnet_module(v) for k, v in observation_networks.items()
+        }
+        self._target_observation_networks = {
+            k: tf2_utils.to_sonnet_module(v)
+            for k, v in target_observation_networks.items()
+        }
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()

@@ -22,7 +22,7 @@ jobs:
         run: |
           pip install --upgrade pip setuptools
           pip install .
-          pip install .[tf,envs,reverb,testing_formatting]
+          pip install .[tf,envs,reverb,testing_formatting,launchpad]
       - name: Format code
         run: |
           # Check code follows black formatting.

@@ -101,7 +101,7 @@ class MADQN:
                 clipping=clipping,
             ),
             trainer_fn=trainer_fn,
-            executer_fn=executor_fn,
+            executor_fn=executor_fn,
         )
 
     def replay(self) -> Any:
@@ -184,7 +184,6 @@ class MADQN:
             q_networks=executor_networks["values"],
             action_selectors=networks["action_selectors"],
             adder=self._builder.make_adder(replay),
-            variable_source=variable_source,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -237,7 +236,6 @@ class MADQN:
         executor = self._builder.make_executor(
             q_networks=executor_networks["values"],
             action_selectors=networks["action_selectors"],
-            variable_source=variable_source,
         )
 
         # Make the environment.
