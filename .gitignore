@@ -143,3 +143,5 @@ eval_loop
 NULL
 logs
 Checkpoints
+mava/workspace.code-workspace
+.DS_Store

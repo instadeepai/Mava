@@ -32,6 +32,7 @@ pip install .
 pip install .[tf]
 pip install .[reverb]
 pip install .[envs]
+pip install .[launchpad]
 pip install .[testing]
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)

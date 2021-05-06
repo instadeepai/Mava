@@ -23,7 +23,7 @@ jobs:
         run: |
           pip install --upgrade pip setuptools
           pip install .
-          pip install .[tf,envs,reverb,testing_formatting]
+          pip install .[tf,envs,reverb,testing_formatting,launchpad]
           # For atari envs
           pip install autorom && echo y | AutoROM && sudo apt-get install unrar
           # Open CV
