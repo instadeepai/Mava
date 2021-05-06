@@ -25,6 +25,7 @@ import sonnet as snt
 from absl import app, flags
 from acme import types
 from acme.tf import networks
+from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.systems.tf import executors, maddpg
@@ -48,7 +49,7 @@ flags.DEFINE_string(
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    observation_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         256,
         256,
         256,
@@ -65,9 +66,9 @@ def make_networks(
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
-    if isinstance(observation_networks_layer_sizes, Sequence):
-        observation_networks_layer_sizes = {
-            key: observation_networks_layer_sizes for key in specs.keys()
+    if isinstance(policy_networks_layer_sizes, Sequence):
+        policy_networks_layer_sizes = {
+            key: policy_networks_layer_sizes for key in specs.keys()
         }
     if isinstance(critic_networks_layer_sizes, Sequence):
         critic_networks_layer_sizes = {
@@ -83,21 +84,18 @@ def make_networks(
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
         # Create the observation network.
-        observation_network = snt.DeepRNN(
-            [
-                snt.Flatten(),
-                snt.nets.MLP(observation_networks_layer_sizes[key]),
-                snt.LSTM(20),
-                snt.nets.MLP([128]),
-                networks.NearZeroInitializedLinear(num_dimensions),
-                networks.TanhToSpec(specs[key].actions),
-            ]
-        )
+        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
         policy_network = snt.DeepRNN(
             [
                 observation_network,
+                snt.Flatten(),
+                snt.nets.MLP(policy_networks_layer_sizes[key]),
+                snt.LSTM(20),
+                snt.nets.MLP([128]),
+                networks.NearZeroInitializedLinear(num_dimensions),
+                networks.TanhToSpec(specs[key].actions),
                 networks.ClippedGaussian(sigma),
                 networks.ClipToSpec(specs[key].actions),
             ]
@@ -133,7 +131,22 @@ def main(_: Any) -> None:
     log_dir = base_dir / "logs"
     log_time_stamp = str(datetime.now())
 
+<<<<<<< HEAD
     log_info = (log_dir, log_time_stamp)
+=======
+    # Construct the agent.
+    system = maddpg.MADDPG(
+        environment_spec=environment_spec,
+        policy_networks=system_networks["policies"],
+        critic_networks=system_networks["critics"],
+        observation_networks=system_networks[
+            "observations"
+        ],  # pytype: disable=wrong-arg-types
+        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
+        executor_fn=executors.RecurrentExecutor,
+        logger=system_logger,
+    )
+>>>>>>> b00fe17da92e6dd47c5c6136f1fde07b795295fc
 
     environment_factory = lp_utils.partial_kwargs(
         pettingzoo_utils.make_environment,
