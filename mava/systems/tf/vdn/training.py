@@ -13,17 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): implement Qmix trainer
-#   - Write code for training the mixing networks.
-# Helper resources
-#   - single agent dqn learner in acme:
-#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/dqn/learning.py
-#   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
+"""VDN trainer implementation."""
 
-
-"""Qmix trainer implementation."""
-
-# import time
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
@@ -36,9 +27,9 @@ import mava
 from mava.utils import training_utils as train_utils
 
 
-class QMIXTrainer(mava.Trainer):
-    """QMIX trainer.
-    This is the trainer component of a QMIX system. i.e. it takes a dataset as input
+class VDNTrainer(mava.Trainer):
+    """VDN trainer.
+    This is the trainer component of a VDN system. i.e. it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
 
@@ -127,10 +118,6 @@ class QMIXTrainer(mava.Trainer):
             online_variables += self._q_networks[key].variables
             target_variables += self._target_q_networks[key].variables
 
-        online_variables += self._mixing_network.variables
-        target_variables += self._target_mixing_network.variables
-
-        # Make online -> target network update ops.
         if tf.math.mod(self._num_steps, self._target_update_period) == 0:
             for src, dest in zip(online_variables, target_variables):
                 dest.assign(src)
@@ -167,16 +154,10 @@ class QMIXTrainer(mava.Trainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t = [Optional] = extra data that the agents persist in replay.
-        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
-
-        # Global state (for hypernetwork) one-hot encoded
-        s_tm1 = tf.one_hot(e_tm1["s_t"], depth=3)  # TODO Get depth from state specs
-        s_t = tf.one_hot(e_t["s_t"], depth=3)
+        o_tm1, a_tm1, _, r_t, d_t, o_t, _ = inputs.data
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            # a_t = self._policy_actions(o_t_trans)
-
             q_tm1 = []  # Q vals
             q_t = []  # Target Q vals
             for agent in self._agents:
@@ -185,10 +166,6 @@ class QMIXTrainer(mava.Trainer):
                 o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
                     o_tm1, o_t, a_tm1, agent
                 )
-
-                # print("Batch state:", s_tm1, "\n") # NOTE Shouldn't these all be 0s?
-                # print("Batch next state:", s_t, "\n")
-                # print("Obs feed:", o_t_feed.observation, "\n")
 
                 # [B, num_actions]
                 q_tm1_agent = self._q_networks[agent_key](o_tm1_feed.observation)
@@ -202,41 +179,36 @@ class QMIXTrainer(mava.Trainer):
             q_tm1 = tf.concat(q_tm1, axis=1)
             q_t = tf.concat(q_t, axis=1)
 
-            q_tot_mixed = self._mixing_network(q_tm1, s_tm1)  # [B, 1, 1]
-            q_tot_target_mixed = self._target_mixing_network(q_t, s_t)  # [B, 1, 1]
-
-            # NOTE (St John) These mixed Q values don't seem to be resetting
-            # after each iteration so the effect is that the total Q value keeps
-            # growing during training. I think this is the reason there is strange
-            # behaviour where everytime the agent tries a new action (randomly)
-            # it thinks that is a better strategy. This leads to bouncing around
-            # and inconsistent reward.
-            # This same thing happens with VDN. Look into this.
-            print("Q mixed:", q_tot_mixed)
+            q_tot_mixed = self._mixing_network(q_tm1)  # [B, 1, 1]
+            q_tot_target_mixed = self._target_mixing_network(q_t)  # [B, 1, 1]
+            print("Q mixed:", q_tot_target_mixed)
 
             # Cast the additional discount to match the environment discount dtype.
             # discount = tf.cast(self._discount, dtype=d_t.dtype)
+
+            # Calculate Q loss.
+            # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
             discount = 0.99  # TODO Generalise
 
             # TODO Case where agents have different rewards?
             r_t = tf.reshape(r_t["agent_0"], shape=(-1, 1))
             target = tf.stop_gradient(
-                r_t + discount * tf.reduce_max(q_tot_target_mixed, axis=1)
+                r_t
+                + discount
+                * q_tot_target_mixed  # tf.reduce_max(q_tot_target_mixed, axis=1)
             )
             target = tf.reshape(target, (-1, 1, 1))
             td_error = target - q_tot_mixed
 
-            # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
             self.loss = 0.5 * tf.square(td_error)
             self.tape = tape
 
     def _backward(self) -> None:
-        """Calculate the gradients and update the networks."""
-        # Collect trainable variables
+        # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
+            # Get trainable variables.
             trainable_variables = self._q_networks[agent_key].trainable_variables
-        trainable_variables += self._mixing_network.trainable_variables
 
         # Compute gradients.
         gradients = self.tape.gradient(self.loss, trainable_variables)
@@ -263,7 +235,7 @@ class QMIXTrainer(mava.Trainer):
         self._forward(inputs)
         self._backward()
 
-        return self.loss  # Return total system loss
+        return self.loss
 
     def step(self) -> None:
         # Run the learning step.
@@ -291,7 +263,7 @@ class QMIXTrainer(mava.Trainer):
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
 
-        variables["mixing"] = self._mixing_network.variables  # Also hypernet vars
+        # variables["mixing"] = self._mixing_network.variables  # Also hypernet vars
         variables["q_networks"] = {}  # or behaviour
 
         for key in self.unique_net_keys:

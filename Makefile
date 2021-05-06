@@ -16,7 +16,9 @@ DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 # Set example to run when using `make run`
 MADDPG=examples/debugging_envs/run_debug_maddpg.py
 IDQN=examples/debugging_envs/run_debug_idqn.py
-QMIX=examples/debugging_envs/run_qmix.py
+QMIX=examples/debugging_envs/run_debug_qmix.py
+VDN=examples/debugging_envs/run_debug_vdn.py
+MAPPO=examples/debugging_envs/run_debug_mappo.py
 
 # make file commands
 run-maddpg:
@@ -27,6 +29,12 @@ run-idqn:
 
 run-qmix:
 	$(DOCKER_RUN) python $(QMIX)
+
+run-vdn:
+	$(DOCKER_RUN) python $(VDN)
+
+run-mappo:
+	$(DOCKER_RUN) python $(MAPPO)
 
 bash:
 	$(DOCKER_RUN) bash

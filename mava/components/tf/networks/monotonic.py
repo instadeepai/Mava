@@ -70,7 +70,7 @@ class MonotonicMixingNetwork(snt.Module):
         # TODO What is the most efficient way to get these from architecture?
         self._state_dim = state_dim
         # self._n_agents = architecture._n_agents
-        self._n_agents = 2  # NOTE (St John) Hard coded for now
+        self._n_agents = 2  # TODO (St John) Hard coded for now
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
 
@@ -83,18 +83,18 @@ class MonotonicMixingNetwork(snt.Module):
         )
 
     # TODO (St John) I need to set up states so that it is a global state
-    # This should be of shape [batch_size, 3] for my env. This is assuming
+    # This should be of shape [B, 3] for my env. This is assuming
     # I take global state as a one-hot input. e.g. State 2 => (0,0,1) has
     # dim=3.
 
     def __call__(
         self,
-        q_values: tf.Tensor,  # [batch_size, n_actions*n_agents] = [B,4]
-        states: tf.Tensor,  # [batch_size, one_hot_state_dim = 3]
+        q_values: tf.Tensor,  # [B, n_actions * n_agents] = [B,4]
+        states: tf.Tensor,  # [B, one_hot_state_dim = 3]
     ) -> tf.Tensor:
         """Monotonic mixing logic."""
 
-        # Expand dimensions to [B, 1, n_actions*n_agents] = [B,1,4] for matmul
+        # Expand dimensions to [B, 1, n_actions*n_agents] = [B, 1, 4] for matmul
         q_values = tf.expand_dims(q_values, axis=1)
         self._hyperparams = self._hypernetworks(states)
 

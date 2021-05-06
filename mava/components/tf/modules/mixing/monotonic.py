@@ -52,8 +52,6 @@ class MonotonicMixing(BaseMixingModule):
 
         self._architecture = architecture
         self._environment_spec = environment_spec
-        # self._n_agents = architecture._n_agents
-        self._n_agents = 2  # NOTE (St John) Hard coded for now
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
@@ -71,13 +69,13 @@ class MonotonicMixing(BaseMixingModule):
         # specs if possible.
         # observation_specs = list(agent_specs.values())[0].observations.observation
 
-        self._num_agents = len(self._agent_networks)
+        self._n_agents = len(self._agent_networks)
         # self._obs_dim = int(np.prod(observation_specs.shape))
 
         # TODO Currently hard coded to 2 but need to generalise
         self._obs_dim = 2
 
-        q_value_dim = tf.TensorSpec(self._obs_dim * self._num_agents)
+        q_value_dim = tf.TensorSpec(self._obs_dim * self._n_agents)
 
         # Implement method from base class
         self._mixed_network = MonotonicMixingNetwork(
@@ -93,9 +91,10 @@ class MonotonicMixing(BaseMixingModule):
         return self._mixed_network
 
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
-        # Implement method from base class
         networks = self._architecture.create_actor_variables()
         self._agent_networks = networks["values"]
+
         networks["mixing"] = self._create_mixing_layer()
-        networks["target_mixing"] = self._create_mixing_layer()  # or deep copy?
+        networks["target_mixing"] = self._create_mixing_layer()
+
         return networks

@@ -15,7 +15,6 @@
 
 import sonnet as snt
 import tensorflow as tf
-from tensorflow import Tensor
 
 
 class AdditiveMixingNetwork(snt.Module):
@@ -25,6 +24,6 @@ class AdditiveMixingNetwork(snt.Module):
         """Initializes the mixer."""
         super(AdditiveMixingNetwork, self).__init__()
 
-    def __call__(self, q_values: Tensor) -> Tensor:
+    def __call__(self, q_values: tf.Tensor) -> tf.Tensor:
         """Monotonic mixing logic."""
         return tf.math.reduce_sum(q_values)

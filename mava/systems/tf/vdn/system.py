@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): finish Qmix
+# TODO (StJohn): finish VDN
 
-"""QMIX system implementation."""
+"""VDN system implementation."""
 import dataclasses
 from typing import Dict, Iterator, Optional, Type
 
@@ -29,15 +29,15 @@ from acme.utils import counting, loggers
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.architectures import DecentralisedValueActor
-from mava.components.tf.modules.mixing import MonotonicMixing
+from mava.components.tf.modules.mixing import AdditiveMixing
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
-from mava.systems.tf.qmix import execution, training
+from mava.systems.tf.vdn import execution, training
 
 
 @dataclasses.dataclass
-class QMIXConfig:
-    """Configuration options for the QMIX system
+class VDNConfig:
+    """Configuration options for the VDN system
     Args:
         environment_spec: description of the actions, observations, etc.
         q_networks: the online Q network (the one being optimized)
@@ -81,8 +81,8 @@ class QMIXConfig:
     checkpoint: bool
 
 
-class QMIXBuilder(SystemBuilder):
-    """Builder for QMIX which constructs individual components of the system."""
+class VDNBuilder(SystemBuilder):
+    """Builder for VDN which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an MARL system.
       Implementations of this interface contain a complete specification of a
@@ -93,12 +93,12 @@ class QMIXBuilder(SystemBuilder):
 
     def __init__(
         self,
-        config: QMIXConfig,
-        trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
-        executer_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
+        config: VDNConfig,
+        trainer_fn: Type[training.VDNTrainer] = training.VDNTrainer,
+        executer_fn: Type[core.Executor] = execution.VDNFeedForwardExecutor,
     ) -> None:
         """Args:
-        _config: Configuration options for the QMIX system.
+        _config: Configuration options for the VDN system.
 
         self._config = config
         self._trainer_fn = trainer_fn
@@ -255,9 +255,9 @@ class QMIXBuilder(SystemBuilder):
         return trainer
 
 
-class QMIX(system.System):
-    """QMIX system.
-    This implements a single-process QMIX system.
+class VDN(system.System):
+    """VDN system.
+    This implements a single-process VDN system.
     Args:
         environment_spec: description of the actions, observations, etc.
         q_networks: the online Q network (the one being optimized)
@@ -286,7 +286,7 @@ class QMIX(system.System):
         environment_spec: specs.MAEnvironmentSpec,
         q_networks: Dict[str, snt.Module],
         epsilon: tf.Variable,
-        trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
+        trainer_fn: Type[training.VDNTrainer] = training.VDNTrainer,
         shared_weights: bool = False,
         target_update_period: int = 100,
         clipping: bool = False,
@@ -303,8 +303,8 @@ class QMIX(system.System):
     ):
         """Initialize the system."""
 
-        builder = QMIXBuilder(
-            QMIXConfig(
+        builder = VDNBuilder(
+            VDNConfig(
                 environment_spec=environment_spec,
                 q_networks=q_networks,
                 shared_weights=shared_weights,
@@ -345,9 +345,9 @@ class QMIX(system.System):
         )
 
         # Augment network architecture by adding mixing layer network.
-        networks = MonotonicMixing(
+        networks = AdditiveMixing(  # MonotonicMixing(
             architecture=architecture,
-            environment_spec=environment_spec,
+            # environment_spec=environment_spec,
         ).create_system()
 
         # Retrieve networks

@@ -13,27 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running Qmix on pettinzoo MPE environments."""
-# import importlib
+# TODO Add option for recurrent agent networks. In original paper they use DQN
+# for one task and DRQN for the StarCraft II SMAC task.
+
+"""Example running Qmix on two-step Qmix paper environment."""
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
 import sonnet as snt
 import tensorflow as tf
-import trfl
 from absl import app, flags
 from acme import types
 from acme.tf import networks
-from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import qmix
 from mava.utils.debugging.environments.two_step import TwoStepEnv
 from mava.wrappers.debugging_envs import TwoStepWrapper
-
-# NOTE See next note.
-# from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
@@ -62,9 +59,6 @@ def make_environment() -> dm_env.Environment:
     return environment
 
 
-# TODO Add option for recurrent agent networks. In original paper they use DQN
-# for one task and DRQN for the StarCraft II SMAC task.
-
 # NOTE The current parameter and hyperparameter choices here are directed by
 # the simple environment implementation in the original Qmix paper.
 
@@ -82,15 +76,10 @@ def make_networks(
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
-    observation_networks = {}
     q_networks = {}
-    behavior_networks = {}
-
     for key in specs.keys():
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
-        # Create the shared observation network
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
         # Create the policy network.
         q_network = snt.Sequential(
             [
@@ -98,25 +87,9 @@ def make_networks(
                 networks.NearZeroInitializedLinear(num_dimensions),
             ]
         )
-
-        behavior_network = snt.Sequential(
-            [
-                q_network,
-                lambda q: tf.cast(
-                    trfl.epsilon_greedy(q, epsilon=epsilon).sample(), "int64"
-                ),
-            ]
-        )
-
-        observation_networks[key] = observation_network
         q_networks[key] = q_network
-        behavior_networks[key] = behavior_network
 
-    return {
-        "q_networks": q_networks,
-        "observations": observation_networks,
-        "behaviors": behavior_networks,
-    }
+    return {"q_networks": q_networks}
 
 
 def main(_: Any) -> None:
@@ -132,8 +105,6 @@ def main(_: Any) -> None:
     system = qmix.QMIX(
         environment_spec=environment_spec,
         q_networks=system_networks["q_networks"],
-        # observation_networks=system_networks["observations"],
-        # behavior_networks=system_networks["behaviors"],
         epsilon=epsilon,
     )
 
