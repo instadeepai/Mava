@@ -101,7 +101,7 @@ class MADQN:
                 clipping=clipping,
             ),
             trainer_fn=trainer_fn,
-            executer_fn=executor_fn,
+            executor_fn=executor_fn,
         )
 
     def replay(self) -> Any:

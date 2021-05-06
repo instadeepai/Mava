@@ -58,7 +58,7 @@ class MADDPG(system.System):
         trainer_fn: Type[
             training.BaseMADDPGTrainer
         ] = training.DecentralisedMADDPGTrainer,
-        executer_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -119,7 +119,7 @@ class MADDPG(system.System):
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
 
-        if executer_fn == executors.RecurrentExecutor:
+        if executor_fn == executors.RecurrentExecutor:
             extras = self._get_extras()
         else:
             extras = {}
@@ -140,7 +140,7 @@ class MADDPG(system.System):
                 clipping=clipping,
             ),
             trainer_fn=trainer_fn,
-            executer_fn=executer_fn,
+            executor_fn=executor_fn,
             extras=extras,
         )
 
@@ -240,11 +240,6 @@ class MADDPG(system.System):
         ).create_system()
 
         # Create the executor.
-        # TODO (Arnu): getting "method get_variables not found" error
-        # when passing in var source directly from launchpad build function.
-        # This is because the var source being sent in seems to be a courier
-        # node of type courier.python.client.Client and not a variable source.
-        # Need to investigate further.
         executor = self._builder.make_executor(
             policy_networks=executor_networks["policies"],
             adder=self._builder.make_adder(replay),

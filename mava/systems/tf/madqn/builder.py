@@ -78,7 +78,7 @@ class MADQNBuilder:
         self,
         config: MADQNConfig,
         trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
-        executer_fn: Type[core.Executor] = execution.FeedForwardMADQNExecutor,
+        executor_fn: Type[core.Executor] = execution.FeedForwardMADQNExecutor,
     ):
         """Args:
         _config: Configuration options for the MADDPG system.
@@ -87,7 +87,7 @@ class MADQNBuilder:
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
-        self._executor_fn = executer_fn
+        self._executor_fn = executor_fn
 
     def make_replay_tables(
         self,
