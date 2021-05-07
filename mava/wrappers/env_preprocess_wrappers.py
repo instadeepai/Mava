@@ -83,6 +83,7 @@ Other PZ preprocess wrappers:
 """
 
 
+# TODO(Kale-ab): Configure this to use RunningMeanStd.
 class StandardizeObservation:
     """
     Standardize observations
@@ -131,10 +132,6 @@ class StandardizeObservation:
             1 - self.alpha
         )
 
-        # If steps is zero, this would result in div by zero error.
-        if num_steps == 0:
-            num_steps = 1
-
         unbiased_mean = state_mean / (1 - pow(self.alpha, num_steps))
         unbiased_std = state_std / (1 - pow(self.alpha, num_steps))
 
@@ -154,10 +151,6 @@ class StandardizeObservationSequential(
     ) -> None:
         SequentialObservationWrapper.__init__(self, env)
         StandardizeObservation.__init__(self, env, load_params, alpha)
-
-    def reset(self) -> None:
-        self._ini_params()
-        super().reset()
 
     def _modify_observation(self, agent: str, observation: Observation) -> Observation:
         self._internal_state[agent]["num_steps"] = (
@@ -183,10 +176,6 @@ class StandardizeObservationParallel(
         ParallelObservationWrapper.__init__(self, env)
         StandardizeObservation.__init__(self, env, load_params, alpha)
 
-    def reset(self) -> Any:
-        self._ini_params()
-        return super().reset()
-
     def _modify_observation(self, agent: str, observation: Observation) -> Observation:
         self._internal_state[agent]["num_steps"] = (
             int(self._internal_state[agent]["num_steps"]) + 1
@@ -205,6 +194,7 @@ class StandardizeReward:
     Standardize rewards
     We rescale rewards, but don't shift the mean - http://joschu.net/docs/nuts-and-bolts.pdf .
     Adapted from https://github.com/DLR-RM/stable-baselines3/blob/237223f834fe9b8143ea24235d087c4e32addd2f/stable_baselines3/common/vec_env/vec_normalize.py # noqa: E501
+    and https://github.com/openai/baselines/blob/master/baselines/common/vec_env/vec_normalize.py.
         :env Env to wrap.
         :load_params Params to load.
         :upper_bound: Max value for discounted reward.
@@ -258,6 +248,8 @@ class StandardizeReward:
         ret = ret * gamma + reward
         ret_rms.update(ret)
 
+        agent_dict["return"] = ret
+        agent_dict["ret_rms"] = ret_rms
         self._internal_state[agent] = agent_dict
 
     def normalize_reward(self, agent: str, reward: Reward) -> Reward:
@@ -279,8 +271,6 @@ class StandardizeReward:
         agent: str,
         reward: Reward,
     ) -> Reward:
-
-        # TODO(Kale-ab): We should only call self._update_reward during training.
         self._update_reward(agent, reward)
         reward = self.normalize_reward(agent, reward)
         return reward
@@ -301,9 +291,11 @@ class StandardizeRewardSequential(PettingzooWrapper, StandardizeReward):
         )
 
     def reset(self) -> None:
-        self._ini_params()
+        # Reset returns, but not running scores.
+        for stats in self._internal_state.values():
+            stats["return"] = 0
+
         super().reset()
-        self._ini_params()
         self.rewards = {
             agent: self._get_updated_reward(agent, reward)
             for agent, reward in self.rewards.items()  # type: ignore
@@ -341,7 +333,10 @@ class StandardizeRewardParallel(
         )
 
     def reset(self) -> Observation:
-        self._ini_params()
+        # Reset returns, but not running scores.
+        for stats in self._internal_state.values():
+            stats["return"] = 0
+
         obs = self.env.reset()  # type: ignore
         self.agents = self.env.agents  # type: ignore
         return obs
