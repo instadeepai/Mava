@@ -64,6 +64,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
 
         self._prev_log_probs: Dict[str, Any] = {}
 
+    @tf.function
     def _policy(
         self,
         agent: str,
