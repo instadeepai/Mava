@@ -198,7 +198,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         # fill the replay buffer.
         self._timestamp = None
 
-    @tf.function
     def _update_target_networks(self) -> None:
         for key in self.unique_net_keys:
             # Update target network.
@@ -219,7 +218,6 @@ class BaseMADDPGTrainer(mava.Trainer):
                     dest.assign(src)
             self._num_steps.assign_add(1)
 
-    @tf.function
     def _transform_observations(
         self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
@@ -250,7 +248,6 @@ class BaseMADDPGTrainer(mava.Trainer):
             #  is not dependent on the behavior networks.
         return o_tm1, o_t
 
-    @tf.function
     def _get_critic_feed(
         self,
         o_tm1_trans: Dict[str, np.ndarray],
@@ -269,7 +266,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         a_t_feed = a_t[agent]
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
-    @tf.function
     def _get_dpg_feed(
         self,
         a_t: Dict[str, np.ndarray],
@@ -280,7 +276,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         dpg_a_t_feed = dpg_a_t
         return dpg_a_t_feed
 
-    @tf.function
     def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         for agent in self._agents:
@@ -293,7 +288,7 @@ class BaseMADDPGTrainer(mava.Trainer):
     # to be called by the step() function below. Removing it makes the code
     # work. The docs on tf.function says it is useful for speed improvements
     # but as far as I can see, we can go ahead without it. At least for now.
-    # @tf.function
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -608,7 +603,6 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
             checkpoint=checkpoint,
         )
 
-    @tf.function
     def _get_critic_feed(
         self,
         o_tm1_trans: Dict[str, np.ndarray],
@@ -627,7 +621,6 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         a_t_feed = tf.stack([x for x in a_t.values()], 1)
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
-    @tf.function
     def _get_dpg_feed(
         self,
         a_t: Dict[str, np.ndarray],
@@ -714,7 +707,6 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
             checkpoint=checkpoint,
         )
 
-    @tf.function
     def _get_critic_feed(
         self,
         o_tm1_trans: Dict[str, np.ndarray],
@@ -732,7 +724,6 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         a_t_feed = tf.stack([x for x in a_t.values()], 1)
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
-    @tf.function
     def _get_dpg_feed(
         self,
         a_t: Dict[str, np.ndarray],
@@ -902,7 +893,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # fill the replay buffer.
         self._timestamp = None
 
-    @tf.function
     def _update_target_networks(self) -> None:
         for key in self.unique_net_keys:
             # Update target network.
@@ -930,7 +920,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     def _extract_dim(self, tensor: tf.Tensor, dims: tf.Tensor) -> tf.Tensor:
         return tf.reshape(tensor, [dims[0], dims[1], -1])
 
-    @tf.function
     def _transform_observations(
         self, observations: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
@@ -974,7 +963,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
         return obs_trans, obs_target_trans
 
-    @tf.function
     def _get_critic_feed(
         self,
         obs_trans: Dict[str, np.ndarray],
@@ -992,7 +980,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         target_actions_feed = target_actions[agent]
         return obs_trans_feed, target_obs_trans_feed, action_feed, target_actions_feed
 
-    @tf.function
     def _get_dpg_feed(
         self,
         target_actions: Dict[str, np.ndarray],
@@ -1003,7 +990,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         dpg_actions_feed = dpg_actions
         return dpg_actions_feed
 
-    @tf.function
     def _policy_actions(
         self,
         target_obs_trans: Dict[str, np.ndarray],
@@ -1033,7 +1019,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     # to be called by the step() function below. Removing it makes the code
     # work. The docs on tf.function says it is useful for speed improvements
     # but as far as I can see, we can go ahead without it. At least for now.
-    # @tf.function
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:

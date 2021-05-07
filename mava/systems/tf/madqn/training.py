@@ -118,7 +118,6 @@ class MADQNTrainer(mava.Trainer):
 
         self._timestamp = None
 
-    @tf.function
     def _update_target_networks(self) -> None:
         for key in self.unique_net_keys:
             # Update target network.
@@ -133,7 +132,6 @@ class MADQNTrainer(mava.Trainer):
 
         self._num_steps.assign_add(1)
 
-    @tf.function
     def _get_feed(
         self,
         o_tm1_trans: Dict[str, np.ndarray],
@@ -153,6 +151,7 @@ class MADQNTrainer(mava.Trainer):
         if self._epsilon < 0.01:
             self._epsilon.assign(0.01)
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
