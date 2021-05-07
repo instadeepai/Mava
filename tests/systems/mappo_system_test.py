@@ -139,7 +139,7 @@ class TestMAPPO:
         environment_factory = lp_utils.partial_kwargs(
             debugging_utils.make_environment,
             env_name="simple_spread",
-            action_space="continuous",
+            action_space="discrete",
         )
 
         # networks
@@ -152,6 +152,7 @@ class TestMAPPO:
             log_info=log_info,
             num_executors=2,
             batch_size=32,
+            max_queue_size=1000,
         )
         program = system.build()
 
