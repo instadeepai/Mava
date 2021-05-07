@@ -13,49 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Tests for MADQN."""
+
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Dict, Mapping, Sequence, Union
 
-import dm_env
 import launchpad as lp
 import sonnet as snt
 import tensorflow as tf
-from absl import app, flags
 from acme import types
 from acme.tf import networks
 
+import mava
 from mava import specs as mava_specs
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.debugging.make_env import make_debugging_env
-from mava.wrappers.debugging_envs import DebuggingEnvWrapper
-
-FLAGS = flags.FLAGS
-flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-
-
-def make_environment(
-    evaluation: bool,
-    env_name: str = "simple_spread",
-    action_space: str = "discrete",
-    num_agents: int = 3,
-    render: bool = False,
-) -> dm_env.Environment:
-
-    assert action_space == "continuous" or action_space == "discrete"
-
-    del evaluation
-
-    """Creates a MPE environment."""
-    env_module = make_debugging_env(env_name, action_space, num_agents)
-    environment = DebuggingEnvWrapper(env_module, render=render)
-    return environment
+from mava.utils.environments import debugging_utils
 
 
 def make_networks(
@@ -110,28 +85,49 @@ def make_networks(
     }
 
 
-def main(_: Any) -> None:
+class TestMADQN:
+    """Simple integration/smoke test for MADQN."""
 
-    # set loggers info
-    base_dir = Path.cwd()
-    log_dir = base_dir / "logs"
-    log_time_stamp = str(datetime.now())
+    def test_madqn_on_debugging_env(self) -> None:
+        """Tests that the system can run on the simple spread
+        debugging environment without crashing."""
 
-    log_info = (log_dir, log_time_stamp)
+        # set loggers info
+        base_dir = Path.cwd()
+        log_dir = base_dir / "logs"
+        log_time_stamp = str(datetime.now())
 
-    environment_factory = lp_utils.partial_kwargs(
-        make_environment, env_name=FLAGS.env_name
-    )
+        log_info = (log_dir, log_time_stamp)
 
-    program = madqn.MADQN(
-        environment_factory=environment_factory,
-        network_factory=lp_utils.partial_kwargs(make_networks),
-        num_executors=2,
-        log_info=log_info,
-    ).build()
+        # environment
+        environment_factory = lp_utils.partial_kwargs(
+            debugging_utils.make_environment,
+            env_name="simple_spread",
+            action_space="discrete",
+        )
 
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+        # networks
+        network_factory = lp_utils.partial_kwargs(make_networks)
 
+        # system
+        system = madqn.MADQN(
+            environment_factory=environment_factory,
+            network_factory=network_factory,
+            log_info=log_info,
+            num_executors=2,
+            batch_size=32,
+            min_replay_size=32,
+            max_replay_size=1000,
+        )
 
-if __name__ == "__main__":
-    app.run(main)
+        program = system.build()
+
+        (trainer_node,) = program.groups["trainer"]
+        trainer_node.disable_run()
+
+        lp.launch(program, launch_type="test_mt")
+
+        trainer: mava.Trainer = trainer_node.create_handle().dereference()
+
+        for _ in range(5):
+            trainer.step()

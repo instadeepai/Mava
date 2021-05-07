@@ -52,7 +52,7 @@ class TestEnvWrapper:
     # Test that we can load a env module and that it contains agents,
     #   agents and possible_agents.
     def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        env, _ = helpers.get_env(env_spec)
+        env = helpers.get_env(env_spec)
         props_which_should_not_be_none = [env, env.agents, env.possible_agents]
         assert helpers.verify_all_props_not_none(
             props_which_should_not_be_none
@@ -286,8 +286,6 @@ class TestEnvWrapper:
         #  Get agent names from env
         agents = wrapped_env.agents
 
-        _ = wrapped_env.reset()
-
         # Parallel env_types
         if env_spec.env_type == EnvType.Parallel:
             test_agents_actions = {
@@ -320,9 +318,8 @@ class TestEnvWrapper:
         helpers.seed_action_space(wrapped_env, random_seed)
 
         #  Get agent names from env
-        agents = wrapped_env.agents
-
         _ = wrapped_env.reset()
+        agents = wrapped_env.agents
 
         # Parallel env_types
         if env_spec.env_type == EnvType.Parallel:
