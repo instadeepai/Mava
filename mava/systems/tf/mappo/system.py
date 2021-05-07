@@ -297,7 +297,9 @@ class MAPPO:
 
     # Overwrite update function to only learn if we can sample
     # from reverb.
-    # TODO (Arnu): find a way to implement this with launchpad
+    # TODO (Arnu): need to implement this with launchpad
+    # however I'm not 100% sure we need it. I suspect the
+    # rate limiter should handle this automatically?
     # def update(self) -> None:
     #     trainer_step = False
     #     while self._can_sample():
