@@ -29,6 +29,12 @@ from mava.utils.wrapper_utils import (
     convert_np_type,
     parameterized_restart,
 )
+from mava.wrappers.env_preprocess_wrappers import (
+    StandardizeObservationParallel,
+    StandardizeObservationSequential,
+    StandardizeRewardParallel,
+    StandardizeRewardSequential,
+)
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
 
@@ -45,6 +51,8 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
             # (env_preprocessor, dict_with_preprocessor_params)
             (black_death_v1, None),
             (pad_observations_v0, None),
+            (StandardizeObservationSequential, None),
+            (StandardizeRewardSequential, None),
         ],
     ):
         self._environment = environment
@@ -207,6 +215,8 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             # (env_preprocessor, dict_with_preprocessor_params)
             (black_death_v1, None),
             (pad_observations_v0, None),
+            (StandardizeObservationParallel, None),
+            (StandardizeRewardParallel, None),
         ],
     ):
         self._environment = environment
