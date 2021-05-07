@@ -15,16 +15,18 @@
 
 import importlib
 import typing
-from typing import Dict, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import acme
 import dm_env
 import numpy as np
+import numpy.testing as npt
 import pytest
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
+from mava.types import Observation, Reward
 from mava.utils.wrapper_utils import convert_np_type
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
@@ -53,8 +55,8 @@ class Helpers:
 
     # Return an env - currently Pettingzoo envs.
     @staticmethod
-    def get_env(env_spec: EnvSpec) -> Tuple[Union[AECEnv, ParallelEnv], int]:
-        env, num_agents = None, None
+    def get_env(env_spec: EnvSpec) -> Union[AECEnv, ParallelEnv]:
+        env = None
         if env_spec.env_source == EnvSource.PettingZoo:
             mod = importlib.import_module(env_spec.env_name)
             if env_spec.env_type == EnvType.Parallel:
@@ -64,8 +66,7 @@ class Helpers:
         else:
             raise Exception("Env_spec is not valid.")
         env.reset()  # type: ignore
-        num_agents = len(env.agents)  # type: ignore
-        return env, num_agents
+        return env
 
     # Returns a wrapper function.
     @staticmethod
@@ -168,7 +169,7 @@ class Helpers:
     # Returns a wrapped env and specs
     @staticmethod
     def get_wrapped_env(
-        env_spec: EnvSpec,
+        env_spec: EnvSpec, **kwargs: Any
     ) -> Tuple[dm_env.Environment, acme.specs.EnvironmentSpec]:
 
         specs = None
@@ -176,10 +177,11 @@ class Helpers:
             wrapped_env = Helpers.get_mocked_env(env_spec)
             specs = wrapped_env._specs
         else:
-            env, num_agents = Helpers.get_env(env_spec)
+            env = Helpers.get_env(env_spec)
             wrapper_func = Helpers.get_wrapper_function(env_spec)
-            wrapped_env = wrapper_func(env)
+            wrapped_env = wrapper_func(env, **kwargs)
             specs = Helpers.get_pz_env_spec(wrapped_env)._specs
+        wrapped_env.reset()  # type : ignore
         return wrapped_env, specs
 
     # Returns a petting zoo environment spec.
@@ -257,6 +259,65 @@ class Helpers:
                 assert dm_env_timestep.discount == expected_discount and type(
                     dm_env_timestep.discount
                 ) == type(expected_discount), "Failed to reset discount."
+
+    @staticmethod
+    @typing.no_type_check
+    # TODO(Kale-ab) Sort out typing issues.
+    def verify_observations_are_normalized(
+        observations: Observation,
+        agents: List,
+        env_spec: EnvSpec,
+        min: int = 0,
+        max: int = 1,
+    ) -> None:
+        if env_spec.env_type == EnvType.Parallel:
+            for agent in agents:
+                assert (
+                    observations[agent].observation.min() >= min
+                    and observations[agent].observation.max() <= max
+                ), "Failed to normalize observations."
+
+        elif env_spec.env_type == EnvType.Sequential:
+            assert (
+                observations.observation.min() >= min
+                and observations.observation.max() <= max
+            ), "Failed to normalize observations."
+
+    @staticmethod
+    @typing.no_type_check
+    # TODO(Kale-ab) Sort out typing issues.
+    def verify_reward_is_normalized(
+        rewards: Reward, agents: List, env_spec: EnvSpec, min: int = 0, max: int = 1
+    ) -> None:
+        if env_spec.env_type == EnvType.Parallel:
+            for agent in agents:
+                assert (
+                    rewards[agent] >= min and rewards[agent] <= max
+                ), "Failed to normalize reward."
+
+        elif env_spec.env_type == EnvType.Sequential:
+            assert rewards >= min and rewards <= max, "Failed to normalize reward."
+
+    @staticmethod
+    def verify_observations_are_standardized(
+        observations: Observation, agents: List, env_spec: EnvSpec
+    ) -> None:
+        if env_spec.env_type == EnvType.Parallel:
+            for agent in agents:
+                npt.assert_almost_equal(
+                    observations[agent].observation.mean(), 0, decimal=2
+                )
+                npt.assert_almost_equal(
+                    observations[agent].observation.std(), 1, decimal=2
+                )
+
+        elif env_spec.env_type == EnvType.Sequential:
+            npt.assert_almost_equal(
+                observations.observation.mean(), 0, decimal=2  # type: ignore
+            )
+            npt.assert_almost_equal(
+                observations.observation.std(), 1, decimal=2  # type: ignore
+            )
 
     @staticmethod
     def mock_done() -> bool:
