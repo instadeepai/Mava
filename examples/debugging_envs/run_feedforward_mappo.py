@@ -91,8 +91,7 @@ def make_networks(
             policy_network = snt.Sequential(
                 [
                     networks.LayerNormMLP(
-                        policy_networks_layer_sizes[key]
-                        + (num_actions,),  # type: ignore
+                        tuple(policy_networks_layer_sizes[key]) + (num_actions,),
                         activate_final=False,
                     ),
                     tf.keras.layers.Lambda(
