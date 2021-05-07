@@ -15,7 +15,7 @@
 
 """MAPPO builder and config."""
 import dataclasses
-from typing import Dict, Iterator, Optional
+from typing import Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -29,25 +29,35 @@ from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf.mappo import execution, training
+from mava.wrappers import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass
 class MAPPOConfig:
     """Configuration options for the MAPPO system
     Args:
-        environment_spec: description of the actions, observations, etc.
-        shared_weights: ...
-        sequence_length: ...
-        sequence_period: ...
-        entropy_cost: ...
-        baseline_cost: ...
-        max_abs_reward: ...
-        batch_size: batch size for updates.
-        max_queue_size: maximum queue size.
-        policy_learning_rate:
-        critic learning_rate: learning rate for the critic-network update.
-        discount: discount to use for TD updates.
-        max_gradient_norm: used for gradient clipping.
+        environment_spec: environment specs.
+        sequence_length: length of the sequences in the queue.
+        sequence_period: amount of overlap between sequences added to the queue.
+        discount: discount factor (Always between 0 and 1).
+        lambda_gae: scalar determining the mix of bootstrapping
+            vs further accumulation of multi-step returns at each timestep.
+            See `High-Dimensional Continuous Control Using Generalized
+            Advantage Estimation` for more information.
+        clipping_epsilon: Hyper-parameter for clipping in the policy
+            objective. Roughly: how far can the new policy go from
+            the old policy while still profiting? The new policy can
+            still go farther than the clip_ratio says, but it doesn’t
+            help on the objective anymore.
+        max_queue_size: maximum number of items in the queue.
+        batch_size: size of the mini-batches.
+        critic_optimizer: optimizer for the critic.
+        policy_optimizer: optimizer for the policy.
+        entropy_cost: contribution of entropy regularization to the total loss.
+        baseline_cost: contribution of the value loss to the total loss.
+        max_abs_reward: max reward. If not None, the reward on which the agent
+            is trained will be clipped between -max_abs_reward and max_abs_reward.
+        max_gradient_norm: gradient normalization.
         replay_table_name: string indicating what name to give the replay table.
     """
 
@@ -58,12 +68,12 @@ class MAPPOConfig:
     discount: float = 0.99
     lambda_gae: float = 0.95
     max_queue_size: int = 100_000
-    batch_size: int = 16
-    critic_learning_rate: float = 1e-3
+    batch_size: int = 32
+    critic_learning_rate: float = 3e-4
     policy_learning_rate: float = 1e-3
     entropy_cost: float = 0.01
     baseline_cost: float = 0.5
-    clipping_epsilon: float = 0.2
+    clipping_epsilon: float = 0.1
     max_abs_reward: Optional[float] = None
     max_gradient_norm: Optional[float] = None
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
@@ -83,6 +93,8 @@ class MAPPOBuilder(SystemBuilder):
     def __init__(
         self,
         config: MAPPOConfig,
+        trainer_fn: Type[training.MAPPOTrainer] = training.MAPPOTrainer,
+        executor_fn: Type[core.Executor] = execution.MAPPOFeedForwardExecutor,
     ):
         """Args:
         config: Configuration options for the MAPPO system.
@@ -91,11 +103,15 @@ class MAPPOBuilder(SystemBuilder):
         """
 
         self._config = config
+        self._agents = self._config.environment_spec.get_agent_ids()
+        self._agent_types = self._config.environment_spec.get_agent_types()
+        self._trainer_fn = trainer_fn
+        self._executor_fn = executor_fn
 
     def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
-    ) -> reverb.Table:
+    ) -> List[reverb.Table]:
         """Create tables to insert data into."""
         agent_specs = environment_spec.get_agent_specs()
         extras_spec: Dict[str, Dict[str, acme_types.NestedArray]] = {"log_probs": {}}
@@ -107,13 +123,15 @@ class MAPPOBuilder(SystemBuilder):
         # Squeeze the batch dim.
         extras_spec = tf2_utils.squeeze_batch_dim(extras_spec)
 
-        return reverb.Table.queue(
+        replay_table = reverb.Table.queue(
             name=self._config.replay_table_name,
             max_size=self._config.max_queue_size,
             signature=reverb_adders.ParallelSequenceAdder.signature(
                 environment_spec, extras_spec=extras_spec
             ),
         )
+
+        return [replay_table]
 
     def make_dataset_iterator(
         self,
@@ -154,7 +172,7 @@ class MAPPOBuilder(SystemBuilder):
 
     def make_executor(
         self,
-        networks: Dict[str, Dict[str, snt.Module]],
+        policy_networks: Dict[str, Dict[str, snt.Module]],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
@@ -165,21 +183,20 @@ class MAPPOBuilder(SystemBuilder):
             adder: how data is recorded (e.g. added to replay).
             variable_source: a source providing the necessary executor parameters.
         """
-        policy_networks = networks["policies"]
 
         variable_client = None
         if variable_source:
             # Create policy variables.
             variables = {}
             for network_key in policy_networks.keys():
-                variables[network_key] = policy_networks[network_key].variables
+                variables[network_key] = policy_networks[network_key].variables  # type: ignore # noqa: E501
 
             # Get new policy variables.
             # TODO Should the variable update period be in the MAPPO config?
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policy": variables},
-                update_period=50,
+                update_period=1000,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -187,7 +204,7 @@ class MAPPOBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the executor which defines how agents take actions.
-        return execution.MAPPOFeedForwardExecutor(
+        return self._executor_fn(
             policy_networks=policy_networks,
             shared_weights=self._config.shared_weights,
             variable_client=variable_client,
@@ -215,16 +232,21 @@ class MAPPOBuilder(SystemBuilder):
             logger: Logger object for logging metadata.
             checkpoint: bool controlling whether the trainer checkpoints itself.
         """
+        agents = self._agents
+        agent_types = self._agent_types
+        shared_weights = self._config.shared_weights
+
         policy_networks = networks["policies"]
         critic_networks = networks["critics"]
 
         # The learner updates the parameters (and initializes them).
         trainer = training.MAPPOTrainer(
-            agents=self._config.environment_spec.get_agent_ids(),
+            agents=agents,
+            agent_types=agent_types,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             dataset=dataset,
-            shared_weights=self._config.shared_weights,
+            shared_weights=shared_weights,
             critic_learning_rate=self._config.critic_learning_rate,
             policy_learning_rate=self._config.policy_learning_rate,
             discount=self._config.discount,
@@ -237,4 +259,11 @@ class MAPPOBuilder(SystemBuilder):
             counter=counter,
             logger=logger,
         )
+
+        # TODO (Kale-ab): networks stats for MAPPO
+
+        trainer = DetailedTrainerStatistics(  # type: ignore
+            trainer, metrics=["policy_loss", "critic_loss"]
+        )
+
         return trainer

@@ -40,6 +40,7 @@ class MAPPOTrainer(mava.Trainer):
     def __init__(
         self,
         agents: List[Any],
+        agent_types: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
@@ -81,8 +82,9 @@ class MAPPOTrainer(mava.Trainer):
         """
         # Store agents.
         self._agents = agents
+        self._agent_types = agent_types
 
-        # Stoe shared_weights.
+        # Store shared_weights.
         self._shared_weights = shared_weights
 
         # Store networks.
@@ -92,6 +94,31 @@ class MAPPOTrainer(mava.Trainer):
         # Get optimizers
         self._policy_optimizer = snt.optimizers.Adam(learning_rate=policy_learning_rate)
         self._critic_optimizer = snt.optimizers.Adam(learning_rate=critic_learning_rate)
+
+        # Dictionary with network keys for each agent.
+        self.agent_net_keys = {agent: agent for agent in self._agents}
+        if self._shared_weights:
+            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
+
+        self.unique_net_keys = self._agent_types if shared_weights else self._agents
+
+        # Expose the variables.
+        policy_networks_to_expose = {}
+        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
+            "critic": {},
+            "policy": {},
+        }
+        for agent_key in self.unique_net_keys:
+            policy_network_to_expose = self._policy_networks[agent_key]
+            policy_networks_to_expose[agent_key] = policy_network_to_expose
+            # TODO (dries): Determine why acme has a critic
+            #  in self._system_network_variables
+            self._system_network_variables["critic"][agent_key] = critic_networks[
+                agent_key
+            ].variables
+            self._system_network_variables["policy"][
+                agent_key
+            ] = policy_network_to_expose.variables
 
         # Other trainer parameters.
         self._discount = discount
@@ -319,12 +346,12 @@ class MAPPOTrainer(mava.Trainer):
 
         self._logger.write(fetches)
 
-    # TODO this function needs to be fixed to use policy_networks and critic_networks.
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
-        variables["network"] = {}
-        for agent_key, network in self._networks.items():
-            variables["network"][agent_key] = tf2_utils.to_numpy(
-                network.trainable_variables
-            )
+        for network_type in names:
+            variables[network_type] = {}
+            for agent in self.unique_net_keys:
+                variables[network_type][agent] = tf2_utils.to_numpy(
+                    self._system_network_variables[network_type][agent]
+                )
         return variables

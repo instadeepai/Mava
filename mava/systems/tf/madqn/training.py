@@ -27,9 +27,9 @@ from acme.utils import counting, loggers
 import mava
 
 
-class IDQNTrainer(mava.Trainer):
-    """IDQN trainer.
-    This is the trainer component of a MADDPG system. IE it takes a dataset as input
+class MADQNTrainer(mava.Trainer):
+    """MADQN trainer.
+    This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
 
