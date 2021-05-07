@@ -206,8 +206,6 @@ class DIALTrainer(mava.Trainer):
         return actions, messages
 
     def _step(self) -> Dict[str, Dict[str, Any]]:
-        # TODO Kevin: Implement DIAL trainer algorithm
-
         # Update the target networks
         self._update_target_networks()
 
@@ -218,19 +216,9 @@ class DIALTrainer(mava.Trainer):
         )
         data = tf2_utils.batch_to_sequence(data)
 
-        # print(data)
-        # raise AssertionError
+        observations, actions, rewards, discounts, _, extra = data
 
-        observations, actions, rewards, discounts, done, extra = data
-
-        # print('core')
-        # print(extra["core_states"])
-        # core_states = tree.map_structure(lambda x: x[0], extra["core_states"])
         core_states = extra["core_states"]
-        # print(core_states)
-
-        # Need to loop backwards through time
-        # for t=T to 1, -1 do
 
         bs = actions[self._agents[0]].shape[1]
         T = actions[self._agents[0]].shape[0]
@@ -245,14 +233,14 @@ class DIALTrainer(mava.Trainer):
             for b in range(bs):
                 # Unroll episode and store states, messages
                 messages = {
-                    -1: {
+                    0: {
                         agent_id: core_states[agent_id]["message"][:, b][0]
                         for agent_id in self._agents
                     }
                 }  # index of time t
                 channel = {}
                 states = {
-                    -1: {
+                    0: {
                         agent_id: core_states[agent_id]["state"][:, b][0]
                         for agent_id in self._agents
                     }
@@ -260,19 +248,18 @@ class DIALTrainer(mava.Trainer):
 
                 # For all time-steps
                 for t in range(0, T, 1):
-
-                    channel[t - 1] = self._communication_module.process_messages(
-                        messages[t - 1]
+                    channel[t] = self._communication_module.process_messages(
+                        messages[t]
                     )[self._agents[0]]
-                    messages[t] = {}
-                    states[t] = {}
+                    messages[t + 1] = {}
+                    states[t + 1] = {}
 
                     # For each agent
                     for agent_id in self._agents:
                         # Agent input at time t
                         obs_in = observations[agent_id].observation[:, b][t]
-                        state_in = states[t - 1][agent_id]
-                        message_in = channel[t - 1]
+                        state_in = states[t][agent_id]
+                        message_in = channel[t]
 
                         batched_observation = tf2_utils.add_batch_dim(obs_in)
                         batched_state = tf2_utils.add_batch_dim(state_in)
@@ -282,43 +269,43 @@ class DIALTrainer(mava.Trainer):
                             batched_observation, batched_state, batched_message
                         )
 
-                        messages[t][agent_id] = m_t[0]
-                        states[t][agent_id] = s_t[0]
+                        if obs_in[0] == 0:
+                            m_t = tf.zeros_like(m_t)
 
-                channel[t] = tf.math.reduce_sum(tf.nest.flatten(messages[t]), axis=0)
+                        messages[t + 1][agent_id] = m_t[0]
+                        states[t + 1][agent_id] = s_t[0]
+
+                channel[t + 1] = self._communication_module.process_messages(
+                    messages[t + 1]
+                )[self._agents[0]]
 
                 # Backtrack episode
                 total_loss[b] = tf.zeros(1)
                 # For t=T to 1, -1 do
-                for t in range(T - 1, 0, -1):  # Should it be (T,1,-1)?
-
+                for t in range(T - 1, 0, -1):
                     # For each agent a do
                     for agent_id in self._agents:
                         # All at timestep t
                         agent_input = observations[agent_id].observation[:, b]
                         # (sequence,batch,1)
-                        # message = core_states[agent_id]["message"][:, b]
                         next_message = channel[t]
                         message = channel[t - 1]
-                        # (sequence,batch,)
-                        # state = core_states[agent_id]["state"][:, b]
                         next_state = states[t][agent_id]
                         state = states[t - 1][agent_id]
-                        # (sequence,batch,128)
+
                         action = actions[agent_id][:, b]
-                        # (sequence,batch,1)
+
                         reward = rewards[agent_id][:, b]
-                        # (sequence,batch,1)
-                        # discount = discounts[agent_id][t, b]
+
                         discount = tf.cast(
                             self._discount, dtype=discounts[agent_id][t, b].dtype
                         )
-                        # (sequence,batch,1)
-                        terminal = done[t, b]
+
+                        terminal = t == T - 1
 
                         # y_t_a = r_t
-                        y_action = reward[t]
-                        y_message = reward[t]
+                        y_action = reward[t - 1]
+                        y_message = reward[t - 1]
 
                         # y_t_a = r_t + discount * max_u Q(t)
                         if not terminal:
@@ -371,9 +358,6 @@ class DIALTrainer(mava.Trainer):
                     }
                 }
             )
-
-        # print(total_loss)
-        # raise AssertionError
 
         return logged_losses
 

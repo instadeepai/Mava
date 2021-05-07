@@ -95,22 +95,29 @@ class DIALExecutor(RecurrentExecutor):
             batched_observation, state, message
         )
 
-        # Sample from the policy if it is stochastic.
-        # action = (
-        #     action_policy.sample()
-        #     if isinstance(action_policy, tfd.Distribution)
-        #     else action_policy
-        # )
-        # print(action_policy)
         action = tf.argmax(action_policy, axis=1)
         if tf.random.uniform([]) < 0.05:
             action = tf.random.uniform([1], 0, 2, dtype=tf.dtypes.int64)
-        # print(action)
-        message = (
-            message_policy.sample()
-            if isinstance(message_policy, tfd.Distribution)
-            else message_policy
-        )
+
+        # Hard coded perfect policy:
+        # if observation[1].item()==5 and observation[0].item()==1:
+        #   action = tf.constant([1], dtype=tf.dtypes.int64)
+        # else:
+        #   tf.constant([0], dtype=tf.dtypes.int64)
+        # if observation[1].item()==1 and observation[0].item()==1:
+        #   action = tf.constant([1], dtype=tf.dtypes.int64)
+        # else:
+        #   tf.constant([0], dtype=tf.dtypes.int64)
+
+        # Only one agent can message at each timestep
+        if observation[0].item() == 0:
+            message = tf.zeros_like(message_policy)
+        else:
+            message = (
+                message_policy.sample()
+                if isinstance(message_policy, tfd.Distribution)
+                else message_policy
+            )
 
         return action, message, new_state
 

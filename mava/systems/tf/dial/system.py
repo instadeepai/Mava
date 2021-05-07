@@ -445,7 +445,7 @@ class DIAL(system.System):
             architecture=architecture,
             shared=True,
             channel_size=1,
-            channel_noise=2,
+            channel_noise=0,
         )
 
         networks = self._communication_module.create_system()
