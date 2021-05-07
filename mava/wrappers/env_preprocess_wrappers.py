@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Union
+from typing import TYPE_CHECKING, Any, Dict, Union
 
 import gym
 import numpy as np
@@ -25,10 +25,15 @@ from supersuit.parallel_wrappers import ParallelWraper as ParallelEnvPettingZoo
 from mava.types import Observation, Reward
 from mava.utils.wrapper_utils import RunningMeanStd
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
-from mava.wrappers.pettingzoo import (
-    PettingZooAECEnvWrapper,
-    PettingZooParallelEnvWrapper,
-)
+
+# Prevent circular import issue.
+if TYPE_CHECKING:
+    from mava.wrappers.pettingzoo import (
+        PettingZooAECEnvWrapper,
+        PettingZooParallelEnvWrapper,
+    )
+
+PettingZooEnv = Union["PettingZooAECEnvWrapper", "PettingZooParallelEnvWrapper"]
 
 # TODO(Kale-ab): Make wrapper more general
 # Should Works across any SequentialEnvWrapper or ParallelEnvWrapper.
@@ -39,12 +44,6 @@ Other gym preprocess wrappers:
     https://github.com/PettingZoo-Team/SuperSuit/blob/1f02289e8f51082aa50a413b34700b67042410c6/supersuit/gym_wrappers.py
     https://github.com/openai/gym/tree/master/gym/wrappers
 """
-
-PettingZooEnv = Union[PettingZooAECEnvWrapper, PettingZooParallelEnvWrapper]
-GeneralEnv = Union[
-    PettingZooAECEnvWrapper,
-    PettingZooParallelEnvWrapper,
-]
 
 
 class StandardizeObservationGym(gym.ObservationWrapper):
@@ -215,7 +214,7 @@ class StandardizeReward:
 
     def __init__(
         self,
-        env: PettingZooAECEnvWrapper = None,
+        env: PettingZooEnv = None,
         load_params: Dict = None,
         lower_bound: float = -10.0,
         upper_bound: float = 10.0,
