@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Tuple, Union
 import dm_env
 import numpy as np
 from dm_env import specs
+from pettingzoo.utils.conversions import ParallelEnv
+from pettingzoo.utils.env import AECEnv
 
 # Need to install typing_extensions since we support pre python 3.8
 from typing_extensions import TypedDict
@@ -83,12 +85,14 @@ def apply_env_wrapper_preprocessers(
     environment: Any,
     env_preprocess_wrappers: List,
 ) -> Any:
-    if env_preprocess_wrappers and isinstance(env_preprocess_wrappers, List):
-        for (env_wrapper, params) in env_preprocess_wrappers:
-            if params:
-                environment = env_wrapper(environment, **params)
-            else:
-                environment = env_wrapper(environment)
+    # Currently only supports PZ envs.
+    if isinstance(environment, ParallelEnv) or isinstance(environment, AECEnv):
+        if env_preprocess_wrappers and isinstance(env_preprocess_wrappers, List):
+            for (env_wrapper, params) in env_preprocess_wrappers:
+                if params:
+                    environment = env_wrapper(environment, **params)
+                else:
+                    environment = env_wrapper(environment)
     return environment
 
 
