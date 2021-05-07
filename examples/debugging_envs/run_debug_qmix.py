@@ -80,7 +80,7 @@ def make_networks(
     for key in specs.keys():
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
-        # Create the policy network.
+
         q_network = snt.Sequential(
             [
                 networks.LayerNormMLP(q_networks_layer_sizes[key], activate_final=True),
