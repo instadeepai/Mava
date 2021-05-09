@@ -327,7 +327,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
-
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
             policy_losses = {}

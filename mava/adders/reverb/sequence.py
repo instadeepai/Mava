@@ -222,6 +222,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         agents = environment_spec.get_agent_ids()
         env_extras_spec = environment_spec.get_extra_specs()
         extras_spec.update(env_extras_spec)
+
         obs_specs = {}
         act_specs = {}
         reward_specs = {}

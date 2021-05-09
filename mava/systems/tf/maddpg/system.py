@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MADDPG system implementation."""
-from typing import Any, Callable, Dict, Tuple, Type
+from typing import Any, Callable, Dict, Tuple, Type, Union
 
 import acme
 import dm_env
@@ -55,8 +55,9 @@ class MADDPG(system.System):
         architecture: Type[
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
-        trainer_fn: Type[
-            training.BaseMADDPGTrainer
+        trainer_fn: Union[
+            Type[training.BaseMADDPGTrainer],
+            Type[training.BaseRecurrentMADDPGTrainer],
         ] = training.DecentralisedMADDPGTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         num_executors: int = 1,
@@ -73,6 +74,8 @@ class MADDPG(system.System):
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
         n_step: int = 5,
+        sequence_length: int = 20,
+        period: int = 20,
         sigma: float = 0.3,
         clipping: bool = True,
         log_every: float = 10.0,
@@ -96,6 +99,10 @@ class MADDPG(system.System):
             samples_per_insert: number of samples to take from replay for every insert
               that is made.
             n_step: number of steps to squash into a single transition.
+            sequence_length: Length of the sequences to use in recurrent
+            training (if using recurrence).
+            period: Overlapping period of sequences used in recurrent
+            training (if using recurrence).
             sigma: standard deviation of zero-mean, Gaussian exploration noise.
             clipping: whether to clip gradients by global norm.
             logger: logger object to be used by trainers.
@@ -120,9 +127,9 @@ class MADDPG(system.System):
         self._log_every = log_every
 
         if executor_fn == executors.RecurrentExecutor:
-            extras = self._get_extras()
+            extra_specs = self._get_extra_specs()
         else:
-            extras = {}
+            extra_specs = {}
 
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
@@ -136,15 +143,17 @@ class MADDPG(system.System):
                 max_replay_size=max_replay_size,
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
+                sequence_length=sequence_length,
+                period=period,
                 sigma=sigma,
                 clipping=clipping,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
-            extras=extras,
+            extra_specs=extra_specs,
         )
 
-    def _get_extras(self) -> Any:
+    def _get_extra_specs(self) -> Any:
         agents = self._environment_spec.get_agent_ids()
         core_state_specs = {}
         networks = self._network_factory(  # type: ignore
@@ -157,7 +166,7 @@ class MADDPG(system.System):
                     networks["policies"][agent_type].initial_state(1)
                 ),
             )
-        extras = {"core_state_specs": core_state_specs}
+        extras = {"core_states": core_state_specs}
         return extras
 
     def replay(self) -> Any:

@@ -256,8 +256,8 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     @classmethod
     def signature(
         cls,
-        environment_spec: mava_specs.MAEnvironmentSpec,
-        core_state_spec: tf.TypeSpec = None,
+        environment_spec: mava_specs.EnvironmentSpec,
+        extras_spec: tf.TypeSpec,
     ) -> tf.TypeSpec:
 
         # This function currently assumes that self._discount is a scalar.
@@ -272,7 +272,9 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
 
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
-        extras_specs = environment_spec.get_extra_specs()
+        env_extras_spec = environment_spec.get_extra_specs()
+        extras_spec.update(env_extras_spec)
+
         obs_specs = {}
         act_specs = {}
         reward_specs = {}
@@ -296,11 +298,11 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         transition_spec = [
             obs_specs,
             act_specs,
-            extras_specs,
+            extras_spec,
             reward_specs,
             step_discount_specs,
             obs_specs,  # next_observation
-            extras_specs,
+            extras_spec,
         ]
 
         return tree.map_structure_with_path(

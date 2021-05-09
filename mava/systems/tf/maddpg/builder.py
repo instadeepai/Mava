@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import dataclasses
-from typing import Any, Dict, Iterator, List, Optional, Type
+from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import reverb
 import sonnet as snt
@@ -91,18 +91,19 @@ class MADDPGBuilder(SystemBuilder):
     def __init__(
         self,
         config: MADDPGConfig,
-        trainer_fn: Type[
-            training.BaseMADDPGTrainer
+        trainer_fn: Union[
+            Type[training.BaseMADDPGTrainer],
+            Type[training.BaseRecurrentMADDPGTrainer],
         ] = training.DecentralisedMADDPGTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
-        extras: Dict[str, Any] = {},
+        extra_specs: Dict[str, Any] = {},
     ):
         """Args:
         config: Configuration options for the MADDPG system.
         trainer_fn: Trainer module to use."""
 
         self._config = config
-        self._extras = extras
+        self._extra_specs = extra_specs
 
         """ _agents: a list of the agent specs (ids).
             _agent_types: a list of the types of agents to be used."""
@@ -119,12 +120,12 @@ class MADDPGBuilder(SystemBuilder):
 
         # Select adder
         if self._executor_fn == executors.FeedForwardExecutor:
-            adder = reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec
+            adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
+                environment_spec, self._extra_specs
             )
         elif self._executor_fn == executors.RecurrentExecutor:
-            adder = reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec, self._extras["core_state_specs"]
+            adder_sig = reverb_adders.ParallelSequenceAdder.signature(
+                environment_spec, self._extra_specs
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
@@ -143,13 +144,14 @@ class MADDPGBuilder(SystemBuilder):
                 samples_per_insert=self._config.samples_per_insert,
                 error_buffer=error_buffer,
             )
+
         replay_table = reverb.Table(
             name=self._config.replay_table_name,
             sampler=reverb.selectors.Uniform(),
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
             rate_limiter=limiter,
-            signature=adder,
+            signature=adder_sig,
         )
 
         return [replay_table]
@@ -158,12 +160,20 @@ class MADDPGBuilder(SystemBuilder):
         self,
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
+
+        sequence_length = (
+            self._config.sequence_length
+            if self._executor_fn == executors.RecurrentExecutor
+            else None
+        )
+
         """Create a dataset iterator to use for learning/updating the system."""
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
+            sequence_length=sequence_length,
         )
         return iter(dataset)
 
@@ -193,7 +203,6 @@ class MADDPGBuilder(SystemBuilder):
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
-
         return adder
 
     def make_executor(
