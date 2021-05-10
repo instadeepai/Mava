@@ -29,6 +29,7 @@ from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
 from mava.systems.tf import executors, maddpg
+from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
 
@@ -92,7 +93,7 @@ def make_networks(
                 observation_network,
                 snt.Flatten(),
                 snt.nets.MLP(policy_networks_layer_sizes[key]),
-                snt.LSTM(20),
+                snt.LSTM(25),
                 snt.nets.MLP([128]),
                 networks.NearZeroInitializedLinear(num_dimensions),
                 networks.TanhToSpec(specs[key].actions),
@@ -146,10 +147,13 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
+        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
         executor_fn=executors.RecurrentExecutor,
     ).build()
 
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+    lp.launch(
+        program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="current_terminal"
+    )
 
 
 if __name__ == "__main__":
