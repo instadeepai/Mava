@@ -72,18 +72,21 @@ class MultiAgentSwitchGame(gym.Env):
 
         # set action for interrogated agent
         selected_agent_id = self.agent_ids[self.selected_agent]
-        # action = action_n[selected_agent_id].argmax()
+
         # advance world state
         self.agent_history.append(self.selected_agent)
         self.seen_all = np.unique(self.agent_history).shape[0] == self.num_agents
         if action_n[selected_agent_id] == 1:
             self.env_done = True
             self.tell = True
-        # print(action_n[selected_agent_id])
-        self.selected_agent = np.random.randint(0, self.num_agents)
+
         self.time += 1
+        # self.selected_agent = np.random.randint(0, self.num_agents)
+
         if self.time >= self.max_time:
             self.env_done = True
+        else:
+            self.selected_agent = self._agent_order[self.time]
 
         # record observation for each agent
         for a_i, agent_id in enumerate(self.agent_ids):
@@ -103,7 +106,13 @@ class MultiAgentSwitchGame(gym.Env):
         self.n_seen = 0
         self.time = 0
         self.tell = False
-        self.selected_agent = np.random.randint(0, self.num_agents)
+
+        self._agent_order = np.array([0])
+        while len(np.unique(self._agent_order)) < self.num_agents:
+            self._agent_order = np.random.randint(0, self.num_agents, (self.max_time,))
+
+        self.selected_agent = self._agent_order[0]
+        # self.selected_agent = np.random.randint(0, self.num_agents)
 
         self.env_done = False
         # record observations for each agent

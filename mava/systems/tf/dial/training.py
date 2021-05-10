@@ -50,6 +50,7 @@ class DIALTrainer(mava.Trainer):
         agent_types: List[str],
         networks: Dict[str, snt.Module],
         target_network: Dict[str, snt.Module],
+        observation_networks: Dict[str, snt.Module],
         discount: float,
         huber_loss_parameter: float,
         target_update_period: int,
@@ -96,6 +97,9 @@ class DIALTrainer(mava.Trainer):
         self._target_policy_networks = target_network
 
         # self._observation_networks = observation_networks
+        self._observation_networks = {
+            k: tf2_utils.to_sonnet_module(v) for k, v in observation_networks.items()
+        }
         # self._target_observation_networks = target_observation_networks
 
         # General learner book-keeping and loggers.
@@ -123,6 +127,24 @@ class DIALTrainer(mava.Trainer):
             self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
+
+        policy_networks_to_expose = {}
+        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
+            "policy": {},
+        }
+        for agent_key in self.unique_net_keys:
+            policy_network_to_expose = snt.Sequential(
+                [
+                    self._observation_networks[agent_key],
+                    self._policy_networks[agent_key],
+                ]
+            )
+            policy_networks_to_expose[agent_key] = policy_network_to_expose
+            # TODO (dries): Determine why acme has a critic
+            #  in self._system_network_variables
+            self._system_network_variables["policy"][
+                agent_key
+            ] = policy_network_to_expose.variables
 
         self._system_checkpointer = {}
         if checkpoint:
@@ -318,8 +340,10 @@ class DIALTrainer(mava.Trainer):
                             (q_t, m_t), s = self._target_policy_networks[agent_type](
                                 batched_observation, batched_state, batched_message
                             )
-                            y_action += discount * q_t[0][action[t]]
-                            y_message += discount * m_t[tf.argmax(m_t)[0]]
+                            # y_action += discount * q_t[0][action[t]]
+                            # y_message += discount * m_t[tf.argmax(m_t)[0]]
+                            y_action += discount * tf.reduce_max(q_t)
+                            y_message += discount * tf.reduce_max(m_t)
 
                         # d_Q_t_a = y_t_a - Q(t-1)
                         batched_observation = tf2_utils.add_batch_dim(
@@ -338,7 +362,8 @@ class DIALTrainer(mava.Trainer):
                         total_loss[b] += td_action ** 2
 
                         # Communication grads
-                        td_comm = y_message - m_t1[tf.argmax(m_t1)[0]]
+                        # td_comm = y_message - m_t1[tf.argmax(m_t1)[0]]
+                        td_comm = y_message - m_t1[tf.argmax(next_message)]
 
                         total_loss[b] += td_comm ** 2
 
