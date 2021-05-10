@@ -25,6 +25,7 @@ from mava.components.tf.architectures.decentralised import (
     DecentralisedPolicyActor,
     DecentralisedQValueActorCritic,
     DecentralisedValueActor,
+    DecentralisedValueActorCritic,
 )
 from mava.components.tf.architectures.state_based import (
     StateBasedPolicyActor,

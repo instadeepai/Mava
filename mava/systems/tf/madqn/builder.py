@@ -77,8 +77,8 @@ class MADQNBuilder:
     def __init__(
         self,
         config: MADQNConfig,
-        trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
-        executor_fn: Type[core.Executor] = execution.FeedForwardMADQNExecutor,
+        trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
+        executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
     ):
         """Args:
         _config: Configuration options for the MADDPG system.
