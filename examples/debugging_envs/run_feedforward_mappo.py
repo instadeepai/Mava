@@ -60,8 +60,6 @@ def make_networks(
 
     """Creates networks used by the agents."""
 
-    # TODO handle observation networks.
-
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
     if shared_weights:
