@@ -89,6 +89,7 @@ class MAPPOTrainer(mava.Trainer):
         self._shared_weights = shared_weights
 
         # Store networks.
+        self._observation_networks = observation_networks
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
 
@@ -110,7 +111,12 @@ class MAPPOTrainer(mava.Trainer):
             "policy": {},
         }
         for agent_key in self.unique_net_keys:
-            policy_network_to_expose = self._policy_networks[agent_key]
+            policy_network_to_expose = snt.Sequential(
+                [
+                    self._observation_networks[agent_key],
+                    self._policy_networks[agent_key],
+                ]
+            )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
             # TODO (dries): Determine why acme has a critic
             #  in self._system_network_variables
@@ -150,6 +156,17 @@ class MAPPOTrainer(mava.Trainer):
         # fill the replay buffer.
         self._timestamp = None
 
+    def _transform_observations(
+        self, obs: Dict[str, np.ndarray]
+    ) -> Dict[str, np.ndarray]:
+        trans_obs = {}
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
+            trans_obs[agent] = self._observation_networks[agent_key](
+                obs[agent].observation
+            )
+        return trans_obs
+
     # @tf.function
     def _step(
         self,
@@ -180,6 +197,9 @@ class MAPPOTrainer(mava.Trainer):
             data.discounts,
             data.extras,
         )
+
+        # transform observation using observation networks
+        all_obs = self._transform_observations(all_obs)
 
         # Get log_probs.
         all_log_probs = extras["log_probs"]
@@ -212,8 +232,8 @@ class MAPPOTrainer(mava.Trainer):
                 critic_network = self._critic_networks[network_key]
 
                 # Reshape inputs.
-                dims = obs.observation.shape[:2]
-                obs = snt.merge_leading_dims(obs.observation, num_dims=2)
+                dims = obs.shape[:2]
+                obs = snt.merge_leading_dims(obs, num_dims=2)
                 policy = policy_network(obs)
                 values = critic_network(obs)
 
