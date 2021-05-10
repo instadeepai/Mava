@@ -186,6 +186,7 @@ def main(_: Any) -> None:
     eval_actor = dial.DIALExecutor(
         policy_networks=eval_policies,
         communication_module=system._communication_module,
+        is_eval=True,
     )
     eval_env = make_environment()
     eval_loop = ParallelEnvironmentLoop(

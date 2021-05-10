@@ -51,6 +51,8 @@ class DIALExecutor(RecurrentExecutor):
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
+        is_eval: bool = False,
+        epsilon: float = 0.05,
     ):
         """Initializes the executor.
         Args:
@@ -74,6 +76,8 @@ class DIALExecutor(RecurrentExecutor):
         self._prev_messages: Dict[str, Any] = {}
         self._store_recurrent_state = store_recurrent_state
         self._communication_module = communication_module
+        self._is_eval = is_eval
+        self._epsilon = epsilon
 
     # @tf.function
     def _policy(
@@ -96,7 +100,7 @@ class DIALExecutor(RecurrentExecutor):
         )
 
         action = tf.argmax(action_policy, axis=1)
-        if tf.random.uniform([]) < 0.05:
+        if tf.random.uniform([]) < self._epsilon and not self._is_eval:
             action = tf.random.uniform([1], 0, 2, dtype=tf.dtypes.int64)
 
         # Hard coded perfect policy:
