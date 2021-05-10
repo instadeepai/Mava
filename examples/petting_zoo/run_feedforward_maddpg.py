@@ -146,7 +146,9 @@ def main(_: Any) -> None:
         log_info=log_info,
     ).build()
 
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+    lp.launch(
+        program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="current_terminal"
+    )
 
 
 if __name__ == "__main__":
