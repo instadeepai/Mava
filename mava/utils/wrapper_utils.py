@@ -114,8 +114,11 @@ class RunningStatistics:
 
         self._label = label
 
+        self._raw = 0.0
+
     def push(self, x: float) -> None:
         self.count += 1
+        self._raw = x
 
         if x > self._max:
             self._max = x
@@ -147,6 +150,9 @@ class RunningStatistics:
 
     def std(self) -> float:
         return np.sqrt(self.var())
+
+    def raw(self) -> float:
+        return self._raw
 
 
 # Adapted From https://github.com/DLR-RM/stable-baselines3/blob/237223f834fe9b8143ea24235d087c4e32addd2f/stable_baselines3/common/running_mean_std.py # noqa: E501

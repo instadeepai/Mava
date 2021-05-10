@@ -58,6 +58,7 @@ class MAPPO:
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
+        executor_variable_update_period: int = 100,
         critic_learning_rate: float = 1e-3,
         policy_learning_rate: float = 1e-3,
         discount: float = 0.99,
@@ -117,6 +118,7 @@ class MAPPO:
             config=builder.MAPPOConfig(
                 environment_spec=environment_spec,
                 shared_weights=shared_weights,
+                executor_variable_update_period=executor_variable_update_period,
                 discount=discount,
                 lambda_gae=lambda_gae,
                 clipping_epsilon=clipping_epsilon,

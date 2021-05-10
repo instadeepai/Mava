@@ -68,6 +68,7 @@ class MAPPOConfig:
     discount: float = 0.99
     lambda_gae: float = 0.95
     max_queue_size: int = 100_000
+    executor_variable_update_period: int = 100
     batch_size: int = 32
     critic_learning_rate: float = 3e-4
     policy_learning_rate: float = 1e-3
@@ -196,7 +197,7 @@ class MAPPOBuilder(SystemBuilder):
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policy": variables},
-                update_period=1000,
+                update_period=self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
