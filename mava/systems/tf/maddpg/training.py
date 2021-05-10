@@ -246,6 +246,9 @@ class BaseMADDPGTrainer(mava.Trainer):
             #  the same set of weights? But the
             #  StateBasedActorCritic will then not work as the critic
             #  is not dependent on the behavior networks.
+            # NOTE (Arnu): the stop grad here is to prevent gradients
+            # flowing through the target networks, which should remain
+            # fixed (only updated periodically).
         return o_tm1, o_t
 
     def _get_critic_feed(
