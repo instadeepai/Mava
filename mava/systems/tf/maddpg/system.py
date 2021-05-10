@@ -31,7 +31,6 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
-from mava.systems import system
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import builder, training
 from mava.utils import lp_utils
@@ -39,7 +38,7 @@ from mava.utils.loggers import Logger
 from mava.wrappers import DetailedPerAgentStatistics
 
 
-class MADDPG(system.System):
+class MADDPG:
     """MADDPG system.
     This implements a single-process DDPG system. This is an actor-critic based
     system that generates data via a behavior policy, inserts N-step transitions into

@@ -1,5 +1,5 @@
 # python3
-# Copyright 2018 DeepMind Technologies Limited. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,8 +47,8 @@ class MADQN:
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         log_info: Tuple,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
-        trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
-        executor_fn: Type[core.Executor] = execution.FeedForwardMADQNExecutor,
+        trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
+        executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
