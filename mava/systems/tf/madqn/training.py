@@ -27,9 +27,9 @@ from acme.utils import counting, loggers
 import mava
 
 
-class IDQNTrainer(mava.Trainer):
-    """IDQN trainer.
-    This is the trainer component of a MADDPG system. IE it takes a dataset as input
+class MADQNTrainer(mava.Trainer):
+    """MADQN trainer.
+    This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
 
@@ -81,6 +81,19 @@ class IDQNTrainer(mava.Trainer):
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
+        # Expose the variables.
+        value_networks_to_expose = {}
+        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
+            "values": {},
+        }
+        for agent_key in self.unique_net_keys:
+            value_network_to_expose = self._target_q_networks[agent_key]
+            value_networks_to_expose[agent_key] = value_network_to_expose
+
+            self._system_network_variables["values"][
+                agent_key
+            ] = value_network_to_expose.variables
+
         # Checkpointer
         self._system_checkpointer = {}
         for agent_key in self.unique_net_keys:
@@ -105,7 +118,6 @@ class IDQNTrainer(mava.Trainer):
 
         self._timestamp = None
 
-    @tf.function
     def _update_target_networks(self) -> None:
         for key in self.unique_net_keys:
             # Update target network.
@@ -120,7 +132,6 @@ class IDQNTrainer(mava.Trainer):
 
         self._num_steps.assign_add(1)
 
-    @tf.function
     def _get_feed(
         self,
         o_tm1_trans: Dict[str, np.ndarray],
@@ -136,10 +147,11 @@ class IDQNTrainer(mava.Trainer):
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
     def _decrement_epsilon(self) -> None:
-        self._epsilon.assign_sub(1e-3)
+        self._epsilon.assign_sub(0.01)
         if self._epsilon < 0.01:
             self._epsilon.assign(0.01)
 
+    # @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:

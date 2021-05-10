@@ -1,5 +1,5 @@
 # python3
-# Copyright 2018 DeepMind Technologies Limited. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,8 +47,8 @@ class MADQN:
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         log_info: Tuple,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
-        trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
-        executor_fn: Type[core.Executor] = execution.FeedForwardMADQNExecutor,
+        trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
+        executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -64,6 +64,7 @@ class MADQN:
         discount: float = 0.99,
         policy_optimizer: snt.Optimizer = None,
         target_update_period: int = 100,
+        executor_variable_update_period: int = 1000,
         log_every: float = 10.0,
         max_executor_steps: int = None,
     ):
@@ -93,6 +94,7 @@ class MADQN:
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
                 target_update_period=target_update_period,
+                executor_variable_update_period=executor_variable_update_period,
                 policy_optimizer=policy_optimizer,
                 min_replay_size=min_replay_size,
                 max_replay_size=max_replay_size,
@@ -101,7 +103,7 @@ class MADQN:
                 clipping=clipping,
             ),
             trainer_fn=trainer_fn,
-            executer_fn=executor_fn,
+            executor_fn=executor_fn,
         )
 
     def replay(self) -> Any:
@@ -184,7 +186,6 @@ class MADQN:
             q_networks=executor_networks["values"],
             action_selectors=networks["action_selectors"],
             adder=self._builder.make_adder(replay),
-            variable_source=variable_source,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -237,7 +238,6 @@ class MADQN:
         executor = self._builder.make_executor(
             q_networks=executor_networks["values"],
             action_selectors=networks["action_selectors"],
-            variable_source=variable_source,
         )
 
         # Make the environment.

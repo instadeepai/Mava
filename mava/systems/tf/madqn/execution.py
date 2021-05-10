@@ -33,7 +33,7 @@ from mava.types import OLT
 tfd = tfp.distributions
 
 
-class FeedForwardMADQNExecutor(core.Executor):
+class MADQNFeedForwardExecutor(core.Executor):
     """A feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system
     which takes non-batched observations and outputs non-batched actions.

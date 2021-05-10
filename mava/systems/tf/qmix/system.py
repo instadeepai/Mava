@@ -13,13 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# type: ignore
-
 # TODO (StJohn): finish Qmix
 
 """QMIX system implementation."""
+import copy
 import dataclasses
-from typing import Dict, Iterator, Optional
+from typing import Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -30,12 +29,11 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import CentralisedActor
+from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
-from mava.systems.tf import executors
-from mava.systems.tf.qmix import training
+from mava.systems.tf.qmix import execution, training
 
 
 @dataclasses.dataclass
@@ -43,55 +41,45 @@ class QMIXConfig:
     """Configuration options for the QMIX system
     Args:
         environment_spec: description of the actions, observations, etc.
-        networks: the online Q network (the one being optimized)
-        batch_size: batch size for updates.
-        prefetch_size: size to prefetch from replay.
-        target_update_period: number of learner steps to perform before updating
-            the target networks.
-        samples_per_insert: number of samples to take from replay for every insert
-            that is made.
-        min_replay_size: minimum replay size before updating. This and all
-            following arguments are related to dataset construction and will be
-            ignored if a dataset argument is passed.
-        max_replay_size: maximum replay size.
-        importance_sampling_exponent: power to which importance weights are raised
-            before normalizing.
-        priority_exponent: exponent used in prioritized sampling.
-        n_step: number of steps to squash into a single transition.
+        q_networks: the online Q network (the one being optimized)
+        behavior_networks: the network responsible for data collection (learning).
+        observation_networks: dictionary of optional networks to transform
+                the observations before they are fed into any network.
         epsilon: probability of taking a random action; ignored if a policy
             network is given.
-        learning_rate: learning rate for the q-network update.
-        discount: discount to use for TD updates.
-        logger: logger object to be used by learner.
-        checkpoint: boolean indicating whether to checkpoint the learner.
-        checkpoint_subpath: directory for the checkpoint.
-        policy_networks: if given, this will be used as the policy network.
-            Otherwise, an epsilon greedy policy using the online Q network will be
-            created. Policy network is used in the actor to sample actions.
-        max_gradient_norm: used for gradient clipping.
+        shared_weights: boolean determining whether shared weights is used.
+        target_update_period: number of learner steps to perform before updating
+            the target networks.
+        clipping: whether to clip gradients by global norm.
         replay_table_name: string indicating what name to give the replay table.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        prefetch_size: size to prefetch from replay.
+        batch_size: batch size for updates.
+        n_step: number of steps to squash into a single transition.
+        discount: discount to use for TD updates.
+        counter: counter object used to keep track of steps.
+        logger: logger object to be used by trainers.
+        checkpoint: boolean indicating whether to checkpoint the learner.
     """
 
     environment_spec: specs.MAEnvironmentSpec
-    networks: Dict[str, snt.Module]
-    batch_size: int = 256
-    prefetch_size: int = 4
-    target_update_period: int = 100
-    samples_per_insert: float = 32.0
-    min_replay_size: int = 1000
-    max_replay_size: int = 1000000
-    importance_sampling_exponent: float = 0.2
-    priority_exponent: float = 0.6
-    n_step: int = 5
-    epsilon: Optional[tf.Tensor] = None
-    learning_rate: float = 1e-3
-    discount: float = 0.99
-    logger: loggers.Logger = None
-    checkpoint: bool = True
-    checkpoint_subpath: str = "~/mava/"
-    policy_networks: Optional[Dict[str, snt.Module]] = None
-    max_gradient_norm: Optional[float] = None
-    replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    q_networks: Dict[str, snt.Module]
+    epsilon: tf.Variable
+    shared_weights: bool
+    target_update_period: int
+    clipping: bool
+    replay_table_name: str
+    max_replay_size: int
+    samples_per_insert: float
+    prefetch_size: int
+    batch_size: int
+    n_step: int
+    discount: float
+    counter: counting.Counter
+    logger: loggers.Logger
+    checkpoint: bool
 
 
 class QMIXBuilder(SystemBuilder):
@@ -104,38 +92,47 @@ class QMIXBuilder(SystemBuilder):
       distributed setup.
       """
 
-    def __init__(self, config: QMIXConfig):
+    def __init__(
+        self,
+        config: QMIXConfig,
+        trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
+        executer_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
+    ) -> None:
         """Args:
-        config: Configuration options for the QMIX system."""
+        _config: Configuration options for the QMIX system.
 
         self._config = config
+        self._trainer_fn = trainer_fn
+        """
 
-        """ _agents: a list of the agent specs (ids).
-            _agent_types: a list of the types of agents to be used."""
+        self._config = config
+        self._trainer_fn = trainer_fn
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
+        self._executer_fn = executer_fn
 
-    def make_replay_table(
+    def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> reverb.Table:
         """Create tables to insert data into."""
         return reverb.Table(
             name=self._config.replay_table_name,
-            sampler=reverb.selectors.Prioritized(self._config.priority_exponent),
+            sampler=reverb.selectors.Uniform(),
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
-            rate_limiter=reverb.rate_limiters.MinSize(1),
+            rate_limiter=reverb.rate_limiters.MinSize(self._config.batch_size),
             signature=reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec
             ),
         )
 
     def make_dataset_iterator(
-        self,
-        replay_client: reverb.Client,
+        self, replay_client: reverb.Client
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the system."""
+        """Create a dataset iterator to use for learning/updating the system.
+        Args:
+            replay_client: Reverb Client which points to the replay server."""
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
@@ -145,34 +142,35 @@ class QMIXBuilder(SystemBuilder):
         return iter(dataset)
 
     def make_adder(
-        self,
-        replay_client: reverb.Client,
+        self, replay_client: reverb.Client
     ) -> Optional[adders.ParallelAdder]:
         """Create an adder which records data generated by the executor/environment.
         Args:
-          replay_client: Reverb Client which points to the replay server.
-        """
+          replay_client: Reverb Client which points to the replay server."""
         return reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns={self._config.replay_table_name: lambda x: 1.0},
             client=replay_client,
+            priority_fns=None,
             n_step=self._config.n_step,
             discount=self._config.discount,
         )
 
     def make_executor(
         self,
-        policy_networks: Dict[str, snt.Module],
+        behavior_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
-          policy_networks: A struct of instance of all the different policy networks;
-           this should be a callable
-            which takes as input observations and returns actions.
-          adder: How data is recorded (e.g. added to replay).
-          variable_source: A source providing the necessary executor parameters.
+            behavior_networks: A struct of instance of all
+                the different behaviour networks,
+                this should be a callable which takes as input observations
+                and returns actions.
+            adder: How data is recorded (e.g. added to replay).
+            variable_source: collection of (nested) numpy arrays. Contains
+                source variables as defined in mava.core.
         """
+
         shared_weights = self._config.shared_weights
 
         variable_client = None
@@ -182,7 +180,7 @@ class QMIXBuilder(SystemBuilder):
             # Create policy variables
             variables = {}
             for agent in agent_keys:
-                variables[agent] = policy_networks[agent].variables
+                variables[agent] = behavior_networks[agent].variables
 
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
@@ -196,10 +194,11 @@ class QMIXBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
-        return executors.RecurrentExecutor(
-            policy_networks=policy_networks,
-            shared_weights=shared_weights,
-            variable_client=variable_client,
+
+        return self._executer_fn(
+            policy_networks=behavior_networks,
+            shared_weights=self._config.shared_weights,
+            variable_client=None,
             adder=adder,
         )
 
@@ -207,10 +206,10 @@ class QMIXBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
+        # TODO: eliminate checkpoint and move it outside.
         checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
@@ -218,143 +217,121 @@ class QMIXBuilder(SystemBuilder):
           networks: struct describing the networks needed by the trainer; this can
             be specific to the trainer in question.
           dataset: iterator over samples from replay.
-          replay_client: client which allows communication with replay, e.g. in
-            order to update priorities.
+          replay_client: Reverb Client which points to the replay server.
           counter: a Counter which allows for recording of counts (trainer steps,
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the trainer checkpoints itself.
         """
-        agents = self._agents
-        agent_types = self._agent_types
-        shared_weights = self._config.shared_weights
-        clipping = self._config.clipping
-        discount = self._config.discount
-        target_update_period = self._config.target_update_period
-        max_gradient_norm = self._config.max_gradient_norm
-        learning_rate = self._config.learning_rate
-        importance_sampling_exponent = self._config.importance_sampling_exponent
+        q_networks = networks["q_networks"]
+        target_q_networks = networks["target_q_networks"]
+        mixing_network = networks["mixing_network"]
+        target_mixing_network = networks["target_mixing_network"]
+
+        agents = self._config.environment_spec.get_agent_ids()
+        agent_types = self._config.environment_spec.get_agent_types()
 
         # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=learning_rate)
+        optimizer = snt.optimizers.Adam(learning_rate=1e-3)
 
         # The learner updates the parameters (and initializes them).
-        trainer = training.QMIXTrainer(
+        trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
-            networks=networks["networks"],
-            target_network=networks["target_networks"],
-            shared_weights=shared_weights,
-            discount=discount,
-            importance_sampling_exponent=importance_sampling_exponent,
-            policy_optimizer=policy_optimizer,
-            target_update_period=target_update_period,
+            q_networks=q_networks,
+            target_q_networks=target_q_networks,
+            mixing_network=mixing_network,
+            target_mixing_network=target_mixing_network,
+            epsilon=self._config.epsilon,
+            shared_weights=self._config.shared_weights,
+            optimizer=optimizer,
+            target_update_period=self._config.target_update_period,
+            clipping=self._config.clipping,
             dataset=dataset,
-            huber_loss_parameter=huber_loss_parameter,
-            replay_client=replay_client,
-            clipping=clipping,
-            counter=counter,
-            logger=logger,
-            checkpoint=checkpoint,
-            max_gradient_norm=max_gradient_norm,
+            counter=self._config.counter,
+            logger=self._config.logger,
+            checkpoint=self._config.checkpoint,
         )
+
         return trainer
 
 
 class QMIX(system.System):
     """QMIX system.
-    This implements a single-process QMIX system. This is an actor-critic based
-    system that generates data via a behavior policy, inserts N-step transitions into
-    a replay buffer, and periodically updates the policies of each agent
-    (and as a result the behavior) by sampling uniformly from this buffer.
+    This implements a single-process QMIX system.
+    Args:
+        environment_spec: description of the actions, observations, etc.
+        q_networks: the online Q network (the one being optimized)
+        behavior_networks: the network responsible for data collection (learning).
+        observation_networks: dictionary of optional networks to transform
+                the observations before they are fed into any network.
+        epsilon: probability of taking a random action; ignored if a policy
+            network is given.
+        trainer_fn: the class used for training the agent and mixing networks.
+        shared_weights: boolean determining whether shared weights is used.
+        target_update_period: number of learner steps to perform before updating
+            the target networks.
+        clipping: whether to clip gradients by global norm.
+        replay_table_name: string indicating what name to give the replay table.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        prefetch_size: size to prefetch from replay.
+        batch_size: batch size for updates.
+        n_step: number of steps to squash into a single transition.
+        discount: discount to use for TD updates.
+        counter: counter object used to keep track of steps.
+        logger: logger object to be used by trainers.
+        checkpoint: boolean indicating whether to checkpoint the learner.
     """
 
     def __init__(
         self,
         environment_spec: specs.MAEnvironmentSpec,
-        networks: Dict[str, snt.Module],
+        q_networks: Dict[str, snt.Module],
+        epsilon: tf.Variable,
+        trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         shared_weights: bool = False,
-        batch_size: int = 256,
-        prefetch_size: int = 4,
         target_update_period: int = 100,
-        samples_per_insert: float = 32.0,
-        min_replay_size: int = 1000,
-        max_replay_size: int = 1000000,
-        importance_sampling_exponent: float = 0.2,
-        priority_exponent: float = 0.6,
-        n_step: int = 5,
-        epsilon: Optional[tf.Tensor] = None,
-        learning_rate: float = 1e-3,
-        discount: float = 0.99,
-        logger: loggers.Logger = None,
-        counter: counting.Counter = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
-        policy_networks: Optional[Dict[str, snt.Module]] = None,
-        max_gradient_norm: Optional[float] = None,
+        clipping: bool = False,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
+        max_replay_size: int = 1_000_000,
+        samples_per_insert: float = 32.0,
+        prefetch_size: int = 4,
+        batch_size: int = 32,
+        n_step: int = 1,
+        discount: float = 0.99,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = False,
     ):
-        """Initialize the system.
-        Args:
-            environment_spec: description of the actions, observations, etc.
-            networks: the online Q network (the one being optimized)
-            batch_size: batch size for updates.
-            prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-                the target networks.
-            samples_per_insert: number of samples to take from replay for every insert
-                that is made.
-            min_replay_size: minimum replay size before updating. This and all
-                following arguments are related to dataset construction and will be
-                ignored if a dataset argument is passed.
-            max_replay_size: maximum replay size.
-            importance_sampling_exponent: power to which importance weights are raised
-                before normalizing.
-            priority_exponent: exponent used in prioritized sampling.
-            n_step: number of steps to squash into a single transition.
-            epsilon: probability of taking a random action; ignored if a policy
-                network is given.
-            learning_rate: learning rate for the q-network update.
-            discount: discount to use for TD updates.
-            logger: logger object to be used by learner.
-            checkpoint: boolean indicating whether to checkpoint the learner.
-            checkpoint_subpath: directory for the checkpoint.
-            policy_networks: if given, this will be used as the policy network.
-                Otherwise, an epsilon greedy policy using the online Q network will be
-                created. Policy network is used in the actor to sample actions.
-            max_gradient_norm: used for gradient clipping.
-            replay_table_name: string indicating what name to give the replay table."""
+        """Initialize the system."""
 
         builder = QMIXBuilder(
             QMIXConfig(
                 environment_spec=environment_spec,
-                networks=networks,
+                q_networks=q_networks,
                 shared_weights=shared_weights,
+                discount=discount,
+                epsilon=epsilon,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
                 target_update_period=target_update_period,
-                samples_per_insert=samples_per_insert,
-                min_replay_size=min_replay_size,
                 max_replay_size=max_replay_size,
-                importance_sampling_exponent=importance_sampling_exponent,
-                priority_exponent=priority_exponent,
+                samples_per_insert=samples_per_insert,
                 n_step=n_step,
-                epsilon=epsilon,
-                learning_rate=learning_rate,
-                discount=discount,
+                clipping=clipping,
                 logger=logger,
                 counter=counter,
                 checkpoint=checkpoint,
-                checkpoint_subpath=checkpoint_subpath,
-                policy_networks=policy_networks,
-                max_gradient_norm=max_gradient_norm,
                 replay_table_name=replay_table_name,
-            )
+            ),
+            trainer_fn=trainer_fn,
         )
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_table(environment_spec=environment_spec)
+        replay_table = builder.make_replay_tables(environment_spec)
         self._server = reverb.Server([replay_table], port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
@@ -365,28 +342,43 @@ class QMIX(system.System):
         dataset = builder.make_dataset_iterator(replay_client)
 
         # Create system architecture
-        architecture = CentralisedActor(
+        architecture = DecentralisedValueActor(
             environment_spec=environment_spec,
-            networks=networks,
+            value_networks=q_networks,
             shared_weights=shared_weights,
         )
 
-        # Add monotonic mixing and get networks
-        # TODO (StJohn): create monotonic mixing module for Qmix
-        # See mava/components/tf/modules/mixing
+        # Augment network architecture by adding mixing layer network.
         networks = MonotonicMixing(
             architecture=architecture,
+            environment_spec=environment_spec,
         ).create_system()
 
-        # Create the actor which defines how we take actions.
-        executor = builder.make_executor(networks["policies"], adder)
+        # Retrieve networks
+        q_networks = networks["values"]
+        target_q_networks = networks["target_values"]
 
-        # The learner updates the parameters (and initializes them).
-        trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
+        # TODO Should I move definition of target mixing into mixer?
+        mixing_network = networks["mixing"]
+        target_mixing_network = copy.deepcopy(mixing_network)
+
+        # Create the actor which defines how we take actions.
+        executor = builder.make_executor(q_networks, adder)
+
+        trainer_networks = {
+            "q_networks": q_networks,
+            "target_q_networks": target_q_networks,
+            "mixing_network": mixing_network,
+            "target_mixing_network": target_mixing_network,
+        }
+
+        # The trainer updates the parameters (and initializes them).
+        # TODO label these inputs properly
+        trainer = builder.make_trainer(trainer_networks, dataset)
 
         super().__init__(
             executor=executor,
             trainer=trainer,
-            min_observations=max(batch_size, min_replay_size),
+            min_observations=batch_size,
             observations_per_step=float(batch_size) / samples_per_insert,
         )

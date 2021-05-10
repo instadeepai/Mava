@@ -11,7 +11,7 @@ ENV CUDA_DEVICE_ORDER=PCI_BUS_ID
 ENV TF_CPP_MIN_LOG_LEVEL=3
 
 # PettingZoo
-RUN python -m pip install autorom
+RUN python -m pip install autorom  && echo y | AutoROM
 RUN apt-get install unrar
 
 # OpenCV

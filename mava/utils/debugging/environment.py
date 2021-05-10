@@ -1,6 +1,7 @@
 # Adapted from https://github.com/openai/multiagent-particle-envs.
 # TODO (dries): Try using this class directly from PettingZoo and delete this file.
 
+import copy
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 import gym
@@ -134,7 +135,8 @@ class MultiAgentEnv(gym.Env):
         # set action for each agent
         for agent_id in self.agent_ids:
             agent = self.agents[agent_id]
-            self._set_action(action_n[agent_id], agent, self.action_spaces[agent_id])
+            agent_action = copy.deepcopy(action_n[agent_id])
+            self._set_action(agent_action, agent, self.action_spaces[agent_id])
         # advance world state
         self.world.step()
         # record observation for each agent

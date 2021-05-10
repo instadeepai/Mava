@@ -13,17 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Adders for Reverb replay buffers."""
+# TODO (StJohn): complete class for weighted mixing
+# https://github.com/oxwhirl/wqmix/tree/master/src/modules/mixers
+"""Mixing for multi-agent RL systems"""
 
-# pylint: disable=unused-import
+import sonnet as snt
+import tensorflow as tf
 
-from mava.adders.reverb.base import (
-    DEFAULT_PRIORITY_TABLE,
-    PriorityFn,
-    PriorityFnInput,
-    ReverbParallelAdder,
-    Step,
-)
-from mava.adders.reverb.episode import ParallelEpisodeAdder
-from mava.adders.reverb.sequence import ParallelSequenceAdder
-from mava.adders.reverb.transition import ParallelNStepTransitionAdder
+
+class WeightedMixing(snt.Module):
+    """Multi-agent mixing architecture."""
+
+    def __init__(self) -> None:
+        return
+
+    def __call__(self) -> tf.Tensor:
+        """Perform some mixing logic"""
+        return tf.constant(1)

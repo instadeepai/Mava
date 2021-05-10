@@ -13,27 +13,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""MADDPG system implementation."""
 import dataclasses
-from typing import Any, Dict, Iterator, List, Optional, Type
+from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import reverb
 import sonnet as snt
-import tensorflow as tf
 from acme import datasets
 from acme.tf import variable_utils
-from acme.utils import counting
+from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.systems.tf.madqn import execution, training
-from mava.wrappers import DetailedTrainerStatistics
+from mava.systems.builders import SystemBuilder
+from mava.systems.tf import executors
+from mava.systems.tf.maddpg import training
+from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
 
 
 @dataclasses.dataclass
-class MADQNConfig:
+class MADDPGConfig:
     """Configuration options for the MADDPG system.
     Args:
             environment_spec: description of the actions, observations, etc.
+            policy_networks: the online (optimized) policies for each agent in
+                the system.
+            critic_networks: the online critic for each agent in the system.
+            observation_networks: dictionary of optional networks to transform
+                the observations before they are fed into any network.
             discount: discount to use for TD updates.
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
@@ -46,26 +53,33 @@ class MADQNConfig:
             n_step: number of steps to squash into a single transition.
             sigma: standard deviation of zero-mean, Gaussian exploration noise.
             clipping: whether to clip gradients by global norm.
+            logger: logger object to be used by trainers.
+            counter: counter object used to keep track of steps.
+            checkpoint: boolean indicating whether to checkpoint the trainers.
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
-    epsilon: tf.Variable
-    shared_weights: bool
-    target_update_period: int
-    executor_variable_update_period: int
-    clipping: bool
-    min_replay_size: int
-    max_replay_size: int
-    samples_per_insert: Optional[float]
-    prefetch_size: int
-    batch_size: int
-    n_step: int
-    discount: float
-    policy_optimizer: snt.Optimizer
+    shared_weights: bool = True
+    discount: float = 0.99
+    batch_size: int = 256
+    prefetch_size: int = 4
+    target_update_period: int = 100
+    executor_variable_update_period: int = 1000
+    min_replay_size: int = 1000
+    max_replay_size: int = 1000000
+    samples_per_insert: float = 32.0
+    n_step: int = 5
+    sequence_length: int = 20
+    period: int = 20
+    sigma: float = 0.3
+    clipping: bool = True
+    logger: loggers.Logger = None
+    counter: counting.Counter = None
+    checkpoint: bool = True
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
-class MADQNBuilder:
+class MADDPGBuilder(SystemBuilder):
     """Builder for MADDPG which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an RL system.
@@ -77,14 +91,23 @@ class MADQNBuilder:
 
     def __init__(
         self,
-        config: MADQNConfig,
-        trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
-        executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
+        config: MADDPGConfig,
+        trainer_fn: Union[
+            Type[training.BaseMADDPGTrainer],
+            Type[training.BaseRecurrentMADDPGTrainer],
+        ] = training.DecentralisedMADDPGTrainer,
+        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        extra_specs: Dict[str, Any] = {},
     ):
         """Args:
-        _config: Configuration options for the MADDPG system.
-        _trainer_fn: Trainer module to use."""
+        config: Configuration options for the MADDPG system.
+        trainer_fn: Trainer module to use."""
+
         self._config = config
+        self._extra_specs = extra_specs
+
+        """ _agents: a list of the agent specs (ids).
+            _agent_types: a list of the types of agents to be used."""
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
@@ -92,8 +115,22 @@ class MADQNBuilder:
 
     def make_replay_tables(
         self,
-        environment_spec: specs.EnvironmentSpec,
+        environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
+        """Create tables to insert data into."""
+
+        # Select adder
+        if self._executor_fn == executors.FeedForwardExecutor:
+            adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
+                environment_spec, self._extra_specs
+            )
+        elif self._executor_fn == executors.RecurrentExecutor:
+            adder_sig = reverb_adders.ParallelSequenceAdder.signature(
+                environment_spec, self._extra_specs
+            )
+        else:
+            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+
         if self._config.samples_per_insert is None:
             # We will take a samples_per_insert ratio of None to mean that there is
             # no limit, i.e. this only implies a min size limit.
@@ -115,52 +152,73 @@ class MADQNBuilder:
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
             rate_limiter=limiter,
-            signature=reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec
-            ),
+            signature=adder_sig,
         )
 
         return [replay_table]
 
     def make_dataset_iterator(
-        self, replay_client: reverb.Client
+        self,
+        replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
+
+        sequence_length = (
+            self._config.sequence_length
+            if self._executor_fn == executors.RecurrentExecutor
+            else None
+        )
+
         """Create a dataset iterator to use for learning/updating the system."""
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
+            sequence_length=sequence_length,
         )
         return iter(dataset)
 
     def make_adder(
-        self, replay_client: reverb.Client
+        self,
+        replay_client: reverb.Client,
     ) -> Optional[adders.ParallelAdder]:
         """Create an adder which records data generated by the executor/environment.
         Args:
-          replay_client: Reverb Client which points to the replay server."""
-        return reverb_adders.ParallelNStepTransitionAdder(
-            client=replay_client,
-            priority_fns=None,
-            n_step=self._config.n_step,
-            discount=self._config.discount,
-        )
+          replay_client: Reverb Client which points to the replay server.
+        """
+
+        # Select adder
+        if self._executor_fn == executors.FeedForwardExecutor:
+            adder = reverb_adders.ParallelNStepTransitionAdder(
+                priority_fns=None,
+                client=replay_client,
+                n_step=self._config.n_step,
+                discount=self._config.discount,
+            )
+        elif self._executor_fn == executors.RecurrentExecutor:
+            adder = reverb_adders.ParallelSequenceAdder(
+                priority_fns=None,
+                client=replay_client,
+                sequence_length=self._config.sequence_length,
+                period=self._config.period,
+            )
+        else:
+            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+        return adder
 
     def make_executor(
         self,
-        q_networks: Dict[str, snt.Module],
-        action_selectors: Dict[str, Any],
+        policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
-            behavior_networks: A struct of instance of all
-                the different behaviour networks,
-                this should be a callable which takes as input observations
-                and returns actions.
-            adder: How data is recorded (e.g. added to replay).
+          policy_networks: A struct of instance of all the different policy networks;
+           this should be a callable
+            which takes as input observations and returns actions.
+          adder: How data is recorded (e.g. added to replay).
+          variable_source: A source providing the necessary executor parameters.
         """
 
         shared_weights = self._config.shared_weights
@@ -172,12 +230,12 @@ class MADQNBuilder:
             # Create policy variables
             variables = {}
             for agent in agent_keys:
-                variables[agent] = q_networks[agent].variables
+                variables[agent] = policy_networks[agent].variables
 
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
-                variables={"value_network": variables},
+                variables={"policy": variables},
                 update_period=self._config.executor_variable_update_period,
             )
 
@@ -191,10 +249,9 @@ class MADQNBuilder:
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
-        # Create the executor which coordinates the actors.
+        # Create the actor which defines how we take actions.
         return self._executor_fn(
-            q_networks=q_networks,
-            action_selectors=action_selectors,
+            policy_networks=policy_networks,
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
@@ -214,37 +271,53 @@ class MADQNBuilder:
           networks: struct describing the networks needed by the trainer; this can
             be specific to the trainer in question.
           dataset: iterator over samples from replay.
+          replay_client: client which allows communication with replay, e.g. in
+            order to update priorities.
           counter: a Counter which allows for recording of counts (trainer steps,
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the trainer checkpoints itself.
         """
-        q_networks = networks["values"]
-        target_q_networks = networks["target_values"]
-
-        agents = self._config.environment_spec.get_agent_ids()
-        agent_types = self._config.environment_spec.get_agent_types()
+        agents = self._agents
+        agent_types = self._agent_types
+        shared_weights = self._config.shared_weights
+        clipping = self._config.clipping
+        discount = self._config.discount
+        target_update_period = self._config.target_update_period
 
         # Create optimizers.
-        optimizer = self._config.policy_optimizer
+        policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
+        critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
-            q_networks=q_networks,
-            target_q_networks=target_q_networks,
-            epsilon=self._config.epsilon,
-            shared_weights=self._config.shared_weights,
-            optimizer=optimizer,
-            target_update_period=self._config.target_update_period,
-            clipping=self._config.clipping,
+            policy_networks=networks["policies"],
+            critic_networks=networks["critics"],
+            observation_networks=networks["observations"],
+            target_policy_networks=networks["target_policies"],
+            target_critic_networks=networks["target_critics"],
+            target_observation_networks=networks["target_observations"],
+            shared_weights=shared_weights,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            clipping=clipping,
+            discount=discount,
+            target_update_period=target_update_period,
             dataset=dataset,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
         )
 
-        trainer = DetailedTrainerStatistics(trainer, metrics=["loss"])  # type: ignore
+        # NB If using both NetworkStatistics and TrainerStatistics, order is important.
+        # NetworkStatistics needs to appear before TrainerStatistics.
+        # TODO(Kale-ab/Arnu): need to fix wrapper type issues
+        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
+
+        trainer = DetailedTrainerStatistics(  # type: ignore
+            trainer, metrics=["policy_loss", "critic_loss"]
+        )
 
         return trainer
