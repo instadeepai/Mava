@@ -86,7 +86,7 @@ class DIALConfig:
     max_replay_size: int = 1000000
     importance_sampling_exponent: float = 0.2
     priority_exponent: float = 0.6
-    n_step: int = 5
+    n_step: int = 1
     epsilon: Optional[tf.Tensor] = None
     learning_rate: float = 5e-4
     discount: float = 1.0
@@ -299,6 +299,7 @@ class DIALBuilder(SystemBuilder):
             agent_types=agent_types,
             networks=networks["policies"],
             target_network=networks["target_policies"],
+            observation_networks=networks["observations"],
             shared_weights=shared_weights,
             discount=discount,
             importance_sampling_exponent=importance_sampling_exponent,
@@ -334,8 +335,8 @@ class DIAL(system.System):
         shared_weights: bool = True,
         batch_size: int = 1,
         prefetch_size: int = 4,
-        target_update_period: int = 10,
-        samples_per_insert: float = 32.0,
+        target_update_period: int = 100,
+        samples_per_insert: float = 1.0,
         min_replay_size: int = 100,
         max_replay_size: int = 1000000,
         importance_sampling_exponent: float = 0.2,
