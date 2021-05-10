@@ -169,7 +169,7 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
     def __init__(
         self,
         environment_loop: ParallelEnvironmentLoop,
-        summary_stats: List = ["mean", "max", "min", "var", "std"],
+        summary_stats: List = ["mean", "max", "min", "var", "std", "raw"],
     ):
         super().__init__(environment_loop)
         self._summary_stats = summary_stats
