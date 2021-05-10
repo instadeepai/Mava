@@ -320,8 +320,10 @@ class MAPPOTrainer(mava.Trainer):
             network_key = agent.split("_")[0] if self._shared_weights else agent
 
             # Get trainable variables.
-            # TODO add in observation network trainable variables.
-            policy_variables = self._policy_networks[network_key].trainable_variables
+            policy_variables = (
+                self._observation_networks[network_key].trainable_variables
+                + self._policy_networks[network_key].trainable_variables
+            )
             critic_variables = self._critic_networks[network_key].trainable_variables
 
             # Get gradients.
