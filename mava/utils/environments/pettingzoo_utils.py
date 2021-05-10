@@ -16,7 +16,7 @@
 """Pettingzoo environment factory."""
 
 import importlib
-from typing import Union
+from typing import Any, Union
 
 import dm_env
 import numpy as np
@@ -63,7 +63,7 @@ def make_environment(
     env_type: str = "parallel",
     env_class: str = "mpe",
     env_name: str = "simple_spread_v2",
-    **kwargs: int,
+    **kwargs: Any,
 ) -> dm_env.Environment:
     """Wraps an Pettingzoo environment.
 
@@ -79,7 +79,6 @@ def make_environment(
 
     env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
 
-    # TODO (Arnu): find a way to pass kwargs when using lp_utils
     if env_type == "parallel":
         env = env_module.parallel_env(**kwargs)  # type: ignore
         if env_class == "atari":
