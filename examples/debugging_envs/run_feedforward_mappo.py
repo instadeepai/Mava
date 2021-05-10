@@ -15,6 +15,7 @@
 
 """Example running MAPPO on multi-agent CartPole."""
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Sequence, Union
@@ -143,7 +144,7 @@ def main(_: Any) -> None:
     log_info = (log_dir, log_time_stamp)
 
     # environment
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
@@ -158,6 +159,8 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
     ).build()
 
     # launch
