@@ -257,7 +257,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     def signature(
         cls,
         environment_spec: mava_specs.EnvironmentSpec,
-        extras_spec: tf.TypeSpec,
+        extras_spec: tf.TypeSpec = {},
     ) -> tf.TypeSpec:
 
         # This function currently assumes that self._discount is a scalar.
