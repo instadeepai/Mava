@@ -204,17 +204,23 @@ class MAPPO:
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system = self._architecture(
             environment_spec=self._environment_spec,
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        # create variables
+        _ = system.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the executor.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
         )
@@ -259,17 +265,23 @@ class MAPPO:
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system = self._architecture(
             environment_spec=self._environment_spec,
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        # create variables
+        _ = system.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the agent.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
         )
 
@@ -294,19 +306,6 @@ class MAPPO:
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)
         return eval_loop
-
-    # Overwrite update function to only learn if we can sample
-    # from reverb.
-    # TODO (Arnu): need to implement this with launchpad
-    # however I'm not 100% sure we need it. I suspect the
-    # rate limiter should handle this automatically?
-    # def update(self) -> None:
-    #     trainer_step = False
-    #     while self._can_sample():
-    #         self._trainer.step()
-    #         trainer_step = True
-    #     if trainer_step:
-    #         self._executor.update()
 
     def build(self, name: str = "mappo") -> Any:
         """Build the distributed system topology."""

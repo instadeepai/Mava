@@ -41,6 +41,7 @@ class MAPPOTrainer(mava.Trainer):
         self,
         agents: List[Any],
         agent_types: List[str],
+        observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
