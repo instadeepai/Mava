@@ -14,27 +14,54 @@
 # limitations under the License.
 
 """Wraps a PettingZoo MARL environment to be used as a dm_env environment."""
-from typing import Any, Dict, Union
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 import dm_env
 import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
+from supersuit import black_death_v1, pad_observations_v0
 
 from mava import types
-from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
+from mava.utils.wrapper_utils import (
+    apply_env_wrapper_preprocessers,
+    convert_np_type,
+    parameterized_restart,
+)
+from mava.wrappers.env_preprocess_wrappers import (
+    StandardizeObservationParallel,
+    StandardizeObservationSequential,
+    StandardizeRewardParallel,
+    StandardizeRewardSequential,
+)
+from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
 
 # TODO(Kale-ab): Check usage agents vs possible agents
-class PettingZooAECEnvWrapper(dm_env.Environment):
+class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
 
     # Note: we don't inherit from base.EnvironmentWrapper because that class
     # assumes that the wrapped environment is a dm_env.Environment.
-    def __init__(self, environment: AECEnv):
+    def __init__(
+        self,
+        environment: AECEnv,
+        env_preprocess_wrappers: Optional[List] = [
+            # (env_preprocessor, dict_with_preprocessor_params)
+            (black_death_v1, None),
+            (pad_observations_v0, None),
+            (StandardizeObservationSequential, None),
+            (StandardizeRewardSequential, None),
+        ],
+    ):
         self._environment = environment
         self._reset_next_step = True
+
+        if env_preprocess_wrappers:
+            self._environment = apply_env_wrapper_preprocessers(
+                self._environment, env_preprocess_wrappers
+            )
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
@@ -43,7 +70,7 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         self._step_type = dm_env.StepType.FIRST
 
         observe, _, done, _ = self._environment.last()
-        agent = self._environment.agent_selection
+        agent = self.current_agent
         observation = self._convert_observation(agent, observe, done)
 
         self._discount = convert_np_type(
@@ -71,13 +98,13 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
             # the last information.
             observe, reward, done, info = self._environment.last()
 
-        agent = self._environment.agent_selection
+        agent = self.current_agent
         # Convert rewards to match spec
         reward = convert_np_type(self.reward_spec()[agent].dtype, reward)
         observation = self._convert_observation(agent, observe, done)
 
         # Reset if all agents are done
-        if self._environment.env_done:
+        if self.env_done():
             self._reset_next_step = True
 
         return dm_env.TimeStep(
@@ -86,6 +113,12 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
             discount=self._discount,
             step_type=self._step_type,
         )
+
+    def env_done(self) -> bool:
+        return self._environment.env_done
+
+    def agent_iter(self, max_iter: int = 2 ** 63) -> Iterator:
+        return self._environment.agent_iter(max_iter)
 
     # Convert PettingZoo observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
@@ -149,6 +182,14 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         self._environment.seed(seed)
 
     @property
+    def agents(self) -> List:
+        return self._environment.agents
+
+    @property
+    def possible_agents(self) -> List:
+        return self._environment.possible_agents
+
+    @property
     def environment(self) -> AECEnv:
         """Returns the wrapped environment."""
         return self._environment
@@ -162,14 +203,29 @@ class PettingZooAECEnvWrapper(dm_env.Environment):
         return getattr(self._environment, name)
 
 
-class PettingZooParallelEnvWrapper(dm_env.Environment):
+class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
 
     # Note: we don't inherit from base.EnvironmentWrapper because that class
     # assumes that the wrapped environment is a dm_env.Environment.
-    def __init__(self, environment: ParallelEnv):
+    def __init__(
+        self,
+        environment: ParallelEnv,
+        env_preprocess_wrappers: Optional[List] = [
+            # (env_preprocessor, dict_with_preprocessor_params)
+            (black_death_v1, None),
+            (pad_observations_v0, None),
+            (StandardizeObservationParallel, None),
+            (StandardizeRewardParallel, None),
+        ],
+    ):
         self._environment = environment
         self._reset_next_step = True
+
+        if env_preprocess_wrappers:
+            self._environment = apply_env_wrapper_preprocessers(
+                self._environment, env_preprocess_wrappers
+            )
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
@@ -221,7 +277,7 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
         if observations:
             observations = self._convert_observations(observations, dones)
 
-        if self._environment.env_done:
+        if self.env_done():
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
         else:
@@ -233,6 +289,9 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
             discount=self._discounts,
             step_type=self._step_type,
         )
+
+    def env_done(self) -> bool:
+        return self._environment.env_done
 
     # Convert PettingZoo observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
@@ -299,6 +358,14 @@ class PettingZooParallelEnvWrapper(dm_env.Environment):
 
     def seed(self, seed: int = None) -> None:
         self._environment.seed(seed)
+
+    @property
+    def agents(self) -> List:
+        return self._environment.agents
+
+    @property
+    def possible_agents(self) -> List:
+        return self._environment.possible_agents
 
     @property
     def environment(self) -> ParallelEnv:

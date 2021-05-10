@@ -28,12 +28,13 @@ from mava import core
 from mava.systems.system import System
 from mava.types import OLT, Observation
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
+from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
 """Mock Objects for Tests"""
 
 
 class MockedExecutor(ActorMock, core.Executor):
-    """ Mock Exexutor Class."""
+    """Mock Exexutor Class."""
 
     def __init__(self, spec: specs.EnvironmentSpec):
         super().__init__(spec)
@@ -52,20 +53,27 @@ class MockedExecutor(ActorMock, core.Executor):
     ) -> Union[float, int]:
         return _generate_from_spec(self._spec[agent].actions)
 
-    def observe_first(self, timestep: dm_env.TimeStep) -> None:
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
         for agent, observation_spec in self._specs.items():
             _validate_spec(
                 observation_spec.observations,
                 timestep.observation[agent],
             )
+        if extras:
+            _validate_spec(extras)
 
     def agent_observe_first(self, agent: str, timestep: dm_env.TimeStep) -> None:
         _validate_spec(self._spec[agent].observations, timestep.observation)
 
     def observe(
         self,
-        action: types.NestedArray,
+        action: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
 
         for agent, observation_spec in self._spec.items():
@@ -76,6 +84,8 @@ class MockedExecutor(ActorMock, core.Executor):
                 _validate_spec(
                     observation_spec.observations, next_timestep.observation[agent]
                 )
+        if next_extras:
+            _validate_spec(next_extras)
 
     def agent_observe(
         self,
@@ -90,7 +100,7 @@ class MockedExecutor(ActorMock, core.Executor):
 
 
 class MockedSystem(MockedExecutor, System):
-    """Mocked System Class. """
+    """Mocked System Class."""
 
     def __init__(
         self,
@@ -106,7 +116,7 @@ class MockedSystem(MockedExecutor, System):
         for agent in self._specs.keys():
             self.variables[network_type][agent] = np.random.rand(5, 5)
 
-    def get_variables(self, names: Dict[str, Sequence[str]]) -> Dict[str, List[Any]]:
+    def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, Any]]:
         variables: Dict = {}
         for network_type in names:
             variables[network_type] = {}
@@ -129,8 +139,8 @@ def get_ma_environment(
 
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             base_class.__init__(self, *args, **kwargs)
-            self.agents = ["agent_0", "agent_1", "agent_2"]
-            self.agents = self.agents
+            self._agents = ["agent_0", "agent_1", "agent_2"]
+            self._possible_agents = self.agents
             self.num_agents = len(self.agents)
 
             multi_agent_specs = {}
@@ -166,6 +176,18 @@ def get_ma_environment(
                 discount_specs[agent] = super().discount_spec()
             return discount_specs
 
+        @property
+        def agents(self) -> List:
+            return self._agents
+
+        @property
+        def possible_agents(self) -> List:
+            return self._possible_agents
+
+        @property
+        def env_done(self) -> bool:
+            return not self.agents
+
     return MockedMAEnvironment
 
 
@@ -173,16 +195,20 @@ def get_ma_environment(
 This class should be inherited with a MockedMAEnvironment. """
 
 
-class SequentialEnvironment(MockedEnvironment):
-    def __init__(self, agents: Dict, specs: EnvironmentSpec) -> None:
-        self.agents = agents
-        self.possible_agents = agents
+class SequentialEnvironment(MockedEnvironment, SequentialEnvWrapper):
+    def __init__(self, agents: List, specs: EnvironmentSpec) -> None:
+        self._agents = agents
+        self._possible_agents = agents
         self._specs = specs
         self.agent_selection = self.agents[0]
         self.agent_step_counter = 0
 
     def agent_iter(self, n_agents: int) -> Iterator[str]:
         return iter(self.agents)
+
+    @property
+    def current_agent(self) -> Any:
+        return self.agent_selection
 
     def observation_spec(self) -> OLT:
 
@@ -260,9 +286,9 @@ class SequentialEnvironment(MockedEnvironment):
 This class should be inherited with a MockedMAEnvironment. """
 
 
-class ParallelEnvironment(MockedEnvironment):
-    def __init__(self, agents: Dict, specs: EnvironmentSpec) -> None:
-        self.agents = agents
+class ParallelEnvironment(MockedEnvironment, ParallelEnvWrapper):
+    def __init__(self, agents: List, specs: EnvironmentSpec) -> None:
+        self._agents = agents
         self._specs = specs
 
     def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:

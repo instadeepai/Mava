@@ -16,16 +16,14 @@
 """MARL system Builder interface."""
 
 import abc
-from typing import Dict, Iterator, Optional, Union
+from typing import Dict, Iterator, List, Optional
 
 import reverb
 import sonnet as snt
 from acme import specs
-from acme.utils import counting, loggers
+from acme.utils import counting
 
-from mava import adders, core
-
-NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
+from mava import adders, core, types
 
 
 class SystemBuilder(abc.ABC):
@@ -37,10 +35,10 @@ class SystemBuilder(abc.ABC):
     """
 
     @abc.abstractmethod
-    def make_replay_table(
+    def make_replay_tables(
         self,
         environment_spec: specs.EnvironmentSpec,
-    ) -> reverb.Table:
+    ) -> List[reverb.Table]:
         """Create tables to insert data into."""
 
     @abc.abstractmethod
@@ -83,8 +81,7 @@ class SystemBuilder(abc.ABC):
         dataset: Iterator[reverb.ReplaySample],
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
-        logger: Optional[NestedLogger] = None,
-        # TODO: eliminate checkpoint and move it outside.
+        logger: Optional[types.NestedLogger] = None,
         checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.

@@ -22,7 +22,7 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
 from mava import types
-from tests.conftest import EnvSpec, EnvType, Helpers, NPZ_EnvName
+from tests.conftest import EnvSpec, EnvType, Helpers
 
 """
 TestEnvWrapper is a general purpose test class that runs tests for environment wrappers.
@@ -31,13 +31,14 @@ This is meant to flexibily test various environments wrappers.
     It is parametrize by an EnvSpec object:
         env_name: [name of env]
         env_type: [EnvType.Parallel/EnvType.Sequential]
+        env_source: [What is source env - e.g. PettingZoo, RLLibMultiEnv or Flatland]
+            - Used in confest to determine which envs and wrappers to load.
 
     For new environments - you might need to update the Helpers class in conftest.py.
 """
 
+
 # TODO (Kale-ab): Test dying agents.
-
-
 @pytest.mark.parametrize(
     "env_spec",
     [
@@ -45,20 +46,15 @@ This is meant to flexibily test various environments wrappers.
         EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
         EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Parallel),
         EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Sequential),
-        EnvSpec(NPZ_EnvName.FLATLAND, EnvType.Parallel),
+        EnvSpec("flatland", EnvType.Parallel),
     ],
 )
 class TestEnvWrapper:
     # Test that we can load a env module and that it contains agents,
-    #   action_spaces and observation_spaces.
+    #   agents and possible_agents.
     def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
-        env, _ = helpers.get_env(env_spec)
-        props_which_should_not_be_none = [
-            env,
-            env.agents,
-            env.action_spaces,
-            env.observation_spaces,
-        ]
+        env = helpers.get_env(env_spec)
+        props_which_should_not_be_none = [env, env.agents, env.possible_agents]
         assert helpers.verify_all_props_not_none(
             props_which_should_not_be_none
         ), "Failed to load module"
@@ -72,6 +68,10 @@ class TestEnvWrapper:
         props_which_should_not_be_none = [
             wrapped_env,
             wrapped_env.environment,
+            wrapped_env.observation_spec(),
+            wrapped_env.action_spec(),
+            wrapped_env.reward_spec(),
+            wrapped_env.discount_spec(),
         ]
 
         assert helpers.verify_all_props_not_none(
@@ -83,6 +83,12 @@ class TestEnvWrapper:
         assert (
             len(wrapped_env.action_spec()) == num_agents
         ), "Failed to generate action specs for all agents."
+        assert (
+            len(wrapped_env.reward_spec()) == num_agents
+        ), "Failed to generate reward specs for all agents."
+        assert (
+            len(wrapped_env.discount_spec()) == num_agents
+        ), "Failed to generate discount specs for all agents."
 
     # Test of reset of wrapper and that dm_env_timestep has basic props.
     def test_wrapper_env_reset(self, env_spec: EnvSpec, helpers: Helpers) -> None:
@@ -281,14 +287,12 @@ class TestEnvWrapper:
         #  Get agent names from env
         agents = wrapped_env.agents
 
-        _ = wrapped_env.reset()
-
         # Parallel env_types
         if env_spec.env_type == EnvType.Parallel:
             test_agents_actions = {
                 agent: wrapped_env.action_spaces[agent].sample() for agent in agents
             }
-            with patch.object(wrapped_env._environment, "step") as parallel_step:
+            with patch.object(wrapped_env, "step") as parallel_step:
                 parallel_step.return_value = None, None, None, None
                 _ = wrapped_env.step(test_agents_actions)
                 parallel_step.assert_called_once_with(test_agents_actions)
@@ -296,7 +300,7 @@ class TestEnvWrapper:
         # Sequential env_types
         elif env_spec.env_type == EnvType.Sequential:
             for agent in agents:
-                with patch.object(wrapped_env._environment, "step") as seq_step:
+                with patch.object(wrapped_env, "step") as seq_step:
                     seq_step.return_value = None
                     test_agent_action = wrapped_env.action_spaces[agent].sample()
                     _ = wrapped_env.step(test_agent_action)
@@ -315,9 +319,8 @@ class TestEnvWrapper:
         helpers.seed_action_space(wrapped_env, random_seed)
 
         #  Get agent names from env
-        agents = wrapped_env.agents
-
         _ = wrapped_env.reset()
+        agents = wrapped_env.agents
 
         # Parallel env_types
         if env_spec.env_type == EnvType.Parallel:
@@ -325,18 +328,14 @@ class TestEnvWrapper:
                 agent: wrapped_env.action_spaces[agent].sample() for agent in agents
             }
 
-            # Mock being done - sets self._environment.env_done to true.
-            # We can't mock env_done directly since it is a propertly.
-            monkeypatch.setattr(wrapped_env._environment, "agents", [], raising=False)
-            monkeypatch.setattr(
-                wrapped_env._environment.aec_env, "agents", [], raising=False
-            )
+            monkeypatch.setattr(wrapped_env, "env_done", helpers.mock_done)
 
             curr_dm_timestep = wrapped_env.step(test_agents_actions)
 
             helpers.assert_env_reset(wrapped_env, curr_dm_timestep, env_spec)
 
         # Sequential env_types
+        # TODO (Kale-ab): Make this part below less reliant on PZ.
         elif env_spec.env_type == EnvType.Sequential:
             n_agents = wrapped_env.num_agents
 
@@ -365,9 +364,9 @@ class TestEnvWrapper:
                 # Mock whole env being done when you reach final agent
                 if index == n_agents - 1:
                     monkeypatch.setattr(
-                        wrapped_env._environment,
-                        "agents",
-                        [],
+                        wrapped_env,
+                        "env_done",
+                        helpers.mock_done,
                     )
 
                 # Mock update has occurred in step

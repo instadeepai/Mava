@@ -13,20 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import tensorflow as tf
-from tensorflow import Tensor
-
-from mava.components.tf.architectures import BaseArchitecture
-from mava.components.tf.modules.mixing import BaseMixingModule
-
-
-class AdditiveMixing(BaseMixingModule):
-    """Multi-agent monotonic mixing architecture."""
-
-    def __init__(self, architecture: BaseArchitecture) -> None:
-        """Initializes the mixer."""
-        super(AdditiveMixing, self).__init__()
-
-    def __call__(self, q_values: Tensor) -> Tensor:
-        """Monotonic mixing logic."""
-        return tf.math.reduce_sum(q_values)
+from mava.utils.debugging.environments.switch_game import MultiAgentSwitchGame
+from mava.utils.debugging.environments.two_step import TwoStepEnv

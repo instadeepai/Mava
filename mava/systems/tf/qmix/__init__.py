@@ -12,3 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Implementations of a QMIX agent."""
+
+from mava.systems.tf.qmix.execution import QMIXFeedForwardExecutor
+from mava.systems.tf.qmix.system import QMIX  # type: ignore
+from mava.systems.tf.qmix.training import QMIXTrainer
+
+# from mava.system.tf.qmix

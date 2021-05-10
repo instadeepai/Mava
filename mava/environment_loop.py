@@ -83,7 +83,7 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         episode_steps = 0
 
         timestep = self._environment.reset()
-        agent = self._environment.agent_selection
+        agent = self._environment.current_agent
 
         # Broadcast timestep for all agents - to use parallel adder.
         # TODO (Kale-ab) : Make more robust -this could cause issues
@@ -239,20 +239,21 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         Returns:
             An instance of `loggers.LoggingData`.
         """
+
         # Reset any counts and start the environment.
         start_time = time.time()
         episode_steps = 0
 
         timestep = self._environment.reset()
+        if type(timestep) == tuple:
+            timestep, env_extras = timestep
+        else:
+            env_extras = {}
 
         # Make the first observation.
-        self._executor.observe_first(timestep)
+        self._executor.observe_first(timestep, extras=env_extras)
 
         n_agents = self._environment.num_agents
-        rewards = {
-            agent: generate_zeros_from_spec(spec)
-            for agent, spec in self._environment.reward_spec().items()
-        }
 
         # For evaluation, this keeps track of the total undiscounted reward
         # for each agent accumulated during the episode.
@@ -268,11 +269,17 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             actions = self._get_actions(timestep)
             timestep = self._environment.step(actions)
 
+            if type(timestep) == tuple:
+                timestep, env_extras = timestep
+            else:
+                env_extras = {}
+
             rewards = timestep.reward
 
-            # Have the agent observe the timestep and let the actor update itself.
-
-            self._executor.observe(actions, next_timestep=timestep)
+            # Have the agent observe the timestep and let the actor update itself
+            self._executor.observe(
+                actions, next_timestep=timestep, next_extras=env_extras
+            )
 
             if self._should_update:
                 self._executor.update()
