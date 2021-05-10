@@ -176,10 +176,6 @@ def main(_: Any) -> None:
     specs = environment_spec.get_agent_specs()
     type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
     specs = type_specs
-    # eval_policies = {
-    #     system_networks["policies"][key]
-    #     for key in specs.keys()
-    # }
     eval_policies = system_networks["policies"]
 
     # Create the evaluation actor and loop.

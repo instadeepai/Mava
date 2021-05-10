@@ -18,7 +18,7 @@
 
 """DIAL system implementation."""
 import dataclasses
-from typing import Callable, Dict, Iterator, Optional, Type
+from typing import Callable, Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -133,7 +133,7 @@ class DIALBuilder(SystemBuilder):
     def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
-    ) -> reverb.Table:
+    ) -> List[reverb.Table]:
         """Create tables to insert data into."""
 
         # Select adder
@@ -160,11 +160,13 @@ class DIALBuilder(SystemBuilder):
             print(self._executor_fn)
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
 
-        return reverb.Table.queue(
-            name=self._config.replay_table_name,
-            max_size=self._config.max_replay_size,
-            signature=adder,
-        )
+        return [
+            reverb.Table.queue(
+                name=self._config.replay_table_name,
+                max_size=self._config.max_replay_size,
+                signature=adder,
+            )
+        ]
 
     def make_dataset_iterator(
         self,
@@ -416,10 +418,10 @@ class DIAL(system.System):
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
         replay_table = builder.make_replay_tables(environment_spec=environment_spec)
-        self._server = reverb.Server([replay_table], port=None)
+        self._server = reverb.Server(replay_table, port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
 
-        self._can_sample: Callable[[], bool] = lambda: replay_table.can_sample(
+        self._can_sample: Callable[[], bool] = lambda: replay_table[0].can_sample(
             batch_size
         )
 

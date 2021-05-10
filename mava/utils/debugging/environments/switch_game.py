@@ -127,12 +127,6 @@ class MultiAgentSwitchGame(gym.Env):
 
     # get observation for a particular agent
     def _get_obs(self, a_i: int, agent_id: str) -> np.array:
-        # return (
-        #     np.array([1.0], dtype=np.float32)
-        #     if a_i == self.selected_agent
-        #     else np.array([0.0], dtype=np.float32)
-        # )
-        # return 1 if a_i == self.selected_agent else 0
         selected = 1.0 if a_i == self.selected_agent else 0.0
         return np.array([selected, self.time], dtype=np.float32)
 

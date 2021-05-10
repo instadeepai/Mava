@@ -79,7 +79,7 @@ class DIALExecutor(RecurrentExecutor):
         self._is_eval = is_eval
         self._epsilon = epsilon
 
-    # @tf.function
+    @tf.function
     def _policy(
         self,
         agent: str,
@@ -108,13 +108,9 @@ class DIALExecutor(RecurrentExecutor):
         #   action = tf.constant([1], dtype=tf.dtypes.int64)
         # else:
         #   tf.constant([0], dtype=tf.dtypes.int64)
-        # if observation[1].item()==1 and observation[0].item()==1:
-        #   action = tf.constant([1], dtype=tf.dtypes.int64)
-        # else:
-        #   tf.constant([0], dtype=tf.dtypes.int64)
 
         # Only one agent can message at each timestep
-        if observation[0].item() == 0:
+        if observation[0] == 0:
             message = tf.zeros_like(message_policy)
         else:
             message = (

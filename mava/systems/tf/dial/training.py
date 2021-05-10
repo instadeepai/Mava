@@ -340,8 +340,7 @@ class DIALTrainer(mava.Trainer):
                             (q_t, m_t), s = self._target_policy_networks[agent_type](
                                 batched_observation, batched_state, batched_message
                             )
-                            # y_action += discount * q_t[0][action[t]]
-                            # y_message += discount * m_t[tf.argmax(m_t)[0]]
+
                             y_action += discount * tf.reduce_max(q_t)
                             y_message += discount * tf.reduce_max(m_t)
 
@@ -362,7 +361,6 @@ class DIALTrainer(mava.Trainer):
                         total_loss[b] += td_action ** 2
 
                         # Communication grads
-                        # td_comm = y_message - m_t1[tf.argmax(m_t1)[0]]
                         td_comm = y_message - m_t1[tf.argmax(next_message)]
 
                         total_loss[b] += td_comm ** 2
