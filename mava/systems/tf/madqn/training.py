@@ -151,7 +151,7 @@ class MADQNTrainer(mava.Trainer):
         if self._epsilon < 0.01:
             self._epsilon.assign(0.01)
 
-    @tf.function
+    # @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:

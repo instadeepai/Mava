@@ -149,7 +149,7 @@ class MAPPOTrainer(mava.Trainer):
         # fill the replay buffer.
         self._timestamp = None
 
-    @tf.function
+    # @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:

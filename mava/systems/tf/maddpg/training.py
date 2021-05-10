@@ -1019,7 +1019,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     # to be called by the step() function below. Removing it makes the code
     # work. The docs on tf.function says it is useful for speed improvements
     # but as far as I can see, we can go ahead without it. At least for now.
-    @tf.function
+    # @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -1393,7 +1393,6 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             checkpoint=checkpoint,
         )
 
-    @tf.function
     def _get_critic_feed(
         self,
         obs_trans: Dict[str, np.ndarray],
@@ -1411,7 +1410,6 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         target_actions_feed = tf.stack([x for x in target_actions.values()], -1)
         return obs_trans_feed, target_obs_trans_feed, action_feed, target_actions_feed
 
-    @tf.function
     def _get_dpg_feed(
         self,
         actions: Dict[str, np.ndarray],
@@ -1500,7 +1498,6 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             checkpoint=checkpoint,
         )
 
-    @tf.function
     def _get_critic_feed(
         self,
         obs_trans: Dict[str, np.ndarray],
@@ -1518,7 +1515,6 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         target_actions_feed = tf.stack([x for x in target_actions.values()], -1)
         return obs_trans_feed, target_obs_trans_feed, action_feed, target_actions_feed
 
-    @tf.function
     def _get_dpg_feed(
         self,
         actions: Dict[str, np.ndarray],
