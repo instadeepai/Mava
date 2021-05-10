@@ -64,6 +64,7 @@ class MADDPGConfig:
     batch_size: int = 256
     prefetch_size: int = 4
     target_update_period: int = 100
+    executor_variable_update_period: int = 1000
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
     samples_per_insert: float = 32.0
@@ -235,7 +236,7 @@ class MADDPGBuilder(SystemBuilder):
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policy": variables},
-                update_period=1000,
+                update_period=self._config.executor_variable_update_period,
             )
 
             # Update variables

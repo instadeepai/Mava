@@ -64,6 +64,7 @@ class MADQN:
         discount: float = 0.99,
         policy_optimizer: snt.Optimizer = None,
         target_update_period: int = 100,
+        executor_variable_update_period: int = 1000,
         log_every: float = 10.0,
         max_executor_steps: int = None,
     ):
@@ -93,6 +94,7 @@ class MADQN:
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
                 target_update_period=target_update_period,
+                executor_variable_update_period=executor_variable_update_period,
                 policy_optimizer=policy_optimizer,
                 min_replay_size=min_replay_size,
                 max_replay_size=max_replay_size,
