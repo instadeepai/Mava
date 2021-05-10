@@ -52,6 +52,7 @@ class MADQNConfig:
     epsilon: tf.Variable
     shared_weights: bool
     target_update_period: int
+    executor_variable_update_period: int
     clipping: bool
     min_replay_size: int
     max_replay_size: int
@@ -177,7 +178,7 @@ class MADQNBuilder:
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"value_network": variables},
-                update_period=1000,
+                update_period=self._config.executor_variable_update_period,
             )
 
             # Update variables
