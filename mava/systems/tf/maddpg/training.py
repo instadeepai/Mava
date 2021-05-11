@@ -275,7 +275,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         dpg_a_t_feed = dpg_a_t
         return dpg_a_t_feed
 
-    def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
+    def _target_policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -328,7 +328,7 @@ class BaseMADDPGTrainer(mava.Trainer):
             critic_losses = {}
 
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-            a_t = self._policy_actions(o_t_trans)
+            a_t = self._target_policy_actions(o_t_trans)
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
@@ -988,7 +988,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         dpg_actions_feed = dpg_actions
         return dpg_actions_feed
 
-    def _policy_actions(
+    def _target_policy_actions(
         self,
         target_obs_trans: Dict[str, np.ndarray],
         target_core_state: Dict[str, np.ndarray],
@@ -1069,7 +1069,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
             obs_trans, target_obs_trans = self._transform_observations(observations)
 
-            target_actions = self._policy_actions(target_obs_trans, target_core_state)
+            target_actions = self._target_policy_actions(
+                target_obs_trans, target_core_state
+            )
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]

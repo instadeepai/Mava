@@ -23,9 +23,7 @@ from acme.utils import loggers
 
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.utils.loggers import Logger
-
-# from mava.utils.loggers import Logger
-from mava.utils.wrapper_utils import RunningStatistics, generate_zeros_from_spec
+from mava.utils.wrapper_utils import RunningStatistics
 
 
 class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
@@ -59,110 +57,11 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
 
     def _compute_episode_statistics(
         self,
-        agent_returns: Dict[str, float],
-        episode_return: float,
-        episode_length: float,
-        steps_per_second: float,
+        episode_returns: Dict[str, float],
+        episode_steps: int,
+        start_time: float,
     ) -> None:
         raise NotImplementedError
-
-    def run_episode(self) -> loggers.LoggingData:
-        """Run one episode.
-        Each episode is a loop which interacts first with the environment to get a
-        dictionary of observations and then give those observations to the executor
-        in order to retrieve an action for each agent in the system.
-        Returns:
-            An instance of `loggers.LoggingData`.
-        """
-
-        # Reset any counts and start the environment.
-        start_time = time.time()
-        episode_steps = 0
-
-        timestep = self._environment.reset()
-
-        if type(timestep) == tuple:
-            timestep, env_extras = timestep
-        else:
-            env_extras = {}
-
-        # Make the first observation.
-        self._executor.observe_first(timestep, extras=env_extras)
-
-        rewards: Dict[str, float] = {}
-        episode_returns: Dict[str, float] = {}
-        for agent, spec in self._environment.reward_spec().items():
-            rewards.update({agent: generate_zeros_from_spec(spec)})
-            episode_returns.update({agent: generate_zeros_from_spec(spec)})
-
-        # For evaluation, this keeps track of the total undiscounted reward
-        # for each agent accumulated during the episode.
-        # multiagent_reward_spec = specs.Array((n_agents,), np.float32)
-        # episode_return = tree.map_structure(
-        #     generate_zeros_from_spec, multiagent_reward_spec
-        # )
-
-        # Run an episode.
-        while not timestep.last():
-
-            # Generate an action from the agent's policy and step the environment.
-            actions = self._get_actions(timestep)
-            timestep = self._environment.step(actions)
-
-            if type(timestep) == tuple:
-                timestep, env_extras = timestep
-            else:
-                env_extras = {}
-
-            rewards = timestep.reward
-
-            # Have the agent observe the timestep and let the actor update itself.
-            self._executor.observe(
-                actions, next_timestep=timestep, next_extras=env_extras
-            )
-
-            if self._should_update:
-                self._executor.update()
-
-            # Book-keeping.
-            episode_steps += 1
-
-            # NOTE (Arnu): fix for when env returns empty dict at end of episode.
-            if not rewards:
-                rewards = {
-                    agent: generate_zeros_from_spec(spec)
-                    for agent, spec in self._environment.reward_spec().items()
-                }
-
-            self._compute_step_statistics(rewards)
-
-            # Equivalent to: episode_return += timestep.reward
-            # We capture the return value because if timestep.reward is a JAX
-            # DeviceArray, episode_return will not be mutated in-place. (In all other
-            # cases, the returned episode_return will be the same object as the
-            # argument episode_return.)
-            # episode_return = tree.map_structure(
-            #     operator.iadd, episode_return, np.array(list(rewards.values()))
-            # )
-            episode_returns = {
-                agent: episode_returns[agent] + reward
-                for agent, reward in rewards.items()
-            }
-
-        # Record counts.
-        counts = self._counter.increment(episodes=1, steps=episode_steps)
-
-        # Collect the results and combine with counts.
-        steps_per_second = episode_steps / (time.time() - start_time)
-        episode_return = np.mean(np.array(list(episode_returns.values())))
-
-        self._compute_episode_statistics(
-            episode_returns, episode_return, episode_steps, steps_per_second
-        )
-        self._running_statistics.update({"episode_length": episode_steps})
-        self._running_statistics.update(counts)
-
-        return self._running_statistics
 
 
 class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
@@ -185,14 +84,20 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
 
     def _compute_episode_statistics(
         self,
-        agent_returns: Dict[str, float],
-        episode_return: float,
-        episode_length: float,
-        steps_per_second: float,
+        episode_returns: Dict[str, float],
+        episode_steps: int,
+        start_time: float,
     ) -> None:
 
-        self._episode_length_stats.push(episode_length)
-        self._episode_return_stats.push(episode_return)
+        # Collect the results and combine with counts.
+        steps_per_second = episode_steps / (time.time() - start_time)
+        mean_episode_return = np.mean(np.array(list(episode_returns.values())))
+
+        # Record counts.
+        counts = self._counter.increment(episodes=1, steps=episode_steps)
+
+        self._episode_length_stats.push(episode_steps)
+        self._episode_return_stats.push(mean_episode_return)
         self._steps_per_second_stats.push(steps_per_second)
 
         for metric in self._metrics:
@@ -200,6 +105,9 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
                 self._running_statistics[f"{stat}_{metric}"] = self.__getattribute__(
                     f"_{metric}_stats"
                 ).__getattribute__(stat)()
+
+        self._running_statistics.update({"episode_length": episode_steps})
+        self._running_statistics.update(counts)
 
 
 class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
@@ -249,20 +157,26 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
             self._agents_stats[agent]["reward"].push(reward)
             for stat in self._summary_stats:
                 agent_running_statistics[
-                    f"{agent}_{stat}_episode_reward"
+                    f"{agent}_{stat}_step_reward"
                 ] = self._agents_stats[agent]["reward"].__getattribute__(stat)()
             self._agent_loggers[agent].write(agent_running_statistics)
 
     def _compute_episode_statistics(
         self,
-        agent_returns: Dict[str, float],
-        episode_return: float,
-        episode_length: float,
-        steps_per_second: float,
+        episode_returns: Dict[str, float],
+        episode_steps: int,
+        start_time: float,
     ) -> None:
 
-        self._episode_length_stats.push(episode_length)
-        self._episode_return_stats.push(episode_return)
+        # Collect the results and combine with counts.
+        steps_per_second = episode_steps / (time.time() - start_time)
+        mean_episode_return = np.mean(np.array(list(episode_returns.values())))
+
+        # Record counts.
+        counts = self._counter.increment(episodes=1, steps=episode_steps)
+
+        self._episode_length_stats.push(episode_steps)
+        self._episode_return_stats.push(mean_episode_return)
         self._steps_per_second_stats.push(steps_per_second)
 
         for metric in self._metrics:
@@ -271,7 +185,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                     f"_{metric}_stats"
                 ).__getattribute__(stat)()
 
-        for agent, agent_return in agent_returns.items():
+        for agent, agent_return in episode_returns.items():
             agent_running_statistics: Dict[str, float] = {}
             self._agents_stats[agent]["return"].push(agent_return)
             for stat in self._summary_stats:
@@ -279,3 +193,6 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                     agent
                 ]["return"].__getattribute__(stat)()
             self._agent_loggers[agent].write(agent_running_statistics)
+
+        self._running_statistics.update({"episode_length": episode_steps})
+        self._running_statistics.update(counts)
