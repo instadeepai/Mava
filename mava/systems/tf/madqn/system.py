@@ -24,7 +24,6 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme import specs as acme_specs
-from acme.tf import savers as tf2_savers
 from acme.utils import counting, loggers
 
 import mava
@@ -32,6 +31,7 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.environment_loop import ParallelEnvironmentLoop
+from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
 from mava.utils import lp_utils
 from mava.utils.loggers import Logger

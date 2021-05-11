@@ -58,7 +58,7 @@ class MAPPOTrainer(mava.Trainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = False,
-        checkpoint_subpath: str = "Checkpoints",
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:

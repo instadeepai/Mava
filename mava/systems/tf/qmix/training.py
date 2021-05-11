@@ -29,10 +29,10 @@ from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-from acme.tf import savers as tf2_savers
 from acme.utils import counting, loggers
 
 import mava
+from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
 

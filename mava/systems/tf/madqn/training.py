@@ -20,11 +20,11 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import trfl
-from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.systems.tf import savers as tf2_savers
 
 
 class MADQNTrainer(mava.Trainer):

@@ -22,7 +22,6 @@ import launchpad as lp
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
-from acme.tf import savers as tf2_savers
 from acme.utils import counting, loggers
 
 import mava
@@ -30,6 +29,7 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
+from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.mappo import builder, execution, training
 from mava.utils import lp_utils
 from mava.utils.loggers import Logger
