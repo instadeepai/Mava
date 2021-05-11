@@ -41,12 +41,13 @@ class MAPPOTrainer(mava.Trainer):
         self,
         agents: List[Any],
         agent_types: List[str],
+        observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool,
-        critic_learning_rate: float = 1e-3,
-        policy_learning_rate: float = 1e-3,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.0,
@@ -63,12 +64,12 @@ class MAPPOTrainer(mava.Trainer):
         Args:
             policy_networks: ...
             critic_networks: ...
+            policy_optimizer: policy optimizer,
+            critic_optimizer: critic optimizer,
             shared_weights: ...
             discount: discount to use for TD updates.
             dataset: dataset to learn from, whether fixed or from a replay buffer
                 (see `acme.datasets.reverb.make_dataset` documentation).
-            critic_learning_rate: ...
-            policy_learning_rate: ...
             lambda_gae: ...
             clipping_espilon: ...
             entropy_cost: ...
@@ -88,12 +89,13 @@ class MAPPOTrainer(mava.Trainer):
         self._shared_weights = shared_weights
 
         # Store networks.
+        self._observation_networks = observation_networks
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
 
         # Get optimizers
-        self._policy_optimizer = snt.optimizers.Adam(learning_rate=policy_learning_rate)
-        self._critic_optimizer = snt.optimizers.Adam(learning_rate=critic_learning_rate)
+        self._policy_optimizer = policy_optimizer
+        self._critic_optimizer = critic_optimizer
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
@@ -109,7 +111,12 @@ class MAPPOTrainer(mava.Trainer):
             "policy": {},
         }
         for agent_key in self.unique_net_keys:
-            policy_network_to_expose = self._policy_networks[agent_key]
+            policy_network_to_expose = snt.Sequential(
+                [
+                    self._observation_networks[agent_key],
+                    self._policy_networks[agent_key],
+                ]
+            )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
             # TODO (dries): Determine why acme has a critic
             #  in self._system_network_variables
@@ -149,6 +156,17 @@ class MAPPOTrainer(mava.Trainer):
         # fill the replay buffer.
         self._timestamp = None
 
+    def _transform_observations(
+        self, obs: Dict[str, np.ndarray]
+    ) -> Dict[str, np.ndarray]:
+        trans_obs = {}
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
+            trans_obs[agent] = self._observation_networks[agent_key](
+                obs[agent].observation
+            )
+        return trans_obs
+
     # @tf.function
     def _step(
         self,
@@ -180,6 +198,9 @@ class MAPPOTrainer(mava.Trainer):
             data.extras,
         )
 
+        # transform observation using observation networks
+        all_obs = self._transform_observations(all_obs)
+
         # Get log_probs.
         all_log_probs = extras["log_probs"]
 
@@ -188,9 +209,6 @@ class MAPPOTrainer(mava.Trainer):
         critic_losses: Dict[str, Any] = {}
 
         with tf.GradientTape(persistent=True) as tape:
-
-            # TODO Possibly transform observations with Observation networks.
-
             for agent in self._agents:
 
                 obs, acts, rews, discs, behaviour_log_probs = (
@@ -211,8 +229,8 @@ class MAPPOTrainer(mava.Trainer):
                 critic_network = self._critic_networks[network_key]
 
                 # Reshape inputs.
-                dims = obs.observation.shape[:2]
-                obs = snt.merge_leading_dims(obs.observation, num_dims=2)
+                dims = obs.shape[:2]
+                obs = snt.merge_leading_dims(obs, num_dims=2)
                 policy = policy_network(obs)
                 values = critic_network(obs)
 
@@ -299,8 +317,10 @@ class MAPPOTrainer(mava.Trainer):
             network_key = agent.split("_")[0] if self._shared_weights else agent
 
             # Get trainable variables.
-            # TODO add in observation network trainable variables.
-            policy_variables = self._policy_networks[network_key].trainable_variables
+            policy_variables = (
+                self._observation_networks[network_key].trainable_variables
+                + self._policy_networks[network_key].trainable_variables
+            )
             critic_variables = self._critic_networks[network_key].trainable_variables
 
             # Get gradients.

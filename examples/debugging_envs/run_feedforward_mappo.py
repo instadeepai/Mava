@@ -15,6 +15,7 @@
 
 """Example running MAPPO on multi-agent CartPole."""
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Sequence, Union
@@ -61,8 +62,6 @@ def make_networks(
 
     """Creates networks used by the agents."""
 
-    # TODO handle observation networks.
-
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
     if shared_weights:
@@ -84,7 +83,7 @@ def make_networks(
     for key in specs.keys():
 
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Note: The discrete case must be placed first as it inherits from BoundedArray.
         if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discreet
@@ -144,7 +143,7 @@ def main(_: Any) -> None:
     log_info = (log_dir, log_time_stamp)
 
     # environment
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
@@ -159,6 +158,8 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
     ).build()
 
     # launch

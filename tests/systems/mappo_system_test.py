@@ -15,6 +15,7 @@
 
 """Tests for MAPPO."""
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Sequence, Union
@@ -71,7 +72,7 @@ def make_networks(
     for key in specs.keys():
 
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Note: The discrete case must be placed first as it inherits from BoundedArray.
         if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discreet
@@ -136,7 +137,7 @@ class TestMAPPO:
         log_info = (log_dir, log_time_stamp)
 
         # environment
-        environment_factory = lp_utils.partial_kwargs(
+        environment_factory = functools.partial(
             debugging_utils.make_environment,
             env_name="simple_spread",
             action_space="discrete",
@@ -153,6 +154,8 @@ class TestMAPPO:
             num_executors=2,
             batch_size=32,
             max_queue_size=1000,
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
         )
         program = system.build()
 

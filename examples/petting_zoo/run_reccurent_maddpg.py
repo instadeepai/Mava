@@ -15,6 +15,7 @@
 
 """Example running MADDPG on pettinzoo MPE environments."""
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
@@ -134,7 +135,7 @@ def main(_: Any) -> None:
 
     log_info = (log_dir, log_time_stamp)
 
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
@@ -149,6 +150,8 @@ def main(_: Any) -> None:
         log_info=log_info,
         trainer_fn=DecentralisedRecurrentMADDPGTrainer,
         executor_fn=executors.RecurrentExecutor,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
     ).build()
 
     lp.launch(

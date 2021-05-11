@@ -23,7 +23,11 @@ from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
-from mava.components.tf.architectures import BaseActorCritic, BaseArchitecture
+from mava.components.tf.architectures import (
+    BaseActorCritic,
+    BaseArchitecture,
+    BasePolicyArchitecture,
+)
 from mava.types import OLT
 
 
@@ -101,7 +105,7 @@ class DecentralisedValueActor(BaseArchitecture):
         return networks
 
 
-class DecentralisedPolicyActor(BaseArchitecture):
+class DecentralisedPolicyActor(BasePolicyArchitecture):
     """Decentralised (independent) policy gradient multi-agent actor architecture."""
 
     def __init__(
@@ -182,6 +186,17 @@ class DecentralisedPolicyActor(BaseArchitecture):
         actor_networks["target_observations"] = self._target_observation_networks
 
         return actor_networks
+
+    def create_behaviour_policy(self) -> Dict[str, snt.Module]:
+        behaviour_policy_networks: Dict[str, snt.Module] = {}
+        for agent_key in self._actor_agent_keys:
+            behaviour_policy_networks[agent_key] = snt.Sequential(
+                [
+                    self._observation_networks[agent_key],
+                    self._policy_networks[agent_key],
+                ]
+            )
+        return behaviour_policy_networks
 
     def create_system(
         self,
@@ -310,6 +325,17 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         critic_networks["critics"] = self._critic_networks
         critic_networks["target_critics"] = self._target_critic_networks
         return critic_networks
+
+    def create_behaviour_policy(self) -> Dict[str, snt.Module]:
+        behaviour_policy_networks: Dict[str, snt.Module] = {}
+        for agent_key in self._actor_agent_keys:
+            behaviour_policy_networks[agent_key] = snt.Sequential(
+                [
+                    self._observation_networks[agent_key],
+                    self._policy_networks[agent_key],
+                ]
+            )
+        return behaviour_policy_networks
 
     def create_system(
         self,

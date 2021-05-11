@@ -54,14 +54,14 @@ class BaseMADDPGTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         discount: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -126,9 +126,8 @@ class BaseMADDPGTrainer(mava.Trainer):
         # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        # Create optimizers if they aren't given.
-        self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-4)
-        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
+        self._critic_optimizer = critic_optimizer
+        self._policy_optimizer = policy_optimizer
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
@@ -234,18 +233,6 @@ class BaseMADDPGTrainer(mava.Trainer):
             # evaluated at o_t, this also means the policy loss does not influence
             # the observation network training.
             o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
-
-            # TODO (dries): Why is there a stop gradient here? The target
-            #  will not be updated unless included into the
-            #  policy_variables or critic_variables sets.
-            #  One reason might be that it helps with preventing the observation
-            #  network from being updated from the policy_loss.
-            #  But why would we want that? Don't we want both the critic
-            #  and policy to update the observation network?
-            #  Or is it bad to have two optimisation processes optimising
-            #  the same set of weights? But the
-            #  StateBasedActorCritic will then not work as the critic
-            #  is not dependent on the behavior networks.
         return o_tm1, o_t
 
     def _get_critic_feed(
@@ -276,7 +263,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         dpg_a_t_feed = dpg_a_t
         return dpg_a_t_feed
 
-    def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
+    def _target_policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -329,7 +316,7 @@ class BaseMADDPGTrainer(mava.Trainer):
             critic_losses = {}
 
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-            a_t = self._policy_actions(o_t_trans)
+            a_t = self._target_policy_actions(o_t_trans)
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
@@ -479,9 +466,9 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -551,9 +538,9 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -655,9 +642,9 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -759,9 +746,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -827,9 +814,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        # Create optimizers if they aren't given.
-        self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-4)
-        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
+        self._critic_optimizer = critic_optimizer
+        self._policy_optimizer = policy_optimizer
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -948,19 +934,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             obs_target_trans[agent] = tree.map_structure(
                 tf.stop_gradient, obs_target_trans[agent]
             )
-
-            # TODO (dries): Why is there a stop gradient here? The target
-            #  will not be updated unless included into the
-            #  policy_variables or critic_variables sets.
-            #  One reason might be that it helps with preventing the observation
-            #  network from being updated from the policy_loss.
-            #  But why would we want that? Don't we want both the critic
-            #  and policy to update the observation network?
-            #  Or is it bad to have two optimisation processes optimising
-            #  the same set of weights? But the
-            #  StateBasedActorCritic will then not work as the critic
-            #  is not dependent on the behavior networks.
-
         return obs_trans, obs_target_trans
 
     def _get_critic_feed(
@@ -990,7 +963,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         dpg_actions_feed = dpg_actions
         return dpg_actions_feed
 
-    def _policy_actions(
+    def _target_policy_actions(
         self,
         target_obs_trans: Dict[str, np.ndarray],
         target_core_state: Dict[str, np.ndarray],
@@ -1071,7 +1044,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
             obs_trans, target_obs_trans = self._transform_observations(observations)
 
-            target_actions = self._policy_actions(target_obs_trans, target_core_state)
+            target_actions = self._target_policy_actions(
+                target_obs_trans, target_core_state
+            )
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
@@ -1270,9 +1245,9 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -1342,9 +1317,9 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -1447,9 +1422,9 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,

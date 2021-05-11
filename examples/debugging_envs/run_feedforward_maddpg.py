@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADDPG on pettinzoo MPE environments."""
+"""Example running feedforward MADDPG on debug MPE environments."""
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
@@ -22,6 +23,7 @@ from typing import Any, Dict, Mapping, Sequence, Union
 import launchpad as lp
 import numpy as np
 import sonnet as snt
+import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
@@ -83,7 +85,7 @@ def make_networks(
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
         policy_network = snt.Sequential(
@@ -132,7 +134,7 @@ def main(_: Any) -> None:
     log_info = (log_dir, log_time_stamp)
 
     # environment
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
@@ -147,6 +149,8 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
     ).build()
 
     # launch
