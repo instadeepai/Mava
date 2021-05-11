@@ -159,8 +159,8 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
     ).build()
 
     # launch
