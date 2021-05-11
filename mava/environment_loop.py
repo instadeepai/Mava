@@ -267,18 +267,13 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         # Make the first observation.
         self._executor.observe_first(timestep, extras=env_extras)
 
+        # For evaluation, this keeps track of the total undiscounted reward
+        # for each agent accumulated during the episode.
         rewards: Dict[str, float] = {}
         episode_returns: Dict[str, float] = {}
         for agent, spec in self._environment.reward_spec().items():
             rewards.update({agent: generate_zeros_from_spec(spec)})
             episode_returns.update({agent: generate_zeros_from_spec(spec)})
-
-        # For evaluation, this keeps track of the total undiscounted reward
-        # for each agent accumulated during the episode.
-        # multiagent_reward_spec = specs.Array((n_agents,), np.float32)
-        # episode_return = tree.map_structure(
-        #     generate_zeros_from_spec, multiagent_reward_spec
-        # )
 
         # Run an episode.
         while not timestep.last():
@@ -314,14 +309,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             self._compute_step_statistics(rewards)
 
-            # Equivalent to: episode_return += timestep.reward
-            # We capture the return value because if timestep.reward is a JAX
-            # DeviceArray, episode_return will not be mutated in-place. (In all other
-            # cases, the returned episode_return will be the same object as the
-            # argument episode_return.)
-            # episode_return = tree.map_structure(
-            #     operator.iadd, episode_return, np.array(list(rewards.values()))
-            # )
             for agent, reward in rewards.items():
                 episode_returns[agent] = episode_returns[agent] + reward
 
