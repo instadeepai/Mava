@@ -15,7 +15,11 @@
 
 """MARL system architectural components."""
 
-from mava.components.tf.architectures.base import BaseActorCritic, BaseArchitecture
+from mava.components.tf.architectures.base import (
+    BaseActorCritic,
+    BaseArchitecture,
+    BasePolicyArchitecture,
+)
 from mava.components.tf.architectures.centralised import (
     CentralisedPolicyActor,
     CentralisedQValueActorCritic,
