@@ -25,7 +25,6 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tree
-import trfl
 from acme.tf import losses
 from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
@@ -351,14 +350,11 @@ class BaseMAD4PGTrainer(mava.Trainer):
                 q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
                 q_t = self._target_critic_networks[agent_key](o_t_feed, a_t_feed)
 
-                # Squeeze into the shape expected by the td_learning implementation.
-                q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
-                q_t = tf.squeeze(q_t, axis=-1)  # [B]
-
                 # Critic loss.
-                critic_loss = trfl.td_learning(
+                critic_loss = losses.categorical(
                     q_tm1, r_t[agent], discount * d_t[agent], q_t
-                ).loss
+                )
+                critic_loss = tf.reduce_mean(critic_loss, axis=[0])
 
                 # Actor learning.
                 o_t_agent_feed = o_t_trans[agent]
@@ -368,7 +364,8 @@ class BaseMAD4PGTrainer(mava.Trainer):
                 dpg_a_t_feed = self._get_dpg_feed(a_t, dpg_a_t, agent)
 
                 # Get dpg Q values.
-                dpg_q_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
+                dpg_z_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
+                dpg_q_t = dpg_z_t.mean()
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
                 dqda_clipping = 1.0 if self._clipping else None
