@@ -59,7 +59,7 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
         self,
         episode_returns: Dict[str, float],
         episode_steps: int,
-        start_time: int,
+        start_time: float,
     ) -> None:
         raise NotImplementedError
 
@@ -86,7 +86,7 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
         self,
         episode_returns: Dict[str, float],
         episode_steps: int,
-        start_time: int,
+        start_time: float,
     ) -> None:
 
         # Collect the results and combine with counts.
@@ -165,7 +165,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         self,
         episode_returns: Dict[str, float],
         episode_steps: int,
-        start_time: int,
+        start_time: float,
     ) -> None:
 
         # Collect the results and combine with counts.

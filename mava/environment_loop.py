@@ -161,6 +161,17 @@ class SequentialEnvironmentLoop(acme.core.Worker):
 
         return result
 
+    def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
+        pass
+
+    def _compute_episode_statistics(
+        self,
+        episode_returns: Dict[str, float],
+        episode_steps: int,
+        start_time: float,
+    ) -> None:
+        pass
+
     def run(
         self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
     ) -> None:
@@ -318,6 +329,17 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             start_time,
         )
         return self._running_statistics
+
+    def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
+        pass
+
+    def _compute_episode_statistics(
+        self,
+        episode_returns: Dict[str, float],
+        episode_steps: int,
+        start_time: float,
+    ) -> None:
+        pass
 
     def run(
         self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
