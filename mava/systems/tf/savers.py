@@ -10,7 +10,7 @@ from acme.tf import savers
 # Classes adapted from https://github.com/deepmind/acme/blob/master/acme/tf/savers.py
 class Checkpointer(savers.Checkpointer):
     def __init__(self, directory: str = "~/mava/", **kwargs: Any) -> None:
-        super().__init__(directory=directory, **kwargs)
+        super().__init__(directory=directory, add_uid=False, **kwargs)
 
 
 class CheckpointingRunner(savers.CheckpointingRunner):
@@ -45,3 +45,10 @@ class CheckpointingRunner(savers.CheckpointingRunner):
             time_delta_minutes=time_delta_minutes,
             **kwargs,
         )
+
+
+class Snapshotter(savers.Snapshotter):
+    """Convenience class for periodically snapshotting."""
+
+    def __init__(self, directory: str = "~/mava/", **kwargs: Any) -> None:
+        super().__init__(directory=directory, **kwargs)
