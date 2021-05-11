@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from acme.utils import loggers
+from acme.utils import loggers, paths
 
 from mava.utils.loggers.tf_logger import TFSummaryLogger
 
@@ -37,6 +37,10 @@ class Logger:
         time_stamp: Optional[str] = None,
     ):
         self._label = label
+
+        if not isinstance(directory, Path):
+            directory = Path(directory)
+
         self._directory = directory
         self._time_stamp = time_stamp if time_stamp else str(datetime.now())
         self._logger = self.make_logger(
@@ -102,11 +106,13 @@ class Logger:
         return logger
 
     def _path(self, subdir: Optional[str] = None) -> str:
-        return (
-            str(self._directory / subdir / self._time_stamp / self._label)
-            if subdir
-            else str(self._directory / self._label)
-        )
+        if subdir:
+            path = str(self._directory / self._time_stamp / subdir / self._label)
+        else:
+            path = str(self._directory / self._time_stamp / self._label)
+
+        # Recursively replace "~"
+        return paths.process_path(path)
 
     def write(self, data: Any) -> None:
         self._logger.write(data)
