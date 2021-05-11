@@ -71,8 +71,8 @@ class MADDPG:
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
         samples_per_insert: float = 32.0,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
+        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
@@ -80,6 +80,7 @@ class MADDPG:
         clipping: bool = True,
         log_every: float = 10.0,
         max_executor_steps: int = None,
+        checkpoint: bool = True,
     ):
         """Initialize the system.
         Args:
@@ -125,6 +126,9 @@ class MADDPG:
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
+        self._policy_optimizer = policy_optimizer
+        self._critic_optimizer = critic_optimizer
+        self._checkpoint = checkpoint
 
         if executor_fn == executors.RecurrentExecutor:
             extra_specs = self._get_extra_specs()
@@ -148,6 +152,7 @@ class MADDPG:
                 period=period,
                 sigma=sigma,
                 clipping=clipping,
+                checkpoint=self._checkpoint,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -214,6 +219,7 @@ class MADDPG:
             to_terminal=True,
             to_tensorboard=True,
             time_stamp=log_time_stamp,
+            time_delta=self._log_every,
         )
 
         return self._builder.make_trainer(
@@ -221,6 +227,9 @@ class MADDPG:
             dataset=dataset,
             counter=counter,
             logger=trainer_logger,
+            policy_optimizer=self._policy_optimizer,
+            critic_optimizer=self._critic_optimizer,
+            checkpoint=self._checkpoint,
         )
 
     def executor(
@@ -268,6 +277,7 @@ class MADDPG:
             to_terminal=True,
             to_tensorboard=True,
             time_stamp=log_time_stamp,
+            time_delta=self._log_every,
         )
 
         # Create the loop to connect environment and executor.
@@ -321,6 +331,7 @@ class MADDPG:
             to_terminal=True,
             to_tensorboard=True,
             time_stamp=log_time_stamp,
+            time_delta=self._log_every,
         )
 
         # Create the run loop and return it.

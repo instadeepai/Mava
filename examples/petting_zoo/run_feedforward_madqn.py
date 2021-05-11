@@ -15,11 +15,13 @@
 
 """Example running MADQN on the pettingzoo environment."""
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
 import launchpad as lp
+import sonnet as snt
 import tensorflow as tf
 from absl import app, flags
 from acme import types
@@ -98,7 +100,7 @@ def main(_: Any) -> None:
 
     log_info = (log_dir, log_time_stamp)
 
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
@@ -111,6 +113,7 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
     ).build()
 
     lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)

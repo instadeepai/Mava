@@ -59,8 +59,8 @@ class MAPPO:
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
         executor_variable_update_period: int = 100,
-        critic_learning_rate: float = 1e-3,
-        policy_learning_rate: float = 1e-3,
+        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=5e-4),
+        critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-5),
         discount: float = 0.99,
         lambda_gae: float = 0.95,
         clipping_epsilon: float = 0.2,
@@ -74,6 +74,7 @@ class MAPPO:
         sequence_period: int = 5,
         log_every: float = 10.0,
         max_executor_steps: int = None,
+        checkpoint: bool = True,
     ):
 
         """Initialize the system.
@@ -90,8 +91,6 @@ class MAPPO:
         max_abs_reward: ...
         batch_size: batch size for updates.
         max_queue_size: maximum queue size.
-        critic_learning_rate: learning rate for the critic-network update.
-        policy_learning_rate: ...
         discount: discount to use for TD updates.
         logger: logger object to be used by learner.
         max_gradient_norm: used for gradient clipping.
@@ -113,6 +112,9 @@ class MAPPO:
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
+        self._policy_optimizer = policy_optimizer
+        self._critic_optimizer = critic_optimizer
+        self._checkpoint = checkpoint
 
         self._builder = builder.MAPPOBuilder(
             config=builder.MAPPOConfig(
@@ -122,8 +124,6 @@ class MAPPO:
                 discount=discount,
                 lambda_gae=lambda_gae,
                 clipping_epsilon=clipping_epsilon,
-                critic_learning_rate=critic_learning_rate,
-                policy_learning_rate=policy_learning_rate,
                 entropy_cost=entropy_cost,
                 baseline_cost=baseline_cost,
                 max_abs_reward=max_abs_reward,
@@ -132,6 +132,7 @@ class MAPPO:
                 batch_size=batch_size,
                 sequence_length=sequence_length,
                 sequence_period=sequence_period,
+                checkpoint=self._checkpoint,
             ),
         )
 
@@ -179,6 +180,7 @@ class MAPPO:
             to_terminal=True,
             to_tensorboard=True,
             time_stamp=log_time_stamp,
+            time_delta=self._log_every,
         )
 
         return self._builder.make_trainer(
@@ -186,6 +188,9 @@ class MAPPO:
             dataset=dataset,
             counter=counter,
             logger=trainer_logger,
+            policy_optimizer=self._policy_optimizer,
+            critic_optimizer=self._critic_optimizer,
+            checkpoint=self._checkpoint,
         )
 
     def executor(
@@ -233,6 +238,7 @@ class MAPPO:
             to_terminal=True,
             to_tensorboard=True,
             time_stamp=log_time_stamp,
+            time_delta=self._log_every,
         )
 
         # Create the loop to connect environment and executor.
@@ -286,6 +292,7 @@ class MAPPO:
             to_terminal=True,
             to_tensorboard=True,
             time_stamp=log_time_stamp,
+            time_delta=self._log_every,
         )
 
         # Create the run loop and return it.
