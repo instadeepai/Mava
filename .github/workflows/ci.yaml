@@ -21,13 +21,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          LC_ALL=C.UTF-8 pip install --upgrade pip setuptools
-          LC_ALL=C.UTF-8 pip install .
-          LC_ALL=C.UTF-8 pip install .[tf,envs,reverb,testing_formatting,launchpad]
+          export PIP_DEFAULT_TIMEOUT=100
+          # Ensure encoding consistency
+          export LC_CTYPE=en_US.UTF-8
+          export LANG=en_US.UTF-8
+          pip install --upgrade pip setuptools
+          pip install .
+          pip install .[tf,envs,reverb,testing_formatting,launchpad]
           # For atari envs
           sudo apt-get update
           sudo apt-get install unrar
-          LC_ALL=C.UTF-8 pip install autorom && echo y | AutoROM
+          pip install autorom && echo y | AutoROM
           # Open CV
           sudo apt-get install ffmpeg libsm6 libxext6  -y
       - name: Format code
