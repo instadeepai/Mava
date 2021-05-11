@@ -43,7 +43,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string(
     "action_space",
-    "discrete",
+    "continuous",
     "Environment action space type (str).",
 )
 
@@ -164,7 +164,7 @@ def main(_: Any) -> None:
     ).build()
 
     # launch
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="gnome-terminal")
+    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
 
 
 if __name__ == "__main__":
