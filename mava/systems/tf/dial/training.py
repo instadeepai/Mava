@@ -64,7 +64,7 @@ class DIALTrainer(mava.Trainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
-        checkpoint_subpath: str = "Checkpoints",
+        checkpoint_subpath: str = "~/mava/",
         max_gradient_norm: Optional[float] = None,
     ):
         """Initializes the learner.
@@ -167,7 +167,7 @@ class DIALTrainer(mava.Trainer):
 
                 checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
                 checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=1,
+                    time_delta_minutes=15,
                     add_uid=False,
                     directory=checkpointer_dir,
                     objects_to_save=objects_to_save,

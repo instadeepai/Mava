@@ -75,6 +75,7 @@ class MAPPO:
         log_every: float = 10.0,
         max_executor_steps: int = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
 
         """Initialize the system.
@@ -95,6 +96,7 @@ class MAPPO:
         logger: logger object to be used by learner.
         max_gradient_norm: used for gradient clipping.
         checkpoint: ...
+        checkpoint_subpath: directory for checkpoints.
         replay_table_name: string indicating what name to give the replay table."""
 
         if not environment_spec:
@@ -112,6 +114,8 @@ class MAPPO:
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
+        self._checkpoint_subpath = checkpoint_subpath
+        self._checkpoint = checkpoint
 
         self._builder = builder.MAPPOBuilder(
             config=builder.MAPPOConfig(
@@ -132,6 +136,7 @@ class MAPPO:
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
                 critic_optimizer=critic_optimizer,
+                checkpoint_subpath=checkpoint_subpath,
             ),
         )
 
@@ -141,7 +146,10 @@ class MAPPO:
 
     def counter(self) -> Any:
         return tf2_savers.CheckpointingRunner(
-            counting.Counter(), time_delta_minutes=1, subdirectory="counter"
+            counting.Counter(),
+            time_delta_minutes=15,
+            directory=self._checkpoint_subpath,
+            subdirectory="counter",
         )
 
     def coordinator(self, counter: counting.Counter) -> Any:
@@ -153,9 +161,6 @@ class MAPPO:
         counter: counting.Counter,
     ) -> mava.core.Trainer:
         """The Trainer part of the system."""
-
-        # get log info
-        log_dir, log_time_stamp = self._log_info
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
@@ -173,14 +178,19 @@ class MAPPO:
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
-        trainer_logger = Logger(
-            label="system_trainer",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-            time_delta=self._log_every,
-        )
+
+        trainer_logger: Optional[Logger] = None
+        if self._log_info:
+            # get log info
+            log_dir, log_time_stamp = self._log_info
+            trainer_logger = Logger(
+                label="system_trainer",
+                directory=log_dir,
+                to_terminal=True,
+                to_tensorboard=True,
+                time_stamp=log_time_stamp,
+                time_delta=self._log_every,
+            )
 
         return self._builder.make_trainer(
             networks=system_networks,
@@ -197,9 +207,6 @@ class MAPPO:
         counter: counting.Counter,
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
-
-        # get log info
-        log_dir, log_time_stamp = self._log_info
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -234,14 +241,19 @@ class MAPPO:
 
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
-        train_logger = Logger(
-            label=f"train_loop_executor_{executor_id}",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-            time_delta=self._log_every,
-        )
+
+        train_logger: Optional[Logger] = None
+        if self._log_info:
+            # get log info
+            log_dir, log_time_stamp = self._log_info
+            train_logger = Logger(
+                label=f"train_loop_executor_{executor_id}",
+                directory=log_dir,
+                to_terminal=True,
+                to_tensorboard=True,
+                time_stamp=log_time_stamp,
+                time_delta=self._log_every,
+            )
 
         # Create the loop to connect environment and executor.
         train_loop = ParallelEnvironmentLoop(
@@ -259,9 +271,6 @@ class MAPPO:
         logger: loggers.Logger = None,
     ) -> Any:
         """The evaluation process."""
-
-        # get log info
-        log_dir, log_time_stamp = self._log_info
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -294,14 +303,19 @@ class MAPPO:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
-        eval_logger = Logger(
-            label="eval_loop",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-            time_delta=self._log_every,
-        )
+
+        eval_logger: Optional[Logger] = None
+        if self._log_info:
+            # get log info
+            log_dir, log_time_stamp = self._log_info
+            eval_logger = Logger(
+                label="eval_loop",
+                directory=log_dir,
+                to_terminal=True,
+                to_tensorboard=True,
+                time_stamp=log_time_stamp,
+                time_delta=self._log_every,
+            )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.

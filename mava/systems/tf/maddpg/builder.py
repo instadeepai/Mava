@@ -61,6 +61,7 @@ class MADDPGConfig:
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: snt.Optimizer
     critic_optimizer: snt.Optimizer
+    checkpoint_subpath: str = "~/mava/"
     shared_weights: bool = True
     discount: float = 0.99
     batch_size: int = 256
@@ -307,6 +308,7 @@ class MADDPGBuilder(SystemBuilder):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.

@@ -78,6 +78,7 @@ class MAPPOConfig:
     max_abs_reward: Optional[float] = None
     max_gradient_norm: Optional[float] = None
     checkpoint: bool = True
+    checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 

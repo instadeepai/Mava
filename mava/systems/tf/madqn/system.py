@@ -45,12 +45,12 @@ class MADQN:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
-        log_info: Tuple,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
+        log_info: Tuple = None,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
         epsilon: float = tf.Variable(1.0, trainable=False),
@@ -68,6 +68,7 @@ class MADQN:
         log_every: float = 10.0,
         max_executor_steps: int = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
 
         if not environment_spec:
@@ -85,6 +86,8 @@ class MADQN:
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
+        self._checkpoint_subpath = checkpoint_subpath
+        self._checkpoint = checkpoint
 
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
@@ -103,6 +106,7 @@ class MADQN:
                 clipping=clipping,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
+                checkpoint_subpath=checkpoint_subpath,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -114,7 +118,10 @@ class MADQN:
 
     def counter(self) -> Any:
         return tf2_savers.CheckpointingRunner(
-            counting.Counter(), time_delta_minutes=1, subdirectory="counter"
+            counting.Counter(),
+            time_delta_minutes=15,
+            directory=self._checkpoint_subpath,
+            subdirectory="counter",
         )
 
     def coordinator(self, counter: counting.Counter) -> Any:
@@ -126,9 +133,6 @@ class MADQN:
         counter: counting.Counter,
     ) -> mava.core.Trainer:
         """The Trainer part of the system."""
-
-        # get log info
-        log_dir, log_time_stamp = self._log_info
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
@@ -144,14 +148,19 @@ class MADQN:
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
-        trainer_logger = Logger(
-            label="system_trainer",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-            time_delta=self._log_every,
-        )
+
+        trainer_logger: Optional[Logger] = None
+        if self._log_info:
+            # get log info
+            log_dir, log_time_stamp = self._log_info
+            trainer_logger = Logger(
+                label="system_trainer",
+                directory=log_dir,
+                to_terminal=True,
+                to_tensorboard=True,
+                time_stamp=log_time_stamp,
+                time_delta=self._log_every,
+            )
 
         return self._builder.make_trainer(
             networks=system_networks,
@@ -168,9 +177,6 @@ class MADQN:
         counter: counting.Counter,
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
-
-        # get log info
-        log_dir, log_time_stamp = self._log_info
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -197,14 +203,19 @@ class MADQN:
 
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
-        train_logger = Logger(
-            label=f"train_loop_executor_{executor_id}",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-            time_delta=self._log_every,
-        )
+
+        train_logger: Optional[Logger] = None
+        if self._log_info:
+            # get log info
+            log_dir, log_time_stamp = self._log_info
+            train_logger = Logger(
+                label=f"train_loop_executor_{executor_id}",
+                directory=log_dir,
+                to_terminal=True,
+                to_tensorboard=True,
+                time_stamp=log_time_stamp,
+                time_delta=self._log_every,
+            )
 
         # Create the loop to connect environment and executor.
         train_loop = ParallelEnvironmentLoop(
@@ -222,9 +233,6 @@ class MADQN:
         logger: loggers.Logger = None,
     ) -> Any:
         """The evaluation process."""
-
-        # get log info
-        log_dir, log_time_stamp = self._log_info
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -249,14 +257,19 @@ class MADQN:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
-        eval_logger = Logger(
-            label="eval_loop",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-            time_delta=self._log_every,
-        )
+
+        eval_logger: Optional[Logger] = None
+        if self._log_info:
+            # get log info
+            log_dir, log_time_stamp = self._log_info
+            eval_logger = Logger(
+                label="eval_loop",
+                directory=log_dir,
+                to_terminal=True,
+                to_tensorboard=True,
+                time_stamp=log_time_stamp,
+                time_delta=self._log_every,
+            )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.

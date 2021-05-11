@@ -16,8 +16,6 @@
 """Tests for MAPPO."""
 
 import functools
-from datetime import datetime
-from pathlib import Path
 from typing import Dict, Sequence, Union
 
 import dm_env
@@ -130,11 +128,10 @@ class TestMAPPO:
         debugging environment without crashing."""
 
         # set loggers info
-        base_dir = Path.cwd()
-        log_dir = base_dir / "logs"
-        log_time_stamp = str(datetime.now())
-
-        log_info = (log_dir, log_time_stamp)
+        # TODO Allow none log_info and checkpoint to be passed.
+        mava_id = "tests/mappo"
+        base_dir = "~/mava"
+        log_info = (base_dir, f"{mava_id}/logs")
 
         # environment
         environment_factory = functools.partial(
@@ -147,6 +144,7 @@ class TestMAPPO:
         network_factory = lp_utils.partial_kwargs(make_networks)
 
         # system
+        checkpoint_dir = f"{base_dir}/{mava_id}"
         system = mappo.MAPPO(
             environment_factory=environment_factory,
             network_factory=network_factory,
@@ -156,6 +154,8 @@ class TestMAPPO:
             max_queue_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            checkpoint=False,
+            checkpoint_subpath=checkpoint_dir,
         )
         program = system.build()
 

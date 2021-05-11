@@ -16,8 +16,6 @@
 """Tests for MADQN."""
 
 import functools
-from datetime import datetime
-from pathlib import Path
 from typing import Dict, Mapping, Sequence, Union
 
 import launchpad as lp
@@ -94,11 +92,10 @@ class TestMADQN:
         debugging environment without crashing."""
 
         # set loggers info
-        base_dir = Path.cwd()
-        log_dir = base_dir / "logs"
-        log_time_stamp = str(datetime.now())
-
-        log_info = (log_dir, log_time_stamp)
+        # TODO Allow none log_info and checkpoint to be passed.
+        mava_id = "tests/madqn"
+        base_dir = "~/mava"
+        log_info = (base_dir, f"{mava_id}/logs")
 
         # environment
         environment_factory = functools.partial(
@@ -111,6 +108,7 @@ class TestMADQN:
         network_factory = lp_utils.partial_kwargs(make_networks)
 
         # system
+        checkpoint_dir = f"{base_dir}/{mava_id}"
         system = madqn.MADQN(
             environment_factory=environment_factory,
             network_factory=network_factory,
@@ -120,6 +118,8 @@ class TestMADQN:
             min_replay_size=32,
             max_replay_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            checkpoint=False,
+            checkpoint_subpath=checkpoint_dir,
         )
 
         program = system.build()

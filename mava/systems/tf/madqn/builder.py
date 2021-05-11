@@ -64,6 +64,7 @@ class MADQNConfig:
     checkpoint: bool
     policy_optimizer: snt.Optimizer
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    checkpoint_subpath: str = "~/mava/"
 
 
 class MADQNBuilder:
@@ -240,6 +241,7 @@ class MADQNBuilder:
             counter=counter,
             logger=logger,
             checkpoint=self._config.checkpoint,
+            checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
         trainer = DetailedTrainerStatistics(trainer, metrics=["loss"])  # type: ignore

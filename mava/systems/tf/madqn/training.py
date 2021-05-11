@@ -48,6 +48,7 @@ class MADQNTrainer(mava.Trainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
 
         self._agents = agents
@@ -96,21 +97,23 @@ class MADQNTrainer(mava.Trainer):
 
         # Checkpointer
         self._system_checkpointer = {}
-        for agent_key in self.unique_net_keys:
+        if checkpoint:
+            for agent_key in self.unique_net_keys:
 
-            checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=5,
-                objects_to_save={
-                    "counter": self._counter,
-                    "q_network": self._q_networks[agent_key],
-                    "target_q_network": self._target_q_networks[agent_key],
-                    "optimizer": self._optimizer,
-                    "num_steps": self._num_steps,
-                },
-                enable_checkpointing=checkpoint,
-            )
+                checkpointer = tf2_savers.Checkpointer(
+                    directory=checkpoint_subpath,
+                    time_delta_minutes=15,
+                    objects_to_save={
+                        "counter": self._counter,
+                        "q_network": self._q_networks[agent_key],
+                        "target_q_network": self._target_q_networks[agent_key],
+                        "optimizer": self._optimizer,
+                        "num_steps": self._num_steps,
+                    },
+                    enable_checkpointing=checkpoint,
+                )
 
-            self._system_checkpointer[agent_key] = checkpointer
+                self._system_checkpointer[agent_key] = checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -233,7 +236,8 @@ class MADQNTrainer(mava.Trainer):
         # Checkpoint and attempt to write the logs.
 
         # NOTE (Arnu): ignoring checkpointing and logging for now
-        # self._checkpointer.save()
+        # if(self._checkpoint):
+        #     self._checkpointer.save()
         self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:

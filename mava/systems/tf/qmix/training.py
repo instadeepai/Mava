@@ -99,7 +99,7 @@ class QMIXTrainer(mava.Trainer):
         for agent_key in self.unique_net_keys:
 
             checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=5,
+                time_delta_minutes=15,
                 objects_to_save={
                     "counter": self._counter,
                     "q_network": self._q_networks[agent_key],

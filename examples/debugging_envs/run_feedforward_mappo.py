@@ -17,7 +17,6 @@
 
 import functools
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, Sequence, Union
 
 import acme.tf.networks as networks
@@ -47,6 +46,13 @@ flags.DEFINE_string(
     "discrete",
     "Environment action space type (str).",
 )
+
+flags.DEFINE_string(
+    "mava_id",
+    str(datetime.now()),
+    "Experiment identifier that can be used to continue experiments.",
+)
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 def make_networks(
@@ -136,11 +142,7 @@ def make_networks(
 def main(_: Any) -> None:
 
     # set loggers info
-    base_dir = Path.cwd()
-    log_dir = base_dir / "logs"
-    log_time_stamp = str(datetime.now())
-
-    log_info = (log_dir, log_time_stamp)
+    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
     # environment
     environment_factory = functools.partial(
@@ -153,6 +155,8 @@ def main(_: Any) -> None:
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # distributed program
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
     program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,
@@ -160,6 +164,7 @@ def main(_: Any) -> None:
         log_info=log_info,
         policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
+        checkpoint_subpath=checkpoint_dir,
     ).build()
 
     # launch

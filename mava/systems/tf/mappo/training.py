@@ -84,6 +84,7 @@ class MAPPOTrainer(mava.Trainer):
         # Store agents.
         self._agents = agents
         self._agent_types = agent_types
+        self._checkpoint = checkpoint
 
         # Store shared_weights.
         self._shared_weights = shared_weights
@@ -150,6 +151,8 @@ class MAPPOTrainer(mava.Trainer):
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger("trainer")
         self._system_checkpointer: Dict[Any, Any] = {}
+
+        # TODO Add checkpointing using `checkpoint` and `checkpoint_subpath`.
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -359,10 +362,11 @@ class MAPPOTrainer(mava.Trainer):
         fetches.update(counts)
 
         # Checkpoint the networks.
-        if len(self._system_checkpointer.keys()) > 0:
-            for agent_key in self.unique_net_keys:
-                checkpointer = self._system_checkpointer[agent_key]
-                checkpointer.save()
+        if self._checkpoint:
+            if len(self._system_checkpointer.keys()) > 0:
+                for agent_key in self.unique_net_keys:
+                    checkpointer = self._system_checkpointer[agent_key]
+                    checkpointer.save()
 
         self._logger.write(fetches)
 
