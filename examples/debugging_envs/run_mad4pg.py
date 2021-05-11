@@ -56,6 +56,9 @@ def make_networks(
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
     sigma: float = 0.3,
+    vmin: float = -150.0,
+    vmax: float = 150.0,
+    num_atoms: int = 51,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
@@ -106,7 +109,7 @@ def make_networks(
                 networks.LayerNormMLP(
                     critic_networks_layer_sizes[key], activate_final=False
                 ),
-                snt.Linear(1),
+                networks.DiscreteValuedHead(vmin, vmax, num_atoms),
             ]
         )
         observation_networks[key] = observation_network

@@ -350,12 +350,14 @@ class BaseMAD4PGTrainer(mava.Trainer):
                 q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
                 q_t = self._target_critic_networks[agent_key](o_t_feed, a_t_feed)
 
+                # print("q_t: ", q_t)
+                # losses/distributional.py
+                # exit()
+
                 # Critic loss.
                 critic_loss = losses.categorical(
                     q_tm1, r_t[agent], discount * d_t[agent], q_t
                 )
-                critic_loss = tf.reduce_mean(critic_loss, axis=[0])
-
                 # Actor learning.
                 o_t_agent_feed = o_t_trans[agent]
                 dpg_a_t = self._policy_networks[agent_key](o_t_agent_feed)
