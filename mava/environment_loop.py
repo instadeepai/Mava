@@ -330,7 +330,22 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             episode_steps,
             start_time,
         )
-        return self._running_statistics
+        if self._running_statistics:
+            return self._running_statistics
+        else:
+            # Record counts.
+            counts = self._counter.increment(episodes=1, steps=episode_steps)
+
+            # Collect the results and combine with counts.
+            steps_per_second = episode_steps / (time.time() - start_time)
+            result = {
+                "episode_length": episode_steps,
+                "mean_episode_return": np.mean(list(episode_returns.values())),
+                "steps_per_second": steps_per_second,
+            }
+            result.update(counts)
+
+            return result
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         pass
