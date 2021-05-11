@@ -45,9 +45,9 @@ class MAPPOTrainer(mava.Trainer):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool,
-        critic_learning_rate: float = 1e-3,
-        policy_learning_rate: float = 1e-3,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.0,
@@ -64,12 +64,12 @@ class MAPPOTrainer(mava.Trainer):
         Args:
             policy_networks: ...
             critic_networks: ...
+            policy_optimizer: policy optimizer,
+            critic_optimizer: critic optimizer,
             shared_weights: ...
             discount: discount to use for TD updates.
             dataset: dataset to learn from, whether fixed or from a replay buffer
                 (see `acme.datasets.reverb.make_dataset` documentation).
-            critic_learning_rate: ...
-            policy_learning_rate: ...
             lambda_gae: ...
             clipping_espilon: ...
             entropy_cost: ...
@@ -94,8 +94,8 @@ class MAPPOTrainer(mava.Trainer):
         self._critic_networks = critic_networks
 
         # Get optimizers
-        self._policy_optimizer = snt.optimizers.Adam(learning_rate=policy_learning_rate)
-        self._critic_optimizer = snt.optimizers.Adam(learning_rate=critic_learning_rate)
+        self._policy_optimizer = policy_optimizer
+        self._critic_optimizer = critic_optimizer
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}

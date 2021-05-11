@@ -15,6 +15,7 @@
 
 """Tests for MADDPG."""
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Mapping, Sequence, Union
@@ -123,7 +124,7 @@ class TestMADDPG:
         log_info = (log_dir, log_time_stamp)
 
         # environment
-        environment_factory = lp_utils.partial_kwargs(
+        environment_factory = functools.partial(
             debugging_utils.make_environment,
             env_name="simple_spread",
             action_space="continuous",
@@ -141,6 +142,8 @@ class TestMADDPG:
             batch_size=32,
             min_replay_size=32,
             max_replay_size=1000,
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         )
         program = system.build()
 
