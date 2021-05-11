@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running feedforward MADDPG on debug MPE environments."""
+"""Example running recurrent MADDPG on the debug MPE environments."""
 
 from datetime import datetime
 from pathlib import Path
@@ -28,7 +28,8 @@ from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
-from mava.systems.tf import maddpg
+from mava.systems.tf import executors, maddpg
+from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 
@@ -81,15 +82,17 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
-        # Create the shared observation network; here simply a state-less operation.
+        # Create the observation network.
         observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
-        policy_network = snt.Sequential(
+        policy_network = snt.DeepRNN(
             [
-                networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key], activate_final=True
-                ),
+                observation_network,
+                snt.Flatten(),
+                snt.nets.MLP(policy_networks_layer_sizes[key]),
+                snt.LSTM(25),
+                snt.nets.MLP([128]),
                 networks.NearZeroInitializedLinear(num_dimensions),
                 networks.TanhToSpec(specs[key].actions),
                 networks.ClippedGaussian(sigma),
@@ -108,21 +111,20 @@ def make_networks(
                 snt.Linear(1),
             ]
         )
+
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
 
     return {
+        "observations": observation_networks,
         "policies": policy_networks,
         "critics": critic_networks,
-        "observations": observation_networks,
     }
 
 
 def main(_: Any) -> None:
 
-    # TODO(Arnu): make logging optional, currently log_info
-    # is required for all systems
     # set loggers info
     base_dir = Path.cwd()
     log_dir = base_dir / "logs"
@@ -137,18 +139,17 @@ def main(_: Any) -> None:
         action_space=FLAGS.action_space,
     )
 
-    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
-    # distributed program
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
+        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
+        executor_fn=executors.RecurrentExecutor,
     ).build()
 
-    # launch
     lp.launch(
         program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="current_terminal"
     )
