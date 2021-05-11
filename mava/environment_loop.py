@@ -245,6 +245,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         episode_steps = 0
 
         timestep = self._environment.reset()
+
         if type(timestep) == tuple:
             timestep, env_extras = timestep
         else:
@@ -253,14 +254,18 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         # Make the first observation.
         self._executor.observe_first(timestep, extras=env_extras)
 
-        n_agents = self._environment.num_agents
+        rewards: Dict[str, float] = {}
+        episode_returns: Dict[str, float] = {}
+        for agent, spec in self._environment.reward_spec().items():
+            rewards.update({agent: generate_zeros_from_spec(spec)})
+            episode_returns.update({agent: generate_zeros_from_spec(spec)})
 
         # For evaluation, this keeps track of the total undiscounted reward
         # for each agent accumulated during the episode.
-        multiagent_reward_spec = specs.Array((n_agents,), np.float32)
-        episode_return = tree.map_structure(
-            generate_zeros_from_spec, multiagent_reward_spec
-        )
+        # multiagent_reward_spec = specs.Array((n_agents,), np.float32)
+        # episode_return = tree.map_structure(
+        #     generate_zeros_from_spec, multiagent_reward_spec
+        # )
 
         # Run an episode.
         while not timestep.last():
@@ -276,7 +281,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             rewards = timestep.reward
 
-            # Have the agent observe the timestep and let the actor update itself
+            # Have the agent observe the timestep and let the actor update itself.
             self._executor.observe(
                 actions, next_timestep=timestep, next_extras=env_extras
             )
@@ -294,28 +299,25 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     for agent, spec in self._environment.reward_spec().items()
                 }
 
+            self._compute_step_statistics(rewards)
+
             # Equivalent to: episode_return += timestep.reward
             # We capture the return value because if timestep.reward is a JAX
             # DeviceArray, episode_return will not be mutated in-place. (In all other
             # cases, the returned episode_return will be the same object as the
             # argument episode_return.)
-            episode_return = tree.map_structure(
-                operator.iadd, episode_return, np.array(list(rewards.values()))
-            )
+            # episode_return = tree.map_structure(
+            #     operator.iadd, episode_return, np.array(list(rewards.values()))
+            # )
+            for agent, reward in rewards.items():
+                episode_returns[agent] = episode_returns[agent] + reward
 
-        # Record counts.
-        counts = self._counter.increment(episodes=1, steps=episode_steps)
-
-        # Collect the results and combine with counts.
-        steps_per_second = episode_steps / (time.time() - start_time)
-        result = {
-            "episode_length": episode_steps,
-            "mean_episode_return": np.mean(episode_return),
-            "steps_per_second": steps_per_second,
-        }
-        result.update(counts)
-
-        return result
+        self._compute_episode_statistics(
+            episode_returns,
+            episode_steps,
+            start_time,
+        )
+        return self._running_statistics
 
     def run(
         self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
