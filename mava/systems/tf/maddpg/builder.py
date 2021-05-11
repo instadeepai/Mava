@@ -265,6 +265,8 @@ class MADDPGBuilder(SystemBuilder):
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         checkpoint: bool = False,
+        policy_optimizer: snt.Optimizer = None,
+        critic_optimizer: snt.Optimizer = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -277,6 +279,8 @@ class MADDPGBuilder(SystemBuilder):
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the trainer checkpoints itself.
+          policy_optimizer: optim for policy.
+          critic_optimizer: optim for critic.
         """
         agents = self._agents
         agent_types = self._agent_types
@@ -284,10 +288,6 @@ class MADDPGBuilder(SystemBuilder):
         clipping = self._config.clipping
         discount = self._config.discount
         target_update_period = self._config.target_update_period
-
-        # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-        critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(

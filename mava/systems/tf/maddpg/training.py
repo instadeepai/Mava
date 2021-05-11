@@ -54,14 +54,14 @@ class BaseMADDPGTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         discount: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -126,9 +126,8 @@ class BaseMADDPGTrainer(mava.Trainer):
         # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        # Create optimizers if they aren't given.
-        self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-4)
-        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
+        self._critic_optimizer = critic_optimizer
+        self._policy_optimizer = policy_optimizer
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
@@ -479,9 +478,9 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -551,9 +550,9 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -655,9 +654,9 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -759,9 +758,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -827,9 +826,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        # Create optimizers if they aren't given.
-        self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-4)
-        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
+        self._critic_optimizer = critic_optimizer
+        self._policy_optimizer = policy_optimizer
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -1270,9 +1268,9 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -1342,9 +1340,9 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -1447,9 +1445,9 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
