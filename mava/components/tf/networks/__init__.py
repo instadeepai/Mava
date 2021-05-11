@@ -15,6 +15,7 @@
 
 
 from mava.components.tf.networks.additive import AdditiveMixingNetwork  # type: ignore
+from mava.components.tf.networks.dial import DIALPolicy  # type: ignore
 from mava.components.tf.networks.epsilon_greedy import epsilon_greedy_action_selector
 from mava.components.tf.networks.monotonic import MonotonicMixingNetwork  # type: ignore
 from mava.components.tf.networks.transformed import QTranAlt  # type: ignore
