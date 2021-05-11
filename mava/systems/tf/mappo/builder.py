@@ -240,7 +240,7 @@ class MAPPOBuilder(SystemBuilder):
         critic_networks = networks["critics"]
 
         # The learner updates the parameters (and initializes them).
-        trainer = training.MAPPOTrainer(
+        trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
             policy_networks=policy_networks,

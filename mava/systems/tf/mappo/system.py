@@ -58,8 +58,9 @@ class MAPPO:
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
-        critic_learning_rate: float = 1e-3,
-        policy_learning_rate: float = 1e-3,
+        executor_variable_update_period: int = 100,
+        critic_learning_rate: float = 5e-4,
+        policy_learning_rate: float = 1e-4,
         discount: float = 0.99,
         lambda_gae: float = 0.95,
         clipping_epsilon: float = 0.2,
@@ -68,7 +69,7 @@ class MAPPO:
         max_abs_reward: Optional[float] = None,
         max_gradient_norm: Optional[float] = None,
         max_queue_size: int = 100_000,
-        batch_size: int = 16,
+        batch_size: int = 256,
         sequence_length: int = 10,
         sequence_period: int = 5,
         log_every: float = 10.0,
@@ -131,6 +132,8 @@ class MAPPO:
                 sequence_length=sequence_length,
                 sequence_period=sequence_period,
             ),
+            trainer_fn=trainer_fn,
+            executor_fn=executor_fn,
         )
 
     def replay(self) -> Any:

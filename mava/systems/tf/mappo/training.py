@@ -149,6 +149,17 @@ class MAPPOTrainer(mava.Trainer):
         # fill the replay buffer.
         self._timestamp = None
 
+    def _get_critic_feed(
+        self,
+        obs_trans: Dict[str, np.ndarray],
+        agent: str,
+    ) -> tf.Tensor:
+
+        # Decentralised based
+        obs_feed = obs_trans[agent]
+
+        return obs_feed
+
     # @tf.function
     def _step(
         self,
@@ -193,13 +204,17 @@ class MAPPOTrainer(mava.Trainer):
 
             for agent in self._agents:
 
-                obs, acts, rews, discs, behaviour_log_probs = (
-                    all_obs[agent],
+                acts, rews, discs, behaviour_log_probs = (
                     all_acts[agent],
                     all_rews[agent],
                     all_discs[agent],
                     all_log_probs[agent],
                 )
+                # TODO (Claude) Observation network transform
+                obs_trans = {agent: o.observation for agent, o in all_obs.items()}
+
+                actor_obs = obs_trans[agent]
+                critic_obs = self._get_critic_feed(obs_trans, agent)
 
                 # Chop off final timestep for bootstrapping value
                 rews = rews[:-1]
@@ -211,10 +226,11 @@ class MAPPOTrainer(mava.Trainer):
                 critic_network = self._critic_networks[network_key]
 
                 # Reshape inputs.
-                dims = obs.observation.shape[:2]
-                obs = snt.merge_leading_dims(obs.observation, num_dims=2)
-                policy = policy_network(obs)
-                values = critic_network(obs)
+                dims = actor_obs.shape[:2]
+                actor_obs = snt.merge_leading_dims(actor_obs, num_dims=2)
+                critic_obs = snt.merge_leading_dims(critic_obs, num_dims=2)
+                policy = policy_network(actor_obs)
+                values = critic_network(critic_obs)
 
                 # Reshape the outputs.
                 policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
@@ -355,3 +371,60 @@ class MAPPOTrainer(mava.Trainer):
                     self._system_network_variables[network_type][agent]
                 )
         return variables
+
+
+class CentralisedMAPPOTrainer(MAPPOTrainer):
+    def __init__(
+        self,
+        agents: List[Any],
+        agent_types: List[str],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        dataset: tf.data.Dataset,
+        shared_weights: bool,
+        critic_learning_rate: float = 1e-3,
+        policy_learning_rate: float = 1e-3,
+        discount: float = 0.99,
+        lambda_gae: float = 1.0,
+        entropy_cost: float = 0.0,
+        baseline_cost: float = 1.0,
+        clipping_epsilon: float = 0.2,
+        max_abs_reward: Optional[float] = None,
+        max_gradient_norm: Optional[float] = None,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = False,
+        checkpoint_subpath: str = "Checkpoints",
+    ):
+
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            dataset=dataset,
+            shared_weights=shared_weights,
+            critic_learning_rate=critic_learning_rate,
+            policy_learning_rate=policy_learning_rate,
+            discount=discount,
+            lambda_gae=lambda_gae,
+            entropy_cost=entropy_cost,
+            baseline_cost=baseline_cost,
+            clipping_epsilon=clipping_epsilon,
+            max_abs_reward=max_abs_reward,
+            max_gradient_norm=max_gradient_norm,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+        )
+
+    def _get_critic_feed(
+        self,
+        obs_trans: Dict[str, np.ndarray],
+        agent: str,
+    ) -> tf.Tensor:
+        # Centralised based
+        obs_feed = tf.stack([x for x in obs_trans.values()], 2)
+
+        return obs_feed
