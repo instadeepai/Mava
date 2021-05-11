@@ -61,7 +61,7 @@ class MADQNConfig:
     batch_size: int
     n_step: int
     discount: float
-    policy_optimizer: snt.Optimizer
+    checkpoint: bool
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
@@ -208,6 +208,7 @@ class MADQNBuilder:
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         checkpoint: bool = False,
+        policy_optimizer: snt.Optimizer = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -225,9 +226,6 @@ class MADQNBuilder:
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
-        # Create optimizers.
-        optimizer = self._config.policy_optimizer
-
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
             agents=agents,
@@ -236,7 +234,7 @@ class MADQNBuilder:
             target_q_networks=target_q_networks,
             epsilon=self._config.epsilon,
             shared_weights=self._config.shared_weights,
-            optimizer=optimizer,
+            optimizer=policy_optimizer,
             target_update_period=self._config.target_update_period,
             clipping=self._config.clipping,
             dataset=dataset,
