@@ -209,9 +209,6 @@ class MAPPOTrainer(mava.Trainer):
         critic_losses: Dict[str, Any] = {}
 
         with tf.GradientTape(persistent=True) as tape:
-
-            # TODO Possibly transform observations with Observation networks.
-
             for agent in self._agents:
 
                 obs, acts, rews, discs, behaviour_log_probs = (
