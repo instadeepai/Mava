@@ -118,6 +118,7 @@ class MAPPO:
             config=builder.MAPPOConfig(
                 environment_spec=environment_spec,
                 shared_weights=shared_weights,
+                executor_variable_update_period=executor_variable_update_period,
                 discount=discount,
                 lambda_gae=lambda_gae,
                 clipping_epsilon=clipping_epsilon,
