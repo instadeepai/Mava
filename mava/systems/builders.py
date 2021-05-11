@@ -82,7 +82,6 @@ class SystemBuilder(abc.ABC):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -97,5 +96,4 @@ class SystemBuilder(abc.ABC):
           counter: a Counter which allows for recording of counts (learner steps,
             actor steps, etc.) distributed throughout the agent.
           logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the learner checkpoints itself.
         """

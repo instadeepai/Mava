@@ -85,8 +85,6 @@ class MADQN:
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
-        self._policy_optimizer = policy_optimizer
-        self._checkpoint = checkpoint
 
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
@@ -103,7 +101,8 @@ class MADQN:
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
                 clipping=clipping,
-                checkpoint=self._checkpoint,
+                checkpoint=checkpoint,
+                policy_optimizer=policy_optimizer,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -159,8 +158,6 @@ class MADQN:
             dataset=dataset,
             counter=counter,
             logger=trainer_logger,
-            policy_optimizer=self._policy_optimizer,
-            checkpoint=self._checkpoint,
         )
 
     def executor(

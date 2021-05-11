@@ -59,6 +59,8 @@ class MADDPGConfig:
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
+    policy_optimizer: snt.Optimizer
+    critic_optimizer: snt.Optimizer
     shared_weights: bool = True
     discount: float = 0.99
     batch_size: int = 256
@@ -265,8 +267,6 @@ class MADDPGBuilder(SystemBuilder):
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         checkpoint: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -279,8 +279,6 @@ class MADDPGBuilder(SystemBuilder):
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the trainer checkpoints itself.
-          policy_optimizer: optim for policy.
-          critic_optimizer: optim for critic.
         """
         agents = self._agents
         agent_types = self._agent_types
@@ -300,8 +298,8 @@ class MADDPGBuilder(SystemBuilder):
             target_critic_networks=networks["target_critics"],
             target_observation_networks=networks["target_observations"],
             shared_weights=shared_weights,
-            policy_optimizer=policy_optimizer,
-            critic_optimizer=critic_optimizer,
+            policy_optimizer=self._config.policy_optimizer,
+            critic_optimizer=self._config.critic_optimizer,
             clipping=clipping,
             discount=discount,
             target_update_period=target_update_period,

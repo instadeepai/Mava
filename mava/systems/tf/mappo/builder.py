@@ -62,6 +62,8 @@ class MAPPOConfig:
     """
 
     environment_spec: specs.EnvironmentSpec
+    policy_optimizer: snt.Optimizer
+    critic_optimizer: snt.Optimizer
     sequence_length: int = 10
     sequence_period: int = 5
     shared_weights: bool = False
@@ -218,9 +220,6 @@ class MAPPOBuilder(SystemBuilder):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -251,8 +250,8 @@ class MAPPOBuilder(SystemBuilder):
             critic_networks=critic_networks,
             dataset=dataset,
             shared_weights=shared_weights,
-            critic_optimizer=critic_optimizer,
-            policy_optimizer=policy_optimizer,
+            critic_optimizer=self._config.critic_optimizer,
+            policy_optimizer=self._config.policy_optimizer,
             discount=self._config.discount,
             lambda_gae=self._config.lambda_gae,
             entropy_cost=self._config.entropy_cost,
@@ -262,6 +261,7 @@ class MAPPOBuilder(SystemBuilder):
             max_gradient_norm=self._config.max_gradient_norm,
             counter=counter,
             logger=logger,
+            checkpoint=self._config.checkpoint,
         )
 
         # TODO (Kale-ab): networks stats for MAPPO

@@ -76,6 +76,7 @@ class DIALConfig:
 
     environment_spec: specs.MAEnvironmentSpec
     networks: Dict[str, snt.Module]
+    policy_optimizer: snt.Optimizer
     shared_weights: bool = True
     batch_size: int = 1
     prefetch_size: int = 4
@@ -261,7 +262,6 @@ class DIALBuilder(SystemBuilder):
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         communication_module: BaseCommunicationModule,
-        policy_optimizer: snt.Optimizer,
         huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
@@ -299,7 +299,7 @@ class DIALBuilder(SystemBuilder):
             shared_weights=shared_weights,
             discount=discount,
             importance_sampling_exponent=importance_sampling_exponent,
-            policy_optimizer=policy_optimizer,
+            policy_optimizer=self._config.policy_optimizer,
             target_update_period=target_update_period,
             dataset=dataset,
             huber_loss_parameter=huber_loss_parameter,
@@ -403,6 +403,7 @@ class DIAL(system.System):
                 policy_networks=policy_networks,
                 max_gradient_norm=max_gradient_norm,
                 replay_table_name=replay_table_name,
+                policy_optimizer=policy_optimizer,
             ),
             executor_fn=executor_fn,
         )
@@ -456,7 +457,6 @@ class DIAL(system.System):
         trainer = builder.make_trainer(
             networks=networks,
             dataset=dataset,
-            policy_optimizer=policy_optimizer,
             counter=counter,
             logger=None,
             checkpoint=checkpoint,

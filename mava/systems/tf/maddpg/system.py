@@ -126,9 +126,6 @@ class MADDPG:
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
-        self._policy_optimizer = policy_optimizer
-        self._critic_optimizer = critic_optimizer
-        self._checkpoint = checkpoint
 
         if executor_fn == executors.RecurrentExecutor:
             extra_specs = self._get_extra_specs()
@@ -152,7 +149,9 @@ class MADDPG:
                 period=period,
                 sigma=sigma,
                 clipping=clipping,
-                checkpoint=self._checkpoint,
+                checkpoint=checkpoint,
+                policy_optimizer=policy_optimizer,
+                critic_optimizer=critic_optimizer,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -227,9 +226,6 @@ class MADDPG:
             dataset=dataset,
             counter=counter,
             logger=trainer_logger,
-            policy_optimizer=self._policy_optimizer,
-            critic_optimizer=self._critic_optimizer,
-            checkpoint=self._checkpoint,
         )
 
     def executor(

@@ -62,6 +62,7 @@ class MADQNConfig:
     n_step: int
     discount: float
     checkpoint: bool
+    policy_optimizer: snt.Optimizer
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
@@ -82,7 +83,7 @@ class MADQNBuilder:
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
     ):
         """Args:
-        _config: Configuration options for the MADDPG system.
+        _config: Configuration options for the MADQN system.
         _trainer_fn: Trainer module to use."""
         self._config = config
         self._agents = self._config.environment_spec.get_agent_ids()
@@ -207,8 +208,6 @@ class MADQNBuilder:
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
-        policy_optimizer: snt.Optimizer = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -234,13 +233,13 @@ class MADQNBuilder:
             target_q_networks=target_q_networks,
             epsilon=self._config.epsilon,
             shared_weights=self._config.shared_weights,
-            optimizer=policy_optimizer,
+            optimizer=self._config.policy_optimizer,
             target_update_period=self._config.target_update_period,
             clipping=self._config.clipping,
             dataset=dataset,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
+            checkpoint=self._config.checkpoint,
         )
 
         trainer = DetailedTrainerStatistics(trainer, metrics=["loss"])  # type: ignore
