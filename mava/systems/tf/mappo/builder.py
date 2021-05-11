@@ -238,6 +238,7 @@ class MAPPOBuilder(SystemBuilder):
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
 
+        observation_networks = networks["observations"]
         policy_networks = networks["policies"]
         critic_networks = networks["critics"]
 
@@ -245,6 +246,7 @@ class MAPPOBuilder(SystemBuilder):
         trainer = training.MAPPOTrainer(
             agents=agents,
             agent_types=agent_types,
+            observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             dataset=dataset,
