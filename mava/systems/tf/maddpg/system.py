@@ -250,17 +250,23 @@ class MADDPG:
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system = self._architecture(
             environment_spec=self._environment_spec,
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        # create variables
+        _ = system.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the executor.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
         )
@@ -306,17 +312,23 @@ class MADDPG:
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system = self._architecture(
             environment_spec=self._environment_spec,
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        # create variables
+        _ = system.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the agent.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
         )
 
