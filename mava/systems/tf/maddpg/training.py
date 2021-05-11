@@ -126,7 +126,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        # Create optimizers if they aren't given.
         self._critic_optimizer = critic_optimizer
         self._policy_optimizer = policy_optimizer
 
@@ -827,7 +826,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        # Create optimizers if they aren't given.
         self._critic_optimizer = critic_optimizer
         self._policy_optimizer = policy_optimizer
 
