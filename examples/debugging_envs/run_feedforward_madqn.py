@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
@@ -23,6 +24,7 @@ import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import epsilon_greedy_action_selector
@@ -105,7 +107,7 @@ def main(_: Any) -> None:
     log_info = (log_dir, log_time_stamp)
 
     # environment
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
@@ -120,10 +122,23 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
     ).build()
 
     # launch
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
+    )
 
 
 if __name__ == "__main__":

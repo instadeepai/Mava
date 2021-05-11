@@ -15,6 +15,7 @@
 
 """Tests for MAPPO."""
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Sequence, Union
@@ -136,7 +137,7 @@ class TestMAPPO:
         log_info = (log_dir, log_time_stamp)
 
         # environment
-        environment_factory = lp_utils.partial_kwargs(
+        environment_factory = functools.partial(
             debugging_utils.make_environment,
             env_name="simple_spread",
             action_space="discrete",
@@ -153,6 +154,8 @@ class TestMAPPO:
             num_executors=2,
             batch_size=32,
             max_queue_size=1000,
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
         )
         program = system.build()
 

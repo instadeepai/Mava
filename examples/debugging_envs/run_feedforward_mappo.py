@@ -15,6 +15,7 @@
 
 """Example running MAPPO on multi-agent CartPole."""
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Sequence, Union
@@ -28,6 +29,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from absl import app, flags
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava.specs as mava_specs
 from mava.systems.tf import mappo
@@ -143,7 +145,7 @@ def main(_: Any) -> None:
     log_info = (log_dir, log_time_stamp)
 
     # environment
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
@@ -158,10 +160,24 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
     ).build()
 
     # launch
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
+    )
 
 
 if __name__ == "__main__":

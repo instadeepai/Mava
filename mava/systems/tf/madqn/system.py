@@ -62,11 +62,12 @@ class MADQN:
         n_step: int = 5,
         clipping: bool = True,
         discount: float = 0.99,
-        policy_optimizer: snt.Optimizer = None,
+        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         log_every: float = 10.0,
         max_executor_steps: int = None,
+        checkpoint: bool = True,
     ):
 
         if not environment_spec:
@@ -84,6 +85,8 @@ class MADQN:
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
+        self._policy_optimizer = policy_optimizer
+        self._checkpoint = checkpoint
 
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
@@ -95,12 +98,12 @@ class MADQN:
                 prefetch_size=prefetch_size,
                 target_update_period=target_update_period,
                 executor_variable_update_period=executor_variable_update_period,
-                policy_optimizer=policy_optimizer,
                 min_replay_size=min_replay_size,
                 max_replay_size=max_replay_size,
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
                 clipping=clipping,
+                checkpoint=self._checkpoint,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -148,6 +151,7 @@ class MADQN:
             to_terminal=True,
             to_tensorboard=True,
             time_stamp=log_time_stamp,
+            time_delta=self._log_every,
         )
 
         return self._builder.make_trainer(
@@ -155,6 +159,8 @@ class MADQN:
             dataset=dataset,
             counter=counter,
             logger=trainer_logger,
+            policy_optimizer=self._policy_optimizer,
+            checkpoint=self._checkpoint,
         )
 
     def executor(
@@ -200,6 +206,7 @@ class MADQN:
             to_terminal=True,
             to_tensorboard=True,
             time_stamp=log_time_stamp,
+            time_delta=self._log_every,
         )
 
         # Create the loop to connect environment and executor.
@@ -251,6 +258,7 @@ class MADQN:
             to_terminal=True,
             to_tensorboard=True,
             time_stamp=log_time_stamp,
+            time_delta=self._log_every,
         )
 
         # Create the run loop and return it.

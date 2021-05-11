@@ -63,7 +63,6 @@ class DIALConfig:
         n_step: number of steps to squash into a single transition.
         epsilon: probability of taking a random action; ignored if a policy
             network is given.
-        learning_rate: learning rate for the q-network update.
         discount: discount to use for TD updates.
         logger: logger object to be used by learner.
         checkpoint: boolean indicating whether to checkpoint the learner.
@@ -88,8 +87,7 @@ class DIALConfig:
     priority_exponent: float = 0.6
     n_step: int = 1
     epsilon: Optional[tf.Tensor] = None
-    learning_rate: float = 5e-4
-    discount: float = 1.0
+    discount: float = 1.00
     logger: loggers.Logger = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
@@ -263,6 +261,7 @@ class DIALBuilder(SystemBuilder):
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         communication_module: BaseCommunicationModule,
+        policy_optimizer: snt.Optimizer,
         huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
@@ -288,12 +287,7 @@ class DIALBuilder(SystemBuilder):
         discount = self._config.discount
         target_update_period = self._config.target_update_period
         max_gradient_norm = self._config.max_gradient_norm
-        learning_rate = self._config.learning_rate
         importance_sampling_exponent = self._config.importance_sampling_exponent
-
-        # Create optimizers.
-        # policy_optimizer = snt.optimizers.Adam(learning_rate=learning_rate)
-        policy_optimizer = snt.optimizers.RMSProp(learning_rate, momentum=0.95)
 
         # The learner updates the parameters (and initializes them).
         trainer = DIALTrainer(
@@ -334,6 +328,7 @@ class DIAL(system.System):
         networks: Dict[str, snt.Module],
         observation_networks: Dict[str, snt.Module],
         executor_fn: Type[core.Executor] = DIALExecutor,
+        policy_optimizer: snt.Optimizer = snt.optimizers.RMSProp(5e-4, momentum=0.95),
         shared_weights: bool = True,
         batch_size: int = 1,
         prefetch_size: int = 4,
@@ -345,7 +340,6 @@ class DIAL(system.System):
         priority_exponent: float = 0.6,
         n_step: int = 1,
         epsilon: Optional[tf.Tensor] = None,
-        learning_rate: float = 5e-4,
         discount: float = 1.0,
         logger: loggers.Logger = None,
         counter: counting.Counter = None,
@@ -376,7 +370,6 @@ class DIAL(system.System):
             n_step: number of steps to squash into a single transition.
             epsilon: probability of taking a random action; ignored if a policy
                 network is given.
-            learning_rate: learning rate for the q-network update.
             discount: discount to use for TD updates.
             logger: logger object to be used by learner.
             checkpoint: boolean indicating whether to checkpoint the learner.
@@ -402,7 +395,6 @@ class DIAL(system.System):
                 priority_exponent=priority_exponent,
                 n_step=n_step,
                 epsilon=epsilon,
-                learning_rate=learning_rate,
                 discount=discount,
                 logger=logger,
                 counter=counter,
@@ -464,6 +456,7 @@ class DIAL(system.System):
         trainer = builder.make_trainer(
             networks=networks,
             dataset=dataset,
+            policy_optimizer=policy_optimizer,
             counter=counter,
             logger=None,
             checkpoint=checkpoint,
