@@ -16,7 +16,7 @@
 """Pettingzoo environment factory."""
 
 import importlib
-from typing import Any, Union
+from typing import Any, List, Optional, Union
 
 import dm_env
 import numpy as np
@@ -63,6 +63,7 @@ def make_environment(
     env_type: str = "parallel",
     env_class: str = "mpe",
     env_name: str = "simple_spread_v2",
+    env_preprocess_wrappers: Optional[List] = None,
     **kwargs: Any,
 ) -> dm_env.Environment:
     """Wraps an Pettingzoo environment.
@@ -84,12 +85,16 @@ def make_environment(
         if env_class == "atari":
             env = atari_preprocessing(env)
         # wrap parallel environment
-        environment = PettingZooParallelEnvWrapper(env)
+        environment = PettingZooParallelEnvWrapper(
+            env, env_preprocess_wrappers=env_preprocess_wrappers
+        )
     elif env_type == "sequential":
         env = env_module.env(**kwargs)  # type: ignore
         if env_class == "atari":
             env = atari_preprocessing(env)
         # wrap sequential environment
-        environment = PettingZooAECEnvWrapper(env)
+        environment = PettingZooAECEnvWrapper(
+            env, env_preprocess_wrappers=env_preprocess_wrappers
+        )
 
     return environment
