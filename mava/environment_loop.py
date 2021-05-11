@@ -239,7 +239,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger(label)
         self._should_update = should_update
-        self._running_statistics = None
+        self._running_statistics: Dict[str, float] = {}
 
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_actions(timestep.observation)
