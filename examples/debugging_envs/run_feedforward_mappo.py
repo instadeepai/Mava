@@ -44,7 +44,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string(
     "action_space",
-    "continuous",
+    "discrete",
     "Environment action space type (str).",
 )
 

@@ -210,7 +210,7 @@ class MAPPOTrainer(mava.Trainer):
         )
 
         # transform observation using observation networks
-        all_obs = self._transform_observations(all_obs)
+        all_obs_trans = self._transform_observations(all_obs)
 
         # Get log_probs.
         all_log_probs = extras["log_probs"]
@@ -228,11 +228,9 @@ class MAPPOTrainer(mava.Trainer):
                     all_discs[agent],
                     all_log_probs[agent],
                 )
-                # TODO (Claude) Observation network transform
-                obs_trans = {agent: o.observation for agent, o in all_obs.items()}
 
-                actor_obs = obs_trans[agent]
-                critic_obs = self._get_critic_feed(obs_trans, agent)
+                actor_obs = all_obs_trans[agent]
+                critic_obs = self._get_critic_feed(all_obs_trans, agent)
 
                 # Chop off final timestep for bootstrapping value
                 rews = rews[:-1]

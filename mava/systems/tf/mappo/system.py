@@ -69,7 +69,7 @@ class MAPPO:
         max_abs_reward: Optional[float] = None,
         max_gradient_norm: Optional[float] = None,
         max_queue_size: int = 100000,
-        batch_size: int = 16,
+        batch_size: int = 256,
         sequence_length: int = 10,
         sequence_period: int = 5,
         log_every: float = 10.0,

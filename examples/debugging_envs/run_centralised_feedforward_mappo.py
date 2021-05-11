@@ -15,6 +15,7 @@
 
 """Example running MAPPO on multi-agent CartPole."""
 
+import functools
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Sequence, Union
@@ -28,6 +29,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from absl import app, flags
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava.specs as mava_specs
 from mava.components.tf.architectures import CentralisedValueActorCritic
@@ -61,8 +63,6 @@ def make_networks(
 
     """Creates networks used by the agents."""
 
-    # TODO handle observation networks.
-
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
     if shared_weights:
@@ -84,7 +84,7 @@ def make_networks(
     for key in specs.keys():
 
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Note: The discrete case must be placed first as it inherits from BoundedArray.
         if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discreet
@@ -144,7 +144,7 @@ def main(_: Any) -> None:
     log_info = (log_dir, log_time_stamp)
 
     # environment
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
@@ -157,14 +157,28 @@ def main(_: Any) -> None:
     program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        architecture=CentralisedValueActorCritic,
-        trainer_fn=mappo.CentralisedMAPPOTrainer,
         num_executors=2,
         log_info=log_info,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
+        architecture=CentralisedValueActorCritic,
+        trainer_fn=mappo.CentralisedMAPPOTrainer,
     ).build()
 
     # launch
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
+    )
 
 
 if __name__ == "__main__":
