@@ -61,7 +61,6 @@ class MADDPGConfig:
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: snt.Optimizer
     critic_optimizer: snt.Optimizer
-    checkpoint_subpath: str = "~/mava/"
     shared_weights: bool = True
     discount: float = 0.99
     batch_size: int = 256
@@ -79,6 +78,7 @@ class MADDPGConfig:
     logger: loggers.Logger = None
     counter: counting.Counter = None
     checkpoint: bool = True
+    checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
@@ -267,7 +267,6 @@ class MADDPGBuilder(SystemBuilder):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -279,7 +278,6 @@ class MADDPGBuilder(SystemBuilder):
           counter: a Counter which allows for recording of counts (trainer steps,
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the trainer checkpoints itself.
         """
         agents = self._agents
         agent_types = self._agent_types
@@ -307,7 +305,7 @@ class MADDPGBuilder(SystemBuilder):
             dataset=dataset,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
+            checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 

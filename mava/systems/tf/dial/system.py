@@ -266,7 +266,6 @@ class DIALBuilder(SystemBuilder):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -278,7 +277,6 @@ class DIALBuilder(SystemBuilder):
           counter: a Counter which allows for recording of counts (trainer steps,
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the trainer checkpoints itself.
         """
         agents = self._agents
         agent_types = self._agent_types
@@ -307,7 +305,7 @@ class DIALBuilder(SystemBuilder):
             clipping=clipping,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
+            checkpoint=self._config.checkpoint,
             max_gradient_norm=max_gradient_norm,
             communication_module=communication_module,
         )
