@@ -35,10 +35,6 @@ from acme.utils import counting, loggers
 import mava
 from mava.utils import training_utils as train_utils
 
-# NOTE (Arnu): in TF2 this should be the default
-# but for some reason it is not when I run it.
-# tf.config.run_functions_eagerly(True)
-
 
 class BaseMADDPGTrainer(mava.Trainer):
     """MADDPG trainer.
@@ -150,8 +146,6 @@ class BaseMADDPGTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            # TODO (dries): Determine why acme has a critic
-            #  in self._system_network_variables
             self._system_network_variables["critic"][
                 agent_key
             ] = target_critic_networks[agent_key].variables
@@ -162,13 +156,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         # Create checkpointer
         self._system_checkpointer = {}
         if checkpoint:
-            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
-            #  of the last 11 calls to
-            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
-            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
-            #  expensive and the excessive number tracings could be due to (1)
-            #  creating @tf.function repeatedly in a loop, (2) passing tensors
-            #  with different shapes, (3) passing Python objects instead of tensors.
             for agent_key in self.unique_net_keys:
                 objects_to_save = {
                     "counter": self._counter,
@@ -399,10 +386,10 @@ class BaseMADDPGTrainer(mava.Trainer):
             )
 
             # Compute gradients.
-            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
+            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
             #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context.
-            # Caused by losses.dpg, which calls tape.gradient.
+            #  than calling it outside the context." caused by losses.dpg, which calls
+            #  tape.gradient.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
@@ -831,8 +818,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            # TODO (dries): Determine why acme has a critic
-            #  in self._system_network_variables
             self._system_network_variables["critic"][
                 agent_key
             ] = target_critic_networks[agent_key].variables
@@ -843,13 +828,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # Create checkpointer
         self._system_checkpointer = {}
         if checkpoint:
-            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
-            #  of the last 11 calls to
-            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
-            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
-            #  expensive and the excessive number tracings could be due to (1)
-            #  creating @tf.function repeatedly in a loop, (2) passing tensors
-            #  with different shapes, (3) passing Python objects instead of tensors.
             for agent_key in self.unique_net_keys:
                 objects_to_save = {
                     "counter": self._counter,
@@ -1170,13 +1148,10 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             )
 
             # Compute gradients.
-            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
+            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
             #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context (it causes the gradient ops to be
-            #  recorded on the tape, leading to increased CPU and memory usage).
-            #  Only call GradientTape.gradient inside the context if you actually want
-            #  to trace the gradient in order to compute higher order derivatives.
-            #  to trace the gradient in order to compute higher order derivatives.
+            #  than calling it outside the context." caused by losses.dpg, which calls
+            #  tape.gradient.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 

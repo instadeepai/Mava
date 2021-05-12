@@ -33,10 +33,6 @@ from acme.utils import counting, loggers
 import mava
 from mava.utils import training_utils as train_utils
 
-# NOTE (Arnu): in TF2 this should be the default
-# but for some reason it is not when I run it.
-# tf.config.run_functions_eagerly(True)
-
 
 class BaseMAD4PGTrainer(mava.Trainer):
     """MAD4PG trainer.
@@ -149,8 +145,6 @@ class BaseMAD4PGTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            # TODO (dries): Determine why acme has a critic
-            #  in self._system_network_variables
             self._system_network_variables["critic"][
                 agent_key
             ] = target_critic_networks[agent_key].variables
@@ -161,13 +155,6 @@ class BaseMAD4PGTrainer(mava.Trainer):
         # Create checkpointer
         self._system_checkpointer = {}
         if checkpoint:
-            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
-            #  of the last 11 calls to
-            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
-            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
-            #  expensive and the excessive number tracings could be due to (1)
-            #  creating @tf.function repeatedly in a loop, (2) passing tensors
-            #  with different shapes, (3) passing Python objects instead of tensors.
             for agent_key in self.unique_net_keys:
                 objects_to_save = {
                     "counter": self._counter,
@@ -232,18 +219,6 @@ class BaseMAD4PGTrainer(mava.Trainer):
             # evaluated at o_t, this also means the policy loss does not influence
             # the observation network training.
             o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
-
-            # TODO (dries): Why is there a stop gradient here? The target
-            #  will not be updated unless included into the
-            #  policy_variables or critic_variables sets.
-            #  One reason might be that it helps with preventing the observation
-            #  network from being updated from the policy_loss.
-            #  But why would we want that? Don't we want both the critic
-            #  and policy to update the observation network?
-            #  Or is it bad to have two optimisation processes optimising
-            #  the same set of weights? But the
-            #  StateBasedActorCritic will then not work as the critic
-            #  is not dependent on the behavior networks.
         return o_tm1, o_t
 
     def _get_critic_feed(
@@ -350,10 +325,6 @@ class BaseMAD4PGTrainer(mava.Trainer):
                 q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
                 q_t = self._target_critic_networks[agent_key](o_t_feed, a_t_feed)
 
-                # print("q_t: ", q_t)
-                # losses/distributional.py
-                # exit()
-
                 # Critic loss.
                 critic_loss = losses.categorical(
                     q_tm1, r_t[agent], discount * d_t[agent], q_t
@@ -410,10 +381,10 @@ class BaseMAD4PGTrainer(mava.Trainer):
             )
 
             # Compute gradients.
-            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
+            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
             #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context.
-            # Caused by losses.dpg, which calls tape.gradient.
+            #  than calling it outside the context." caused by losses.dpg, which calls
+            #  tape.gradient.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 

@@ -238,12 +238,6 @@ class MAD4PGBuilder(SystemBuilder):
                 update_period=self._config.executor_variable_update_period,
             )
 
-            # Update variables
-            # TODO: Is this needed? Probably not because
-            #  in acme they only update policy.variables.
-            # for agent in agent_keys:
-            #     policy_networks[agent].variables = variables[agent]
-
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()

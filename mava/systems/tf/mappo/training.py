@@ -118,8 +118,6 @@ class MAPPOTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            # TODO (dries): Determine why acme has a critic
-            #  in self._system_network_variables
             self._system_network_variables["critic"][agent_key] = critic_networks[
                 agent_key
             ].variables
