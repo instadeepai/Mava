@@ -158,25 +158,25 @@ class MAPPOTrainer(mava.Trainer):
 
     def _get_critic_feed(
         self,
-        obs_trans: Dict[str, np.ndarray],
+        observations_trans: Dict[str, np.ndarray],
         agent: str,
     ) -> tf.Tensor:
 
         # Decentralised based
-        obs_feed = obs_trans[agent]
+        observation_feed = observations_trans[agent]
 
-        return obs_feed
+        return observation_feed
 
     def _transform_observations(
-        self, obs: Dict[str, np.ndarray]
+        self, observation: Dict[str, np.ndarray]
     ) -> Dict[str, np.ndarray]:
-        trans_obs = {}
+        observation_trans = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            trans_obs[agent] = self._observation_networks[agent_key](
-                obs[agent].observation
+            observation_trans[agent] = self._observation_networks[agent_key](
+                observation[agent].observation
             )
-        return trans_obs
+        return observation_trans
 
     # @tf.function
     def _step(
@@ -201,7 +201,7 @@ class MAPPOTrainer(mava.Trainer):
         data = tf2_utils.batch_to_sequence(inputs.data)
 
         # Unpack input data as follows:
-        all_obs, all_acts, all_rews, all_discs, extras = (
+        observations, actions, rewards, discounts, extras = (
             data.observations,
             data.actions,
             data.rewards,
@@ -210,10 +210,10 @@ class MAPPOTrainer(mava.Trainer):
         )
 
         # transform observation using observation networks
-        all_obs_trans = self._transform_observations(all_obs)
+        observations_trans = self._transform_observations(observations)
 
         # Get log_probs.
-        all_log_probs = extras["log_probs"]
+        log_probs = extras["log_probs"]
 
         # Store losses.
         policy_losses: Dict[str, Any] = {}
@@ -222,19 +222,19 @@ class MAPPOTrainer(mava.Trainer):
         with tf.GradientTape(persistent=True) as tape:
             for agent in self._agents:
 
-                acts, rews, discs, behaviour_log_probs = (
-                    all_acts[agent],
-                    all_rews[agent],
-                    all_discs[agent],
-                    all_log_probs[agent],
+                action, reward, discount, behaviour_log_prob = (
+                    actions[agent],
+                    rewards[agent],
+                    discounts[agent],
+                    log_probs[agent],
                 )
 
-                actor_obs = all_obs_trans[agent]
-                critic_obs = self._get_critic_feed(all_obs_trans, agent)
+                actor_observation = observations_trans[agent]
+                critic_observation = self._get_critic_feed(observations_trans, agent)
 
                 # Chop off final timestep for bootstrapping value
-                rews = rews[:-1]
-                discs = discs[:-1]
+                reward = reward[:-1]
+                discount = discount[:-1]
 
                 # Get agent network
                 network_key = agent.split("_")[0] if self._shared_weights else agent
@@ -242,11 +242,15 @@ class MAPPOTrainer(mava.Trainer):
                 critic_network = self._critic_networks[network_key]
 
                 # Reshape inputs.
-                dims = actor_obs.shape[:2]
-                actor_obs = snt.merge_leading_dims(actor_obs, num_dims=2)
-                critic_obs = snt.merge_leading_dims(critic_obs, num_dims=2)
-                policy = policy_network(actor_obs)
-                values = critic_network(critic_obs)
+                dims = actor_observation.shape[:2]
+                actor_observation = snt.merge_leading_dims(
+                    actor_observation, num_dims=2
+                )
+                critic_observation = snt.merge_leading_dims(
+                    critic_observation, num_dims=2
+                )
+                policy = policy_network(actor_observation)
+                values = critic_network(critic_observation)
 
                 # Reshape the outputs.
                 policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
@@ -257,17 +261,17 @@ class MAPPOTrainer(mava.Trainer):
                 state_values = values[:-1]
 
                 # Optionally clip rewards.
-                rews = tf.clip_by_value(
-                    rews,
-                    tf.cast(-self._max_abs_reward, rews.dtype),
-                    tf.cast(self._max_abs_reward, rews.dtype),
+                reward = tf.clip_by_value(
+                    reward,
+                    tf.cast(-self._max_abs_reward, reward.dtype),
+                    tf.cast(self._max_abs_reward, reward.dtype),
                 )
 
                 # Generalized Return Estimation
                 td_loss, td_lambda_extra = trfl.td_lambda(
                     state_values=state_values,
-                    rewards=rews,
-                    pcontinues=discs,
+                    rewards=reward,
+                    pcontinues=discount,
                     bootstrap_value=bootstrap_value,
                     lambda_=self._lambda_gae,
                     name="CriticLoss",
@@ -280,7 +284,7 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 # Compute importance sampling weights: current policy / behavior policy.
-                log_rhos = policy.log_prob(acts) - behaviour_log_probs
+                log_rhos = policy.log_prob(action) - behaviour_log_prob
                 importance_ratio = tf.exp(log_rhos)[:-1]
                 clipped_importance_ratio = tf.clip_by_value(
                     importance_ratio,
@@ -441,10 +445,10 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
 
     def _get_critic_feed(
         self,
-        obs_trans: Dict[str, np.ndarray],
+        observations_trans: Dict[str, np.ndarray],
         agent: str,
     ) -> tf.Tensor:
         # Centralised based
-        obs_feed = tf.stack([x for x in obs_trans.values()], 2)
+        observation_feed = tf.stack([x for x in observations_trans.values()], 2)
 
-        return obs_feed
+        return observation_feed

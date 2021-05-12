@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MAPPO on multi-agent CartPole."""
+"""Example running centralized MAPPO on simple spread debug env."""
 
 import functools
 from datetime import datetime
