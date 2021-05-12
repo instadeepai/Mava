@@ -4,7 +4,7 @@ As with Acme, Mava includes a number of pre-built agents as listed below. All th
 implemented using [Launchpad](https://github.com/deepmind/launchpad), which is used for distributed
 training. This allows for easy scaling of computational resources by changing only one variable.
 
-Below we list the different systems in Mava based on the actions spaces they use.
+Below we list the different systems in Mava based on the actions spaces they use. More systems will be added in future Mava versions.
 
 ### Continuous control
 
@@ -22,11 +22,11 @@ We also include a number of systems built with discrete action-spaces in mind li
 Agent                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
 Deep Q-Networks (DQN)                                    | [Horgan et al., 2018]      | [![TF](../../docs/logos/tf-small.png)][DQN_TF2]
-Differentiable Inter-Agent Learning (DAIL)               | [Foerster et al., 2016]    | [![TF](../../docs/logos/tf-small.png)][DIAL_TF2]
+Differentiable Inter-Agent Learning (DIAL)               | [Foerster et al., 2016]    | [![TF](../../docs/logos/tf-small.png)][DIAL_TF2]
 QMIX                                                     | [Rashid et al., 2018]      | [![TF](../../docs/logos/tf-small.png)][QMIX_TF2]
 
 ### Mixed
-We also have a system that works with either a discrete or continuous action-spaces:
+We also have a system that works with either discrete or continuous action-spaces:
 
 Agent                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
