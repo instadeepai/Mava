@@ -262,6 +262,7 @@ class DIALBuilder(SystemBuilder):
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         communication_module: BaseCommunicationModule,
+        checkpoint: bool = True,
         huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
@@ -305,7 +306,7 @@ class DIALBuilder(SystemBuilder):
             clipping=clipping,
             counter=counter,
             logger=logger,
-            checkpoint=self._config.checkpoint,
+            checkpoint=checkpoint,
             max_gradient_norm=max_gradient_norm,
             communication_module=communication_module,
         )
