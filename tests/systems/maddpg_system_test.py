@@ -31,6 +31,7 @@ from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
+from mava.utils.loggers import Logger
 
 
 def make_networks(
@@ -132,6 +133,36 @@ class TestMADDPG:
 
         # system
         checkpoint_dir = f"{base_dir}/{mava_id}"
+
+        log_every = 10
+        trainer_logger = Logger(
+            label="system_trainer",
+            directory=base_dir,
+            to_terminal=True,
+            to_tensorboard=True,
+            time_stamp=mava_id,
+            time_delta=log_every,
+        )
+
+        exec_logger = Logger(
+            # _{executor_id} gets appended to label in system.
+            label="train_loop_executor",
+            directory=base_dir,
+            to_terminal=True,
+            to_tensorboard=True,
+            time_stamp=mava_id,
+            time_delta=log_every,
+        )
+
+        eval_logger = Logger(
+            label="eval_loop",
+            directory=base_dir,
+            to_terminal=True,
+            to_tensorboard=True,
+            time_stamp=mava_id,
+            time_delta=log_every,
+        )
+
         system = maddpg.MADDPG(
             environment_factory=environment_factory,
             network_factory=network_factory,
@@ -144,6 +175,9 @@ class TestMADDPG:
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             checkpoint=False,
             checkpoint_subpath=checkpoint_dir,
+            trainer_logger=trainer_logger,
+            exec_logger=exec_logger,
+            eval_logger=eval_logger,
         )
         program = system.build()
 

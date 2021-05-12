@@ -15,6 +15,7 @@
 
 """Defines the MADQN system class."""
 
+import copy
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 import acme
@@ -34,7 +35,7 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
 from mava.utils import lp_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers.base import MavaLogger
 from mava.wrappers import DetailedPerAgentStatistics
 
 
@@ -69,6 +70,9 @@ class MADQN:
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        trainer_logger: MavaLogger = None,
+        exec_logger: MavaLogger = None,
+        eval_logger: MavaLogger = None,
     ):
 
         if not environment_spec:
@@ -88,6 +92,9 @@ class MADQN:
         self._log_every = log_every
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
+        self._trainer_logger = trainer_logger
+        self._exec_logger = exec_logger
+        self._eval_logger = eval_logger
 
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
@@ -149,24 +156,11 @@ class MADQN:
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
 
-        trainer_logger: Optional[Logger] = None
-        if self._log_info:
-            # get log info
-            log_dir, log_time_stamp = self._log_info
-            trainer_logger = Logger(
-                label="system_trainer",
-                directory=log_dir,
-                to_terminal=True,
-                to_tensorboard=True,
-                time_stamp=log_time_stamp,
-                time_delta=self._log_every,
-            )
-
         return self._builder.make_trainer(
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=trainer_logger,
+            logger=self._trainer_logger,
         )
 
     def executor(
@@ -204,22 +198,15 @@ class MADQN:
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
 
-        train_logger: Optional[Logger] = None
-        if self._log_info:
-            # get log info
-            log_dir, log_time_stamp = self._log_info
-            train_logger = Logger(
-                label=f"train_loop_executor_{executor_id}",
-                directory=log_dir,
-                to_terminal=True,
-                to_tensorboard=True,
-                time_stamp=log_time_stamp,
-                time_delta=self._log_every,
-            )
+        # Update label to include exec id
+        exec_logger = None
+        if self._exec_logger:
+            exec_logger = copy.deepcopy(self._exec_logger)
+            exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
 
         # Create the loop to connect environment and executor.
         train_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=train_logger
+            environment, executor, counter=counter, logger=exec_logger
         )
 
         train_loop = DetailedPerAgentStatistics(train_loop)
@@ -258,23 +245,10 @@ class MADQN:
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
 
-        eval_logger: Optional[Logger] = None
-        if self._log_info:
-            # get log info
-            log_dir, log_time_stamp = self._log_info
-            eval_logger = Logger(
-                label="eval_loop",
-                directory=log_dir,
-                to_terminal=True,
-                to_tensorboard=True,
-                time_stamp=log_time_stamp,
-                time_delta=self._log_every,
-            )
-
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
         eval_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=eval_logger
+            environment, executor, counter=counter, logger=self._eval_logger
         )
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)

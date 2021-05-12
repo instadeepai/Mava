@@ -15,26 +15,36 @@
 
 """helper functions for logging"""
 
+import abc
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 from acme.utils import loggers, paths
+from acme.utils.loggers import base
 
 from mava.utils.loggers.tf_logger import TFSummaryLogger
 
 
-class Logger:
+class MavaLogger(abc.ABC):
+    @abc.abstractmethod
+    def write(self, data: Any) -> None:
+        """Function that writes logged data."""
+
+
+class Logger(MavaLogger):
     def __init__(
         self,
         label: str,
-        directory: Path,
+        directory: Union[Path, str],
         to_terminal: bool = True,
         to_csv: bool = False,
         to_tensorboard: bool = False,
         time_delta: float = 1.0,
         print_fn: Callable[[str], None] = print,
         time_stamp: Optional[str] = None,
+        external_logger: Optional[base.Logger] = None,
+        **external_logger_kwargs: Any,
     ):
         self._label = label
 
@@ -44,7 +54,13 @@ class Logger:
         self._directory = directory
         self._time_stamp = time_stamp if time_stamp else str(datetime.now())
         self._logger = self.make_logger(
-            to_terminal, to_csv, to_tensorboard, time_delta, print_fn
+            to_terminal,
+            to_csv,
+            to_tensorboard,
+            time_delta,
+            print_fn,
+            external_logger=external_logger,
+            external_logger_kwargs=external_logger_kwargs,
         )
         self._logger_info = (
             to_terminal,
@@ -62,6 +78,8 @@ class Logger:
         to_tensorboard: bool,
         time_delta: float,
         print_fn: Callable[[str], None],
+        external_logger: Optional[base.Logger],
+        **external_logger_kwargs: Any,
     ) -> loggers.Logger:
         """Build a Mava logger.
 
@@ -75,7 +93,7 @@ class Logger:
             to_neptune: whether to use neptune.
             time_delta: minimum elapsed time (in seconds) between logging events.
             print_fn: function to call which acts like print.
-
+            external_logger: optional external logger.
         Returns:
             A logger (pipe) object that responds to logger.write(some_dict).
         """
@@ -95,6 +113,14 @@ class Logger:
             logger += [
                 TFSummaryLogger(logdir=self._path("tensorboard"), label=self._label)
             ]  # type: ignore
+
+        if external_logger:
+            logger += [
+                external_logger(
+                    label=self._label,
+                    **external_logger_kwargs,
+                )
+            ]
 
         if logger:
             logger = loggers.Dispatcher(logger)
