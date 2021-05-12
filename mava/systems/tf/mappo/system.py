@@ -73,7 +73,6 @@ class MAPPO:
         batch_size: int = 16,
         sequence_length: int = 10,
         sequence_period: int = 5,
-        log_every: float = 10.0,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -120,7 +119,6 @@ class MAPPO:
         self._num_exectors = num_executors
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
-        self._log_every = log_every
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
         self._trainer_logger = trainer_logger

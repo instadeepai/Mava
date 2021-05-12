@@ -66,7 +66,6 @@ class MADQN:
         policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
-        log_every: float = 10.0,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -89,7 +88,6 @@ class MADQN:
         self._num_exectors = num_executors
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
-        self._log_every = log_every
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
         self._trainer_logger = trainer_logger

@@ -116,7 +116,8 @@ class TestMADDPG:
         debugging environment without crashing."""
 
         # set loggers info
-        # TODO Allow none log_info and checkpoint to be passed.
+        # TODO Allow for no checkpointing and no loggers to be
+        # passed in.
         mava_id = "tests/maddpg"
         base_dir = "~/mava"
         log_info = (base_dir, f"{mava_id}/logs")
