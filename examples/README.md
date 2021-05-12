@@ -1,11 +1,10 @@
 # Examples
-This directory includes working examples of Mava systems. These
-examples
+This directory includes working examples of Mava systems.
 
 ## Environments
 
 In Mava we use a variety of different environments which include the
-PettingZoo environment set [petting_zoo] as well as a few custom [environments](utils/debugging) inside Mava .
+[petting_zoo] environment set as well as a few custom [environments](utils/debugging) inside Mava.
 
 ## Continuous control
 We include a number of systems running on continuous control tasks.
