@@ -60,7 +60,7 @@ class BaseMAD4PGTrainer(mava.Trainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
-        checkpoint_subpath: str = "Checkpoints",
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -455,6 +455,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -498,6 +499,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
 
@@ -527,6 +529,7 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -570,6 +573,7 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(
@@ -631,6 +635,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -674,6 +679,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(
