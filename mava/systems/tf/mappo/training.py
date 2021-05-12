@@ -53,7 +53,6 @@ class MAPPOTrainer(mava.Trainer):
         entropy_cost: float = 0.0,
         baseline_cost: float = 1.0,
         clipping_epsilon: float = 0.2,
-        max_abs_reward: Optional[float] = None,
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -137,13 +136,10 @@ class MAPPOTrainer(mava.Trainer):
         # Dataset iterator
         self._iterator = dataset
 
-        # Set up reward/gradient clipping.
-        if max_abs_reward is None:
-            max_abs_reward = np.inf
+        # Set up gradient clipping.
         if max_gradient_norm is None:
             max_gradient_norm = 1e10  # A very large number. Infinity results in NaNs.
 
-        self._max_abs_reward = tf.convert_to_tensor(max_abs_reward)
         self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
 
         # General learner book-keeping and loggers.
@@ -259,13 +255,6 @@ class MAPPOTrainer(mava.Trainer):
                 # Values along the sequence T.
                 bootstrap_value = values[-1]
                 state_values = values[:-1]
-
-                # Optionally clip rewards.
-                reward = tf.clip_by_value(
-                    reward,
-                    tf.cast(-self._max_abs_reward, reward.dtype),
-                    tf.cast(self._max_abs_reward, reward.dtype),
-                )
 
                 # Generalized Return Estimation
                 td_loss, td_lambda_extra = trfl.td_lambda(
@@ -412,7 +401,6 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         entropy_cost: float = 0.0,
         baseline_cost: float = 1.0,
         clipping_epsilon: float = 0.2,
-        max_abs_reward: Optional[float] = None,
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -435,7 +423,6 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             entropy_cost=entropy_cost,
             baseline_cost=baseline_cost,
             clipping_epsilon=clipping_epsilon,
-            max_abs_reward=max_abs_reward,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
