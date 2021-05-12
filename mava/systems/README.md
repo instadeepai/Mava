@@ -4,7 +4,7 @@ As with Acme, Mava includes a number of pre-built agents as listed below. All th
 implemented using [Launchpad](https://github.com/deepmind/launchpad), which is used for distributed
 training. This allows for easy scaling of computational resources by changing only one variable.
 
-Below we list the different systems in Mava based on the actions spaces they use. More systems will be added in future Mava versions.
+Below we list the different systems in Mava based on the actions spaces they use. More systems will be added in future Mava updates.
 
 ### Continuous control
 
