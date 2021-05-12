@@ -98,8 +98,6 @@ class Logger(MavaLogger):
             to_terminal: to print the logs in the terminal.
             to_csv: to save the logs in a csv file.
             to_tensorboard: to write the logs tf-events.
-            to_wandb: whether to use wandb.
-            to_neptune: whether to use neptune.
             time_delta: minimum elapsed time (in seconds) between logging events.
             print_fn: function to call which acts like print.
             external_logger: optional external logger.
