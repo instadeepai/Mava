@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
+import copy
 from typing import Any, Callable, Dict, Tuple, Type
 
 import acme
@@ -22,7 +23,6 @@ import launchpad as lp
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
-from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
@@ -32,15 +32,16 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
+from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.mad4pg import builder, training
 from mava.utils import lp_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import MavaLogger
 from mava.wrappers import DetailedPerAgentStatistics
 
 
 class MAD4PG:
     """MAD4PG system.
-    This implements a multi-process MA-D4PG system. This is an actor-critic based
+    This implements a single-process D4PG system. This is an actor-critic based
     system that generates data via a behavior policy, inserts N-step transitions into
     a replay buffer, and periodically updates the policies of each agent
     (and as a result the behavior) by sampling uniformly from this buffer.
@@ -50,7 +51,6 @@ class MAD4PG:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
-        log_info: Tuple,
         architecture: Type[
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
@@ -58,6 +58,7 @@ class MAD4PG:
             training.BaseMAD4PGTrainer
         ] = training.DecentralisedMAD4PGTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        log_info: Tuple = None,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -70,15 +71,19 @@ class MAD4PG:
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
         samples_per_insert: float = 32.0,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
+        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
         sigma: float = 0.3,
         clipping: bool = True,
-        log_every: float = 10.0,
         max_executor_steps: int = None,
+        checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
+        trainer_logger: MavaLogger = None,
+        exec_logger: MavaLogger = None,
+        eval_logger: MavaLogger = None,
     ):
         """Initialize the system.
         Args:
@@ -107,7 +112,13 @@ class MAD4PG:
             logger: logger object to be used by trainers.
             counter: counter object used to keep track of steps.
             checkpoint: boolean indicating whether to checkpoint the trainers.
-            replay_table_name: string indicating what name to give the replay table."""
+            checkpoint_subpath: directory for checkpoints.
+            replay_table_name: string indicating what name to give the replay table.
+            trainer_logger: logger for trainer class.
+            exec_logger: logger for executor.
+            eval_logger: logger for evaluator.
+
+        """
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
@@ -123,7 +134,11 @@ class MAD4PG:
         self._num_exectors = num_executors
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
-        self._log_every = log_every
+        self._checkpoint_subpath = checkpoint_subpath
+        self._checkpoint = checkpoint
+        self._trainer_logger = trainer_logger
+        self._exec_logger = exec_logger
+        self._eval_logger = eval_logger
 
         if executor_fn == executors.RecurrentExecutor:
             extra_specs = self._get_extra_specs()
@@ -147,6 +162,10 @@ class MAD4PG:
                 period=period,
                 sigma=sigma,
                 clipping=clipping,
+                checkpoint=checkpoint,
+                policy_optimizer=policy_optimizer,
+                critic_optimizer=critic_optimizer,
+                checkpoint_subpath=checkpoint_subpath,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -175,7 +194,10 @@ class MAD4PG:
 
     def counter(self) -> Any:
         return tf2_savers.CheckpointingRunner(
-            counting.Counter(), time_delta_minutes=1, subdirectory="counter"
+            counting.Counter(),
+            time_delta_minutes=15,
+            directory=self._checkpoint_subpath,
+            subdirectory="counter",
         )
 
     def coordinator(self, counter: counting.Counter) -> Any:
@@ -187,9 +209,6 @@ class MAD4PG:
         counter: counting.Counter,
     ) -> mava.core.Trainer:
         """The Trainer part of the system."""
-
-        # get log info
-        log_dir, log_time_stamp = self._log_info
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
@@ -207,19 +226,12 @@ class MAD4PG:
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
-        trainer_logger = Logger(
-            label="system_trainer",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-        )
 
         return self._builder.make_trainer(
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=trainer_logger,
+            logger=self._trainer_logger,
         )
 
     def executor(
@@ -231,26 +243,29 @@ class MAD4PG:
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
 
-        # get log info
-        log_dir, log_time_stamp = self._log_info
-
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system = self._architecture(
             environment_spec=self._environment_spec,
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        # create variables
+        _ = system.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the executor.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
         )
@@ -261,17 +276,16 @@ class MAD4PG:
 
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
-        train_logger = Logger(
-            label=f"train_loop_executor_{executor_id}",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-        )
+
+        # Update label to include exec id
+        exec_logger = None
+        if self._exec_logger:
+            exec_logger = copy.deepcopy(self._exec_logger)
+            exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
 
         # Create the loop to connect environment and executor.
         train_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=train_logger
+            environment, executor, counter=counter, logger=exec_logger
         )
 
         train_loop = DetailedPerAgentStatistics(train_loop)
@@ -286,26 +300,29 @@ class MAD4PG:
     ) -> Any:
         """The evaluation process."""
 
-        # get log info
-        log_dir, log_time_stamp = self._log_info
-
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system = self._architecture(
             environment_spec=self._environment_spec,
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        # create variables
+        _ = system.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the agent.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
         )
 
@@ -314,18 +331,11 @@ class MAD4PG:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
-        eval_logger = Logger(
-            label="eval_loop",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-        )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
         eval_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=eval_logger
+            environment, executor, counter=counter, logger=self._eval_logger
         )
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)
