@@ -67,10 +67,9 @@ class MAPPO:
         clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
-        max_abs_reward: Optional[float] = None,
         max_gradient_norm: Optional[float] = None,
         max_queue_size: int = 100000,
-        batch_size: int = 16,
+        batch_size: int = 256,
         sequence_length: int = 10,
         sequence_period: int = 5,
         max_executor_steps: int = None,
@@ -135,7 +134,6 @@ class MAPPO:
                 clipping_epsilon=clipping_epsilon,
                 entropy_cost=entropy_cost,
                 baseline_cost=baseline_cost,
-                max_abs_reward=max_abs_reward,
                 max_gradient_norm=max_gradient_norm,
                 max_queue_size=max_queue_size,
                 batch_size=batch_size,
@@ -146,6 +144,8 @@ class MAPPO:
                 critic_optimizer=critic_optimizer,
                 checkpoint_subpath=checkpoint_subpath,
             ),
+            trainer_fn=trainer_fn,
+            executor_fn=executor_fn,
         )
 
     def replay(self) -> Any:

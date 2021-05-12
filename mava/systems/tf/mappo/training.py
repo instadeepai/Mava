@@ -55,7 +55,6 @@ class MAPPOTrainer(mava.Trainer):
         entropy_cost: float = 0.0,
         baseline_cost: float = 1.0,
         clipping_epsilon: float = 0.2,
-        max_abs_reward: Optional[float] = None,
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -138,13 +137,10 @@ class MAPPOTrainer(mava.Trainer):
         # Dataset iterator
         self._iterator = dataset
 
-        # Set up reward/gradient clipping.
-        if max_abs_reward is None:
-            max_abs_reward = np.inf
+        # Set up gradient clipping.
         if max_gradient_norm is None:
             max_gradient_norm = 1e10  # A very large number. Infinity results in NaNs.
 
-        self._max_abs_reward = tf.convert_to_tensor(max_abs_reward)
         self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
 
         # General learner book-keeping and loggers.
@@ -178,16 +174,27 @@ class MAPPOTrainer(mava.Trainer):
         # fill the replay buffer.
         self._timestamp = None
 
+    def _get_critic_feed(
+        self,
+        observations_trans: Dict[str, np.ndarray],
+        agent: str,
+    ) -> tf.Tensor:
+
+        # Decentralised based
+        observation_feed = observations_trans[agent]
+
+        return observation_feed
+
     def _transform_observations(
-        self, obs: Dict[str, np.ndarray]
+        self, observation: Dict[str, np.ndarray]
     ) -> Dict[str, np.ndarray]:
-        trans_obs = {}
+        observation_trans = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            trans_obs[agent] = self._observation_networks[agent_key](
-                obs[agent].observation
+            observation_trans[agent] = self._observation_networks[agent_key](
+                observation[agent].observation
             )
-        return trans_obs
+        return observation_trans
 
     # @tf.function
     def _step(
@@ -212,7 +219,7 @@ class MAPPOTrainer(mava.Trainer):
         data = tf2_utils.batch_to_sequence(inputs.data)
 
         # Unpack input data as follows:
-        all_obs, all_acts, all_rews, all_discs, extras = (
+        observations, actions, rewards, discounts, extras = (
             data.observations,
             data.actions,
             data.rewards,
@@ -221,10 +228,10 @@ class MAPPOTrainer(mava.Trainer):
         )
 
         # transform observation using observation networks
-        all_obs = self._transform_observations(all_obs)
+        observations_trans = self._transform_observations(observations)
 
         # Get log_probs.
-        all_log_probs = extras["log_probs"]
+        log_probs = extras["log_probs"]
 
         # Store losses.
         policy_losses: Dict[str, Any] = {}
@@ -233,17 +240,19 @@ class MAPPOTrainer(mava.Trainer):
         with tf.GradientTape(persistent=True) as tape:
             for agent in self._agents:
 
-                obs, acts, rews, discs, behaviour_log_probs = (
-                    all_obs[agent],
-                    all_acts[agent],
-                    all_rews[agent],
-                    all_discs[agent],
-                    all_log_probs[agent],
+                action, reward, discount, behaviour_log_prob = (
+                    actions[agent],
+                    rewards[agent],
+                    discounts[agent],
+                    log_probs[agent],
                 )
 
+                actor_observation = observations_trans[agent]
+                critic_observation = self._get_critic_feed(observations_trans, agent)
+
                 # Chop off final timestep for bootstrapping value
-                rews = rews[:-1]
-                discs = discs[:-1]
+                reward = reward[:-1]
+                discount = discount[:-1]
 
                 # Get agent network
                 network_key = agent.split("_")[0] if self._shared_weights else agent
@@ -251,10 +260,15 @@ class MAPPOTrainer(mava.Trainer):
                 critic_network = self._critic_networks[network_key]
 
                 # Reshape inputs.
-                dims = obs.shape[:2]
-                obs = snt.merge_leading_dims(obs, num_dims=2)
-                policy = policy_network(obs)
-                values = critic_network(obs)
+                dims = actor_observation.shape[:2]
+                actor_observation = snt.merge_leading_dims(
+                    actor_observation, num_dims=2
+                )
+                critic_observation = snt.merge_leading_dims(
+                    critic_observation, num_dims=2
+                )
+                policy = policy_network(actor_observation)
+                values = critic_network(critic_observation)
 
                 # Reshape the outputs.
                 policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
@@ -264,18 +278,11 @@ class MAPPOTrainer(mava.Trainer):
                 bootstrap_value = values[-1]
                 state_values = values[:-1]
 
-                # Optionally clip rewards.
-                rews = tf.clip_by_value(
-                    rews,
-                    tf.cast(-self._max_abs_reward, rews.dtype),
-                    tf.cast(self._max_abs_reward, rews.dtype),
-                )
-
                 # Generalized Return Estimation
                 td_loss, td_lambda_extra = trfl.td_lambda(
                     state_values=state_values,
-                    rewards=rews,
-                    pcontinues=discs,
+                    rewards=reward,
+                    pcontinues=discount,
                     bootstrap_value=bootstrap_value,
                     lambda_=self._lambda_gae,
                     name="CriticLoss",
@@ -288,7 +295,7 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 # Compute importance sampling weights: current policy / behavior policy.
-                log_rhos = policy.log_prob(acts) - behaviour_log_probs
+                log_rhos = policy.log_prob(action) - behaviour_log_prob
                 importance_ratio = tf.exp(log_rhos)[:-1]
                 clipped_importance_ratio = tf.clip_by_value(
                     importance_ratio,
@@ -396,3 +403,60 @@ class MAPPOTrainer(mava.Trainer):
                     self._system_network_variables[network_type][agent]
                 )
         return variables
+
+
+class CentralisedMAPPOTrainer(MAPPOTrainer):
+    def __init__(
+        self,
+        agents: List[Any],
+        agent_types: List[str],
+        observation_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        dataset: tf.data.Dataset,
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
+        shared_weights: bool,
+        discount: float = 0.99,
+        lambda_gae: float = 1.0,
+        entropy_cost: float = 0.0,
+        baseline_cost: float = 1.0,
+        clipping_epsilon: float = 0.2,
+        max_gradient_norm: Optional[float] = None,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = False,
+        checkpoint_subpath: str = "Checkpoints",
+    ):
+
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            observation_networks=observation_networks,
+            dataset=dataset,
+            shared_weights=shared_weights,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            discount=discount,
+            lambda_gae=lambda_gae,
+            entropy_cost=entropy_cost,
+            baseline_cost=baseline_cost,
+            clipping_epsilon=clipping_epsilon,
+            max_gradient_norm=max_gradient_norm,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+        )
+
+    def _get_critic_feed(
+        self,
+        observations_trans: Dict[str, np.ndarray],
+        agent: str,
+    ) -> tf.Tensor:
+        # Centralised based
+        observation_feed = tf.stack([x for x in observations_trans.values()], 2)
+
+        return observation_feed
