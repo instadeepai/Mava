@@ -94,6 +94,7 @@ class Logger(MavaLogger):
             time_delta: minimum elapsed time (in seconds) between logging events.
             print_fn: function to call which acts like print.
             external_logger: optional external logger.
+            external_logger_kwargs: optional external logger params.
         Returns:
             A logger (pipe) object that responds to logger.write(some_dict).
         """
