@@ -59,6 +59,8 @@ class MAD4PGConfig:
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
+    policy_optimizer: snt.Optimizer
+    critic_optimizer: snt.Optimizer
     shared_weights: bool = True
     discount: float = 0.99
     batch_size: int = 256
@@ -76,6 +78,7 @@ class MAD4PGConfig:
     logger: loggers.Logger = None
     counter: counting.Counter = None
     checkpoint: bool = True
+    checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
@@ -257,7 +260,6 @@ class MAD4PGBuilder(SystemBuilder):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -269,7 +271,6 @@ class MAD4PGBuilder(SystemBuilder):
           counter: a Counter which allows for recording of counts (trainer steps,
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the trainer checkpoints itself.
         """
         agents = self._agents
         agent_types = self._agent_types
@@ -277,10 +278,6 @@ class MAD4PGBuilder(SystemBuilder):
         clipping = self._config.clipping
         discount = self._config.discount
         target_update_period = self._config.target_update_period
-
-        # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-        critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
@@ -293,15 +290,16 @@ class MAD4PGBuilder(SystemBuilder):
             target_critic_networks=networks["target_critics"],
             target_observation_networks=networks["target_observations"],
             shared_weights=shared_weights,
-            policy_optimizer=policy_optimizer,
-            critic_optimizer=critic_optimizer,
+            policy_optimizer=self._config.policy_optimizer,
+            critic_optimizer=self._config.critic_optimizer,
             clipping=clipping,
             discount=discount,
             target_update_period=target_update_period,
             dataset=dataset,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
+            checkpoint=self._config.checkpoint,
+            checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.
