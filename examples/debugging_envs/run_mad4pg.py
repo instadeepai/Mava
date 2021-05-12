@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADDPG on pettinzoo MPE environments."""
+"""Example running MAD4PG on debug MPE environments."""
 
 from datetime import datetime
 from pathlib import Path
