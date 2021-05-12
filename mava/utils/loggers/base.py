@@ -28,6 +28,15 @@ from mava.utils.loggers.tf_logger import TFSummaryLogger
 
 class MavaLogger(abc.ABC):
     @abc.abstractmethod
+    def __init__(
+        self,
+        label: str,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        """Init function that takes in a label and possibly other variables."""
+
+    @abc.abstractmethod
     def write(self, data: Any) -> None:
         """Function that writes logged data."""
 
