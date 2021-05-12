@@ -35,7 +35,7 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
 from mava.utils import lp_utils
-from mava.utils.loggers.base import MavaLogger
+from mava.utils.loggers import MavaLogger
 from mava.wrappers import DetailedPerAgentStatistics
 
 

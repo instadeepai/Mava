@@ -35,7 +35,7 @@ from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.maddpg import builder, training
 from mava.utils import lp_utils
-from mava.utils.loggers.base import MavaLogger
+from mava.utils.loggers import MavaLogger
 from mava.wrappers import DetailedPerAgentStatistics
 
 
