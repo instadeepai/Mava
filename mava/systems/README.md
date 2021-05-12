@@ -30,7 +30,7 @@ We also have a system that works with either discrete or continuous action-space
 
 Agent                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Proximal Policy Optimization (MA-PPO)        | [Schulman et al., 2017]      | [![TF](../../docs/logos/tf-small.png)][MAPPO_TF2]
+Multi-Agent Proximal Policy Optimization (MA-PPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![TF](../../docs/logos/tf-small.png)][MAPPO_TF2]
 
 <!-- TF agents -->
 
@@ -51,4 +51,5 @@ Multi-Agent Proximal Policy Optimization (MA-PPO)        | [Schulman et al., 201
 [Horgan et al., 2018]: https://arxiv.org/abs/1803.00933
 [Foerster et al., 2016]: https://arxiv.org/abs/1605.06676
 
-[Schulman et al., 2017]: https://arxiv.org/abs/1707.06347
+[Yu et al., 2021]: https://arxiv.org/abs/2103.01955
+[Schroeder et al., 2020]: https://arxiv.org/abs/2011.09533
