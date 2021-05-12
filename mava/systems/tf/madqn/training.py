@@ -20,11 +20,12 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import trfl
-from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.systems.tf import savers as tf2_savers
+from mava.utils import training_utils as train_utils
 
 
 class MADQNTrainer(mava.Trainer):
@@ -48,12 +49,14 @@ class MADQNTrainer(mava.Trainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
 
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
-        self._optimizer = optimizer or snt.optimizers.Adam(1e-4)
+        self._optimizer = optimizer
+        self._checkpoint = checkpoint
 
         # Store online and target networks.
         self._q_networks = q_networks
@@ -96,21 +99,23 @@ class MADQNTrainer(mava.Trainer):
 
         # Checkpointer
         self._system_checkpointer = {}
-        for agent_key in self.unique_net_keys:
+        if checkpoint:
+            for agent_key in self.unique_net_keys:
 
-            checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=5,
-                objects_to_save={
-                    "counter": self._counter,
-                    "q_network": self._q_networks[agent_key],
-                    "target_q_network": self._target_q_networks[agent_key],
-                    "optimizer": self._optimizer,
-                    "num_steps": self._num_steps,
-                },
-                enable_checkpointing=checkpoint,
-            )
+                checkpointer = tf2_savers.Checkpointer(
+                    directory=checkpoint_subpath,
+                    time_delta_minutes=15,
+                    objects_to_save={
+                        "counter": self._counter,
+                        "q_network": self._q_networks[agent_key],
+                        "target_q_network": self._target_q_networks[agent_key],
+                        "optimizer": self._optimizer,
+                        "num_steps": self._num_steps,
+                    },
+                    enable_checkpointing=checkpoint,
+                )
 
-            self._system_checkpointer[agent_key] = checkpointer
+                self._system_checkpointer[agent_key] = checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -208,7 +213,7 @@ class MADQNTrainer(mava.Trainer):
                 gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
 
             # Apply gradients.
-            self._optimizer.apply(gradients, q_network_variables)
+            self._optimizer.apply(gradients, q_network_variables)  # type: ignore
 
             logged_losses[agent] = {"loss": loss}
 
@@ -231,10 +236,11 @@ class MADQNTrainer(mava.Trainer):
         fetches.update(counts)
 
         # Checkpoint and attempt to write the logs.
+        if self._checkpoint:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
-        # NOTE (Arnu): ignoring checkpointing and logging for now
-        # self._checkpointer.save()
-        self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}

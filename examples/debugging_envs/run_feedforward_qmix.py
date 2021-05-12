@@ -14,6 +14,8 @@
 # limitations under the License.
 
 """Example running Qmix on pettinzoo MPE environments."""
+from datetime import datetime
+
 # import importlib
 from typing import Any, Dict, Mapping, Sequence, Union
 
@@ -43,6 +45,14 @@ flags.DEFINE_integer(
     100,
     "Number of training episodes to run between evaluation " "episodes.",
 )
+
+flags.DEFINE_string(
+    "mava_id",
+    str(datetime.now()),
+    "Experiment identifier that can be used to continue experiments.",
+)
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
+
 
 # NOTE (St John) Will remove later. Currently debugging on two-step env.
 # def make_environment(
@@ -127,6 +137,10 @@ def main(_: Any) -> None:
     system_networks = make_networks(environment_spec, epsilon)
 
     # TODO Create loggers
+    # log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
+
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    # checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Construct the agent
     system = qmix.QMIX(

@@ -28,11 +28,11 @@ import tensorflow as tf
 import tree
 import trfl
 from acme.tf import losses
-from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
 
@@ -62,7 +62,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
-        checkpoint_subpath: str = "Checkpoints",
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -90,6 +90,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
+        self._checkpoint = checkpoint
 
         # Store online and target networks.
         self._policy_networks = policy_networks
@@ -170,13 +171,12 @@ class BaseMADDPGTrainer(mava.Trainer):
                     "num_steps": self._num_steps,
                 }
 
-                checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
+                subdir = os.path.join("trainer", agent_key)
                 checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=1,
-                    add_uid=False,
-                    directory=checkpointer_dir,
+                    time_delta_minutes=15,
+                    directory=checkpoint_subpath,
                     objects_to_save=objects_to_save,
-                    enable_checkpointing=True,
+                    subdirectory=subdir,
                 )
                 self._system_checkpointer[agent_key] = checkpointer
         # Do not record timestamps until after the first learning step is done.
@@ -419,9 +419,12 @@ class BaseMADDPGTrainer(mava.Trainer):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        train_utils.checkpoint_networks(self._system_checkpointer)
+        # Checkpoint and attempt to write the logs.
+        if self._checkpoint:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
-        self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
@@ -451,15 +454,16 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
         discount: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        observation_networks: Dict[str, snt.Module],
-        target_observation_networks: Dict[str, snt.Module],
         policy_optimizer: snt.Optimizer,
         critic_optimizer: snt.Optimizer,
+        observation_networks: Dict[str, snt.Module],
+        target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -503,6 +507,7 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
 
@@ -525,13 +530,14 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
+        policy_optimizer: snt.Optimizer = None,
+        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -575,6 +581,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(
@@ -629,13 +636,14 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
+        policy_optimizer: snt.Optimizer = None,
+        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -679,6 +687,7 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(
@@ -731,16 +740,16 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         discount: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        observation_networks: Dict[str, snt.Module],
-        target_observation_networks: Dict[str, snt.Module],
         policy_optimizer: snt.Optimizer,
         critic_optimizer: snt.Optimizer,
+        observation_networks: Dict[str, snt.Module],
+        target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
-        checkpoint_subpath: str = "Checkpoints",
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -768,6 +777,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
+        self._checkpoint = checkpoint
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
@@ -841,14 +851,12 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                     "critic_optimizer": self._critic_optimizer,
                     "num_steps": self._num_steps,
                 }
-
-                checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
+                subdir = os.path.join("trainer", agent_key)
                 checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=1,
-                    add_uid=False,
-                    directory=checkpointer_dir,
+                    time_delta_minutes=15,
+                    directory=checkpoint_subpath,
                     objects_to_save=objects_to_save,
-                    enable_checkpointing=True,
+                    subdirectory=subdir,
                 )
                 self._system_checkpointer[agent_key] = checkpointer
 
@@ -1183,10 +1191,11 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         fetches.update(counts)
 
         # Checkpoint the networks.
-        if len(self._system_checkpointer.keys()) > 0:
-            for agent_key in self.unique_net_keys:
-                checkpointer = self._system_checkpointer[agent_key]
-                checkpointer.save()
+        if self._checkpoint:
+            if len(self._system_checkpointer.keys()) > 0:
+                for agent_key in self.unique_net_keys:
+                    checkpointer = self._system_checkpointer[agent_key]
+                    checkpointer.save()
 
         self._logger.write(fetches)
 
@@ -1227,6 +1236,7 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -1270,6 +1280,7 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
 
@@ -1292,13 +1303,14 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
+        policy_optimizer: snt.Optimizer = None,
+        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -1341,6 +1353,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(
@@ -1397,13 +1410,14 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
+        policy_optimizer: snt.Optimizer = None,
+        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -1446,6 +1460,7 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(

@@ -17,7 +17,6 @@
 
 import functools
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import launchpad as lp
@@ -27,11 +26,13 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
+from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
 
@@ -46,6 +47,12 @@ flags.DEFINE_string(
     "multiwalker_v6",
     "Pettingzoo environment name, e.g. pong (str).",
 )
+flags.DEFINE_string(
+    "mava_id",
+    str(datetime.now()),
+    "Experiment identifier that can be used to continue experiments.",
+)
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 def make_networks(
@@ -126,11 +133,7 @@ def make_networks(
 def main(_: Any) -> None:
 
     # set loggers info
-    base_dir = Path.cwd()
-    log_dir = base_dir / "logs"
-    log_time_stamp = str(datetime.now())
-
-    log_info = (log_dir, log_time_stamp)
+    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
     environment_factory = functools.partial(
         pettingzoo_utils.make_environment,
@@ -141,6 +144,37 @@ def main(_: Any) -> None:
 
     network_factory = lp_utils.partial_kwargs(make_networks)
 
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    log_every = 10
+    trainer_logger = Logger(
+        label="system_trainer",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    exec_logger = Logger(
+        # _{executor_id} gets appended to label in system.
+        label="train_loop_executor",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    eval_logger = Logger(
+        label="eval_loop",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
@@ -148,10 +182,26 @@ def main(_: Any) -> None:
         log_info=log_info,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        checkpoint_subpath=checkpoint_dir,
+        trainer_logger=trainer_logger,
+        exec_logger=exec_logger,
+        eval_logger=eval_logger,
     ).build()
 
+    # Launch gpu config - let trainer use gpu.
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+
     lp.launch(
-        program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="current_terminal"
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
     )
 
 

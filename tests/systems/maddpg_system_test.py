@@ -16,8 +16,6 @@
 """Tests for MADDPG."""
 
 import functools
-from datetime import datetime
-from pathlib import Path
 from typing import Dict, Mapping, Sequence, Union
 
 import launchpad as lp
@@ -33,6 +31,7 @@ from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
+from mava.utils.loggers import Logger
 
 
 def make_networks(
@@ -117,11 +116,11 @@ class TestMADDPG:
         debugging environment without crashing."""
 
         # set loggers info
-        base_dir = Path.cwd()
-        log_dir = base_dir / "logs"
-        log_time_stamp = str(datetime.now())
-
-        log_info = (log_dir, log_time_stamp)
+        # TODO Allow for no checkpointing and no loggers to be
+        # passed in.
+        mava_id = "tests/maddpg"
+        base_dir = "~/mava"
+        log_info = (base_dir, f"{mava_id}/logs")
 
         # environment
         environment_factory = functools.partial(
@@ -134,6 +133,37 @@ class TestMADDPG:
         network_factory = lp_utils.partial_kwargs(make_networks)
 
         # system
+        checkpoint_dir = f"{base_dir}/{mava_id}"
+
+        log_every = 10
+        trainer_logger = Logger(
+            label="system_trainer",
+            directory=base_dir,
+            to_terminal=True,
+            to_tensorboard=True,
+            time_stamp=mava_id,
+            time_delta=log_every,
+        )
+
+        exec_logger = Logger(
+            # _{executor_id} gets appended to label in system.
+            label="train_loop_executor",
+            directory=base_dir,
+            to_terminal=True,
+            to_tensorboard=True,
+            time_stamp=mava_id,
+            time_delta=log_every,
+        )
+
+        eval_logger = Logger(
+            label="eval_loop",
+            directory=base_dir,
+            to_terminal=True,
+            to_tensorboard=True,
+            time_stamp=mava_id,
+            time_delta=log_every,
+        )
+
         system = maddpg.MADDPG(
             environment_factory=environment_factory,
             network_factory=network_factory,
@@ -144,6 +174,11 @@ class TestMADDPG:
             max_replay_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            checkpoint=False,
+            checkpoint_subpath=checkpoint_dir,
+            trainer_logger=trainer_logger,
+            exec_logger=exec_logger,
+            eval_logger=eval_logger,
         )
         program = system.build()
 
