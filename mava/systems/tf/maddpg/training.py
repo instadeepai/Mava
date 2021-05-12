@@ -432,10 +432,12 @@ class BaseMADDPGTrainer(mava.Trainer):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
+        # Checkpoint and attempt to write the logs.
         if self._checkpoint:
             train_utils.checkpoint_networks(self._system_checkpointer)
 
-        self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}

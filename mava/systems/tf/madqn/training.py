@@ -25,6 +25,7 @@ from acme.utils import counting, loggers
 
 import mava
 from mava.systems.tf import savers as tf2_savers
+from mava.utils import training_utils as train_utils
 
 
 class MADQNTrainer(mava.Trainer):
@@ -54,7 +55,8 @@ class MADQNTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
-        self._optimizer = optimizer or snt.optimizers.Adam(1e-4)
+        self._optimizer = optimizer
+        self._checkpoint = checkpoint
 
         # Store online and target networks.
         self._q_networks = q_networks
@@ -211,7 +213,7 @@ class MADQNTrainer(mava.Trainer):
                 gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
 
             # Apply gradients.
-            self._optimizer.apply(gradients, q_network_variables)
+            self._optimizer.apply(gradients, q_network_variables)  # type: ignore
 
             logged_losses[agent] = {"loss": loss}
 
@@ -234,11 +236,11 @@ class MADQNTrainer(mava.Trainer):
         fetches.update(counts)
 
         # Checkpoint and attempt to write the logs.
+        if self._checkpoint:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
-        # NOTE (Arnu): ignoring checkpointing and logging for now
-        # if(self._checkpoint):
-        #     self._checkpointer.save()
-        self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}

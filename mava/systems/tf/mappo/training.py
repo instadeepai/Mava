@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """MAPPO trainer implementation."""
+import os
 import time
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -26,6 +27,7 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
 tfd = tfp.distributions
@@ -150,9 +152,28 @@ class MAPPOTrainer(mava.Trainer):
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger("trainer")
-        self._system_checkpointer: Dict[Any, Any] = {}
 
-        # TODO Add checkpointing using `checkpoint` and `checkpoint_subpath`.
+        # Create checkpointer
+        self._system_checkpointer = {}
+        if checkpoint:
+            for agent_key in self.unique_net_keys:
+                objects_to_save = {
+                    "counter": self._counter,
+                    "policy": self._policy_networks[agent_key],
+                    "critic": self._critic_networks[agent_key],
+                    "observation": self._observation_networks[agent_key],
+                    "policy_optimizer": self._policy_optimizer,
+                    "critic_optimizer": self._critic_optimizer,
+                }
+
+                subdir = os.path.join("trainer", agent_key)
+                checkpointer = tf2_savers.Checkpointer(
+                    time_delta_minutes=15,
+                    directory=checkpoint_subpath,
+                    objects_to_save=objects_to_save,
+                    subdirectory=subdir,
+                )
+                self._system_checkpointer[agent_key] = checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -361,14 +382,12 @@ class MAPPOTrainer(mava.Trainer):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        # Checkpoint the networks.
+        # Checkpoint and attempt to write the logs.
         if self._checkpoint:
-            if len(self._system_checkpointer.keys()) > 0:
-                for agent_key in self.unique_net_keys:
-                    checkpointer = self._system_checkpointer[agent_key]
-                    checkpointer.save()
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
-        self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
