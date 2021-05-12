@@ -73,7 +73,6 @@ class MAPPOConfig:
     entropy_cost: float = 0.01
     baseline_cost: float = 0.5
     clipping_epsilon: float = 0.1
-    max_abs_reward: Optional[float] = None
     max_gradient_norm: Optional[float] = None
     checkpoint: bool = True
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
@@ -243,7 +242,7 @@ class MAPPOBuilder(SystemBuilder):
         critic_networks = networks["critics"]
 
         # The learner updates the parameters (and initializes them).
-        trainer = training.MAPPOTrainer(
+        trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
             observation_networks=observation_networks,
@@ -258,7 +257,6 @@ class MAPPOBuilder(SystemBuilder):
             entropy_cost=self._config.entropy_cost,
             baseline_cost=self._config.baseline_cost,
             clipping_epsilon=self._config.clipping_epsilon,
-            max_abs_reward=self._config.max_abs_reward,
             max_gradient_norm=self._config.max_gradient_norm,
             counter=counter,
             logger=logger,
