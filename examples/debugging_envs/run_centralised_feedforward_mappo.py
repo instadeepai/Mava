@@ -32,7 +32,7 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava.specs as mava_specs
-from mava.components.tf.architectures import CentralisedValueActorCritic
+from mava.components.tf.architectures import CentralisedValueCritic
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
@@ -161,7 +161,7 @@ def main(_: Any) -> None:
         log_info=log_info,
         policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
-        architecture=CentralisedValueActorCritic,
+        architecture=CentralisedValueCritic,
         trainer_fn=mappo.CentralisedMAPPOTrainer,
     ).build()
 

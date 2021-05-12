@@ -30,7 +30,7 @@ from absl import app, flags
 from acme.tf import utils as tf2_utils
 
 import mava.specs as mava_specs
-from mava.components.tf.architectures import CentralisedValueActorCritic
+from mava.components.tf.architectures import CentralisedValueCritic
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
@@ -159,7 +159,7 @@ def main(_: Any) -> None:
     program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        architecture=CentralisedValueActorCritic,
+        architecture=CentralisedValueCritic,
         trainer_fn=mappo.CentralisedMAPPOTrainer,
         num_executors=2,
         log_info=log_info,

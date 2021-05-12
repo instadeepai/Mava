@@ -74,7 +74,7 @@ class CentralisedPolicyActor(DecentralisedPolicyActor):
         return actor_obs_specs
 
 
-class CentralisedValueActorCritic(DecentralisedValueActorCritic):
+class CentralisedValueCritic(DecentralisedValueActorCritic):
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
