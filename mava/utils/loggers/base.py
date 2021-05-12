@@ -60,7 +60,7 @@ class Logger(MavaLogger):
             time_delta,
             print_fn,
             external_logger=external_logger,
-            external_logger_kwargs=external_logger_kwargs,
+            **external_logger_kwargs,
         )
         self._logger_info = (
             to_terminal,
