@@ -39,6 +39,7 @@ from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.dial.execution import DIALExecutor
 from mava.systems.tf.dial.training import DIALTrainer
+from mava.utils.loggers import MavaLogger
 
 
 @dataclasses.dataclass
@@ -340,7 +341,6 @@ class DIAL(system.System):
         n_step: int = 1,
         epsilon: Optional[tf.Tensor] = None,
         discount: float = 1.0,
-        logger: loggers.Logger = None,
         counter: counting.Counter = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -348,6 +348,9 @@ class DIAL(system.System):
         max_gradient_norm: Optional[float] = None,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
         communication_module: BaseCommunicationModule = BroadcastedCommunication,
+        trainer_logger: MavaLogger = None,
+        exec_logger: MavaLogger = None,
+        eval_logger: MavaLogger = None,
     ):
         """Initialize the system.
         Args:
@@ -379,6 +382,10 @@ class DIAL(system.System):
             max_gradient_norm: used for gradient clipping.
             replay_table_name: string indicating what name to give the replay table."""
 
+        self._trainer_logger = trainer_logger
+        self._exec_logger = exec_logger
+        self._eval_logger = eval_logger
+
         builder = DIALBuilder(
             DIALConfig(
                 environment_spec=environment_spec,
@@ -395,7 +402,6 @@ class DIAL(system.System):
                 n_step=n_step,
                 epsilon=epsilon,
                 discount=discount,
-                logger=logger,
                 counter=counter,
                 checkpoint=checkpoint,
                 checkpoint_subpath=checkpoint_subpath,
@@ -457,7 +463,7 @@ class DIAL(system.System):
             networks=networks,
             dataset=dataset,
             counter=counter,
-            logger=None,
+            logger=self._trainer_logger,
             checkpoint=checkpoint,
             communication_module=self._communication_module,
         )

@@ -26,7 +26,6 @@ import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import utils as tf2_utils
-from acme.utils.loggers.tf_summary import TFSummaryLogger
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym import spaces
 
@@ -35,6 +34,7 @@ from mava.components.tf.networks import DIALPolicy
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import dial
 from mava.utils.debugging.environments import switch_game
+from mava.utils.loggers import Logger
 from mava.wrappers.debugging_envs import SwitchGameWrapper
 
 FLAGS = flags.FLAGS
@@ -159,10 +159,39 @@ def main(_: Any) -> None:
     system_networks = make_networks(environment_spec)
 
     # create tf loggers
-    logs_dir = "logs"
-    system_logger = TFSummaryLogger(f"{logs_dir}/system")
-    train_logger = TFSummaryLogger(f"{logs_dir}/train_loop")
-    eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
+    # logs_dir = "logs"
+    # system_logger = TFSummaryLogger(f"{logs_dir}/system")
+    # train_logger = TFSummaryLogger(f"{logs_dir}/train_loop")
+    # eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
+
+    log_every = 10
+    trainer_logger = Logger(
+        label="system_trainer",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    exec_logger = Logger(
+        # _{executor_id} gets appended to label in system.
+        label="train_loop_executor",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    eval_logger = Logger(
+        label="eval_loop",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
 
     #  # TODO Create loggers
     # log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
@@ -177,13 +206,16 @@ def main(_: Any) -> None:
         observation_networks=system_networks[
             "observations"
         ],  # pytype: disable=wrong-arg-types
-        logger=system_logger,
+        # logger=system_logger,
         checkpoint=False,
+        trainer_logger=trainer_logger,
+        exec_logger=exec_logger,
+        eval_logger=eval_logger,
     )
 
     # Create the environment loop used for training.
     train_loop = ParallelEnvironmentLoop(
-        environment, system, logger=train_logger, label="train_loop"
+        environment, system, logger=exec_logger, label="train_loop"
     )
 
     # Create the evaluation policy.
