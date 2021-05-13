@@ -17,16 +17,18 @@
 # TODO (Kevin): finish DIAL system
 
 """DIAL system implementation."""
-from typing import Callable, Dict, Optional, Type, Any, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple, Type
 
+import acme
+import dm_env
+import launchpad as lp
 import reverb
 import sonnet as snt
-import launchpad as lp
 import tensorflow as tf
-import acme
-from acme.utils import counting
 from acme.tf import utils as tf2_utils
-import dm_env
+from acme.utils import counting
+
+import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.adders import reverb as reverb_adders
@@ -35,10 +37,9 @@ from mava.components.tf.modules.communication import (
     BaseCommunicationModule,
     BroadcastedCommunication,
 )
-import mava
 from mava.systems import system
-from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf import executors
+from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.dial import builder
 from mava.systems.tf.dial.execution import DIALExecutor
 from mava.utils.loggers import MavaLogger
@@ -57,9 +58,7 @@ class DIAL(system.System):
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Dict[str, snt.Module],
         # observation_networks: Dict[str, snt.Module],
-            architecture: Type[
-                BaseArchitecture
-            ] = DecentralisedPolicyActor,
+        architecture: Type[BaseArchitecture] = DecentralisedPolicyActor,
         executor_fn: Type[core.Executor] = DIALExecutor,
         log_info: Tuple = None,
         num_executors: int = 1,
@@ -357,7 +356,6 @@ class DIAL(system.System):
             communication_module=communication_module,
             variable_source=variable_source,
         )
-
 
         # TODO (Arnu): figure out why factory function are giving type errors
         # Create the environment.

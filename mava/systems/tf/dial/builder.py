@@ -19,6 +19,7 @@ from mava.systems.tf import executors
 from mava.systems.tf.dial.execution import DIALExecutor
 from mava.systems.tf.dial.training import DIALTrainer
 
+
 @dataclasses.dataclass
 class DIALConfig:
     """Configuration options for the DIAL system
