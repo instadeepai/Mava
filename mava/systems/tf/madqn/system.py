@@ -31,6 +31,8 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
+from mava.components.tf.modules import exploration
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf.madqn import builder, execution, training
 from mava.utils import lp_utils
@@ -49,11 +51,16 @@ class MADQN:
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
+        exploration_scheduler_fn: Type[
+            LinearExplorationScheduler
+        ] = LinearExplorationScheduler,
+        epsilon_min: float = 0.05,
+        epsilon_decay: float = 1e-4,
+        epsilon_logdir: str = "logs/epsilon/",
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
-        epsilon: float = tf.Variable(1.0, trainable=False),
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
@@ -62,7 +69,7 @@ class MADQN:
         n_step: int = 5,
         clipping: bool = True,
         discount: float = 0.99,
-        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         log_every: float = 10.0,
@@ -85,13 +92,15 @@ class MADQN:
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
         self._log_every = log_every
-        self._policy_optimizer = policy_optimizer
+        self._optimizer = optimizer
         self._checkpoint = checkpoint
 
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
                 environment_spec=environment_spec,
-                epsilon=epsilon,
+                epsilon_min=epsilon_min,
+                epsilon_decay=epsilon_decay,
+                epsilon_logdir=epsilon_logdir,
                 shared_weights=shared_weights,
                 discount=discount,
                 batch_size=batch_size,
@@ -107,6 +116,7 @@ class MADQN:
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
+            exploration_scheduler_fn=exploration_scheduler_fn,
         )
 
     def replay(self) -> Any:
@@ -159,7 +169,7 @@ class MADQN:
             dataset=dataset,
             counter=counter,
             logger=trainer_logger,
-            policy_optimizer=self._policy_optimizer,
+            optimizer=self._optimizer,
             checkpoint=self._checkpoint,
         )
 
@@ -181,7 +191,7 @@ class MADQN:
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system_networks = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
@@ -189,9 +199,10 @@ class MADQN:
 
         # Create the executor.
         executor = self._builder.make_executor(
-            q_networks=executor_networks["values"],
+            q_networks=system_networks["values"],
             action_selectors=networks["action_selectors"],
             adder=self._builder.make_adder(replay),
+            variable_source=variable_source,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -235,7 +246,7 @@ class MADQN:
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system_networks = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
@@ -243,8 +254,9 @@ class MADQN:
 
         # Create the agent.
         executor = self._builder.make_executor(
-            q_networks=executor_networks["values"],
+            q_networks=system_networks["values"],
             action_selectors=networks["action_selectors"],
+            variable_source=variable_source,
         )
 
         # Make the environment.

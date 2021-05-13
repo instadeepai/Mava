@@ -25,6 +25,9 @@ from acme.utils import counting
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationScheduler,
+)
 from mava.systems.tf.madqn import execution, training
 from mava.wrappers import DetailedTrainerStatistics
 
@@ -49,24 +52,26 @@ class MADQNConfig:
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
-    epsilon: tf.Variable
-    shared_weights: bool
-    target_update_period: int
-    executor_variable_update_period: int
-    clipping: bool
-    min_replay_size: int
-    max_replay_size: int
-    samples_per_insert: Optional[float]
-    prefetch_size: int
-    batch_size: int
-    n_step: int
-    discount: float
-    checkpoint: bool
+    shared_weights: bool = True
+    discount: float = 0.99
+    batch_size: int = 256
+    prefetch_size: int = 4
+    target_update_period: int = 100
+    executor_variable_update_period: int = 1000
+    min_replay_size: int = 1000
+    max_replay_size: int = 1000000
+    samples_per_insert: Optional[float] = 32
+    n_step: int = 5
+    clipping: bool = True
+    epsilon_min: float = 0.05
+    epsilon_decay: float = 1e-3
+    epsilon_logdir: str = "logs/epsilon"
+    checkpoint: bool = True
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
 class MADQNBuilder:
-    """Builder for MADDPG which constructs individual components of the system."""
+    """Builder for MADQN which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an RL system.
       Implementations of this interface contain a complete specification of a
@@ -80,6 +85,9 @@ class MADQNBuilder:
         config: MADQNConfig,
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
+        exploration_scheduler_fn: Type[
+            LinearExplorationScheduler
+        ] = LinearExplorationScheduler,
     ):
         """Args:
         _config: Configuration options for the MADDPG system.
@@ -89,6 +97,7 @@ class MADQNBuilder:
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
+        self._exploration_scheduler_fn = exploration_scheduler_fn
 
     def make_replay_tables(
         self,
@@ -177,7 +186,7 @@ class MADQNBuilder:
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
-                variables={"value_network": variables},
+                variables={"q_network": variables},
                 update_period=self._config.executor_variable_update_period,
             )
 
@@ -191,10 +200,18 @@ class MADQNBuilder:
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
+        # Make epsilon scheduler
+        exploration_scheduler = self._exploration_scheduler_fn(
+            logdir=self._config.epsilon_logdir,
+            epsilon_min=self._config.epsilon_min,
+            epsilon_decay=self._config.epsilon_decay,
+        )
+
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
             action_selectors=action_selectors,
+            exploration_scheduler=exploration_scheduler,
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
@@ -208,7 +225,7 @@ class MADQNBuilder:
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         checkpoint: bool = False,
-        policy_optimizer: snt.Optimizer = None,
+        optimizer: snt.Optimizer = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -230,11 +247,11 @@ class MADQNBuilder:
         trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
+            discount=self._config.discount,
             q_networks=q_networks,
             target_q_networks=target_q_networks,
-            epsilon=self._config.epsilon,
             shared_weights=self._config.shared_weights,
-            optimizer=policy_optimizer,
+            optimizer=optimizer,
             target_update_period=self._config.target_update_period,
             clipping=self._config.clipping,
             dataset=dataset,
@@ -243,6 +260,6 @@ class MADQNBuilder:
             checkpoint=checkpoint,
         )
 
-        trainer = DetailedTrainerStatistics(trainer, metrics=["loss"])  # type: ignore
+        trainer = DetailedTrainerStatistics(trainer, metrics=["q_value_loss"])  # type: ignore
 
         return trainer
