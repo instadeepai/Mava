@@ -4,7 +4,7 @@ As with Acme, Mava includes a number of pre-built agents as listed below. All th
 implemented using [Launchpad](https://github.com/deepmind/launchpad), which is used for distributed
 training. This allows for easy scaling of computational resources by changing only one variable.
 
-Below we list the different systems in Mava based on the actions spaces they use. More systems will be added in future Mava updates.
+Below we list the different systems in Mava based on the action spaces they use. More systems will be added in future Mava updates.
 
 ### Continuous control
 
@@ -14,7 +14,7 @@ setting:
 Agent                                                                | Paper                    | Code
 -------------------------------------------------------------------- | :----------------------: | :--:
 Multi-Agent Deep Deterministic Policy Gradient (MA-DDPG)             | [Lowe et al., 2017]   | [![TF](../../docs/logos/tf-small.png)][MADDPG_TF2]
-Multi-Agent Distributed Distributional Deep Determinist (MA-D4PG)    | [Barth-Maron et al., 2018] | [![TF](../../docs/logos/tf-small.png)][MAD4PG_TF2]
+Multi-Agent Distributed Distributional DDPG (MA-D4PG)    | [Barth-Maron et al., 2018] | [![TF](../../docs/logos/tf-small.png)][MAD4PG_TF2]
 
 ### Discrete control
 We also include a number of systems built with discrete action-spaces in mind listed below:
