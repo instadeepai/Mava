@@ -74,19 +74,19 @@ class MonotonicMixing(BaseMixingModule):
         self._num_agents = len(self._agent_networks)
         # self._obs_dim = int(np.prod(observation_specs.shape))
 
-        # TODO Currently hard coded to 2 but need to generalise
-        self._obs_dim = 2
+        # # TODO Currently hard coded to 2 but need to generalise
+        # self._obs_dim = 2
 
-        q_value_dim = tf.TensorSpec(self._obs_dim * self._num_agents)
+        q_value_dim = tf.TensorSpec(self._num_agents)
 
         # Implement method from base class
         self._mixed_network = MonotonicMixingNetwork(
             self._architecture,
             self._agent_networks,
             self._qmix_hidden_dim,
-            self._obs_dim,
-            self._num_hypernet_layers,
-            self._hypernet_hidden_dim,
+            3,  # NOTE state dim. change later
+            num_hypernet_layers=self._num_hypernet_layers,
+            hypernet_hidden_dim=self._hypernet_hidden_dim,
         )
 
         tf2_utils.create_variables(self._mixed_network, [q_value_dim, state_specs])

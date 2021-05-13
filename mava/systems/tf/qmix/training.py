@@ -23,13 +23,14 @@
 
 """Qmix trainer implementation."""
 
-# import time
+import time
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme.utils import counting, loggers
+from trfl.indexing_ops import batched_index
 
 import mava
 from mava.systems.tf import savers as tf2_savers
@@ -152,7 +153,7 @@ class QMIXTrainer(mava.Trainer):
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
     def _decrement_epsilon(self) -> None:
-        self._epsilon.assign_sub(1e-3)
+        self._epsilon.assign_sub(1e-4)
         if self._epsilon < 0.01:
             self._epsilon.assign(0.01)
 
@@ -191,50 +192,65 @@ class QMIXTrainer(mava.Trainer):
                 # print("Obs feed:", o_t_feed.observation, "\n")
 
                 # [B, num_actions]
-                q_tm1_agent = self._q_networks[agent_key](o_tm1_feed.observation)
-                q_t_agent = self._target_q_networks[agent_key](o_t_feed.observation)
+                q_tm1_agent = self._q_networks[agent_key](
+                    o_tm1_feed.observation
+                )  # [B, num_actions]
+                q_act = batched_index(q_tm1_agent, a_tm1_feed, keepdims=True)  # [B, 1]
 
-                # TODO Should I rather use policy to select my q_val than just max?
-                q_tm1.append(q_tm1_agent)  # [B, num_actions] = [32,2]
-                q_t.append(q_t_agent)  # Take only the best q_val
+                q_t_agent = self._target_q_networks[agent_key](
+                    o_t_feed.observation
+                )  # [B, num_actions]
+                q_target_max = tf.reduce_max(q_t_agent, axis=1, keepdims=True)  # [B, 1]
 
-            # [B, num_actions*num_agents] = [32,4]
-            q_tm1 = tf.concat(q_tm1, axis=1)
-            q_t = tf.concat(q_t, axis=1)
+                q_tm1.append(q_act)
+                q_t.append(q_target_max)
+
+            num_agents = len(self._agents)
+
+            rewards = [tf.reshape(val, (-1, 1)) for val in list(r_t.values())]
+            rewards = tf.reshape(
+                tf.concat(rewards, axis=1), (-1, 1, num_agents)
+            )  # [B, 1, num_agents]
+
+            dones = [tf.reshape(val.terminal, (-1, 1)) for val in list(o_tm1.values())]
+            dones = tf.reshape(
+                tf.concat(dones, axis=1), (-1, 1, num_agents)
+            )  # [B, 1, num_agents]
+
+            q_tm1 = tf.concat(q_tm1, axis=1)  # [B, num_agents]
+            q_t = tf.concat(q_t, axis=1)  # [B, num_agents]
 
             q_tot_mixed = self._mixing_network(q_tm1, s_tm1)  # [B, 1, 1]
             q_tot_target_mixed = self._target_mixing_network(q_t, s_t)  # [B, 1, 1]
-            # print("Q mixed:", q_tot_mixed)
 
             # Cast the additional discount to match the environment discount dtype.
             # discount = tf.cast(self._discount, dtype=d_t.dtype)
 
             # Calculate Q loss.
             # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
-            discount = 0.99  # TODO Generalise
+            discount = tf.constant(0.99)  # TODO Generalise
 
-            # TODO Case where agents have different rewards?
-            r_t = tf.reshape(r_t["agent_0"], shape=(-1, 1))
-            # print("r_t.shape:",r_t.shape)
-            # print("Q_t.shape:",tf.reduce_max(q_tot_target_mixed, axis=1).shape)
-            target = tf.stop_gradient(
-                r_t + discount * tf.reduce_max(q_tot_target_mixed, axis=1)
+            targets = (
+                rewards + discount * (tf.constant(1.0) - dones) * q_tot_target_mixed
             )
-            target = tf.reshape(target, (-1, 1, 1))
-            # print("Target shape:",target.shape)
-            td_error = target - q_tot_mixed
-            # print("TD shape:", td_error.shape)
 
-            self.loss = 0.5 * tf.square(td_error)
-            # print(self.loss.shape)
+            targets = tf.stop_gradient(targets)
+
+            td_error = targets - q_tot_mixed
+
+            self.loss = 0.5 * tf.reduce_mean(tf.square(td_error))
+
+            self._log_q_tot = q_tot_mixed
+
             self.tape = tape
 
     def _backward(self) -> None:
         # Calculate the gradients and update the networks
+        trainable_variables = []
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
             # Get trainable variables.
-            trainable_variables = self._q_networks[agent_key].trainable_variables
+            trainable_variables += self._q_networks[agent_key].trainable_variables
 
         trainable_variables += self._mixing_network.trainable_variables
 
@@ -264,30 +280,34 @@ class QMIXTrainer(mava.Trainer):
         self._forward(inputs)
         self._backward()
 
-        return self.loss  # Return total system loss
+        return {
+            "Epsilon": self._epsilon,
+            "system_loss": self.loss,
+            "q_tot": tf.reduce_mean(self._log_q_tot).numpy(),
+        }  # Return total system loss
 
     def step(self) -> None:
         # Run the learning step.
         # fetches = self._step()
-        self._step()
+        fetches = self._step()
 
         # Compute elapsed time.
-        # timestamp = time.time()
-        # if self._timestamp:
-        #     elapsed_time = timestamp - self._timestamp
-        # else:
-        #     elapsed_time = 0
-        # self._timestamp = timestamp  # type: ignore
+        timestamp = time.time()
+        if self._timestamp:
+            elapsed_time = timestamp - self._timestamp
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
 
         # Update our counts and record it.
-        # counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        # fetches.update(counts)
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
 
         # Checkpoint and attempt to write the logs.
 
         # NOTE (Arnu): ignoring checkpointing and logging for now
         # self._checkpointer.save()
-        # self._logger.write(fetches)
+        self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
