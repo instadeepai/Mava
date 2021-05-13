@@ -222,6 +222,7 @@ class MAD4PG:
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
             shared_weights=self._shared_weights,
+            checkpoint=self._checkpoint,
         ).create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
