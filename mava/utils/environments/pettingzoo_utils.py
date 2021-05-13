@@ -64,6 +64,7 @@ def make_environment(
     env_class: str = "mpe",
     env_name: str = "simple_spread_v2",
     env_preprocess_wrappers: Optional[List] = None,
+    random_seed: Optional[int] = None,
     **kwargs: Any,
 ) -> dm_env.Environment:
     """Wraps an Pettingzoo environment.
@@ -96,5 +97,8 @@ def make_environment(
         environment = PettingZooAECEnvWrapper(
             env, env_preprocess_wrappers=env_preprocess_wrappers
         )
+
+    if random_seed and hasattr(environment, "seed"):
+        environment.seed(random_seed)
 
     return environment
