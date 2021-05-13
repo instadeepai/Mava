@@ -978,7 +978,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     # to be called by the step() function below. Removing it makes the code
     # work. The docs on tf.function says it is useful for speed improvements
     # but as far as I can see, we can go ahead without it. At least for now.
-    # @tf.function
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
