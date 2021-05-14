@@ -4,7 +4,6 @@ from typing import Any, Dict, Iterator, List, Optional, Type
 import reverb
 import sonnet as snt
 import tensorflow as tf
-from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
 

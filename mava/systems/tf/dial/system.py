@@ -355,7 +355,7 @@ class DIAL(system.System):
         behaviour_policy_networks = communication_module.create_behaviour_policy()
 
         # Create the executor.
-        executor = builder.make_executor(
+        executor = self._builder.make_executor(
             policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             communication_module=communication_module,
@@ -418,7 +418,7 @@ class DIAL(system.System):
         behaviour_policy_networks = communication_module.create_behaviour_policy()
 
         # Create the executor.
-        executor = builder.make_executor(
+        executor = self._builder.make_executor(
             policy_networks=behaviour_policy_networks,
             communication_module=communication_module,
             variable_source=variable_source,

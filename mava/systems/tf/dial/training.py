@@ -36,6 +36,7 @@ from acme.utils import counting, loggers
 import mava
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.systems.tf import savers as tf2_savers
+from mava.utils import training_utils as train_utils
 
 
 class DIALTrainer(mava.Trainer):
@@ -140,38 +141,29 @@ class DIALTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            # TODO (dries): Determine why acme has a critic
-            #  in self._system_network_variables
             self._system_network_variables["policy"][
                 agent_key
             ] = policy_network_to_expose.variables
 
         self._system_checkpointer = {}
         if checkpoint:
-            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
-            #  of the last 11 calls to
-            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
-            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
-            #  expensive and the excessive number tracings could be due to (1)
-            #  creating @tf.function repeatedly in a loop, (2) passing tensors
-            #  with different shapes, (3) passing Python objects instead of tensors.
             for agent_key in self.unique_net_keys:
                 objects_to_save = {
                     "counter": self._counter,
                     "policy": self._policy_networks[agent_key],
                     "observation": self._observation_networks[agent_key],
                     "target_policy": self._target_policy_networks[agent_key],
+                    # "target_observation": self._target_observation_networks[agent_key],
                     "policy_optimizer": self._policy_optimizer,
                     "num_steps": self._num_steps,
                 }
 
-                checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
+                subdir = os.path.join("trainer", agent_key)
                 checkpointer = tf2_savers.Checkpointer(
                     time_delta_minutes=15,
-                    add_uid=False,
-                    directory=checkpointer_dir,
+                    directory=checkpoint_subpath,
                     objects_to_save=objects_to_save,
-                    enable_checkpointing=True,
+                    subdirectory=subdir,
                 )
                 self._system_checkpointer[agent_key] = checkpointer
 
@@ -233,6 +225,15 @@ class DIALTrainer(mava.Trainer):
 
         inputs = next(self._iterator)
 
+        self._forward(inputs)
+
+        self._backward()
+
+        # Log losses per agent
+        return train_utils.map_losses_per_agent_ac(self.total_loss)
+
+    # Forward pass that calculates loss.
+    def _forward(self, inputs: Any) -> None:
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
         )
@@ -243,9 +244,10 @@ class DIALTrainer(mava.Trainer):
         core_states = extra["core_states"]
 
         bs = actions[self._agents[0]].shape[1]
+        self.bs = bs
         T = actions[self._agents[0]].shape[0]
 
-        logged_losses: Dict[str, Dict[str, Any]] = {}
+        # logged_losses: Dict[str, Dict[str, Any]] = {}
         agent_type = self._agent_types[0]
 
         with tf.GradientTape(persistent=True) as tape:
@@ -364,25 +366,62 @@ class DIALTrainer(mava.Trainer):
                         td_comm = y_message - m_t1[tf.argmax(next_message)]
 
                         total_loss[b] += td_comm ** 2
+        self.total_loss = total_loss
+        self.tape = tape
 
-        for b in range(bs):
-            policy_variables = self._policy_networks[agent_type].trainable_variables
-            policy_gradients = tape.gradient(total_loss[b], policy_variables)
+    # Backward pass that calculates gradients and updates network.
+    # def _backward(self) -> None:
+    #     agent_type = self._agent_types[0]
+    #     for b in range(self.bs):
+    #         policy_variables = self._policy_networks[agent_type].trainable_variables
+    #         policy_gradients = self.tape.gradient(self.total_loss[b], policy_variables)
+    #         if self._clipping:
+    #             policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
+    #
+    #         # Apply gradients.
+    #         self._policy_optimizer.apply(policy_gradients, policy_variables)
+    #     train_utils.safe_del(self, "tape")
+
+    # logged_losses.update(
+    #     {
+    #         agent_type: {
+    #             "policy_loss": self.total_loss[b],
+    #         }
+    #     }
+    # )
+
+    # return logged_losses
+
+    def _backward(self) -> None:
+
+        # TODO (dries): I still need to figure out the total_loss thing. Not per agent I see.
+
+        # Calculate the gradients and update the networks
+        total_loss = self.total_loss
+        tape = self.tape
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
+
+            # Get trainable variables.
+            policy_variables = (
+                self._observation_networks[agent_key].trainable_variables
+                + self._policy_networks[agent_key].trainable_variables
+            )
+
+            # Compute gradients.
+            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
+            #  on a persistent tape inside its context is significantly less efficient
+            #  than calling it outside the context." caused by losses.dpg, which calls
+            #  tape.gradient.
+            policy_gradients = tape.gradient(total_loss[agent], policy_variables)
+
+            # Maybe clip gradients.
             if self._clipping:
                 policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
 
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
-
-            logged_losses.update(
-                {
-                    agent_type: {
-                        "policy_loss": total_loss[b],
-                    }
-                }
-            )
-
-        return logged_losses
+        train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
         # Run the learning step.

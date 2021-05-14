@@ -58,6 +58,9 @@ class BroadcastedCommunication(BaseCommunicationModule):
 
         return self._architecture.create_system()
 
+    def create_behaviour_policy(self) -> Dict[str, snt.Module]:
+        return self._architecture.create_behaviour_policy()
+
     def process_messages(
         self,
         messages: Dict[str, snt.Module],
