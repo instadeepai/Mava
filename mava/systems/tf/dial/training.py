@@ -153,7 +153,8 @@ class DIALTrainer(mava.Trainer):
                     "policy": self._policy_networks[agent_key],
                     "observation": self._observation_networks[agent_key],
                     "target_policy": self._target_policy_networks[agent_key],
-                    # "target_observation": self._target_observation_networks[agent_key],
+                    # "target_observation":
+                    # self._target_observation_networks[agent_key],
                     "policy_optimizer": self._policy_optimizer,
                     "num_steps": self._num_steps,
                 }
@@ -229,8 +230,13 @@ class DIALTrainer(mava.Trainer):
 
         self._backward()
 
+        # TODO (dries): Find a better solution that reduce_mean. The data should
+        #  be batched processed and then reduce_mean should be used on that.
+        for key in self.policy_losses.keys():
+            self.policy_losses[key] = tf.reduce_mean(self.policy_losses[key], axis=0)
+
         # Log losses per agent
-        return train_utils.map_losses_per_agent_ac(self.total_loss)
+        return train_utils.map_losses_per_agent_a(self.policy_losses)
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
@@ -248,11 +254,8 @@ class DIALTrainer(mava.Trainer):
         T = actions[self._agents[0]].shape[0]
 
         # logged_losses: Dict[str, Dict[str, Any]] = {}
-        agent_type = self._agent_types[0]
-
         with tf.GradientTape(persistent=True) as tape:
-            total_loss = {}
-
+            policy_losses = {agent_id: tf.zeros(1) for agent_id in self._agents}
             # for each batch
             for b in range(bs):
                 # Unroll episode and store states, messages
@@ -280,6 +283,7 @@ class DIALTrainer(mava.Trainer):
 
                     # For each agent
                     for agent_id in self._agents:
+                        agent_type = self.agent_net_keys[agent_id]
                         # Agent input at time t
                         obs_in = observations[agent_id].observation[:, b][t]
                         state_in = states[t][agent_id]
@@ -304,11 +308,12 @@ class DIALTrainer(mava.Trainer):
                 )[self._agents[0]]
 
                 # Backtrack episode
-                total_loss[b] = tf.zeros(1)
                 # For t=T to 1, -1 do
                 for t in range(T - 1, 0, -1):
                     # For each agent a do
                     for agent_id in self._agents:
+                        agent_type = self.agent_net_keys[agent_id]
+
                         # All at timestep t
                         agent_input = observations[agent_id].observation[:, b]
                         # (sequence,batch,1)
@@ -360,26 +365,31 @@ class DIALTrainer(mava.Trainer):
                         td_action = y_action - q_t1[0][action[t - 1]]
 
                         # d_theta = d_theta + d_Q_t_a ^ 2
-                        total_loss[b] += td_action ** 2
+                        policy_losses[agent_id] += td_action ** 2
 
                         # Communication grads
                         td_comm = y_message - m_t1[tf.argmax(next_message)]
 
-                        total_loss[b] += td_comm ** 2
-        self.total_loss = total_loss
+                        policy_losses[agent_id] += td_comm ** 2
+
+        self.policy_losses = policy_losses
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
     # def _backward(self) -> None:
     #     agent_type = self._agent_types[0]
     #     for b in range(self.bs):
-    #         policy_variables = self._policy_networks[agent_type].trainable_variables
-    #         policy_gradients = self.tape.gradient(self.total_loss[b], policy_variables)
+    #         policy_variables =
+    #         self._policy_networks[agent_type].trainable_variables
+    #         policy_gradients =
+    #         self.tape.gradient(self.total_loss[b], policy_variables)
     #         if self._clipping:
-    #             policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
+    #             policy_gradients
+    #             = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
     #
     #         # Apply gradients.
-    #         self._policy_optimizer.apply(policy_gradients, policy_variables)
+    #         self._policy_optimizer
+    #         .apply(policy_gradients, policy_variables)
     #     train_utils.safe_del(self, "tape")
 
     # logged_losses.update(
@@ -394,10 +404,12 @@ class DIALTrainer(mava.Trainer):
 
     def _backward(self) -> None:
 
-        # TODO (dries): I still need to figure out the total_loss thing. Not per agent I see but per batch?
+        # TODO (dries): I still need to figure out the
+        #  total_loss thing. Not per agent I see but per batch?
 
         # Calculate the gradients and update the networks
-        total_loss = self.total_loss
+        policy_losses = self.policy_losses
+
         tape = self.tape
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -413,7 +425,7 @@ class DIALTrainer(mava.Trainer):
             #  on a persistent tape inside its context is significantly less efficient
             #  than calling it outside the context." caused by losses.dpg, which calls
             #  tape.gradient.
-            policy_gradients = tape.gradient(total_loss[agent], policy_variables)
+            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
 
             # Maybe clip gradients.
             if self._clipping:

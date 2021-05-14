@@ -142,12 +142,11 @@ class DIALExecutor(RecurrentExecutor):
                 }
                 for agent, _state in self._states.items()
             }
-
-            if extras:
+            if extras is not None:
                 extras.update({"core_states": numpy_states})
                 self._adder.add_first(timestep, extras)
             else:
-                self._adder.add_first(timestep, numpy_states)
+                raise NotImplementedError("Why is extras None?")
 
     def observe(
         self,

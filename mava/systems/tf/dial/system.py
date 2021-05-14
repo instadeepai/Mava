@@ -40,7 +40,6 @@ from mava.components.tf.modules.communication import (
 )
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems import system
-from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.dial import builder
 from mava.systems.tf.dial.execution import DIALExecutor
@@ -147,10 +146,7 @@ class DIAL(system.System):
         self._exec_logger = exec_logger
         self._eval_logger = eval_logger
 
-        if executor_fn == executors.RecurrentExecutor:
-            extra_specs = self._get_extra_specs()
-        else:
-            extra_specs = {}
+        extra_specs = self._get_extra_specs()
 
         self._builder = builder.DIALBuilder(
             builder.DIALConfig(
@@ -245,15 +241,19 @@ class DIAL(system.System):
         # )
 
     def _get_extra_specs(self) -> Any:
+        agents = self._environment_spec.get_agent_ids()
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec
+        )
         core_state_spec = {}
-        for agent in self._agents:
+        for agent in agents:
             agent_type = agent.split("_")[0]
             core_state_spec[agent] = {
                 "state": tf2_utils.squeeze_batch_dim(
-                    self._config.networks[agent_type].initial_state(1)
+                    networks["policies"][agent_type].initial_state(1)
                 ),
                 "message": tf2_utils.squeeze_batch_dim(
-                    self._config.networks[agent_type].initial_message(1)
+                    networks["policies"][agent_type].initial_message(1)
                 ),
             }
         extras = {"core_states": core_state_spec}

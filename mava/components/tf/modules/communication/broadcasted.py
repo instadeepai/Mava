@@ -22,7 +22,7 @@ from typing import Dict
 import sonnet as snt
 import tensorflow as tf
 
-from mava.components.tf.architectures import BaseArchitecture
+from mava.components.tf.architectures import DecentralisedPolicyActor
 from mava.components.tf.modules.communication import BaseCommunicationModule
 
 
@@ -31,7 +31,7 @@ class BroadcastedCommunication(BaseCommunicationModule):
 
     def __init__(
         self,
-        architecture: BaseArchitecture,
+        architecture: DecentralisedPolicyActor,
         shared: bool = True,
         channel_size: int = 4,
         channel_noise: float = 0.0,
@@ -59,7 +59,9 @@ class BroadcastedCommunication(BaseCommunicationModule):
         return self._architecture.create_system()
 
     def create_behaviour_policy(self) -> Dict[str, snt.Module]:
-        return self._architecture.create_behaviour_policy()
+        # Note (dries): Can't use the base architecture
+        # because it assumes there is an observation network.
+        return self._architecture._policy_networks
 
     def process_messages(
         self,
