@@ -17,7 +17,7 @@
 
 from datetime import datetime
 
-# import importlib
+import launchpad as lp
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
@@ -31,7 +31,7 @@ from gym import spaces
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import DIALPolicy
-from mava.environment_loop import ParallelEnvironmentLoop
+from mava.utils import lp_utils
 from mava.systems.tf import dial
 from mava.utils.debugging.environments import switch_game
 from mava.utils.loggers import Logger
@@ -54,14 +54,16 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
-def make_environment(
+def make_environment_fn(
+    evaluation: bool,
     env_name: str = "switch",
     num_agents: int = 3,
 ) -> dm_env.Environment:
+    del evaluation
     """Creates a SwitchGame environment."""
-    env_module = switch_game.MultiAgentSwitchGame(num_agents=num_agents)
-    environment = SwitchGameWrapper(env_module)
-    return environment
+    env_module_fn = switch_game.MultiAgentSwitchGame(num_agents=num_agents)
+    environment_fn = SwitchGameWrapper(env_module_fn)
+    return environment_fn
 
 
 # TODO Kevin: Define message head node correctly
@@ -153,16 +155,14 @@ def make_networks(
 
 
 def main(_: Any) -> None:
-    # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment()
-    environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    system_networks = make_networks(environment_spec)
+    # set loggers info
+    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
-    # create tf loggers
-    # logs_dir = "logs"
-    # system_logger = TFSummaryLogger(f"{logs_dir}/system")
-    # train_logger = TFSummaryLogger(f"{logs_dir}/train_loop")
-    # eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
+    environment_factory = lp_utils.partial_kwargs(make_environment_fn)
+    network_factory = lp_utils.partial_kwargs(make_networks)
+
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     log_every = 10
     trainer_logger = Logger(
@@ -200,45 +200,60 @@ def main(_: Any) -> None:
     # checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Construct the agent.
-    system = dial.DIAL(
-        environment_spec=environment_spec,
-        networks=system_networks["policies"],
-        observation_networks=system_networks[
-            "observations"
-        ],  # pytype: disable=wrong-arg-types
-        # logger=system_logger,
-        checkpoint=False,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
-    )
+    # system = dial.DIAL(
+    #     environment_spec=environment_spec,
+    #     networks=system_networks["policies"],
+    #     observation_networks=system_networks[
+    #         "observations"
+    #     ],  # pytype: disable=wrong-arg-types
+    #     # logger=system_logger,
+    #     checkpoint=False,
+    #     trainer_logger=trainer_logger,
+    #     exec_logger=exec_logger,
+    #     eval_logger=eval_logger,
+    # )
 
     # Create the environment loop used for training.
-    train_loop = ParallelEnvironmentLoop(
-        environment, system, logger=exec_logger, label="train_loop"
-    )
+    # train_loop = ParallelEnvironmentLoop(
+    #     environment, system, logger=exec_logger, label="train_loop"
+    # )
 
     # Create the evaluation policy.
     # NOTE: assumes weight sharing
-    specs = environment_spec.get_agent_specs()
-    type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-    specs = type_specs
-    eval_policies = system_networks["policies"]
+    # specs = environment_spec.get_agent_specs()
+    # type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
+    # specs = type_specs
+    # eval_policies = system_networks["policies"]
+    #
+    # # Create the evaluation actor and loop.
+    # eval_actor = dial.DIALExecutor(
+    #     policy_networks=eval_policies,
+    #     communication_module=system._communication_module,
+    #     is_eval=True,
+    # )
+    # eval_env = make_environment()
+    # eval_loop = ParallelEnvironmentLoop(
+    #     eval_env, eval_actor, logger=eval_logger, label="eval_loop"
+    # )
+    #
+    # for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
+    #     train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
+    #     eval_loop.run(num_episodes=10)
 
-    # Create the evaluation actor and loop.
-    eval_actor = dial.DIALExecutor(
-        policy_networks=eval_policies,
-        communication_module=system._communication_module,
-        is_eval=True,
-    )
-    eval_env = make_environment()
-    eval_loop = ParallelEnvironmentLoop(
-        eval_env, eval_actor, logger=eval_logger, label="eval_loop"
-    )
+    program = dial.DIAL(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        num_executors=2,
+        log_info=log_info,
+        checkpoint_subpath=checkpoint_dir,
+        trainer_logger=trainer_logger,
+        exec_logger=exec_logger,
+        eval_logger=eval_logger,
+    ).build()
 
-    for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
-        train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        eval_loop.run(num_episodes=10)
+    lp.launch(
+        program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="current_terminal"
+    )
 
 
 if __name__ == "__main__":

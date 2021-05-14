@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Dict, Iterator, List, Optional, Type
+from typing import Dict, Iterator, List, Optional, Type, Any
 
 import reverb
 import sonnet as snt
@@ -54,7 +54,7 @@ class DIALConfig:
     """
 
     environment_spec: specs.MAEnvironmentSpec
-    networks: Dict[str, snt.Module]
+    # networks: Dict[str, snt.Module]
     policy_optimizer: snt.Optimizer
     shared_weights: bool = True
     batch_size: int = 1
@@ -71,12 +71,12 @@ class DIALConfig:
     logger: loggers.Logger = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
-    policy_networks: Optional[Dict[str, snt.Module]] = None
+    # policy_networks: Optional[Dict[str, snt.Module]] = None
     max_gradient_norm: Optional[float] = None
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     counter: counting.Counter = None
     clipping: bool = False
-    communication_module: BaseCommunicationModule = BroadcastedCommunication
+    # communication_module: BaseCommunicationModule = BroadcastedCommunication
     sequence_length: int = 10
     period: int = 1
 
@@ -95,12 +95,14 @@ class DIALBuilder(SystemBuilder):
         self,
         config: DIALConfig,
         executor_fn: Type[core.Executor] = DIALExecutor,
+        extra_specs: Dict[str, Any] = {},
     ):
         """Args:
         config: Configuration options for the DIAL system.
         executor_fn: Executor function to use"""
 
         self._config = config
+        self._extra_specs = extra_specs
 
         """ _agents: a list of the agent specs (ids).
             _agent_types: a list of the types of agents to be used."""
@@ -116,23 +118,14 @@ class DIALBuilder(SystemBuilder):
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+            raise ValueError("(dries): Why is there a feedforward executor version of DIAL?")
             adder = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
-            core_state_spec = {}
-            for agent in self._agents:
-                agent_type = agent.split("_")[0]
-                core_state_spec[agent] = {
-                    "state": tf2_utils.squeeze_batch_dim(
-                        self._config.networks[agent_type].initial_state(1)
-                    ),
-                    "message": tf2_utils.squeeze_batch_dim(
-                        self._config.networks[agent_type].initial_message(1)
-                    ),
-                }
+
             adder = reverb_adders.ParallelEpisodeAdder.signature(
-                environment_spec, core_state_spec
+                environment_spec, self._extra_specs
             )
         else:
             print(self._executor_fn)

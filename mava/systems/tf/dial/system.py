@@ -17,6 +17,11 @@
 # TODO (Kevin): finish DIAL system
 
 """DIAL system implementation."""
+import copy
+from acme.utils import loggers
+from mava.environment_loop import ParallelEnvironmentLoop
+from mava.utils import lp_utils
+from mava.wrappers import DetailedPerAgentStatistics
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 import acme
@@ -171,6 +176,8 @@ class DIAL(system.System):
                 max_gradient_norm=max_gradient_norm,
                 replay_table_name=replay_table_name,
                 policy_optimizer=policy_optimizer,
+                sequence_length=sequence_length,
+                period=period,
             ),
             executor_fn=executor_fn,
             extra_specs=extra_specs,
@@ -239,19 +246,18 @@ class DIAL(system.System):
         # )
 
     def _get_extra_specs(self) -> Any:
-        agents = self._environment_spec.get_agent_ids()
-        core_state_specs = {}
-        networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
-        )
-        for agent in agents:
+        core_state_spec = {}
+        for agent in self._agents:
             agent_type = agent.split("_")[0]
-            core_state_specs[agent] = (
-                tf2_utils.squeeze_batch_dim(
-                    networks["policies"][agent_type].initial_state(1)
+            core_state_spec[agent] = {
+                "state": tf2_utils.squeeze_batch_dim(
+                    self._config.networks[agent_type].initial_state(1)
                 ),
-            )
-        extras = {"core_states": core_state_specs}
+                "message": tf2_utils.squeeze_batch_dim(
+                    self._config.networks[agent_type].initial_message(1)
+                ),
+            }
+        extras = {"core_states": core_state_spec}
         return extras
 
     # def update(self) -> None:
