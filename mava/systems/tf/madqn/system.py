@@ -36,7 +36,7 @@ from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger
-from mava.wrappers import DetailedPerAgentStatistics
+from mava.wrappers import DetailedPerAgentStatistics, MonitorParallelEnvironmentLoop
 
 
 class MADQN:
@@ -72,6 +72,8 @@ class MADQN:
         trainer_logger: MavaLogger = None,
         exec_logger: MavaLogger = None,
         eval_logger: MavaLogger = None,
+        train_loop_fn: Callable = ParallelEnvironmentLoop,
+        eval_loop_fn: Callable = ParallelEnvironmentLoop,
     ):
 
         if not environment_spec:
@@ -93,6 +95,8 @@ class MADQN:
         self._trainer_logger = trainer_logger
         self._exec_logger = exec_logger
         self._eval_logger = eval_logger
+        self._train_loop_fn = train_loop_fn
+        self._eval_loop_fn = eval_loop_fn
 
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
@@ -203,7 +207,7 @@ class MADQN:
             exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
 
         # Create the loop to connect environment and executor.
-        train_loop = ParallelEnvironmentLoop(
+        train_loop = self._train_loop_fn(
             environment, executor, counter=counter, logger=exec_logger
         )
 
@@ -245,9 +249,18 @@ class MADQN:
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
-        eval_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=self._eval_logger
-        )
+        if isinstance(self._eval_loop_fn, MonitorParallelEnvironmentLoop):
+            eval_loop = self._eval_loop_fn(
+                environment,
+                executor,
+                counter=counter,
+                logger=self._eval_logger,
+                path=self._checkpoint_subpath,
+            )
+        else:
+            eval_loop = self._eval_loop_fn(
+                environment, executor, counter=counter, logger=self._eval_logger
+            )
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)
         return eval_loop
