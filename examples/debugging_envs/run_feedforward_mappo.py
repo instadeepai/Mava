@@ -155,7 +155,6 @@ def main(_: Any) -> None:
     # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
-    # distributed program
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
@@ -188,6 +187,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
+    # distributed program
     program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,

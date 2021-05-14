@@ -89,8 +89,6 @@ def make_networks(
     observation_networks = {}
     policy_networks = {}
     critic_networks = {}
-    # logging.info("*" * 100)
-    # logging.info(specs)
     for key in specs.keys():
 
         # Create the shared observation network; here simply a state-less operation.
@@ -99,7 +97,6 @@ def make_networks(
         # Note: The discrete case must be placed first as it inherits from BoundedArray.
         if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discrete
             num_actions = specs[key].actions.num_values
-            # logging.info(f"action: {num_actions} discrete")
             policy_network = snt.Sequential(
                 [
                     networks.LayerNormMLP(
@@ -113,7 +110,6 @@ def make_networks(
             )
         elif isinstance(specs[key].actions, dm_env.specs.BoundedArray):  # continuous
             num_actions = np.prod(specs[key].actions.shape, dtype=int)
-            # logging.info(f"action: {num_actions} cont")
             policy_network = snt.Sequential(
                 [
                     networks.LayerNormMLP(
@@ -138,7 +134,6 @@ def make_networks(
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
-    # print("*" * 100)
     return {
         "policies": policy_networks,
         "critics": critic_networks,
@@ -162,7 +157,6 @@ def main(_: Any) -> None:
     # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
-    # distributed program
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
@@ -195,6 +189,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
+    # distributed program
     program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,

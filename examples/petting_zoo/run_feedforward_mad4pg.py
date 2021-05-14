@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MAD4PG on debug MPE environments."""
+"""Example running MAD4PG on PZ environments."""
 
 import functools
 from datetime import datetime
@@ -150,7 +150,6 @@ def main(_: Any) -> None:
     # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
-    # distributed program
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
@@ -183,6 +182,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
+    # distributed program
     program = mad4pg.MAD4PG(
         environment_factory=environment_factory,
         network_factory=network_factory,
