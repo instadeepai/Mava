@@ -26,6 +26,7 @@ from absl import app, flags
 from acme import types
 from acme.tf.networks import DQNAtariNetwork
 from launchpad.nodes.python.local_multi_processing import PythonProcess
+from supersuit.aec_wrappers import black_death_v1
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import epsilon_greedy_action_selector
@@ -107,6 +108,7 @@ def main(_: Any) -> None:
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
+        env_preprocess_wrappers=[(black_death_v1, None)],
     )
 
     network_factory = lp_utils.partial_kwargs(make_networks)

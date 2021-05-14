@@ -16,11 +16,15 @@
 """Generic environment loop wrapper to track system statistics"""
 
 import time
-from typing import Dict, List
+from typing import Dict, List, Tuple, Union
 
+import dm_env
 import numpy as np
-from acme.utils import loggers
+from acme.utils import counting, loggers, paths
+from acme.wrappers.video import _make_animation
+from array2gif import write_gif
 
+import mava
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics
@@ -196,3 +200,105 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
         self._running_statistics.update({"episode_length": episode_steps})
         self._running_statistics.update(counts)
+
+
+class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
+    """A MARL environment loop.
+    This records a gif/video every `record_every` eval episodes.
+    """
+
+    def __init__(
+        self,
+        environment: dm_env.Environment,
+        executor: mava.core.Executor,
+        filename: str = "agents",
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        should_update: bool = True,
+        label: str = "parallel_environment_loop",
+        record_every: int = 1000,
+        path: str = "~/mava",
+        fps: int = 15,
+        counter_str: str = "evaluator_episodes",
+        format: str = "video",
+        figsize: Union[float, Tuple[int, int]] = (360, 640),
+    ):
+        assert (
+            format == "gif" or format == "video"
+        ), "Only gif and video format are supported."
+
+        # Internalize agent and environment.
+        super().__init__(
+            environment=environment,
+            executor=executor,
+            counter=counter,
+            logger=logger,
+            should_update=should_update,
+            label=label,
+        )
+        self._record_every = record_every
+        self._path = paths.process_path(path, "recordings", add_uid=False)
+        self._filename = filename
+        self._record_current_episode = False
+        self._fps = fps
+        self._frames: List = []
+
+        self._parent_environment_step = self._environment.step
+        self._environment.step = self.step
+
+        self._parent_environment_reset = self._environment.reset
+        self._environment.reset = self.reset
+
+        self._counter_str = counter_str
+
+        self._format = format
+        self._figsize = figsize
+
+    def step(self, action: Dict[str, np.ndarray]) -> dm_env.TimeStep:
+        timestep = self._parent_environment_step(action)
+        self._append_frame()
+        return timestep
+
+    def _retrieve_render(self) -> np.ndarray:
+        if self._format == "video":
+            render = self._environment.render(mode="rgb_array")
+        elif self._format == "gif":
+            render = np.transpose(
+                self._environment.render(mode="rgb_array"), axes=(1, 0, 2)
+            )
+        return render
+
+    def _append_frame(self) -> None:
+        """Appends a frame to the sequence of frames."""
+        counts = self._counter.get_counts()
+        counter = counts.get(self._counter_str)
+        if counter and (counter % self._record_every == 0):
+            self._frames.append(self._retrieve_render())
+
+    def reset(self) -> dm_env.TimeStep:
+        if self._frames:
+            self._write_frames()
+        timestep = self._parent_environment_reset()
+        return timestep
+
+    def _write_frames(self) -> None:
+        counts = self._counter.get_counts()
+        counter = counts.get(self._counter_str)
+        path = f"{self._path}/{self._filename}_{counter}_eval_episode"
+        if self._format == "video":
+            self._save_video(path)
+        elif self._format == "gif":
+            self._save_gif(path)
+        self._frames = []
+
+    def _save_video(self, path: str) -> None:
+        video = _make_animation(self._frames, self._fps, self._figsize).to_html5_video()
+        with open(f"{path}.html", "w") as f:
+            f.write(video)
+
+    def _save_gif(self, path: str) -> None:
+        write_gif(
+            self._frames,
+            f"{path}.gif",
+            fps=self._fps,
+        )

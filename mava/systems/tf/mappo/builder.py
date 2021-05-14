@@ -261,6 +261,7 @@ class MAPPOBuilder(SystemBuilder):
             counter=counter,
             logger=logger,
             checkpoint=self._config.checkpoint,
+            checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
         # TODO (Kale-ab): networks stats for MAPPO
