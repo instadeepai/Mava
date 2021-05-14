@@ -18,10 +18,6 @@
 
 """DIAL system implementation."""
 import copy
-from acme.utils import loggers
-from mava.environment_loop import ParallelEnvironmentLoop
-from mava.utils import lp_utils
-from mava.wrappers import DetailedPerAgentStatistics
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 import acme
@@ -31,7 +27,7 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme.tf import utils as tf2_utils
-from acme.utils import counting
+from acme.utils import counting, loggers
 
 import mava
 from mava import core
@@ -42,12 +38,15 @@ from mava.components.tf.modules.communication import (
     BaseCommunicationModule,
     BroadcastedCommunication,
 )
+from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems import system
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.dial import builder
 from mava.systems.tf.dial.execution import DIALExecutor
+from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger
+from mava.wrappers import DetailedPerAgentStatistics
 
 
 class DIAL(system.System):

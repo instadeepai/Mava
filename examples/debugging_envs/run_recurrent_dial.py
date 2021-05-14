@@ -16,11 +16,10 @@
 """Example running DIAL"""
 
 from datetime import datetime
-
-import launchpad as lp
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
+import launchpad as lp
 import numpy as np
 import tensorflow as tf
 from absl import app, flags
@@ -31,8 +30,8 @@ from gym import spaces
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import DIALPolicy
-from mava.utils import lp_utils
 from mava.systems.tf import dial
+from mava.utils import lp_utils
 from mava.utils.debugging.environments import switch_game
 from mava.utils.loggers import Logger
 from mava.wrappers.debugging_envs import SwitchGameWrapper

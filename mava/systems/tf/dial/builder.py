@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Dict, Iterator, List, Optional, Type, Any
+from typing import Any, Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -118,7 +118,9 @@ class DIALBuilder(SystemBuilder):
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
-            raise ValueError("(dries): Why is there a feedforward executor version of DIAL?")
+            raise ValueError(
+                "(dries): Why is there a feedforward executor version of DIAL?"
+            )
             adder = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec
             )
