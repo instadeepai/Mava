@@ -143,9 +143,14 @@ Alternatively, examples can be run directly from the command line without first 
     ```
 
 8. **Optional**: To log episodes in video/gif format, using the `Monitor` wrapper.
-- Install `xvfb` to run a headless screen and `ffmpeg` to record video.
+- Install `xvfb` to run a headless/fake screen and `ffmpeg` to record video.
     ```
     sudo apt-get install -y xvfb ffmpeg
+    ```
+
+- Setup fake display:
+    ```
+    xvfb-run -s "-screen 0 1400x900x24" bash
     ```
 
 - Install `array2gif`, if you would like to save the episode in gif format.
