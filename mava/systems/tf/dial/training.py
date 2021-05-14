@@ -394,7 +394,7 @@ class DIALTrainer(mava.Trainer):
 
     def _backward(self) -> None:
 
-        # TODO (dries): I still need to figure out the total_loss thing. Not per agent I see.
+        # TODO (dries): I still need to figure out the total_loss thing. Not per agent I see but per batch?
 
         # Calculate the gradients and update the networks
         total_loss = self.total_loss
