@@ -1,3 +1,4 @@
+import collections
 from typing import Any, Dict, List, Tuple, Union
 
 import dm_env
@@ -102,20 +103,23 @@ class RunningStatistics:
     a specific quantity.
     """
 
-    def __init__(self, label: str) -> None:
-        self.count = 0
-        self.old_mean = 0.0
-        self.new_mean = 0.0
-        self.old_var = 0.0
-        self.new_var = 0.0
+    def __init__(self, label: str, queue_size: int = 100) -> None:
 
-        self._max = -9999999.9
-        self._min = 9999999.9
+        self.queue: collections.deque = collections.deque(maxlen=queue_size)
+        self._max = -float("inf")
+        self._min = float("inf")
+
+        self._mean = 0.0
+
+        self._var = 0.0
 
         self._label = label
 
+        self._raw = 0.0
+
     def push(self, x: float) -> None:
-        self.count += 1
+        self._raw = x
+        self.queue.append(x)
 
         if x > self._max:
             self._max = x
@@ -123,15 +127,12 @@ class RunningStatistics:
         if x < self._min:
             self._min = x
 
-        if self.count == 1:
-            self.old_mean = self.new_mean = x
-            self.old_var = 0.0
+        if len(self.queue) == 1:
+            self._mean = x
+            self._var = 0
         else:
-            self.new_mean = self.old_mean + (x - self.old_mean) / self.count
-            self.new_var = self.old_var + (x - self.old_mean) * (x - self.new_mean)
-
-            self.old_mean = self.new_mean
-            self.old_var = self.new_var
+            self._mean = np.mean(self.queue)
+            self._var = np.var(self.queue)
 
     def max(self) -> float:
         return self._max
@@ -140,13 +141,16 @@ class RunningStatistics:
         return self._min
 
     def mean(self) -> float:
-        return self.new_mean if self.count else 0.0
+        return self._mean
 
     def var(self) -> float:
-        return self.new_var / (self.count - 1) if self.count > 1 else 0.0
+        return self._var
 
     def std(self) -> float:
-        return np.sqrt(self.var())
+        return np.sqrt(self._var)
+
+    def raw(self) -> float:
+        return self._raw
 
 
 # Adapted From https://github.com/DLR-RM/stable-baselines3/blob/237223f834fe9b8143ea24235d087c4e32addd2f/stable_baselines3/common/running_mean_std.py # noqa: E501

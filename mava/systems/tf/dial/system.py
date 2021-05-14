@@ -18,21 +18,25 @@
 
 """DIAL system implementation."""
 import dataclasses
-from typing import Dict, Iterator, Optional
+from typing import Callable, Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
 import tensorflow as tf
-from acme import datasets
+from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import CentralisedActor
-from mava.components.tf.modules.communication import BroadcastedCommunication
+from mava.components.tf.architectures import DecentralisedPolicyActor
+from mava.components.tf.modules.communication import (
+    BaseCommunicationModule,
+    BroadcastedCommunication,
+)
 from mava.systems import system
 from mava.systems.builders import SystemBuilder
+from mava.systems.tf import executors
 from mava.systems.tf.dial.execution import DIALExecutor
 from mava.systems.tf.dial.training import DIALTrainer
 
@@ -59,7 +63,6 @@ class DIALConfig:
         n_step: number of steps to squash into a single transition.
         epsilon: probability of taking a random action; ignored if a policy
             network is given.
-        learning_rate: learning rate for the q-network update.
         discount: discount to use for TD updates.
         logger: logger object to be used by learner.
         checkpoint: boolean indicating whether to checkpoint the learner.
@@ -73,24 +76,30 @@ class DIALConfig:
 
     environment_spec: specs.MAEnvironmentSpec
     networks: Dict[str, snt.Module]
-    batch_size: int = 256
+    policy_optimizer: snt.Optimizer
+    shared_weights: bool = True
+    batch_size: int = 1
     prefetch_size: int = 4
     target_update_period: int = 100
     samples_per_insert: float = 32.0
-    min_replay_size: int = 1000
+    min_replay_size: int = 1
     max_replay_size: int = 1000000
     importance_sampling_exponent: float = 0.2
     priority_exponent: float = 0.6
-    n_step: int = 5
+    n_step: int = 1
     epsilon: Optional[tf.Tensor] = None
-    learning_rate: float = 1e-3
-    discount: float = 0.99
+    discount: float = 1.00
     logger: loggers.Logger = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     policy_networks: Optional[Dict[str, snt.Module]] = None
     max_gradient_norm: Optional[float] = None
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    counter: counting.Counter = None
+    clipping: bool = False
+    communication_module: BaseCommunicationModule = BroadcastedCommunication
+    sequence_length: int = 10
+    period: int = 1
 
 
 class DIALBuilder(SystemBuilder):
@@ -103,9 +112,14 @@ class DIALBuilder(SystemBuilder):
       distributed setup.
       """
 
-    def __init__(self, config: DIALConfig):
+    def __init__(
+        self,
+        config: DIALConfig,
+        executor_fn: Type[core.Executor] = DIALExecutor,
+    ):
         """Args:
-        config: Configuration options for the DIAL system."""
+        config: Configuration options for the DIAL system.
+        executor_fn: Executor function to use"""
 
         self._config = config
 
@@ -113,34 +127,59 @@ class DIALBuilder(SystemBuilder):
             _agent_types: a list of the types of agents to be used."""
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
+        self._executor_fn = executor_fn
 
-    def make_replay_table(
+    def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
-    ) -> reverb.Table:
+    ) -> List[reverb.Table]:
         """Create tables to insert data into."""
-        return reverb.Table(
-            name=self._config.replay_table_name,
-            sampler=reverb.selectors.Prioritized(self._config.priority_exponent),
-            remover=reverb.selectors.Fifo(),
-            max_size=self._config.max_replay_size,
-            rate_limiter=reverb.rate_limiters.MinSize(1),
-            signature=reverb_adders.ParallelNStepTransitionAdder.signature(
+
+        # Select adder
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+            adder = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec
-            ),
-        )
+            )
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
+            core_state_spec = {}
+            for agent in self._agents:
+                agent_type = agent.split("_")[0]
+                core_state_spec[agent] = {
+                    "state": tf2_utils.squeeze_batch_dim(
+                        self._config.networks[agent_type].initial_state(1)
+                    ),
+                    "message": tf2_utils.squeeze_batch_dim(
+                        self._config.networks[agent_type].initial_message(1)
+                    ),
+                }
+            adder = reverb_adders.ParallelEpisodeAdder.signature(
+                environment_spec, core_state_spec
+            )
+        else:
+            print(self._executor_fn)
+            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+
+        return [
+            reverb.Table.queue(
+                name=self._config.replay_table_name,
+                max_size=self._config.max_replay_size,
+                signature=adder,
+            )
+        ]
 
     def make_dataset_iterator(
         self,
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for learning/updating the system."""
-        dataset = datasets.make_reverb_dataset(
-            table=self._config.replay_table_name,
+        dataset = reverb.ReplayDataset.from_table_signature(
             server_address=replay_client.server_address,
-            batch_size=self._config.batch_size,
-            prefetch_size=self._config.prefetch_size,
+            table=self._config.replay_table_name,
+            max_in_flight_samples_per_worker=1,
+            # sequence_length=self._config.sequence_length,
+            emit_timesteps=False,
         )
+        dataset = dataset.batch(self._config.batch_size, drop_remainder=True)
         return iter(dataset)
 
     def make_adder(
@@ -151,16 +190,31 @@ class DIALBuilder(SystemBuilder):
         Args:
           replay_client: Reverb Client which points to the replay server.
         """
-        return reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns={self._config.replay_table_name: lambda x: 1.0},
-            client=replay_client,
-            n_step=self._config.n_step,
-            discount=self._config.discount,
-        )
+
+        # Select adder
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+            adder = reverb_adders.ParallelNStepTransitionAdder(
+                priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+                client=replay_client,
+                n_step=self._config.n_step,
+                discount=self._config.discount,
+            )
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
+            adder = reverb_adders.ParallelEpisodeAdder(
+                priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+                client=replay_client,
+                max_sequence_length=self._config.sequence_length,
+                # period=self._config.period,
+            )
+        else:
+            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+
+        return adder
 
     def make_executor(
         self,
         policy_networks: Dict[str, snt.Module],
+        communication_module: BaseCommunicationModule,
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
@@ -187,7 +241,7 @@ class DIALBuilder(SystemBuilder):
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policy": variables},
-                update_period=1000,
+                update_period=10,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -195,8 +249,9 @@ class DIALBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
-        return DIALExecutor(
+        return self._executor_fn(
             policy_networks=policy_networks,
+            communication_module=communication_module,
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
@@ -206,11 +261,11 @@ class DIALBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
+        communication_module: BaseCommunicationModule,
         huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -222,7 +277,6 @@ class DIALBuilder(SystemBuilder):
           counter: a Counter which allows for recording of counts (trainer steps,
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the trainer checkpoints itself.
         """
         agents = self._agents
         agent_types = self._agent_types
@@ -231,22 +285,19 @@ class DIALBuilder(SystemBuilder):
         discount = self._config.discount
         target_update_period = self._config.target_update_period
         max_gradient_norm = self._config.max_gradient_norm
-        learning_rate = self._config.learning_rate
         importance_sampling_exponent = self._config.importance_sampling_exponent
-
-        # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=learning_rate)
 
         # The learner updates the parameters (and initializes them).
         trainer = DIALTrainer(
             agents=agents,
             agent_types=agent_types,
-            networks=networks["networks"],
-            target_network=networks["target_networks"],
+            networks=networks["policies"],
+            target_network=networks["target_policies"],
+            observation_networks=networks["observations"],
             shared_weights=shared_weights,
             discount=discount,
             importance_sampling_exponent=importance_sampling_exponent,
-            policy_optimizer=policy_optimizer,
+            policy_optimizer=self._config.policy_optimizer,
             target_update_period=target_update_period,
             dataset=dataset,
             huber_loss_parameter=huber_loss_parameter,
@@ -254,8 +305,9 @@ class DIALBuilder(SystemBuilder):
             clipping=clipping,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
+            checkpoint=self._config.checkpoint,
             max_gradient_norm=max_gradient_norm,
+            communication_module=communication_module,
         )
         return trainer
 
@@ -272,19 +324,21 @@ class DIAL(system.System):
         self,
         environment_spec: specs.MAEnvironmentSpec,
         networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
-        batch_size: int = 256,
+        observation_networks: Dict[str, snt.Module],
+        executor_fn: Type[core.Executor] = DIALExecutor,
+        policy_optimizer: snt.Optimizer = snt.optimizers.RMSProp(5e-4, momentum=0.95),
+        shared_weights: bool = True,
+        batch_size: int = 1,
         prefetch_size: int = 4,
         target_update_period: int = 100,
-        samples_per_insert: float = 32.0,
-        min_replay_size: int = 1000,
+        samples_per_insert: float = 1.0,
+        min_replay_size: int = 100,
         max_replay_size: int = 1000000,
         importance_sampling_exponent: float = 0.2,
         priority_exponent: float = 0.6,
-        n_step: int = 5,
+        n_step: int = 1,
         epsilon: Optional[tf.Tensor] = None,
-        learning_rate: float = 1e-3,
-        discount: float = 0.99,
+        discount: float = 1.0,
         logger: loggers.Logger = None,
         counter: counting.Counter = None,
         checkpoint: bool = True,
@@ -292,6 +346,7 @@ class DIAL(system.System):
         policy_networks: Optional[Dict[str, snt.Module]] = None,
         max_gradient_norm: Optional[float] = None,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
+        communication_module: BaseCommunicationModule = BroadcastedCommunication,
     ):
         """Initialize the system.
         Args:
@@ -313,7 +368,6 @@ class DIAL(system.System):
             n_step: number of steps to squash into a single transition.
             epsilon: probability of taking a random action; ignored if a policy
                 network is given.
-            learning_rate: learning rate for the q-network update.
             discount: discount to use for TD updates.
             logger: logger object to be used by learner.
             checkpoint: boolean indicating whether to checkpoint the learner.
@@ -339,7 +393,6 @@ class DIAL(system.System):
                 priority_exponent=priority_exponent,
                 n_step=n_step,
                 epsilon=epsilon,
-                learning_rate=learning_rate,
                 discount=discount,
                 logger=logger,
                 counter=counter,
@@ -348,14 +401,20 @@ class DIAL(system.System):
                 policy_networks=policy_networks,
                 max_gradient_norm=max_gradient_norm,
                 replay_table_name=replay_table_name,
-            )
+                policy_optimizer=policy_optimizer,
+            ),
+            executor_fn=executor_fn,
         )
 
         # Create a replay server to add data to. This uses no limiter behavior in
         # order to allow the Agent interface to handle it.
-        replay_table = builder.make_replay_table(environment_spec=environment_spec)
-        self._server = reverb.Server([replay_table], port=None)
+        replay_table = builder.make_replay_tables(environment_spec=environment_spec)
+        self._server = reverb.Server(replay_table, port=None)
         replay_client = reverb.Client(f"localhost:{self._server.port}")
+
+        self._can_sample: Callable[[], bool] = lambda: replay_table[0].can_sample(
+            batch_size
+        )
 
         # The adder is used to insert observations into replay.
         adder = builder.make_adder(replay_client)
@@ -366,24 +425,41 @@ class DIAL(system.System):
         # Create system architecture
         # TODO (Kevin): create decentralised/centralised/networked actor architectures
         # see mava/components/tf/architectures
-        architecture = CentralisedActor(
+        architecture = DecentralisedPolicyActor(
             environment_spec=environment_spec,
-            networks=networks,
+            policy_networks=networks,
+            observation_networks=observation_networks,
             shared_weights=shared_weights,
         )
 
         # Add differentiable communication and get networks
         # TODO (Kevin): create differentiable communication module
         # See mava/components/tf/modules/communication
-        networks = BroadcastedCommunication(
+        self._communication_module = communication_module(
             architecture=architecture,
-        ).create_system()
+            shared=True,
+            channel_size=1,
+            channel_noise=0,
+        )
+
+        networks = self._communication_module.create_system()
 
         # Create the actor which defines how we take actions.
-        executor = builder.make_executor(networks["policies"], adder)
+        executor = builder.make_executor(
+            policy_networks=networks["policies"],
+            adder=adder,
+            communication_module=self._communication_module,
+        )
 
         # The learner updates the parameters (and initializes them).
-        trainer = builder.make_trainer(networks, dataset, counter, logger, checkpoint)
+        trainer = builder.make_trainer(
+            networks=networks,
+            dataset=dataset,
+            counter=counter,
+            logger=None,
+            checkpoint=checkpoint,
+            communication_module=self._communication_module,
+        )
 
         super().__init__(
             executor=executor,
@@ -391,3 +467,11 @@ class DIAL(system.System):
             min_observations=max(batch_size, min_replay_size),
             observations_per_step=float(batch_size) / samples_per_insert,
         )
+
+    def update(self) -> None:
+        learner_step = False
+        while self._can_sample():
+            self._trainer.step()
+            learner_step = True
+        if learner_step:
+            self._executor.update()

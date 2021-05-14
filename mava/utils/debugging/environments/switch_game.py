@@ -14,10 +14,11 @@
 # limitations under the License.
 
 
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import gym
 import numpy as np
+from gym import spaces
 
 """
 DIAL switch game implementation
@@ -33,34 +34,28 @@ class MultiAgentSwitchGame(gym.Env):
     def __init__(
         self,
         num_agents: int = 3,
-        reset_callback: Callable = None,
-        reward_callback: Callable = None,
-        observation_callback: Callable = None,
-        info_callback: Callable = None,
-        done_callback: Callable = None,
-        shared_viewer: bool = True,
     ) -> None:
 
-        self._num_agents = num_agents
+        self.num_agents = num_agents
         # Generate IDs and convert agent list to dictionary format.
         self.env_done = False
         self.agent_ids = []
 
-        for a_i in range(self._num_agents):
+        # spaces
+        self.action_spaces = {}
+        self.observation_spaces = {}
+        for a_i in range(self.num_agents):
             agent_id = "agent_" + str(a_i)
             self.agent_ids.append(agent_id)
+            self.action_spaces[agent_id] = spaces.Discrete(2)
+            # self.observation_spaces[agent_id] = spaces.Discrete(2)
+            self.observation_spaces[agent_id] = spaces.Box(
+                low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32
+            )
 
         self.possible_agents = self.agent_ids
-        # scenario callbacks
-        self._reset_callback = reset_callback
-        self._reward_callback = reward_callback
-        self._observation_callback = observation_callback
-        self._info_callback = info_callback
-        self._done_callback = done_callback
         # environment parameters
-
-        self.max_time = 4 * self._num_agents - 6
-
+        self.max_time = 4 * self.num_agents - 6
         self.selected_agent = -1
 
     def step(
@@ -77,18 +72,21 @@ class MultiAgentSwitchGame(gym.Env):
 
         # set action for interrogated agent
         selected_agent_id = self.agent_ids[self.selected_agent]
-        action = action_n[selected_agent_id]
+
         # advance world state
         self.agent_history.append(self.selected_agent)
-        self.seen_all = np.unique(self.agent_history).shape[0] == self._num_agents
-        if action == 1:
+        self.seen_all = np.unique(self.agent_history).shape[0] == self.num_agents
+        if action_n[selected_agent_id] == 1:
             self.env_done = True
             self.tell = True
 
-        self.selected_agent = np.random.randint(0, self._num_agents)
         self.time += 1
+        # self.selected_agent = np.random.randint(0, self.num_agents)
+
         if self.time >= self.max_time:
             self.env_done = True
+        else:
+            self.selected_agent = self._agent_order[self.time]
 
         # record observation for each agent
         for a_i, agent_id in enumerate(self.agent_ids):
@@ -104,14 +102,17 @@ class MultiAgentSwitchGame(gym.Env):
 
     def reset(self) -> Dict[str, np.array]:
         # reset world
-        if self._reset_callback is not None:
-            self._reset_callback(self.world)
-        else:
-            self.agent_history: List[int] = []
-            self.n_seen = 0
-            self.time = 0
-            self.tell = False
-            self.selected_agent = np.random.randint(0, self._num_agents)
+        self.agent_history: List[int] = []
+        self.n_seen = 0
+        self.time = 0
+        self.tell = False
+
+        self._agent_order = np.array([0])
+        while len(np.unique(self._agent_order)) < self.num_agents:
+            self._agent_order = np.random.randint(0, self.num_agents, (self.max_time,))
+
+        self.selected_agent = self._agent_order[0]
+        # self.selected_agent = np.random.randint(0, self.num_agents)
 
         self.env_done = False
         # record observations for each agent
@@ -122,28 +123,24 @@ class MultiAgentSwitchGame(gym.Env):
 
     # get info used for benchmarking
     def _get_info(self, agent_id: str) -> Dict:
-        if self._info_callback is None:
-            return {}
-        return self._info_callback(agent_id)
+        return {}
 
     # get observation for a particular agent
     def _get_obs(self, a_i: int, agent_id: str) -> np.array:
-        if self._observation_callback is None:
-            return 1 if a_i == self.selected_agent else 0
-        return self._observation_callback(agent_id, a_i, self.world)
+        selected = 1.0 if a_i == self.selected_agent else 0.0
+        return np.array([selected, self.time], dtype=np.float32)
 
     # get dones for a particular agent
     # unused right now -- agents are allowed to go beyond the viewing screen
     def _get_done(self, agent_id: str) -> bool:
-        if self._done_callback is None:
-            return self.env_done
-        done = self._done_callback(agent_id)
-        return done
+        return self.env_done
 
     # get reward for a particular agent
     def _get_reward(self, a_i: int, agent_id: str) -> float:
-        if self._reward_callback is None:
-            if not self.env_done:
-                return 0.0
-            return 1.0 if self.seen_all and self.tell else -1.0
-        return self._reward_callback(agent_id, a_i, self.world)
+        if not self.env_done:
+            return np.array(0.0, dtype=np.float32)
+        return (
+            np.array(1.0, dtype=np.float32)
+            if self.seen_all and self.tell
+            else np.array(-1.0, dtype=np.float32)
+        )

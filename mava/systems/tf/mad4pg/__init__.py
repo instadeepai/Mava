@@ -13,6 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.systems.tf.mappo.execution import MAPPOFeedForwardExecutor
-from mava.systems.tf.mappo.system import MAPPO
-from mava.systems.tf.mappo.training import CentralisedMAPPOTrainer, MAPPOTrainer
+"""Implementations of a MAD4PG agent."""
+
+from mava.systems.tf.mad4pg.system import MAD4PG
+from mava.systems.tf.mad4pg.training import (
+    BaseMAD4PGTrainer,
+    CentralisedMAD4PGTrainer,
+    DecentralisedMAD4PGTrainer,
+    StateBasedMAD4PGTrainer,
+)

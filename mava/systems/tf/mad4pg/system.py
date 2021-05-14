@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG system implementation."""
+"""MAD4PG system implementation."""
 import copy
-from typing import Any, Callable, Dict, Tuple, Type, Union
+from typing import Any, Callable, Dict, Tuple, Type
 
 import acme
 import dm_env
@@ -33,15 +33,15 @@ from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
-from mava.systems.tf.maddpg import builder, training
+from mava.systems.tf.mad4pg import builder, training
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger
 from mava.wrappers import DetailedPerAgentStatistics
 
 
-class MADDPG:
-    """MADDPG system.
-    This implements a single-process DDPG system. This is an actor-critic based
+class MAD4PG:
+    """MAD4PG system.
+    This implements a single-process D4PG system. This is an actor-critic based
     system that generates data via a behavior policy, inserts N-step transitions into
     a replay buffer, and periodically updates the policies of each agent
     (and as a result the behavior) by sampling uniformly from this buffer.
@@ -54,10 +54,9 @@ class MADDPG:
         architecture: Type[
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
-        trainer_fn: Union[
-            Type[training.BaseMADDPGTrainer],
-            Type[training.BaseRecurrentMADDPGTrainer],
-        ] = training.DecentralisedMADDPGTrainer,
+        trainer_fn: Type[
+            training.BaseMAD4PGTrainer
+        ] = training.DecentralisedMAD4PGTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         log_info: Tuple = None,
         num_executors: int = 1,
@@ -146,8 +145,8 @@ class MADDPG:
         else:
             extra_specs = {}
 
-        self._builder = builder.MADDPGBuilder(
-            builder.MADDPGConfig(
+        self._builder = builder.MAD4PGBuilder(
+            builder.MAD4PGConfig(
                 environment_spec=environment_spec,
                 shared_weights=shared_weights,
                 discount=discount,
@@ -342,7 +341,7 @@ class MADDPG:
         eval_loop = DetailedPerAgentStatistics(eval_loop)
         return eval_loop
 
-    def build(self, name: str = "maddpg") -> Any:
+    def build(self, name: str = "mad4pg") -> Any:
         """Build the distributed system topology."""
         program = lp.Program(name=name)
 

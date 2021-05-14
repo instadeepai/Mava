@@ -37,7 +37,19 @@ class BaseArchitecture:
         """Create system architecture."""
 
 
-class BaseActorCritic(BaseArchitecture):
+class BasePolicyArchitecture(BaseArchitecture):
+    """Base class for policy gradient MARL architectures.
+    Objects which implement this interface provide a set of functions
+    to create systems according to a specific architectural design,
+    e.g. decentralised, centralised or networked.
+    """
+
+    @abc.abstractmethod
+    def create_behaviour_policy(self) -> Dict[str, Dict[str, snt.Module]]:
+        """Return behaviour policy networks (observation network + policy head)."""
+
+
+class BaseActorCritic(BasePolicyArchitecture):
     """Base class for MARL Actor critic architectures.
     Objects which implement this interface provide a set of functions
     to create systems according to a specific architectural design,
