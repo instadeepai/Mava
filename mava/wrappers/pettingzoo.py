@@ -177,9 +177,6 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         return {}
 
-    def seed(self, seed: int = None) -> None:
-        self._environment.seed(seed)
-
     @property
     def agents(self) -> List:
         return self._environment.agents
@@ -353,9 +350,6 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         return {}
-
-    def seed(self, seed: int = None) -> None:
-        self._environment.seed(seed)
 
     @property
     def agents(self) -> List:
