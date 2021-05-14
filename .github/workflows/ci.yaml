@@ -27,7 +27,8 @@ jobs:
           export LANG=en_US.UTF-8
           pip install --upgrade pip setuptools
           pip install .
-          pip install .[tf,envs,reverb,testing_formatting,launchpad,flatland]
+          pip install .[tf,envs,reverb,testing_formatting,launchpad]
+          pip install .[flatland]
           # For atari envs
           sudo apt-get update
           sudo apt-get install unrar
