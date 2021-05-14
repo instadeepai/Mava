@@ -36,7 +36,7 @@ from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.maddpg import builder, training
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger
-from mava.wrappers import DetailedPerAgentStatistics, MonitorParallelEnvironmentLoop
+from mava.wrappers import DetailedPerAgentStatistics
 
 
 class MADDPG:
@@ -87,6 +87,8 @@ class MADDPG:
         eval_logger: MavaLogger = None,
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
+        train_loop_fn_kwargs: Dict = {},
+        eval_loop_fn_kwargs: Dict = {},
     ):
         """Initialize the system.
         Args:
@@ -145,7 +147,9 @@ class MADDPG:
         self._exec_logger = exec_logger
         self._eval_logger = eval_logger
         self._train_loop_fn = train_loop_fn
+        self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
+        self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
 
         if executor_fn == executors.RecurrentExecutor:
             extra_specs = self._get_extra_specs()
@@ -292,7 +296,11 @@ class MADDPG:
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
-            environment, executor, counter=counter, logger=exec_logger
+            environment,
+            executor,
+            counter=counter,
+            logger=exec_logger,
+            **self._train_loop_fn_kwargs,
         )
 
         train_loop = DetailedPerAgentStatistics(train_loop)
@@ -341,18 +349,13 @@ class MADDPG:
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
-        if isinstance(self._eval_loop_fn, MonitorParallelEnvironmentLoop):
-            eval_loop = self._eval_loop_fn(
-                environment,
-                executor,
-                counter=counter,
-                logger=self._eval_logger,
-                path=self._checkpoint_subpath,
-            )
-        else:
-            eval_loop = self._eval_loop_fn(
-                environment, executor, counter=counter, logger=self._eval_logger
-            )
+        eval_loop = self._eval_loop_fn(
+            environment,
+            executor,
+            counter=counter,
+            logger=self._eval_logger,
+            **self._eval_loop_fn_kwargs,
+        )
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)
         return eval_loop

@@ -216,7 +216,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         logger: loggers.Logger = None,
         should_update: bool = True,
         label: str = "parallel_environment_loop",
-        record_every: int = 500,
+        record_every: int = 1000,
         path: str = "~/mava",
         fps: int = 15,
         counter_str: str = "evaluator_episodes",
@@ -284,7 +284,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
     def _write_frames(self) -> None:
         counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
-        path = f"{self._path}/{self._filename}_{counter}"
+        path = f"{self._path}/{self._filename}_{counter}_eval_episode"
         if self._format == "video":
             self._save_video(path)
         elif self._format == "gif":
