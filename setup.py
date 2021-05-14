@@ -93,6 +93,7 @@ setup(
     extras_require={
         "tf": tf_requirements,
         "envs": env_requirements,
+        "flatland": ["flatland-rl"],
         "reverb": reverb_requirements,
         "launchpad": launchpad_requirements,
         "testing_formatting": testing_formatting_requirements,
