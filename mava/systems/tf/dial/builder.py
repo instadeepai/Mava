@@ -9,9 +9,8 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.modules.communication import (
+from mava.components.tf.modules.communication import (  # BroadcastedCommunication,
     BaseCommunicationModule,
-    BroadcastedCommunication,
 )
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
@@ -235,7 +234,6 @@ class DIALBuilder(SystemBuilder):
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         communication_module: BaseCommunicationModule,
-        checkpoint: bool = True,
         huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
@@ -279,7 +277,7 @@ class DIALBuilder(SystemBuilder):
             clipping=clipping,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
+            checkpoint=self._config.checkpoint,
             max_gradient_norm=max_gradient_norm,
             communication_module=communication_module,
         )

@@ -242,7 +242,7 @@ def main(_: Any) -> None:
     program = dial.DIAL(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        num_executors=2,
+        num_executors=5,
         log_info=log_info,
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,

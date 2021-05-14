@@ -233,7 +233,6 @@ class MADDPG:
             dataset=dataset,
             counter=counter,
             logger=self._trainer_logger,
-            checkpoint=self._checkpoint,
         )
 
     def executor(

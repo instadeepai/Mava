@@ -316,7 +316,7 @@ class DIAL(system.System):
             dataset=dataset,
             counter=counter,
             logger=self._trainer_logger,
-            checkpoint=self._checkpoint,
+            # checkpoint=self._checkpoint,
             communication_module=communication_module,
         )
 
