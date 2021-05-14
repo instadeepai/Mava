@@ -142,6 +142,16 @@ Alternatively, examples can be run directly from the command line without first 
     conda install -c anaconda cudatoolkit
     ```
 
+8. **Optional**: To log episodes in video/gif format, using the `Monitor` wrapper.
+- Install `xvfb` to run a headless screen and `ffmpeg` to record video.
+    ```
+    sudo apt-get install -y xvfb ffmpeg
+    ```
+
+- Install `array2gif`, if you would like to save the episode in gif format.
+    ```
+    pip install .[record_episode]
+    ```
 ## Contributing
 
 Please read our [contributing docs](./CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.

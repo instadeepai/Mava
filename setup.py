@@ -54,6 +54,8 @@ testing_formatting_requirements = [
     "pytest-cov",
 ]
 
+record_episode_requirements = ["array2gif"]
+
 long_description = """Mava is a library for building multi-agent reinforcement
 learning (MARL) systems. Mava builds off of Acme and in a similar way strives
 to expose simple, efficient, and readable components, as well as examples that
@@ -96,6 +98,7 @@ setup(
         "reverb": reverb_requirements,
         "launchpad": launchpad_requirements,
         "testing_formatting": testing_formatting_requirements,
+        "record_episode": record_episode_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

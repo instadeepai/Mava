@@ -21,6 +21,9 @@ RUN apt-get install ffmpeg libsm6 libxext6  -y
 # Install Mava and dependencies
 COPY . /home/app/mava
 RUN python -m pip install --upgrade pip
-RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting]
+RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting,record_episode]
+
+# Install `xvfb` to run a headless screen and `ffmpeg` to record video.
+RUN apt-get install -y xvfb ffmpeg
 
 EXPOSE 6006
