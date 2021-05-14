@@ -85,7 +85,8 @@ class TrainerStatisticsBase(TrainerWrapperBase):
 
         train_utils.checkpoint_networks(self._system_checkpointer)
 
-        self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
 
 class DetailedTrainerStatistics(TrainerStatisticsBase):
@@ -306,7 +307,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
 
         train_utils.checkpoint_networks(self._system_checkpointer)
 
-        self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
 
 class NetworkStatistics(NetworkStatisticsBase):

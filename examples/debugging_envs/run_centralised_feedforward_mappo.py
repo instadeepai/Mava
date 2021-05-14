@@ -13,26 +13,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for MAPPO."""
+"""Example running centralized MAPPO on simple spread debug env."""
 
 import functools
-from typing import Dict, Sequence, Union
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Sequence, Union
 
+import acme.tf.networks as networks
 import dm_env
 import launchpad as lp
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
-from acme.tf import networks
+from absl import app, flags
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
-import mava
-from mava import specs as mava_specs
+import mava.specs as mava_specs
+from mava.components.tf.architectures import CentralisedValueCritic
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import Logger
+
+FLAGS = flags.FLAGS
+flags.DEFINE_string(
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "continuous",
+    "Environment action space type (str).",
+)
 
 
 def make_networks(
@@ -47,8 +62,6 @@ def make_networks(
 ) -> Dict[str, snt.Module]:
 
     """Creates networks used by the agents."""
-
-    # TODO handle observation networks.
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
@@ -121,84 +134,52 @@ def make_networks(
     }
 
 
-class TestMAPPO:
-    """Simple integration/smoke test for MAPPO."""
+def main(_: Any) -> None:
 
-    def test_mappo_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
+    # set loggers info
+    base_dir = Path.cwd()
+    log_dir = base_dir / "logs"
+    log_time_stamp = str(datetime.now())
 
-        # set loggers info
-        # TODO Allow for no checkpointing and no loggers to be
-        # passed in.
-        mava_id = "tests/mappo"
-        base_dir = "~/mava"
-        log_info = (base_dir, f"{mava_id}/logs")
+    log_info = (log_dir, log_time_stamp)
 
-        # environment
-        environment_factory = functools.partial(
-            debugging_utils.make_environment,
-            env_name="simple_spread",
-            action_space="discrete",
-        )
+    # environment
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+    )
 
-        # networks
-        network_factory = lp_utils.partial_kwargs(make_networks)
+    # networks
+    network_factory = lp_utils.partial_kwargs(make_networks)
 
-        # system
-        checkpoint_dir = f"{base_dir}/{mava_id}"
+    # distributed program
+    program = mappo.MAPPO(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        num_executors=2,
+        log_info=log_info,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
+        architecture=CentralisedValueCritic,
+        trainer_fn=mappo.CentralisedMAPPOTrainer,
+    ).build()
 
-        log_every = 10
-        trainer_logger = Logger(
-            label="system_trainer",
-            directory=base_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=mava_id,
-            time_delta=log_every,
-        )
+    # launch
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
+    )
 
-        exec_logger = Logger(
-            # _{executor_id} gets appended to label in system.
-            label="train_loop_executor",
-            directory=base_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=mava_id,
-            time_delta=log_every,
-        )
 
-        eval_logger = Logger(
-            label="eval_loop",
-            directory=base_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=mava_id,
-            time_delta=log_every,
-        )
-        system = mappo.MAPPO(
-            environment_factory=environment_factory,
-            network_factory=network_factory,
-            log_info=log_info,
-            num_executors=2,
-            batch_size=32,
-            max_queue_size=1000,
-            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
-            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
-            checkpoint=False,
-            checkpoint_subpath=checkpoint_dir,
-            trainer_logger=trainer_logger,
-            exec_logger=exec_logger,
-            eval_logger=eval_logger,
-        )
-        program = system.build()
-
-        (trainer_node,) = program.groups["trainer"]
-        trainer_node.disable_run()
-
-        lp.launch(program, launch_type="test_mt")
-
-        trainer: mava.Trainer = trainer_node.create_handle().dereference()
-
-        for _ in range(5):
-            trainer.step()
+if __name__ == "__main__":
+    app.run(main)

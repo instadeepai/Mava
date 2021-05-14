@@ -15,32 +15,61 @@
 
 """helper functions for logging"""
 
+import abc
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
-from acme.utils import loggers
+from acme.utils import loggers, paths
+from acme.utils.loggers import base
 
 from mava.utils.loggers.tf_logger import TFSummaryLogger
 
 
-class Logger:
+class MavaLogger(abc.ABC):
+    @abc.abstractmethod
     def __init__(
         self,
         label: str,
-        directory: Path,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        """Init function that takes in a label and possibly other variables."""
+
+    @abc.abstractmethod
+    def write(self, data: Any) -> None:
+        """Function that writes logged data."""
+
+
+class Logger(MavaLogger):
+    def __init__(
+        self,
+        label: str,
+        directory: Union[Path, str],
         to_terminal: bool = True,
         to_csv: bool = False,
         to_tensorboard: bool = False,
         time_delta: float = 1.0,
         print_fn: Callable[[str], None] = print,
         time_stamp: Optional[str] = None,
+        external_logger: Optional[base.Logger] = None,
+        **external_logger_kwargs: Any,
     ):
         self._label = label
+
+        if not isinstance(directory, Path):
+            directory = Path(directory)
+
         self._directory = directory
         self._time_stamp = time_stamp if time_stamp else str(datetime.now())
         self._logger = self.make_logger(
-            to_terminal, to_csv, to_tensorboard, time_delta, print_fn
+            to_terminal,
+            to_csv,
+            to_tensorboard,
+            time_delta,
+            print_fn,
+            external_logger=external_logger,
+            **external_logger_kwargs,
         )
         self._logger_info = (
             to_terminal,
@@ -58,6 +87,8 @@ class Logger:
         to_tensorboard: bool,
         time_delta: float,
         print_fn: Callable[[str], None],
+        external_logger: Optional[base.Logger],
+        **external_logger_kwargs: Any,
     ) -> loggers.Logger:
         """Build a Mava logger.
 
@@ -67,11 +98,10 @@ class Logger:
             to_terminal: to print the logs in the terminal.
             to_csv: to save the logs in a csv file.
             to_tensorboard: to write the logs tf-events.
-            to_wandb: whether to use wandb.
-            to_neptune: whether to use neptune.
             time_delta: minimum elapsed time (in seconds) between logging events.
             print_fn: function to call which acts like print.
-
+            external_logger: optional external logger.
+            external_logger_kwargs: optional external logger params.
         Returns:
             A logger (pipe) object that responds to logger.write(some_dict).
         """
@@ -92,6 +122,14 @@ class Logger:
                 TFSummaryLogger(logdir=self._path("tensorboard"), label=self._label)
             ]  # type: ignore
 
+        if external_logger:
+            logger += [
+                external_logger(
+                    label=self._label,
+                    **external_logger_kwargs,
+                )
+            ]
+
         if logger:
             logger = loggers.Dispatcher(logger)
             logger = loggers.NoneFilter(logger)
@@ -102,11 +140,13 @@ class Logger:
         return logger
 
     def _path(self, subdir: Optional[str] = None) -> str:
-        return (
-            str(self._directory / subdir / self._time_stamp / self._label)
-            if subdir
-            else str(self._directory / self._label)
-        )
+        if subdir:
+            path = str(self._directory / self._time_stamp / subdir / self._label)
+        else:
+            path = str(self._directory / self._time_stamp / self._label)
+
+        # Recursively replace "~"
+        return paths.process_path(path)
 
     def write(self, data: Any) -> None:
         self._logger.write(data)

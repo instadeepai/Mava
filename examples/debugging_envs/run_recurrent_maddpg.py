@@ -13,25 +13,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for MADDPG."""
+"""Example running recurrent MADDPG on the debug MPE environments."""
 
-import functools
-from typing import Dict, Mapping, Sequence, Union
+from datetime import datetime
+from typing import Any, Dict, Mapping, Sequence, Union
 
 import launchpad as lp
 import numpy as np
 import sonnet as snt
-import tensorflow as tf
+from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
 
-import mava
 from mava import specs as mava_specs
-from mava.systems.tf import maddpg
+from mava.systems.tf import executors, maddpg
+from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
+
+FLAGS = flags.FLAGS
+flags.DEFINE_string(
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "continuous",
+    "Environment action space type (str).",
+)
+flags.DEFINE_string(
+    "mava_id",
+    str(datetime.now()),
+    "Experiment identifier that can be used to continue experiments.",
+)
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 def make_networks(
@@ -70,15 +88,17 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
-        # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
+        # Create the observation network.
+        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
-        policy_network = snt.Sequential(
+        policy_network = snt.DeepRNN(
             [
-                networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key], activate_final=True
-                ),
+                observation_network,
+                snt.Flatten(),
+                snt.nets.MLP(policy_networks_layer_sizes[key]),
+                snt.LSTM(25),
+                snt.nets.MLP([128]),
                 networks.NearZeroInitializedLinear(num_dimensions),
                 networks.TanhToSpec(specs[key].actions),
                 networks.ClippedGaussian(sigma),
@@ -97,97 +117,81 @@ def make_networks(
                 snt.Linear(1),
             ]
         )
+
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
 
     return {
+        "observations": observation_networks,
         "policies": policy_networks,
         "critics": critic_networks,
-        "observations": observation_networks,
     }
 
 
-class TestMADDPG:
-    """Simple integration/smoke test for MADDPG."""
+def main(_: Any) -> None:
 
-    def test_maddpg_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
+    # set loggers info
+    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
-        # set loggers info
-        # TODO Allow for no checkpointing and no loggers to be
-        # passed in.
-        mava_id = "tests/maddpg"
-        base_dir = "~/mava"
-        log_info = (base_dir, f"{mava_id}/logs")
+    # environment
+    environment_factory = lp_utils.partial_kwargs(
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+    )
 
-        # environment
-        environment_factory = functools.partial(
-            debugging_utils.make_environment,
-            env_name="simple_spread",
-            action_space="continuous",
-        )
+    network_factory = lp_utils.partial_kwargs(make_networks)
 
-        # networks
-        network_factory = lp_utils.partial_kwargs(make_networks)
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-        # system
-        checkpoint_dir = f"{base_dir}/{mava_id}"
+    log_every = 10
+    trainer_logger = Logger(
+        label="system_trainer",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
 
-        log_every = 10
-        trainer_logger = Logger(
-            label="system_trainer",
-            directory=base_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=mava_id,
-            time_delta=log_every,
-        )
+    exec_logger = Logger(
+        # _{executor_id} gets appended to label in system.
+        label="train_loop_executor",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
 
-        exec_logger = Logger(
-            # _{executor_id} gets appended to label in system.
-            label="train_loop_executor",
-            directory=base_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=mava_id,
-            time_delta=log_every,
-        )
+    eval_logger = Logger(
+        label="eval_loop",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
 
-        eval_logger = Logger(
-            label="eval_loop",
-            directory=base_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=mava_id,
-            time_delta=log_every,
-        )
+    program = maddpg.MADDPG(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        num_executors=2,
+        log_info=log_info,
+        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
+        executor_fn=executors.RecurrentExecutor,
+        checkpoint_subpath=checkpoint_dir,
+        trainer_logger=trainer_logger,
+        exec_logger=exec_logger,
+        eval_logger=eval_logger,
+    ).build()
 
-        system = maddpg.MADDPG(
-            environment_factory=environment_factory,
-            network_factory=network_factory,
-            log_info=log_info,
-            num_executors=2,
-            batch_size=32,
-            min_replay_size=32,
-            max_replay_size=1000,
-            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-            checkpoint=False,
-            checkpoint_subpath=checkpoint_dir,
-            trainer_logger=trainer_logger,
-            exec_logger=exec_logger,
-            eval_logger=eval_logger,
-        )
-        program = system.build()
+    lp.launch(
+        program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="current_terminal"
+    )
 
-        (trainer_node,) = program.groups["trainer"]
-        trainer_node.disable_run()
 
-        lp.launch(program, launch_type="test_mt")
-
-        trainer: mava.Trainer = trainer_node.create_handle().dereference()
-
-        for _ in range(5):
-            trainer.step()
+if __name__ == "__main__":
+    app.run(main)
