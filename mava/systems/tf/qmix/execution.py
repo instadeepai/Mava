@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional
+"""Executor implementations for QMIX."""
+
+from typing import Dict, Optional
 
 import dm_env
 import sonnet as snt
@@ -23,17 +25,24 @@ from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders, core
-from mava.components.tf.networks import epsilon_greedy_action_selector
+from mava.types import OLT
 
 
 class QMIXFeedForwardExecutor(core.Executor):
+    """A feed-forward executor.
+    An executor based on a feed-forward policy for each agent in the system
+    which takes non-batched observations and outputs non-batched actions.
+    It also allows adding experiences to replay and updating the weights
+    from the policy on the learner.
+    """
+
     def __init__(
         self,
         q_networks: Dict[str, snt.Module],
+        action_selectors: Dict[str, snt.Module],
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        epsilon: Optional[tf.Variable] = None,
     ):
         """Initializes the executor.
         Args:
@@ -45,27 +54,12 @@ class QMIXFeedForwardExecutor(core.Executor):
             of the policies to the executor copy (in case they are separate).
         """
 
-        def action_selector_fn(
-            q_values: types.NestedTensor,
-            legal_actions: types.NestedTensor,
-            epsilon: tf.Variable,
-        ) -> types.NestedTensor:
-            return epsilon_greedy_action_selector(
-                action_values=q_values,
-                legal_actions_mask=legal_actions,
-                epsilon=epsilon,
-            )
-
         # Store these for later use.
         self._adder = adder
         self._variable_client = variable_client
         self._q_networks = q_networks
-        self._action_selector = action_selector_fn
+        self._action_selectors = action_selectors
         self._shared_weights = shared_weights
-        if epsilon:
-            self.epsilon = epsilon
-        else:
-            self.epsilon = tf.Variable(0.05, trainable=False)
 
     @tf.function
     def _policy(
@@ -86,7 +80,7 @@ class QMIXFeedForwardExecutor(core.Executor):
         q_values = self._q_networks[agent_key](batched_observation)
 
         # select legal action
-        action = self._action_selector(q_values, batched_legals, epsilon=self.epsilon)
+        action = self._action_selectors[agent_key](q_values, batched_legals)
 
         return action
 
@@ -116,7 +110,7 @@ class QMIXFeedForwardExecutor(core.Executor):
                 self._adder.add(actions, next_timestep)
 
     def select_actions(
-        self, observations: Dict[str, Any]
+        self, observations: Dict[str, OLT]
     ) -> Dict[str, types.NestedArray]:
         actions = {}
         for agent, observation in observations.items():

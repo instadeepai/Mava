@@ -15,7 +15,7 @@
 
 """Example running Qmix on pettinzoo MPE environments."""
 from datetime import datetime
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import dm_env
 import launchpad as lp
@@ -30,17 +30,19 @@ from mava import specs as mava_specs
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import qmix
 from mava.utils import lp_utils
-from mava.utils.debugging.environments.two_step import TwoStepEnv
+
+# from mava.utils.debugging.environments.two_step import TwoStepEnv
+from mava.utils.debugging.make_env import make_debugging_env
 from mava.utils.loggers import Logger
-from mava.wrappers.debugging_envs import TwoStepWrapper
+from mava.wrappers.debugging_envs import DebuggingEnvWrapper  # , TwoStepWrapper
 
 FLAGS = flags.FLAGS
-FLAGS.DEFINE_string(
+flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-FLAGS.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 # TODO Add option for recurrent agent networks. In original paper they use DQN
 # for one task and DRQN for the StarCraft II SMAC task.
@@ -49,11 +51,34 @@ FLAGS.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 # the simple environment implementation in the original Qmix paper.
 
 
-def make_environment() -> dm_env.Environment:
-    """Creates a two-step game environment."""
-    environment = TwoStepEnv()
-    environment = TwoStepWrapper(environment)
+def make_environment(
+    evaluation: bool = False,
+    env_name: str = "simple_spread",
+    action_space: str = "discrete",
+    num_agents: int = 2,
+    render: bool = False,
+    random_seed: Optional[int] = None,
+) -> dm_env.Environment:
+
+    assert action_space == "continuous" or action_space == "discrete"
+
+    del evaluation
+
+    """Creates a MPE environment."""
+    env_module = make_debugging_env(env_name, action_space, num_agents)
+    environment = DebuggingEnvWrapper(env_module, render=render)
+
+    if random_seed and hasattr(environment, "seed"):
+        environment.seed(random_seed)
+
     return environment
+
+
+# def make_environment() -> dm_env.Environment:
+#     """Creates a two-step game environment."""
+#     environment = TwoStepEnv()
+#     environment = TwoStepWrapper(environment)
+#     return environment
 
 
 def make_networks(

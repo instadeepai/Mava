@@ -26,6 +26,7 @@ from acme.utils import counting
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.tf.qmix import execution, training
+from mava.wrappers import DetailedTrainerStatistics
 
 # TODO Clean up documentation
 
@@ -196,12 +197,12 @@ class QMIXBuilder:
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
-        # Create the actor which defines how we take actions.
+        # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
             action_selectors=action_selectors,
-            shared_weights=self._config.shared_weights,
-            variable_client=None,
+            shared_weights=shared_weights,
+            variable_client=variable_client,
             adder=adder,
         )
 
@@ -209,7 +210,6 @@ class QMIXBuilder:
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
     ) -> core.Trainer:
@@ -218,14 +218,13 @@ class QMIXBuilder:
           networks: struct describing the networks needed by the trainer; this can
             be specific to the trainer in question.
           dataset: iterator over samples from replay.
-          replay_client: Reverb Client which points to the replay server.
           counter: a Counter which allows for recording of counts (trainer steps,
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
           checkpoint: bool controlling whether the trainer checkpoints itself.
         """
-        q_networks = networks["q_networks"]
-        target_q_networks = networks["target_q_networks"]
+        q_networks = networks["values"]
+        target_q_networks = networks["target_values"]
         mixing_network = networks["mixing_network"]
         target_mixing_network = networks["target_mixing_network"]
 
@@ -251,5 +250,7 @@ class QMIXBuilder:
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
+
+        trainer = DetailedTrainerStatistics(trainer, metrics=["loss"])  # type: ignore
 
         return trainer

@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
+from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 from trfl.indexing_ops import batched_index
 
@@ -89,6 +90,19 @@ class QMIXTrainer(mava.Trainer):
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
+        # Expose the variables.
+        value_networks_to_expose = {}
+        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
+            "values": {},
+        }
+        for agent_key in self.unique_net_keys:
+            value_network_to_expose = self._target_q_networks[agent_key]
+            value_networks_to_expose[agent_key] = value_network_to_expose
+
+            self._system_network_variables["values"][
+                agent_key
+            ] = value_network_to_expose.variables
+
         # Checkpointer
         self._system_checkpointer = {}
         if checkpoint:
@@ -133,6 +147,7 @@ class QMIXTrainer(mava.Trainer):
         if tf.math.mod(self._num_steps, self._target_update_period) == 0:
             for src, dest in zip(online_variables, target_variables):
                 dest.assign(src)
+
         self._num_steps.assign_add(1)
 
     @tf.function
@@ -144,8 +159,8 @@ class QMIXTrainer(mava.Trainer):
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
 
-        o_tm1_feed = o_tm1_trans[agent]
-        o_t_feed = o_t_trans[agent]
+        o_tm1_feed = o_tm1_trans[agent].observation
+        o_t_feed = o_t_trans[agent].observation
         a_tm1_feed = a_tm1[agent]
 
         return o_tm1_feed, o_t_feed, a_tm1_feed
@@ -189,15 +204,12 @@ class QMIXTrainer(mava.Trainer):
                 # print("Batch next state:", s_t, "\n")
                 # print("Obs feed:", o_t_feed.observation, "\n")
 
-                # [B, num_actions]
-                q_tm1_agent = self._q_networks[agent_key](
-                    o_tm1_feed.observation
-                )  # [B, num_actions]
+                q_tm1_agent = self._q_networks[agent_key](o_tm1_feed)  # [B, n_actions]
                 q_act = batched_index(q_tm1_agent, a_tm1_feed, keepdims=True)  # [B, 1]
 
                 q_t_agent = self._target_q_networks[agent_key](
-                    o_t_feed.observation
-                )  # [B, num_actions]
+                    o_t_feed
+                )  # [B, n_actions]
                 q_target_max = tf.reduce_max(q_t_agent, axis=1, keepdims=True)  # [B, 1]
 
                 q_tm1.append(q_act)
@@ -265,11 +277,8 @@ class QMIXTrainer(mava.Trainer):
         # Delete the tape manually because of the persistent=True flag.
         train_utils.safe_del(self, "tape")
 
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
+    def _step(self) -> Dict[str, Dict[str, Any]]:
         # Update the target networks
-        # TODO Update target mixing network in this function
         self._update_target_networks()
         self._decrement_epsilon()
 
@@ -286,7 +295,6 @@ class QMIXTrainer(mava.Trainer):
 
     def step(self) -> None:
         # Run the learning step.
-        # fetches = self._step()
         fetches = self._step()
 
         # Compute elapsed time.
@@ -302,18 +310,23 @@ class QMIXTrainer(mava.Trainer):
         fetches.update(counts)
 
         # Checkpoint and attempt to write the logs.
+        if self._checkpoint:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
-        # NOTE (Arnu): ignoring checkpointing and logging for now
-        # self._checkpointer.save()
-        self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
 
-        variables["mixing"] = self._mixing_network.variables  # Also hypernet vars
-        variables["q_networks"] = {}  # or behaviour
-
-        for key in self.unique_net_keys:
-            variables["q_networks"][key] += self._q_networks[key].variables
-
+        for network_type in names:
+            if network_type == "mixing":
+                # Includes the hypernet variables
+                variables[network_type] = self._mixing_network.variables
+            else:  # Collect variables for each agent network
+                variables[network_type] = {}
+                for key in self.unique_net_keys:
+                    variables[network_type][key] = tf2_utils.to_numpy(
+                        self._system_network_variables[network_type][key]
+                    )
         return variables

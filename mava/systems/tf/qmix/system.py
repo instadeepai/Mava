@@ -31,7 +31,7 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
-from mava.components.tf.modules.mixing import MonotonicMixing
+from mava.components.tf.modules import mixing
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.qmix import builder, execution, training
@@ -77,6 +77,7 @@ class QMIX:
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
+        mixer: Type[mixing.BaseMixingModule] = mixing.MonotonicMixing,
         num_executors: int = 1,
         num_caches: int = 0,
         log_info: Tuple = None,
@@ -105,11 +106,13 @@ class QMIX:
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
     ):
+
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(environment)
 
         self._architecture = architecture
         self._environment = environment
+        self._mixer = mixer
         self._network_factory = network_factory
         self._log_info = log_info
         self._environment_spec = environment_spec
@@ -177,14 +180,14 @@ class QMIX:
         )
 
         # Create system architecture
-        architecture = DecentralisedValueActor(
+        architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
         )
 
         # Augment network architecture by adding mixing layer network.
-        system_networks = MonotonicMixing(
+        system_networks = self._mixer(
             architecture=architecture,
             environment_spec=self._environment_spec,
         ).create_system()
@@ -225,6 +228,7 @@ class QMIX:
             q_networks=executor_networks["values"],
             action_selectors=networks["action_selectors"],
             adder=self._builder.make_adder(replay),
+            variable_source=variable_source,
         )
 
         # Create logger and counter; actors will not spam bigtable.
@@ -273,6 +277,7 @@ class QMIX:
         executor = self._builder.make_executor(
             q_networks=executor_networks["values"],
             action_selectors=networks["action_selectors"],
+            variable_source=variable_source,
         )
 
         # Create logger and counter.
