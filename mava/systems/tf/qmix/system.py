@@ -66,7 +66,6 @@ class QMIXConfig:
 
     environment_spec: specs.MAEnvironmentSpec
     q_networks: Dict[str, snt.Module]
-    epsilon: tf.Variable
     shared_weights: bool
     target_update_period: int
     clipping: bool
@@ -77,8 +76,6 @@ class QMIXConfig:
     batch_size: int
     n_step: int
     discount: float
-    counter: counting.Counter
-    logger: loggers.Logger
     checkpoint: bool
 
 
@@ -110,6 +107,7 @@ class QMIXBuilder(SystemBuilder):
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._executer_fn = executer_fn
+        self.epsilon = tf.Variable(1.0, trainable=False)
 
     def make_replay_tables(
         self,
@@ -194,12 +192,12 @@ class QMIXBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
-
         return self._executer_fn(
-            policy_networks=behavior_networks,
+            q_networks=behavior_networks,
             shared_weights=self._config.shared_weights,
             variable_client=None,
             adder=adder,
+            epsilon=self.epsilon,
         )
 
     def make_trainer(
@@ -240,15 +238,15 @@ class QMIXBuilder(SystemBuilder):
             target_q_networks=target_q_networks,
             mixing_network=mixing_network,
             target_mixing_network=target_mixing_network,
-            epsilon=self._config.epsilon,
             shared_weights=self._config.shared_weights,
             optimizer=optimizer,
             target_update_period=self._config.target_update_period,
             clipping=self._config.clipping,
             dataset=dataset,
-            counter=self._config.counter,
-            logger=self._config.logger,
+            counter=counter,
+            logger=logger,
             checkpoint=self._config.checkpoint,
+            epsilon=self.epsilon,
         )
 
         return trainer
@@ -287,7 +285,6 @@ class QMIX(system.System):
         self,
         environment_spec: specs.MAEnvironmentSpec,
         q_networks: Dict[str, snt.Module],
-        epsilon: tf.Variable,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         shared_weights: bool = False,
         target_update_period: int = 100,
@@ -311,7 +308,6 @@ class QMIX(system.System):
                 q_networks=q_networks,
                 shared_weights=shared_weights,
                 discount=discount,
-                epsilon=epsilon,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
                 target_update_period=target_update_period,
@@ -319,8 +315,6 @@ class QMIX(system.System):
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
                 clipping=clipping,
-                logger=logger,
-                counter=counter,
                 checkpoint=checkpoint,
                 replay_table_name=replay_table_name,
             ),
@@ -372,7 +366,7 @@ class QMIX(system.System):
 
         # The trainer updates the parameters (and initializes them).
         # TODO label these inputs properly
-        trainer = builder.make_trainer(trainer_networks, dataset)
+        trainer = builder.make_trainer(trainer_networks, dataset, logger=logger)
 
         super().__init__(
             executor=executor,

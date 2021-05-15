@@ -15,6 +15,7 @@
 
 """Example running Qmix on pettinzoo MPE environments."""
 from datetime import datetime
+from pathlib import Path
 
 # import importlib
 from typing import Any, Dict, Mapping, Sequence, Union
@@ -32,6 +33,8 @@ from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import qmix
 from mava.utils.debugging.environments.two_step import TwoStepEnv
+from mava.utils.loggers import Logger
+from mava.wrappers import DetailedPerAgentStatistics
 from mava.wrappers.debugging_envs import TwoStepWrapper
 
 # NOTE See next note.
@@ -81,7 +84,6 @@ def make_environment() -> dm_env.Environment:
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    epsilon: tf.Variable,
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64,),
     shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
@@ -92,9 +94,7 @@ def make_networks(
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
-    observation_networks = {}
     q_networks = {}
-    behavior_networks = {}
 
     for key in specs.keys():
         # Get total number of action dimensions from action spec.
@@ -109,32 +109,16 @@ def make_networks(
             ]
         )
 
-        behavior_network = snt.Sequential(
-            [
-                q_network,
-                lambda q: tf.cast(
-                    trfl.epsilon_greedy(q, epsilon=epsilon).sample(), "int64"
-                ),
-            ]
-        )
-
-        observation_networks[key] = observation_network
         q_networks[key] = q_network
-        behavior_networks[key] = behavior_network
 
-    return {
-        "q_networks": q_networks,
-        "observations": observation_networks,
-        "behaviors": behavior_networks,
-    }
+    return {"q_networks": q_networks}
 
 
 def main(_: Any) -> None:
     # Create an environment, grab the spec, and use it to create networks.
     environment = make_environment()
     environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    epsilon = tf.Variable(1.0, trainable=False)  # float
-    system_networks = make_networks(environment_spec, epsilon)
+    system_networks = make_networks(environment_spec)
 
     # TODO Create loggers
     # log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
@@ -142,18 +126,39 @@ def main(_: Any) -> None:
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     # checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
+    # create tf loggers
+    base_dir = Path.cwd()
+    log_dir = base_dir / "logs"
+    log_time_stamp = str(datetime.now())
+    system_logger = Logger(
+        label="system_trainer",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
+    train_logger = Logger(
+        label="train_loop",
+        directory=log_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=log_time_stamp,
+    )
+
     # Construct the agent
     system = qmix.QMIX(
         environment_spec=environment_spec,
         q_networks=system_networks["q_networks"],
         # observation_networks=system_networks["observations"],
         # behavior_networks=system_networks["behaviors"],
-        epsilon=epsilon,
+        logger=system_logger,
     )
 
     # Create the environment loop used for training.
-    train_loop = ParallelEnvironmentLoop(environment, system, label="train_loop")
-
+    train_loop = ParallelEnvironmentLoop(
+        environment, system, logger=train_logger, label="train_loop"
+    )
+    train_loop = DetailedPerAgentStatistics(train_loop)
     # Create the evaluation policy.
     # NOTE: assumes weight sharing
     # specs = environment_spec.get_agent_specs()
