@@ -15,9 +15,10 @@
 
 from mava.wrappers.debugging_envs import DebuggingEnvWrapper, TwoStepWrapper
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
-from mava.wrappers.environment_loop_statistics import (
+from mava.wrappers.environment_loop_wrappers import (
     DetailedEpisodeStatistics,
     DetailedPerAgentStatistics,
+    MonitorParallelEnvironmentLoop,
 )
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,

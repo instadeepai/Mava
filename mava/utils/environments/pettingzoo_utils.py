@@ -1,5 +1,5 @@
 # python3
-# Copyright 2018 DeepMind Technologies Limited. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 """Pettingzoo environment factory."""
 
 import importlib
-from typing import Union
+from typing import Any, List, Optional, Union
 
 import dm_env
 import numpy as np
@@ -63,7 +63,9 @@ def make_environment(
     env_type: str = "parallel",
     env_class: str = "mpe",
     env_name: str = "simple_spread_v2",
-    **kwargs: int,
+    env_preprocess_wrappers: Optional[List] = None,
+    random_seed: Optional[int] = None,
+    **kwargs: Any,
 ) -> dm_env.Environment:
     """Wraps an Pettingzoo environment.
 
@@ -79,18 +81,24 @@ def make_environment(
 
     env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
 
-    # TODO (Arnu): find a way to pass kwargs when using lp_utils
     if env_type == "parallel":
         env = env_module.parallel_env(**kwargs)  # type: ignore
         if env_class == "atari":
             env = atari_preprocessing(env)
         # wrap parallel environment
-        environment = PettingZooParallelEnvWrapper(env)
+        environment = PettingZooParallelEnvWrapper(
+            env, env_preprocess_wrappers=env_preprocess_wrappers
+        )
     elif env_type == "sequential":
         env = env_module.env(**kwargs)  # type: ignore
         if env_class == "atari":
             env = atari_preprocessing(env)
         # wrap sequential environment
-        environment = PettingZooAECEnvWrapper(env)
+        environment = PettingZooAECEnvWrapper(
+            env, env_preprocess_wrappers=env_preprocess_wrappers
+        )
+
+    if random_seed and hasattr(environment, "seed"):
+        environment.seed(random_seed)
 
     return environment

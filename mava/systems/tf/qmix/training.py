@@ -29,10 +29,10 @@ from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-from acme.tf import savers as tf2_savers
 from acme.utils import counting, loggers
 
 import mava
+from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
 
@@ -99,7 +99,7 @@ class QMIXTrainer(mava.Trainer):
         for agent_key in self.unique_net_keys:
 
             checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=5,
+                time_delta_minutes=15,
                 objects_to_save={
                     "counter": self._counter,
                     "q_network": self._q_networks[agent_key],

@@ -13,5 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.utils.loggers.base import Logger
+from mava.utils.loggers.base import Logger, MavaLogger
 from mava.utils.loggers.tf_logger import TFSummaryLogger

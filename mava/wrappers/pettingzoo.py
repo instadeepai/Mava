@@ -21,7 +21,7 @@ import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
-from supersuit import black_death_v1, pad_observations_v0
+from supersuit import black_death_v1
 
 from mava import types
 from mava.utils.wrapper_utils import (
@@ -50,7 +50,6 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         env_preprocess_wrappers: Optional[List] = [
             # (env_preprocessor, dict_with_preprocessor_params)
             (black_death_v1, None),
-            (pad_observations_v0, None),
             (StandardizeObservationSequential, None),
             (StandardizeRewardSequential, None),
         ],
@@ -178,9 +177,6 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         return {}
 
-    def seed(self, seed: int = None) -> None:
-        self._environment.seed(seed)
-
     @property
     def agents(self) -> List:
         return self._environment.agents
@@ -214,7 +210,6 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         env_preprocess_wrappers: Optional[List] = [
             # (env_preprocessor, dict_with_preprocessor_params)
             (black_death_v1, None),
-            (pad_observations_v0, None),
             (StandardizeObservationParallel, None),
             (StandardizeRewardParallel, None),
         ],
@@ -355,9 +350,6 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         return {}
-
-    def seed(self, seed: int = None) -> None:
-        self._environment.seed(seed)
 
     @property
     def agents(self) -> List:
