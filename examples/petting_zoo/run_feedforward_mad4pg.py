@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running feedforward MADDPG on debug MPE environments."""
+"""Example running MAD4PG on PZ environments."""
 
 import functools
 from datetime import datetime
@@ -22,7 +22,6 @@ from typing import Any, Dict, Mapping, Sequence, Union
 import launchpad as lp
 import numpy as np
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
@@ -30,21 +29,23 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.systems.tf import maddpg
+from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
+
+flags.DEFINE_string(
+    "env_class",
+    "sisl",
+    "Pettingzoo environment class, e.g. atari (str).",
+)
+
 flags.DEFINE_string(
     "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "continuous",
-    "Environment action space type (str).",
+    "multiwalker_v6",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 flags.DEFINE_string(
     "mava_id",
@@ -64,6 +65,9 @@ def make_networks(
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
     sigma: float = 0.3,
+    vmin: float = -150.0,
+    vmax: float = 150.0,
+    num_atoms: int = 51,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
@@ -91,7 +95,7 @@ def make_networks(
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
+        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
         policy_network = snt.Sequential(
@@ -114,7 +118,7 @@ def make_networks(
                 networks.LayerNormMLP(
                     critic_networks_layer_sizes[key], activate_final=False
                 ),
-                snt.Linear(1),
+                networks.DiscreteValuedHead(vmin, vmax, num_atoms),
             ]
         )
         observation_networks[key] = observation_network
@@ -137,9 +141,10 @@ def main(_: Any) -> None:
 
     # environment
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        env_class=FLAGS.env_class,
+        remove_on_fall=False,
     )
 
     # networks
@@ -178,7 +183,7 @@ def main(_: Any) -> None:
     )
 
     # distributed program
-    program = maddpg.MADDPG(
+    program = mad4pg.MAD4PG(
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,

@@ -93,7 +93,7 @@ def make_networks(
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Note: The discrete case must be placed first as it inherits from BoundedArray.
-        if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discreet
+        if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discrete
             num_actions = specs[key].actions.num_values
             policy_network = snt.Sequential(
                 [
@@ -155,7 +155,6 @@ def main(_: Any) -> None:
     # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
-    # distributed program
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
@@ -188,6 +187,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
+    # distributed program
     program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,

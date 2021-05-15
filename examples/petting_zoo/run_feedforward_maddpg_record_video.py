@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running feedforward MADDPG on debug MPE environments."""
+"""Example running MADDPG on pettinzoo MPE environments, while recording video
+of episodes."""
 
 import functools
 from datetime import datetime
@@ -22,7 +23,6 @@ from typing import Any, Dict, Mapping, Sequence, Union
 import launchpad as lp
 import numpy as np
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
@@ -32,19 +32,22 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import Logger
+from mava.wrappers import MonitorParallelEnvironmentLoop
 
 FLAGS = flags.FLAGS
+
+flags.DEFINE_string(
+    "env_class",
+    "sisl",
+    "Pettingzoo environment class, e.g. atari (str).",
+)
+
 flags.DEFINE_string(
     "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "continuous",
-    "Environment action space type (str).",
+    "multiwalker_v6",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 flags.DEFINE_string(
     "mava_id",
@@ -91,11 +94,12 @@ def make_networks(
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
+        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
         policy_network = snt.Sequential(
             [
+                observation_network,
                 networks.LayerNormMLP(
                     policy_networks_layer_sizes[key], activate_final=True
                 ),
@@ -130,24 +134,20 @@ def make_networks(
 
 def main(_: Any) -> None:
 
-    # TODO(Arnu): make logging optional, currently log_info
-    # is required for all systems
     # set loggers info
     log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
-    # environment
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        remove_on_fall=False,
     )
 
-    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
-
     log_every = 10
     trainer_logger = Logger(
         label="system_trainer",
@@ -177,7 +177,6 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
@@ -189,9 +188,11 @@ def main(_: Any) -> None:
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,
         eval_logger=eval_logger,
+        eval_loop_fn=MonitorParallelEnvironmentLoop,
+        eval_loop_fn_kwargs={"path": checkpoint_dir, "record_every": 100},
     ).build()
 
-    # launch
+    # Launch gpu config - let trainer use gpu.
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
@@ -199,6 +200,7 @@ def main(_: Any) -> None:
         "evaluator": PythonProcess(env=env_vars),
         "executor": PythonProcess(env=env_vars),
     }
+
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
