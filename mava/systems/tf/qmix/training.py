@@ -26,7 +26,8 @@ from acme.utils import counting, loggers
 from trfl.indexing_ops import batched_index
 
 import mava
-from mava.systems.tf import savers as tf2_savers
+
+# from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
 
@@ -104,26 +105,27 @@ class QMIXTrainer(mava.Trainer):
             ] = value_network_to_expose.variables
 
         # Checkpointer
-        self._system_checkpointer = {}
-        if checkpoint:
-            for agent_key in self.unique_net_keys:
+        self._system_checkpointer: Dict = {}
+        # TODO Get checkpointing working. Launchpad crashes currently.
+        # if checkpoint:
+        #     for agent_key in self.unique_net_keys:
 
-                checkpointer = tf2_savers.Checkpointer(
-                    directory=checkpoint_subpath,
-                    time_delta_minutes=15,
-                    objects_to_save={
-                        "counter": self._counter,
-                        "q_network": self._q_networks[agent_key],
-                        "target_q_network": self._target_q_networks[agent_key],
-                        "mixing_network": self._mixing_network,
-                        "target_mixing_network": self._target_mixing_network,
-                        "optimizer": self._optimizer,
-                        "num_steps": self._num_steps,
-                    },
-                    enable_checkpointing=checkpoint,
-                )
+        #         checkpointer = tf2_savers.Checkpointer(
+        #             directory=checkpoint_subpath,
+        #             time_delta_minutes=15,
+        #             objects_to_save={
+        #                 "counter": self._counter,
+        #                 "q_network": self._q_networks[agent_key],
+        #                 "target_q_network": self._target_q_networks[agent_key],
+        #                 "mixing_network": self._mixing_network,
+        #                 "target_mixing_network": self._target_mixing_network,
+        #                 "optimizer": self._optimizer,
+        #                 "num_steps": self._num_steps,
+        #             },
+        #             enable_checkpointing=checkpoint,
+        #         )
 
-                self._system_checkpointer[agent_key] = checkpointer
+        #         self._system_checkpointer[agent_key] = checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -199,10 +201,6 @@ class QMIXTrainer(mava.Trainer):
                 o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
                     o_tm1, o_t, a_tm1, agent
                 )
-
-                # print("Batch state:", s_tm1, "\n") # NOTE Shouldn't these all be 0s?
-                # print("Batch next state:", s_t, "\n")
-                # print("Obs feed:", o_t_feed.observation, "\n")
 
                 q_tm1_agent = self._q_networks[agent_key](o_tm1_feed)  # [B, n_actions]
                 q_act = batched_index(q_tm1_agent, a_tm1_feed, keepdims=True)  # [B, 1]
@@ -287,11 +285,7 @@ class QMIXTrainer(mava.Trainer):
         self._forward(inputs)
         self._backward()
 
-        return {
-            "Epsilon": self._epsilon,
-            "system_loss": self.loss,
-            "q_tot": tf.reduce_mean(self._log_q_tot).numpy(),
-        }  # Return total system loss
+        return {"system": {"loss": self.loss}}  # Return total system loss
 
     def step(self) -> None:
         # Run the learning step.
@@ -310,8 +304,8 @@ class QMIXTrainer(mava.Trainer):
         fetches.update(counts)
 
         # Checkpoint and attempt to write the logs.
-        if self._checkpoint:
-            train_utils.checkpoint_networks(self._system_checkpointer)
+        # if self._checkpoint:
+        #     train_utils.checkpoint_networks(self._system_checkpointer)
 
         if self._logger:
             self._logger.write(fetches)

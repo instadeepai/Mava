@@ -49,7 +49,7 @@ class HyperNetwork(snt.Module):
             self._hypernet_hidden_dim = hypernet_hidden_dim
 
         # Calculate other necessary variables
-        self._n_agents = len(agent_networks)
+        self._n_agents = len(agent_networks["values"])
 
         # Set up hypernetwork configuration
         if self._num_hypernet_layers == 1:

@@ -63,7 +63,7 @@ def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     epsilon: tf.Variable = tf.Variable(1.0, trainable=False),
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64,),
-    shared_weights: bool = True,
+    shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
 

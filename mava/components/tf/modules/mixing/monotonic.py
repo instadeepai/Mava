@@ -18,7 +18,7 @@
 
 """Mixing for multi-agent RL systems"""
 
-from typing import Dict
+from typing import Dict, Optional
 
 import sonnet as snt
 import tensorflow as tf
@@ -40,6 +40,7 @@ class MonotonicMixing(BaseMixingModule):
         self,
         architecture: BaseArchitecture,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        agent_networks: Optional[Dict[str, snt.Module]] = None,
         qmix_hidden_dim: int = 64,
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 0,  # Defaults to qmix_hidden_dim
@@ -56,6 +57,12 @@ class MonotonicMixing(BaseMixingModule):
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
 
+        if agent_networks is None:
+            agent_networks = self._architecture.create_actor_variables()
+        self._agent_networks = {}
+        self._agent_networks["values"] = agent_networks["values"]
+        self._agent_networks["target_values"] = agent_networks["target_values"]
+
     def _create_mixing_layer(self) -> snt.Module:
         """Modify and return system architecture given mixing structure."""
         state_specs = self._environment_spec.get_extra_specs()
@@ -64,9 +71,8 @@ class MonotonicMixing(BaseMixingModule):
         # Need to figure out how to get the size of one-hot representation
         # of the global state that is returned by the environment.
         # One hot input dimension of global state
-        state_specs = tf.TensorSpec(shape=(3,))
-
-        self._num_agents = len(self._agent_networks)
+        state_specs = tf.TensorSpec(shape=(1, 3))  # Check this shape
+        self._num_agents = len(self._agent_networks["values"])
         q_value_dim = tf.TensorSpec(self._num_agents)
 
         # Implement method from base class
@@ -83,8 +89,6 @@ class MonotonicMixing(BaseMixingModule):
 
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         # Implement method from base class
-        networks = self._architecture.create_actor_variables()
-        self._agent_networks = networks["values"]
-        networks["mixing"] = self._create_mixing_layer()
-        networks["target_mixing"] = self._create_mixing_layer()
-        return networks
+        self._agent_networks["mixing"] = self._create_mixing_layer()
+        self._agent_networks["target_mixing"] = self._create_mixing_layer()
+        return self._agent_networks

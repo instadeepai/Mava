@@ -39,6 +39,7 @@ class BaseMixingModule:
         self,
         architecture: Optional[BaseArchitecture] = None,
         environment_spec: Optional[mava_specs.MAEnvironmentSpec] = None,
+        agent_networks: Optional[Dict[str, snt.Module]] = None,
     ) -> None:
         """Initialise the mixer."""
 

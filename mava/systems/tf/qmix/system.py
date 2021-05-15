@@ -82,12 +82,12 @@ class QMIX:
         num_caches: int = 0,
         log_info: Tuple = None,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
-        shared_weights: bool = True,
+        shared_weights: bool = False,
         epsilon: float = tf.Variable(1.0, trainable=False),
-        batch_size: int = 32,
+        batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
-        max_replay_size: int = 1000000,
+        max_replay_size: int = 1000,
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
         clipping: bool = True,
@@ -188,10 +188,13 @@ class QMIX:
             shared_weights=self._shared_weights,
         )
 
+        agent_networks = architecture.create_actor_variables()
+
         # Augment network architecture by adding mixing layer network.
         system_networks = self._mixer(
             architecture=architecture,
             environment_spec=self._environment_spec,
+            agent_networks=agent_networks,
         ).create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
