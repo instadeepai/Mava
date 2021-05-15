@@ -15,57 +15,38 @@
 
 """Example running Qmix on pettinzoo MPE environments."""
 from datetime import datetime
-from pathlib import Path
-
-# import importlib
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import dm_env
+import launchpad as lp
 import sonnet as snt
 import tensorflow as tf
-import trfl
 from absl import app, flags
 from acme import types
 from acme.tf import networks
-from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.environment_loop import ParallelEnvironmentLoop
+from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import qmix
+from mava.utils import lp_utils
 from mava.utils.debugging.environments.two_step import TwoStepEnv
 from mava.utils.loggers import Logger
-from mava.wrappers import DetailedPerAgentStatistics
 from mava.wrappers.debugging_envs import TwoStepWrapper
 
-# NOTE See next note.
-# from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
-
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 10000, "Number of training episodes to run for.")
-
-flags.DEFINE_integer(
-    "num_episodes_per_eval",
-    100,
-    "Number of training episodes to run between evaluation " "episodes.",
-)
-
-flags.DEFINE_string(
+FLAGS.DEFINE_string(
     "mava_id",
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
+FLAGS.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
+# TODO Add option for recurrent agent networks. In original paper they use DQN
+# for one task and DRQN for the StarCraft II SMAC task.
 
-# NOTE (St John) Will remove later. Currently debugging on two-step env.
-# def make_environment(
-#     env_class: str = "mpe", env_name: str = "simple_v2", **kwargs: int
-# ) -> dm_env.Environment:
-#     """Creates a MPE environment."""
-#     env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
-#     env = env_module.parallel_env(**kwargs)  # type: ignore
-#     environment = PettingZooParallelEnvWrapper(env)
-#     return environment
+# NOTE The current parameter and hyperparameter choices here are directed by
+# the simple environment implementation in the original Qmix paper.
 
 
 def make_environment() -> dm_env.Environment:
@@ -75,32 +56,38 @@ def make_environment() -> dm_env.Environment:
     return environment
 
 
-# TODO Add option for recurrent agent networks. In original paper they use DQN
-# for one task and DRQN for the StarCraft II SMAC task.
-
-# NOTE The current parameter and hyperparameter choices here are directed by
-# the simple environment implementation in the original Qmix paper.
-
-
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
+    epsilon: tf.Variable = tf.Variable(1.0, trainable=False),
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64,),
-    shared_weights: bool = False,
+    shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
 
     specs = environment_spec.get_agent_specs()
-    # Convert Sequence to Dict of labled Sequences
+
+    # Create agent_type specs
+    if shared_weights:
+        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
+        specs = type_specs
+
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
-    q_networks = {}
+    def action_selector_fn(
+        q_values: types.NestedTensor, legal_actions: types.NestedTensor
+    ) -> types.NestedTensor:
+        return epsilon_greedy_action_selector(
+            action_values=q_values, legal_actions_mask=legal_actions
+        )
 
+    q_networks = {}
+    action_selectors = {}
     for key in specs.keys():
+
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
-        # Create the shared observation network
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
+
         # Create the policy network.
         q_network = snt.Sequential(
             [
@@ -109,81 +96,87 @@ def make_networks(
             ]
         )
 
-        q_networks[key] = q_network
+        # epsilon greedy action selector
+        action_selector = action_selector_fn
 
-    return {"q_networks": q_networks}
+        q_networks[key] = q_network
+        action_selectors[key] = action_selector
+
+    return {
+        "q_networks": q_networks,
+        "action_selectors": action_selectors,
+    }
 
 
 def main(_: Any) -> None:
-    # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment()
-    environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    system_networks = make_networks(environment_spec)
+    # set loggers info
+    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
-    # TODO Create loggers
-    # log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
+    # networks
+    network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
-    # checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-    # create tf loggers
-    base_dir = Path.cwd()
-    log_dir = base_dir / "logs"
-    log_time_stamp = str(datetime.now())
-    system_logger = Logger(
+    # Create an environment, grab the spec, and use it to create networks.
+    environment = make_environment()
+
+    log_every = 10
+    trainer_logger = Logger(
         label="system_trainer",
-        directory=log_dir,
+        directory=FLAGS.base_dir,
         to_terminal=True,
         to_tensorboard=True,
-        time_stamp=log_time_stamp,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
     )
-    train_logger = Logger(
-        label="train_loop",
-        directory=log_dir,
+
+    exec_logger = Logger(
+        # _{executor_id} gets appended to label in system.
+        label="train_loop_executor",
+        directory=FLAGS.base_dir,
         to_terminal=True,
         to_tensorboard=True,
-        time_stamp=log_time_stamp,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
     )
 
-    # Construct the agent
-    system = qmix.QMIX(
-        environment_spec=environment_spec,
-        q_networks=system_networks["q_networks"],
-        # observation_networks=system_networks["observations"],
-        # behavior_networks=system_networks["behaviors"],
-        logger=system_logger,
+    eval_logger = Logger(
+        label="eval_loop",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
     )
 
-    # Create the environment loop used for training.
-    train_loop = ParallelEnvironmentLoop(
-        environment, system, logger=train_logger, label="train_loop"
+    # distributed program
+    program = qmix.QMIX(
+        environment=environment,
+        network_factory=network_factory,
+        num_executors=2,
+        log_info=log_info,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        checkpoint_subpath=checkpoint_dir,
+        trainer_logger=trainer_logger,
+        exec_logger=exec_logger,
+        eval_logger=eval_logger,
+    ).build()
+
+    # launch
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
     )
-    train_loop = DetailedPerAgentStatistics(train_loop)
-    # Create the evaluation policy.
-    # NOTE: assumes weight sharing
-    # specs = environment_spec.get_agent_specs()
-    # type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-    # specs = type_specs
-    # eval_policies = {
-    #     key: snt.Sequential(
-    #         [
-    #             system_networks["observations"][key],
-    #             system_networks["policies"][key],
-    #         ]
-    #     )
-    #     for key in specs.keys()
-    # }
-
-    # # Create the evaluation actor and loop.
-    # eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
-    # eval_env = make_environment(remove_on_fall=False)
-    # eval_loop = ParallelEnvironmentLoop(
-    #     eval_env, eval_actor, logger=eval_logger, label="eval_loop"
-    # )
-
-    for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
-        train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        # eval_loop.run(num_episodes=1)
 
 
 if __name__ == "__main__":

@@ -13,14 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): implement Qmix trainer
-#   - Write code for training the mixing networks.
-# Helper resources
-#   - single agent dqn learner in acme:
-#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/dqn/learning.py
-#   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
-
-
 """Qmix trainer implementation."""
 
 import time
@@ -56,16 +48,18 @@ class QMIXTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         shared_weights: bool,
         optimizer: snt.Optimizer,
-        clipping: bool,
-        counter: counting.Counter,
-        logger: loggers.Logger,
-        checkpoint: bool,
+        clipping: bool = True,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ) -> None:
 
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
         self._optimizer = optimizer
+        self._checkpoint = checkpoint
 
         # Store online and target networks.
         self._q_networks = q_networks
@@ -97,21 +91,25 @@ class QMIXTrainer(mava.Trainer):
 
         # Checkpointer
         self._system_checkpointer = {}
-        for agent_key in self.unique_net_keys:
+        if checkpoint:
+            for agent_key in self.unique_net_keys:
 
-            checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=15,
-                objects_to_save={
-                    "counter": self._counter,
-                    "q_network": self._q_networks[agent_key],
-                    "target_q_network": self._target_q_networks[agent_key],
-                    "optimizer": self._optimizer,
-                    "num_steps": self._num_steps,
-                },
-                enable_checkpointing=checkpoint,
-            )
+                checkpointer = tf2_savers.Checkpointer(
+                    directory=checkpoint_subpath,
+                    time_delta_minutes=15,
+                    objects_to_save={
+                        "counter": self._counter,
+                        "q_network": self._q_networks[agent_key],
+                        "target_q_network": self._target_q_networks[agent_key],
+                        "mixing_network": self._mixing_network,
+                        "target_mixing_network": self._target_mixing_network,
+                        "optimizer": self._optimizer,
+                        "num_steps": self._num_steps,
+                    },
+                    enable_checkpointing=checkpoint,
+                )
 
-            self._system_checkpointer[agent_key] = checkpointer
+                self._system_checkpointer[agent_key] = checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
