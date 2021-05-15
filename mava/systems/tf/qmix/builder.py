@@ -225,8 +225,8 @@ class QMIXBuilder:
         """
         q_networks = networks["values"]
         target_q_networks = networks["target_values"]
-        mixing_network = networks["mixing_network"]
-        target_mixing_network = networks["target_mixing_network"]
+        mixing_network = networks["mixing"]
+        target_mixing_network = networks["target_mixing"]
 
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()

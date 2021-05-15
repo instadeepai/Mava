@@ -93,13 +93,13 @@ class QMIXTrainer(mava.Trainer):
         # Expose the variables.
         value_networks_to_expose = {}
         self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
-            "values": {},
+            "value_network": {},
         }
         for agent_key in self.unique_net_keys:
             value_network_to_expose = self._target_q_networks[agent_key]
             value_networks_to_expose[agent_key] = value_network_to_expose
 
-            self._system_network_variables["values"][
+            self._system_network_variables["value_network"][
                 agent_key
             ] = value_network_to_expose.variables
 
@@ -318,7 +318,7 @@ class QMIXTrainer(mava.Trainer):
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
-
+        variables = {}
         for network_type in names:
             if network_type == "mixing":
                 # Includes the hypernet variables

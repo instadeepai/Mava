@@ -14,10 +14,10 @@
 # limitations under the License.
 
 """Example running Qmix on pettinzoo MPE environments."""
+import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Mapping, Sequence, Union
 
-import dm_env
 import launchpad as lp
 import sonnet as snt
 import tensorflow as tf
@@ -30,13 +30,21 @@ from mava import specs as mava_specs
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import qmix
 from mava.utils import lp_utils
-
-# from mava.utils.debugging.environments.two_step import TwoStepEnv
-from mava.utils.debugging.make_env import make_debugging_env
+from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
-from mava.wrappers.debugging_envs import DebuggingEnvWrapper  # , TwoStepWrapper
 
 FLAGS = flags.FLAGS
+flags.DEFINE_string(
+    "env_name",
+    "two_step",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "discrete",
+    "Environment action space type (str).",
+)
+
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
@@ -49,36 +57,6 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 # NOTE The current parameter and hyperparameter choices here are directed by
 # the simple environment implementation in the original Qmix paper.
-
-
-def make_environment(
-    evaluation: bool = False,
-    env_name: str = "simple_spread",
-    action_space: str = "discrete",
-    num_agents: int = 2,
-    render: bool = False,
-    random_seed: Optional[int] = None,
-) -> dm_env.Environment:
-
-    assert action_space == "continuous" or action_space == "discrete"
-
-    del evaluation
-
-    """Creates a MPE environment."""
-    env_module = make_debugging_env(env_name, action_space, num_agents)
-    environment = DebuggingEnvWrapper(env_module, render=render)
-
-    if random_seed and hasattr(environment, "seed"):
-        environment.seed(random_seed)
-
-    return environment
-
-
-# def make_environment() -> dm_env.Environment:
-#     """Creates a two-step game environment."""
-#     environment = TwoStepEnv()
-#     environment = TwoStepWrapper(environment)
-#     return environment
 
 
 def make_networks(
@@ -128,23 +106,28 @@ def make_networks(
         action_selectors[key] = action_selector
 
     return {
-        "q_networks": q_networks,
+        "value_network": q_networks,
         "action_selectors": action_selectors,
     }
 
 
 def main(_: Any) -> None:
+
     # set loggers info
     log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
+
+    # environment
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+    )
 
     # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
-
-    # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment()
 
     log_every = 10
     trainer_logger = Logger(
@@ -177,7 +160,7 @@ def main(_: Any) -> None:
 
     # distributed program
     program = qmix.QMIX(
-        environment=environment,
+        environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,

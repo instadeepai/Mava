@@ -25,7 +25,7 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme import specs as acme_specs
-from acme.utils import counting, loggers
+from acme.utils import counting
 
 import mava
 from mava import core
@@ -72,7 +72,7 @@ class QMIX:
 
     def __init__(
         self,
-        environment: dm_env.Environment,
+        environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
@@ -108,10 +108,12 @@ class QMIX:
     ):
 
         if not environment_spec:
-            environment_spec = mava_specs.MAEnvironmentSpec(environment)
+            environment_spec = mava_specs.MAEnvironmentSpec(
+                environment_factory(evaluation=False)  # type:ignore
+            )
 
         self._architecture = architecture
-        self._environment = environment
+        self._environment_factory = environment_factory
         self._mixer = mixer
         self._network_factory = network_factory
         self._log_info = log_info
@@ -182,7 +184,7 @@ class QMIX:
         # Create system architecture
         architecture = self._architecture(
             environment_spec=self._environment_spec,
-            value_networks=networks["q_networks"],
+            value_networks=networks["value_network"],
             shared_weights=self._shared_weights,
         )
 
@@ -219,7 +221,7 @@ class QMIX:
         # Create system architecture with target networks.
         executor_networks = self._architecture(
             environment_spec=self._environment_spec,
-            value_networks=networks["q_networks"],
+            value_networks=networks["value_network"],
             shared_weights=self._shared_weights,
         ).create_system()
 
@@ -230,6 +232,9 @@ class QMIX:
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
         )
+        # TODO (Arnu): figure out why factory function are giving type errors
+        # Create the environment.
+        environment = self._environment_factory(evaluation=False)  # type: ignore
 
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
@@ -242,7 +247,7 @@ class QMIX:
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
-            self._environment,
+            environment,
             executor,
             counter=counter,
             logger=exec_logger,
@@ -257,7 +262,6 @@ class QMIX:
         self,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        logger: loggers.Logger = None,
     ) -> Any:
         """The evaluation process. No mixing networks involved."""
 
@@ -269,7 +273,7 @@ class QMIX:
         # Create system architecture with target networks.
         executor_networks = self._architecture(
             environment_spec=self._environment_spec,
-            value_networks=networks["q_networks"],
+            value_networks=networks["value_network"],
             shared_weights=self._shared_weights,
         ).create_system()
 
@@ -280,13 +284,16 @@ class QMIX:
             variable_source=variable_source,
         )
 
+        # Make the environment.
+        environment = self._environment_factory(evaluation=True)  # type: ignore
+
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
         eval_loop = self._eval_loop_fn(
-            self._environment,
+            environment,
             executor,
             counter=counter,
             logger=self._eval_logger,
