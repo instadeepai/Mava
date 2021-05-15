@@ -29,9 +29,9 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
 from acme import types
+from acme.specs import EnvironmentSpec
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
-from acme.specs import EnvironmentSpec
 
 from mava import adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
@@ -104,7 +104,9 @@ class DIALExecutor(RecurrentExecutor):
         action = tf.argmax(action_policy, axis=1)
         if tf.random.uniform([]) < self._epsilon and not self._is_eval:
             action_spec = self._agent_specs[agent].actions
-            action = tf.random.uniform(action_spec.shape, 0, action_spec.num_values, dtype=tf.dtypes.int64)
+            action = tf.random.uniform(
+                action_spec.shape, 0, action_spec.num_values, dtype=tf.dtypes.int64
+            )
 
         # Hard coded perfect policy:
         # if observation[1].item()==5 and observation[0].item()==1:

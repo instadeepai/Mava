@@ -28,12 +28,12 @@ from acme.tf import utils as tf2_utils
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym import spaces
 
-from mava.utils.environments import debugging_utils
 from mava import specs as mava_specs
 from mava.components.tf.networks import DIALPolicy
 from mava.systems.tf import dial
 from mava.utils import lp_utils
 from mava.utils.debugging.environments import switch_game
+from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
 from mava.wrappers.debugging_envs import SwitchGameWrapper
 
