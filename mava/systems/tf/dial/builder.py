@@ -116,15 +116,12 @@ class DIALBuilder(SystemBuilder):
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
-            raise ValueError(
-                "(dries): Why is there a feedforward executor version of DIAL?"
-            )
-            adder = reverb_adders.ParallelNStepTransitionAdder.signature(
+            adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
 
-            adder = reverb_adders.ParallelEpisodeAdder.signature(
+            adder_sig = reverb_adders.ParallelEpisodeAdder.signature(
                 environment_spec, self._extra_specs
             )
         else:
@@ -135,7 +132,7 @@ class DIALBuilder(SystemBuilder):
             reverb.Table.queue(
                 name=self._config.replay_table_name,
                 max_size=self._config.max_replay_size,
-                signature=adder,
+                signature=adder_sig,
             )
         ]
 

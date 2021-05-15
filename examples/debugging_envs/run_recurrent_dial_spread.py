@@ -77,7 +77,7 @@ def make_networks(
     policy_network_message_in_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
     policy_network_message_out_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
     policy_network_output_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    message_size: int = 1,
+    message_size: int = 10,
     shared_weights: bool = True,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
@@ -126,8 +126,8 @@ def make_networks(
     for key in specs.keys():
 
         # Get total number of action dimensions from action and message spec.
-        num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
-        num_dimensions += np.prod(message_size, dtype=int)
+        # num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
+        # num_dimensions += np.prod(message_size, dtype=int)
 
         # Create the shared observation network
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
@@ -204,7 +204,7 @@ def main(_: Any) -> None:
     program = dial.DIAL(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        num_executors=5,
+        num_executors=10,
         log_info=log_info,
         sequence_length=100,
         checkpoint_subpath=checkpoint_dir,

@@ -250,6 +250,8 @@ class DIALTrainer(mava.Trainer):
         core_states = extra["core_states"]
 
         bs = actions[self._agents[0]].shape[1]
+
+        # TODO (dries): Use batch sizes bigger than 1!
         self.bs = bs
         T = actions[self._agents[0]].shape[0]
 
@@ -278,6 +280,7 @@ class DIALTrainer(mava.Trainer):
                     channel[t] = self._communication_module.process_messages(
                         messages[t]
                     )[self._agents[0]]
+
                     messages[t + 1] = {}
                     states[t + 1] = {}
 
@@ -368,7 +371,7 @@ class DIALTrainer(mava.Trainer):
                         policy_losses[agent_id] += td_action ** 2
 
                         # Communication grads
-                        td_comm = y_message - m_t1[tf.argmax(next_message)]
+                        td_comm = y_message - m_t1[0][tf.argmax(next_message)]
 
                         policy_losses[agent_id] += td_comm ** 2
 

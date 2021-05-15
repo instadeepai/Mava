@@ -224,8 +224,25 @@ class DIALExecutor(RecurrentExecutor):
                 self._states[agent],
                 message_inputs[agent],
             )
+
+            import numpy as np
+
+            if np.isnan(np.sum(message.numpy())):
+                print(
+                    "In: ",
+                    message_inputs[agent],
+                    self._states[agent],
+                    observation.observation,
+                    "Out: ",
+                    message,
+                )
+                exit()
+
+            # print("action: ", policy_output, ". message: ", message, ". new_state: ", new_state, ". obs: ", observation.observation)
+            # exit()
             # Bookkeeping of recurrent states for the observe method.
             self._states[agent] = new_state
+
             self._messages[agent] = message
 
             # self._update_state(agent, new_state)
