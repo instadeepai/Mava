@@ -65,7 +65,7 @@ class DIAL(system.System):
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
         discount: float = 1.0,
-        batch_size: int = 1,
+        batch_size: int = 32,
         prefetch_size: int = 4,
         target_update_period: int = 100,
         min_replay_size: int = 100,

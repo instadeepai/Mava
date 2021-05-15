@@ -206,6 +206,7 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         num_executors=10,
         log_info=log_info,
+        batch_size=32,
         sequence_length=100,
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
