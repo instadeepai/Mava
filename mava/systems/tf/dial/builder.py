@@ -125,7 +125,6 @@ class DIALBuilder(SystemBuilder):
                 environment_spec, self._extra_specs
             )
         else:
-            print(self._executor_fn)
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
 
         return [
