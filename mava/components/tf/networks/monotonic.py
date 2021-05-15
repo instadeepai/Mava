@@ -31,6 +31,7 @@
 
 from typing import Dict
 
+# import launchpad as lp
 import sonnet as snt
 import tensorflow as tf
 
@@ -48,8 +49,7 @@ class MonotonicMixingNetwork(snt.Module):
         self,
         architecture: BaseArchitecture,
         agent_networks: Dict[str, snt.Module],
-        qmix_hidden_dim: int,
-        state_dim: int,
+        qmix_hidden_dim: int = 64,
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 0,
     ) -> None:
@@ -67,10 +67,6 @@ class MonotonicMixingNetwork(snt.Module):
         self._architecture = architecture
         self._agent_networks = agent_networks
         self._qmix_hidden_dim = qmix_hidden_dim
-        # TODO What is the most efficient way to get these from architecture?
-        self._state_dim = state_dim
-        # self._n_agents = architecture._n_agents
-        self._n_agents = 2  # TODO (St John) Hard coded for now
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
 
@@ -89,17 +85,17 @@ class MonotonicMixingNetwork(snt.Module):
 
     def __call__(
         self,
-        q_values: tf.Tensor,  # [B, n_actions * n_agents] = [B,4]
-        states: tf.Tensor,  # [B, one_hot_state_dim = 3]
+        q_values: tf.Tensor,  # [batch_size, n_agents] = [B,2]
+        states: tf.Tensor,  # [batch_size, one_hot_state_dim = 3]
     ) -> tf.Tensor:
         """Monotonic mixing logic."""
 
-        # Expand dimensions to [B, 1, n_actions*n_agents] = [B, 1, 4] for matmul
+        # Expand dimensions to [B, 1, n_agents] = [B,1,2] for matmul
         q_values = tf.expand_dims(q_values, axis=1)
         self._hyperparams = self._hypernetworks(states)
 
         # For convenience
-        w1 = self._hyperparams["w1"]  # [B, 4, qmix_hidden_dim]
+        w1 = self._hyperparams["w1"]  # [B, 2, qmix_hidden_dim]
         b1 = self._hyperparams["b1"]  # [B, 1, qmix_hidden_dim]
         w2 = self._hyperparams["w2"]  # [B, qmix_hidden_dim, 1]
         b2 = self._hyperparams["b2"]  # [B, 1, 1]

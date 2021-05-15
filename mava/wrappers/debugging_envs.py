@@ -19,14 +19,19 @@ from typing import Dict, Tuple
 import dm_env
 import numpy as np
 from acme import specs
+
+# from acme.specs import EnvironmentSpec
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym import spaces
 
 from mava.types import OLT
 from mava.utils.debugging.environment import MultiAgentEnv
+from mava.utils.debugging.environments.switch_game import MultiAgentSwitchGame
 from mava.utils.debugging.environments.two_step import TwoStepEnv
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+
+# from gym import spaces
 
 
 class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
@@ -120,6 +125,45 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
+
+
+class SwitchGameWrapper(PettingZooParallelEnvWrapper):
+    """Environment wrapper for Debugging Switch environment."""
+
+    # Note: we don't inherit from base.EnvironmentWrapper because that class
+    # assumes that the wrapped environment is a dm_env.Environment.
+    def __init__(self, environment: MultiAgentSwitchGame):
+        super().__init__(environment=environment)
+
+    def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
+        if self._reset_next_step:
+            return self.reset()
+
+        observations, rewards, dones, infos = self._environment.step(actions)
+
+        if observations:
+            observations = self._convert_observations(observations, dones)
+
+        if self._environment.env_done:
+            self._step_type = dm_env.StepType.LAST
+            self._reset_next_step = True
+        else:
+            self._step_type = dm_env.StepType.MID
+
+        return dm_env.TimeStep(
+            observation=observations,
+            reward=rewards,
+            discount=self._discounts,
+            step_type=self._step_type,
+        )
+
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        return {
+            # agent: _convert_to_spec(
+            #     spaces.Box(-np.inf, np.inf, (1,), dtype=np.float32)
+            # )
+            # for agent in self._environment.agent_ids
+        }
 
 
 class TwoStepWrapper(PettingZooParallelEnvWrapper):

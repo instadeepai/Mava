@@ -23,7 +23,11 @@ from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
-from mava.components.tf.architectures import BaseActorCritic, BaseArchitecture
+from mava.components.tf.architectures import (
+    BaseActorCritic,
+    BaseArchitecture,
+    BasePolicyArchitecture,
+)
 from mava.types import OLT
 
 
@@ -101,7 +105,7 @@ class DecentralisedValueActor(BaseArchitecture):
         return networks
 
 
-class DecentralisedPolicyActor(BaseArchitecture):
+class DecentralisedPolicyActor(BasePolicyArchitecture):
     """Decentralised (independent) policy gradient multi-agent actor architecture."""
 
     def __init__(
@@ -183,6 +187,18 @@ class DecentralisedPolicyActor(BaseArchitecture):
 
         return actor_networks
 
+    def create_behaviour_policy(self) -> Dict[str, snt.Module]:
+        behaviour_policy_networks: Dict[str, snt.Module] = {}
+        for agent_key in self._actor_agent_keys:
+            snt_module = type(self._policy_networks[agent_key])
+            behaviour_policy_networks[agent_key] = snt_module(
+                [
+                    self._observation_networks[agent_key],
+                    self._policy_networks[agent_key],
+                ]
+            )
+        return behaviour_policy_networks
+
     def create_system(
         self,
     ) -> Dict[str, Dict[str, snt.Module]]:
@@ -190,7 +206,7 @@ class DecentralisedPolicyActor(BaseArchitecture):
         return networks
 
 
-class DecentralisedQValueActorCritic(BaseActorCritic):
+class DecentralisedValueActorCritic(BaseActorCritic):
     """Decentralised (independent) multi-agent actor critic architecture."""
 
     def __init__(
@@ -242,13 +258,7 @@ class DecentralisedQValueActorCritic(BaseActorCritic):
     def _get_critic_specs(
         self,
     ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
-        critic_act_specs = {}
-        for agent_key in self._critic_agent_keys:
-            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
-
-            # Get observation and action spec for critic.
-            critic_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
-        return self._embed_specs, critic_act_specs
+        return self._embed_specs, {}
 
     def create_actor_variables(self) -> Dict[str, Dict[str, snt.Module]]:
 
@@ -297,6 +307,84 @@ class DecentralisedQValueActorCritic(BaseActorCritic):
         }
 
         # get critic specs
+        embed_specs, _ = self._get_critic_specs()
+
+        # create critics
+        for agent_key in self._critic_agent_keys:
+
+            # get specs
+            emb_spec = embed_specs[agent_key]
+
+            # Create variables.
+            tf2_utils.create_variables(self._critic_networks[agent_key], [emb_spec])
+
+            # create target network variables
+            tf2_utils.create_variables(
+                self._target_critic_networks[agent_key], [emb_spec]
+            )
+
+        critic_networks["critics"] = self._critic_networks
+        critic_networks["target_critics"] = self._target_critic_networks
+        return critic_networks
+
+    def create_behaviour_policy(self) -> Dict[str, snt.Module]:
+        behaviour_policy_networks: Dict[str, snt.Module] = {}
+        for agent_key in self._actor_agent_keys:
+            snt_module = type(self._policy_networks[agent_key])
+            behaviour_policy_networks[agent_key] = snt_module(
+                [
+                    self._observation_networks[agent_key],
+                    self._policy_networks[agent_key],
+                ]
+            )
+        return behaviour_policy_networks
+
+    def create_system(
+        self,
+    ) -> Dict[str, Dict[str, snt.Module]]:
+        networks = self.create_actor_variables()
+        critic_networks = self.create_critic_variables()
+        networks.update(critic_networks)
+        return networks
+
+
+class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
+    def __init__(
+        self,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        shared_weights: bool = True,
+    ):
+
+        super().__init__(
+            environment_spec=environment_spec,
+            observation_networks=observation_networks,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            shared_weights=shared_weights,
+        )
+
+    def _get_critic_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        critic_act_specs = {}
+        for agent_key in self._critic_agent_keys:
+            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
+
+            # Get observation and action spec for critic.
+            critic_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
+        return self._embed_specs, critic_act_specs
+
+    def create_critic_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+
+        critic_networks: Dict[str, Dict[str, snt.Module]] = {
+            "critics": {},
+            "target_critics": {},
+        }
+
+        # get critic specs
         embed_specs, act_specs = self._get_critic_specs()
 
         # create critics
@@ -319,11 +407,3 @@ class DecentralisedQValueActorCritic(BaseActorCritic):
         critic_networks["critics"] = self._critic_networks
         critic_networks["target_critics"] = self._target_critic_networks
         return critic_networks
-
-    def create_system(
-        self,
-    ) -> Dict[str, Dict[str, snt.Module]]:
-        networks = self.create_actor_variables()
-        critic_networks = self.create_critic_variables()
-        networks.update(critic_networks)
-        return networks

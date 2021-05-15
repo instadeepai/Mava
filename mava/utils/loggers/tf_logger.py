@@ -47,10 +47,19 @@ class TFSummaryLogger(base.Logger):
         self._time = time.time()
         self.label = label
         self._iter = 0
-        self.summary = tf.summary.create_file_writer(logdir)
+        self._summary = None
+        self._logdir = logdir
 
     def write(self, values: base.LoggingData) -> None:
-        with self.summary.as_default():
+        # If this is in init, launchpad fails,
+        # Error: tensorflow.python.framework.errors_impl.InvalidArgumentError:
+        #   Cannot convert a Tensor of dtype resource to a NumPy array.
+        # Line: CloudPickler(file, protocol=protocol, buffer_callback
+        #   =buffer_callback).dump(obj)
+        if self._summary is None:
+            self._summary = tf.summary.create_file_writer(self._logdir)
+
+        with self._summary.as_default():  # type: ignore
             for key, value in values.items():
                 if hasattr(value, "shape"):
                     if len(value.shape) > 0:

@@ -26,6 +26,7 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures.decentralised import (
     DecentralisedPolicyActor,
     DecentralisedQValueActorCritic,
+    DecentralisedValueActorCritic,
 )
 
 
@@ -71,6 +72,45 @@ class CentralisedPolicyActor(DecentralisedPolicyActor):
             # Get observation and action spec for critic.
             actor_obs_specs[agent_key] = obs_specs_per_type[agent_type]
         return actor_obs_specs
+
+
+class CentralisedValueCritic(DecentralisedValueActorCritic):
+    def __init__(
+        self,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        shared_weights: bool = True,
+    ):
+        super().__init__(
+            environment_spec=environment_spec,
+            observation_networks=observation_networks,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            shared_weights=shared_weights,
+        )
+
+    def _get_critic_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        obs_specs_per_type: Dict[str, acme_specs.Array] = {}
+        agents_by_type = self._env_spec.get_agents_by_type()
+
+        for agent_type, agents in agents_by_type.items():
+            critic_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            critic_obs_shape.insert(0, len(agents))
+            obs_specs_per_type[agent_type] = tf.TensorSpec(
+                shape=critic_obs_shape,
+                dtype=tf.dtypes.float32,
+            )
+
+        critic_obs_specs = {}
+        for agent_key in self._critic_agent_keys:
+            agent_type = agent_key.split("_")[0]
+            # Get observation and action spec for critic.
+            critic_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+        return critic_obs_specs, {}
 
 
 class CentralisedQValueCritic(DecentralisedQValueActorCritic):

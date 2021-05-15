@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import dataclasses
-from typing import Any, Dict, Iterator, List, Optional, Type
+from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import reverb
 import sonnet as snt
@@ -59,11 +59,14 @@ class MADDPGConfig:
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
+    policy_optimizer: snt.Optimizer
+    critic_optimizer: snt.Optimizer
     shared_weights: bool = True
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
     target_update_period: int = 100
+    executor_variable_update_period: int = 1000
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
     samples_per_insert: float = 32.0
@@ -75,6 +78,7 @@ class MADDPGConfig:
     logger: loggers.Logger = None
     counter: counting.Counter = None
     checkpoint: bool = True
+    checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
@@ -91,18 +95,19 @@ class MADDPGBuilder(SystemBuilder):
     def __init__(
         self,
         config: MADDPGConfig,
-        trainer_fn: Type[
-            training.BaseMADDPGTrainer
+        trainer_fn: Union[
+            Type[training.BaseMADDPGTrainer],
+            Type[training.BaseRecurrentMADDPGTrainer],
         ] = training.DecentralisedMADDPGTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
-        extras: Dict[str, Any] = {},
+        extra_specs: Dict[str, Any] = {},
     ):
         """Args:
         config: Configuration options for the MADDPG system.
         trainer_fn: Trainer module to use."""
 
         self._config = config
-        self._extras = extras
+        self._extra_specs = extra_specs
 
         """ _agents: a list of the agent specs (ids).
             _agent_types: a list of the types of agents to be used."""
@@ -119,12 +124,12 @@ class MADDPGBuilder(SystemBuilder):
 
         # Select adder
         if self._executor_fn == executors.FeedForwardExecutor:
-            adder = reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec
+            adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
+                environment_spec, self._extra_specs
             )
         elif self._executor_fn == executors.RecurrentExecutor:
-            adder = reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec, self._extras["core_state_specs"]
+            adder_sig = reverb_adders.ParallelSequenceAdder.signature(
+                environment_spec, self._extra_specs
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
@@ -143,13 +148,14 @@ class MADDPGBuilder(SystemBuilder):
                 samples_per_insert=self._config.samples_per_insert,
                 error_buffer=error_buffer,
             )
+
         replay_table = reverb.Table(
             name=self._config.replay_table_name,
             sampler=reverb.selectors.Uniform(),
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
             rate_limiter=limiter,
-            signature=adder,
+            signature=adder_sig,
         )
 
         return [replay_table]
@@ -158,12 +164,20 @@ class MADDPGBuilder(SystemBuilder):
         self,
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
+
+        sequence_length = (
+            self._config.sequence_length
+            if self._executor_fn == executors.RecurrentExecutor
+            else None
+        )
+
         """Create a dataset iterator to use for learning/updating the system."""
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
+            sequence_length=sequence_length,
         )
         return iter(dataset)
 
@@ -193,7 +207,6 @@ class MADDPGBuilder(SystemBuilder):
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
-
         return adder
 
     def make_executor(
@@ -226,14 +239,8 @@ class MADDPGBuilder(SystemBuilder):
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policy": variables},
-                update_period=1000,
+                update_period=self._config.executor_variable_update_period,
             )
-
-            # Update variables
-            # TODO: Is this needed? Probably not because
-            #  in acme they only update policy.variables.
-            # for agent in agent_keys:
-            #     policy_networks[agent].variables = variables[agent]
 
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
@@ -254,7 +261,6 @@ class MADDPGBuilder(SystemBuilder):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -266,7 +272,6 @@ class MADDPGBuilder(SystemBuilder):
           counter: a Counter which allows for recording of counts (trainer steps,
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the trainer checkpoints itself.
         """
         agents = self._agents
         agent_types = self._agent_types
@@ -274,10 +279,6 @@ class MADDPGBuilder(SystemBuilder):
         clipping = self._config.clipping
         discount = self._config.discount
         target_update_period = self._config.target_update_period
-
-        # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-        critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
@@ -290,15 +291,16 @@ class MADDPGBuilder(SystemBuilder):
             target_critic_networks=networks["target_critics"],
             target_observation_networks=networks["target_observations"],
             shared_weights=shared_weights,
-            policy_optimizer=policy_optimizer,
-            critic_optimizer=critic_optimizer,
+            policy_optimizer=self._config.policy_optimizer,
+            critic_optimizer=self._config.critic_optimizer,
             clipping=clipping,
             discount=discount,
             target_update_period=target_update_period,
             dataset=dataset,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
+            checkpoint=self._config.checkpoint,
+            checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.

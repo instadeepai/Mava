@@ -13,26 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): implement Qmix trainer
-#   - Write code for training the mixing networks.
-# Helper resources
-#   - single agent dqn learner in acme:
-#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/dqn/learning.py
-#   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
-
-
 """Qmix trainer implementation."""
 
-# import time
+import time
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-from acme.tf import savers as tf2_savers
+from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
+from trfl.indexing_ops import batched_index
 
 import mava
+
+# from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
 
@@ -55,16 +50,18 @@ class QMIXTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         shared_weights: bool,
         optimizer: snt.Optimizer,
-        clipping: bool,
-        counter: counting.Counter,
-        logger: loggers.Logger,
-        checkpoint: bool,
+        clipping: bool = True,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ) -> None:
 
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
         self._optimizer = optimizer
+        self._checkpoint = checkpoint
 
         # Store online and target networks.
         self._q_networks = q_networks
@@ -94,23 +91,41 @@ class QMIXTrainer(mava.Trainer):
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
-        # Checkpointer
-        self._system_checkpointer = {}
+        # Expose the variables.
+        value_networks_to_expose = {}
+        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
+            "value_network": {},
+        }
         for agent_key in self.unique_net_keys:
+            value_network_to_expose = self._target_q_networks[agent_key]
+            value_networks_to_expose[agent_key] = value_network_to_expose
 
-            checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=5,
-                objects_to_save={
-                    "counter": self._counter,
-                    "q_network": self._q_networks[agent_key],
-                    "target_q_network": self._target_q_networks[agent_key],
-                    "optimizer": self._optimizer,
-                    "num_steps": self._num_steps,
-                },
-                enable_checkpointing=checkpoint,
-            )
+            self._system_network_variables["value_network"][
+                agent_key
+            ] = value_network_to_expose.variables
 
-            self._system_checkpointer[agent_key] = checkpointer
+        # Checkpointer
+        self._system_checkpointer: Dict = {}
+        # TODO Get checkpointing working. Launchpad crashes currently.
+        # if checkpoint:
+        #     for agent_key in self.unique_net_keys:
+
+        #         checkpointer = tf2_savers.Checkpointer(
+        #             directory=checkpoint_subpath,
+        #             time_delta_minutes=15,
+        #             objects_to_save={
+        #                 "counter": self._counter,
+        #                 "q_network": self._q_networks[agent_key],
+        #                 "target_q_network": self._target_q_networks[agent_key],
+        #                 "mixing_network": self._mixing_network,
+        #                 "target_mixing_network": self._target_mixing_network,
+        #                 "optimizer": self._optimizer,
+        #                 "num_steps": self._num_steps,
+        #             },
+        #             enable_checkpointing=checkpoint,
+        #         )
+
+        #         self._system_checkpointer[agent_key] = checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -134,6 +149,7 @@ class QMIXTrainer(mava.Trainer):
         if tf.math.mod(self._num_steps, self._target_update_period) == 0:
             for src, dest in zip(online_variables, target_variables):
                 dest.assign(src)
+
         self._num_steps.assign_add(1)
 
     @tf.function
@@ -145,14 +161,14 @@ class QMIXTrainer(mava.Trainer):
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
 
-        o_tm1_feed = o_tm1_trans[agent]
-        o_t_feed = o_t_trans[agent]
+        o_tm1_feed = o_tm1_trans[agent].observation
+        o_t_feed = o_t_trans[agent].observation
         a_tm1_feed = a_tm1[agent]
 
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
     def _decrement_epsilon(self) -> None:
-        self._epsilon.assign_sub(1e-3)
+        self._epsilon.assign_sub(1e-4)
         if self._epsilon < 0.01:
             self._epsilon.assign(0.01)
 
@@ -186,56 +202,64 @@ class QMIXTrainer(mava.Trainer):
                     o_tm1, o_t, a_tm1, agent
                 )
 
-                # print("Batch state:", s_tm1, "\n") # NOTE Shouldn't these all be 0s?
-                # print("Batch next state:", s_t, "\n")
-                # print("Obs feed:", o_t_feed.observation, "\n")
+                q_tm1_agent = self._q_networks[agent_key](o_tm1_feed)  # [B, n_actions]
+                q_act = batched_index(q_tm1_agent, a_tm1_feed, keepdims=True)  # [B, 1]
 
-                # [B, num_actions]
-                q_tm1_agent = self._q_networks[agent_key](o_tm1_feed.observation)
-                q_t_agent = self._target_q_networks[agent_key](o_t_feed.observation)
+                q_t_agent = self._target_q_networks[agent_key](
+                    o_t_feed
+                )  # [B, n_actions]
+                q_target_max = tf.reduce_max(q_t_agent, axis=1, keepdims=True)  # [B, 1]
 
-                # TODO Should I rather use policy to select my q_val than just max?
-                q_tm1.append(q_tm1_agent)  # [B, num_actions] = [32,2]
-                q_t.append(q_t_agent)  # Take only the best q_val
+                q_tm1.append(q_act)
+                q_t.append(q_target_max)
 
-            # [B, num_actions*num_agents] = [32,4]
-            q_tm1 = tf.concat(q_tm1, axis=1)
-            q_t = tf.concat(q_t, axis=1)
+            num_agents = len(self._agents)
+
+            rewards = [tf.reshape(val, (-1, 1)) for val in list(r_t.values())]
+            rewards = tf.reshape(
+                tf.concat(rewards, axis=1), (-1, 1, num_agents)
+            )  # [B, 1, num_agents]
+
+            dones = [tf.reshape(val.terminal, (-1, 1)) for val in list(o_tm1.values())]
+            dones = tf.reshape(
+                tf.concat(dones, axis=1), (-1, 1, num_agents)
+            )  # [B, 1, num_agents]
+
+            q_tm1 = tf.concat(q_tm1, axis=1)  # [B, num_agents]
+            q_t = tf.concat(q_t, axis=1)  # [B, num_agents]
 
             q_tot_mixed = self._mixing_network(q_tm1, s_tm1)  # [B, 1, 1]
             q_tot_target_mixed = self._target_mixing_network(q_t, s_t)  # [B, 1, 1]
 
-            # NOTE (St John) These mixed Q values don't seem to be resetting
-            # after each iteration so the effect is that the total Q value keeps
-            # growing during training. I think this is the reason there is strange
-            # behaviour where everytime the agent tries a new action (randomly)
-            # it thinks that is a better strategy. This leads to bouncing around
-            # and inconsistent reward.
-            # This same thing happens with VDN. Look into this.
-            print("Q mixed:", q_tot_mixed)
-
             # Cast the additional discount to match the environment discount dtype.
             # discount = tf.cast(self._discount, dtype=d_t.dtype)
-            discount = 0.99  # TODO Generalise
 
-            # TODO Case where agents have different rewards?
-            r_t = tf.reshape(r_t["agent_0"], shape=(-1, 1))
-            target = tf.stop_gradient(
-                r_t + discount * tf.reduce_max(q_tot_target_mixed, axis=1)
-            )
-            target = tf.reshape(target, (-1, 1, 1))
-            td_error = target - q_tot_mixed
-
+            # Calculate Q loss.
             # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
-            self.loss = 0.5 * tf.square(td_error)
+            discount = tf.constant(0.99)  # TODO Generalise
+
+            targets = (
+                rewards + discount * (tf.constant(1.0) - dones) * q_tot_target_mixed
+            )
+
+            targets = tf.stop_gradient(targets)
+
+            td_error = targets - q_tot_mixed
+
+            self.loss = 0.5 * tf.reduce_mean(tf.square(td_error))
+
+            self._log_q_tot = q_tot_mixed
+
             self.tape = tape
 
     def _backward(self) -> None:
-        """Calculate the gradients and update the networks."""
-        # Collect trainable variables
+        # Calculate the gradients and update the networks
+        trainable_variables = []
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            trainable_variables = self._q_networks[agent_key].trainable_variables
+            # Get trainable variables.
+            trainable_variables += self._q_networks[agent_key].trainable_variables
+
         trainable_variables += self._mixing_network.trainable_variables
 
         # Compute gradients.
@@ -251,9 +275,7 @@ class QMIXTrainer(mava.Trainer):
         # Delete the tape manually because of the persistent=True flag.
         train_utils.safe_del(self, "tape")
 
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
+    def _step(self) -> Dict[str, Dict[str, Any]]:
         # Update the target networks
         self._update_target_networks()
         self._decrement_epsilon()
@@ -263,38 +285,42 @@ class QMIXTrainer(mava.Trainer):
         self._forward(inputs)
         self._backward()
 
-        return self.loss  # Return total system loss
+        return {"system": {"loss": self.loss}}  # Return total system loss
 
     def step(self) -> None:
         # Run the learning step.
-        # fetches = self._step()
-        self._step()
+        fetches = self._step()
 
         # Compute elapsed time.
-        # timestamp = time.time()
-        # if self._timestamp:
-        #     elapsed_time = timestamp - self._timestamp
-        # else:
-        #     elapsed_time = 0
-        # self._timestamp = timestamp  # type: ignore
+        timestamp = time.time()
+        if self._timestamp:
+            elapsed_time = timestamp - self._timestamp
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
 
         # Update our counts and record it.
-        # counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        # fetches.update(counts)
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
 
         # Checkpoint and attempt to write the logs.
+        # if self._checkpoint:
+        #     train_utils.checkpoint_networks(self._system_checkpointer)
 
-        # NOTE (Arnu): ignoring checkpointing and logging for now
-        # self._checkpointer.save()
-        # self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
-
-        variables["mixing"] = self._mixing_network.variables  # Also hypernet vars
-        variables["q_networks"] = {}  # or behaviour
-
-        for key in self.unique_net_keys:
-            variables["q_networks"][key] += self._q_networks[key].variables
-
+        variables = {}
+        for network_type in names:
+            if network_type == "mixing":
+                # Includes the hypernet variables
+                variables[network_type] = self._mixing_network.variables
+            else:  # Collect variables for each agent network
+                variables[network_type] = {}
+                for key in self.unique_net_keys:
+                    variables[network_type][key] = tf2_utils.to_numpy(
+                        self._system_network_variables[network_type][key]
+                    )
         return variables

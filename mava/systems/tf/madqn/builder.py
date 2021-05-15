@@ -52,6 +52,7 @@ class MADQNConfig:
     epsilon: tf.Variable
     shared_weights: bool
     target_update_period: int
+    executor_variable_update_period: int
     clipping: bool
     min_replay_size: int
     max_replay_size: int
@@ -60,8 +61,10 @@ class MADQNConfig:
     batch_size: int
     n_step: int
     discount: float
+    checkpoint: bool
     policy_optimizer: snt.Optimizer
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    checkpoint_subpath: str = "~/mava/"
 
 
 class MADQNBuilder:
@@ -77,11 +80,11 @@ class MADQNBuilder:
     def __init__(
         self,
         config: MADQNConfig,
-        trainer_fn: Type[training.IDQNTrainer] = training.IDQNTrainer,
-        executor_fn: Type[core.Executor] = execution.FeedForwardMADQNExecutor,
+        trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
+        executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
     ):
         """Args:
-        _config: Configuration options for the MADDPG system.
+        _config: Configuration options for the MADQN system.
         _trainer_fn: Trainer module to use."""
         self._config = config
         self._agents = self._config.environment_spec.get_agent_ids()
@@ -177,14 +180,8 @@ class MADQNBuilder:
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"value_network": variables},
-                update_period=1000,
+                update_period=self._config.executor_variable_update_period,
             )
-
-            # Update variables
-            # TODO: Is this needed? Probably not because
-            #  in acme they only update policy.variables.
-            # for agent in agent_keys:
-            #     policy_networks[agent].variables = variables[agent]
 
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
@@ -206,7 +203,6 @@ class MADQNBuilder:
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -224,9 +220,6 @@ class MADQNBuilder:
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
-        # Create optimizers.
-        optimizer = self._config.policy_optimizer
-
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
             agents=agents,
@@ -235,13 +228,14 @@ class MADQNBuilder:
             target_q_networks=target_q_networks,
             epsilon=self._config.epsilon,
             shared_weights=self._config.shared_weights,
-            optimizer=optimizer,
+            optimizer=self._config.policy_optimizer,
             target_update_period=self._config.target_update_period,
             clipping=self._config.clipping,
             dataset=dataset,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
+            checkpoint=self._config.checkpoint,
+            checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
         trainer = DetailedTrainerStatistics(trainer, metrics=["loss"])  # type: ignore

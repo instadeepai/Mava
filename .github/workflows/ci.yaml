@@ -8,7 +8,7 @@ on:
 
 jobs:
   test-ubuntu:
-    runs-on: self-hosted
+    runs-on: onprem
     timeout-minutes: 30
     strategy:
       matrix:
@@ -21,14 +21,19 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
+          export PIP_DEFAULT_TIMEOUT=100
+          # Ensure encoding consistency
+          export LC_ALL=en_US.UTF-8
+          export LANG=en_US.UTF-8
           pip install --upgrade pip setuptools
           pip install .
-          pip install .[tf,envs,reverb,testing_formatting,launchpad]
+          pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
           # For atari envs
-          pip install autorom && echo y | AutoROM && sudo apt-get install unrar
-          # Open CV
           sudo apt-get update
-          sudo apt-get install ffmpeg libsm6 libxext6  -y
+          sudo apt-get install unrar
+          pip install autorom && echo y | AutoROM
+          # Open CV and Headless screen.
+          sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
       - name: Format code
         run: |
           # Check code follows black formatting.
