@@ -373,8 +373,8 @@ class DIALTrainer(mava.Trainer):
                     # print("m_t1: ", m_t1.shape)
 
                     # TODO (Kevin): Explain to Dries what is going on here. Add comms back in
-                    # td_comm = y_message - tf.gather(m_t1, next_message, batch_dims=1)
-                    # td_comm = y_message - m_t1[0][tf.argmax(next_message)]
+                    td_comm = y_message - tf.gather(m_t1, next_message, batch_dims=1)
+                    td_comm = y_message - m_t1[0][tf.argmax(next_message)]
 
                     # print("td_comm: ", td_comm)
                     # exit()
