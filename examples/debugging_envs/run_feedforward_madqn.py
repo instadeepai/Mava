@@ -35,6 +35,7 @@ from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -171,7 +172,7 @@ def main(_: Any) -> None:
         epsilon_min=0.01,
         epsilon_decay=1e-3,
         log_info=log_info,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,

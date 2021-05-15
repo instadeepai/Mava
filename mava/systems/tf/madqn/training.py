@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mava.components.tf.modules.exploration.exploration_scheduling import LinearExplorationScheduler
 import time
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -45,6 +46,7 @@ class MADQNTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         discount: float,
         shared_weights: bool,
+        exploration_scheduler: LinearExplorationScheduler,
         optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
@@ -77,6 +79,9 @@ class MADQNTrainer(mava.Trainer):
 
         # Create an iterator to go through the dataset.
         self._iterator = dataset
+
+        # Store the exploration scheduler
+        self._exploration_scheduler = exploration_scheduler
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
@@ -124,6 +129,9 @@ class MADQNTrainer(mava.Trainer):
         # fill the replay buffer.
 
         self._timestamp = None
+
+    def get_epsilon(self) -> tf.Variable:
+        return self._exploration_scheduler.get_epsilon()
 
     def _update_target_networks(self) -> None:
         for key in self.unique_net_keys:
@@ -234,7 +242,8 @@ class MADQNTrainer(mava.Trainer):
                 gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
 
             # Apply gradients.
-            self._optimizer.apply(gradients, q_network_variables)
+            if self._optimizer:
+                self._optimizer.apply(gradients, q_network_variables)
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:

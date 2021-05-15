@@ -52,7 +52,8 @@ class MADQNConfig:
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
-    epsilon: tf.Variable
+    epsilon_min: float
+    epsilon_decay: float
     shared_weights: bool
     target_update_period: int
     executor_variable_update_period: int
@@ -65,7 +66,7 @@ class MADQNConfig:
     n_step: int
     discount: float
     checkpoint: bool
-    policy_optimizer: snt.Optimizer
+    optimizer: snt.Optimizer
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
 
@@ -162,6 +163,7 @@ class MADQNBuilder:
         action_selectors: Dict[str, Any],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
+        trainer: Optional[training.MADQNTrainer] = None
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -194,21 +196,14 @@ class MADQNBuilder:
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
-        # Make epsilon scheduler
-        exploration_scheduler = self._exploration_scheduler_fn(
-            logdir=self._config.epsilon_logdir,
-            epsilon_min=self._config.epsilon_min,
-            epsilon_decay=self._config.epsilon_decay,
-        )
-
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
             action_selectors=action_selectors,
-            exploration_scheduler=exploration_scheduler,
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
+            trainer=trainer
         )
 
     def make_trainer(
@@ -235,6 +230,12 @@ class MADQNBuilder:
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
+        # Make epsilon scheduler
+        exploration_scheduler = self._exploration_scheduler_fn(
+            epsilon_min=self._config.epsilon_min,
+            epsilon_decay=self._config.epsilon_decay,
+        )
+
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
             agents=agents,
@@ -243,9 +244,10 @@ class MADQNBuilder:
             q_networks=q_networks,
             target_q_networks=target_q_networks,
             shared_weights=self._config.shared_weights,
-            optimizer=self._config.policy_optimizer,
+            optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             clipping=self._config.clipping,
+            exploration_scheduler=exploration_scheduler,
             dataset=dataset,
             counter=counter,
             logger=logger,
@@ -253,6 +255,6 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = DetailedTrainerStatistics(trainer, metrics=["q_value_loss"])  # type: ignore
+        # trainer = DetailedTrainerStatistics(trainer, metrics=["q_value_loss"])  # type: ignore
 
         return trainer

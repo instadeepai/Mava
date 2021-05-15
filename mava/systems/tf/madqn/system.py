@@ -106,7 +106,6 @@ class MADQN:
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
-                epsilon_logdir=epsilon_logdir,
                 shared_weights=shared_weights,
                 discount=discount,
                 batch_size=batch_size,
@@ -119,7 +118,7 @@ class MADQN:
                 n_step=n_step,
                 clipping=clipping,
                 checkpoint=checkpoint,
-                policy_optimizer=policy_optimizer,
+                optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
             ),
             trainer_fn=trainer_fn,
@@ -177,6 +176,7 @@ class MADQN:
         replay: reverb.Client,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
+        trainer: Optional[training.MADQNTrainer] = None
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
 
@@ -198,6 +198,7 @@ class MADQN:
             action_selectors=networks["action_selectors"],
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
+            trainer=trainer
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -304,7 +305,7 @@ class MADQN:
             for executor_id in range(self._num_exectors):
                 source = sources[executor_id % len(sources)]
                 program.add_node(
-                    lp.CourierNode(self.executor, executor_id, replay, source, counter)
+                    lp.CourierNode(self.executor, executor_id, replay, source, counter, trainer=trainer)
                 )
 
         return program

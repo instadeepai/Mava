@@ -30,6 +30,7 @@ from acme.tf import variable_utils as tf2_variable_utils
 from mava import adders, core
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.types import OLT
+from mava.systems.tf.madqn.training import MADQNTrainer
 
 tfd = tfp.distributions
 
@@ -46,10 +47,10 @@ class MADQNFeedForwardExecutor(core.Executor):
         self,
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
-        exploration_scheduler: Optional[LinearExplorationScheduler] = None,
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        trainer: MADQNTrainer = None
     ):
         """Initializes the executor.
         Args:
@@ -66,7 +67,7 @@ class MADQNFeedForwardExecutor(core.Executor):
         self._variable_client = variable_client
         self._q_networks = q_networks
         self._action_selectors = action_selectors
-        self._exploration_scheduler = exploration_scheduler
+        self._trainer = trainer
         self._shared_weights = shared_weights
 
     @tf.function
@@ -88,8 +89,8 @@ class MADQNFeedForwardExecutor(core.Executor):
         q_values = self._q_networks[agent_key](batched_observation)
 
         # select legal action
-        if self._exploration_scheduler:
-            epsilon = self._exploration_scheduler.get_epsilon()
+        if self._trainer is not None:
+            epsilon = self._trainer.get_epsilon()
             action = self._action_selectors[agent_key](
                 q_values, batched_legals, epsilon=epsilon
             )
@@ -108,11 +109,6 @@ class MADQNFeedForwardExecutor(core.Executor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-
-        # Decrement Epsilon at the start of an episode
-        if self._exploration_scheduler:
-            self._exploration_scheduler.decrement_epsilon()
-            self._exploration_scheduler.log()
 
         if self._adder:
             self._adder.add_first(timestep, extras)
