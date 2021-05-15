@@ -41,6 +41,7 @@ class HyperNetwork(snt.Module):
         self._agent_networks = agent_networks
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
+
         # Let the user define the hidden dim but default it to qmix_hidden_dim.
         if hypernet_hidden_dim == 0:
             self._hypernet_hidden_dim = qmix_hidden_dim
@@ -49,9 +50,6 @@ class HyperNetwork(snt.Module):
 
         # Calculate other necessary variables
         self._n_agents = len(agent_networks)
-        # TODO Generalise this
-        # self._n_actions = list(agent_networks.values())[0]._layers._layer_sizes[-1]
-        # self._n_actions = 2
 
         # Set up hypernetwork configuration
         if self._num_hypernet_layers == 1:
