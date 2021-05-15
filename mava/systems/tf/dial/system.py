@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# type: ignore
-
-# TODO (Kevin): finish DIAL system
-
 """DIAL system implementation."""
 import copy
 from typing import Any, Callable, Dict, Optional, Tuple, Type
@@ -74,7 +70,7 @@ class DIAL(system.System):
         target_update_period: int = 100,
         min_replay_size: int = 100,
         max_replay_size: int = 1000000,
-        samples_per_insert: float = 1.0,
+        samples_per_insert: float = 32.0,
         policy_optimizer: snt.Optimizer = snt.optimizers.RMSProp(5e-4, momentum=0.95),
         n_step: int = 1,
         sequence_length: int = 20,

@@ -14,7 +14,6 @@
 
 from typing import Optional, Sequence
 
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme.specs import EnvironmentSpec
@@ -36,9 +35,9 @@ class DIALPolicy(snt.RNNCore):
     ):
         super(DIALPolicy, self).__init__(name=name)
         self._action_spec = action_spec
-        self._action_dim = np.prod(self._action_spec.shape, dtype=int)
+        self._action_dim = self._action_spec.num_values
         self._message_spec = message_spec
-        self._message_dim = np.prod(self._message_spec.shape, dtype=int)
+        self._message_dim = self._message_spec.shape[0]
 
         self._gru_hidden_size = gru_hidden_size
 
@@ -52,18 +51,19 @@ class DIALPolicy(snt.RNNCore):
             activate_final=True,
         )
 
-        self.message_in_mlp = networks.LayerNormMLP(
-            message_out_mlp_size,
-            activate_final=True,
-        )
+        #
+        # self.message_in_mlp = networks.LayerNormMLP(
+        #     message_out_mlp_size,
+        #     activate_final=True,
+        # )
 
         self.gru = snt.GRU(gru_hidden_size)
 
         self.output_mlp = snt.Sequential(
             [
                 networks.LayerNormMLP(output_mlp_size, activate_final=True),
-                networks.NearZeroInitializedLinear(2),
-                # networks.TanhToSpec(self._action_spec),
+                networks.NearZeroInitializedLinear(self._action_dim),
+                networks.TanhToSpec(self._action_spec),
             ]
         )
 
@@ -71,7 +71,7 @@ class DIALPolicy(snt.RNNCore):
             [
                 networks.LayerNormMLP(message_out_mlp_size, activate_final=True),
                 networks.NearZeroInitializedLinear(self._message_dim),
-                # networks.TanhToSpec(self._message_spec),
+                networks.TanhToSpec(self._message_spec),
             ]
         )
 
@@ -89,13 +89,15 @@ class DIALPolicy(snt.RNNCore):
         state: Optional[snt.Module] = None,
         message: Optional[snt.Module] = None,
     ) -> snt.Module:
+
         if state is None:
             state = self.initial_state()
         if message is None:
-            message = tf.zeros(self._message_dim, dtype=tf.float32)
+            message = tf.zeros((1, self._message_dim), dtype=tf.float32)
 
         x_task = self.task_mlp(x)
         x_message = self.message_in_mlp(message)
+
         x = tf.concat([x_task, x_message], axis=1)
 
         x, state = self.gru(x, state)

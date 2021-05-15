@@ -226,6 +226,7 @@ class DIALBuilder(SystemBuilder):
             communication_module=communication_module,
             shared_weights=shared_weights,
             variable_client=variable_client,
+            agent_specs=self._config.environment_spec.get_agent_specs(),
             adder=adder,
         )
 

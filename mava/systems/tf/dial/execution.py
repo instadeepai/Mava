@@ -31,6 +31,7 @@ import tensorflow_probability as tfp
 from acme import types
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
+from acme.specs import EnvironmentSpec
 
 from mava import adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
@@ -46,7 +47,7 @@ class DIALExecutor(RecurrentExecutor):
         self,
         policy_networks: Dict[str, snt.RNNCore],
         communication_module: BaseCommunicationModule,
-        message_size: int = 1,
+        agent_specs: Dict[str, EnvironmentSpec],
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -55,6 +56,7 @@ class DIALExecutor(RecurrentExecutor):
         epsilon: float = 0.05,
     ):
         """Initializes the executor.
+        TODO: Update docstring
         Args:
           policy_networks: the (recurrent) policy to run for each agent in the system.
           shared_weights: specify if weights are shared between agent networks.
@@ -69,7 +71,7 @@ class DIALExecutor(RecurrentExecutor):
         self._adder = adder
         self._variable_client = variable_client
         self._policy_networks = policy_networks
-        self._message_size = message_size
+        self._agent_specs = agent_specs
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}
         self._prev_states: Dict[str, Any] = {}
@@ -101,7 +103,8 @@ class DIALExecutor(RecurrentExecutor):
 
         action = tf.argmax(action_policy, axis=1)
         if tf.random.uniform([]) < self._epsilon and not self._is_eval:
-            action = tf.random.uniform([1], 0, 2, dtype=tf.dtypes.int64)
+            action_spec = self._agent_specs[agent].actions
+            action = tf.random.uniform(action_spec.shape, 0, action_spec.num_values, dtype=tf.dtypes.int64)
 
         # Hard coded perfect policy:
         # if observation[1].item()==5 and observation[0].item()==1:
@@ -118,7 +121,6 @@ class DIALExecutor(RecurrentExecutor):
                 if isinstance(message_policy, tfd.Distribution)
                 else message_policy
             )
-
         return action, message, new_state
 
     def observe_first(
@@ -189,7 +191,6 @@ class DIALExecutor(RecurrentExecutor):
             self._states[agent] = self._networks[agent].initial_state(1)
 
         message_inputs = self._communication_module.process_messages(self._messages)
-
         # Step the recurrent policy forward given the current observation and state.
         policy_output, message, new_state = self._policy(
             agent,
@@ -221,7 +222,6 @@ class DIALExecutor(RecurrentExecutor):
                 self._states[agent],
                 message_inputs[agent],
             )
-
             # Bookkeeping of recurrent states for the observe method.
             self._states[agent] = new_state
             self._messages[agent] = message
