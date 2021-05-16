@@ -184,7 +184,7 @@ class MADQNTrainer(mava.Trainer):
         self._backward()
 
         # Log losses per agent
-        return train_utils.map_losses_per_agent_q(self._q_network_losses)
+        return self._q_network_losses
 
     def _forward(self, inputs: Any) -> None:
         # Unpack input data as follows:
@@ -226,7 +226,8 @@ class MADQNTrainer(mava.Trainer):
 
                 loss = tf.reduce_mean(loss)
 
-                q_network_losses[agent] = loss
+                q_network_losses[agent] = {}
+                q_network_losses[agent]["q_value_loss"] = loss
 
         self._q_network_losses = q_network_losses
         self.tape = tape
