@@ -50,7 +50,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 def make_networks(
@@ -175,7 +175,7 @@ def main(_: Any) -> None:
         eval_logger=eval_logger,
     ).build()
 
-    # launchd
+    # launch
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
