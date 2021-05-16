@@ -38,5 +38,7 @@ We also include a number of systems running on discrete action space environment
     a QMIX system on the two step custom environment.
 - [DIAL](debugging_envs/run_recurrent_dial.py):
     a DIAL system on the custom SwitchGame environment.
+- [DIAL](debugging_envs/run_recurrent_dial_spread.py):
+    a DIAL system on the discrete action space simple_spread MPE debugging environment.
 - [MA-DQN (feedforward)](debugging_envs/run_feedforward_madqn.py):
     an MA-DQN system running on the discrete action space maze_craze_v2 PettingZoo environment.

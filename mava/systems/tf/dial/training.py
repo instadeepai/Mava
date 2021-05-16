@@ -34,7 +34,8 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
-from mava.components.tf.modules.communication import BaseCommunicationModule
+
+# from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
@@ -50,13 +51,13 @@ class DIALTrainer(mava.Trainer):
         agents: List[str],
         agent_types: List[str],
         networks: Dict[str, snt.Module],
-        target_network: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
+        # target_network: Dict[str, snt.Module],
+        # observation_networks: Dict[str, snt.Module],
         discount: float,
         huber_loss_parameter: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        communication_module: BaseCommunicationModule,
+        # communication_module: BaseCommunicationModule,
         policy_optimizer: snt.Optimizer,
         shared_weights: bool = True,
         importance_sampling_exponent: float = None,
@@ -87,19 +88,19 @@ class DIALTrainer(mava.Trainer):
           logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.
         """
-
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
-        self._communication_module = communication_module
+        self._communication_module = networks["communication_module"]["all_agents"]
 
         # Store online and target networks.
-        self._policy_networks = networks
-        self._target_policy_networks = target_network
+        self._policy_networks = networks["policies"]
+        self._target_policy_networks = networks["target_policies"]
 
         # self._observation_networks = observation_networks
         self._observation_networks = {
-            k: tf2_utils.to_sonnet_module(v) for k, v in observation_networks.items()
+            k: tf2_utils.to_sonnet_module(v)
+            for k, v in networks["observations"].items()
         }
         # self._target_observation_networks = target_observation_networks
 
@@ -357,7 +358,8 @@ class DIALTrainer(mava.Trainer):
                     batched_state = state
                     batched_message = message
 
-                    # TODO (dries): Why is the policy values calculated again? Was this not done in the first loop?
+                    # TODO (dries): Why is the policy values calculated
+                    #  again? Was this not done in the first loop?
                     (q_t1, m_t1), s = self._policy_networks[agent_type](
                         batched_observation, batched_state, batched_message
                     )
@@ -372,12 +374,13 @@ class DIALTrainer(mava.Trainer):
                     # print("next_message: ", next_message.shape)
                     # print("m_t1: ", m_t1.shape)
 
-                    # TODO (Kevin): Explain to Dries what is going on here. Add comms back in
+                    # TODO (Kevin): Explain to Dries what is going on
+                    #  here. Add comms back in
                     td_comm = y_message - tf.gather(m_t1, next_message, batch_dims=1)
-                    td_comm = y_message - m_t1[0][tf.argmax(next_message)]
+                    # td_comm = y_message - m_t1[0][tf.argmax(next_message)]
 
-                    # print("td_comm: ", td_comm)
-                    # exit()
+                    print("td_comm: ", td_comm)
+                    exit()
 
                     # policy_losses[agent_id] += td_comm ** 2
 

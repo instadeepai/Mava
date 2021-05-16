@@ -9,9 +9,10 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.modules.communication import (  # BroadcastedCommunication,
-    BaseCommunicationModule,
-)
+
+# from mava.components.tf.modules.communication import (  # BroadcastedCommunication,
+#     BaseCommunicationModule,
+# )
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.dial.execution import DIALExecutor
@@ -73,6 +74,7 @@ class DIALConfig:
     max_gradient_norm: Optional[float] = None
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     counter: counting.Counter = None
+    huber_loss_parameter: float = 1.0
     clipping: bool = False
     # communication_module: BaseCommunicationModule = BroadcastedCommunication
     sequence_length: int = 10
@@ -182,7 +184,6 @@ class DIALBuilder(SystemBuilder):
     def make_executor(
         self,
         policy_networks: Dict[str, snt.Module],
-        communication_module: BaseCommunicationModule,
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
@@ -195,6 +196,7 @@ class DIALBuilder(SystemBuilder):
           variable_source: A source providing the necessary executor parameters.
         """
         shared_weights = self._config.shared_weights
+        policy_networks, communication_module = policy_networks
 
         variable_client = None
         if variable_source:
@@ -230,8 +232,6 @@ class DIALBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        communication_module: BaseCommunicationModule,
-        huber_loss_parameter: float = 1.0,
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
@@ -260,22 +260,19 @@ class DIALBuilder(SystemBuilder):
         trainer = DIALTrainer(
             agents=agents,
             agent_types=agent_types,
-            networks=networks["policies"],
-            target_network=networks["target_policies"],
-            observation_networks=networks["observations"],
+            networks=networks,
             shared_weights=shared_weights,
             discount=discount,
             importance_sampling_exponent=importance_sampling_exponent,
             policy_optimizer=self._config.policy_optimizer,
             target_update_period=target_update_period,
             dataset=dataset,
-            huber_loss_parameter=huber_loss_parameter,
+            huber_loss_parameter=self._config.huber_loss_parameter,
             replay_client=replay_client,
             clipping=clipping,
             counter=counter,
             logger=logger,
             checkpoint=self._config.checkpoint,
             max_gradient_norm=max_gradient_norm,
-            communication_module=communication_module,
         )
         return trainer

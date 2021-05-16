@@ -29,11 +29,8 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.adders import reverb as reverb_adders
-from mava.components.tf.architectures import BaseArchitecture, DecentralisedPolicyActor
-from mava.components.tf.modules.communication import (
-    BaseCommunicationModule,
-    BroadcastedCommunication,
-)
+from mava.components.tf.architectures import DecentralisedPolicyActor
+from mava.components.tf.modules.communication import BroadcastedCommunication
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems import system
 from mava.systems.tf import savers as tf2_savers
@@ -57,7 +54,7 @@ class DIAL(system.System):
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Dict[str, snt.Module],
         # observation_networks: Dict[str, snt.Module],
-        architecture: Type[BaseArchitecture] = DecentralisedPolicyActor,
+        architecture: Type[DecentralisedPolicyActor] = DecentralisedPolicyActor,
         executor_fn: Type[core.Executor] = DIALExecutor,
         log_info: Tuple = None,
         num_executors: int = 1,
@@ -85,7 +82,7 @@ class DIAL(system.System):
         # policy_networks: Optional[Dict[str, snt.Module]] = None,
         max_gradient_norm: Optional[float] = None,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
-        communication_module: BaseCommunicationModule = BroadcastedCommunication,
+        communication_module: Type[BroadcastedCommunication] = BroadcastedCommunication,
         trainer_logger: MavaLogger = None,
         exec_logger: MavaLogger = None,
         eval_logger: MavaLogger = None,
@@ -307,13 +304,15 @@ class DIAL(system.System):
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
 
+        system_networks["communication_module"] = {"all_agents": communication_module}
+
         return self._builder.make_trainer(
             networks=system_networks,
             dataset=dataset,
             counter=counter,
             logger=self._trainer_logger,
             # checkpoint=self._checkpoint,
-            communication_module=communication_module,
+            # communication_module=communication_module,
         )
 
     def executor(
@@ -352,9 +351,8 @@ class DIAL(system.System):
 
         # Create the executor.
         executor = self._builder.make_executor(
-            policy_networks=behaviour_policy_networks,
+            policy_networks=[behaviour_policy_networks, communication_module],
             adder=self._builder.make_adder(replay),
-            communication_module=communication_module,
             variable_source=variable_source,
         )
 
@@ -415,8 +413,7 @@ class DIAL(system.System):
 
         # Create the executor.
         executor = self._builder.make_executor(
-            policy_networks=behaviour_policy_networks,
-            communication_module=communication_module,
+            policy_networks=[behaviour_policy_networks, communication_module],
             variable_source=variable_source,
         )
 
