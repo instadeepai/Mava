@@ -256,7 +256,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
 
     def step(self, action: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         timestep = self._parent_environment_step(action)
-        self._append_frame()
+        self._append_frame(timestep)
         return timestep
 
     def _retrieve_render(self) -> np.ndarray:
@@ -268,11 +268,12 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
             )
         return render
 
-    def _append_frame(self) -> None:
+    def _append_frame(self, timestep: dm_env.TimeStep) -> None:
         """Appends a frame to the sequence of frames."""
         counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
-        if counter and (counter % self._record_every == 0):
+        last_step = timestep and timestep.step_type == dm_env.StepType.LAST
+        if (counter and (counter % self._record_every == 0)) or last_step:
             self._frames.append(self._retrieve_render())
 
     def reset(self) -> dm_env.TimeStep:
