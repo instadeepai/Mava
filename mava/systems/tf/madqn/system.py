@@ -23,7 +23,6 @@ import dm_env
 import launchpad as lp
 import reverb
 import sonnet as snt
-import tensorflow as tf
 from acme import specs as acme_specs
 from acme.utils import counting, loggers
 
@@ -31,7 +30,6 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
-from mava.components.tf.modules import exploration
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import savers as tf2_savers
@@ -56,7 +54,6 @@ class MADQN:
         ] = LinearExplorationScheduler,
         epsilon_min: float = 0.05,
         epsilon_decay: float = 1e-4,
-        epsilon_logdir: str = "logs/epsilon/",
         num_executors: int = 1,
         num_caches: int = 0,
         log_info: Tuple = None,
@@ -176,7 +173,7 @@ class MADQN:
         replay: reverb.Client,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        trainer: Optional[training.MADQNTrainer] = None
+        trainer: Optional[training.MADQNTrainer] = None,
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
 
@@ -198,7 +195,7 @@ class MADQN:
             action_selectors=networks["action_selectors"],
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
-            trainer=trainer
+            trainer=trainer,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -305,7 +302,14 @@ class MADQN:
             for executor_id in range(self._num_exectors):
                 source = sources[executor_id % len(sources)]
                 program.add_node(
-                    lp.CourierNode(self.executor, executor_id, replay, source, counter, trainer=trainer)
+                    lp.CourierNode(
+                        self.executor,
+                        executor_id,
+                        replay,
+                        source,
+                        counter,
+                        trainer=trainer,
+                    )
                 )
 
         return program

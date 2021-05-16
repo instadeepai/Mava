@@ -18,7 +18,6 @@ from typing import Any, Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
-import tensorflow as tf
 from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting
@@ -30,6 +29,25 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 )
 from mava.systems.tf.madqn import execution, training
 from mava.wrappers import DetailedTrainerStatistics
+
+# TODO (CLAUDE) I had to make a custom class here that
+# inherits DetailedTrainerStatistics
+# to expose the get_epsilon() function. For some
+# reason lp does not bind it otherwise.
+# Need to fix this.
+
+
+class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
+    def __init__(
+        self,
+        trainer: training.MADQNTrainer,
+        metrics: List[str] = ["policy_loss"],
+        summary_stats: List = ["mean", "max", "min", "var", "std"],
+    ) -> None:
+        super().__init__(trainer, metrics, summary_stats)
+
+    def get_epsilon(self) -> float:
+        return self._trainer.get_epsilon()  # type: ignore
 
 
 @dataclasses.dataclass
@@ -163,7 +181,7 @@ class MADQNBuilder:
         action_selectors: Dict[str, Any],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
-        trainer: Optional[training.MADQNTrainer] = None
+        trainer: Optional[training.MADQNTrainer] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -203,7 +221,7 @@ class MADQNBuilder:
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
-            trainer=trainer
+            trainer=trainer,
         )
 
     def make_trainer(
@@ -255,6 +273,15 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        # trainer = DetailedTrainerStatistics(trainer, metrics=["q_value_loss"])  # type: ignore
+        # TODO (CLAUDE) if I add this wrapper then epsilon doesnt get logged.
+        # Without the wrapper, q-losses dont get logged.
+        # Not sure how to fix this.
+
+        # NOTE (Claude) use my custom statistics
+        # wrapper to expose get_epsilon() for lp.
+        # trainer = DetailedTrainerStatisticsWithEpsilon(
+        #   trainer,
+        #   metrics=["q_value_loss"]
+        # )  # type: ignore
 
         return trainer

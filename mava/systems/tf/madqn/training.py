@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.components.tf.modules.exploration.exploration_scheduling import LinearExplorationScheduler
 import time
 from typing import Any, Dict, List, Sequence, Tuple
 
@@ -26,6 +25,9 @@ from acme.types import NestedArray
 from acme.utils import counting, loggers
 
 import mava
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationScheduler,
+)
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
@@ -130,8 +132,12 @@ class MADQNTrainer(mava.Trainer):
 
         self._timestamp = None
 
-    def get_epsilon(self) -> tf.Variable:
-        return self._exploration_scheduler.get_epsilon()
+    def get_epsilon(self) -> float:
+        epsilon = self._exploration_scheduler.get_epsilon()
+        return epsilon
+
+    def _decrement_epsilon(self) -> None:
+        self._exploration_scheduler.decrement_epsilon()
 
     def _update_target_networks(self) -> None:
         for key in self.unique_net_keys:
@@ -265,6 +271,11 @@ class MADQNTrainer(mava.Trainer):
         # Checkpoint and attempt to write the logs.
         if self._checkpoint:
             train_utils.checkpoint_networks(self._system_checkpointer)
+
+        # Log and decrement epsilon
+        epsilon = self.get_epsilon()
+        fetches["epsilon"] = epsilon
+        self._decrement_epsilon()
 
         if self._logger:
             self._logger.write(fetches)

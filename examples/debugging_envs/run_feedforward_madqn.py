@@ -15,7 +15,6 @@
 
 import functools
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import launchpad as lp
@@ -27,15 +26,12 @@ from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
-)
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -54,7 +50,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
 
 
 def make_networks(
@@ -170,7 +166,7 @@ def main(_: Any) -> None:
         num_executors=2,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.01,
-        epsilon_decay=1e-3,
+        epsilon_decay=1e-4,
         log_info=log_info,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
@@ -179,7 +175,7 @@ def main(_: Any) -> None:
         eval_logger=eval_logger,
     ).build()
 
-    # launch
+    # launchd
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {

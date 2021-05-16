@@ -25,7 +25,7 @@ def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
     return logged_losses
 
 
-# Map critic and polic losses to dict, grouped by agent.
+# Map q-losses to dict, grouped by agent.
 def map_losses_per_agent_q(q_losses: Dict) -> Dict:
     assert len(q_losses) > 0
     logged_losses: Dict[str, Dict[str, Any]] = {}
