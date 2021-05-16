@@ -93,7 +93,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         )
 
         if self.return_state_info:
-            return (timestep, {"env_state": state})
+            return timestep, {"env_state": state}
         else:
             return timestep
 
