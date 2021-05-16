@@ -13,39 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running VDN on two-step environment."""
+"""Example running VDN on debugging environment."""
 import functools
 from datetime import datetime
-
-# import importlib
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import launchpad as lp
 import sonnet as snt
 import tensorflow as tf
-
-# import trfl
 from absl import app, flags
 from acme import types
 from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import vdn
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
 
-# from acme.tf import utils as tf2_utils
-
-
-# NOTE See next note.
-# from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
-
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
-    "two_step",
+    "two_step",  # "simple_spread"
     "Debugging environment name (str).",
 )
 flags.DEFINE_string(
@@ -59,10 +51,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
-
-# TODO Add option for recurrent agent networks. In original paper they use DQN
-# for one task and DRQN for the StarCraft II SMAC task.
+flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
 
 # TODO Add option for recurrent agent networks. In original paper they use DQN
 # for one task and DRQN for the StarCraft II SMAC task.
@@ -73,7 +62,6 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    epsilon: tf.Variable = tf.Variable(1.0, trainable=False),
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64,),
     shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
@@ -88,22 +76,40 @@ def make_networks(
 
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
-    q_networks = {}
 
+    def action_selector_fn(
+        q_values: types.NestedTensor,
+        legal_actions: types.NestedTensor,
+        epsilon: Optional[tf.Variable] = None,
+    ) -> types.NestedTensor:
+        return epsilon_greedy_action_selector(
+            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
+        )
+
+    q_networks = {}
+    action_selectors = {}
     for key in specs.keys():
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
         # Create the policy network.
         q_network = snt.Sequential(
             [
-                networks.LayerNormMLP(q_networks_layer_sizes[key], activate_final=True),
+                networks.LayerNormMLP(
+                    q_networks_layer_sizes[key], activate_final=False
+                ),
                 networks.NearZeroInitializedLinear(num_dimensions),
             ]
         )
 
+        # epsilon greedy action selector
+        action_selector = action_selector_fn
         q_networks[key] = q_network
+        action_selectors[key] = action_selector
 
-    return {"q_networks": q_networks}
+    return {
+        "q_networks": q_networks,
+        "action_selectors": action_selectors,
+    }
 
 
 def main(_: Any) -> None:
@@ -116,6 +122,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        num_agents=2,
     )
 
     # networks
@@ -158,8 +165,11 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
+        exploration_scheduler_fn=LinearExplorationScheduler,
+        epsilon_min=0.01,
+        epsilon_decay=1e-4,
         log_info=log_info,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,

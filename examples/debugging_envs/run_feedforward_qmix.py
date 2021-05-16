@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running Qmix on pettinzoo MPE environments."""
+"""Example running QMIX on debugging environments."""
 import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Optional, Sequence, Union

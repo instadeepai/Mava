@@ -25,6 +25,7 @@ from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders, core
+from mava.systems.tf.qmix.training import QMIXTrainer
 from mava.types import OLT
 
 
@@ -43,6 +44,7 @@ class VDNFeedForwardExecutor(core.Executor):
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        trainer: QMIXTrainer = None,
     ):
         """Initializes the executor.
         Args:
@@ -59,6 +61,7 @@ class VDNFeedForwardExecutor(core.Executor):
         self._variable_client = variable_client
         self._q_networks = q_networks
         self._action_selectors = action_selectors
+        self._trainer = trainer
         self._shared_weights = shared_weights
 
     @tf.function
@@ -67,6 +70,7 @@ class VDNFeedForwardExecutor(core.Executor):
         agent: str,
         observation: types.NestedTensor,
         legal_actions: types.NestedTensor,
+        epsilon: tf.Tensor,
     ) -> types.NestedTensor:
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
@@ -80,7 +84,9 @@ class VDNFeedForwardExecutor(core.Executor):
         q_values = self._q_networks[agent_key](batched_observation)
 
         # select legal action
-        action = self._action_selectors[agent_key](q_values, batched_legals)
+        action = self._action_selectors[agent_key](
+            q_values, batched_legals, epsilon=epsilon
+        )
 
         return action
 
@@ -115,8 +121,15 @@ class VDNFeedForwardExecutor(core.Executor):
         actions = {}
         for agent, observation in observations.items():
             # Pass the observation through the policy network.
+            if self._trainer is not None:
+                epsilon = self._trainer.get_epsilon()
+            else:
+                epsilon = 0.0
+
+            epsilon = tf.convert_to_tensor(epsilon)
+
             action = self._policy(
-                agent, observation.observation, observation.legal_actions
+                agent, observation.observation, observation.legal_actions, epsilon
             )
 
             actions[agent] = tf2_utils.to_numpy_squeeze(action)
