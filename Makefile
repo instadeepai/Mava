@@ -20,6 +20,7 @@ DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 MADDPG=examples/debugging_envs/run_feedforward_maddpg.py
 MADQN=examples/debugging_envs/run_feedforward_madqn.py
 QMIX=examples/debugging_envs/run_feedforward_qmix.py
+QMIX-PZ=examples/petting_zoo/run_feedforward_qmix.py
 
 # make file commands
 run-maddpg:
@@ -30,6 +31,9 @@ run-madqn:
 
 run-qmix:
 	$(DOCKER_RUN) python $(QMIX)
+
+run-qmix-pz:
+	$(DOCKER_RUN) python $(QMIX-PZ)
 
 bash:
 	$(DOCKER_RUN) bash

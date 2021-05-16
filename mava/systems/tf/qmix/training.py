@@ -140,8 +140,6 @@ class QMIXTrainer(mava.Trainer):
                         "counter": self._counter,
                         "q_network": self._q_networks[agent_key],
                         "target_q_network": self._target_q_networks[agent_key],
-                        # "mixing_network": self._mixing_network,
-                        # "target_mixing_network": self._target_mixing_network,
                         "optimizer": self._optimizer,
                         "num_steps": self._num_steps,
                     },
