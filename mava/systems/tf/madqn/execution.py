@@ -20,7 +20,6 @@ from typing import Dict, Optional
 import dm_env
 import sonnet as snt
 import tensorflow as tf
-import tensorflow_probability as tfp
 from acme import types
 
 # Internal imports.
@@ -30,8 +29,6 @@ from acme.tf import variable_utils as tf2_variable_utils
 from mava import adders, core
 from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.types import OLT
-
-tfd = tfp.distributions
 
 
 class MADQNFeedForwardExecutor(core.Executor):

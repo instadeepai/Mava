@@ -46,10 +46,10 @@ class MADQNTrainer(mava.Trainer):
         target_q_networks: Dict[str, snt.Module],
         target_update_period: int,
         dataset: tf.data.Dataset,
+        optimizer: snt.Optimizer,
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
-        optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -69,7 +69,7 @@ class MADQNTrainer(mava.Trainer):
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
-        self._logger = logger or loggers.make_default_logger("trainer")
+        self._logger = logger
 
         # Other learner parameters.
         self._discount = discount
@@ -184,7 +184,7 @@ class MADQNTrainer(mava.Trainer):
         self._backward()
 
         # Log losses per agent
-        return train_utils.map_losses_per_agent_q(self.q_network_losses)
+        return train_utils.map_losses_per_agent_q(self._q_network_losses)
 
     def _forward(self, inputs: Any) -> None:
         # Unpack input data as follows:
@@ -228,11 +228,11 @@ class MADQNTrainer(mava.Trainer):
 
                 q_network_losses[agent] = loss
 
-        self.q_network_losses = q_network_losses
+        self._q_network_losses = q_network_losses
         self.tape = tape
 
     def _backward(self) -> None:
-        q_network_losses = self.q_network_losses
+        q_network_losses = self._q_network_losses
         tape = self.tape
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -248,8 +248,8 @@ class MADQNTrainer(mava.Trainer):
                 gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
 
             # Apply gradients.
-            if self._optimizer:
-                self._optimizer.apply(gradients, q_network_variables)
+            self._optimizer.apply(gradients, q_network_variables)
+
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
