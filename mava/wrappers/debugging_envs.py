@@ -85,16 +85,17 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         else:
             self._step_type = dm_env.StepType.MID
 
-        extras = {"env_state": state} if self.return_state_info else {}
-        return (
-            dm_env.TimeStep(
-                observation=observations,
-                reward=rewards,
-                discount=self._discounts,
-                step_type=self._step_type,
-            ),
-            extras,
+        timestep = dm_env.TimeStep(
+            observation=observations,
+            reward=rewards,
+            discount=self._discounts,
+            step_type=self._step_type,
         )
+
+        if self.return_state_info:
+            return (timestep, {"env_state": state})
+        else:
+            return timestep
 
     # Convert Debugging environment observation so it's dm_env compatible.
     # Also, the list of legal actions must be converted to a legal actions mask.
