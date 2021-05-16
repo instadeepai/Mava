@@ -30,19 +30,19 @@ from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
+    "env_class",
+    "butterfly",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "env_name",
+    "cooperative_pong_v2",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 
 flags.DEFINE_string(
@@ -56,7 +56,6 @@ flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        512,
         512,
         256,
     ),
@@ -93,6 +92,8 @@ def make_networks(
         # Create the policy network.
         q_network = snt.Sequential(
             [
+                snt.Conv2D(32, 5),
+                snt.Conv2D(32, 3),
                 networks.LayerNormMLP(
                     q_networks_layer_sizes[key], activate_final=False
                 ),
@@ -119,9 +120,10 @@ def main(_: Any) -> None:
 
     # environment
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        env_preprocess_wrappers=[(pettingzoo_utils.atari_preprocessing, None)],
     )
 
     # networks
@@ -166,7 +168,7 @@ def main(_: Any) -> None:
         num_executors=2,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
-        epsilon_decay=5e-4,
+        epsilon_decay=1e-4,
         log_info=log_info,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
