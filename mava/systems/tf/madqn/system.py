@@ -23,7 +23,6 @@ import dm_env
 import launchpad as lp
 import reverb
 import sonnet as snt
-import tensorflow as tf
 from acme import specs as acme_specs
 from acme.utils import counting, loggers
 
@@ -31,6 +30,7 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
@@ -49,12 +49,16 @@ class MADQN:
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
+        exploration_scheduler_fn: Type[
+            LinearExplorationScheduler
+        ] = LinearExplorationScheduler,
+        epsilon_min: float = 0.05,
+        epsilon_decay: float = 1e-4,
         num_executors: int = 1,
         num_caches: int = 0,
         log_info: Tuple = None,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
-        epsilon: float = tf.Variable(1.0, trainable=False),
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
@@ -63,7 +67,7 @@ class MADQN:
         n_step: int = 5,
         clipping: bool = True,
         discount: float = 0.99,
-        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         max_executor_steps: int = None,
@@ -105,7 +109,8 @@ class MADQN:
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
                 environment_spec=environment_spec,
-                epsilon=epsilon,
+                epsilon_min=epsilon_min,
+                epsilon_decay=epsilon_decay,
                 shared_weights=shared_weights,
                 discount=discount,
                 batch_size=batch_size,
@@ -118,11 +123,12 @@ class MADQN:
                 n_step=n_step,
                 clipping=clipping,
                 checkpoint=checkpoint,
-                policy_optimizer=policy_optimizer,
+                optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
+            exploration_scheduler_fn=exploration_scheduler_fn,
         )
 
     def replay(self) -> Any:
@@ -175,6 +181,7 @@ class MADQN:
         replay: reverb.Client,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
+        trainer: Optional[training.MADQNTrainer] = None,
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
 
@@ -184,7 +191,7 @@ class MADQN:
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system_networks = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
@@ -192,9 +199,11 @@ class MADQN:
 
         # Create the executor.
         executor = self._builder.make_executor(
-            q_networks=executor_networks["values"],
+            q_networks=system_networks["values"],
             action_selectors=networks["action_selectors"],
             adder=self._builder.make_adder(replay),
+            variable_source=variable_source,
+            trainer=trainer,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -237,7 +246,7 @@ class MADQN:
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system_networks = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
@@ -245,8 +254,9 @@ class MADQN:
 
         # Create the agent.
         executor = self._builder.make_executor(
-            q_networks=executor_networks["values"],
+            q_networks=system_networks["values"],
             action_selectors=networks["action_selectors"],
+            variable_source=variable_source,
         )
 
         # Make the environment.
@@ -308,7 +318,14 @@ class MADQN:
             for executor_id in range(self._num_exectors):
                 source = sources[executor_id % len(sources)]
                 program.add_node(
-                    lp.CourierNode(self.executor, executor_id, replay, source, counter)
+                    lp.CourierNode(
+                        self.executor,
+                        executor_id,
+                        replay,
+                        source,
+                        counter,
+                        trainer=trainer,
+                    )
                 )
 
         return program

@@ -16,6 +16,7 @@
 # https://github.com/deepmind/acme/blob/master/acme/tf/networks/masked_epsilon_greedy.py
 
 """Adaptation of trfl epsilon_greedy with legal action masking."""
+from typing import Optional
 
 import tensorflow as tf
 import tensorflow.compat.v1 as tfv1
@@ -25,7 +26,7 @@ from acme import types as acme_types
 
 def epsilon_greedy_action_selector(
     action_values: acme_types.NestedArray,
-    epsilon: tf.Tensor = tf.Variable(0.05, trainable=False),
+    epsilon: Optional[tf.Tensor] = None,
     legal_actions_mask: acme_types.NestedArray = None,
 ) -> tfp.distributions.Categorical:
     """Computes an epsilon-greedy distribution over actions.
@@ -54,7 +55,10 @@ def epsilon_greedy_action_selector(
         # Convert inputs to Tensors if they aren't already.
         action_values = tfv1.convert_to_tensor(action_values)
 
-        epsilon = tfv1.convert_to_tensor(epsilon, dtype=action_values.dtype)
+        if epsilon is not None:
+            epsilon = tfv1.convert_to_tensor(epsilon, dtype=action_values.dtype)
+        else:
+            epsilon = 0
 
         # convert mask to float
         legal_actions_mask = tfv1.cast(legal_actions_mask, dtype=tf.float32)

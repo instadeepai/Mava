@@ -15,7 +15,7 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import launchpad as lp
 import sonnet as snt
@@ -26,6 +26,7 @@ from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
@@ -54,8 +55,11 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    epsilon: tf.Variable = tf.Variable(1.0, trainable=False),
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
+    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+        512,
+        512,
+        256,
+    ),
     shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -71,10 +75,12 @@ def make_networks(
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
     def action_selector_fn(
-        q_values: types.NestedTensor, legal_actions: types.NestedTensor
+        q_values: types.NestedTensor,
+        legal_actions: types.NestedTensor,
+        epsilon: Optional[tf.Variable] = None,
     ) -> types.NestedTensor:
         return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions
+            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
         )
 
     q_networks = {}
@@ -87,7 +93,9 @@ def make_networks(
         # Create the policy network.
         q_network = snt.Sequential(
             [
-                networks.LayerNormMLP(q_networks_layer_sizes[key], activate_final=True),
+                networks.LayerNormMLP(
+                    q_networks_layer_sizes[key], activate_final=False
+                ),
                 networks.NearZeroInitializedLinear(num_dimensions),
             ]
         )
@@ -156,8 +164,11 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
+        exploration_scheduler_fn=LinearExplorationScheduler,
+        epsilon_min=0.01,
+        epsilon_decay=1e-4,
         log_info=log_info,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,
