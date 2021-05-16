@@ -361,7 +361,7 @@ class QMIX:
                         replay,
                         source,
                         counter,
-                        trainer=trainer,
+                        trainer,
                     )
                 )
 

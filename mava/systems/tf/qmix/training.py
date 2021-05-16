@@ -49,10 +49,10 @@ class QMIXTrainer(mava.Trainer):
         target_mixing_network: snt.Module,
         target_update_period: int,
         dataset: tf.data.Dataset,
+        optimizer: snt.Optimizer,
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
-        optimizer: snt.Optimizer,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -74,7 +74,7 @@ class QMIXTrainer(mava.Trainer):
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
-        self._logger = logger or loggers.make_default_logger("trainer")
+        self._logger = logger
 
         # Other learner parameters.
         self._discount = discount
@@ -85,7 +85,7 @@ class QMIXTrainer(mava.Trainer):
         self._target_update_period = target_update_period
 
         # Create an iterator to go through the dataset.
-        self._iterator = iter(dataset)  # TODO Should we remove iter()?
+        self._iterator = dataset
 
         # Store the exploration scheduler
         self._exploration_scheduler = exploration_scheduler
@@ -111,27 +111,44 @@ class QMIXTrainer(mava.Trainer):
             ] = q_network_to_expose.variables
 
         # Checkpointer
-        self._system_checkpointer: Dict = {}
-        # TODO Get checkpointing working. Launchpad crashes currently.
+        self._system_checkpointer = {}
         if checkpoint:
+            # TODO Checkpointing of mixing networks not playing nicely...
+            # self._system_checkpointer["mixing_network"] = tf2_savers.Checkpointer(
+            #     directory=checkpoint_subpath,
+            #     time_delta_minutes=15,
+            #     objects_to_save={
+            #         "mixing_network": self._mixing_network,
+            #     },
+            #     enable_checkpointing=checkpoint,
+            # )
+            # self._system_checkpointer[
+            #     "target_mixing_network"
+            # ] = tf2_savers.Checkpointer(
+            #     directory=checkpoint_subpath,
+            #     time_delta_minutes=15,
+            #     objects_to_save={
+            #         "target_mixing_network": self._target_mixing_network,
+            #     },
+            #     enable_checkpointing=checkpoint,
+            # )
             for agent_key in self.unique_net_keys:
-
-                checkpointer = tf2_savers.Checkpointer(
+                agent_checkpointer = tf2_savers.Checkpointer(
                     directory=checkpoint_subpath,
                     time_delta_minutes=15,
                     objects_to_save={
                         "counter": self._counter,
                         "q_network": self._q_networks[agent_key],
                         "target_q_network": self._target_q_networks[agent_key],
-                        "mixing_network": self._mixing_network,
-                        "target_mixing_network": self._target_mixing_network,
+                        # "mixing_network": self._mixing_network,
+                        # "target_mixing_network": self._target_mixing_network,
                         "optimizer": self._optimizer,
                         "num_steps": self._num_steps,
                     },
                     enable_checkpointing=checkpoint,
                 )
 
-                self._system_checkpointer[agent_key] = checkpointer
+                self._system_checkpointer[agent_key] = agent_checkpointer
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -177,6 +194,46 @@ class QMIXTrainer(mava.Trainer):
         a_tm1_feed = a_tm1[agent]
 
         return o_tm1_feed, o_t_feed, a_tm1_feed
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        # Compute elapsed time.
+        timestamp = time.time()
+        if self._timestamp:
+            elapsed_time = timestamp - self._timestamp
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        # Checkpoint and attempt to write the logs.
+        if self._checkpoint:
+            train_utils.checkpoint_networks(self._system_checkpointer)
+
+        # Log and decrement epsilon
+        epsilon = self.get_epsilon()
+        fetches["epsilon"] = epsilon
+        self._decrement_epsilon()
+
+        if self._logger:
+            self._logger.write(fetches)
+
+    @tf.function
+    def _step(self) -> Dict[str, Dict[str, Any]]:
+        # Update the target networks
+        self._update_target_networks()
+
+        inputs = next(self._iterator)
+
+        self._forward(inputs)
+        self._backward()
+
+        return {"system": {"q_value_loss": self.loss}}  # Return total system loss
 
     def _forward(self, inputs: Any) -> None:
         # Unpack input data as follows:
@@ -247,14 +304,9 @@ class QMIXTrainer(mava.Trainer):
             targets = (
                 rewards + discount * (tf.constant(1.0) - dones) * q_tot_target_mixed
             )
-
             targets = tf.stop_gradient(targets)
-
             td_error = targets - q_tot_mixed
-
             self.loss = 0.5 * tf.reduce_mean(tf.square(td_error))
-
-            self._log_q_tot = q_tot_mixed
 
             self.tape = tape
 
@@ -280,46 +332,6 @@ class QMIXTrainer(mava.Trainer):
 
         # Delete the tape manually because of the persistent=True flag.
         train_utils.safe_del(self, "tape")
-
-    @tf.function
-    def _step(self) -> Dict[str, Dict[str, Any]]:
-        # Update the target networks
-        self._update_target_networks()
-
-        inputs = next(self._iterator)
-
-        self._forward(inputs)
-        self._backward()
-
-        return {"system": {"loss": self.loss}}  # Return total system loss
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        # Compute elapsed time.
-        timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        # Checkpoint and attempt to write the logs.
-        if self._checkpoint:
-            train_utils.checkpoint_networks(self._system_checkpointer)
-
-        # Log and decrement epsilon
-        epsilon = self.get_epsilon()
-        fetches["epsilon"] = epsilon
-        self._decrement_epsilon()
-
-        if self._logger:
-            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
