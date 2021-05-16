@@ -76,6 +76,10 @@ class MADQN:
         trainer_logger: MavaLogger = None,
         exec_logger: MavaLogger = None,
         eval_logger: MavaLogger = None,
+        train_loop_fn: Callable = ParallelEnvironmentLoop,
+        eval_loop_fn: Callable = ParallelEnvironmentLoop,
+        train_loop_fn_kwargs: Dict = {},
+        eval_loop_fn_kwargs: Dict = {},
     ):
 
         if not environment_spec:
@@ -97,6 +101,10 @@ class MADQN:
         self._trainer_logger = trainer_logger
         self._exec_logger = exec_logger
         self._eval_logger = eval_logger
+        self._train_loop_fn = train_loop_fn
+        self._train_loop_fn_kwargs = train_loop_fn_kwargs
+        self._eval_loop_fn = eval_loop_fn
+        self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
 
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
@@ -212,8 +220,12 @@ class MADQN:
             exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
 
         # Create the loop to connect environment and executor.
-        train_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=exec_logger
+        train_loop = self._train_loop_fn(
+            environment,
+            executor,
+            counter=counter,
+            logger=exec_logger,
+            **self._train_loop_fn_kwargs,
         )
 
         train_loop = DetailedPerAgentStatistics(train_loop)
@@ -255,8 +267,12 @@ class MADQN:
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
-        eval_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=self._eval_logger
+        eval_loop = self._eval_loop_fn(
+            environment,
+            executor,
+            counter=counter,
+            logger=self._eval_logger,
+            **self._eval_loop_fn_kwargs,
         )
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)
