@@ -69,7 +69,7 @@ class MADQNTrainer(mava.Trainer):
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
-        self._logger = logger or loggers.make_default_logger("trainer")
+        self._logger = logger
 
         # Other learner parameters.
         self._discount = discount

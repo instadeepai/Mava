@@ -324,7 +324,7 @@ class MADQN:
                         replay,
                         source,
                         counter,
-                        trainer=trainer,
+                        trainer,
                     )
                 )
 
