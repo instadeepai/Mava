@@ -14,19 +14,75 @@
 # limitations under the License.
 
 import dataclasses
+import time
 from typing import Any, Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
-import tensorflow as tf
 from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationScheduler,
+)
 from mava.systems.tf.madqn import execution, training
+from mava.utils import training_utils as train_utils
 from mava.wrappers import DetailedTrainerStatistics
+
+# TODO (CLAUDE) I had to make a custom class here that
+# inherits DetailedTrainerStatistics
+# to expose the get_epsilon() function. For some
+# reason lp does not bind it otherwise.
+# Need to fix this.
+
+
+class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
+    def __init__(
+        self,
+        trainer: training.MADQNTrainer,
+        metrics: List[str] = ["q_value_loss"],
+        summary_stats: List = ["mean", "max", "min", "var", "std"],
+    ) -> None:
+        super().__init__(trainer, metrics, summary_stats)
+
+    def get_epsilon(self) -> float:
+        return self._trainer.get_epsilon()  # type: ignore
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        if self._require_loggers:
+            self._create_loggers(list(fetches.keys()))
+            self._require_loggers = False
+
+        # compute statistics
+        self._compute_statistics(fetches)
+
+        # Compute elapsed time.
+        # NOTE (Arnu): getting type issues with the timestamp
+        # not sure why. Look into a fix for this.
+        timestamp = time.time()
+        if self._timestamp:  # type: ignore
+            elapsed_time = timestamp - self._timestamp  # type: ignore
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        train_utils.checkpoint_networks(self._system_checkpointer)
+
+        fetches["epsilon"] = self.get_epsilon()
+        self._trainer._decrement_epsilon()  # type: ignore
+
+        if self._logger:
+            self._logger.write(fetches)
 
 
 @dataclasses.dataclass
@@ -49,7 +105,8 @@ class MADQNConfig:
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
-    epsilon: tf.Variable
+    epsilon_min: float
+    epsilon_decay: float
     shared_weights: bool
     target_update_period: int
     executor_variable_update_period: int
@@ -62,13 +119,13 @@ class MADQNConfig:
     n_step: int
     discount: float
     checkpoint: bool
-    policy_optimizer: snt.Optimizer
+    optimizer: snt.Optimizer
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
 
 
 class MADQNBuilder:
-    """Builder for MADDPG which constructs individual components of the system."""
+    """Builder for MADQN which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an RL system.
       Implementations of this interface contain a complete specification of a
@@ -82,6 +139,9 @@ class MADQNBuilder:
         config: MADQNConfig,
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
+        exploration_scheduler_fn: Type[
+            LinearExplorationScheduler
+        ] = LinearExplorationScheduler,
     ):
         """Args:
         _config: Configuration options for the MADQN system.
@@ -91,6 +151,7 @@ class MADQNBuilder:
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
+        self._exploration_scheduler_fn = exploration_scheduler_fn
 
     def make_replay_tables(
         self,
@@ -155,6 +216,7 @@ class MADQNBuilder:
         action_selectors: Dict[str, Any],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
+        trainer: Optional[training.MADQNTrainer] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -179,7 +241,7 @@ class MADQNBuilder:
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
-                variables={"value_network": variables},
+                variables={"q_network": variables},
                 update_period=self._config.executor_variable_update_period,
             )
 
@@ -194,13 +256,13 @@ class MADQNBuilder:
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
+            trainer=trainer,
         )
 
     def make_trainer(
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
     ) -> core.Trainer:
@@ -220,17 +282,24 @@ class MADQNBuilder:
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
+        # Make epsilon scheduler
+        exploration_scheduler = self._exploration_scheduler_fn(
+            epsilon_min=self._config.epsilon_min,
+            epsilon_decay=self._config.epsilon_decay,
+        )
+
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
+            discount=self._config.discount,
             q_networks=q_networks,
             target_q_networks=target_q_networks,
-            epsilon=self._config.epsilon,
             shared_weights=self._config.shared_weights,
-            optimizer=self._config.policy_optimizer,
+            optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             clipping=self._config.clipping,
+            exploration_scheduler=exploration_scheduler,
             dataset=dataset,
             counter=counter,
             logger=logger,
@@ -238,6 +307,12 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = DetailedTrainerStatistics(trainer, metrics=["loss"])  # type: ignore
+        # TODO (CLAUDE) if I add this wrapper then epsilon doesnt get logged.
+        # Without the wrapper, q-losses dont get logged.
+        # Not sure how to fix this.
+
+        # NOTE (Claude) use my custom statistics
+        # wrapper to expose get_epsilon() for lp.
+        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type: ignore
 
         return trainer
