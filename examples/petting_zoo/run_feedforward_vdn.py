@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running QMIX on pettinzoo MPE environments."""
+"""Example running VDN on pettinzoo MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Optional, Sequence, Union
@@ -29,7 +29,7 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 from mava import specs as mava_specs
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.networks import epsilon_greedy_action_selector
-from mava.systems.tf import qmix
+from mava.systems.tf import vdn
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import Logger
@@ -92,10 +92,8 @@ def make_networks(
     q_networks = {}
     action_selectors = {}
     for key in specs.keys():
-
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
-
         # Create the policy network.
         q_network = snt.Sequential(
             [
@@ -110,7 +108,6 @@ def make_networks(
 
         # epsilon greedy action selector
         action_selector = action_selector_fn
-
         q_networks[key] = q_network
         action_selectors[key] = action_selector
 
@@ -169,7 +166,7 @@ def main(_: Any) -> None:
     )
 
     # distributed program
-    program = qmix.QMIX(
+    program = vdn.VDN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
