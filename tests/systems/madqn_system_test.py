@@ -149,7 +149,7 @@ class TestMADQN:
             batch_size=32,
             min_replay_size=32,
             max_replay_size=1000,
-            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
             checkpoint_subpath=checkpoint_dir,
             trainer_logger=trainer_logger,
