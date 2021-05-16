@@ -263,7 +263,6 @@ class MADQNBuilder:
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
     ) -> core.Trainer:
