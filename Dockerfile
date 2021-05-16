@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:latest-gpu
+FROM tensorflow/tensorflow:2.4.1-gpu
 
 RUN apt-get -y --fix-missing update
 
