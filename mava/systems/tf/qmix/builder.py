@@ -28,21 +28,17 @@ from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
-from mava.systems.tf.madqn import execution, training
+from mava.systems.tf.qmix import execution, training
 from mava.utils import training_utils as train_utils
 from mava.wrappers import DetailedTrainerStatistics
 
-# TODO (CLAUDE) I had to make a custom class here that
-# inherits DetailedTrainerStatistics
-# to expose the get_epsilon() function. For some
-# reason lp does not bind it otherwise.
-# Need to fix this.
+# TODO Clean up documentation
 
 
 class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
     def __init__(
         self,
-        trainer: training.MADQNTrainer,
+        trainer: training.QMIXTrainer,
         metrics: List[str] = ["q_value_loss"],
         summary_stats: List = ["mean", "max", "min", "var", "std"],
     ) -> None:
@@ -86,8 +82,8 @@ class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
 
 
 @dataclasses.dataclass
-class MADQNConfig:
-    """Configuration options for the MADDPG system.
+class QMIXConfig:
+    """Configuration options for the QMIX system.
     Args:
             environment_spec: description of the actions, observations, etc.
             discount: discount to use for TD updates.
@@ -124,28 +120,32 @@ class MADQNConfig:
     checkpoint_subpath: str = "~/mava/"
 
 
-class MADQNBuilder:
-    """Builder for MADQN which constructs individual components of the system."""
+class QMIXBuilder:
+    """Builder for QMIX which constructs individual components of the system."""
 
-    """Defines an interface for defining the components of an RL system.
+    """Defines an interface for defining the components of an MARL system.
       Implementations of this interface contain a complete specification of a
-      concrete RL system. An instance of this class can be used to build an
-      RL system which interacts with the environment either locally or in a
+      concrete MARL system. An instance of this class can be used to build an
+      MARL system which interacts with the environment either locally or in a
       distributed setup.
       """
 
     def __init__(
         self,
-        config: MADQNConfig,
-        trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
-        executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
+        config: QMIXConfig,
+        trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
+        executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
-    ):
+    ) -> None:
         """Args:
-        _config: Configuration options for the MADQN system.
-        _trainer_fn: Trainer module to use."""
+        _config: Configuration options for the QMIX system.
+
+        self._config = config
+        self._trainer_fn = trainer_fn
+        """
+
         self._config = config
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
@@ -155,7 +155,7 @@ class MADQNBuilder:
 
     def make_replay_tables(
         self,
-        environment_spec: specs.EnvironmentSpec,
+        environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
         if self._config.samples_per_insert is None:
             # We will take a samples_per_insert ratio of None to mean that there is
@@ -188,7 +188,9 @@ class MADQNBuilder:
     def make_dataset_iterator(
         self, replay_client: reverb.Client
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the system."""
+        """Create a dataset iterator to use for learning/updating the system.
+        Args:
+            replay_client: Reverb Client which points to the replay server."""
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
@@ -216,15 +218,17 @@ class MADQNBuilder:
         action_selectors: Dict[str, Any],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
-        trainer: Optional[training.MADQNTrainer] = None,
+        trainer: Optional[training.QMIXTrainer] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
-            behavior_networks: A struct of instance of all
-                the different behaviour networks,
+            q_networks: A struct of instance of all
+                the different system q networks,
                 this should be a callable which takes as input observations
                 and returns actions.
             adder: How data is recorded (e.g. added to replay).
+            variable_source: collection of (nested) numpy arrays. Contains
+                source variables as defined in mava.core.
         """
 
         shared_weights = self._config.shared_weights
@@ -278,6 +282,8 @@ class MADQNBuilder:
         """
         q_networks = networks["values"]
         target_q_networks = networks["target_values"]
+        mixing_network = networks["mixing"]
+        target_mixing_network = networks["target_mixing"]
 
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
@@ -287,7 +293,6 @@ class MADQNBuilder:
             epsilon_min=self._config.epsilon_min,
             epsilon_decay=self._config.epsilon_decay,
         )
-
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
             agents=agents,
@@ -295,6 +300,8 @@ class MADQNBuilder:
             discount=self._config.discount,
             q_networks=q_networks,
             target_q_networks=target_q_networks,
+            mixing_network=mixing_network,
+            target_mixing_network=target_mixing_network,
             shared_weights=self._config.shared_weights,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
@@ -307,12 +314,6 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        # TODO (CLAUDE) if I add this wrapper then epsilon doesnt get logged.
-        # Without the wrapper, q-losses dont get logged.
-        # Not sure how to fix this.
-
-        # NOTE (Claude) use my custom statistics
-        # wrapper to expose get_epsilon() for lp.
-        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type: ignore
+        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type:ignore
 
         return trainer

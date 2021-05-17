@@ -41,6 +41,7 @@ class HyperNetwork(snt.Module):
         self._agent_networks = agent_networks
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
+
         # Let the user define the hidden dim but default it to qmix_hidden_dim.
         if hypernet_hidden_dim == 0:
             self._hypernet_hidden_dim = qmix_hidden_dim
@@ -48,14 +49,11 @@ class HyperNetwork(snt.Module):
             self._hypernet_hidden_dim = hypernet_hidden_dim
 
         # Calculate other necessary variables
-        self._n_agents = len(agent_networks)
-        # TODO Generalise this
-        # self._n_actions = list(agent_networks.values())[0]._layers._layer_sizes[-1]
-        self._n_actions = 2
+        self._n_agents = len(agent_networks["values"])
 
         # Set up hypernetwork configuration
         if self._num_hypernet_layers == 1:
-            self.hyper_w1 = snt.nets.MLP(output_sizes=[self.qmix_hidden_dim])
+            self.hyper_w1 = snt.nets.MLP(output_sizes=[self._qmix_hidden_dim])
             self.hyper_w2 = snt.nets.MLP(output_sizes=[self._qmix_hidden_dim])
 
         # Default
@@ -63,7 +61,7 @@ class HyperNetwork(snt.Module):
             self.hyper_w1 = snt.nets.MLP(
                 output_sizes=[
                     self._hypernet_hidden_dim,
-                    self._qmix_hidden_dim * self._n_agents * self._n_actions,
+                    self._qmix_hidden_dim * self._n_agents,
                 ]
             )
             self.hyper_w2 = snt.nets.MLP(
@@ -82,8 +80,8 @@ class HyperNetwork(snt.Module):
         )  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
         w1 = tf.reshape(
             w1,
-            (-1, self._n_actions * self._n_agents, self._qmix_hidden_dim),
-        )  # [B, n_actions*n_agents, qmix_hidden_dim] = [B, 4, qmix_hidden_dim]
+            (-1, self._n_agents, self._qmix_hidden_dim),
+        )  # [B, n_agents, qmix_hidden_dim] = [B, 2, qmix_hidden_dim]
 
         b1 = self.hyper_b1(states)  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
         b1 = tf.reshape(b1, [-1, 1, self._qmix_hidden_dim])  # [B, 1, qmix_hidden_dim]
@@ -97,7 +95,7 @@ class HyperNetwork(snt.Module):
         b2 = tf.reshape(b2, shape=(-1, 1, 1))  # [B, 1, 1]
 
         hyperparams = {}
-        hyperparams["w1"] = w1  # [B, 4, qmix_hidden_dim]
+        hyperparams["w1"] = w1  # [B, 2, qmix_hidden_dim]
         hyperparams["b1"] = b1  # [B, 1, qmix_hidden_dim]
         hyperparams["w2"] = w2  # [B, qmix_hidden_dim]
         hyperparams["b2"] = b2  # [B, 1]

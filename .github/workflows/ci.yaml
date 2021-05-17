@@ -27,14 +27,14 @@ jobs:
           export LANG=en_US.UTF-8
           pip install --upgrade pip setuptools
           pip install .
-          pip install .[tf,envs,reverb,testing_formatting,launchpad]
+          pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
           pip install .[flatland]
           # For atari envs
           sudo apt-get update
           sudo apt-get install unrar
           pip install autorom && echo y | AutoROM
-          # Open CV
-          sudo apt-get install ffmpeg libsm6 libxext6  -y
+          # Open CV and Headless screen.
+          sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
       - name: Format code
         run: |
           # Check code follows black formatting.

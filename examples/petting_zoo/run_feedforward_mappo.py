@@ -13,36 +13,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Example running MAPPO on pettingzoo environment."""
+
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Sequence, Union
 
+import acme.tf.networks as networks
+import dm_env
 import launchpad as lp
+import numpy as np
 import sonnet as snt
 import tensorflow as tf
+import tensorflow_probability as tfp
 from absl import app, flags
-from acme import types
-from acme.tf import networks
+from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
+from supersuit import black_death_v1
 
-from mava import specs as mava_specs
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.components.tf.networks import epsilon_greedy_action_selector
-from mava.systems.tf import madqn
+import mava.specs as mava_specs
+from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_class",
-    "butterfly",
-    "Pettingzoo environment class, e.g. atari (str).",
-)
-flags.DEFINE_string(
     "env_name",
-    "cooperative_pong_v2",
-    "Pettingzoo environment name, e.g. pong (str).",
+    "multiwalker_v6",
+    "Debugging environment name (str).",
+)
+
+flags.DEFINE_string(
+    "env_class",
+    "sisl",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 
 flags.DEFINE_string(
@@ -50,66 +55,89 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        512,
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+        256,
+        256,
         256,
     ),
+    critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
-) -> Mapping[str, types.TensorTransformation]:
+) -> Dict[str, snt.Module]:
+
     """Creates networks used by the agents."""
 
+    # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
-
-    # Create agent_type specs
     if shared_weights:
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
+    if isinstance(policy_networks_layer_sizes, Sequence):
+        policy_networks_layer_sizes = {
+            key: policy_networks_layer_sizes for key in specs.keys()
+        }
+    if isinstance(critic_networks_layer_sizes, Sequence):
+        critic_networks_layer_sizes = {
+            key: critic_networks_layer_sizes for key in specs.keys()
+        }
 
-    def action_selector_fn(
-        q_values: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: Optional[tf.Variable] = None,
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
-
-    q_networks = {}
-    action_selectors = {}
+    observation_networks = {}
+    policy_networks = {}
+    critic_networks = {}
     for key in specs.keys():
 
-        # Get total number of action dimensions from action spec.
-        num_dimensions = specs[key].actions.num_values
+        # Create the shared observation network; here simply a state-less operation.
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
-        # Create the policy network.
-        q_network = snt.Sequential(
+        # Note: The discrete case must be placed first as it inherits from BoundedArray.
+        if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discrete
+            num_actions = specs[key].actions.num_values
+            policy_network = snt.Sequential(
+                [
+                    networks.LayerNormMLP(
+                        tuple(policy_networks_layer_sizes[key]) + (num_actions,),
+                        activate_final=False,
+                    ),
+                    tf.keras.layers.Lambda(
+                        lambda logits: tfp.distributions.Categorical(logits=logits)
+                    ),
+                ]
+            )
+        elif isinstance(specs[key].actions, dm_env.specs.BoundedArray):  # continuous
+            num_actions = np.prod(specs[key].actions.shape, dtype=int)
+            policy_network = snt.Sequential(
+                [
+                    networks.LayerNormMLP(
+                        policy_networks_layer_sizes[key], activate_final=True
+                    ),
+                    networks.MultivariateNormalDiagHead(num_dimensions=num_actions),
+                    networks.TanhToSpec(specs[key].actions),
+                ]
+            )
+        else:
+            raise ValueError(f"Unknown action_spec type, got {specs[key].actions}.")
+
+        critic_network = snt.Sequential(
             [
-                snt.Conv2D(32, 5),
-                snt.Conv2D(32, 3),
                 networks.LayerNormMLP(
-                    q_networks_layer_sizes[key], activate_final=False
+                    critic_networks_layer_sizes[key], activate_final=True
                 ),
-                networks.NearZeroInitializedLinear(num_dimensions),
+                networks.NearZeroInitializedLinear(1),
             ]
         )
 
-        # epsilon greedy action selector
-        action_selector = action_selector_fn
-
-        q_networks[key] = q_network
-        action_selectors[key] = action_selector
-
+        observation_networks[key] = observation_network
+        policy_networks[key] = policy_network
+        critic_networks[key] = critic_network
     return {
-        "q_networks": q_networks,
-        "action_selectors": action_selectors,
+        "policies": policy_networks,
+        "critics": critic_networks,
+        "observations": observation_networks,
     }
 
 
@@ -123,7 +151,7 @@ def main(_: Any) -> None:
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        env_preprocess_wrappers=[(pettingzoo_utils.atari_preprocessing, None)],
+        env_preprocess_wrappers=[(black_death_v1, None)],
     )
 
     # networks
@@ -162,15 +190,13 @@ def main(_: Any) -> None:
     )
 
     # distributed program
-    program = madqn.MADQN(
+    program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
-        exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.05,
-        epsilon_decay=1e-4,
         log_info=log_info,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,

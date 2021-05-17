@@ -16,6 +16,7 @@
 from typing import Any, Dict, Optional, Tuple
 
 import dm_env
+import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -100,6 +101,12 @@ class MAPPOFeedForwardExecutor(core.Executor):
 
         # Return a numpy array with squeezed out batch dimension.
         action = tf2_utils.to_numpy_squeeze(action)
+
+        # TODO(Kale-ab) : Remove. This is for debugging.
+        if np.isnan(action).any():
+            print(
+                f"Value error- Log Probs:{self._prev_log_probs[agent]} Action: {action} "  # noqa: E501
+            )
 
         return action
 
