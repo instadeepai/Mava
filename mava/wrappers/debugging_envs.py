@@ -108,7 +108,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 legals = observation["action_mask"]
                 observation = observation["observation"]
             else:
-                # TODO Handle legal actions better for continous envs,
+                # TODO Handle legal actions better for continuous envs,
                 #  maybe have min and max for each action and clip the agents actions
                 #  accordingly
                 legals = np.ones(
