@@ -29,14 +29,11 @@ loop.run()
 This will run a simple loop in which the given multi-agent system interacts with its
 environment and and each agent learns from this interaction. This assumes a `system` instance
 (implementations of which you can find [here][Systems]) and a multi-agent `environment`
-instance which implements the [DeepMind Environment API][dm_env]. Each
-individual system also includes a `README.md` file describing the implementation
-in more detail.
+instance which implements the [DeepMind Environment API][dm_env]. 
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a
-few MARL systems and environments. We also include a
-[quickstart notebook][Quickstart].
+few MARL systems and environments. 
 
 > :information_source: Mava heavily relies on Acme, therefore as is the case with Acme, we make the same statement regarding reliability: mava is a framework for MARL research written by
 > researchers, for researchers. We will make every attempt to keep everything in good
@@ -165,22 +162,6 @@ Please read our [contributing docs](./CONTRIBUTING.md) for details on how to sub
 
 Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
 
-## Citing Mava
-
-If you use Mava in your work, please cite the accompanying
-[technical report][Paper]:
-
-```bibtex
-@article{pretorius2021mava,
-    title={Mava: A Research Framework for Multi-Agent Reinforcement Learning},
-    author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Siphelele Danisa and Kevin Eloff
-    and Claude Formanek and St John Grimbly and Alexandre Laterre and Karim Beguir},
-    year={2021},
-    journal={arXiv preprint},
-    url={},
-}
-```
-
 [Systems]: mava/systems/
 [Examples]: examples/
 [Tutorial]: https://arxiv.org
@@ -191,3 +172,4 @@ If you use Mava in your work, please cite the accompanying
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [openspiel]: https://github.com/deepmind/open_spiel
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
+[dm_env]: https://github.com/deepmind/dm_env
