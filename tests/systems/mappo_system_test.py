@@ -201,7 +201,7 @@ class TestMAPPO:
         gpu_id = -1
         env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
         local_resources = {
-            "trainer": [],
+            "trainer": PythonProcess(env=env_vars),
             "evaluator": PythonProcess(env=env_vars),
             "executor": PythonProcess(env=env_vars),
         }
