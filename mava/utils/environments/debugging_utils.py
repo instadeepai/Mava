@@ -17,8 +17,9 @@ from typing import Optional
 
 import dm_env
 
+from mava.utils.debugging.environments import TwoStepEnv
 from mava.utils.debugging.make_env import make_debugging_env
-from mava.wrappers.debugging_envs import DebuggingEnvWrapper
+from mava.wrappers.debugging_envs import DebuggingEnvWrapper, TwoStepWrapper
 
 
 def make_environment(
@@ -34,11 +35,16 @@ def make_environment(
 
     del evaluation
 
-    """Creates a MPE environment."""
-    env_module = make_debugging_env(env_name, action_space, num_agents)
-    environment = DebuggingEnvWrapper(env_module, render=render)
+    if env_name == "two_step":
+        environment = TwoStepEnv()
+        environment = TwoStepWrapper(environment)
 
-    if random_seed and hasattr(environment, "seed"):
-        environment.seed(random_seed)
+    else:
+        """Creates a MPE environment."""
+        env_module = make_debugging_env(env_name, action_space, num_agents)
+        environment = DebuggingEnvWrapper(env_module, render=render)
+
+        if random_seed and hasattr(environment, "seed"):
+            environment.seed(random_seed)
 
     return environment

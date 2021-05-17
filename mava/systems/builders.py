@@ -65,7 +65,7 @@ class SystemBuilder(abc.ABC):
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
-        """Create an executer instance.
+        """Create an executor instance.
         Args:
           policy_networks: A struct of instance of all the different
             policy networks; this should be a callable
