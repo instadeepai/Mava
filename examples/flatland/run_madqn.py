@@ -16,7 +16,7 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Tuple
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 import launchpad as lp
 import sonnet as snt
@@ -30,6 +30,9 @@ from flatland.envs.schedule_generators import sparse_schedule_generator
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationScheduler,
+)
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
@@ -81,10 +84,12 @@ def make_networks(
         specs = type_specs
 
     def action_selector_fn(
-        q_values: types.NestedTensor, legal_actions: types.NestedTensor
+        q_values: types.NestedTensor,
+        legal_actions: types.NestedTensor,
+        epsilon: Optional[tf.Variable] = None,
     ) -> types.NestedTensor:
         return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions
+            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
         )
 
     q_networks = {}
@@ -123,6 +128,7 @@ def main(_: Any) -> None:
         flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
     )
 
+    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -157,19 +163,23 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
+    # distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
+        exploration_scheduler_fn=LinearExplorationScheduler,
+        epsilon_min=0.05,
+        epsilon_decay=1e-4,
         log_info=log_info,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,
         eval_logger=eval_logger,
     ).build()
 
-    # Launch gpu config - let trainer use gpu.
+    # launch
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
@@ -177,7 +187,6 @@ def main(_: Any) -> None:
         "evaluator": PythonProcess(env=env_vars),
         "executor": PythonProcess(env=env_vars),
     }
-
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
