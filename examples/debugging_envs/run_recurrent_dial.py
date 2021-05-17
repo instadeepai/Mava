@@ -121,11 +121,6 @@ def make_networks(
     policy_networks = {}
 
     for key in specs.keys():
-
-        # Get total number of action dimensions from action and message spec.
-        # num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
-        # num_dimensions += np.prod(message_size, dtype=int)
-
         # Create the shared observation network
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
