@@ -64,14 +64,6 @@ flatland_env_config: Dict = {
 }
 
 
-# non-pettingzoo environment names
-class NPZ_EnvName:
-    FLATLAND = "flatland"
-
-
-# non-pettingzoo environment wrappers
-npz_env_wrappers: Dict = {NPZ_EnvName.FLATLAND: FlatlandEnvWrapper}
-
 """
 Helpers contains re-usable test functions.
 """
