@@ -30,8 +30,8 @@ from tests.mocks import MockedExecutor, MockedSystem
         # Real Environments
         EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Parallel),
         EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
-        EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Parallel),
-        EnvSpec("pettingzoo.sisl.multiwalker_v6", EnvType.Sequential),
+        EnvSpec("pettingzoo.sisl.multiwalker_v7", EnvType.Parallel),
+        EnvSpec("pettingzoo.sisl.multiwalker_v7", EnvType.Sequential),
     ],
 )
 class TestEnvironmentLoop:

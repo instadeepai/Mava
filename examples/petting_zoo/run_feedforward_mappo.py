@@ -40,7 +40,7 @@ from mava.utils.loggers import Logger
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
-    "multiwalker_v6",
+    "multiwalker_v7",
     "Debugging environment name (str).",
 )
 
