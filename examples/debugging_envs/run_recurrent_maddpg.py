@@ -25,6 +25,7 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.systems.tf import executors, maddpg
@@ -131,9 +132,6 @@ def make_networks(
 
 def main(_: Any) -> None:
 
-    # set loggers info
-    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
-
     # environment
     environment_factory = lp_utils.partial_kwargs(
         debugging_utils.make_environment,
@@ -179,7 +177,6 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
-        log_info=log_info,
         trainer_fn=DecentralisedRecurrentMADDPGTrainer,
         executor_fn=executors.RecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
@@ -188,8 +185,19 @@ def main(_: Any) -> None:
         eval_logger=eval_logger,
     ).build()
 
+    # launch
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
     lp.launch(
-        program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="current_terminal"
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
     )
 
 

@@ -23,24 +23,29 @@ VDN=examples/debugging_envs/run_feedforward_vdn.py
 QMIX-PZ=examples/petting_zoo/run_feedforward_qmix.py
 VDN-PZ==examples/petting_zoo/run_feedforward_vdn.py
 
+MADDPG_RECORD=examples/petting_zoo/run_feedforward_maddpg_record_video.py
+
 # make file commands
+run:
+	$(DOCKER_RUN) python $(EXAMPLE) --base_dir /home/mava/
+
 run-maddpg:
-	$(DOCKER_RUN) python $(MADDPG)
+	$(DOCKER_RUN) python $(MADDPG) --base_dir /home/mava/
 
 run-madqn:
-	$(DOCKER_RUN) python $(MADQN)
+	$(DOCKER_RUN) python  $(MADQN) --base_dir /home/mava/
 
 run-mappo:
 	$(DOCKER_RUN) python $(MAPPO)
 
 run-qmix:
-	$(DOCKER_RUN) python $(QMIX)
+	$(DOCKER_RUN) python  $(QMIX) --base_dir /home/mava/
 
 run-vdn:
 	$(DOCKER_RUN) python $(VDN)
 
 run-qmix-pz:
-	$(DOCKER_RUN) python $(QMIX-PZ)
+	$(DOCKER_RUN) python $(QMIX-PZ) --base_dir /home/mava/
 
 run-vdn-pz:
 	$(DOCKER_RUN) python $(VDN-PZ)
@@ -49,7 +54,7 @@ bash:
 	$(DOCKER_RUN) bash
 
 record:
-	$(DOCKER_RUN)  /bin/bash -c "./startup.sh ; python main.py $(MADDPG) "
+	$(DOCKER_RUN)  /bin/bash -c "./startup.sh ; python $(MADDPG_RECORD) "
 
 build:
 	docker build --tag $(IMAGE) .

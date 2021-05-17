@@ -26,6 +26,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
 from mava import specs as mava_specs
@@ -133,7 +134,6 @@ class TestMAPPO:
         # passed in.
         mava_id = "tests/mappo"
         base_dir = "~/mava"
-        log_info = (base_dir, f"{mava_id}/logs")
 
         # environment
         environment_factory = functools.partial(
@@ -179,7 +179,6 @@ class TestMAPPO:
         system = mappo.MAPPO(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            log_info=log_info,
             num_executors=2,
             batch_size=32,
             max_queue_size=1000,
@@ -196,7 +195,20 @@ class TestMAPPO:
         (trainer_node,) = program.groups["trainer"]
         trainer_node.disable_run()
 
-        lp.launch(program, launch_type="test_mt")
+        # Launch gpu config - don't use gpu
+        gpu_id = -1
+        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+        local_resources = {
+            "trainer": PythonProcess(env=env_vars),
+            "evaluator": PythonProcess(env=env_vars),
+            "executor": PythonProcess(env=env_vars),
+        }
+
+        lp.launch(
+            program,
+            launch_type="test_mt",
+            local_resources=local_resources,
+        )
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
