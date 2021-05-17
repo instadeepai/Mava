@@ -69,6 +69,7 @@ class DIALPolicy(snt.RNNCore):
                 #  Is it the -inf -> inf bounds?
                 #  Also should NearZeroInitializedLinear be the final layer?
                 # # networks.TanhToSpec(self._message_spec),
+                # TODO (Arnu): might need to implement more stable version.
             ]
         )
 

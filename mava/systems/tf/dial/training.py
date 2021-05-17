@@ -150,8 +150,6 @@ class DIALTrainer(mava.Trainer):
                     "policy": self._policy_networks[agent_key],
                     "observation": self._observation_networks[agent_key],
                     "target_policy": self._target_policy_networks[agent_key],
-                    # "target_observation":
-                    # self._target_observation_networks[agent_key],
                     "policy_optimizer": self._policy_optimizer,
                     "num_steps": self._num_steps,
                 }
@@ -171,14 +169,8 @@ class DIALTrainer(mava.Trainer):
     def _update_target_networks(self) -> None:
         for key in self.unique_net_keys:
             # Update target network.
-            online_variables = (
-                # *self._observation_networks[key].variables,
-                *self._policy_networks[key].variables,
-            )
-            target_variables = (
-                # *self._target_observation_networks[key].variables,
-                *self._target_policy_networks[key].variables,
-            )
+            online_variables = (*self._policy_networks[key].variables,)
+            target_variables = (*self._target_policy_networks[key].variables,)
 
             # Make online -> target network update ops.
             if tf.math.mod(self._num_steps, self._target_update_period) == 0:
@@ -247,7 +239,6 @@ class DIALTrainer(mava.Trainer):
 
         T = actions[self._agents[0]].shape[0]
 
-        # logged_losses: Dict[str, Dict[str, Any]] = {}
         with tf.GradientTape(persistent=True) as tape:
             policy_losses = {agent_id: tf.zeros(bs) for agent_id in self._agents}
             # for each batch
@@ -335,11 +326,6 @@ class DIALTrainer(mava.Trainer):
                     # y_t_a = r_t
                     y_action = reward[t - 1]
                     y_message = reward[t - 1]
-                    # y_message = tf.repeat(
-                    #     tf.expand_dims(reward[t - 1], axis=-1),
-                    #     message.shape[-1],
-                    #     axis=-1,
-                    # )
 
                     # y_t_a = r_t + discount * max_u Q(t)
                     if not terminal:

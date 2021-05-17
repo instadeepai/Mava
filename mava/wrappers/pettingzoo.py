@@ -42,8 +42,6 @@ from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
 
-    # Note: we don't inherit from base.EnvironmentWrapper because that class
-    # assumes that the wrapped environment is a dm_env.Environment.
     def __init__(
         self,
         environment: AECEnv,
@@ -202,8 +200,6 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
 class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
 
-    # Note: we don't inherit from base.EnvironmentWrapper because that class
-    # assumes that the wrapped environment is a dm_env.Environment.
     def __init__(
         self,
         environment: ParallelEnv,

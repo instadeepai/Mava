@@ -258,10 +258,6 @@ class BaseMADDPGTrainer(mava.Trainer):
             actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
 
-    # NOTE (Arnu): the decorator below was causing this _step() function not
-    # to be called by the step() function below. Removing it makes the code
-    # work. The docs on tf.function says it is useful for speed improvements
-    # but as far as I can see, we can go ahead without it. At least for now.
     @tf.function
     def _step(
         self,
@@ -974,10 +970,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             actions[agent] = tf2_utils.batch_to_sequence(outputs)
         return actions
 
-    # NOTE (Arnu): the decorator below was causing this _step() function not
-    # to be called by the step() function below. Removing it makes the code
-    # work. The docs on tf.function says it is useful for speed improvements
-    # but as far as I can see, we can go ahead without it. At least for now.
     @tf.function
     def _step(
         self,

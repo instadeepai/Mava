@@ -300,7 +300,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             # Book-keeping.
             episode_steps += 1
 
-            # NOTE (Arnu): fix for when env returns empty dict at end of episode.
+            # If env returns empty dict at end of episode.
             if not rewards:
                 rewards = {
                     agent: generate_zeros_from_spec(spec)

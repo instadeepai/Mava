@@ -37,8 +37,6 @@ from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Debugging MARL environments."""
 
-    # Note: we don't inherit from base.EnvironmentWrapper because that class
-    # assumes that the wrapped environment is a dm_env.Environment.
     def __init__(
         self,
         environment: MultiAgentEnv,
@@ -141,8 +139,6 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
 class SwitchGameWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Debugging Switch environment."""
 
-    # Note: we don't inherit from base.EnvironmentWrapper because that class
-    # assumes that the wrapped environment is a dm_env.Environment.
     def __init__(self, environment: MultiAgentSwitchGame):
         super().__init__(environment=environment)
 

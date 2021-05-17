@@ -307,12 +307,6 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        # TODO (CLAUDE) if I add this wrapper then epsilon doesnt get logged.
-        # Without the wrapper, q-losses dont get logged.
-        # Not sure how to fix this.
-
-        # NOTE (Claude) use my custom statistics
-        # wrapper to expose get_epsilon() for lp.
         trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type: ignore
 
         return trainer
