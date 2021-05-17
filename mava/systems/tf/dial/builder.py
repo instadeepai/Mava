@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Dict, Iterator, List, Optional, Type
+from typing import Any, Dict, Iterator, List, Optional, Type  # , Union
 
 import reverb
 import sonnet as snt
@@ -196,7 +196,9 @@ class DIALBuilder(SystemBuilder):
           variable_source: A source providing the necessary executor parameters.
         """
         shared_weights = self._config.shared_weights
-        policy_networks, communication_module = policy_networks
+
+        policy_net: Dict[str, snt.Module] = policy_networks["policy_net"]
+        communication_module: str = policy_networks["communication_module"]
 
         variable_client = None
         if variable_source:
@@ -205,7 +207,7 @@ class DIALBuilder(SystemBuilder):
             # Create policy variables
             variables = {}
             for agent in agent_keys:
-                variables[agent] = policy_networks[agent].variables
+                variables[agent] = policy_net[agent].variables
 
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
@@ -220,7 +222,7 @@ class DIALBuilder(SystemBuilder):
 
         # Create the actor which defines how we take actions.
         return self._executor_fn(
-            policy_networks=policy_networks,
+            policy_networks=policy_net,
             communication_module=communication_module,
             shared_weights=shared_weights,
             variable_client=variable_client,

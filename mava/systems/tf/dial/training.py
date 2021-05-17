@@ -380,7 +380,7 @@ class DIALTrainer(mava.Trainer):
                     # td_comm = y_message - m_t1[0][tf.argmax(next_message)]
 
                     print("td_comm: ", td_comm)
-                    exit()
+                    # exit()
 
                     # policy_losses[agent_id] += td_comm ** 2
 
