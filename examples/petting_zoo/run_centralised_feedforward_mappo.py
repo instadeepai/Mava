@@ -45,7 +45,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_string(
     "env_name",
-    "multiwalker_v6",
+    "multiwalker_v7",
     "Pettingzoo environment name, e.g. pong (str).",
 )
 
