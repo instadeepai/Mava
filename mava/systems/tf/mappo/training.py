@@ -141,11 +141,13 @@ class MAPPOTrainer(mava.Trainer):
 
         # Set up gradient clipping.
         if not clipping:
-            max_gradient_norm = 1e10  # A very large number. Infinity results in NaNs.
+            max_gradient_norm = tf.convert_to_tensor(
+                1e10
+            )  # A very large number. Infinity results in NaNs.
         elif clipping and max_gradient_norm is not None:
             self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
         else:  # default clipping value if not provided by user
-            self._max_gradient_norm = tf.convert_to_tensor(40)
+            self._max_gradient_norm = tf.convert_to_tensor(40.0)
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
@@ -362,13 +364,12 @@ class MAPPOTrainer(mava.Trainer):
 
             # Optionally apply clipping.
             # Maybe clip gradients.
-            if self._clipping:
-                critic_grads, critic_norm = tf.clip_by_global_norm(
-                    critic_gradients, self._max_gradient_norm
-                )
-                policy_grads, policy_norm = tf.clip_by_global_norm(
-                    policy_gradients, self._max_gradient_norm
-                )
+            critic_grads, critic_norm = tf.clip_by_global_norm(
+                critic_gradients, self._max_gradient_norm
+            )
+            policy_grads, policy_norm = tf.clip_by_global_norm(
+                policy_gradients, self._max_gradient_norm
+            )
 
             # Apply gradients.
             self._critic_optimizer.apply(critic_grads, critic_variables)
