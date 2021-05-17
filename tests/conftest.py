@@ -23,7 +23,6 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 from flatland.envs.observations import TreeObsForRailEnv
-from flatland.envs.rail_env import RailEnv
 from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
 from pettingzoo.utils.env import AECEnv, ParallelEnv
@@ -31,6 +30,7 @@ from pettingzoo.utils.env import AECEnv, ParallelEnv
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
 from mava.types import Observation, Reward
+from mava.utils.environments.flatland_utils import load_flatland_env
 from mava.utils.wrapper_utils import convert_np_type
 from mava.wrappers.flatland import FlatlandEnvWrapper
 from mava.wrappers.pettingzoo import (
@@ -96,11 +96,7 @@ class Helpers:
             elif env_spec.env_type == EnvType.Sequential:
                 env = mod.env()  # type: ignore
         elif env_spec.env_source == EnvSource.Flatland:
-            env = RailEnv(**flatland_env_config)
-            # flatland does not explicitly define an observation and action space.
-            # We use a dummy
-            env.observation_space = None
-            env.action_space = None
+            env = load_flatland_env(flatland_env_config)
         else:
             raise Exception("Env_spec is not valid.")
         env.reset()  # type: ignore
@@ -111,14 +107,14 @@ class Helpers:
     def get_wrapper_function(
         env_spec: EnvSpec,
     ) -> dm_env.Environment:
-        wrapper = None
+        wrapper: dm_env.Environment = None
         if env_spec.env_source == EnvSource.PettingZoo:
             if env_spec.env_type == EnvType.Parallel:
                 wrapper = PettingZooParallelEnvWrapper
             elif env_spec.env_type == EnvType.Sequential:
                 wrapper = PettingZooAECEnvWrapper
         elif env_spec.env_source == EnvSource.Flatland:
-            wrapper = ParallelEnv
+            wrapper = FlatlandEnvWrapper
         else:
             raise Exception("Env_spec is not valid.")
         return wrapper
