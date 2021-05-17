@@ -35,10 +35,9 @@ from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 30000, "Number of training episodes to run for.")
 flags.DEFINE_string(
     "env_name",
-    "switch",
+    "simple_spread",
     "Debugging environment name (str).",
 )
 flags.DEFINE_string(
@@ -46,12 +45,6 @@ flags.DEFINE_string(
     "discrete",
     "Environment action space type (str).",
 )
-flags.DEFINE_integer(
-    "num_episodes_per_eval",
-    100,
-    "Number of training episodes to run between evaluation " "episodes.",
-)
-
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
@@ -69,7 +62,7 @@ def make_networks(
     policy_network_message_in_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
     policy_network_message_out_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
     policy_network_output_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    message_size: int = 1,
+    message_size: int = 10,
     shared_weights: bool = True,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
@@ -190,9 +183,10 @@ def main(_: Any) -> None:
     program = dial.DIAL(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        num_executors=5,
-        batch_size=1,
+        num_executors=10,
         log_info=log_info,
+        batch_size=32,
+        sequence_length=100,
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,

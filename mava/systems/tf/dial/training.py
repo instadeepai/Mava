@@ -34,8 +34,10 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
-from mava.components.tf.modules.communication import BaseCommunicationModule
+
+# from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.systems.tf import savers as tf2_savers
+from mava.utils import training_utils as train_utils
 
 
 class DIALTrainer(mava.Trainer):
@@ -49,13 +51,10 @@ class DIALTrainer(mava.Trainer):
         agents: List[str],
         agent_types: List[str],
         networks: Dict[str, snt.Module],
-        target_network: Dict[str, snt.Module],
-        observation_networks: Dict[str, snt.Module],
         discount: float,
         huber_loss_parameter: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        communication_module: BaseCommunicationModule,
         policy_optimizer: snt.Optimizer,
         shared_weights: bool = True,
         importance_sampling_exponent: float = None,
@@ -86,21 +85,20 @@ class DIALTrainer(mava.Trainer):
           logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.
         """
-
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
-        self._communication_module = communication_module
+        self._communication_module = networks["communication_module"]["all_agents"]
 
         # Store online and target networks.
-        self._policy_networks = networks
-        self._target_policy_networks = target_network
+        self._policy_networks = networks["policies"]
+        self._target_policy_networks = networks["target_policies"]
 
         # self._observation_networks = observation_networks
         self._observation_networks = {
-            k: tf2_utils.to_sonnet_module(v) for k, v in observation_networks.items()
+            k: tf2_utils.to_sonnet_module(v)
+            for k, v in networks["observations"].items()
         }
-        # self._target_observation_networks = target_observation_networks
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
@@ -140,38 +138,30 @@ class DIALTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            # TODO (dries): Determine why acme has a critic
-            #  in self._system_network_variables
             self._system_network_variables["policy"][
                 agent_key
             ] = policy_network_to_expose.variables
 
         self._system_checkpointer = {}
         if checkpoint:
-            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
-            #  of the last 11 calls to
-            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
-            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
-            #  expensive and the excessive number tracings could be due to (1)
-            #  creating @tf.function repeatedly in a loop, (2) passing tensors
-            #  with different shapes, (3) passing Python objects instead of tensors.
             for agent_key in self.unique_net_keys:
                 objects_to_save = {
                     "counter": self._counter,
                     "policy": self._policy_networks[agent_key],
                     "observation": self._observation_networks[agent_key],
                     "target_policy": self._target_policy_networks[agent_key],
+                    # "target_observation":
+                    # self._target_observation_networks[agent_key],
                     "policy_optimizer": self._policy_optimizer,
                     "num_steps": self._num_steps,
                 }
 
-                checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
+                subdir = os.path.join("trainer", agent_key)
                 checkpointer = tf2_savers.Checkpointer(
                     time_delta_minutes=15,
-                    add_uid=False,
-                    directory=checkpointer_dir,
+                    directory=checkpoint_subpath,
                     objects_to_save=objects_to_save,
-                    enable_checkpointing=True,
+                    subdirectory=subdir,
                 )
                 self._system_checkpointer[agent_key] = checkpointer
 
@@ -233,6 +223,15 @@ class DIALTrainer(mava.Trainer):
 
         inputs = next(self._iterator)
 
+        self._forward(inputs)
+
+        self._backward()
+
+        # Log losses per agent
+        return self.policy_losses
+
+    # Forward pass that calculates loss.
+    def _forward(self, inputs: Any) -> None:
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
         )
@@ -243,146 +242,181 @@ class DIALTrainer(mava.Trainer):
         core_states = extra["core_states"]
 
         bs = actions[self._agents[0]].shape[1]
+
+        self.bs = bs
+
         T = actions[self._agents[0]].shape[0]
 
-        logged_losses: Dict[str, Dict[str, Any]] = {}
-        agent_type = self._agent_types[0]
-
+        # logged_losses: Dict[str, Dict[str, Any]] = {}
         with tf.GradientTape(persistent=True) as tape:
-            total_loss = {}
-
+            policy_losses = {agent_id: tf.zeros(bs) for agent_id in self._agents}
             # for each batch
-            for b in range(bs):
-                # Unroll episode and store states, messages
-                messages = {
-                    0: {
-                        agent_id: core_states[agent_id]["message"][:, b][0]
-                        for agent_id in self._agents
-                    }
-                }  # index of time t
-                channel = {}
-                states = {
-                    0: {
-                        agent_id: core_states[agent_id]["state"][:, b][0]
-                        for agent_id in self._agents
-                    }
-                }  # index of time t
+            # for b in range(bs):
+            # Unroll episode and store states, messages
 
-                # For all time-steps
-                for t in range(0, T, 1):
-                    channel[t] = self._communication_module.process_messages(
-                        messages[t]
-                    )[self._agents[0]]
-                    messages[t + 1] = {}
-                    states[t + 1] = {}
+            messages = {
+                0: {
+                    agent_id: core_states[agent_id]["message"][0]
+                    for agent_id in self._agents
+                }
+            }  # index of time t
 
-                    # For each agent
-                    for agent_id in self._agents:
-                        # Agent input at time t
-                        obs_in = observations[agent_id].observation[:, b][t]
-                        state_in = states[t][agent_id]
-                        message_in = channel[t]
+            channel = {}
 
-                        batched_observation = tf2_utils.add_batch_dim(obs_in)
-                        batched_state = tf2_utils.add_batch_dim(state_in)
-                        batched_message = tf2_utils.add_batch_dim(message_in)
+            states = {
+                0: {
+                    agent_id: core_states[agent_id]["state"][0]
+                    for agent_id in self._agents
+                }
+            }  # index of time t
 
-                        (q_t, m_t), s_t = self._policy_networks[agent_type](
+            # For all time-steps
+            for t in range(0, T, 1):
+                channel[t] = self._communication_module.process_messages(messages[t])[
+                    self._agents[0]
+                ]
+
+                messages[t + 1] = {}
+                states[t + 1] = {}
+
+                # For each agent
+                for agent_id in self._agents:
+                    agent_type = self.agent_net_keys[agent_id]
+                    # Agent input at time t
+                    obs_in = observations[agent_id].observation[t]
+
+                    state_in = states[t][agent_id]
+                    message_in = channel[t]
+
+                    batched_observation = obs_in
+                    batched_state = state_in
+                    batched_message = message_in
+
+                    (q_t, m_t), s_t = self._policy_networks[agent_type](
+                        batched_observation, batched_state, batched_message
+                    )
+
+                    # TODO (dries): Why was this here? Is it still needed?
+                    # if obs_in[0] == 0:
+                    #     m_t = tf.zeros_like(m_t)
+
+                    messages[t + 1][agent_id] = m_t
+                    states[t + 1][agent_id] = s_t
+
+            channel[t + 1] = self._communication_module.process_messages(
+                messages[t + 1]
+            )[self._agents[0]]
+
+            # Backtrack episode
+            # For t=T to 1, -1 do
+            for t in range(T - 1, 0, -1):
+                # For each agent a do
+                for agent_id in self._agents:
+                    agent_type = self.agent_net_keys[agent_id]
+
+                    # All at timestep t
+                    agent_input = observations[agent_id].observation
+                    # (sequence,batch,1)
+                    next_message = channel[t]
+                    message = channel[t - 1]
+                    next_state = states[t][agent_id]
+                    state = states[t - 1][agent_id]
+
+                    action = actions[agent_id]
+
+                    reward = rewards[agent_id]
+
+                    discount = tf.cast(
+                        self._discount, dtype=discounts[agent_id][t, 0].dtype
+                    )
+
+                    terminal = t == T - 1
+
+                    # y_t_a = r_t
+                    y_action = reward[t - 1]
+                    y_message = reward[t - 1]
+                    # y_message = tf.repeat(
+                    #     tf.expand_dims(reward[t - 1], axis=-1),
+                    #     message.shape[-1],
+                    #     axis=-1,
+                    # )
+
+                    # y_t_a = r_t + discount * max_u Q(t)
+                    if not terminal:
+                        batched_observation = agent_input[t]
+                        batched_state = next_state
+                        batched_message = next_message
+
+                        (q_t, m_t), s = self._target_policy_networks[agent_type](
                             batched_observation, batched_state, batched_message
                         )
 
-                        if obs_in[0] == 0:
-                            m_t = tf.zeros_like(m_t)
+                        y_action += discount * tf.reduce_max(q_t)
+                        y_message += discount * tf.reduce_max(m_t)
+                        # y_message += discount * m_t
 
-                        messages[t + 1][agent_id] = m_t[0]
-                        states[t + 1][agent_id] = s_t[0]
+                    # d_Q_t_a = y_t_a - Q(t-1)
+                    batched_observation = agent_input[t - 1]
+                    batched_state = state
+                    batched_message = message
 
-                channel[t + 1] = self._communication_module.process_messages(
-                    messages[t + 1]
-                )[self._agents[0]]
+                    # TODO (dries): Why is the policy values calculated
+                    #  again? Was this not done in the first loop?
+                    (q_t1, m_t1), s = self._policy_networks[agent_type](
+                        batched_observation, batched_state, batched_message
+                    )
 
-                # Backtrack episode
-                total_loss[b] = tf.zeros(1)
-                # For t=T to 1, -1 do
-                for t in range(T - 1, 0, -1):
-                    # For each agent a do
-                    for agent_id in self._agents:
-                        # All at timestep t
-                        agent_input = observations[agent_id].observation[:, b]
-                        # (sequence,batch,1)
-                        next_message = channel[t]
-                        message = channel[t - 1]
-                        next_state = states[t][agent_id]
-                        state = states[t - 1][agent_id]
+                    td_action = y_action - tf.gather(q_t1, action[t - 1], batch_dims=1)
 
-                        action = actions[agent_id][:, b]
+                    # d_theta = d_theta + d_Q_t_a ^ 2
+                    policy_losses[agent_id] += td_action ** 2
 
-                        reward = rewards[agent_id][:, b]
+                    # Communication grads
+                    td_comm = y_message - tf.gather(
+                        m_t1, tf.argmax(next_message, axis=-1), batch_dims=1
+                    )
+                    policy_losses[agent_id] += td_comm ** 2
 
-                        discount = tf.cast(
-                            self._discount, dtype=discounts[agent_id][t, b].dtype
-                        )
+            # Average over batches
+            for key in policy_losses.keys():
+                policy_losses[key] = {
+                    "policy_loss": tf.reduce_mean(policy_losses[key], axis=0)
+                }
+        self.policy_losses: Dict[str, Dict[str, tf.Tensor]] = policy_losses
+        self.tape = tape
 
-                        terminal = t == T - 1
+    def _backward(self) -> None:
 
-                        # y_t_a = r_t
-                        y_action = reward[t - 1]
-                        y_message = reward[t - 1]
+        # TODO (dries): I still need to figure out the
+        #  total_loss thing. Not per agent I see but per batch?
 
-                        # y_t_a = r_t + discount * max_u Q(t)
-                        if not terminal:
-                            batched_observation = tf2_utils.add_batch_dim(
-                                agent_input[t]
-                            )
-                            batched_state = tf2_utils.add_batch_dim(next_state)
-                            batched_message = tf2_utils.add_batch_dim(next_message)
+        # Calculate the gradients and update the networks
+        policy_losses = self.policy_losses
 
-                            (q_t, m_t), s = self._target_policy_networks[agent_type](
-                                batched_observation, batched_state, batched_message
-                            )
+        tape = self.tape
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
 
-                            y_action += discount * tf.reduce_max(q_t)
-                            y_message += discount * tf.reduce_max(m_t)
+            # Get trainable variables.
+            policy_variables = (
+                self._observation_networks[agent_key].trainable_variables
+                + self._policy_networks[agent_key].trainable_variables
+            )
 
-                        # d_Q_t_a = y_t_a - Q(t-1)
-                        batched_observation = tf2_utils.add_batch_dim(
-                            agent_input[t - 1]
-                        )
-                        batched_state = tf2_utils.add_batch_dim(state)
-                        batched_message = tf2_utils.add_batch_dim(message)
+            # Compute gradients.
+            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
+            #  on a persistent tape inside its context is significantly less efficient
+            #  than calling it outside the context." caused by losses.dpg, which calls
+            #  tape.gradient.
+            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
 
-                        (q_t1, m_t1), s = self._policy_networks[agent_type](
-                            batched_observation, batched_state, batched_message
-                        )
-
-                        td_action = y_action - q_t1[0][action[t - 1]]
-
-                        # d_theta = d_theta + d_Q_t_a ^ 2
-                        total_loss[b] += td_action ** 2
-
-                        # Communication grads
-                        td_comm = y_message - m_t1[tf.argmax(next_message)]
-
-                        total_loss[b] += td_comm ** 2
-
-        for b in range(bs):
-            policy_variables = self._policy_networks[agent_type].trainable_variables
-            policy_gradients = tape.gradient(total_loss[b], policy_variables)
+            # Maybe clip gradients.
             if self._clipping:
                 policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
 
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
-
-            logged_losses.update(
-                {
-                    agent_type: {
-                        "policy_loss": total_loss[b],
-                    }
-                }
-            )
-
-        return logged_losses
+        train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
         # Run the learning step.
