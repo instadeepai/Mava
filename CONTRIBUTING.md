@@ -40,17 +40,8 @@ use GitHub pull requests for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
-When making a Pull Request with a proposed change, please using the following format:
-```md
-## What?
-[Describe what was changed.]
-## Why?
-[Describe why the change was made.]
-## How?
-[Describe how the change was made i.e. describe technically what the change does.]
-## Extra
-[Any extra information.]
-```
+When making a Pull Request with a proposed change, please use this [format](.github/pull_request_template.md).
+
 
 ## Community Guidelines
 

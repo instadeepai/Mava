@@ -11,6 +11,8 @@ import dm_env
 from acme.specs import EnvironmentSpec
 
 
+# TODO Why use this class to define specs, when you can just update
+# the specs on the wrappers themselves
 class MAEnvironmentSpec:
     def __init__(self, environment: dm_env.Environment):
         self._specs = self._make_ma_environment_spec(environment)
@@ -26,6 +28,7 @@ class MAEnvironmentSpec:
         action_specs = environment.action_spec()
         reward_specs = environment.reward_spec()
         discount_specs = environment.discount_spec()
+        self.extra_specs = environment.extra_spec()
         for agent in environment.possible_agents:
             specs[agent] = EnvironmentSpec(
                 observations=observation_specs[agent],
@@ -34,6 +37,9 @@ class MAEnvironmentSpec:
                 discounts=discount_specs[agent],
             )
         return specs
+
+    def get_extra_specs(self) -> Dict[str, EnvironmentSpec]:
+        return self.extra_specs
 
     def get_agent_specs(self) -> Dict[str, EnvironmentSpec]:
         return self._specs

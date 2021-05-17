@@ -26,29 +26,35 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb",
-    "tensorflow>=2.4.0",
+    "dm-reverb==0.2.0",
+    "tensorflow==2.4.1",
     "jax",
     "jaxlib",
 ]
 
 tf_requirements = [
-    "tensorflow>=2.4.0",
+    "tensorflow==2.4.1",
     "tensorflow_probability",
     "dm-sonnet",
     "trfl",
 ]
 
-env_requirements = ["pettingzoo"]
+env_requirements = ["pettingzoo>=1.8.2", "multi_agent_ale_py", "supersuit"]
+
+launchpad_requirements = [
+    "dm-launchpad",
+]
 
 testing_formatting_requirements = [
     "pre-commit",
-    "mypy",
+    "mypy==0.812",
     "pytest-xdist",
-    "flake8",
-    "black",
+    "flake8==3.9.1",
+    "black==21.4b1",
     "pytest-cov",
 ]
+
+record_episode_requirements = ["array2gif"]
 
 long_description = """Mava is a library for building multi-agent reinforcement
 learning (MARL) systems. Mava builds off of Acme and in a similar way strives
@@ -90,7 +96,9 @@ setup(
         "tf": tf_requirements,
         "envs": env_requirements,
         "reverb": reverb_requirements,
+        "launchpad": launchpad_requirements,
         "testing_formatting": testing_formatting_requirements,
+        "record_episode": record_episode_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

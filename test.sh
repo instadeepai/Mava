@@ -32,6 +32,7 @@ pip install .
 pip install .[tf]
 pip install .[reverb]
 pip install .[envs]
+pip install .[launchpad]
 pip install .[testing]
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
@@ -40,7 +41,7 @@ N_CPU=$(grep -c ^processor /proc/cpuinfo)
 mypy mava
 
 # Run all tests.
-pytest -n "${N_CPU}" mava
+pytest -n "${N_CPU}" tests
 
 # Clean-up.
 deactivate

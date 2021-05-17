@@ -16,16 +16,14 @@
 """MARL system Builder interface."""
 
 import abc
-from typing import Dict, Iterator, Optional, Union
+from typing import Dict, Iterator, List, Optional
 
 import reverb
 import sonnet as snt
 from acme import specs
-from acme.utils import counting, loggers
+from acme.utils import counting
 
-from mava import adders, core
-
-NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
+from mava import adders, core, types
 
 
 class SystemBuilder(abc.ABC):
@@ -37,10 +35,10 @@ class SystemBuilder(abc.ABC):
     """
 
     @abc.abstractmethod
-    def make_replay_table(
+    def make_replay_tables(
         self,
         environment_spec: specs.EnvironmentSpec,
-    ) -> reverb.Table:
+    ) -> List[reverb.Table]:
         """Create tables to insert data into."""
 
     @abc.abstractmethod
@@ -67,7 +65,7 @@ class SystemBuilder(abc.ABC):
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
-        """Create an executer instance.
+        """Create an executor instance.
         Args:
           policy_networks: A struct of instance of all the different
             policy networks; this should be a callable
@@ -83,19 +81,19 @@ class SystemBuilder(abc.ABC):
         dataset: Iterator[reverb.ReplaySample],
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
-        logger: Optional[NestedLogger] = None,
-        # TODO: eliminate checkpoint and move it outside.
-        checkpoint: bool = False,
+        logger: Optional[types.NestedLogger] = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
           networks: struct describing the networks needed by the trainer; this can
             be specific to the trainer in question.
+          training_info: Info on what architecture is used. This is necessary for
+          the trainer to know how to process
+          certain data to work with the specific critics.
           dataset: iterator over samples from replay.
           replay_client: client which allows communication with replay, e.g. in
             order to update priorities.
           counter: a Counter which allows for recording of counts (learner steps,
             actor steps, etc.) distributed throughout the agent.
           logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the learner checkpoints itself.
         """

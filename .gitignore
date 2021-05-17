@@ -132,10 +132,18 @@ dmypy.json
 .vscode
 
 # custom
-Dockerfile
-makefile
+# Dockerfile
+# makefile
 mava/bin
 mava/lib64
 mava/pyvenv.cfg
 mava/share
 train_loop
+eval_loop
+NULL
+logs
+Checkpoints
+mava/workspace.code-workspace
+.DS_Store
+mava_testing
+.devcontainer/devcontainer.json

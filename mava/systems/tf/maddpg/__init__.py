@@ -16,4 +16,9 @@
 """Implementations of a MADDPG agent."""
 
 from mava.systems.tf.maddpg.system import MADDPG
-from mava.systems.tf.maddpg.training import MADDPGTrainer
+from mava.systems.tf.maddpg.training import (
+    BaseMADDPGTrainer,
+    CentralisedMADDPGTrainer,
+    DecentralisedMADDPGTrainer,
+    StateBasedMADDPGTrainer,
+)

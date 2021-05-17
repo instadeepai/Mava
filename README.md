@@ -1,11 +1,8 @@
-<img src="docs/images/mava.png" width="20%">
+<img src="docs/images/mava_name.png" width="80%">
 
 # Mava: a research framework for multi-agent reinforcement learning
 
-**[Overview](#overview)** | **[Installation](#installation)** |
-**[Documentation]** | **[Quickstart]** | **[Tutorial]** |
-**[Systems]** | **[Examples]** | **[Paper]** |
-**[Blog post]**
+**[Overview](#overview)** | **[Installation](#installation)** | **[Systems]** | **[Examples]** |
 
 ![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava)
 ![PyPI version](https://badge.fury.io/py/id-mava.svg)
@@ -29,14 +26,10 @@ loop.run()
 This will run a simple loop in which the given multi-agent system interacts with its
 environment and and each agent learns from this interaction. This assumes a `system` instance
 (implementations of which you can find [here][Systems]) and a multi-agent `environment`
-instance which implements the [DeepMind Environment API][dm_env]. Each
-individual system also includes a `README.md` file describing the implementation
-in more detail.
+instance which implements the [DeepMind Environment API][dm_env]. 
 
 For a deeper dive, take a look at the detailed working code
-examples found in our [examples] subdirectory which show how to instantiate a
-few MARL systems and environments. We also include a
-[quickstart notebook][Quickstart].
+examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
 
 > :information_source: Mava heavily relies on Acme, therefore as is the case with Acme, we make the same statement regarding reliability: mava is a framework for MARL research written by
 > researchers, for researchers. We will make every attempt to keep everything in good
@@ -45,9 +38,32 @@ few MARL systems and environments. We also include a
 
 ## Installation
 
-We have tested `mava` on Python 3.6 & 3.7.
+We have tested `mava` on Python 3.6, 3.7 and 3.8.
 
-1.  **Optional**: We strongly recommend using a
+### Docker (**Recommended**)
+
+1. Build the docker image using the following make command:
+    ```bash
+    make build
+    ```
+
+2. Run an example:
+    ```bash
+    make run EXAMPLE=dir/to/example/example.py
+    ```
+    For example, `make run EXAMPLE=examples/petting_zoo/run_feedforward_maddpg.py`.
+
+    Alternatively, you can also run a specific system that is defined in the `Makefile`:
+    ```bash
+    make run-maddpg
+    ```
+
+    Or run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
+
+
+### Python virtual environment
+
+1.  If not using docker, we strongly recommend using a
     [Python virtual environment](https://docs.python.org/3/tutorial/venv.html)
     to manage your dependencies in order to avoid version conflicts:
 
@@ -69,26 +85,71 @@ We have tested `mava` on Python 3.6 & 3.7.
     ```
 
 
-3.  To install Acme dependencies for [TensorFlow]-based Acme agents:
+3. To install Acme dependencies for [TensorFlow]-based Acme agents:
 
-    ```bash
-    pip install dm-acme
-    pip install dm-acme[reverb]
-    pip install dm-acme[tf]
+   ```
+   pip install id-mava[reverb]
+   pip install id-mava[tf]
+   ```
+
+   or from source:
+
+   ```bash
+   pip install .[reverb]
+   pip install .[tf]
+   ```
+
+4. To install a few example environments (including [pettingzoo],
+   [openspiel], and [flatland]):
+
+   ```bash
+   pip install id-mava[envs]
+   ```
+
+   or from source:
+   ```bash
+   pip install .[envs]
+   ```
+
+5. **Optional**: To install ROM files for Atari-Py using AutoROM (https://github.com/PettingZoo-Team/AutoROM).
+   ```
+   pip install autorom && AutoROM
+   ```
+   Then follow the on-screen instructions.
+
+   You might also need to download unrar:
+   ```
+   sudo apt-get install unrar
+   ```
+
+
+6. **Optional**: To install opencv for [Supersuit](https://github.com/PettingZoo-Team/SuperSuit) environment wrappers.
+    ```
+    sudo apt-get update
+    sudo apt-get install ffmpeg libsm6 libxext6  -y
     ```
 
-4.  Finally, to install a few example environments (including [pettingzoo],
-    [openspiel], and [flatland]):
+7. **Optional**: To install [CUDA toolkit](https://docs.nvidia.com/cuda/) for NVIDIA GPU support, download [here](https://anaconda.org/anaconda/cudatoolkit). Alternatively, for anaconda users:
 
     ```bash
-    pip install id-mava[envs]
+    conda install -c anaconda cudatoolkit
     ```
 
-    or from source:
-    ```bash
-    pip install .[envs]
+8. **Optional**: To log episodes in video/gif format, using the `Monitor` wrapper.
+- Install `xvfb` to run a headless/fake screen and `ffmpeg` to record video.
+    ```
+    sudo apt-get install -y xvfb ffmpeg
     ```
 
+- Setup fake display:
+    ```
+    xvfb-run -s "-screen 0 1400x900x24" bash
+    ```
+
+- Install `array2gif`, if you would like to save the episode in gif format.
+    ```
+    pip install .[record_episode]
+    ```
 ## Contributing
 
 Please read our [contributing docs](./CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
@@ -96,23 +157,6 @@ Please read our [contributing docs](./CONTRIBUTING.md) for details on how to sub
 ## Troubleshooting and FAQs
 
 Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
-
-## Citing Mava
-
-If you use Mava in your work, please cite the accompanying
-[technical report][Paper]:
-
-```bibtex
-@article{pretorius2021mava,
-    title={Mava: A Research Framework for Multi-Agent Reinforcement Learning},
-    author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Siphelele Danisa and Kevin Eloff
-    and Claude Formanek and St John Grimbly and Lawrence Francis and Jonathan Shock and Herman Kamper
-    and Herman Engelbrecht and Alexandre Laterre and Karim Beguir},
-    year={2021},
-    journal={arXiv preprint},
-    url={},
-}
-```
 
 [Systems]: mava/systems/
 [Examples]: examples/
@@ -124,3 +168,4 @@ If you use Mava in your work, please cite the accompanying
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [openspiel]: https://github.com/deepmind/open_spiel
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
+[dm_env]: https://github.com/deepmind/dm_env

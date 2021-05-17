@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Interface for adders which transmit data to a replay buffer."""
-
 import abc
 from typing import Dict
 

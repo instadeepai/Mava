@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADDPG on pettinzoo MPE environments."""
+"""Example running feedforward MADDPG on debug MPE environments."""
 
-import importlib
+import functools
+from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
 
-import dm_env
+import launchpad as lp
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
@@ -26,41 +27,52 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.environment_loops.pettingzoo import PettingZooParallelEnvironmentLoop
-from mava.systems.tf import executors, maddpg
-from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
+from mava.systems.tf import maddpg
+from mava.utils import lp_utils
+from mava.utils.environments import debugging_utils
+from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 100, "Number of training episodes to run for.")
-
-flags.DEFINE_integer(
-    "num_episodes_per_eval",
-    10,
-    "Number of training episodes to run between evaluation " "episodes.",
+flags.DEFINE_string(
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
 )
-
-
-def make_environment(
-    env_class: str = "sisl", env_name: str = "multiwalker_v6", **kwargs: int
-) -> dm_env.Environment:
-    """Creates a MPE environment."""
-    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
-    env = env_module.parallel_env(**kwargs)  # type: ignore
-    environment = PettingZooParallelEnvWrapper(env)
-    return environment
+flags.DEFINE_string(
+    "action_space",
+    "continuous",
+    "Environment action space type (str).",
+)
+flags.DEFINE_string(
+    "mava_id",
+    str(datetime.now()),
+    "Experiment identifier that can be used to continue experiments.",
+)
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+        256,
+        256,
+        256,
+    ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
-    shared_weights: bool = False,
+    shared_weights: bool = True,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
+
+    # Create agent_type specs
+    if shared_weights:
+        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
+        specs = type_specs
+
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
             key: policy_networks_layer_sizes for key in specs.keys()
@@ -70,17 +82,15 @@ def make_networks(
             key: critic_networks_layer_sizes for key in specs.keys()
         }
 
-    specs = environment_spec.get_agent_specs()
     observation_networks = {}
     policy_networks = {}
-    behavior_networks = {}
     critic_networks = {}
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
-        # Create the shared observation network
+        # Create the shared observation network; here simply a state-less operation.
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
@@ -91,14 +101,6 @@ def make_networks(
                 ),
                 networks.NearZeroInitializedLinear(num_dimensions),
                 networks.TanhToSpec(specs[key].actions),
-            ]
-        )
-
-        # Create the behavior policy.
-        behavior_network = snt.Sequential(
-            [
-                observation_network,
-                policy_network,
                 networks.ClippedGaussian(sigma),
                 networks.ClipToSpec(specs[key].actions),
             ]
@@ -118,59 +120,85 @@ def make_networks(
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
-        behavior_networks[key] = behavior_network
 
     return {
         "policies": policy_networks,
         "critics": critic_networks,
         "observations": observation_networks,
-        "behaviors": behavior_networks,
     }
 
 
 def main(_: Any) -> None:
-    # Create an environment, grab the spec, and use it to create networks.
-    environment = make_environment(remove_on_fall=False)
-    environment_spec = mava_specs.MAEnvironmentSpec(environment)
-    system_networks = make_networks(environment_spec)
 
-    # Construct the agent.
-    system = maddpg.MADDPG(
-        environment_spec=environment_spec,
-        policy_networks=system_networks["policies"],
-        critic_networks=system_networks["critics"],
-        observation_networks=system_networks[
-            "observations"
-        ],  # pytype: disable=wrong-arg-types
-        behavior_networks=system_networks["behaviors"],
+    # environment
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
     )
 
-    # Create the environment loop used for training.
-    train_loop = PettingZooParallelEnvironmentLoop(
-        environment, system, label="train_loop"
+    # networks
+    network_factory = lp_utils.partial_kwargs(make_networks)
+
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+
+    log_every = 10
+    trainer_logger = Logger(
+        label="system_trainer",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
     )
 
-    # Create the evaluation policy.
-    eval_policies = {
-        key: snt.Sequential(
-            [
-                system_networks["observations"][key],
-                system_networks["policies"][key],
-            ]
-        )
-        for key in environment_spec.get_agent_specs().keys()
+    exec_logger = Logger(
+        # _{executor_id} gets appended to label in system.
+        label="train_loop_executor",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    eval_logger = Logger(
+        label="eval_loop",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    # distributed program
+    program = maddpg.MADDPG(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        num_executors=2,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        checkpoint_subpath=checkpoint_dir,
+        trainer_logger=trainer_logger,
+        exec_logger=exec_logger,
+        eval_logger=eval_logger,
+    ).build()
+
+    # launch
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
     }
-
-    # Create the evaluation actor and loop.
-    eval_actor = executors.FeedForwardExecutor(policy_networks=eval_policies)
-    eval_env = make_environment(remove_on_fall=False)
-    eval_loop = PettingZooParallelEnvironmentLoop(
-        eval_env, eval_actor, label="eval_loop"
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
     )
-
-    for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
-        train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-        eval_loop.run(num_episodes=1)
 
 
 if __name__ == "__main__":
