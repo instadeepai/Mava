@@ -131,7 +131,6 @@ class MultiAgentEnv(gym.Env):
         obs_n = {}
         reward_n = {}
         done_n = {}
-        # info_n: Dict[str, Dict[str, Any]] = {"n": {}}
         # set action for each agent
         for agent_id in self.agent_ids:
             agent = self.agents[agent_id]
@@ -145,7 +144,6 @@ class MultiAgentEnv(gym.Env):
             obs_n[agent_id] = self._get_obs(a_i, agent)
             reward_n[agent_id] = self._get_reward(a_i, agent)
             done_n[agent_id] = self._get_done(agent)
-            # info_n["n"][agent_id] = self._get_info(agent)
 
             if done_n[agent_id]:
                 self.env_done = True
