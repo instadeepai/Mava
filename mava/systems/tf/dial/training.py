@@ -51,13 +51,10 @@ class DIALTrainer(mava.Trainer):
         agents: List[str],
         agent_types: List[str],
         networks: Dict[str, snt.Module],
-        # target_network: Dict[str, snt.Module],
-        # observation_networks: Dict[str, snt.Module],
         discount: float,
         huber_loss_parameter: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        # communication_module: BaseCommunicationModule,
         policy_optimizer: snt.Optimizer,
         shared_weights: bool = True,
         importance_sampling_exponent: float = None,
@@ -102,7 +99,6 @@ class DIALTrainer(mava.Trainer):
             k: tf2_utils.to_sonnet_module(v)
             for k, v in networks["observations"].items()
         }
-        # self._target_observation_networks = target_observation_networks
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()

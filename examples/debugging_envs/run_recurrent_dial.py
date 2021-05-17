@@ -132,10 +132,8 @@ def make_networks(
         # Create the policy network.
         policy_network = DIALPolicy(
             action_spec=specs[key].actions,
-            # message_spec=extra_specs[key + '_0'],
-            # TODO (dries): Why is the message spec 1?
             message_spec=_convert_to_spec(
-                spaces.Box(-np.inf, np.inf, (1,), dtype=np.float32)
+                spaces.Box(-np.inf, np.inf, (message_size,), dtype=np.float32)
             ),
             gru_hidden_size=policy_network_gru_hidden_sizes[key],
             gru_layers=policy_network_gru_layers[key],
@@ -192,53 +190,6 @@ def main(_: Any) -> None:
         time_stamp=FLAGS.mava_id,
         time_delta=log_every,
     )
-
-    #  # TODO Create loggers
-    # log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
-
-    # # Checkpointer appends "Checkpoints" to checkpoint_dir
-    # checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
-
-    # Construct the agent.
-    # system = dial.DIAL(
-    #     environment_spec=environment_spec,
-    #     networks=system_networks["policies"],
-    #     observation_networks=system_networks[
-    #         "observations"
-    #     ],  # pytype: disable=wrong-arg-types
-    #     # logger=system_logger,
-    #     checkpoint=False,
-    #     trainer_logger=trainer_logger,
-    #     exec_logger=exec_logger,
-    #     eval_logger=eval_logger,
-    # )
-
-    # Create the environment loop used for training.
-    # train_loop = ParallelEnvironmentLoop(
-    #     environment, system, logger=exec_logger, label="train_loop"
-    # )
-
-    # Create the evaluation policy.
-    # NOTE: assumes weight sharing
-    # specs = environment_spec.get_agent_specs()
-    # type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-    # specs = type_specs
-    # eval_policies = system_networks["policies"]
-    #
-    # # Create the evaluation actor and loop.
-    # eval_actor = dial.DIALExecutor(
-    #     policy_networks=eval_policies,
-    #     communication_module=system._communication_module,
-    #     is_eval=True,
-    # )
-    # eval_env = make_environment()
-    # eval_loop = ParallelEnvironmentLoop(
-    #     eval_env, eval_actor, logger=eval_logger, label="eval_loop"
-    # )
-    #
-    # for _ in range(FLAGS.num_episodes // FLAGS.num_episodes_per_eval):
-    #     train_loop.run(num_episodes=FLAGS.num_episodes_per_eval)
-    #     eval_loop.run(num_episodes=10)
 
     program = dial.DIAL(
         environment_factory=environment_factory,

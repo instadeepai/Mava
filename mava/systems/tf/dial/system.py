@@ -172,67 +172,11 @@ class DIAL(system.System):
             extra_specs=extra_specs,
         )
 
-        # # Create a replay server to add data to. This uses no limiter behavior in
-        # # order to allow the Agent interface to handle it.
-        # replay_table = builder.make_replay_tables(environment_spec=environment_spec)
-        # self._server = reverb.Server(replay_table, port=None)
-        # replay_client = reverb.Client(f"localhost:{self._server.port}")
-        #
-        # self._can_sample: Callable[[], bool] = lambda: replay_table[0].can_sample(
-        #     batch_size
-        # )
-        #
-        # # The adder is used to insert observations into replay.
-        # adder = builder.make_adder(replay_client)
-        #
-        # # The dataset provides an interface to sample from replay.
-        # dataset = builder.make_dataset_iterator(replay_client)
-        #
-        # # Create system architecture
-        # # TODO (Kevin): create decentralised/centralised/networked actor architectures
-        # # see mava/components/tf/architectures
-        # architecture = self._architecture(
-        #     environment_spec=environment_spec,
-        #     policy_networks=networks,
-        #     observation_networks=observation_networks,
-        #     shared_weights=shared_weights,
-        # )
-        #
-        # # Add differentiable communication and get networks
-        # # TODO (Kevin): create differentiable communication module
-        # # See mava/components/tf/modules/communication
-        # self._communication_module = communication_module(
-        #     architecture=architecture,
-        #     shared=True,
-        #     channel_size=1,
-        #     channel_noise=0,
-        # )
-        #
-        # networks = self._communication_module.create_system()
-        #
-        # # Create the actor which defines how we take actions.
-        # executor = builder.make_executor(
-        #     policy_networks=networks["policies"],
-        #     adder=adder,
-        #     communication_module=self._communication_module,
-        # )
-        #
-        # # The learner updates the parameters (and initializes them).
-        # trainer = builder.make_trainer(
-        #     networks=networks,
-        #     dataset=dataset,
-        #     counter=counter,
-        #     logger=self._trainer_logger,
-        #     checkpoint=checkpoint,
-        #     communication_module=self._communication_module,
-        # )
-        #
-        # super().__init__(
-        #     executor=executor,
-        #     trainer=trainer,
-        #     min_observations=max(batch_size, min_replay_size),
-        #     observations_per_step=float(batch_size) / samples_per_insert,
-        # )
+        # TODO (Kevin): create decentralised/centralised/networked actor architectures
+        # see mava/components/tf/architectures
+
+        # TODO (Kevin): create differentiable communication module
+        # See mava/components/tf/modules/communication
 
     def _get_extra_specs(self) -> Any:
         agents = self._environment_spec.get_agent_ids()
@@ -252,14 +196,6 @@ class DIAL(system.System):
             }
         extras = {"core_states": core_state_spec}
         return extras
-
-    # def update(self) -> None:
-    #     learner_step = False
-    #     while self._can_sample():
-    #         self._trainer.step()
-    #         learner_step = True
-    #     if learner_step:
-    #         self._executor.update()
 
     def replay(self) -> Any:
         """The replay storage."""

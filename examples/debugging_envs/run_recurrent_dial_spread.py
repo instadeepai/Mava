@@ -124,18 +124,12 @@ def make_networks(
     policy_networks = {}
 
     for key in specs.keys():
-
-        # Get total number of action dimensions from action and message spec.
-        # num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
-        # num_dimensions += np.prod(message_size, dtype=int)
-
         # Create the shared observation network
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
         policy_network = DIALPolicy(
             action_spec=specs[key].actions,
-            # message_spec=extra_specs[key + '_0'],
             message_spec=_convert_to_spec(
                 spaces.Box(-np.inf, np.inf, (message_size,), dtype=np.float32)
             ),

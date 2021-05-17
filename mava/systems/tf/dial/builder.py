@@ -9,10 +9,6 @@ from acme.utils import counting, loggers
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-
-# from mava.components.tf.modules.communication import (  # BroadcastedCommunication,
-#     BaseCommunicationModule,
-# )
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.dial.execution import DIALExecutor

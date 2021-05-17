@@ -51,12 +51,6 @@ class DIALPolicy(snt.RNNCore):
             activate_final=True,
         )
 
-        #
-        # self.message_in_mlp = networks.LayerNormMLP(
-        #     message_out_mlp_size,
-        #     activate_final=True,
-        # )
-
         self.gru = snt.GRU(gru_hidden_size)
 
         self.output_mlp = snt.Sequential(
@@ -71,7 +65,8 @@ class DIALPolicy(snt.RNNCore):
             [
                 networks.LayerNormMLP(message_out_mlp_size),
                 networks.LayerNormMLP([self._message_dim]),
-                # TODO (dries): Why does this TanhToSpec break things? Is it the -inf -> inf bounds?
+                # TODO (dries): Why does this TanhToSpec break things?
+                #  Is it the -inf -> inf bounds?
                 #  Also should NearZeroInitializedLinear be the final layer?
                 # # networks.TanhToSpec(self._message_spec),
             ]

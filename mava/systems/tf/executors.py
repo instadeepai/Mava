@@ -323,13 +323,6 @@ class RecurrentExecutorWithComms(RecurrentExecutor):
             action = tf.random.uniform(
                 action_spec.shape, 0, action_spec.num_values, dtype=tf.dtypes.int64
             )
-
-        # Hard coded perfect policy:
-        # if observation[1].item()==5 and observation[0].item()==1:
-        #   action = tf.constant([1], dtype=tf.dtypes.int64)
-        # else:
-        #   tf.constant([0], dtype=tf.dtypes.int64)
-
         return action
 
     def _process_message(
