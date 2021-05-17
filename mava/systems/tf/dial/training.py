@@ -228,7 +228,7 @@ class DIALTrainer(mava.Trainer):
         self._backward()
 
         # Log losses per agent
-        return train_utils.map_losses_per_agent_a(self.policy_losses)
+        return self.policy_losses
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
@@ -391,37 +391,11 @@ class DIALTrainer(mava.Trainer):
 
             # Average over batches
             for key in policy_losses.keys():
-                policy_losses[key] = tf.reduce_mean(policy_losses[key], axis=0)
-
-        self.policy_losses = policy_losses
+                policy_losses[key] = {
+                    "policy_loss": tf.reduce_mean(policy_losses[key], axis=0)
+                }
+        self.policy_losses: Dict[str, Dict[str, tf.Tensor]] = policy_losses
         self.tape = tape
-
-    # Backward pass that calculates gradients and updates network.
-    # def _backward(self) -> None:
-    #     agent_type = self._agent_types[0]
-    #     for b in range(self.bs):
-    #         policy_variables =
-    #         self._policy_networks[agent_type].trainable_variables
-    #         policy_gradients =
-    #         self.tape.gradient(self.total_loss[b], policy_variables)
-    #         if self._clipping:
-    #             policy_gradients
-    #             = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
-    #
-    #         # Apply gradients.
-    #         self._policy_optimizer
-    #         .apply(policy_gradients, policy_variables)
-    #     train_utils.safe_del(self, "tape")
-
-    # logged_losses.update(
-    #     {
-    #         agent_type: {
-    #             "policy_loss": self.total_loss[b],
-    #         }
-    #     }
-    # )
-
-    # return logged_losses
 
     def _backward(self) -> None:
 
