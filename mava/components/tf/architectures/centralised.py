@@ -283,7 +283,7 @@ class CentralisedQValueActorCritic(  # type: ignore
 # TODO (Arnu): remove mypy type ignore once we can handle type checking for
 # nested/multiple inheritance
 class CentralisedSoftQValueActorCritic(  # type: ignore
-    CentralisedPolicyActor, CentralisedSoftQValueCritic
+    CentralisedSoftQValueCritic, CentralisedPolicyActor
 ):
     """Centralised multi-agent soft actor critic architecture."""
 

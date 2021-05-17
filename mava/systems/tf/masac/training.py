@@ -15,7 +15,6 @@
 
 
 """MASAC trainer implementation."""
-import copy
 import os
 import time
 from typing import Any, Dict, List, Sequence, Tuple
@@ -30,6 +29,7 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.utils import training_utils as train_utils
 
 
 class BaseMASACTrainer(mava.Trainer):
@@ -246,7 +246,7 @@ class BaseMASACTrainer(mava.Trainer):
                     dest.assign(
                         tf.math.add(
                             tf.math.multiply(self._tau, src),
-                            tf.math.multiply(dest, 1.0 - self.tau),
+                            tf.math.multiply(dest, 1.0 - self._tau),
                         )
                     )
             else:
@@ -306,21 +306,6 @@ class BaseMASACTrainer(mava.Trainer):
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     @tf.function
-    def _get_dpg_feed(
-        self,
-        a_t: Dict[str, np.ndarray],
-        dpg_a_t: np.ndarray,
-        agent: str,
-    ) -> tf.Tensor:
-        # Centralised and StateBased DPG
-        # Note (dries): Copy has to be made because the input
-        # variables cannot be changed.
-        dpg_a_t_feed = copy.copy(a_t)
-        dpg_a_t_feed[agent] = dpg_a_t
-        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
-        return dpg_a_t_feed
-
-    @tf.function
     def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         log_probs = {}
@@ -348,6 +333,20 @@ class BaseMASACTrainer(mava.Trainer):
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
 
+        self._forward(inputs)
+
+        self._backward()
+
+        # Log losses per agent
+        return train_utils.map_losses_per_agent_acq(
+            self.policy_losses,
+            self.critic_V_losses,
+            self.critic_Q_1_losses,
+            self.critic_Q_2_losses,
+        )
+
+    # Forward pass that calculates loss.
+    def _forward(self, inputs: Any) -> None:
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -360,8 +359,6 @@ class BaseMASACTrainer(mava.Trainer):
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
-
-        logged_losses: Dict[str, Dict[str, Any]] = {}
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
@@ -414,23 +411,10 @@ class BaseMASACTrainer(mava.Trainer):
                     self._critic_Q_2_networks[agent_key](o_tm1_feed, a_t[agent]),
                 )
                 v_targ = tf.math.subtract(
-                    q_pred, tf.math.multiply(self.temperature, log_prob[agent])
+                    q_pred, tf.math.multiply(self._temperature, log_prob[agent])
                 )
                 v_loss = tf.reduce_mean(tf.square(v_pred - v_targ), axis=0)
                 critic_V_losses[agent] = v_loss
-
-                # # Critic learning.
-                # q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
-                # q_t = self._target_critic_networks[agent_key](o_t_feed, a_t_feed)
-
-                # # Squeeze into the shape expected by the td_learning implementation.
-                # q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
-                # q_t = tf.squeeze(q_t, axis=-1)  # [B]
-
-                # # Critic loss.
-                # critic_loss = trfl.td_learning(
-                #     q_tm1, r_t[agent], discount * d_t[agent], q_t
-                # ).loss
 
                 # Actor Learning
                 advantage = q_pred - v_pred
@@ -442,32 +426,22 @@ class BaseMASACTrainer(mava.Trainer):
                 )
                 policy_losses[agent] = actor_loss
 
-                # # Actor learning.
-                # o_t_agent_feed = o_t_trans[agent]
-                # dpg_a_t = self._policy_networks[agent_key](o_t_agent_feed)
+        self.policy_losses = policy_losses
+        self.critic_V_losses = critic_V_losses
+        self.critic_Q_1_losses = critic_Q_1_losses
+        self.critic_Q_2_losses = critic_Q_2_losses
+        self.tape = tape
 
-                # # Get dpg actions
-                # dpg_a_t_feed = self._get_dpg_feed(a_t, dpg_a_t, agent)
-
-                # # Get dpg Q values.
-                # dpg_q_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
-
-                # # Actor loss. If clipping is true use dqda clipping and clip the norm.
-                # dqda_clipping = 1.0 if self._clipping else None
-                # policy_loss = losses.dpg(
-                #     dpg_q_t,
-                #     dpg_a_t,
-                #     tape=tape,
-                #     dqda_clipping=dqda_clipping,
-                #     clip_norm=self._clipping,
-                # )
-                # policy_loss = tf.reduce_mean(policy_loss, axis=0)
-                # policy_losses[agent] = policy_loss
-
-                # critic_loss = tf.reduce_mean(critic_loss, axis=0)
-                # critic_losses[agent] = critic_loss
-
+    # Backward pass that calculates gradients and updates network.
+    def _backward(self) -> None:
         # Calculate the gradients and update the networks
+
+        policy_losses = self.policy_losses
+        critic_V_losses = self.critic_V_losses
+        critic_Q_1_losses = self.critic_Q_1_losses
+        critic_Q_2_losses = self.critic_Q_2_losses
+        tape = self.tape
+
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
 
@@ -529,23 +503,7 @@ class BaseMASACTrainer(mava.Trainer):
             self._critic_V_optimizer.apply(critic_V_gradients, critic_V_variables)
             self._critic_Q_1_optimizer.apply(critic_Q_1_gradients, critic_Q_1_variables)
             self._critic_Q_2_optimizer.apply(critic_Q_2_gradients, critic_Q_2_variables)
-
-            logged_losses.update(
-                {
-                    agent: {
-                        "critic_V_loss": v_loss,
-                        "critic_Q_1_loss": q_1_loss,
-                        "critic_Q_2_loss": q_2_loss,
-                        "policy_loss": actor_loss,
-                    }
-                }
-            )
-
-        # Delete the tape manually because of the persistent=True flag.
-        del tape
-
-        # Losses to track.
-        return logged_losses
+        train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
         # Run the learning step.
