@@ -21,6 +21,7 @@ from mava.systems.tf import executors
 from mava.systems.tf.mad4pg import training
 from mava.systems.tf.maddpg.builder import MADDPGBuilder, MADPPGConfig
 
+
 class MAD4PGBuilder(MADDPGBuilder):
     """Builder for MAD4PG which constructs individual components of the system."""
 
