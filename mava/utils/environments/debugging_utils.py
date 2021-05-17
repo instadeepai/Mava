@@ -32,6 +32,7 @@ def make_environment(
     action_space: str = "discrete",
     num_agents: int = 3,
     render: bool = False,
+    return_state_info: bool = False,
     random_seed: Optional[int] = None,
 ) -> dm_env.Environment:
 
@@ -50,7 +51,9 @@ def make_environment(
     else:
         """Creates a MPE environment."""
         env_module = make_debugging_env(env_name, action_space, num_agents)
-        environment = DebuggingEnvWrapper(env_module, render=render)
+        environment = DebuggingEnvWrapper(
+            env_module, render=render, return_state_info=return_state_info
+        )
 
         if random_seed and hasattr(environment, "seed"):
             environment.seed(random_seed)

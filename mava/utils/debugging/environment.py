@@ -131,7 +131,6 @@ class MultiAgentEnv(gym.Env):
         obs_n = {}
         reward_n = {}
         done_n = {}
-        info_n: Dict[str, Dict[str, Any]] = {"n": {}}
         # set action for each agent
         for agent_id in self.agent_ids:
             agent = self.agents[agent_id]
@@ -145,12 +144,13 @@ class MultiAgentEnv(gym.Env):
             obs_n[agent_id] = self._get_obs(a_i, agent)
             reward_n[agent_id] = self._get_reward(a_i, agent)
             done_n[agent_id] = self._get_done(agent)
-            info_n["n"][agent_id] = self._get_info(agent)
 
             if done_n[agent_id]:
                 self.env_done = True
 
-        return obs_n, reward_n, done_n, info_n
+        state_n = self._get_state()
+
+        return obs_n, reward_n, done_n, state_n
 
     def reset(self) -> Dict[str, np.array]:
         # reset world
@@ -194,6 +194,23 @@ class MultiAgentEnv(gym.Env):
         if self.reward_callback is None:
             return 0.0
         return self.reward_callback(agent, a_i, self.world)
+
+    def _get_state(self) -> np.array:
+        # get positions of all entities in this agent's reference frame
+        entity_pos = []
+        for entity in self.world.landmarks:  # world.entities:
+            entity_pos.append(entity.state.p_pos)
+        # entity colors
+
+        agent_pos = []
+        agent_vel = []
+        for i, agent in enumerate(self.world.agents):
+            agent_pos.append(agent.state.p_pos)
+            agent_vel.append(agent.state.p_vel)
+
+        return np.concatenate(
+            [[self.world.current_step / 50]] + entity_pos + agent_pos + agent_vel
+        )
 
     # set env action for a particular agent
     def _set_action(
