@@ -25,6 +25,7 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.systems.tf import executors, maddpg
@@ -49,7 +50,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "/home/mava_logs/", "Base dir to store experiments.")
 
 
 def make_networks(
@@ -178,7 +179,7 @@ def main(_: Any) -> None:
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        num_executors=2,
+        num_executors=8,
         log_info=log_info,
         trainer_fn=DecentralisedRecurrentMADDPGTrainer,
         executor_fn=executors.RecurrentExecutor,
@@ -188,8 +189,19 @@ def main(_: Any) -> None:
         eval_logger=eval_logger,
     ).build()
 
+    # launch
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
     lp.launch(
-        program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="current_terminal"
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
     )
 
 
