@@ -56,6 +56,7 @@ class MAPPOTrainer(mava.Trainer):
         baseline_cost: float = 1.0,
         clipping_epsilon: float = 0.2,
         max_gradient_norm: Optional[float] = None,
+        clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = False,
@@ -129,6 +130,7 @@ class MAPPOTrainer(mava.Trainer):
 
         # Other trainer parameters.
         self._discount = discount
+        self._clipping = clipping
         self._entropy_cost = entropy_cost
         self._baseline_cost = baseline_cost
         self._lambda_gae = lambda_gae
@@ -138,10 +140,12 @@ class MAPPOTrainer(mava.Trainer):
         self._iterator = dataset
 
         # Set up gradient clipping.
-        if max_gradient_norm is None:
+        if not clipping:
             max_gradient_norm = 1e10  # A very large number. Infinity results in NaNs.
-
-        self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        elif clipping and max_gradient_norm is not None:
+            self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        else:  # default clipping value if not provided by user
+            self._max_gradient_norm = tf.convert_to_tensor(40)
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
@@ -357,12 +361,14 @@ class MAPPOTrainer(mava.Trainer):
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
             # Optionally apply clipping.
-            critic_grads, critic_norm = tf.clip_by_global_norm(
-                critic_gradients, self._max_gradient_norm
-            )
-            policy_grads, policy_norm = tf.clip_by_global_norm(
-                policy_gradients, self._max_gradient_norm
-            )
+            # Maybe clip gradients.
+            if self._clipping:
+                critic_grads, critic_norm = tf.clip_by_global_norm(
+                    critic_gradients, self._max_gradient_norm
+                )
+                policy_grads, policy_norm = tf.clip_by_global_norm(
+                    policy_gradients, self._max_gradient_norm
+                )
 
             # Apply gradients.
             self._critic_optimizer.apply(critic_grads, critic_variables)

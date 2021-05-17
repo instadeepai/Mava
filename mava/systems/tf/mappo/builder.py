@@ -29,7 +29,7 @@ from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf.mappo import execution, training
-from mava.wrappers import DetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
 
 
 @dataclasses.dataclass
@@ -67,6 +67,7 @@ class MAPPOConfig:
     sequence_length: int = 10
     sequence_period: int = 5
     shared_weights: bool = False
+    clipping: bool = True
     discount: float = 0.99
     lambda_gae: float = 0.95
     max_queue_size: int = 100_000
@@ -248,6 +249,7 @@ class MAPPOBuilder(SystemBuilder):
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
+            clipping=self._config.clipping,
             dataset=dataset,
             shared_weights=shared_weights,
             critic_optimizer=self._config.critic_optimizer,
@@ -265,6 +267,7 @@ class MAPPOBuilder(SystemBuilder):
         )
 
         # TODO (Kale-ab): networks stats for MAPPO
+        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
 
         trainer = DetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]

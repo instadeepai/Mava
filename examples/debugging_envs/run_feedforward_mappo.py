@@ -194,7 +194,7 @@ def main(_: Any) -> None:
         num_executors=2,
         log_info=log_info,
         policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,
