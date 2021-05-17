@@ -317,27 +317,18 @@ class RecurrentExecutorWithComms(RecurrentExecutor):
     def _sample_action(
         self, action_policy: types.NestedTensor, agent: str
     ) -> types.NestedTensor:
-        action = tf.argmax(action_policy, axis=1)
-        if tf.random.uniform([]) < self._epsilon and not self._is_eval:
-            action_spec = self._agent_specs[agent].actions
-            action = tf.random.uniform(
-                action_spec.shape, 0, action_spec.num_values, dtype=tf.dtypes.int64
-            )
-        return action
+        # Sample from the policy if it is stochastic.
+        return (
+            action_policy.sample()
+            if isinstance(action_policy, tfd.Distribution)
+            else action_policy
+        )
 
     def _process_message(
         self, observation: types.NestedTensor, message_policy: types.NestedTensor
     ) -> types.NestedTensor:
         # Only one agent can message at each timestep
-        if observation[0] == 0:
-            message = tf.zeros_like(message_policy)
-        else:
-            message = (
-                message_policy.sample()
-                if isinstance(message_policy, tfd.Distribution)
-                else message_policy
-            )
-        return message
+        return message_policy
 
     @tf.function
     def _policy(
