@@ -26,7 +26,7 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb",
+    "dm-reverb==0.2.0",
     "tensorflow==2.4.1",
     "jax",
     "jaxlib",
@@ -39,7 +39,7 @@ tf_requirements = [
     "trfl",
 ]
 
-env_requirements = ["pettingzoo", "multi_agent_ale_py", "supersuit"]
+env_requirements = ["pettingzoo>=1.8.2", "multi_agent_ale_py", "supersuit"]
 
 launchpad_requirements = [
     "dm-launchpad",

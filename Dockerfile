@@ -18,13 +18,16 @@ RUN apt-get install unrar
 RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6  -y
 
+# Install `xvfb` to run a headless screen.
+RUN apt-get update -y && \
+    apt-get install -y xvfb && \
+    apt-get install -y python-opengl
+ENV DISPLAY=:0
+
 # Install Mava and dependencies
 COPY . /home/app/mava
 RUN python -m pip install --upgrade pip
 RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting,record_episode]
 RUN python -m pip install -e .[flatland]
-
-# Install `xvfb` to run a headless screen.
-RUN apt-get install -y xvfb
 
 EXPOSE 6006
