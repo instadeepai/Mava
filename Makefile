@@ -19,24 +19,29 @@ MADQN=examples/debugging_envs/run_feedforward_madqn.py
 QMIX=examples/debugging_envs/run_feedforward_qmix.py
 QMIX-PZ=examples/petting_zoo/run_feedforward_qmix.py
 
+MADDPG_RECORD=examples/petting_zoo/run_feedforward_maddpg_record_video.py
+
 # make file commands
+run:
+	$(DOCKER_RUN) python $(EXAMPLE) --base_dir /home/mava/
+
 run-maddpg:
-	$(DOCKER_RUN) python $(MADDPG)
+	$(DOCKER_RUN) python $(MADDPG) --base_dir /home/mava/
 
 run-madqn:
-	$(DOCKER_RUN) python $(MADQN)
+	$(DOCKER_RUN) python  $(MADQN) --base_dir /home/mava/
 
 run-qmix:
-	$(DOCKER_RUN) python $(QMIX)
+	$(DOCKER_RUN) python  $(QMIX) --base_dir /home/mava/
 
 run-qmix-pz:
-	$(DOCKER_RUN) python $(QMIX-PZ)
+	$(DOCKER_RUN) python $(QMIX-PZ) --base_dir /home/mava/
 
 bash:
 	$(DOCKER_RUN) bash
 
 record:
-	$(DOCKER_RUN)  /bin/bash -c "./startup.sh ; python main.py $(MADDPG) "
+	$(DOCKER_RUN)  /bin/bash -c "./startup.sh ; python $(MADDPG_RECORD) "
 
 build:
 	docker build --tag $(IMAGE) .
