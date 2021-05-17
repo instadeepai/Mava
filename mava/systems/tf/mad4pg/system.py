@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
-from typing import Callable, Dict, Tuple, Type
+from typing import Callable, Dict, Type
 
 import dm_env
 import sonnet as snt
@@ -49,7 +49,6 @@ class MAD4PG(MADDPG):
             training.BaseMAD4PGTrainer
         ] = training.DecentralisedMAD4PGTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
-        log_info: Tuple = None,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -116,14 +115,12 @@ class MAD4PG(MADDPG):
             eval_loop_fn: loop for evaluation.
 
         """
-
         super().__init__(
             environment_factory=environment_factory,
             network_factory=network_factory,
             architecture=architecture,
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
-            log_info=log_info,
             num_executors=num_executors,
             num_caches=num_caches,
             environment_spec=environment_spec,

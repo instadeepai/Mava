@@ -132,9 +132,6 @@ def make_networks(
 
 def main(_: Any) -> None:
 
-    # set loggers info
-    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
-
     # environment
     environment_factory = lp_utils.partial_kwargs(
         debugging_utils.make_environment,
@@ -179,8 +176,7 @@ def main(_: Any) -> None:
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        num_executors=8,
-        log_info=log_info,
+        num_executors=2,
         trainer_fn=DecentralisedRecurrentMADDPGTrainer,
         executor_fn=executors.RecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
