@@ -7,9 +7,6 @@ else
 GPUS=
 endif
 
-# Setup fake screen
-FAKE_DISPLAY := $(shell xvfb-run -s "-screen 0 1400x900x24" bash)
-
 # Set flag for docker run command
 BASE_FLAGS=-it --rm  -v $(PWD):/home/app/mava -w /home/app/mava
 RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
@@ -18,9 +15,8 @@ DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 
 # Set example to run when using `make run`
 MADDPG=examples/debugging_envs/run_feedforward_maddpg.py
-MADQN=examples/debugging_envs/run_feedforward_madqn.py
+IDQN=examples/debugging_envs/run_feedforward_idqn.py
 QMIX=examples/debugging_envs/run_feedforward_qmix.py
-QMIX-PZ=examples/petting_zoo/run_feedforward_qmix.py
 
 # make file commands
 run-maddpg:
@@ -37,6 +33,9 @@ run-qmix-pz:
 
 bash:
 	$(DOCKER_RUN) bash
+
+record:
+	$(DOCKER_RUN)  /bin/bash -c "./startup.sh ; python main.py $(MADDPG) "
 
 build:
 	docker build --tag $(IMAGE) .
