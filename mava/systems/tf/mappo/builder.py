@@ -264,8 +264,6 @@ class MAPPOBuilder(SystemBuilder):
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        # TODO (Kale-ab): networks stats for MAPPO
-
         trainer = DetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]
         )

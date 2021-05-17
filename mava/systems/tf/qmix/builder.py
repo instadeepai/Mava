@@ -33,6 +33,7 @@ from mava.utils import training_utils as train_utils
 from mava.wrappers import DetailedTrainerStatistics
 
 # TODO Clean up documentation
+# TODO (Arnu): For St John - Have VDN, QMIX inherit from MADQN and import stats wrapper
 
 
 class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):

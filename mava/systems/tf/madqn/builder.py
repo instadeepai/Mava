@@ -32,7 +32,7 @@ from mava.systems.tf.madqn import execution, training
 from mava.utils import training_utils as train_utils
 from mava.wrappers import DetailedTrainerStatistics
 
-# TODO (CLAUDE) I had to make a custom class here that
+# TODO (Claude) I had to make a custom class here that
 # inherits DetailedTrainerStatistics
 # to expose the get_epsilon() function. For some
 # reason lp does not bind it otherwise.
