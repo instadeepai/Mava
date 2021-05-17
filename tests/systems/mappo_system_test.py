@@ -26,6 +26,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
 from mava import specs as mava_specs
@@ -196,7 +197,20 @@ class TestMAPPO:
         (trainer_node,) = program.groups["trainer"]
         trainer_node.disable_run()
 
-        lp.launch(program, launch_type="test_mt")
+        # Launch gpu config - don't use gpu
+        gpu_id = -1
+        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+        local_resources = {
+            "trainer": [],
+            "evaluator": PythonProcess(env=env_vars),
+            "executor": PythonProcess(env=env_vars),
+        }
+
+        lp.launch(
+            program,
+            launch_type="test_mt",
+            local_resources=local_resources,
+        )
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
