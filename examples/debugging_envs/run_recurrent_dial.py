@@ -165,7 +165,6 @@ def main(_: Any) -> None:
     eval_logger = TFSummaryLogger(f"{logs_dir}/eval_loop")
 
     #  # TODO Create loggers
-    # log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
     # # Checkpointer appends "Checkpoints" to checkpoint_dir
     # checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"

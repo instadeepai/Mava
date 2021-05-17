@@ -134,7 +134,6 @@ class TestMAPPO:
         # passed in.
         mava_id = "tests/mappo"
         base_dir = "~/mava"
-        log_info = (base_dir, f"{mava_id}/logs")
 
         # environment
         environment_factory = functools.partial(
@@ -180,7 +179,6 @@ class TestMAPPO:
         system = mappo.MAPPO(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            log_info=log_info,
             num_executors=2,
             batch_size=32,
             max_queue_size=1000,

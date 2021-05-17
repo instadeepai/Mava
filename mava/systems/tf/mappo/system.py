@@ -15,7 +15,7 @@
 
 """MAPPO system implementation."""
 import copy
-from typing import Any, Callable, Dict, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Optional, Type
 
 import acme
 import dm_env
@@ -49,7 +49,6 @@ class MAPPO:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
-        log_info: Tuple,
         architecture: Type[
             DecentralisedValueActorCritic
         ] = DecentralisedValueActorCritic,
@@ -118,7 +117,6 @@ class MAPPO:
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
-        self._log_info = log_info
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
