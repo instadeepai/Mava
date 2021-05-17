@@ -23,19 +23,19 @@ MADDPG_RECORD=examples/petting_zoo/run_feedforward_maddpg_record_video.py
 
 # make file commands
 run:
-	$(DOCKER_RUN) python $(EXAMPLE) --base_dir /home/mava/
+	$(DOCKER_RUN) python $(EXAMPLE) --base_dir /home/app/mava/
 
 run-maddpg:
-	$(DOCKER_RUN) python $(MADDPG) --base_dir /home/mava/
+	$(DOCKER_RUN) python $(MADDPG) --base_dir /home/app/mava/
 
 run-madqn:
-	$(DOCKER_RUN) python  $(MADQN) --base_dir /home/mava/
+	$(DOCKER_RUN) python  $(MADQN) --base_dir /home/app/mava/
 
 run-qmix:
-	$(DOCKER_RUN) python  $(QMIX) --base_dir /home/mava/
+	$(DOCKER_RUN) python  $(QMIX) --base_dir /home/app/mava/
 
 run-qmix-pz:
-	$(DOCKER_RUN) python $(QMIX-PZ) --base_dir /home/mava/
+	$(DOCKER_RUN) python $(QMIX-PZ) --base_dir /home/app/mava/
 
 bash:
 	$(DOCKER_RUN) bash
