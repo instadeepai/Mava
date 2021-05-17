@@ -121,9 +121,6 @@ def make_networks(
 
 def main(_: Any) -> None:
 
-    # set loggers info
-    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
-
     environment_factory = functools.partial(
         flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
     )
@@ -171,7 +168,6 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
         epsilon_decay=1e-4,
-        log_info=log_info,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
