@@ -126,6 +126,7 @@ def main(_: Any) -> None:
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
         num_agents=2,
+        return_state_info=True,
     )
 
     # networks
