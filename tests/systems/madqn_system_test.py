@@ -20,7 +20,6 @@ from typing import Dict, Mapping, Sequence, Union
 
 import launchpad as lp
 import sonnet as snt
-import tensorflow as tf
 from acme import types
 from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
@@ -36,7 +35,6 @@ from mava.utils.loggers import Logger
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    epsilon: tf.Variable = tf.Variable(1.0, trainable=False),
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
     shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
@@ -53,10 +51,10 @@ def make_networks(
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
     def action_selector_fn(
-        q_values: types.NestedTensor, legal_actions: types.NestedTensor
+        q_values: types.NestedTensor, legal_actions: types.NestedTensor, epsilon: float
     ) -> types.NestedTensor:
         return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions
+            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
         )
 
     q_networks = {}
