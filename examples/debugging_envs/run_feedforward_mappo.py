@@ -15,8 +15,8 @@
 
 """Example running MAPPO on multi-agent CartPole."""
 
+import functools
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, Sequence, Union
 
 import acme.tf.networks as networks
@@ -28,11 +28,13 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from absl import app, flags
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava.specs as mava_specs
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
+from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -45,6 +47,13 @@ flags.DEFINE_string(
     "discrete",
     "Environment action space type (str).",
 )
+
+flags.DEFINE_string(
+    "mava_id",
+    str(datetime.now()),
+    "Experiment identifier that can be used to continue experiments.",
+)
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 def make_networks(
@@ -59,8 +68,6 @@ def make_networks(
 ) -> Dict[str, snt.Module]:
 
     """Creates networks used by the agents."""
-
-    # TODO handle observation networks.
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
@@ -83,10 +90,10 @@ def make_networks(
     for key in specs.keys():
 
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Note: The discrete case must be placed first as it inherits from BoundedArray.
-        if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discreet
+        if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discrete
             num_actions = specs[key].actions.num_values
             policy_network = snt.Sequential(
                 [
@@ -136,14 +143,10 @@ def make_networks(
 def main(_: Any) -> None:
 
     # set loggers info
-    base_dir = Path.cwd()
-    log_dir = base_dir / "logs"
-    log_time_stamp = str(datetime.now())
-
-    log_info = (log_dir, log_time_stamp)
+    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
     # environment
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
@@ -152,16 +155,66 @@ def main(_: Any) -> None:
     # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+
+    log_every = 10
+    trainer_logger = Logger(
+        label="system_trainer",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    exec_logger = Logger(
+        # _{executor_id} gets appended to label in system.
+        label="train_loop_executor",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    eval_logger = Logger(
+        label="eval_loop",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
     # distributed program
     program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
+        checkpoint_subpath=checkpoint_dir,
+        trainer_logger=trainer_logger,
+        exec_logger=exec_logger,
+        eval_logger=eval_logger,
     ).build()
 
     # launch
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
+    )
 
 
 if __name__ == "__main__":

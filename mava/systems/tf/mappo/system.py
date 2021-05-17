@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """MAPPO system implementation."""
+import copy
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 import acme
@@ -22,7 +23,6 @@ import launchpad as lp
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
-from acme.tf import savers as tf2_savers
 from acme.utils import counting, loggers
 
 import mava
@@ -30,9 +30,10 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
+from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.mappo import builder, execution, training
 from mava.utils import lp_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import MavaLogger
 from mava.wrappers import DetailedPerAgentStatistics
 
 
@@ -59,21 +60,28 @@ class MAPPO:
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
         executor_variable_update_period: int = 100,
-        critic_learning_rate: float = 1e-3,
-        policy_learning_rate: float = 1e-3,
+        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=5e-4),
+        critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-5),
         discount: float = 0.99,
-        lambda_gae: float = 0.95,
+        lambda_gae: float = 0.99,
         clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
-        max_abs_reward: Optional[float] = None,
         max_gradient_norm: Optional[float] = None,
-        max_queue_size: int = 100_000,
-        batch_size: int = 16,
+        max_queue_size: int = 100000,
+        batch_size: int = 256,
         sequence_length: int = 10,
         sequence_period: int = 5,
-        log_every: float = 10.0,
         max_executor_steps: int = None,
+        checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
+        trainer_logger: MavaLogger = None,
+        exec_logger: MavaLogger = None,
+        eval_logger: MavaLogger = None,
+        train_loop_fn: Callable = ParallelEnvironmentLoop,
+        eval_loop_fn: Callable = ParallelEnvironmentLoop,
+        train_loop_fn_kwargs: Dict = {},
+        eval_loop_fn_kwargs: Dict = {},
     ):
 
         """Initialize the system.
@@ -90,12 +98,16 @@ class MAPPO:
         max_abs_reward: ...
         batch_size: batch size for updates.
         max_queue_size: maximum queue size.
-        critic_learning_rate: learning rate for the critic-network update.
-        policy_learning_rate: ...
         discount: discount to use for TD updates.
         logger: logger object to be used by learner.
         max_gradient_norm: used for gradient clipping.
         checkpoint: ...
+        checkpoint_subpath: directory for checkpoints.
+        trainer_logger: logger for trainer class.
+        exec_logger: logger for executor.
+        eval_logger: logger for evaluator.
+        train_loop_fn: loop for training.
+        eval_loop_fn: loop for evaluation.
         replay_table_name: string indicating what name to give the replay table."""
 
         if not environment_spec:
@@ -112,7 +124,15 @@ class MAPPO:
         self._num_exectors = num_executors
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
-        self._log_every = log_every
+        self._checkpoint_subpath = checkpoint_subpath
+        self._checkpoint = checkpoint
+        self._trainer_logger = trainer_logger
+        self._exec_logger = exec_logger
+        self._eval_logger = eval_logger
+        self._train_loop_fn = train_loop_fn
+        self._train_loop_fn_kwargs = train_loop_fn_kwargs
+        self._eval_loop_fn = eval_loop_fn
+        self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
 
         self._builder = builder.MAPPOBuilder(
             config=builder.MAPPOConfig(
@@ -122,17 +142,20 @@ class MAPPO:
                 discount=discount,
                 lambda_gae=lambda_gae,
                 clipping_epsilon=clipping_epsilon,
-                critic_learning_rate=critic_learning_rate,
-                policy_learning_rate=policy_learning_rate,
                 entropy_cost=entropy_cost,
                 baseline_cost=baseline_cost,
-                max_abs_reward=max_abs_reward,
                 max_gradient_norm=max_gradient_norm,
                 max_queue_size=max_queue_size,
                 batch_size=batch_size,
                 sequence_length=sequence_length,
                 sequence_period=sequence_period,
+                checkpoint=checkpoint,
+                policy_optimizer=policy_optimizer,
+                critic_optimizer=critic_optimizer,
+                checkpoint_subpath=checkpoint_subpath,
             ),
+            trainer_fn=trainer_fn,
+            executor_fn=executor_fn,
         )
 
     def replay(self) -> Any:
@@ -141,7 +164,10 @@ class MAPPO:
 
     def counter(self) -> Any:
         return tf2_savers.CheckpointingRunner(
-            counting.Counter(), time_delta_minutes=1, subdirectory="counter"
+            counting.Counter(),
+            time_delta_minutes=15,
+            directory=self._checkpoint_subpath,
+            subdirectory="counter",
         )
 
     def coordinator(self, counter: counting.Counter) -> Any:
@@ -153,9 +179,6 @@ class MAPPO:
         counter: counting.Counter,
     ) -> mava.core.Trainer:
         """The Trainer part of the system."""
-
-        # get log info
-        log_dir, log_time_stamp = self._log_info
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
@@ -173,19 +196,12 @@ class MAPPO:
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
-        trainer_logger = Logger(
-            label="system_trainer",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-        )
 
         return self._builder.make_trainer(
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=trainer_logger,
+            logger=self._trainer_logger,
         )
 
     def executor(
@@ -197,26 +213,29 @@ class MAPPO:
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
 
-        # get log info
-        log_dir, log_time_stamp = self._log_info
-
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system = self._architecture(
             environment_spec=self._environment_spec,
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        # create variables
+        _ = system.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the executor.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
         )
@@ -227,17 +246,20 @@ class MAPPO:
 
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
-        train_logger = Logger(
-            label=f"train_loop_executor_{executor_id}",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-        )
+
+        # Update label to include exec id
+        exec_logger = None
+        if self._exec_logger:
+            exec_logger = copy.deepcopy(self._exec_logger)
+            exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
 
         # Create the loop to connect environment and executor.
-        train_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=train_logger
+        train_loop = self._train_loop_fn(
+            environment,
+            executor,
+            counter=counter,
+            logger=exec_logger,
+            **self._train_loop_fn_kwargs,
         )
 
         train_loop = DetailedPerAgentStatistics(train_loop)
@@ -252,26 +274,29 @@ class MAPPO:
     ) -> Any:
         """The evaluation process."""
 
-        # get log info
-        log_dir, log_time_stamp = self._log_info
-
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec
         )
 
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
+        system = self._architecture(
             environment_spec=self._environment_spec,
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        # create variables
+        _ = system.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the agent.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
         )
 
@@ -280,35 +305,19 @@ class MAPPO:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
-        eval_logger = Logger(
-            label="eval_loop",
-            directory=log_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=log_time_stamp,
-        )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
-        eval_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=eval_logger
+        eval_loop = self._eval_loop_fn(
+            environment,
+            executor,
+            counter=counter,
+            logger=self._eval_logger,
+            **self._eval_loop_fn_kwargs,
         )
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)
         return eval_loop
-
-    # Overwrite update function to only learn if we can sample
-    # from reverb.
-    # TODO (Arnu): need to implement this with launchpad
-    # however I'm not 100% sure we need it. I suspect the
-    # rate limiter should handle this automatically?
-    # def update(self) -> None:
-    #     trainer_step = False
-    #     while self._can_sample():
-    #         self._trainer.step()
-    #         trainer_step = True
-    #     if trainer_step:
-    #         self._executor.update()
 
     def build(self, name: str = "mappo") -> Any:
         """Build the distributed system topology."""

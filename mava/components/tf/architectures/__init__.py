@@ -18,6 +18,7 @@
 from mava.components.tf.architectures.base import (
     BaseActorCritic,
     BaseArchitecture,
+    BasePolicyArchitecture,
     BaseSoftActorCritic,
 )
 from mava.components.tf.architectures.centralised import (
@@ -26,6 +27,7 @@ from mava.components.tf.architectures.centralised import (
     CentralisedQValueCritic,
     CentralisedSoftQValueActorCritic,
     CentralisedSoftQValueCritic,
+    CentralisedValueCritic,
 )
 from mava.components.tf.architectures.decentralised import (
     DecentralisedPolicyActor,

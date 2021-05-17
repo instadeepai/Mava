@@ -18,7 +18,7 @@
 
 """Mixing for multi-agent RL systems"""
 
-from typing import Dict
+from typing import Dict, Optional
 
 import sonnet as snt
 import tensorflow as tf
@@ -40,9 +40,10 @@ class MonotonicMixing(BaseMixingModule):
         self,
         architecture: BaseArchitecture,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        agent_networks: Optional[Dict[str, snt.Module]] = None,
         qmix_hidden_dim: int = 64,
         num_hypernet_layers: int = 2,
-        hypernet_hidden_dim: int = 0,
+        hypernet_hidden_dim: int = 0,  # Defaults to qmix_hidden_dim
     ) -> None:
         """Initializes the mixer.
         Args:
@@ -52,41 +53,35 @@ class MonotonicMixing(BaseMixingModule):
 
         self._architecture = architecture
         self._environment_spec = environment_spec
-        # self._n_agents = architecture._n_agents
-        self._n_agents = 2  # NOTE (St John) Hard coded for now
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
 
+        if agent_networks is None:
+            agent_networks = self._architecture.create_actor_variables()
+        self._agent_networks = {}
+        self._agent_networks["values"] = agent_networks["values"]
+        self._agent_networks["target_values"] = agent_networks["target_values"]
+
     def _create_mixing_layer(self) -> snt.Module:
         """Modify and return system architecture given mixing structure."""
-        agent_specs = self._environment_spec.get_agent_specs()  # noqa F841
         state_specs = self._environment_spec.get_extra_specs()
         state_specs = state_specs["s_t"]
-
-        # TODO Currently hard coded to 2 but need to generaliseca
-        state_specs = tf.TensorSpec(shape=(3,))
-
-        # TODO I want to be able to get the number of inputs to the q_networks using
-        # specs if possible.
-        # observation_specs = list(agent_specs.values())[0].observations.observation
-
-        self._num_agents = len(self._agent_networks)
-        # self._obs_dim = int(np.prod(observation_specs.shape))
-
-        # TODO Currently hard coded to 2 but need to generalise
-        self._obs_dim = 2
-
-        q_value_dim = tf.TensorSpec(self._obs_dim * self._num_agents)
+        # TODO Currently hard coded to 3 but need to generalise
+        # Need to figure out how to get the size of one-hot representation
+        # of the global state that is returned by the environment.
+        # One hot input dimension of global state
+        state_specs = tf.TensorSpec(shape=(1, 3))  # Check this shape
+        self._num_agents = len(self._agent_networks["values"])
+        q_value_dim = tf.TensorSpec(self._num_agents)
 
         # Implement method from base class
         self._mixed_network = MonotonicMixingNetwork(
             self._architecture,
             self._agent_networks,
             self._qmix_hidden_dim,
-            self._obs_dim,
-            self._num_hypernet_layers,
-            self._hypernet_hidden_dim,
+            num_hypernet_layers=self._num_hypernet_layers,
+            hypernet_hidden_dim=self._hypernet_hidden_dim,
         )
 
         tf2_utils.create_variables(self._mixed_network, [q_value_dim, state_specs])
@@ -94,8 +89,6 @@ class MonotonicMixing(BaseMixingModule):
 
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         # Implement method from base class
-        networks = self._architecture.create_actor_variables()
-        self._agent_networks = networks["values"]
-        networks["mixing"] = self._create_mixing_layer()
-        networks["target_mixing"] = self._create_mixing_layer()  # or deep copy?
-        return networks
+        self._agent_networks["mixing"] = self._create_mixing_layer()
+        self._agent_networks["target_mixing"] = self._create_mixing_layer()
+        return self._agent_networks

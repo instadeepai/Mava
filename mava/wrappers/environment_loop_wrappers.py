@@ -16,16 +16,18 @@
 """Generic environment loop wrapper to track system statistics"""
 
 import time
-from typing import Dict, List
+from typing import Dict, List, Tuple, Union
 
+import dm_env
 import numpy as np
-from acme.utils import loggers
+from acme.utils import counting, loggers, paths
+from acme.wrappers.video import _make_animation
+from array2gif import write_gif
 
+import mava
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.utils.loggers import Logger
-
-# from mava.utils.loggers import Logger
-from mava.utils.wrapper_utils import RunningStatistics, generate_zeros_from_spec
+from mava.utils.wrapper_utils import RunningStatistics
 
 
 class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
@@ -59,110 +61,11 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
 
     def _compute_episode_statistics(
         self,
-        agent_returns: Dict[str, float],
-        episode_return: float,
-        episode_length: float,
-        steps_per_second: float,
+        episode_returns: Dict[str, float],
+        episode_steps: int,
+        start_time: float,
     ) -> None:
         raise NotImplementedError
-
-    def run_episode(self) -> loggers.LoggingData:
-        """Run one episode.
-        Each episode is a loop which interacts first with the environment to get a
-        dictionary of observations and then give those observations to the executor
-        in order to retrieve an action for each agent in the system.
-        Returns:
-            An instance of `loggers.LoggingData`.
-        """
-
-        # Reset any counts and start the environment.
-        start_time = time.time()
-        episode_steps = 0
-
-        timestep = self._environment.reset()
-
-        if type(timestep) == tuple:
-            timestep, env_extras = timestep
-        else:
-            env_extras = {}
-
-        # Make the first observation.
-        self._executor.observe_first(timestep, extras=env_extras)
-
-        rewards: Dict[str, float] = {}
-        episode_returns: Dict[str, float] = {}
-        for agent, spec in self._environment.reward_spec().items():
-            rewards.update({agent: generate_zeros_from_spec(spec)})
-            episode_returns.update({agent: generate_zeros_from_spec(spec)})
-
-        # For evaluation, this keeps track of the total undiscounted reward
-        # for each agent accumulated during the episode.
-        # multiagent_reward_spec = specs.Array((n_agents,), np.float32)
-        # episode_return = tree.map_structure(
-        #     generate_zeros_from_spec, multiagent_reward_spec
-        # )
-
-        # Run an episode.
-        while not timestep.last():
-
-            # Generate an action from the agent's policy and step the environment.
-            actions = self._get_actions(timestep)
-            timestep = self._environment.step(actions)
-
-            if type(timestep) == tuple:
-                timestep, env_extras = timestep
-            else:
-                env_extras = {}
-
-            rewards = timestep.reward
-
-            # Have the agent observe the timestep and let the actor update itself.
-            self._executor.observe(
-                actions, next_timestep=timestep, next_extras=env_extras
-            )
-
-            if self._should_update:
-                self._executor.update()
-
-            # Book-keeping.
-            episode_steps += 1
-
-            # NOTE (Arnu): fix for when env returns empty dict at end of episode.
-            if not rewards:
-                rewards = {
-                    agent: generate_zeros_from_spec(spec)
-                    for agent, spec in self._environment.reward_spec().items()
-                }
-
-            self._compute_step_statistics(rewards)
-
-            # Equivalent to: episode_return += timestep.reward
-            # We capture the return value because if timestep.reward is a JAX
-            # DeviceArray, episode_return will not be mutated in-place. (In all other
-            # cases, the returned episode_return will be the same object as the
-            # argument episode_return.)
-            # episode_return = tree.map_structure(
-            #     operator.iadd, episode_return, np.array(list(rewards.values()))
-            # )
-            episode_returns = {
-                agent: episode_returns[agent] + reward
-                for agent, reward in rewards.items()
-            }
-
-        # Record counts.
-        counts = self._counter.increment(episodes=1, steps=episode_steps)
-
-        # Collect the results and combine with counts.
-        steps_per_second = episode_steps / (time.time() - start_time)
-        episode_return = np.mean(np.array(list(episode_returns.values())))
-
-        self._compute_episode_statistics(
-            episode_returns, episode_return, episode_steps, steps_per_second
-        )
-        self._running_statistics.update({"episode_length": episode_steps})
-        self._running_statistics.update(counts)
-
-        return self._running_statistics
 
 
 class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
@@ -185,14 +88,20 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
 
     def _compute_episode_statistics(
         self,
-        agent_returns: Dict[str, float],
-        episode_return: float,
-        episode_length: float,
-        steps_per_second: float,
+        episode_returns: Dict[str, float],
+        episode_steps: int,
+        start_time: float,
     ) -> None:
 
-        self._episode_length_stats.push(episode_length)
-        self._episode_return_stats.push(episode_return)
+        # Collect the results and combine with counts.
+        steps_per_second = episode_steps / (time.time() - start_time)
+        mean_episode_return = np.mean(np.array(list(episode_returns.values())))
+
+        # Record counts.
+        counts = self._counter.increment(episodes=1, steps=episode_steps)
+
+        self._episode_length_stats.push(episode_steps)
+        self._episode_return_stats.push(mean_episode_return)
         self._steps_per_second_stats.push(steps_per_second)
 
         for metric in self._metrics:
@@ -200,6 +109,9 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
                 self._running_statistics[f"{stat}_{metric}"] = self.__getattribute__(
                     f"_{metric}_stats"
                 ).__getattribute__(stat)()
+
+        self._running_statistics.update({"episode_length": episode_steps})
+        self._running_statistics.update(counts)
 
 
 class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
@@ -249,20 +161,26 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
             self._agents_stats[agent]["reward"].push(reward)
             for stat in self._summary_stats:
                 agent_running_statistics[
-                    f"{agent}_{stat}_episode_reward"
+                    f"{agent}_{stat}_step_reward"
                 ] = self._agents_stats[agent]["reward"].__getattribute__(stat)()
             self._agent_loggers[agent].write(agent_running_statistics)
 
     def _compute_episode_statistics(
         self,
-        agent_returns: Dict[str, float],
-        episode_return: float,
-        episode_length: float,
-        steps_per_second: float,
+        episode_returns: Dict[str, float],
+        episode_steps: int,
+        start_time: float,
     ) -> None:
 
-        self._episode_length_stats.push(episode_length)
-        self._episode_return_stats.push(episode_return)
+        # Collect the results and combine with counts.
+        steps_per_second = episode_steps / (time.time() - start_time)
+        mean_episode_return = np.mean(np.array(list(episode_returns.values())))
+
+        # Record counts.
+        counts = self._counter.increment(episodes=1, steps=episode_steps)
+
+        self._episode_length_stats.push(episode_steps)
+        self._episode_return_stats.push(mean_episode_return)
         self._steps_per_second_stats.push(steps_per_second)
 
         for metric in self._metrics:
@@ -271,7 +189,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                     f"_{metric}_stats"
                 ).__getattribute__(stat)()
 
-        for agent, agent_return in agent_returns.items():
+        for agent, agent_return in episode_returns.items():
             agent_running_statistics: Dict[str, float] = {}
             self._agents_stats[agent]["return"].push(agent_return)
             for stat in self._summary_stats:
@@ -279,3 +197,109 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                     agent
                 ]["return"].__getattribute__(stat)()
             self._agent_loggers[agent].write(agent_running_statistics)
+
+        self._running_statistics.update({"episode_length": episode_steps})
+        self._running_statistics.update(counts)
+
+
+class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
+    """A MARL environment loop.
+    This records a gif/video every `record_every` eval episodes.
+    """
+
+    def __init__(
+        self,
+        environment: dm_env.Environment,
+        executor: mava.core.Executor,
+        filename: str = "agents",
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        should_update: bool = True,
+        label: str = "parallel_environment_loop",
+        record_every: int = 1000,
+        path: str = "~/mava",
+        fps: int = 15,
+        counter_str: str = "evaluator_episodes",
+        format: str = "video",
+        figsize: Union[float, Tuple[int, int]] = (360, 640),
+    ):
+        assert (
+            format == "gif" or format == "video"
+        ), "Only gif and video format are supported."
+
+        # Internalize agent and environment.
+        super().__init__(
+            environment=environment,
+            executor=executor,
+            counter=counter,
+            logger=logger,
+            should_update=should_update,
+            label=label,
+        )
+        self._record_every = record_every
+        self._path = paths.process_path(path, "recordings", add_uid=False)
+        self._filename = filename
+        self._record_current_episode = False
+        self._fps = fps
+        self._frames: List = []
+
+        self._parent_environment_step = self._environment.step
+        self._environment.step = self.step
+
+        self._parent_environment_reset = self._environment.reset
+        self._environment.reset = self.reset
+
+        self._counter_str = counter_str
+
+        self._format = format
+        self._figsize = figsize
+
+    def step(self, action: Dict[str, np.ndarray]) -> dm_env.TimeStep:
+        timestep = self._parent_environment_step(action)
+        self._append_frame(timestep)
+        return timestep
+
+    def _retrieve_render(self) -> np.ndarray:
+        if self._format == "video":
+            render = self._environment.render(mode="rgb_array")
+        elif self._format == "gif":
+            render = np.transpose(
+                self._environment.render(mode="rgb_array"), axes=(1, 0, 2)
+            )
+        return render
+
+    def _append_frame(self, timestep: dm_env.TimeStep) -> None:
+        """Appends a frame to the sequence of frames."""
+        counts = self._counter.get_counts()
+        counter = counts.get(self._counter_str)
+        last_step = timestep and timestep.step_type == dm_env.StepType.LAST
+        if (counter and (counter % self._record_every == 0)) or last_step:
+            self._frames.append(self._retrieve_render())
+
+    def reset(self) -> dm_env.TimeStep:
+        if self._frames:
+            self._write_frames()
+        timestep = self._parent_environment_reset()
+        return timestep
+
+    def _write_frames(self) -> None:
+        counts = self._counter.get_counts()
+        counter = counts.get(self._counter_str)
+        path = f"{self._path}/{self._filename}_{counter}_eval_episode"
+        if self._format == "video":
+            self._save_video(path)
+        elif self._format == "gif":
+            self._save_gif(path)
+        self._frames = []
+
+    def _save_video(self, path: str) -> None:
+        video = _make_animation(self._frames, self._fps, self._figsize).to_html5_video()
+        with open(f"{path}.html", "w") as f:
+            f.write(video)
+
+    def _save_gif(self, path: str) -> None:
+        write_gif(
+            self._frames,
+            f"{path}.gif",
+            fps=self._fps,
+        )

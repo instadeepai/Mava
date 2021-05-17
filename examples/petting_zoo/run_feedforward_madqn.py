@@ -13,42 +13,52 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADQN on the pettingzoo environment."""
-
+import functools
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import launchpad as lp
+import sonnet as snt
 import tensorflow as tf
 from absl import app, flags
 from acme import types
-from acme.tf.networks import DQNAtariNetwork
+from acme.tf import networks
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
+from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
-
 flags.DEFINE_string(
     "env_class",
-    "atari",
+    "butterfly",
     "Pettingzoo environment class, e.g. atari (str).",
+)
+flags.DEFINE_string(
+    "env_name",
+    "cooperative_pong_v2",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 
 flags.DEFINE_string(
-    "env_name",
-    "maze_craze_v2",
-    "Pettingzoo environment name, e.g. pong (str).",
+    "mava_id",
+    str(datetime.now()),
+    "Experiment identifier that can be used to continue experiments.",
 )
+flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
 
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    epsilon: tf.Variable = tf.Variable(0.05, trainable=False),
+    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+        512,
+        256,
+    ),
     shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -60,11 +70,16 @@ def make_networks(
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
+    if isinstance(q_networks_layer_sizes, Sequence):
+        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
+
     def action_selector_fn(
-        q_values: types.NestedTensor, legal_actions: types.NestedTensor
+        q_values: types.NestedTensor,
+        legal_actions: types.NestedTensor,
+        epsilon: Optional[tf.Variable] = None,
     ) -> types.NestedTensor:
         return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions
+            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
         )
 
     q_networks = {}
@@ -74,8 +89,17 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
 
-        # Create the q-value network.
-        q_network = DQNAtariNetwork(num_dimensions)
+        # Create the policy network.
+        q_network = snt.Sequential(
+            [
+                snt.Conv2D(32, 5),
+                snt.Conv2D(32, 3),
+                networks.LayerNormMLP(
+                    q_networks_layer_sizes[key], activate_final=False
+                ),
+                networks.NearZeroInitializedLinear(num_dimensions),
+            ]
+        )
 
         # epsilon greedy action selector
         action_selector = action_selector_fn
@@ -92,28 +116,81 @@ def make_networks(
 def main(_: Any) -> None:
 
     # set loggers info
-    base_dir = Path.cwd()
-    log_dir = base_dir / "logs"
-    log_time_stamp = str(datetime.now())
+    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
-    log_info = (log_dir, log_time_stamp)
-
-    environment_factory = lp_utils.partial_kwargs(
+    # environment
+    environment_factory = functools.partial(
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
+        env_preprocess_wrappers=[(pettingzoo_utils.atari_preprocessing, None)],
     )
 
+    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+
+    log_every = 10
+    trainer_logger = Logger(
+        label="system_trainer",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    exec_logger = Logger(
+        # _{executor_id} gets appended to label in system.
+        label="train_loop_executor",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    eval_logger = Logger(
+        label="eval_loop",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    # distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
+        exploration_scheduler_fn=LinearExplorationScheduler,
+        epsilon_min=0.05,
+        epsilon_decay=1e-4,
         log_info=log_info,
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        checkpoint_subpath=checkpoint_dir,
+        trainer_logger=trainer_logger,
+        exec_logger=exec_logger,
+        eval_logger=eval_logger,
     ).build()
 
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+    # launch
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
+    )
 
 
 if __name__ == "__main__":

@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADDPG on pettinzoo MPE environments."""
+"""Example running MAD4PG on PZ environments."""
 
+import functools
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import launchpad as lp
@@ -26,12 +26,13 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.systems.tf import executors, maddpg
-from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
+from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
+from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
 
@@ -43,9 +44,15 @@ flags.DEFINE_string(
 
 flags.DEFINE_string(
     "env_name",
-    "multiwalker_v6",
+    "multiwalker_v7",
     "Pettingzoo environment name, e.g. pong (str).",
 )
+flags.DEFINE_string(
+    "mava_id",
+    str(datetime.now()),
+    "Experiment identifier that can be used to continue experiments.",
+)
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 def make_networks(
@@ -58,6 +65,9 @@ def make_networks(
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
     sigma: float = 0.3,
+    vmin: float = -150.0,
+    vmax: float = 150.0,
+    num_atoms: int = 51,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
@@ -84,17 +94,15 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
-        # Create the observation network.
+        # Create the shared observation network; here simply a state-less operation.
         observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
-        policy_network = snt.DeepRNN(
+        policy_network = snt.Sequential(
             [
-                observation_network,
-                snt.Flatten(),
-                snt.nets.MLP(policy_networks_layer_sizes[key]),
-                snt.LSTM(25),
-                snt.nets.MLP([128]),
+                networks.LayerNormMLP(
+                    policy_networks_layer_sizes[key], activate_final=True
+                ),
                 networks.NearZeroInitializedLinear(num_dimensions),
                 networks.TanhToSpec(specs[key].actions),
                 networks.ClippedGaussian(sigma),
@@ -110,49 +118,97 @@ def make_networks(
                 networks.LayerNormMLP(
                     critic_networks_layer_sizes[key], activate_final=False
                 ),
-                snt.Linear(1),
+                networks.DiscreteValuedHead(vmin, vmax, num_atoms),
             ]
         )
-
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
 
     return {
-        "observations": observation_networks,
         "policies": policy_networks,
         "critics": critic_networks,
+        "observations": observation_networks,
     }
 
 
 def main(_: Any) -> None:
 
+    # TODO(Arnu): make logging optional, currently log_info
+    # is required for all systems
     # set loggers info
-    base_dir = Path.cwd()
-    log_dir = base_dir / "logs"
-    log_time_stamp = str(datetime.now())
+    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
-    log_info = (log_dir, log_time_stamp)
-
-    environment_factory = lp_utils.partial_kwargs(
+    # environment
+    environment_factory = functools.partial(
         pettingzoo_utils.make_environment,
-        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
+        env_class=FLAGS.env_class,
+        remove_on_fall=False,
     )
 
+    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
-    program = maddpg.MADDPG(
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+
+    log_every = 10
+    trainer_logger = Logger(
+        label="system_trainer",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    exec_logger = Logger(
+        # _{executor_id} gets appended to label in system.
+        label="train_loop_executor",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    eval_logger = Logger(
+        label="eval_loop",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    # distributed program
+    program = mad4pg.MAD4PG(
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
         log_info=log_info,
-        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
-        executor_fn=executors.RecurrentExecutor,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        checkpoint_subpath=checkpoint_dir,
+        trainer_logger=trainer_logger,
+        exec_logger=exec_logger,
+        eval_logger=eval_logger,
     ).build()
 
+    # launch
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
     lp.launch(
-        program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="current_terminal"
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
     )
 
 

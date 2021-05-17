@@ -28,16 +28,12 @@ import tensorflow as tf
 import tree
 import trfl
 from acme.tf import losses
-from acme.tf import savers as tf2_savers
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
-
-# NOTE (Arnu): in TF2 this should be the default
-# but for some reason it is not when I run it.
-# tf.config.run_functions_eagerly(True)
 
 
 class BaseMADDPGTrainer(mava.Trainer):
@@ -54,19 +50,19 @@ class BaseMADDPGTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         discount: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
-        checkpoint_subpath: str = "Checkpoints",
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -94,6 +90,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
+        self._checkpoint = checkpoint
 
         # Store online and target networks.
         self._policy_networks = policy_networks
@@ -126,9 +123,8 @@ class BaseMADDPGTrainer(mava.Trainer):
         # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        # Create optimizers if they aren't given.
-        self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-4)
-        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
+        self._critic_optimizer = critic_optimizer
+        self._policy_optimizer = policy_optimizer
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
@@ -151,8 +147,6 @@ class BaseMADDPGTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            # TODO (dries): Determine why acme has a critic
-            #  in self._system_network_variables
             self._system_network_variables["critic"][
                 agent_key
             ] = target_critic_networks[agent_key].variables
@@ -163,13 +157,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         # Create checkpointer
         self._system_checkpointer = {}
         if checkpoint:
-            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
-            #  of the last 11 calls to
-            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
-            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
-            #  expensive and the excessive number tracings could be due to (1)
-            #  creating @tf.function repeatedly in a loop, (2) passing tensors
-            #  with different shapes, (3) passing Python objects instead of tensors.
             for agent_key in self.unique_net_keys:
                 objects_to_save = {
                     "counter": self._counter,
@@ -184,13 +171,12 @@ class BaseMADDPGTrainer(mava.Trainer):
                     "num_steps": self._num_steps,
                 }
 
-                checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
+                subdir = os.path.join("trainer", agent_key)
                 checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=1,
-                    add_uid=False,
-                    directory=checkpointer_dir,
+                    time_delta_minutes=15,
+                    directory=checkpoint_subpath,
                     objects_to_save=objects_to_save,
-                    enable_checkpointing=True,
+                    subdirectory=subdir,
                 )
                 self._system_checkpointer[agent_key] = checkpointer
         # Do not record timestamps until after the first learning step is done.
@@ -234,18 +220,6 @@ class BaseMADDPGTrainer(mava.Trainer):
             # evaluated at o_t, this also means the policy loss does not influence
             # the observation network training.
             o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
-
-            # TODO (dries): Why is there a stop gradient here? The target
-            #  will not be updated unless included into the
-            #  policy_variables or critic_variables sets.
-            #  One reason might be that it helps with preventing the observation
-            #  network from being updated from the policy_loss.
-            #  But why would we want that? Don't we want both the critic
-            #  and policy to update the observation network?
-            #  Or is it bad to have two optimisation processes optimising
-            #  the same set of weights? But the
-            #  StateBasedActorCritic will then not work as the critic
-            #  is not dependent on the behavior networks.
         return o_tm1, o_t
 
     def _get_critic_feed(
@@ -276,7 +250,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         dpg_a_t_feed = dpg_a_t
         return dpg_a_t_feed
 
-    def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
+    def _target_policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -329,7 +303,7 @@ class BaseMADDPGTrainer(mava.Trainer):
             critic_losses = {}
 
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-            a_t = self._policy_actions(o_t_trans)
+            a_t = self._target_policy_actions(o_t_trans)
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
@@ -412,10 +386,10 @@ class BaseMADDPGTrainer(mava.Trainer):
             )
 
             # Compute gradients.
-            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
+            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
             #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context.
-            # Caused by losses.dpg, which calls tape.gradient.
+            #  than calling it outside the context." caused by losses.dpg, which calls
+            #  tape.gradient.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
@@ -445,9 +419,12 @@ class BaseMADDPGTrainer(mava.Trainer):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        train_utils.checkpoint_networks(self._system_checkpointer)
+        # Checkpoint and attempt to write the logs.
+        if self._checkpoint:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
-        self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
@@ -477,15 +454,16 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
         discount: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -529,6 +507,7 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
 
@@ -558,6 +537,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -601,6 +581,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(
@@ -662,6 +643,7 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -705,6 +687,7 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(
@@ -757,16 +740,16 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         discount: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
-        checkpoint_subpath: str = "Checkpoints",
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -794,6 +777,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
+        self._checkpoint = checkpoint
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
@@ -827,9 +811,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        # Create optimizers if they aren't given.
-        self._critic_optimizer = critic_optimizer or snt.optimizers.Adam(1e-4)
-        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
+        self._critic_optimizer = critic_optimizer
+        self._policy_optimizer = policy_optimizer
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -845,8 +828,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            # TODO (dries): Determine why acme has a critic
-            #  in self._system_network_variables
             self._system_network_variables["critic"][
                 agent_key
             ] = target_critic_networks[agent_key].variables
@@ -857,13 +838,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # Create checkpointer
         self._system_checkpointer = {}
         if checkpoint:
-            # TODO (dries): Address this new warning: WARNING:tensorflow:11 out
-            #  of the last 11 calls to
-            #  <function MultiDeviceSaver.save.<locals>.tf_function_save at
-            #  0x7eff3c13dd30> triggered tf.function retracing. Tracing is
-            #  expensive and the excessive number tracings could be due to (1)
-            #  creating @tf.function repeatedly in a loop, (2) passing tensors
-            #  with different shapes, (3) passing Python objects instead of tensors.
             for agent_key in self.unique_net_keys:
                 objects_to_save = {
                     "counter": self._counter,
@@ -877,14 +851,12 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                     "critic_optimizer": self._critic_optimizer,
                     "num_steps": self._num_steps,
                 }
-
-                checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
+                subdir = os.path.join("trainer", agent_key)
                 checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=1,
-                    add_uid=False,
-                    directory=checkpointer_dir,
+                    time_delta_minutes=15,
+                    directory=checkpoint_subpath,
                     objects_to_save=objects_to_save,
-                    enable_checkpointing=True,
+                    subdirectory=subdir,
                 )
                 self._system_checkpointer[agent_key] = checkpointer
 
@@ -948,19 +920,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             obs_target_trans[agent] = tree.map_structure(
                 tf.stop_gradient, obs_target_trans[agent]
             )
-
-            # TODO (dries): Why is there a stop gradient here? The target
-            #  will not be updated unless included into the
-            #  policy_variables or critic_variables sets.
-            #  One reason might be that it helps with preventing the observation
-            #  network from being updated from the policy_loss.
-            #  But why would we want that? Don't we want both the critic
-            #  and policy to update the observation network?
-            #  Or is it bad to have two optimisation processes optimising
-            #  the same set of weights? But the
-            #  StateBasedActorCritic will then not work as the critic
-            #  is not dependent on the behavior networks.
-
         return obs_trans, obs_target_trans
 
     def _get_critic_feed(
@@ -990,7 +949,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         dpg_actions_feed = dpg_actions
         return dpg_actions_feed
 
-    def _policy_actions(
+    def _target_policy_actions(
         self,
         target_obs_trans: Dict[str, np.ndarray],
         target_core_state: Dict[str, np.ndarray],
@@ -1019,7 +978,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     # to be called by the step() function below. Removing it makes the code
     # work. The docs on tf.function says it is useful for speed improvements
     # but as far as I can see, we can go ahead without it. At least for now.
-    # @tf.function
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -1071,7 +1030,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
             obs_trans, target_obs_trans = self._transform_observations(observations)
 
-            target_actions = self._policy_actions(target_obs_trans, target_core_state)
+            target_actions = self._target_policy_actions(
+                target_obs_trans, target_core_state
+            )
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
@@ -1195,13 +1156,10 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             )
 
             # Compute gradients.
-            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
+            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
             #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context (it causes the gradient ops to be
-            #  recorded on the tape, leading to increased CPU and memory usage).
-            #  Only call GradientTape.gradient inside the context if you actually want
-            #  to trace the gradient in order to compute higher order derivatives.
-            #  to trace the gradient in order to compute higher order derivatives.
+            #  than calling it outside the context." caused by losses.dpg, which calls
+            #  tape.gradient.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
@@ -1233,10 +1191,11 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         fetches.update(counts)
 
         # Checkpoint the networks.
-        if len(self._system_checkpointer.keys()) > 0:
-            for agent_key in self.unique_net_keys:
-                checkpointer = self._system_checkpointer[agent_key]
-                checkpointer.save()
+        if self._checkpoint:
+            if len(self._system_checkpointer.keys()) > 0:
+                for agent_key in self.unique_net_keys:
+                    checkpointer = self._system_checkpointer[agent_key]
+                    checkpointer.save()
 
         self._logger.write(fetches)
 
@@ -1270,13 +1229,14 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -1320,6 +1280,7 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
 
@@ -1349,6 +1310,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -1391,6 +1353,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(
@@ -1454,6 +1417,7 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -1496,6 +1460,7 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(

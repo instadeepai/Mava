@@ -13,10 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional
+
 import dm_env
 
+from mava.utils.debugging.environments import TwoStepEnv
 from mava.utils.debugging.make_env import make_debugging_env
-from mava.wrappers.debugging_envs import DebuggingEnvWrapper
+from mava.wrappers.debugging_envs import DebuggingEnvWrapper, TwoStepWrapper
 
 
 def make_environment(
@@ -25,13 +28,23 @@ def make_environment(
     action_space: str = "discrete",
     num_agents: int = 3,
     render: bool = False,
+    random_seed: Optional[int] = None,
 ) -> dm_env.Environment:
 
     assert action_space == "continuous" or action_space == "discrete"
 
     del evaluation
 
-    """Creates a MPE environment."""
-    env_module = make_debugging_env(env_name, action_space, num_agents)
-    environment = DebuggingEnvWrapper(env_module, render=render)
+    if env_name == "two_step":
+        environment = TwoStepEnv()
+        environment = TwoStepWrapper(environment)
+
+    else:
+        """Creates a MPE environment."""
+        env_module = make_debugging_env(env_name, action_space, num_agents)
+        environment = DebuggingEnvWrapper(env_module, render=render)
+
+        if random_seed and hasattr(environment, "seed"):
+            environment.seed(random_seed)
+
     return environment

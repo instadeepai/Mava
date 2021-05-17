@@ -62,6 +62,8 @@ class MAPPOConfig:
     """
 
     environment_spec: specs.EnvironmentSpec
+    policy_optimizer: snt.Optimizer
+    critic_optimizer: snt.Optimizer
     sequence_length: int = 10
     sequence_period: int = 5
     shared_weights: bool = False
@@ -70,13 +72,12 @@ class MAPPOConfig:
     max_queue_size: int = 100_000
     executor_variable_update_period: int = 100
     batch_size: int = 32
-    critic_learning_rate: float = 3e-4
-    policy_learning_rate: float = 1e-3
     entropy_cost: float = 0.01
     baseline_cost: float = 0.5
     clipping_epsilon: float = 0.1
-    max_abs_reward: Optional[float] = None
     max_gradient_norm: Optional[float] = None
+    checkpoint: bool = True
+    checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
@@ -219,7 +220,6 @@ class MAPPOBuilder(SystemBuilder):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -237,28 +237,31 @@ class MAPPOBuilder(SystemBuilder):
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
 
+        observation_networks = networks["observations"]
         policy_networks = networks["policies"]
         critic_networks = networks["critics"]
 
         # The learner updates the parameters (and initializes them).
-        trainer = training.MAPPOTrainer(
+        trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
+            observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             dataset=dataset,
             shared_weights=shared_weights,
-            critic_learning_rate=self._config.critic_learning_rate,
-            policy_learning_rate=self._config.policy_learning_rate,
+            critic_optimizer=self._config.critic_optimizer,
+            policy_optimizer=self._config.policy_optimizer,
             discount=self._config.discount,
             lambda_gae=self._config.lambda_gae,
             entropy_cost=self._config.entropy_cost,
             baseline_cost=self._config.baseline_cost,
             clipping_epsilon=self._config.clipping_epsilon,
-            max_abs_reward=self._config.max_abs_reward,
             max_gradient_norm=self._config.max_gradient_norm,
             counter=counter,
             logger=logger,
+            checkpoint=self._config.checkpoint,
+            checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
         # TODO (Kale-ab): networks stats for MAPPO

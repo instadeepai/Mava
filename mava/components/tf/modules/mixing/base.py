@@ -17,9 +17,12 @@
 #   - [] complete base class for mixing
 
 import abc
-from typing import Dict
+from typing import Dict, Optional
 
 import sonnet as snt
+
+from mava import specs as mava_specs
+from mava.components.tf.architectures import BaseArchitecture
 
 """Base mixing interface for multi-agent RL systems"""
 
@@ -30,6 +33,15 @@ class BaseMixingModule:
     to create systems that can perform value decomposition via a mixing
     strategy between agents in a multi-agent RL system.
     """
+
+    @abc.abstractmethod
+    def __init__(
+        self,
+        architecture: Optional[BaseArchitecture] = None,
+        environment_spec: Optional[mava_specs.MAEnvironmentSpec] = None,
+        agent_networks: Optional[Dict[str, snt.Module]] = None,
+    ) -> None:
+        """Initialise the mixer."""
 
     @abc.abstractmethod
     def _create_mixing_layer(self) -> snt.Module:
