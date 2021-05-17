@@ -339,6 +339,11 @@ class DIALTrainer(mava.Trainer):
                     # y_t_a = r_t
                     y_action = reward[t - 1]
                     y_message = reward[t - 1]
+                    # y_message = tf.repeat(
+                    #     tf.expand_dims(reward[t - 1], axis=-1),
+                    #     message.shape[-1],
+                    #     axis=-1,
+                    # )
 
                     # y_t_a = r_t + discount * max_u Q(t)
                     if not terminal:
@@ -352,6 +357,7 @@ class DIALTrainer(mava.Trainer):
 
                         y_action += discount * tf.reduce_max(q_t)
                         y_message += discount * tf.reduce_max(m_t)
+                        # y_message += discount * m_t
 
                     # d_Q_t_a = y_t_a - Q(t-1)
                     batched_observation = agent_input[t - 1]
@@ -370,19 +376,22 @@ class DIALTrainer(mava.Trainer):
                     policy_losses[agent_id] += td_action ** 2
 
                     # Communication grads
-                    # print("y_message: ", y_message.shape)
-                    # print("next_message: ", next_message.shape)
+                    print("y_message: ", y_message.shape)
+                    print("next_message: ", next_message.shape)
                     # print("m_t1: ", m_t1.shape)
 
                     # TODO (Kevin): Explain to Dries what is going on
-                    #  here. Add comms back in
-                    td_comm = y_message - tf.gather(m_t1, next_message, batch_dims=1)
+                    # here. Add comms back in
+                    td_comm = y_message - tf.gather(
+                        m_t1, tf.argmax(next_message, axis=-1), batch_dims=1
+                    )
+                    # td_comm = tf.reduce_mean(y_message - m_t1, axis=-1)
                     # td_comm = y_message - m_t1[0][tf.argmax(next_message)]
 
-                    print("td_comm: ", td_comm)
+                    # print("td_comm: ", td_comm)
                     # exit()
 
-                    # policy_losses[agent_id] += td_comm ** 2
+                    policy_losses[agent_id] += td_comm ** 2
 
             # Average over batches
             for key in policy_losses.keys():

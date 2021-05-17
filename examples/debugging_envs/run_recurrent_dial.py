@@ -50,7 +50,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "/home/mava_logs/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava_logs/", "Base dir to store experiments.")
 
 
 def make_environment_fn(
@@ -244,6 +244,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=5,
+        batch_size=1,
         log_info=log_info,
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,

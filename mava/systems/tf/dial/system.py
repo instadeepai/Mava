@@ -77,7 +77,7 @@ class DIAL(system.System):
         epsilon: Optional[tf.Tensor] = None,
         counter: counting.Counter = None,
         max_executor_steps: int = None,
-        checkpoint: bool = True,
+        checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava/",
         # policy_networks: Optional[Dict[str, snt.Module]] = None,
         max_gradient_norm: Optional[float] = None,
