@@ -23,25 +23,25 @@ MADDPG_RECORD=examples/petting_zoo/run_feedforward_maddpg_record_video.py
 
 # make file commands
 run:
-	$(DOCKER_RUN) python $(EXAMPLE) --base_dir /home/app/mava/
+	$(DOCKER_RUN) python $(EXAMPLE) --base_dir /home/app/mava/logs/
 
 run-maddpg:
-	$(DOCKER_RUN) python $(MADDPG) --base_dir /home/app/mava/
+	$(DOCKER_RUN) python $(MADDPG) --base_dir /home/app/mava/logs/
 
 run-madqn:
-	$(DOCKER_RUN) python  $(MADQN) --base_dir /home/app/mava/
+	$(DOCKER_RUN) python  $(MADQN) --base_dir /home/app/mava/logs/
 
 run-qmix:
-	$(DOCKER_RUN) python  $(QMIX) --base_dir /home/app/mava/
+	$(DOCKER_RUN) python  $(QMIX) --base_dir /home/app/mava/logs/
 
 run-qmix-pz:
-	$(DOCKER_RUN) python $(QMIX-PZ) --base_dir /home/app/mava/
+	$(DOCKER_RUN) python $(QMIX-PZ) --base_dir /home/app/mava/logs/
 
 bash:
 	$(DOCKER_RUN) bash
 
 record:
-	$(DOCKER_RUN)  /bin/bash -c "./startup.sh ; python $(MADDPG_RECORD) "
+	$(DOCKER_RUN)  /bin/bash -c "./startup.sh ; python $(MADDPG_RECORD) --base_dir /home/app/mava/logs/ "
 
 build:
 	docker build --tag $(IMAGE) .
