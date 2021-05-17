@@ -16,14 +16,14 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping
+from typing import Any, Dict, Mapping, Tuple
 
 import launchpad as lp
 import sonnet as snt
 import tensorflow as tf
 from absl import app, flags
 from acme import types
-from acme.tf.networks import DQNAtariNetwork
+from acme.tf import networks
 from flatland.envs.observations import TreeObsForRailEnv
 from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
@@ -69,6 +69,7 @@ def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     epsilon: tf.Variable = tf.Variable(0.05, trainable=False),
     shared_weights: bool = True,
+    q_networks_layer_sizes: Tuple = (256, 256),
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
 
@@ -94,7 +95,12 @@ def make_networks(
         num_dimensions = specs[key].actions.num_values
 
         # Create the q-value network.
-        q_network = DQNAtariNetwork(num_dimensions)
+        q_network = snt.Sequential(
+            [
+                networks.LayerNormMLP(q_networks_layer_sizes, activate_final=True),
+                networks.NearZeroInitializedLinear(num_dimensions),
+            ]
+        )
 
         # epsilon greedy action selector
         action_selector = action_selector_fn
