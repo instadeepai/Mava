@@ -26,7 +26,7 @@ loop.run()
 This will run a simple loop in which the given multi-agent system interacts with its
 environment and and each agent learns from this interaction. This assumes a `system` instance
 (implementations of which you can find [here][Systems]) and a multi-agent `environment`
-instance which implements the [DeepMind Environment API][dm_env]. 
+instance which implements the [DeepMind Environment API][dm_env].
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
