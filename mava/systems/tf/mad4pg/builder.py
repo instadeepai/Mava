@@ -16,10 +16,10 @@
 """MAD4PG system implementation."""
 from typing import Any, Dict, Type
 
-from mava import core, spec
+from mava import core
 from mava.systems.tf import executors
 from mava.systems.tf.mad4pg import training
-from mava.systems.tf.maddpg.builder import MADDPGBuilder, MADPPGConfig
+from mava.systems.tf.maddpg.builder import MADDPGBuilder, MADDPGConfig
 
 
 class MAD4PGBuilder(MADDPGBuilder):
@@ -34,7 +34,7 @@ class MAD4PGBuilder(MADDPGBuilder):
 
     def __init__(
         self,
-        config: MAD4PGConfig,
+        config: MADDPGConfig,
         trainer_fn: Type[
             training.BaseMAD4PGTrainer
         ] = training.DecentralisedMAD4PGTrainer,
