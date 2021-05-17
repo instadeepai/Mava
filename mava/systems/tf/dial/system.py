@@ -22,6 +22,7 @@ import launchpad as lp
 import reverb
 import sonnet as snt
 import tensorflow as tf
+from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
@@ -52,7 +53,7 @@ class DIAL(system.System):
     def __init__(
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
-        network_factory: Dict[str, snt.Module],
+        network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         # observation_networks: Dict[str, snt.Module],
         architecture: Type[DecentralisedPolicyActor] = DecentralisedPolicyActor,
         executor_fn: Type[core.Executor] = DIALExecutor,
