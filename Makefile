@@ -7,9 +7,6 @@ else
 GPUS=
 endif
 
-# Setup fake screen
-FAKE_DISPLAY := $(shell xvfb-run -s "-screen 0 1400x900x24" bash)
-
 # Set flag for docker run command
 BASE_FLAGS=-it --rm  -v $(PWD):/home/app/mava -w /home/app/mava
 RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
@@ -37,6 +34,9 @@ run-qmix-pz:
 
 bash:
 	$(DOCKER_RUN) bash
+
+record:
+	$(DOCKER_RUN)  /bin/bash -c "./startup.sh ; python main.py $(MADDPG) "
 
 build:
 	docker build --tag $(IMAGE) .
