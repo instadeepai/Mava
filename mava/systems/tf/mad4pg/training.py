@@ -117,7 +117,6 @@ class BaseMAD4PGTrainer(mava.Trainer):
         self._target_update_period = target_update_period
 
         # Create an iterator to go through the dataset.
-        # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         # Create optimizers if they aren't given.
