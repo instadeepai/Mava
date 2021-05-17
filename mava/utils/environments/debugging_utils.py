@@ -17,9 +17,13 @@ from typing import Optional
 
 import dm_env
 
-from mava.utils.debugging.environments import TwoStepEnv
+from mava.utils.debugging.environments import TwoStepEnv, switch_game
 from mava.utils.debugging.make_env import make_debugging_env
-from mava.wrappers.debugging_envs import DebuggingEnvWrapper, TwoStepWrapper
+from mava.wrappers.debugging_envs import (
+    DebuggingEnvWrapper,
+    SwitchGameWrapper,
+    TwoStepWrapper,
+)
 
 
 def make_environment(
@@ -39,7 +43,11 @@ def make_environment(
     if env_name == "two_step":
         environment = TwoStepEnv()
         environment = TwoStepWrapper(environment)
-
+    elif env_name == "switch":
+        """Creates a SwitchGame environment."""
+        env_module_fn = switch_game.MultiAgentSwitchGame(num_agents=num_agents)
+        environment_fn = SwitchGameWrapper(env_module_fn)
+        return environment_fn
     else:
         """Creates a MPE environment."""
         env_module = make_debugging_env(env_name, action_space, num_agents)
