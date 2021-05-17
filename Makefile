@@ -20,7 +20,11 @@ QMIX=examples/debugging_envs/run_feedforward_qmix.py
 QMIX-PZ=examples/petting_zoo/run_feedforward_qmix.py
 
 MADDPG_RECORD=examples/petting_zoo/run_feedforward_maddpg_record_video.py
+
 # make file commands
+run:
+	$(DOCKER_RUN) python $(EXAMPLE) --base_dir /home/mava/
+
 run-maddpg:
 	$(DOCKER_RUN) python $(MADDPG) --base_dir /home/mava/
 
