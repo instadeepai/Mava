@@ -2,10 +2,7 @@
 
 # Mava: a research framework for multi-agent reinforcement learning
 
-**[Overview](#overview)** | **[Installation](#installation)** |
-**[Documentation]** | **[Quickstart]** | **[Tutorial]** |
-**[Systems]** | **[Examples]** | **[Paper]** |
-**[Blog post]**
+**[Overview](#overview)** | **[Installation](#installation)** | **[Systems]** | **[Examples]** |
 
 ![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava)
 ![PyPI version](https://badge.fury.io/py/id-mava.svg)
@@ -35,8 +32,7 @@ in more detail.
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a
-few MARL systems and environments. We also include a
-[quickstart notebook][Quickstart].
+few MARL systems and environments.
 
 > :information_source: Mava heavily relies on Acme, therefore as is the case with Acme, we make the same statement regarding reliability: mava is a framework for MARL research written by
 > researchers, for researchers. We will make every attempt to keep everything in good
@@ -47,25 +43,25 @@ few MARL systems and environments. We also include a
 
 We have tested `mava` on Python 3.6, 3.7 and 3.8.
 
-### Docker
+### Docker (**Recommended**)
 
 1. Build the docker image using the following make command:
     ```bash
     make build
     ```
 
-2. Run bash inside a docker container with mava installed:
+2. Run an example:
     ```bash
-    make bash
-    ```
-From here, examples can be run using:
-    ```
-    python dir/to/example/example.py
-    ```
-Alternatively, examples can be run directly from the command line without first launching the container by using the following make command:
-    ```
     make run EXAMPLE=dir/to/example/example.py
     ```
+    For example, `make run EXAMPLE=examples/petting_zoo/run_feedforward_maddpg.py`.
+
+    Alternatively, you can also run a specific system that is defined in the `Makefile`:
+    ```bash
+    make run-maddpg
+    ```
+
+    Or run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
 
 
 ### Python virtual environment
