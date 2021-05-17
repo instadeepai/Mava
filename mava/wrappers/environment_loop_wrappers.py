@@ -19,6 +19,7 @@ import time
 from typing import Dict, List, Tuple, Union
 
 import dm_env
+import matplotlib.pyplot as plt
 import numpy as np
 from acme.utils import counting, loggers, paths
 from acme.wrappers.video import _make_animation
@@ -291,6 +292,9 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         elif self._format == "gif":
             self._save_gif(path)
         self._frames = []
+
+        # Clear matplotlib figures in memory
+        plt.close("all")
 
     def _save_video(self, path: str) -> None:
         video = _make_animation(self._frames, self._fps, self._figsize).to_html5_video()

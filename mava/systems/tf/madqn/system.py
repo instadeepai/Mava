@@ -16,7 +16,7 @@
 """Defines the MADQN system class."""
 
 import copy
-from typing import Any, Callable, Dict, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Optional, Type
 
 import acme
 import dm_env
@@ -56,7 +56,6 @@ class MADQN:
         epsilon_decay: float = 1e-4,
         num_executors: int = 1,
         num_caches: int = 0,
-        log_info: Tuple = None,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
         batch_size: int = 256,
@@ -90,7 +89,6 @@ class MADQN:
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
-        self._log_info = log_info
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
