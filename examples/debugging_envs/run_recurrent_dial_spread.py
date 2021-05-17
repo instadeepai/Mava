@@ -18,7 +18,6 @@
 from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
 
-import dm_env
 import launchpad as lp
 import numpy as np
 import tensorflow as tf
@@ -32,10 +31,8 @@ from mava import specs as mava_specs
 from mava.components.tf.networks import DIALPolicy
 from mava.systems.tf import dial
 from mava.utils import lp_utils
-from mava.utils.debugging.environments import switch_game
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
-from mava.wrappers.debugging_envs import SwitchGameWrapper
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -54,18 +51,6 @@ flags.DEFINE_string(
     "Experiment identifier that can be used to continue experiments.",
 )
 flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
-
-
-def make_environment_fn(
-    evaluation: bool,
-    env_name: str = "switch",
-    num_agents: int = 3,
-) -> dm_env.Environment:
-    del evaluation
-    """Creates a SwitchGame environment."""
-    env_module_fn = switch_game.MultiAgentSwitchGame(num_agents=num_agents)
-    environment_fn = SwitchGameWrapper(env_module_fn)
-    return environment_fn
 
 
 # TODO Kevin: Define message head node correctly

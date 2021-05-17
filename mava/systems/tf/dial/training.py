@@ -372,21 +372,9 @@ class DIALTrainer(mava.Trainer):
                     policy_losses[agent_id] += td_action ** 2
 
                     # Communication grads
-                    print("y_message: ", y_message.shape)
-                    print("next_message: ", next_message.shape)
-                    # print("m_t1: ", m_t1.shape)
-
-                    # TODO (Kevin): Explain to Dries what is going on
-                    # here. Add comms back in
                     td_comm = y_message - tf.gather(
                         m_t1, tf.argmax(next_message, axis=-1), batch_dims=1
                     )
-                    # td_comm = tf.reduce_mean(y_message - m_t1, axis=-1)
-                    # td_comm = y_message - m_t1[0][tf.argmax(next_message)]
-
-                    # print("td_comm: ", td_comm)
-                    # exit()
-
                     policy_losses[agent_id] += td_comm ** 2
 
             # Average over batches
