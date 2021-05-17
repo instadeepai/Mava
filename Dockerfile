@@ -22,5 +22,6 @@ RUN apt-get install ffmpeg libsm6 libxext6  -y
 COPY . /home/app/mava
 RUN python -m pip install --upgrade pip
 RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting]
+RUN python -m pip install -e .[flatland]
 
 EXPOSE 6006
