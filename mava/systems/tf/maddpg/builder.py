@@ -27,7 +27,6 @@ from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
-from mava.systems.tf.mad4pg.builder import MAD4PGConfig
 from mava.systems.tf.maddpg import training
 from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
 
@@ -95,7 +94,7 @@ class MADDPGBuilder(SystemBuilder):
 
     def __init__(
         self,
-        config: Union[MADDPGConfig, MAD4PGConfig],
+        config: MADDPGConfig,
         trainer_fn: Union[
             Type[training.BaseMADDPGTrainer],
             Type[training.BaseRecurrentMADDPGTrainer],
