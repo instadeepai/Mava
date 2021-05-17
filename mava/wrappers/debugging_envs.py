@@ -39,17 +39,23 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
 
     # Note: we don't inherit from base.EnvironmentWrapper because that class
     # assumes that the wrapped environment is a dm_env.Environment.
-    def __init__(self, environment: MultiAgentEnv, render: bool = False):
+    def __init__(
+        self,
+        environment: MultiAgentEnv,
+        render: bool = False,
+        return_state_info: bool = False,
+    ):
         self.render = render
+        self.return_state_info = return_state_info
         super().__init__(environment=environment)
 
-    def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
+    def step(self, actions: Dict[str, np.ndarray]) -> Tuple[dm_env.TimeStep, np.array]:
         """Steps the environment."""
 
         if self._reset_next_step:
             return self.reset()
 
-        observations, rewards, dones, infos = self._environment.step(actions)
+        observations, rewards, dones, state = self._environment.step(actions)
 
         if self.render:
             self._environment.render(mode="not_human")
@@ -79,12 +85,17 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         else:
             self._step_type = dm_env.StepType.MID
 
-        return dm_env.TimeStep(
+        timestep = dm_env.TimeStep(
             observation=observations,
             reward=rewards,
             discount=self._discounts,
             step_type=self._step_type,
         )
+
+        if self.return_state_info:
+            return timestep, {"env_state": state}
+        else:
+            return timestep
 
     # Convert Debugging environment observation so it's dm_env compatible.
     # Also, the list of legal actions must be converted to a legal actions mask.
@@ -97,7 +108,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 legals = observation["action_mask"]
                 observation = observation["observation"]
             else:
-                # TODO Handle legal actions better for continous envs,
+                # TODO Handle legal actions better for continuous envs,
                 #  maybe have min and max for each action and clip the agents actions
                 #  accordingly
                 legals = np.ones(
