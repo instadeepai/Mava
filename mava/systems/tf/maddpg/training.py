@@ -718,7 +718,7 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         return dpg_a_t_feed
 
 
-class BaseRecurrentMADDPGTrainer(mava.Trainer):
+class BaseRecurrentMADDPGTrainer(BaseMADDPGTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -732,15 +732,15 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         discount: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -769,116 +769,29 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
           checkpoint: boolean indicating whether to checkpoint the learner.
         """
 
-        self._agents = agents
-        self._agent_types = agent_types
-        self._shared_weights = shared_weights
-        self._checkpoint = checkpoint
+        super() __init__(
+                self,
+                agents: List[str],
+                agent_types: List[str],
+                policy_networks: Dict[str, snt.Module],
+                critic_networks: Dict[str, snt.Module],
+                target_policy_networks: Dict[str, snt.Module],
+                target_critic_networks: Dict[str, snt.Module],
+                policy_optimizer: snt.Optimizer,
+                critic_optimizer: snt.Optimizer,
+                discount: float,
+                target_update_period: int,
+                dataset: tf.data.Dataset,
+                observation_networks: Dict[str, snt.Module],
+                target_observation_networks: Dict[str, snt.Module],
+                shared_weights: bool = False,
+                max_gradient_norm: float = None,
+                counter: counting.Counter = None,
+                logger: loggers.Logger = None,
+                checkpoint: bool = True,
+                checkpoint_subpath: str = "~/mava/",
+        )
 
-        # Dictionary with network keys for each agent.
-        self.agent_net_keys = {agent: agent for agent in self._agents}
-        if self._shared_weights:
-            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
-
-        self.unique_net_keys = self._agent_types if shared_weights else self._agents
-
-        # Store online and target networks.
-        self._policy_networks = policy_networks
-        self._critic_networks = critic_networks
-        self._target_policy_networks = target_policy_networks
-        self._target_critic_networks = target_critic_networks
-
-        self._observation_networks = observation_networks
-        self._target_observation_networks = target_observation_networks
-
-        # General learner book-keeping and loggers.
-        self._counter = counter or counting.Counter()
-        self._logger = logger or loggers.make_default_logger("trainer")
-
-        # Other learner parameters.
-        self._discount = discount
-        self._clipping = clipping
-
-        # Necessary to track when to update target networks.
-        self._num_steps = tf.Variable(0, dtype=tf.int32)
-        self._target_update_period = target_update_period
-
-        # Create an iterator to go through the dataset.
-        # TODO(b/155086959): Fix type stubs and remove.
-        self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
-
-        self._critic_optimizer = critic_optimizer
-        self._policy_optimizer = policy_optimizer
-
-        # Expose the variables.
-        policy_networks_to_expose = {}
-        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
-            "critic": {},
-            "policy": {},
-        }
-        for agent_key in self.unique_net_keys:
-            policy_network_to_expose = snt.Sequential(
-                [
-                    self._target_observation_networks[agent_key],
-                    self._target_policy_networks[agent_key],
-                ]
-            )
-            policy_networks_to_expose[agent_key] = policy_network_to_expose
-            self._system_network_variables["critic"][
-                agent_key
-            ] = target_critic_networks[agent_key].variables
-            self._system_network_variables["policy"][
-                agent_key
-            ] = policy_network_to_expose.variables
-
-        # Create checkpointer
-        self._system_checkpointer = {}
-        if checkpoint:
-            for agent_key in self.unique_net_keys:
-                objects_to_save = {
-                    "counter": self._counter,
-                    "policy": self._policy_networks[agent_key],
-                    "critic": self._critic_networks[agent_key],
-                    "observation": self._observation_networks[agent_key],
-                    "target_policy": self._target_policy_networks[agent_key],
-                    "target_critic": self._target_critic_networks[agent_key],
-                    "target_observation": self._target_observation_networks[agent_key],
-                    "policy_optimizer": self._policy_optimizer,
-                    "critic_optimizer": self._critic_optimizer,
-                    "num_steps": self._num_steps,
-                }
-                subdir = os.path.join("trainer", agent_key)
-                checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=15,
-                    directory=checkpoint_subpath,
-                    objects_to_save=objects_to_save,
-                    subdirectory=subdir,
-                )
-                self._system_checkpointer[agent_key] = checkpointer
-
-        # Do not record timestamps until after the first learning step is done.
-        # This is to avoid including the time it takes for actors to come online and
-        # fill the replay buffer.
-        self._timestamp = None
-
-    def _update_target_networks(self) -> None:
-        for key in self.unique_net_keys:
-            # Update target network.
-            online_variables = (
-                *self._observation_networks[key].variables,
-                *self._critic_networks[key].variables,
-                *self._policy_networks[key].variables,
-            )
-            target_variables = (
-                *self._target_observation_networks[key].variables,
-                *self._target_critic_networks[key].variables,
-                *self._target_policy_networks[key].variables,
-            )
-
-            # Make online -> target network update ops.
-            if tf.math.mod(self._num_steps, self._target_update_period) == 0:
-                for src, dest in zip(online_variables, target_variables):
-                    dest.assign(src)
-            self._num_steps.assign_add(1)
 
     def _combine_dim(self, tensor: tf.Tensor) -> tf.Tensor:
         dims = tensor.shape[:2]
