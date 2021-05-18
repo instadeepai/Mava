@@ -25,7 +25,7 @@ class BaseExplorationScheduler:
         epsilon_decay: float = 1e-4,
     ):
         """
-        Decays epsilon linearly to epsilon_min.
+        Base class for decaying epsilon by schedule.
         """
         self._epsilon_start = epsilon_start
         self._epsilon_min = epsilon_min

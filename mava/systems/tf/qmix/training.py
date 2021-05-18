@@ -247,8 +247,12 @@ class QMIXTrainer(mava.Trainer):
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
 
         # Global state (for hypernetwork)
+        # TODO Switch between one-hot for discrete state space and no one-hot
+        # for continuous state spaces. `depth` param should be taken from
+        # state specs - or somewhere else in a cleaner way?
+
         # One-hot if discrete states
-        # s_tm1 = tf.one_hot(e_tm1["s_t"], depth=3)  # TODO Get depth from state specs
+        # s_tm1 = tf.one_hot(e_tm1["s_t"], depth=3)
         # s_t = tf.one_hot(e_t["s_t"], depth=3)
 
         # Don't one-hot for continuous states

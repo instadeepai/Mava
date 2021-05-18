@@ -31,8 +31,6 @@ from mava.utils.debugging.environments.two_step import TwoStepEnv
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
-# from gym import spaces
-
 
 class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Debugging MARL environments."""
