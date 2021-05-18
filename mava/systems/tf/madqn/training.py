@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
+import tree
 import trfl
 from acme.tf import utils as tf2_utils
 from acme.types import NestedArray
@@ -333,3 +334,90 @@ class RecurrentMADQNTrainer(MADQNTrainer):
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
         )
+
+    def _forward(self, inputs: Any) -> None:
+        # Unpack input data as follows:
+        # o_tm1 = dictionary of observations one for each agent
+        # a_tm1 = dictionary of actions taken from obs in o_tm1
+        # r_t = dictionary of rewards or rewards sequences
+        #   (if using N step transitions) ensuing from actions a_tm1
+        # d_t = environment discount ensuing from actions a_tm1.
+        #   This discount is applied to future rewards after r_t.
+        # o_t = dictionary of next observations or next observation sequences
+        # e_t [Optional] = extra data that the agents persist in replay.
+        # o_tm1, a_tm1, _, r_t, d_t, o_t, _ = inputs.data
+        data = inputs.data
+
+        o_tm1, a_tm1, r_t, d_t, _, extras = (
+            data.observations,
+            data.actions,
+            data.rewards,
+            data.discounts,
+            data.start_of_episode,
+            data.extras,
+        )
+
+        # Get initial state for the LSTM from replay and
+        # extract the first state in the sequence..
+        print(extras)
+        core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
+        target_core_state = tree.map_structure(tf.identity, core_state)
+
+        # temporary
+        o_t = o_tm1
+
+        with tf.GradientTape(persistent=True) as tape:
+            q_network_losses: Dict[str, NestedArray] = {}
+
+            for agent in self._agents:
+                agent_key = self.agent_net_keys[agent]
+
+                # Cast the additional discount to match the environment discount dtype.
+                discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
+
+                # Maybe transform the observation before feeding into policy and critic.
+                # Transforming the observations this way at the start of the learning
+                # step effectively means that the policy and critic share observation
+                # network weights.
+
+                o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
+                    o_tm1, o_t, a_tm1, agent
+                )
+
+                agent_core_state = core_state[agent][0]
+                # Q-network learning
+                q_tm1 = self._q_networks[agent_key](o_tm1_feed, agent_core_state)
+                q_t = self._target_q_networks[agent_key](o_t_feed, target_core_state)
+
+                loss, _ = trfl.qlearning(
+                    q_tm1, a_tm1_feed, r_t[agent], discount * d_t[agent], q_t
+                )
+
+                loss = tf.reduce_mean(loss)
+
+                q_network_losses[agent] = {}
+                q_network_losses[agent]["q_value_loss"] = loss
+
+        self._q_network_losses = q_network_losses
+        self.tape = tape
+
+    # def _backward(self) -> None:
+    #     q_network_losses = self._q_network_losses
+    #     tape = self.tape
+    #     for agent in self._agents:
+    #         agent_key = self.agent_net_keys[agent]
+
+    #         # Get trainable variables
+    #         q_network_variables = self._q_networks[agent_key].trainable_variables
+
+    #         # Compute gradients
+    #         gradients = tape.gradient(q_network_losses[agent], q_network_variables)
+
+    #         # Maybe clip gradients.
+    #         if self._clipping:
+    #             gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+
+    #         # Apply gradients.
+    #         self._optimizer.apply(gradients, q_network_variables)
+
+    #     train_utils.safe_del(self, "tape")
