@@ -129,7 +129,7 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
         self.critic_losses = {}
         with tf.GradientTape(persistent=True) as tape:
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-            a_t = self._policy_actions(o_t_trans)
+            a_t = self._target_policy_actions(o_t_trans)
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
@@ -183,7 +183,7 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
         self.tape = tape
 
 
-class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
+class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -257,7 +257,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
         )
 
 
-class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
+class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -588,17 +588,17 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
                 act_comb, _ = self._combine_dim(dpg_actions_feed)
                 dpg_z_values = self._critic_networks[agent_key](obs_comb, act_comb)
                 dpg_q_values = dpg_z_values.mean()
-                # Actor loss. If clipping is true use dqda clipping and clip the norm.
-                # dpg_q_values = tf.squeeze(dpg_q_values, axis=-1)  # [B]
 
-                dqda_clipping = 1.0 if self._clipping else None
+                # Actor loss. If clipping is true use dqda clipping and clip the norm.
+                dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
+                clip_norm = True if self._max_gradient_norm is not None else False
 
                 policy_loss = losses.dpg(
                     dpg_q_values,
                     act_comb,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
-                    clip_norm=self._clipping,
+                    clip_norm=clip_norm,
                 )
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
         self.tape = tape

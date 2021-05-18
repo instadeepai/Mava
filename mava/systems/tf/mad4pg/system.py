@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
-from typing import Callable, Dict, Type
+from typing import Callable, Dict, Type, Union
 
 import dm_env
 import sonnet as snt
@@ -45,8 +45,9 @@ class MAD4PG(MADDPG):
         architecture: Type[
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
-        trainer_fn: Type[
-            training.BaseMAD4PGTrainer
+        trainer_fn: Union[
+            Type[training.BaseMAD4PGTrainer],
+            Type[training.BaseRecurrentMAD4PGTrainer],
         ] = training.DecentralisedMAD4PGTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         num_executors: int = 1,
