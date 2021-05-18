@@ -61,7 +61,8 @@ learning (MARL) systems. Mava builds off of Acme and in a similar way strives
 to expose simple, efficient, and readable components, as well as examples that
 serve both as reference implementations of popular algorithms and as strong
 baselines, while still providing enough flexibility to do novel research.
-For more information see [github repository](https://github.com/[...placeholder...]ai/mava)."""
+For more information see
+[github repository](https://github.com/[...placeholder...]ai/mava)."""
 
 # Get the version from metadata.
 version = _metadata.__version__  # type: ignore

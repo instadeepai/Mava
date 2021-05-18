@@ -56,7 +56,7 @@ class BaseMAD4PGTrainer(mava.Trainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -110,7 +110,12 @@ class BaseMAD4PGTrainer(mava.Trainer):
 
         # Other learner parameters.
         self._discount = discount
-        self._clipping = clipping
+
+        # Set up gradient clipping.
+        if max_gradient_norm is not None:
+            self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        else:  # A very large number. Infinity results in NaNs.
+            self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
         self._num_steps = tf.Variable(0, dtype=tf.int32)
@@ -336,14 +341,15 @@ class BaseMAD4PGTrainer(mava.Trainer):
                 dpg_q_t = dpg_z_t.mean()
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
-                dqda_clipping = 1.0 if self._clipping else None
+                dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
+                clip_norm = True if self._max_gradient_norm is not None else False
 
                 policy_loss = losses.dpg(
                     dpg_q_t,
                     dpg_a_t,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
-                    clip_norm=self._clipping,
+                    clip_norm=clip_norm,
                 )
                 policy_loss = tf.reduce_mean(policy_loss, axis=0)
                 policy_losses[agent] = policy_loss
@@ -383,10 +389,12 @@ class BaseMAD4PGTrainer(mava.Trainer):
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
-            # Maybe clip gradients.
-            if self._clipping:
-                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
-                critic_gradients = tf.clip_by_global_norm(critic_gradients, 40.0)[0]
+            policy_gradients = tf.clip_by_global_norm(
+                policy_gradients, self._max_gradient_norm
+            )[0]
+            critic_gradients = tf.clip_by_global_norm(
+                critic_gradients, self._max_gradient_norm
+            )[0]
 
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
@@ -446,7 +454,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -490,7 +498,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -520,7 +528,7 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -564,7 +572,7 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -626,7 +634,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -670,7 +678,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
