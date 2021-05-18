@@ -257,7 +257,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
 
     def step(self, action: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         timestep = self._parent_environment_step(action)
-        self._append_frame(timestep)
+        self._append_frame()
         return timestep
 
     def _retrieve_render(self) -> np.ndarray:
@@ -269,12 +269,11 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
             )
         return render
 
-    def _append_frame(self, timestep: dm_env.TimeStep) -> None:
+    def _append_frame(self) -> None:
         """Appends a frame to the sequence of frames."""
         counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
-        last_step = timestep and timestep.step_type == dm_env.StepType.LAST
-        if (counter and (counter % self._record_every == 0)) or last_step:
+        if counter and (counter % self._record_every == 0):
             self._frames.append(self._retrieve_render())
 
     def reset(self) -> dm_env.TimeStep:
@@ -287,12 +286,15 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
         path = f"{self._path}/{self._filename}_{counter}_eval_episode"
-        if self._format == "video":
-            self._save_video(path)
-        elif self._format == "gif":
-            self._save_gif(path)
+        try:
+            if self._format == "video":
+                self._save_video(path)
+            elif self._format == "gif":
+                self._save_gif(path)
+        except Exception as ex:
+            print(f"Write frames exception: {ex}")
+            pass
         self._frames = []
-
         # Clear matplotlib figures in memory
         plt.close("all")
 
