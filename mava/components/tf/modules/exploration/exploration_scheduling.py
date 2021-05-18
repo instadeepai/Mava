@@ -25,7 +25,7 @@ class BaseExplorationScheduler:
         epsilon_decay: float = 1e-4,
     ):
         """
-        Decays epsilon linearly to zero.
+        Base class for decaying epsilon by schedule.
         """
         self._epsilon_start = epsilon_start
         self._epsilon_min = epsilon_min
@@ -79,7 +79,7 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
         epsilon_decay: float = 1e-4,
     ):
         """
-        Decays epsilon exponentially to zero.
+        Decays epsilon exponentially to epsilon_start.
         """
         super(ExponentialExplorationScheduler, self).__init__(
             epsilon_start,
