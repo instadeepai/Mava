@@ -72,7 +72,6 @@ class MonotonicMixing(BaseMixingModule):
         # of the global state that is returned by the environment.
         # One hot input dimension of global state
         # state_specs = tf.TensorSpec(shape=(1, 3))  # Check this shape
-        print(state_specs)
         self._num_agents = len(self._agent_networks["values"])
         q_value_dim = tf.TensorSpec(self._num_agents)
 

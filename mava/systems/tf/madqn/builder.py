@@ -208,7 +208,6 @@ class MADQNBuilder:
             priority_fns=None,
             n_step=self._config.n_step,
             discount=self._config.discount,
-
         )
 
     def make_executor(

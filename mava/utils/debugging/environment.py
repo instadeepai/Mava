@@ -154,7 +154,7 @@ class MultiAgentEnv(gym.Env):
 
         return obs_n, reward_n, done_n, state_n
 
-    def reset(self) -> Dict[str, np.array]:
+    def reset(self) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         # reset world
         if self.reset_callback is not None:
             self.reset_callback(self.world)
@@ -211,9 +211,12 @@ class MultiAgentEnv(gym.Env):
             agent_pos.append(agent.state.p_pos)
             agent_vel.append(agent.state.p_vel)
 
-        return np.array(np.concatenate(
-            [[self.world.current_step / 50]] + entity_pos + agent_pos + agent_vel),
-        dtype=np.float32)
+        return np.array(
+            np.concatenate(
+                [[self.world.current_step / 50]] + entity_pos + agent_pos + agent_vel
+            ),
+            dtype=np.float32,
+        )
 
     # set env action for a particular agent
     def _set_action(

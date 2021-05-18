@@ -305,11 +305,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             extras_spec,
         ]
 
-
-        return_val = tree.map_structure_with_path(
-            base.spec_like_to_tensor_spec, tuple(transition_spec)
-        )
-
         return tree.map_structure_with_path(
             base.spec_like_to_tensor_spec, tuple(transition_spec)
         )

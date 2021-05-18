@@ -18,7 +18,6 @@ from typing import Dict, Tuple
 
 import dm_env
 import numpy as np
-import tensorflow as tf
 from acme import specs
 
 # from acme.specs import EnvironmentSpec
@@ -93,8 +92,6 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             step_type=self._step_type,
         )
         if self.return_state_info:
-            assert state.shape == (13,)
-
             return timestep, {"s_t": state}
         else:
             return timestep
@@ -142,9 +139,13 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         shape = self.environment._get_state().shape
 
-        spec = specs.BoundedArray(shape=shape, dtype='float32', name='observation',
-                           minimum=[float('-inf')]*shape[0],
-                           maximum=[float('inf')]*shape[0])
+        spec = specs.BoundedArray(
+            shape=shape,
+            dtype="float32",
+            name="observation",
+            minimum=[float("-inf")] * shape[0],
+            maximum=[float("inf")] * shape[0],
+        )
 
         return {"s_t": spec}
 
