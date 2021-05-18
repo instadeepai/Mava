@@ -53,7 +53,7 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -97,8 +97,8 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
             counter=counter,
+            max_gradient_norm=max_gradient_norm,
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
@@ -164,14 +164,15 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
                 dpg_q_t = dpg_z_t.mean()
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
-                dqda_clipping = 1.0 if self._clipping else None
+                dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
+                clip_norm = True if self._max_gradient_norm is not None else False
 
                 policy_loss = losses.dpg(
                     dpg_q_t,
                     dpg_a_t,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
-                    clip_norm=self._clipping,
+                    clip_norm=clip_norm,
                 )
                 policy_loss = tf.reduce_mean(policy_loss, axis=0)
                 policy_losses[agent] = policy_loss
@@ -206,7 +207,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -250,7 +251,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -280,7 +281,7 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -324,7 +325,7 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -354,7 +355,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -398,7 +399,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,

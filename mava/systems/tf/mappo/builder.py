@@ -67,7 +67,6 @@ class MAPPOConfig:
     sequence_length: int = 10
     sequence_period: int = 5
     shared_weights: bool = False
-    clipping: bool = True
     discount: float = 0.99
     lambda_gae: float = 0.95
     max_queue_size: int = 100_000
@@ -249,7 +248,6 @@ class MAPPOBuilder(SystemBuilder):
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            clipping=self._config.clipping,
             dataset=dataset,
             shared_weights=shared_weights,
             critic_optimizer=self._config.critic_optimizer,
@@ -266,7 +264,6 @@ class MAPPOBuilder(SystemBuilder):
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        # TODO (Kale-ab): networks stats for MAPPO
         trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
 
         trainer = DetailedTrainerStatistics(  # type: ignore

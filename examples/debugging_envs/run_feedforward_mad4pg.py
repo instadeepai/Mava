@@ -181,6 +181,7 @@ def main(_: Any) -> None:
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        max_gradient_norm=40.0,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,
         eval_logger=eval_logger,
