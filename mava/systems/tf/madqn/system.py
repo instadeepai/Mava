@@ -151,7 +151,7 @@ class MADQN:
             agent_type = agent.split("_")[0]
             core_state_specs[agent] = (
                 tf2_utils.squeeze_batch_dim(
-                    networks["policies"][agent_type].initial_state(1)
+                    networks["q_networks"][agent_type].initial_state(1)
                 ),
             )
         extras = {"core_states": core_state_specs}

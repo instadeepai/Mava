@@ -28,7 +28,7 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 from mava import specs as mava_specs
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.networks import epsilon_greedy_action_selector
-from mava.systems.tf import madqn
+from mava.systems.tf import executors, madqn
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
@@ -163,6 +163,8 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
+        # trainer_fn=DecentralisedRecurrentMADDPGTrainer,
+        executor_fn=executors.RecurrentExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
         epsilon_decay=5e-4,
