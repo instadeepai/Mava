@@ -197,6 +197,7 @@ def main(_: Any) -> None:
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
         architecture=CentralisedValueCritic,
         trainer_fn=mappo.CentralisedMAPPOTrainer,
+        max_gradient_norm=40,
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,

@@ -73,8 +73,8 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
+    max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
-    clipping: bool = True
     logger: loggers.Logger = None
     counter: counting.Counter = None
     checkpoint: bool = True
@@ -276,7 +276,7 @@ class MADDPGBuilder(SystemBuilder):
         agents = self._agents
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
-        clipping = self._config.clipping
+        max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         target_update_period = self._config.target_update_period
 
@@ -293,7 +293,7 @@ class MADDPGBuilder(SystemBuilder):
             shared_weights=shared_weights,
             policy_optimizer=self._config.policy_optimizer,
             critic_optimizer=self._config.critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             discount=discount,
             target_update_period=target_update_period,
             dataset=dataset,
