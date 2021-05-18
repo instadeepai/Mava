@@ -333,7 +333,7 @@ class MultiAgentEnv(gym.Env):
             # render to display or array
             results.append(self.viewers[i].render(return_rgb_array=mode == "rgb_array"))
 
-        return results
+        return np.squeeze(results)
 
     # create receptor field locations in local coordinate frame
     def _make_receptor_locations(self) -> List[np.array]:
