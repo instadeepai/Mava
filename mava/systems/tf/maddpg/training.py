@@ -1077,12 +1077,20 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
                 # Critic loss.
                 # TODO (dries): Change the critic losses to n step return losses?
-                critic_loss = trfl.td_learning(
+
+                critic_loss = train_utils.sequence_critic(
                     q_values,
                     agent_rewards,
                     discount * agent_discounts,
                     target_q_values,
                 ).loss
+
+                # critic_loss = trfl.td_learning(
+                #     q_values,
+                #     agent_rewards,
+                #     discount * agent_discounts,
+                #     target_q_values,
+                # ).loss
                 self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
 
                 # Actor learning.
