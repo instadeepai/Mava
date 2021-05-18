@@ -16,7 +16,7 @@
 """Defines the MADQN system class."""
 
 import copy
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type, Union
 
 import acme
 import dm_env
@@ -49,7 +49,9 @@ class MADQN:
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
-        trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
+        trainer_fn: Union[
+            Type[training.MADQNTrainer], Type[training.RecurrentMADQNTrainer]
+        ] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler

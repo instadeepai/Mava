@@ -290,3 +290,46 @@ class MADQNTrainer(mava.Trainer):
                     self._system_network_variables[network_type][agent]
                 )
         return variables
+
+
+class RecurrentMADQNTrainer(MADQNTrainer):
+    """Recurrent MADQN trainer.
+    This is the trainer component of a MADQN system. IE it takes a dataset as input
+    and implements update functionality to learn from this dataset.
+    """
+
+    def __init__(
+        self,
+        agents: List[str],
+        agent_types: List[str],
+        q_networks: Dict[str, snt.Module],
+        target_q_networks: Dict[str, snt.Module],
+        target_update_period: int,
+        dataset: tf.data.Dataset,
+        optimizer: snt.Optimizer,
+        discount: float,
+        shared_weights: bool,
+        exploration_scheduler: LinearExplorationScheduler,
+        clipping: bool = True,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
+    ):
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            q_networks=q_networks,
+            target_q_networks=target_q_networks,
+            target_update_period=target_update_period,
+            dataset=dataset,
+            optimizer=optimizer,
+            discount=discount,
+            shared_weights=shared_weights,
+            exploration_scheduler=exploration_scheduler,
+            clipping=clipping,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+        )
