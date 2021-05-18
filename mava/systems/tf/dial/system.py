@@ -1,4 +1,4 @@
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,7 +54,6 @@ class DIAL(system.System):
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
-        # observation_networks: Dict[str, snt.Module],
         architecture: Type[DecentralisedPolicyActor] = DecentralisedPolicyActor,
         executor_fn: Type[core.Executor] = DIALExecutor,
         log_info: Tuple = None,
@@ -80,7 +79,6 @@ class DIAL(system.System):
         max_executor_steps: int = None,
         checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava/",
-        # policy_networks: Optional[Dict[str, snt.Module]] = None,
         max_gradient_norm: Optional[float] = None,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
         communication_module: Type[BroadcastedCommunication] = BroadcastedCommunication,
@@ -145,7 +143,6 @@ class DIAL(system.System):
         self._builder = builder.DIALBuilder(
             builder.DIALConfig(
                 environment_spec=environment_spec,
-                # networks=networks,
                 shared_weights=shared_weights,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -161,7 +158,6 @@ class DIAL(system.System):
                 counter=counter,
                 checkpoint=checkpoint,
                 checkpoint_subpath=checkpoint_subpath,
-                # policy_networks=policy_networks,
                 max_gradient_norm=max_gradient_norm,
                 replay_table_name=replay_table_name,
                 policy_optimizer=policy_optimizer,
@@ -248,8 +244,6 @@ class DIAL(system.System):
             dataset=dataset,
             counter=counter,
             logger=self._trainer_logger,
-            # checkpoint=self._checkpoint,
-            # communication_module=communication_module,
         )
 
     def executor(

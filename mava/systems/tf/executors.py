@@ -461,14 +461,9 @@ class RecurrentExecutorWithComms(RecurrentExecutor):
 
             self._messages[agent] = message
 
-            # self._update_state(agent, new_state)
             # TODO Mask actions here using observation.legal_actions
             # What happens in discrete vs cont case
             actions[agent] = tf2_utils.to_numpy_squeeze(policy_output)
 
         # Return a numpy array with squeezed out batch dimension.
         return actions
-
-
-# Internal class 1.
-# Internal class 2.

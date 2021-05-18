@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -132,7 +132,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # n-step discount accumulator, and self.discount, so that they can be
         # iterated in parallel using tree.map_structure.
 
-        # NOTE (Arnu): temp fix for empty rewards dict
+        # If rewards dict is empty populate with zeros
         if not self._buffer[0].rewards:
             rewards = {
                 agent: np.dtype("float32").type(0.0)
@@ -166,11 +166,8 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # discount we don't apply it twice. Inside the following loop we will
         # apply this right before summing up the n_step_return.
         for step in itertools.islice(self._buffer, 1, None):
-            # print("DISCOUNTS:", step.discounts)
-            # print("REWARDS:", step.rewards)
-            # print("TOTAL_DISCOUNTS:", total_discount)
 
-            # NOTE (Arnu): temp fix for empty rewards dict
+            # If rewards dict is empty populate with zeros
             if not step.rewards:
                 rewards = {
                     agent: np.dtype("float32").type(0.0)
@@ -185,7 +182,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             ) = tree_utils.broadcast_structures(step.discounts, rewards, total_discount)
 
             # Equivalent to: `total_discount *= self._discount`.
-            # print("Computing total discount")
             tree.map_structure(operator.imul, total_discount, self_discount)
 
             # Equivalent to: `n_step_return += step.reward * total_discount`.
@@ -232,7 +228,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             steps = list(self._buffer) + [final_step]
 
             # Calculate the priority for this transition.
-
             table_priorities = acme_utils.calculate_priorities(
                 self._priority_fns, steps
             )
