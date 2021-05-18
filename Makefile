@@ -10,8 +10,10 @@ endif
 # Set flag for docker run command
 BASE_FLAGS=-it --rm  -v $(PWD):/home/app/mava -w /home/app/mava
 RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
+RUN_FLAGS_TENSORBOARD=$(GPUS) -p 6006:6006 $(BASE_FLAGS)
 IMAGE=instadeepct/mava:latest
 DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
+DOCKER_RUN_TENSORBOARD=docker run $(RUN_FLAGS_TENSORBOARD) $(IMAGE)
 
 # Set example to run when using `make run`
 MADDPG=examples/debugging_envs/run_feedforward_maddpg.py
@@ -39,6 +41,9 @@ run-qmix-pz:
 
 bash:
 	$(DOCKER_RUN) bash
+
+run-tensorboard:
+	$(DOCKER_RUN_TENSORBOARD) /bin/bash -c "  tensorboard --bind_all --logdir  /home/app/mava/logs/ & python $(EXAMPLE) --base_dir /home/app/mava/logs/; "
 
 record:
 	$(DOCKER_RUN)  /bin/bash -c "./startup.sh ; python $(MADDPG_RECORD) --base_dir /home/app/mava/logs/ "

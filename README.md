@@ -57,9 +57,13 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     make run-maddpg
     ```
-
     Or run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
 
+    For viewing results through tensorboard, you can run
+    ```bash
+    make run-tensorboard EXAMPLE=dir/to/example/example.py
+    ```
+    and navigate to `http://127.0.0.1:6006/`.
 
 ### Python virtual environment
 
