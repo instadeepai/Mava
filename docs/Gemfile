@@ -10,5 +10,5 @@ gem "webrick", "~> 1.7"
 # Update for https://github.com/advisories/GHSA-52p9-v744-mwjj
 gem "kramdown", ">= 2.3.1"
 
-# Update for https://github.com/instadeepai/Mava/security/dependabot/docs/Gemfile.lock/rexml/open
+# Update for security issue
 gem "rexml", ">= 3.2.5"

@@ -15,10 +15,10 @@ url    : "" # the base hostname & protocol for your site, e.g. http://example.co
 baseurl: "" # the subpath of your site, e.g. /blog
 
 title      : Mava
-email      : a.pretorius@instadeep.com #this is also the email contact forms will go to
+email      : [...placeholder...] #this is also the email contact forms will go to
 description: "Multi-Agent Reinforcement Learning Environments"
 author     : Your Name
-copyright  : InstaDeep Ltd
+copyright  : [...placeholder...]
 logo:     #optional, defaults to site title
   path: /assets/img/mava_logo_icon.jpg
   height: 100 #height in px, defaults to 52px

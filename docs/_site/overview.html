@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
-  <link rel="icon" href="/favicon.png">
-  <head>
+<link rel="icon" href="/favicon.png">
+
+<head>
 
 
   <meta charset="utf-8">
@@ -19,7 +20,8 @@
   <link href="/assets/css/all.min.css" rel="stylesheet" type="text/css">
   <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet" type="text/css">
   <link href='https://fonts.googleapis.com/css?family=Kaushan+Script' rel='stylesheet' type='text/css'>
-  <link href='https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+  <link href='https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic,700italic' rel='stylesheet'
+    type='text/css'>
   <link href='https://fonts.googleapis.com/css?family=Roboto+Slab:400,100,300,700' rel='stylesheet' type='text/css'>
   <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@900&display=swap" rel="stylesheet">
 
@@ -33,85 +35,100 @@
 </head>
 
 
-  <body id="page-top">
+<body id="page-top">
 
-      <!-- Navigation -->
-<nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="mainNav" style="background-color:#212529">
-  <div class="container">
-    <a class="navbar-brand js-scroll-trigger" href="/#"><img height="100" src="/assets/img/mava.png" /></a>
-    <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse"
-      data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false"
-      aria-label="Toggle navigation">
-      Menu
-      <i class="fas fa-bars"></i>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarResponsive">
-      <ul class="navbar-nav text-uppercase ml-auto"><li class="nav-item"><a class="nav-link js-scroll-trigger" href="/overview">Overview</a></li>
-        <li class="nav-item"><a class="nav-link js-scroll-trigger" href="/envs">Components</a></li>
-        <li class="nav-item"><a class="nav-link js-scroll-trigger" href="https://github.com/arnupretorius/mava">Github</a></li>
+  <!-- Navigation -->
+  <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="mainNav" style="background-color:#212529">
+    <div class="container">
+      <a class="navbar-brand js-scroll-trigger" href="/#"><img height="100" src="/assets/img/mava.png" /></a>
+      <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse"
+        data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false"
+        aria-label="Toggle navigation">
+        Menu
+        <i class="fas fa-bars"></i>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarResponsive">
+        <ul class="navbar-nav text-uppercase ml-auto">
+          <li class="nav-item"><a class="nav-link js-scroll-trigger" href="/overview">Overview</a></li>
+          <li class="nav-item"><a class="nav-link js-scroll-trigger" href="/envs">Components</a></li>
+          <li class="nav-item"><a class="nav-link js-scroll-trigger"
+              href="https://github.com/arnupretorius/mava">Github</a></li>
 
-      </ul>
-    </div>
-  </div>
-</nav>
-<!-- End Navigation -->
-
-
-<header></header>
-
-<section class="page-section">
-  <div class="docnavcontainer">
-    <div class="row environment-bar">
-      <div class="col docnavi">
-        <a href="/architectures"> Architectures</a>
-      </div>
-      <div class="col docnavi">
-        <a href="/modules"> Modules</a>
-      </div>
-      <div class="col docnavi">
-        <a href="/networks"> Networks</a>
-      </div>
-      <div class="col docnavi">
-        <a href="/losses"> Losses</a>
+        </ul>
       </div>
     </div>
-  </div>
-</section>
+  </nav>
+  <!-- End Navigation -->
 
 
-<div class="doccontainer container" id="pagecontainer">
-  <div class="markdown-body">
-    <h1 id="overview">Overview</h1>
+  <header></header>
 
-<h2 id="systems-and-the-executor-trainer-paradigm">Systems and the Executor-Trainer paradigm</h2>
+  <section class="page-section">
+    <div class="docnavcontainer">
+      <div class="row environment-bar">
+        <div class="col docnavi">
+          <a href="/architectures"> Architectures</a>
+        </div>
+        <div class="col docnavi">
+          <a href="/modules"> Modules</a>
+        </div>
+        <div class="col docnavi">
+          <a href="/networks"> Networks</a>
+        </div>
+        <div class="col docnavi">
+          <a href="/losses"> Losses</a>
+        </div>
+      </div>
+    </div>
+  </section>
 
-<p>At the core of the Mava framework is the concept of a <em>system</em>. A system refers to a full multi-agent reinforcement learning algorithm consisting of the following specific components: an <em>Executor</em>, a <em>Trainer</em> and a <em>Dataset</em>.</p>
 
-<p style="text-align:center;">
-<img src="images/mava_system.png" style="max-width:60%;" />
-</p>
+  <div class="doccontainer container" id="pagecontainer">
+    <div class="markdown-body">
+      <h1 id="overview">Overview</h1>
 
-<h3 id="executor">Executor</h3>
+      <h2 id="systems-and-the-executor-trainer-paradigm">Systems and the Executor-Trainer paradigm</h2>
 
-<p>The Executor is the part of the system that interacts with the environment, takes actions for each agent and observes the next state as a collection of observations, one for each agent in the system. Essentially, executors are the multi-agent version of the Actor class in Acme and are themselves constructed through feeding to the executor a dictionary of policy networks.</p>
+      <p>At the core of the Mava framework is the concept of a <em>system</em>. A system refers to a full multi-agent
+        reinforcement learning algorithm consisting of the following specific components: an <em>Executor</em>, a
+        <em>Trainer</em> and a <em>Dataset</em>.</p>
 
-<h3 id="trainer">Trainer</h3>
+      <p style="text-align:center;">
+        <img src="images/mava_system.png" style="max-width:60%;" />
+      </p>
 
-<p>The Trainer is responsible for sampling data from the Dataset originally collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner class in Acme.</p>
+      <h3 id="executor">Executor</h3>
 
-<h3 id="dataset">Dataset</h3>
+      <p>The Executor is the part of the system that interacts with the environment, takes actions for each agent and
+        observes the next state as a collection of observations, one for each agent in the system. Essentially,
+        executors are the multi-agent version of the Actor class in Acme and are themselves constructed through feeding
+        to the executor a dictionary of policy networks.</p>
 
-<p>The Dataset stores all of the information collected by the executors in the form of a collection of dictionaries for the actions, observations and rewards with keys corresponding to the individual agent ids.</p>
+      <h3 id="trainer">Trainer</h3>
 
-<h3 id="distributed-system-training">Distributed system training</h3>
+      <p>The Trainer is responsible for sampling data from the Dataset originally collected from the executor and
+        updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the
+        Learner class in Acme.</p>
 
-<p>Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to run these systems either as a single process, or distributed at scale, using the same underlying multi-agent RL system code. In the latter case, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of the actor networks used within each executor.</p>
+      <h3 id="dataset">Dataset</h3>
 
-<p style="text-align:center;">
-<img src="images/mava_distributed_training.png" style="max-width:60%;" />
-</p>
+      <p>The Dataset stores all of the information collected by the executors in the form of a collection of
+        dictionaries for the actions, observations and rewards with keys corresponding to the individual agent ids.</p>
 
-<!-- Using environments in PettingZoo is very similar to using them in OpenAI's Gym. You initialize an environment via:
+      <h3 id="distributed-system-training">Distributed system training</h3>
+
+      <p>Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability
+        for novel research (i.e. building new systems) as well as making it possible to run these systems either as a
+        single process, or distributed at scale, using the same underlying multi-agent RL system code. In the latter
+        case, the system executor (which is responsible for data collection) is distributed across multiple processes
+        each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the
+        parameters of the actor networks used within each executor.</p>
+
+      <p style="text-align:center;">
+        <img src="images/mava_distributed_training.png" style="max-width:60%;" />
+      </p>
+
+      <!-- Using environments in PettingZoo is very similar to using them in OpenAI's Gym. You initialize an environment via:
 
 ```
 from pettingzoo.butterfly import pistonball_v4
@@ -303,19 +320,19 @@ env.reset()
 save_observation(env, agent=None, all_agents=False, save_dir=os.getcwd())
 ``` -->
 
+    </div>
   </div>
-</div>
 
 
-	    <!-- Footer -->
+  <!-- Footer -->
   <footer class="footer" id="footer" style="background-color:white;">
     <div class="container">
       <div class="row">
         <div class="col-md">
-          <span class="copyright">Copyright &copy; InstaDeep Ltd 2021</span>
+          <span class="copyright">Copyright &copy; [...placeholder...] 2021</span>
         </div>
-		<!-- Social Media -->
-		<!-- Legal -->
+        <!-- Social Media -->
+        <!-- Legal -->
       </div>
     </div>
   </footer>
@@ -324,20 +341,21 @@ save_observation(env, agent=None, all_agents=False, save_dir=os.getcwd())
 
 
 
-	  <!-- Bootstrap core JavaScript -->
-	  <script src="/assets/js/jquery.min.js"></script>
-	  <script src="/assets/js/bootstrap.bundle.min.js"></script>
+  <!-- Bootstrap core JavaScript -->
+  <script src="/assets/js/jquery.min.js"></script>
+  <script src="/assets/js/bootstrap.bundle.min.js"></script>
 
-	  <!-- Plugin JavaScript -->
-	  <script src="/assets/js/jquery.easing.min.js"></script>
+  <!-- Plugin JavaScript -->
+  <script src="/assets/js/jquery.easing.min.js"></script>
 
-	  <!-- Contact form JavaScript -->
-	  <script src="/assets/js/jqBootstrapValidation.js"></script>
-	  <script src="/assets/js/contact_me.js"></script>
+  <!-- Contact form JavaScript -->
+  <script src="/assets/js/jqBootstrapValidation.js"></script>
+  <script src="/assets/js/contact_me.js"></script>
 
-	  <!-- Custom scripts for this template -->
-	  <script src="/assets/js/agency.min.js"></script>
-	  <script src="/assets/js/app.js"></script>
+  <!-- Custom scripts for this template -->
+  <script src="/assets/js/agency.min.js"></script>
+  <script src="/assets/js/app.js"></script>
 
-  </body>
+</body>
+
 </html>
