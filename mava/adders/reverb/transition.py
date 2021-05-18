@@ -84,7 +84,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         n_step: int,
         discount: float,
         priority_fns: Optional[base.PriorityFnMapping] = None,
-        use_next_extras: bool = True,
     ) -> None:
         """Creates an N-step transition adder.
         Args:
@@ -112,7 +111,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             buffer_size=n_step,
             max_sequence_length=1,
             priority_fns=priority_fns,
-            use_next_extras=use_next_extras,
+            use_next_extras=True,
         )
 
     def _write(self) -> None:

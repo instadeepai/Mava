@@ -246,8 +246,7 @@ class QMIXTrainer(mava.Trainer):
         # e_t = [Optional] = extra data that the agents persist in replay.
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
 
-        # Global state (for hypernetwork) one-hot encoded
-
+        # Global state (for hypernetwork)
         # One-hot if discrete states
         # s_tm1 = tf.one_hot(e_tm1["s_t"], depth=3)  # TODO Get depth from state specs
         # s_t = tf.one_hot(e_t["s_t"], depth=3)
@@ -255,7 +254,6 @@ class QMIXTrainer(mava.Trainer):
         # Don't one-hot for continuous states
         s_tm1 = e_tm1["s_t"]
         s_t = e_t["s_t"]
-        print(s_t)
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:

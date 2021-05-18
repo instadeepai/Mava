@@ -15,7 +15,7 @@
 class LinearExplorationScheduler:
     def __init__(self, epsilon_min: float = 0.05, epsilon_decay: float = 1e-4):
         """
-        Decays epsilon linearly to zero.
+        Decays epsilon linearly to epsilon_min.
         """
         self._epsilon_min = epsilon_min
         self._epsilon_decay = epsilon_decay
@@ -37,14 +37,16 @@ class LinearExplorationScheduler:
 
 
 class ExponentialExplorationScheduler(LinearExplorationScheduler):
-    def __init__(
-        self, logdir: str, epsilon_min: float = 0.05, epsilon_decay: float = 1e-4
-    ):
+    def __init__(self, epsilon_min: float = 0.05, epsilon_decay: float = 1e-4):
         """
-        Decays epsilon exponentially to zero.
+        Decays epsilon exponentially to epsilon_min.
         """
-        super().__init__(epsilon_min=epsilon_min, epsilon_decay=epsilon_decay)
+        super(ExponentialExplorationScheduler, self).__init__(
+            epsilon_min,
+            epsilon_decay,
+        )
 
-    # TODO (Claude) implement exponential decay.
     def decrement_epsilon(self) -> None:
-        raise NotImplementedError
+        if self._epsilon <= self._epsilon_min:
+            return
+        self._epsilon *= 1 - self._epsilon_decay
