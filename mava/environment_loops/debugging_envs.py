@@ -49,7 +49,6 @@ def get_good_simple_spread_action(
 
 
 def test_loop(environment: DebuggingEnvWrapper) -> None:
-    environment.render = True
     while True:
         timestep = environment.reset()
         obs_n = timestep.observation
