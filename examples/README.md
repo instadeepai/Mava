@@ -17,6 +17,8 @@ We include a number of systems running on continuous control tasks.
     an MA-D4PG system on the continuous action space simple_spread MPE debugging environment.
 -   [MA-DDPG (decentralised, recurrent)](debugging_envs/run_recurrent_maddpg.py):
     an MA-DDPG system (with recurrence) on the continuous action space simple_spread MPE debugging environment.
+-   [MA-D4PG (decentralised, recurrent)](debugging_envs/run_recurrent_mad4pg.py):
+    an MA-D4PG system (with recurrence) on the continuous action space simple_spread MPE debugging environment.
 -  [PPO (centralised, feedforward)](petting_zoo/run_centralised_feedforward_mappo.py):
     a PPO system using a centralised critic on the continuous action space multiwalker_v7 PettingZoo environment.
 -  [MA-DDPG (decentralised, feedforward)](petting_zoo/run_feedforward_maddpg.py):

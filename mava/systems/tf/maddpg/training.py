@@ -1129,15 +1129,15 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 critic_loss = tf.reduce_mean(critic_loss, axis=0)
                 critic_losses[agent] = critic_loss
 
-        self.policy_losses = policy_losses
-        self.critic_losses = critic_losses
+        self.policy_losses: Dict[str, tf.Tensor] = policy_losses
+        self.critic_losses: Dict[str, tf.Tensor] = critic_losses
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
     def _backward(self) -> None:
         # Calculate the gradients and update the networks
-        policy_losses = self.policy_losses
-        critic_losses = self.critic_losses
+        policy_losses: Dict[str, tf.Tensor] = self.policy_losses
+        critic_losses: Dict[str, tf.Tensor] = self.critic_losses
         tape = self.tape
 
         # Calculate the gradients and update the networks
