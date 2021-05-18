@@ -173,18 +173,10 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             observations = self._create_observations(observations, infos, dones)
 
         if self.env_done():
-            # step_type = self._step_type
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
         else:
-            # step_type = dm_env.StepType.MID
             self._step_type = dm_env.StepType.MID
-
-        # if step_type == dm_env.StepType.LAST:
-        #     self._reset_next_step = True
-        #     rewards = {
-        #         agent: np.dtype("float32").type(0) for agent, _ in rewards.items()
-        #     }
 
         return dm_env.TimeStep(
             observation=observations,

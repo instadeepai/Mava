@@ -115,6 +115,15 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
    pip install .[envs]
    ```
 
+   NB: For flatland installation, It has to be installed separately using:
+   ```bash
+   pip install id-mava[flatland]
+   ```
+   or from source
+   ```bash
+   pip install .[flatland]
+   ```
+
 We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functionality such as the use of Atari environments, environment wrappers, gpu support and agent episode recording.
 
 ## Contributing
