@@ -10,7 +10,7 @@ endif
 # Set flag for docker run command
 BASE_FLAGS=-it --rm  -v $(PWD):/home/app/mava -w /home/app/mava
 RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
-IMAGE=instadeepct/mava:latest
+IMAGE=mava:latest
 DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 
 # Set example to run when using `make run`

@@ -164,7 +164,6 @@ Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
 [Quickstart]: examples/quickstart.ipynb
 [Documentation]: www.mava.rl
 [Paper]: https://arxiv.org
-[Blog post]: https://instadeep.com
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [openspiel]: https://github.com/deepmind/open_spiel
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
