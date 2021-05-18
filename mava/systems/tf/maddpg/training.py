@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -113,14 +113,18 @@ class BaseMADDPGTrainer(mava.Trainer):
 
         # Other learner parameters.
         self._discount = discount
-        self._clipping = clipping
+
+        # Set up gradient clipping.
+        if max_gradient_norm is not None:
+            self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        else:  # A very large number. Infinity results in NaNs.
+            self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
         self._num_steps = tf.Variable(0, dtype=tf.int32)
         self._target_update_period = target_update_period
 
         # Create an iterator to go through the dataset.
-        # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         self._critic_optimizer = critic_optimizer
@@ -258,10 +262,6 @@ class BaseMADDPGTrainer(mava.Trainer):
             actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
 
-    # NOTE (Arnu): the decorator below was causing this _step() function not
-    # to be called by the step() function below. Removing it makes the code
-    # work. The docs on tf.function says it is useful for speed improvements
-    # but as far as I can see, we can go ahead without it. At least for now.
     @tf.function
     def _step(
         self,
@@ -348,14 +348,15 @@ class BaseMADDPGTrainer(mava.Trainer):
                 dpg_q_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
-                dqda_clipping = 1.0 if self._clipping else None
+                dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
+                clip_norm = True if self._max_gradient_norm is not None else False
 
                 policy_loss = losses.dpg(
                     dpg_q_t,
                     dpg_a_t,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
-                    clip_norm=self._clipping,
+                    clip_norm=clip_norm,
                 )
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
         self.tape = tape
@@ -389,9 +390,12 @@ class BaseMADDPGTrainer(mava.Trainer):
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
             # Maybe clip gradients.
-            if self._clipping:
-                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
-                critic_gradients = tf.clip_by_global_norm(critic_gradients, 40.0)[0]
+            policy_gradients = tf.clip_by_global_norm(
+                policy_gradients, self._max_gradient_norm
+            )[0]
+            critic_gradients = tf.clip_by_global_norm(
+                critic_gradients, self._max_gradient_norm
+            )[0]
 
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
@@ -454,7 +458,7 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -498,7 +502,7 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -528,7 +532,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -572,7 +576,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -634,7 +638,7 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -678,7 +682,7 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -769,29 +773,27 @@ class BaseRecurrentMADDPGTrainer(BaseMADDPGTrainer):
           checkpoint: boolean indicating whether to checkpoint the learner.
         """
 
-        super() __init__(
-                self,
-                agents: List[str],
-                agent_types: List[str],
-                policy_networks: Dict[str, snt.Module],
-                critic_networks: Dict[str, snt.Module],
-                target_policy_networks: Dict[str, snt.Module],
-                target_critic_networks: Dict[str, snt.Module],
-                policy_optimizer: snt.Optimizer,
-                critic_optimizer: snt.Optimizer,
-                discount: float,
-                target_update_period: int,
-                dataset: tf.data.Dataset,
-                observation_networks: Dict[str, snt.Module],
-                target_observation_networks: Dict[str, snt.Module],
-                shared_weights: bool = False,
-                max_gradient_norm: float = None,
-                counter: counting.Counter = None,
-                logger: loggers.Logger = None,
-                checkpoint: bool = True,
-                checkpoint_subpath: str = "~/mava/",
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            target_policy_networks=target_policy_networks,
+            target_critic_networks=target_critic_networks,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            discount=discount,
+            target_update_period=target_update_period,
+            dataset=dataset,
+            observation_networks=observation_networks,
+            target_observation_networks=target_observation_networks,
+            shared_weights=shared_weights,
+            max_gradient_norm=max_gradient_norm,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
         )
-
 
     def _combine_dim(self, tensor: tf.Tensor) -> tf.Tensor:
         dims = tensor.shape[:2]
@@ -881,29 +883,6 @@ class BaseRecurrentMADDPGTrainer(BaseMADDPGTrainer):
             )
             actions[agent] = tf2_utils.batch_to_sequence(outputs)
         return actions
-
-    # NOTE (Arnu): the decorator below was causing this _step() function not
-    # to be called by the step() function below. Removing it makes the code
-    # work. The docs on tf.function says it is useful for speed improvements
-    # but as far as I can see, we can go ahead without it. At least for now.
-    @tf.function
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-        # Update the target networks
-        self._update_target_networks()
-
-        # Draw a batch of data from replay.
-        sample: reverb.ReplaySample = next(self._iterator)
-
-        self._forward(sample)
-
-        self._backward()
-
-        # Log losses per agent
-        return train_utils.map_losses_per_agent_ac(
-            self.critic_losses, self.policy_losses
-        )
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
@@ -1030,93 +1009,18 @@ class BaseRecurrentMADDPGTrainer(BaseMADDPGTrainer):
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
                 # dpg_q_values = tf.squeeze(dpg_q_values, axis=-1)  # [B]
 
-                dqda_clipping = 1.0 if self._clipping else None
+                dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
+                clip_norm = True if self._max_gradient_norm is not None else False
 
                 policy_loss = losses.dpg(
                     dpg_q_values,
                     act_comb,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
-                    clip_norm=self._clipping,
+                    clip_norm=clip_norm,
                 )
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
         self.tape = tape
-
-    # Backward pass that calculates gradients and updates network.
-    def _backward(self) -> None:
-        # Calculate the gradients and update the networks
-        policy_losses: Dict[str, tf.Tensor] = self.policy_losses
-        critic_losses: Dict[str, tf.Tensor] = self.critic_losses
-        tape = self.tape
-
-        # Calculate the gradients and update the networks
-        for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
-
-            # Get trainable variables.
-            policy_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._policy_networks[agent_key].trainable_variables
-            )
-            critic_variables = (
-                # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_networks[agent_key].trainable_variables
-            )
-
-            # Compute gradients.
-            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
-            #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context." caused by losses.dpg, which calls
-            #  tape.gradient.
-            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
-            critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
-
-            # Maybe clip gradients.
-            if self._clipping:
-                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
-                critic_gradients = tf.clip_by_global_norm(critic_gradients, 40.0)[0]
-
-            # Apply gradients.
-            self._policy_optimizer.apply(policy_gradients, policy_variables)
-            self._critic_optimizer.apply(critic_gradients, critic_variables)
-
-        train_utils.safe_del(self, "tape")
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        # Compute elapsed time.
-        timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        # Checkpoint the networks.
-        if self._checkpoint:
-            if len(self._system_checkpointer.keys()) > 0:
-                for agent_key in self.unique_net_keys:
-                    checkpointer = self._system_checkpointer[agent_key]
-                    checkpointer.save()
-
-        self._logger.write(fetches)
-
-    def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
-        variables: Dict[str, Dict[str, np.ndarray]] = {}
-        for network_type in names:
-            variables[network_type] = {}
-            for agent in self.unique_net_keys:
-                variables[network_type][agent] = tf2_utils.to_numpy(
-                    self._system_network_variables[network_type][agent]
-                )
-        return variables
 
 
 class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
@@ -1141,7 +1045,7 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         policy_optimizer: snt.Optimizer,
         critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -1185,7 +1089,7 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -1215,7 +1119,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -1258,7 +1162,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -1322,7 +1226,7 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -1365,7 +1269,7 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,

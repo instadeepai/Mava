@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,8 +68,6 @@ def make_networks(
 ) -> Dict[str, snt.Module]:
 
     """Creates networks used by the agents."""
-
-    # TODO handle observation networks.
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()

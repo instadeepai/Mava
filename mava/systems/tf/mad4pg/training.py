@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 
 
 """MAD4PG trainer implementation."""
-
 from typing import Any, Dict, List
 
 import sonnet as snt
@@ -59,7 +58,7 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -95,15 +94,15 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             discount=discount,
             target_update_period=target_update_period,
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             shared_weights=shared_weights,
-            policy_optimizer=policy_optimizer,
-            critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -130,7 +129,7 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
         self.critic_losses = {}
         with tf.GradientTape(persistent=True) as tape:
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-            a_t = self._target_policy_actions(o_t_trans)
+            a_t = self._policy_actions(o_t_trans)
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
@@ -170,20 +169,21 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
                 dpg_q_t = dpg_z_t.mean()
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
-                dqda_clipping = 1.0 if self._clipping else None
+                dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
+                clip_norm = True if self._max_gradient_norm is not None else False
 
                 policy_loss = losses.dpg(
                     dpg_q_t,
                     dpg_a_t,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
-                    clip_norm=self._clipping,
+                    clip_norm=clip_norm,
                 )
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
         self.tape = tape
 
 
-class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
+class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -205,7 +205,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -249,7 +249,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -257,7 +257,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
         )
 
 
-class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
+class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -271,16 +271,15 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         discount: float,
         target_update_period: int,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
+        policy_optimizer: snt.Optimizer = None,
+        critic_optimizer: snt.Optimizer = None,
         max_gradient_norm: float = None,
-        clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -354,7 +353,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -398,7 +397,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -428,7 +427,7 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -472,7 +471,7 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -629,7 +628,7 @@ class DecentralisedRecurrentMAD4PGTrainer(
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -673,7 +672,7 @@ class DecentralisedRecurrentMAD4PGTrainer(
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -705,7 +704,7 @@ class CentralisedRecurrentMAD4PGTrainer(
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -749,7 +748,7 @@ class CentralisedRecurrentMAD4PGTrainer(
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -781,7 +780,7 @@ class StateBasedRecurrentMAD4PGTrainer(
         shared_weights: bool = False,
         policy_optimizer: snt.Optimizer = None,
         critic_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -825,7 +824,7 @@ class StateBasedRecurrentMAD4PGTrainer(
             shared_weights=shared_weights,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,

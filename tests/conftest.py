@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,12 +22,17 @@ import dm_env
 import numpy as np
 import numpy.testing as npt
 import pytest
+from flatland.envs.observations import TreeObsForRailEnv
+from flatland.envs.rail_generators import sparse_rail_generator
+from flatland.envs.schedule_generators import sparse_schedule_generator
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
 from mava.types import Observation, Reward
+from mava.utils.environments.flatland_utils import load_flatland_env
 from mava.utils.wrapper_utils import convert_np_type
+from mava.wrappers.flatland import FlatlandEnvWrapper
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
@@ -39,6 +44,25 @@ from tests.mocks import (
     SequentialMAContinuousEnvironment,
     SequentialMADiscreteEnvironment,
 )
+
+# flatland environment config
+rail_gen_cfg: Dict = {
+    "max_num_cities": 4,
+    "max_rails_between_cities": 2,
+    "max_rails_in_city": 3,
+    "grid_mode": True,
+    "seed": 42,
+}
+
+flatland_env_config: Dict = {
+    "number_of_agents": 2,
+    "width": 25,
+    "height": 25,
+    "rail_generator": sparse_rail_generator(**rail_gen_cfg),
+    "schedule_generator": sparse_schedule_generator(),
+    "obs_builder_object": TreeObsForRailEnv(max_depth=2),
+}
+
 
 """
 Helpers contains re-usable test functions.
@@ -63,6 +87,8 @@ class Helpers:
                 env = mod.parallel_env()  # type: ignore
             elif env_spec.env_type == EnvType.Sequential:
                 env = mod.env()  # type: ignore
+        elif env_spec.env_source == EnvSource.Flatland:
+            env = load_flatland_env(flatland_env_config)
         else:
             raise Exception("Env_spec is not valid.")
         env.reset()  # type: ignore
@@ -73,12 +99,14 @@ class Helpers:
     def get_wrapper_function(
         env_spec: EnvSpec,
     ) -> dm_env.Environment:
-        wrapper = None
+        wrapper: dm_env.Environment = None
         if env_spec.env_source == EnvSource.PettingZoo:
             if env_spec.env_type == EnvType.Parallel:
                 wrapper = PettingZooParallelEnvWrapper
             elif env_spec.env_type == EnvType.Sequential:
                 wrapper = PettingZooAECEnvWrapper
+        elif env_spec.env_source == EnvSource.Flatland:
+            wrapper = FlatlandEnvWrapper
         else:
             raise Exception("Env_spec is not valid.")
         return wrapper

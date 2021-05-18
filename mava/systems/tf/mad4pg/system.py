@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
-from typing import Callable, Dict, Type, Union
+from typing import Callable, Dict, Type
 
 import dm_env
 import sonnet as snt
@@ -45,9 +45,8 @@ class MAD4PG(MADDPG):
         architecture: Type[
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
-        trainer_fn: Union[
-            Type[training.BaseMAD4PGTrainer],
-            Type[training.BaseRecurrentMAD4PGTrainer],
+        trainer_fn: Type[
+            training.BaseMAD4PGTrainer
         ] = training.DecentralisedMAD4PGTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         num_executors: int = 1,
@@ -68,7 +67,7 @@ class MAD4PG(MADDPG):
         sequence_length: int = 20,
         period: int = 20,
         sigma: float = 0.3,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -103,7 +102,7 @@ class MAD4PG(MADDPG):
             period: Overlapping period of sequences used in recurrent
             training (if using recurrence).
             sigma: standard deviation of zero-mean, Gaussian exploration noise.
-            clipping: whether to clip gradients by global norm.
+            max_gradient_norm:
             logger: logger object to be used by trainers.
             counter: counter object used to keep track of steps.
             checkpoint: boolean indicating whether to checkpoint the trainers.
@@ -114,7 +113,6 @@ class MAD4PG(MADDPG):
             eval_logger: logger for evaluator.
             train_loop_fn: loop for training.
             eval_loop_fn: loop for evaluation.
-
         """
         super().__init__(
             environment_factory=environment_factory,
@@ -140,7 +138,7 @@ class MAD4PG(MADDPG):
             sequence_length=sequence_length,
             period=period,
             sigma=sigma,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             max_executor_steps=max_executor_steps,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,

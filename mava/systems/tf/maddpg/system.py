@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ class MADDPG:
         sequence_length: int = 20,
         period: int = 20,
         sigma: float = 0.3,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -170,7 +170,7 @@ class MADDPG:
                 sequence_length=sequence_length,
                 period=period,
                 sigma=sigma,
-                clipping=clipping,
+                max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
                 critic_optimizer=critic_optimizer,

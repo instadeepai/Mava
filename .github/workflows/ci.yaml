@@ -27,6 +27,7 @@ jobs:
           export LANG=en_US.UTF-8
           pip install --upgrade pip setuptools
           pip install .
+          pip install .[flatland]
           pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
           # For atari envs
           sudo apt-get update

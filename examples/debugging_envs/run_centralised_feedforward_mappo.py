@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -197,6 +197,7 @@ def main(_: Any) -> None:
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
         architecture=CentralisedValueCritic,
         trainer_fn=mappo.CentralisedMAPPOTrainer,
+        max_gradient_norm=40,
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,
