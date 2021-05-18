@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ from mava.systems.tf.madqn import execution, training
 from mava.utils import training_utils as train_utils
 from mava.wrappers import DetailedTrainerStatistics
 
-# TODO (CLAUDE) I had to make a custom class here that
+# TODO (Claude) I had to make a custom class here that
 # inherits DetailedTrainerStatistics
 # to expose the get_epsilon() function. For some
 # reason lp does not bind it otherwise.
@@ -307,12 +307,6 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        # TODO (CLAUDE) if I add this wrapper then epsilon doesnt get logged.
-        # Without the wrapper, q-losses dont get logged.
-        # Not sure how to fix this.
-
-        # NOTE (Claude) use my custom statistics
-        # wrapper to expose get_epsilon() for lp.
         trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type: ignore
 
         return trainer

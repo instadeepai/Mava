@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -120,7 +120,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         self._target_update_period = target_update_period
 
         # Create an iterator to go through the dataset.
-        # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         self._critic_optimizer = critic_optimizer
@@ -258,10 +257,6 @@ class BaseMADDPGTrainer(mava.Trainer):
             actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
 
-    # NOTE (Arnu): the decorator below was causing this _step() function not
-    # to be called by the step() function below. Removing it makes the code
-    # work. The docs on tf.function says it is useful for speed improvements
-    # but as far as I can see, we can go ahead without it. At least for now.
     @tf.function
     def _step(
         self,
@@ -808,7 +803,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         self._target_update_period = target_update_period
 
         # Create an iterator to go through the dataset.
-        # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         self._critic_optimizer = critic_optimizer
@@ -974,10 +968,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             actions[agent] = tf2_utils.batch_to_sequence(outputs)
         return actions
 
-    # NOTE (Arnu): the decorator below was causing this _step() function not
-    # to be called by the step() function below. Removing it makes the code
-    # work. The docs on tf.function says it is useful for speed improvements
-    # but as far as I can see, we can go ahead without it. At least for now.
     @tf.function
     def _step(
         self,

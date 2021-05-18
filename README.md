@@ -57,9 +57,13 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     make run-maddpg
     ```
-
     Or run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
 
+    For viewing results through tensorboard, you can run
+    ```bash
+    make run-tensorboard EXAMPLE=dir/to/example/example.py
+    ```
+    and navigate to `http://127.0.0.1:6006/`.
 
 ### Python virtual environment
 
@@ -111,45 +115,8 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
    pip install .[envs]
    ```
 
-5. **Optional**: To install ROM files for Atari-Py using AutoROM (https://github.com/PettingZoo-Team/AutoROM).
-   ```
-   pip install autorom && AutoROM
-   ```
-   Then follow the on-screen instructions.
+We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functionality such as the use of Atari environments, environment wrappers, gpu support and agent episode recording.
 
-   You might also need to download unrar:
-   ```
-   sudo apt-get install unrar
-   ```
-
-
-6. **Optional**: To install opencv for [Supersuit](https://github.com/PettingZoo-Team/SuperSuit) environment wrappers.
-    ```
-    sudo apt-get update
-    sudo apt-get install ffmpeg libsm6 libxext6  -y
-    ```
-
-7. **Optional**: To install [CUDA toolkit](https://docs.nvidia.com/cuda/) for NVIDIA GPU support, download [here](https://anaconda.org/anaconda/cudatoolkit). Alternatively, for anaconda users:
-
-    ```bash
-    conda install -c anaconda cudatoolkit
-    ```
-
-8. **Optional**: To log episodes in video/gif format, using the `Monitor` wrapper.
-- Install `xvfb` to run a headless/fake screen and `ffmpeg` to record video.
-    ```
-    sudo apt-get install -y xvfb ffmpeg
-    ```
-
-- Setup fake display:
-    ```
-    xvfb-run -s "-screen 0 1400x900x24" bash
-    ```
-
-- Install `array2gif`, if you would like to save the episode in gif format.
-    ```
-    pip install .[record_episode]
-    ```
 ## Contributing
 
 Please read our [contributing docs](./CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
@@ -164,7 +131,6 @@ Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
 [Quickstart]: examples/quickstart.ipynb
 [Documentation]: www.mava.rl
 [Paper]: https://arxiv.org
-[Blog post]: https://instadeep.com
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [openspiel]: https://github.com/deepmind/open_spiel
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland

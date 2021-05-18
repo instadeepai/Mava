@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ def make_environment(
         """Creates a MPE environment."""
         env_module = make_debugging_env(env_name, action_space, num_agents)
         environment = DebuggingEnvWrapper(
-            env_module, render=render, return_state_info=return_state_info
+            env_module, return_state_info=return_state_info
         )
 
         if random_seed and hasattr(environment, "seed"):
