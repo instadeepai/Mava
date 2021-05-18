@@ -40,7 +40,7 @@
   <!-- Navigation -->
   <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="mainNav" style="background-color:#212529">
     <div class="container">
-      <a class="navbar-brand js-scroll-trigger" href="/#"><img height="100" src="/assets/img/mava.png" /></a>
+      <a class="navbar-brand js-scroll-trigger" href="/#"><img height="100" src="/assets/img/mava_logo_icon.jpg" /></a>
       <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse"
         data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false"
         aria-label="Toggle navigation">
@@ -52,51 +52,69 @@
           <li class="nav-item"><a class="nav-link js-scroll-trigger" href="/overview">Overview</a></li>
           <li class="nav-item"><a class="nav-link js-scroll-trigger" href="/envs">Components</a></li>
           <li class="nav-item"><a class="nav-link js-scroll-trigger"
-              href="https://github.com/arnupretorius/mava">Github</a></li>
+              href="https://github.com/instadeepai/Mava">Github</a></li>
 
-        </ul>
-      </div>
-    </div>
-  </nav>
-  <!-- End Navigation -->
+          <!-- Navigation -->
+          <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="mainNav" style="background-color:#212529">
+            <div class="container">
+              <a class="navbar-brand js-scroll-trigger" href="/#"><img height="100" src="/assets/img/mava.png" /></a>
+              <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse"
+                data-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false"
+                aria-label="Toggle navigation">
+                Menu
+                <i class="fas fa-bars"></i>
+              </button>
+              <div class="collapse navbar-collapse" id="navbarResponsive">
+                <ul class="navbar-nav text-uppercase ml-auto">
+                  <li class="nav-item"><a class="nav-link js-scroll-trigger" href="/overview">Overview</a></li>
+                  <li class="nav-item"><a class="nav-link js-scroll-trigger" href="/envs">Components</a></li>
+                  <li class="nav-item"><a class="nav-link js-scroll-trigger"
+                      href="https://github.com/arnupretorius/mava">Github</a></li>
 
-
-  <header></header>
-
-  <section class="page-section">
-    <div class="docnavcontainer">
-      <div class="row environment-bar">
-        <div class="col docnavi">
-          <a href="/architectures"> Architectures</a>
-        </div>
-        <div class="col docnavi">
-          <a href="/modules"> Modules</a>
-        </div>
-        <div class="col docnavi">
-          <a href="/networks"> Networks</a>
-        </div>
-        <div class="col docnavi">
-          <a href="/losses"> Losses</a>
-        </div>
-      </div>
-    </div>
-  </section>
+                </ul>
+              </div>
+            </div>
+          </nav>
+          <!-- End Navigation -->
 
 
-  <div class="doccontainer container" id="pagecontainer">
-    <div class="markdown-body">
-      <h1 id="developer-documentation">Developer Documentation</h1>
+          <header></header>
 
-      <p>This documentation overviews creating new environments and relevant useful wrappers, utilities and tests
-        included in PettingZoo designed for the creation of new environments.</p>
+          <section class="page-section">
+            <div class="docnavcontainer">
+              <div class="row environment-bar">
+                <div class="col docnavi">
+                  <a href="/architectures"> Architectures</a>
+                </div>
+                <div class="col docnavi">
+                  <a href="/modules"> Modules</a>
+                </div>
+                <div class="col docnavi">
+                  <a href="/networks"> Networks</a>
+                </div>
+                <div class="col docnavi">
+                  <a href="/losses"> Losses</a>
+                </div>
+              </div>
+            </div>
+          </section>
 
-      <h2 id="example-custom-environment">Example Custom Environment</h2>
 
-      <p>This is a carefully commented version of the PettingZoo rock paper scissors environment.</p>
+          <div class="doccontainer container" id="pagecontainer">
+            <div class="markdown-body">
+              <h1 id="developer-documentation">Developer Documentation</h1>
 
-      <div class="language-python highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code><span class="kn">from</span> <span class="nn">gym.spaces</span> <span class="kn">import</span> <span class="n">Discrete</span>
+              <p>This documentation overviews creating new environments and relevant useful wrappers, utilities and
+                tests
+                included in PettingZoo designed for the creation of new environments.</p>
+
+              <h2 id="example-custom-environment">Example Custom Environment</h2>
+
+              <p>This is a carefully commented version of the PettingZoo rock paper scissors environment.</p>
+
+              <div class="language-python highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code><span class="kn">from</span> <span class="nn">gym.spaces</span> <span class="kn">import</span> <span class="n">Discrete</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="n">np</span>
 <span class="kn">from</span> <span class="nn">pettingzoo</span> <span class="kn">import</span> <span class="n">AECEnv</span>
 <span class="kn">from</span> <span class="nn">pettingzoo.utils</span> <span class="kn">import</span> <span class="n">agent_selector</span>
@@ -278,14 +296,14 @@
         <span class="c1"># Adds .rewards to ._cumulative_rewards
 </span>        <span class="bp">self</span><span class="p">.</span><span class="n">_accumulate_rewards</span><span class="p">()</span>
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h2 id="example-custom-parallel-environment">Example Custom Parallel Environment</h2>
+              <h2 id="example-custom-parallel-environment">Example Custom Parallel Environment</h2>
 
-      <div class="language-python highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code><span class="kn">from</span> <span class="nn">gym.spaces</span> <span class="kn">import</span> <span class="n">Discrete</span>
+              <div class="language-python highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code><span class="kn">from</span> <span class="nn">gym.spaces</span> <span class="kn">import</span> <span class="n">Discrete</span>
 <span class="kn">from</span> <span class="nn">pettingzoo</span> <span class="kn">import</span> <span class="n">ParallelEnv</span>
 <span class="kn">from</span> <span class="nn">pettingzoo.utils</span> <span class="kn">import</span> <span class="n">wrappers</span>
 <span class="kn">from</span> <span class="nn">pettingzoo.utils</span> <span class="kn">import</span> <span class="n">from_parallel</span>
@@ -428,118 +446,141 @@
 
         <span class="k">return</span> <span class="n">observations</span><span class="p">,</span> <span class="n">rewards</span><span class="p">,</span> <span class="n">dones</span><span class="p">,</span> <span class="n">infos</span>
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h2 id="wrappers">Wrappers</h2>
+              <h2 id="wrappers">Wrappers</h2>
 
-      <p>A wrapper is an environment transformation that takes in an environment as input, and outputs a new environment
-        that is similar to the input environment, but with some transformation or validation applied.</p>
+              <p>A wrapper is an environment transformation that takes in an environment as input, and outputs a new
+                environment
+                that is similar to the input environment, but with some transformation or validation applied.</p>
 
-      <h3 id="conversion-wrappers">Conversion wrappers</h3>
+              <h3 id="conversion-wrappers">Conversion wrappers</h3>
 
-      <p>As we provide both the AEC API and the Parallel API, we also provide wrappers to convert environments back and
-        forth between the two APIs.</p>
+              <p>As we provide both the AEC API and the Parallel API, we also provide wrappers to convert environments
+                back and
+                forth between the two APIs.</p>
 
-      <h4 id="aec-to-parallel">AEC to Parallel</h4>
+              <h4 id="aec-to-parallel">AEC to Parallel</h4>
 
-      <p>An environment can be converted from an AEC environment to a parallel environment with the <code
-          class="language-plaintext highlighter-rouge">to_parallel</code> wrapper shown below. Note that this wrapper
-        makes the following assumptions about the underlying environment:</p>
+              <p>An environment can be converted from an AEC environment to a parallel environment with the <code
+                  class="language-plaintext highlighter-rouge">to_parallel</code> wrapper shown below. Note that this
+                wrapper
+                makes the following assumptions about the underlying environment:</p>
 
-      <ol>
-        <li>The environment steps in a cycle, i.e. it steps through every live agent in order.</li>
-        <li>The environment does not update the observations of the agents except at the end of a cycle.</li>
-      </ol>
+              <ol>
+                <li>The environment steps in a cycle, i.e. it steps through every live agent in order.</li>
+                <li>The environment does not update the observations of the agents except at the end of a cycle.</li>
+              </ol>
 
-      <p>Most parallel environments in PettingZoo only allocate rewards at the end of a cycle. In these environments,
-        the reward scheme of the AEC API an the parallel API is equivalent. If an AEC environment does allocate rewards
-        within a cycle, then the rewards will be allocated at different timesteps in the AEC environment an the Parallel
-        environment. In particular, the AEC environment will allocate all rewards from one time the agent steps to the
-        next time, while the Parallel environment will allocate all rewards from when the first agent stepped to the
-        last agent stepped.</p>
+              <p>Most parallel environments in PettingZoo only allocate rewards at the end of a cycle. In these
+                environments,
+                the reward scheme of the AEC API an the parallel API is equivalent. If an AEC environment does allocate
+                rewards
+                within a cycle, then the rewards will be allocated at different timesteps in the AEC environment an the
+                Parallel
+                environment. In particular, the AEC environment will allocate all rewards from one time the agent steps
+                to the
+                next time, while the Parallel environment will allocate all rewards from when the first agent stepped to
+                the
+                last agent stepped.</p>
 
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.utils import to_parallel
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.utils import to_parallel
 from pettingzoo.butterfly import pistonball_v4
 env = pistonball_v4.env()
 env = to_parallel(env)
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h4 id="parallel-to-aec">Parallel to AEC</h4>
+              <h4 id="parallel-to-aec">Parallel to AEC</h4>
 
-      <p>Any parallel environment can be efficiently converted to an AEC environment with the <code
-          class="language-plaintext highlighter-rouge">from_parallel</code> wrapper.</p>
+              <p>Any parallel environment can be efficiently converted to an AEC environment with the <code
+                  class="language-plaintext highlighter-rouge">from_parallel</code> wrapper.</p>
 
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.utils import from_parallel
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.utils import from_parallel
 from pettingzoo.butterfly import pistonball_v4
 env = pistonball_v4.parallel_env()
 env = from_parallel(env)
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h3 id="utility-wrappers">Utility Wrappers</h3>
+              <h3 id="utility-wrappers">Utility Wrappers</h3>
 
-      <p>We wanted our pettingzoo environments to be both easy to use and easy to implement. To combine these, we have a
-        set of simple wrappers which provide input validation and other convenient reusable logic.</p>
+              <p>We wanted our pettingzoo environments to be both easy to use and easy to implement. To combine these,
+                we have a
+                set of simple wrappers which provide input validation and other convenient reusable logic.</p>
 
-      <ul>
-        <li><code class="language-plaintext highlighter-rouge">BaseWrapper</code>: All AECEnv wrappers should inherit
-          from this base class</li>
-        <li><code class="language-plaintext highlighter-rouge">TerminateIllegalWrapper</code>: Handles illegal move
-          logic for classic games</li>
-        <li><code class="language-plaintext highlighter-rouge">CaptureStdoutWrapper</code>: Takes an environment which
-          prints to terminal, and gives it an <code class="language-plaintext highlighter-rouge">ansi</code> render mode
-          where it captures the terminal output and returns it as a string instead.</li>
-        <li><code class="language-plaintext highlighter-rouge">AssertOutOfBoundsWrapper</code>: Asserts if the action
-          given to step is outside of the action space. Applied in PettingZoo environments with discrete action spaces.
-        </li>
-        <li><code class="language-plaintext highlighter-rouge">ClipOutOfBoundsWrapper</code>: Clips the input action to
-          fit in the continuous action space (emitting a warning if it does so). Applied to continuous environments in
-          pettingzoo.</li>
-        <li><code class="language-plaintext highlighter-rouge">OrderEnforcingWrapper</code>: Gives a sensible error
-          message if function calls or attribute access are in a disallowed order, for example if step() is called
-          before reset(), or the .dones attribute is accessed before reset(), or if seed() is called and then step() is
-          used before reset() is called again (reset must be called after seed()). Applied to all PettingZoo
-          environments.</li>
-      </ul>
+              <ul>
+                <li><code class="language-plaintext highlighter-rouge">BaseWrapper</code>: All AECEnv wrappers should
+                  inherit
+                  from this base class</li>
+                <li><code class="language-plaintext highlighter-rouge">TerminateIllegalWrapper</code>: Handles illegal
+                  move
+                  logic for classic games</li>
+                <li><code class="language-plaintext highlighter-rouge">CaptureStdoutWrapper</code>: Takes an environment
+                  which
+                  prints to terminal, and gives it an <code class="language-plaintext highlighter-rouge">ansi</code>
+                  render mode
+                  where it captures the terminal output and returns it as a string instead.</li>
+                <li><code class="language-plaintext highlighter-rouge">AssertOutOfBoundsWrapper</code>: Asserts if the
+                  action
+                  given to step is outside of the action space. Applied in PettingZoo environments with discrete action
+                  spaces.
+                </li>
+                <li><code class="language-plaintext highlighter-rouge">ClipOutOfBoundsWrapper</code>: Clips the input
+                  action to
+                  fit in the continuous action space (emitting a warning if it does so). Applied to continuous
+                  environments in
+                  pettingzoo.</li>
+                <li><code class="language-plaintext highlighter-rouge">OrderEnforcingWrapper</code>: Gives a sensible
+                  error
+                  message if function calls or attribute access are in a disallowed order, for example if step() is
+                  called
+                  before reset(), or the .dones attribute is accessed before reset(), or if seed() is called and then
+                  step() is
+                  used before reset() is called again (reset must be called after seed()). Applied to all PettingZoo
+                  environments.</li>
+              </ul>
 
-      <p>You can apply these wrappers to your environment in a similar manner to the below example:</p>
+              <p>You can apply these wrappers to your environment in a similar manner to the below example:</p>
 
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.utils import OrderEnforcingWrapper
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.utils import OrderEnforcingWrapper
 from pettingzoo.butterfly import pistonball_v4
 env = pistonball_v4.env()
 env = OrderEnforcingWrapper(env)
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h2 id="developer-utils">Developer Utils</h2>
+              <h2 id="developer-utils">Developer Utils</h2>
 
-      <p>The utils directory contains a few functions which are helpful for debugging environments. These are documented
-        in the API docs.</p>
+              <p>The utils directory contains a few functions which are helpful for debugging environments. These are
+                documented
+                in the API docs.</p>
 
-      <p>The utils directory also contain some classes which are only helpful for developing new environments. These are
-        documented below.</p>
+              <p>The utils directory also contain some classes which are only helpful for developing new environments.
+                These are
+                documented below.</p>
 
-      <h3 id="agent-selector">Agent selector</h3>
+              <h3 id="agent-selector">Agent selector</h3>
 
-      <p>The <code class="language-plaintext highlighter-rouge">agent_selector</code> class steps through agents in a
-        cycle</p>
+              <p>The <code class="language-plaintext highlighter-rouge">agent_selector</code> class steps through agents
+                in a
+                cycle</p>
 
-      <p>It can be used as follows to cycle through the list of agents:</p>
+              <p>It can be used as follows to cycle through the list of agents:</p>
 
-      <div class="language-python highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code><span class="kn">from</span> <span class="nn">pettingzoo.utils</span> <span class="kn">import</span> <span class="n">agent_selector</span>
+              <div class="language-python highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code><span class="kn">from</span> <span class="nn">pettingzoo.utils</span> <span class="kn">import</span> <span class="n">agent_selector</span>
 
 <span class="n">agents</span> <span class="o">=</span> <span class="p">[</span><span class="s">"agent_1"</span><span class="p">,</span> <span class="s">"agent_2"</span><span class="p">,</span> <span class="s">"agent_3"</span><span class="p">]</span>
 <span class="n">selector</span> <span class="o">=</span> <span class="n">agent_selector</span><span class="p">(</span><span class="n">agents</span><span class="p">)</span>
@@ -549,210 +590,235 @@ env = OrderEnforcingWrapper(env)
     <span class="n">agent_selection</span> <span class="o">=</span> <span class="n">selector</span><span class="p">.</span><span class="nb">next</span><span class="p">()</span>
     <span class="c1"># will select "agent_2", "agent_3", "agent_1", "agent_2", "agent_3", ..."
 </span></code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h3 id="deprecated-module">Deprecated Module</h3>
+              <h3 id="deprecated-module">Deprecated Module</h3>
 
-      <p>The DeprecatedModule is used in PettingZoo to help guide the user away from old obsolete environment versions
-        and toward new ones. If you wish to create a similar versioning system, this may be helpful.</p>
+              <p>The DeprecatedModule is used in PettingZoo to help guide the user away from old obsolete environment
+                versions
+                and toward new ones. If you wish to create a similar versioning system, this may be helpful.</p>
 
-      <p>For example, when the user tries to import the <code
-          class="language-plaintext highlighter-rouge">prospector_v0</code> environment, they import the following
-        variable (defined in <code
-          class="language-plaintext highlighter-rouge">pettingzoo/butterfly/__init__.py</code>):</p>
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.utils.deprecated_module import DeprecatedModule
+              <p>For example, when the user tries to import the <code
+                  class="language-plaintext highlighter-rouge">prospector_v0</code> environment, they import the
+                following
+                variable (defined in <code
+                  class="language-plaintext highlighter-rouge">pettingzoo/butterfly/__init__.py</code>):</p>
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.utils.deprecated_module import DeprecatedModule
 prospector_v0 = DeprecatedModule("prospector", "v0", "v3")
 </code></pre>
-        </div>
-      </div>
-      <p>This declaration tells the user that <code class="language-plaintext highlighter-rouge">prospector_v0</code> is
-        deprecated and <code class="language-plaintext highlighter-rouge">prospector_v4</code> should be used instead.
-        In particular, it gives the following error:</p>
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.butterfly import prospector_v0
+                </div>
+              </div>
+              <p>This declaration tells the user that <code
+                  class="language-plaintext highlighter-rouge">prospector_v0</code> is
+                deprecated and <code class="language-plaintext highlighter-rouge">prospector_v4</code> should be used
+                instead.
+                In particular, it gives the following error:</p>
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.butterfly import prospector_v0
 prospector_v0.env()
 # pettingzoo.utils.deprecated_module.DeprecatedEnv: prospector_v0 is now deprecated, use prospector_v4 instead
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h2 id="tests">Tests</h2>
+              <h2 id="tests">Tests</h2>
 
-      <p>PettingZoo has a number of compliance tests for environments through. If you are adding a new environment, we
-        encourage you to run these tests on your own environment.</p>
+              <p>PettingZoo has a number of compliance tests for environments through. If you are adding a new
+                environment, we
+                encourage you to run these tests on your own environment.</p>
 
-      <h3 id="api-test">API Test</h3>
+              <h3 id="api-test">API Test</h3>
 
-      <p>PettingZoo’s API has a number of features and requirements. To make sure your environment is consistent with
-        the API, we have the api_test. Below is an example:</p>
+              <p>PettingZoo’s API has a number of features and requirements. To make sure your environment is consistent
+                with
+                the API, we have the api_test. Below is an example:</p>
 
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.test import api_test
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.test import api_test
 from pettingzoo.butterfly import pistonball_v4
 env = pistonball_v4.env()
 api_test(env, num_cycles=10, verbose_progress=False)
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <p>As you can tell, you simply pass an environment to the test. The test will assert or give some other error on
-        an API issue, and will return normally if it passes.</p>
+              <p>As you can tell, you simply pass an environment to the test. The test will assert or give some other
+                error on
+                an API issue, and will return normally if it passes.</p>
 
-      <p>The optional arguments are:</p>
+              <p>The optional arguments are:</p>
 
-      <ul>
-        <li><code class="language-plaintext highlighter-rouge">num_cycles</code>: runs the environment for that many
-          cycles and checks that the output is consistent with the API.</li>
-        <li><code class="language-plaintext highlighter-rouge">verbose_progress</code>: Prints out messages to indicate
-          partial completion of the test. Useful for debugging environments.</li>
-      </ul>
+              <ul>
+                <li><code class="language-plaintext highlighter-rouge">num_cycles</code>: runs the environment for that
+                  many
+                  cycles and checks that the output is consistent with the API.</li>
+                <li><code class="language-plaintext highlighter-rouge">verbose_progress</code>: Prints out messages to
+                  indicate
+                  partial completion of the test. Useful for debugging environments.</li>
+              </ul>
 
-      <h3 id="parallel-api-test">Parallel API Test</h3>
+              <h3 id="parallel-api-test">Parallel API Test</h3>
 
-      <p>This is an analogous version of the API test, but for parallel environments. You can use this test like:</p>
+              <p>This is an analogous version of the API test, but for parallel environments. You can use this test
+                like:</p>
 
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.test import parallel_api_test
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.test import parallel_api_test
 from pettingzoo.butterfly import pistonball_v4
 env = pistonball_v4.parallel_env()
 parallel_api_test(env, num_cycles=10)
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h3 id="seed-test">Seed Test</h3>
+              <h3 id="seed-test">Seed Test</h3>
 
-      <p>To have a properly reproducible environment that utilizes randomness, you need to be able to make it
-        deterministic during evaluation by setting a seed for the random number generator that defines the random
-        behavior. The seed test checks that calling the <code class="language-plaintext highlighter-rouge">seed()</code>
-        method with a constant actually makes the environment deterministic.</p>
+              <p>To have a properly reproducible environment that utilizes randomness, you need to be able to make it
+                deterministic during evaluation by setting a seed for the random number generator that defines the
+                random
+                behavior. The seed test checks that calling the <code
+                  class="language-plaintext highlighter-rouge">seed()</code>
+                method with a constant actually makes the environment deterministic.</p>
 
-      <p>The seed test takes in a function that creates a pettingzoo environment. For example</p>
+              <p>The seed test takes in a function that creates a pettingzoo environment. For example</p>
 
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.test import seed_test
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.test import seed_test
 from pettingzoo.butterfly import pistonball_v4
 env_fn = pistonball_v4.env
 seed_test(env_fn, num_cycles=10)
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <p>The optional argument, <code class="language-plaintext highlighter-rouge">num_cycles</code>, indicates how long
-        the environment will be run to check for determinism. Some environments only fail the test long after
-        initialization.</p>
+              <p>The optional argument, <code class="language-plaintext highlighter-rouge">num_cycles</code>, indicates
+                how long
+                the environment will be run to check for determinism. Some environments only fail the test long after
+                initialization.</p>
 
-      <h3 id="max-cycles-test">Max Cycles Test</h3>
+              <h3 id="max-cycles-test">Max Cycles Test</h3>
 
-      <p>The max cycles test tests that the <code class="language-plaintext highlighter-rouge">max_cycles</code>
-        environment argument exists and the resulting environment actually runs for the correct number of cycles. If
-        your environment does not take a <code class="language-plaintext highlighter-rouge">max_cycles</code> argument,
-        you should not run this test. The reason this test exists is that many off-by-one errors are possible when
-        implementing <code class="language-plaintext highlighter-rouge">max_cycles</code>. An example test usage looks
-        like:</p>
+              <p>The max cycles test tests that the <code class="language-plaintext highlighter-rouge">max_cycles</code>
+                environment argument exists and the resulting environment actually runs for the correct number of
+                cycles. If
+                your environment does not take a <code class="language-plaintext highlighter-rouge">max_cycles</code>
+                argument,
+                you should not run this test. The reason this test exists is that many off-by-one errors are possible
+                when
+                implementing <code class="language-plaintext highlighter-rouge">max_cycles</code>. An example test usage
+                looks
+                like:</p>
 
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.test import max_cycles_test
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.test import max_cycles_test
 from pettingzoo.butterfly import pistonball_v4
 env = pistonball_v4.env()
 max_cycles_test(env)
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h3 id="render-test">Render Test</h3>
+              <h3 id="render-test">Render Test</h3>
 
-      <p>The render test checks that rendering 1) does not crash and 2) produces output of the correct type when given a
-        mode. The render test supports testing <code class="language-plaintext highlighter-rouge">'human'</code>, <code
-          class="language-plaintext highlighter-rouge">'ansi'</code>, and <code
-          class="language-plaintext highlighter-rouge">'rgb_array'</code> modes.</p>
+              <p>The render test checks that rendering 1) does not crash and 2) produces output of the correct type when
+                given a
+                mode. The render test supports testing <code
+                  class="language-plaintext highlighter-rouge">'human'</code>, <code
+                  class="language-plaintext highlighter-rouge">'ansi'</code>, and <code
+                  class="language-plaintext highlighter-rouge">'rgb_array'</code> modes.</p>
 
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.test import render_test
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.test import render_test
 from pettingzoo.butterfly import pistonball_v4
 env = pistonball_v4.env()
 render_test(env)
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h3 id="performance-benchmark-test">Performance Benchmark Test</h3>
+              <h3 id="performance-benchmark-test">Performance Benchmark Test</h3>
 
-      <p>To make sure we do not have performance regressions, we have the performance benchmark test. This test simply
-        prints out the number of steps and cycles that the environment takes in 5 seconds. This test requires manual
-        inspection of its outputs:</p>
+              <p>To make sure we do not have performance regressions, we have the performance benchmark test. This test
+                simply
+                prints out the number of steps and cycles that the environment takes in 5 seconds. This test requires
+                manual
+                inspection of its outputs:</p>
 
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.test import performance_benchmark
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.test import performance_benchmark
 from pettingzoo.butterfly import pistonball_v4
 env = pistonball_v4.env()
 performance_benchmark(env)
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-      <h3 id="save-observation-test">Save Observation Test</h3>
+              <h3 id="save-observation-test">Save Observation Test</h3>
 
-      <p>The save observation test is to visually inspect the observations of games with graphical observations to make
-        sure they are what is intended. We have found that observations are a huge source of bugs in environments, so it
-        is good to manually check them when possible. This test just tries to save the observations of all the agents.
-        If it fails, then it just prints a warning. The output needs to be visually inspected for correctness.</p>
+              <p>The save observation test is to visually inspect the observations of games with graphical observations
+                to make
+                sure they are what is intended. We have found that observations are a huge source of bugs in
+                environments, so it
+                is good to manually check them when possible. This test just tries to save the observations of all the
+                agents.
+                If it fails, then it just prints a warning. The output needs to be visually inspected for correctness.
+              </p>
 
-      <div class="language-plaintext highlighter-rouge">
-        <div class="highlight">
-          <pre class="highlight"><code>from pettingzoo.test import test_save_obs
+              <div class="language-plaintext highlighter-rouge">
+                <div class="highlight">
+                  <pre class="highlight"><code>from pettingzoo.test import test_save_obs
 from pettingzoo.butterfly import pistonball_v4
 env = pistonball_v4.env()
 test_save_obs(env)
 </code></pre>
-        </div>
-      </div>
+                </div>
+              </div>
 
-    </div>
-  </div>
-
-
-  <!-- Footer -->
-  <footer class="footer" id="footer" style="background-color:white;">
-    <div class="container">
-      <div class="row">
-        <div class="col-md">
-          <span class="copyright">Copyright &copy; [...placeholder...] 2021</span>
-        </div>
-        <!-- Social Media -->
-        <!-- Legal -->
-      </div>
-    </div>
-  </footer>
-
-  <!-- End Footer -->
+            </div>
+          </div>
 
 
+          <!-- Footer -->
+          <footer class="footer" id="footer" style="background-color:white;">
+            <div class="container">
+              <div class="row">
+                <div class="col-md">
+                  <span class="copyright">Copyright &copy; [...placeholder...] 2021</span>
+                </div>
+                <!-- Social Media -->
+                <!-- Legal -->
+              </div>
+            </div>
+          </footer>
 
-  <!-- Bootstrap core JavaScript -->
-  <script src="/assets/js/jquery.min.js"></script>
-  <script src="/assets/js/bootstrap.bundle.min.js"></script>
+          <!-- End Footer -->
 
-  <!-- Plugin JavaScript -->
-  <script src="/assets/js/jquery.easing.min.js"></script>
 
-  <!-- Contact form JavaScript -->
-  <script src="/assets/js/jqBootstrapValidation.js"></script>
-  <script src="/assets/js/contact_me.js"></script>
 
-  <!-- Custom scripts for this template -->
-  <script src="/assets/js/agency.min.js"></script>
-  <script src="/assets/js/app.js"></script>
+          <!-- Bootstrap core JavaScript -->
+          <script src="/assets/js/jquery.min.js"></script>
+          <script src="/assets/js/bootstrap.bundle.min.js"></script>
+
+          <!-- Plugin JavaScript -->
+          <script src="/assets/js/jquery.easing.min.js"></script>
+
+          <!-- Contact form JavaScript -->
+          <script src="/assets/js/jqBootstrapValidation.js"></script>
+          <script src="/assets/js/contact_me.js"></script>
+
+          <!-- Custom scripts for this template -->
+          <script src="/assets/js/agency.min.js"></script>
+          <script src="/assets/js/app.js"></script>
 
 </body>
 
