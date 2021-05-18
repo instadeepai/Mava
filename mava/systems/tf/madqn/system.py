@@ -24,6 +24,7 @@ import launchpad as lp
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
+from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
@@ -32,6 +33,7 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.environment_loop import ParallelEnvironmentLoop
+from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
 from mava.utils import lp_utils
@@ -64,6 +66,8 @@ class MADQN:
         max_replay_size: int = 1000000,
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
+        sequence_length: int = 20,
+        period: int = 20,
         clipping: bool = True,
         discount: float = 0.99,
         optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
@@ -104,6 +108,11 @@ class MADQN:
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
 
+        if executor_fn == executors.RecurrentExecutor:
+            extra_specs = self._get_extra_specs()
+        else:
+            extra_specs = {}
+
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
                 environment_spec=environment_spec,
@@ -119,6 +128,8 @@ class MADQN:
                 max_replay_size=max_replay_size,
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
+                sequence_length=sequence_length,
+                period=period,
                 clipping=clipping,
                 checkpoint=checkpoint,
                 optimizer=optimizer,
@@ -126,8 +137,25 @@ class MADQN:
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
+            extra_specs=extra_specs,
             exploration_scheduler_fn=exploration_scheduler_fn,
         )
+
+    def _get_extra_specs(self) -> Any:
+        agents = self._environment_spec.get_agent_ids()
+        core_state_specs = {}
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec
+        )
+        for agent in agents:
+            agent_type = agent.split("_")[0]
+            core_state_specs[agent] = (
+                tf2_utils.squeeze_batch_dim(
+                    networks["policies"][agent_type].initial_state(1)
+                ),
+            )
+        extras = {"core_states": core_state_specs}
+        return extras
 
     def replay(self) -> Any:
         """The replay storage."""

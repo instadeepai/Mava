@@ -26,12 +26,13 @@ from acme import types
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
-from mava import adders, core
+from mava import adders
+from mava.systems.tf.executors import FeedForwardExecutor
 from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.types import OLT
 
 
-class MADQNFeedForwardExecutor(core.Executor):
+class MADQNFeedForwardExecutor(FeedForwardExecutor):
     """A feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system
     which takes non-batched observations and outputs non-batched actions.
@@ -105,18 +106,6 @@ class MADQNFeedForwardExecutor(core.Executor):
 
         if self._adder:
             self._adder.add_first(timestep, extras)
-
-    def observe(
-        self,
-        actions: Dict[str, types.NestedArray],
-        next_timestep: dm_env.TimeStep,
-        next_extras: Optional[Dict[str, types.NestedArray]] = {},
-    ) -> None:
-        if self._adder:
-            if next_extras:
-                self._adder.add(actions, next_timestep, next_extras)
-            else:
-                self._adder.add(actions, next_timestep)
 
     def select_actions(
         self, observations: Dict[str, OLT]
