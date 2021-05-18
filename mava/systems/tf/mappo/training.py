@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -138,10 +138,10 @@ class MAPPOTrainer(mava.Trainer):
         self._iterator = dataset
 
         # Set up gradient clipping.
-        if max_gradient_norm is None:
-            max_gradient_norm = 1e10  # A very large number. Infinity results in NaNs.
-
-        self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        if max_gradient_norm is not None:
+            self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        else:  # A very large number. Infinity results in NaNs.
+            self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()

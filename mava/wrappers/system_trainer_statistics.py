@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -473,9 +473,12 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
 
             # Maybe clip gradients.
-            if self._clipping:
-                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
-                critic_gradients = tf.clip_by_global_norm(critic_gradients, 40.0)[0]
+            policy_gradients = tf.clip_by_global_norm(
+                policy_gradients, self._max_gradient_norm
+            )[0]
+            critic_gradients = tf.clip_by_global_norm(
+                critic_gradients, self._max_gradient_norm
+            )[0]
 
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)

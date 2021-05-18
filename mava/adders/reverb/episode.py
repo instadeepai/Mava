@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -130,7 +130,7 @@ class ParallelEpisodeAdder(base.ReverbParallelAdder):
     def signature(
         cls,
         environment_spec: specs.EnvironmentSpec,
-        core_state_spec: tf.TypeSpec,
+        extras_specs: tf.TypeSpec,
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
 
@@ -151,8 +151,7 @@ class ParallelEpisodeAdder(base.ReverbParallelAdder):
         """
         agent_specs = environment_spec.get_agent_specs()
         agents = environment_spec.get_agent_ids()
-        extras_specs = environment_spec.get_extra_specs()
-        extras_specs["core_states"] = core_state_spec
+        extras_specs.update(environment_spec.get_extra_specs())
         obs_specs = {}
         act_specs = {}
         reward_specs = {}

@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ from _pytest.monkeypatch import MonkeyPatch
 
 from mava import types
 from tests.conftest import EnvSpec, EnvType, Helpers
+from tests.enums import EnvSource
 
 """
 TestEnvWrapper is a general purpose test class that runs tests for environment wrappers.
@@ -31,7 +32,7 @@ This is meant to flexibily test various environments wrappers.
     It is parametrize by an EnvSpec object:
         env_name: [name of env]
         env_type: [EnvType.Parallel/EnvType.Sequential]
-        env_source: [What is source env - e.g. PettingZoo/RLLibMultiEnv]
+        env_source: [What is source env - e.g. PettingZoo, RLLibMultiEnv or Flatland]
             - Used in confest to determine which envs and wrappers to load.
 
     For new environments - you might need to update the Helpers class in conftest.py.
@@ -46,6 +47,7 @@ This is meant to flexibily test various environments wrappers.
         EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
         EnvSpec("pettingzoo.sisl.multiwalker_v7", EnvType.Parallel),
         EnvSpec("pettingzoo.sisl.multiwalker_v7", EnvType.Sequential),
+        EnvSpec("flatland", EnvType.Parallel, EnvSource.Flatland),
     ],
 )
 class TestEnvWrapper:

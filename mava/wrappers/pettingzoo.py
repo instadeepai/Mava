@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,8 +42,6 @@ from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
 
-    # Note: we don't inherit from base.EnvironmentWrapper because that class
-    # assumes that the wrapped environment is a dm_env.Environment.
     def __init__(
         self,
         environment: AECEnv,
@@ -202,8 +200,6 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
 class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
 
-    # Note: we don't inherit from base.EnvironmentWrapper because that class
-    # assumes that the wrapped environment is a dm_env.Environment.
     def __init__(
         self,
         environment: ParallelEnv,

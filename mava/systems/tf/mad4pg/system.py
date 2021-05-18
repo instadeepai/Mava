@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 """MAD4PG system implementation."""
 import copy
-from typing import Any, Callable, Dict, Tuple, Type
+from typing import Any, Callable, Dict, Type
 
 import acme
 import dm_env
@@ -58,7 +58,6 @@ class MAD4PG:
             training.BaseMAD4PGTrainer
         ] = training.DecentralisedMAD4PGTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
-        log_info: Tuple = None,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -77,7 +76,7 @@ class MAD4PG:
         sequence_length: int = 20,
         period: int = 20,
         sigma: float = 0.3,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -134,7 +133,6 @@ class MAD4PG:
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
-        self._log_info = log_info
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
@@ -171,7 +169,7 @@ class MAD4PG:
                 sequence_length=sequence_length,
                 period=period,
                 sigma=sigma,
-                clipping=clipping,
+                max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
                 critic_optimizer=critic_optimizer,

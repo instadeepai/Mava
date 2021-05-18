@@ -28,5 +28,6 @@ ENV DISPLAY=:0
 COPY . /home/app/mava
 RUN python -m pip install --upgrade pip
 RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting,record_episode]
+RUN python -m pip install -e .[flatland]
 
 EXPOSE 6006
