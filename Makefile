@@ -10,8 +10,8 @@ endif
 # Set flag for docker run command
 BASE_FLAGS=-it --rm  -v $(PWD):/home/app/mava -w /home/app/mava
 RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
+IMAGE=mava:latest
 RUN_FLAGS_TENSORBOARD=$(GPUS) -p 6006:6006 $(BASE_FLAGS)
-IMAGE=instadeepct/mava:latest
 DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 DOCKER_RUN_TENSORBOARD=docker run $(RUN_FLAGS_TENSORBOARD) $(IMAGE)
 
