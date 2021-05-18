@@ -21,7 +21,6 @@ from typing import Any, Dict, List
 import sonnet as snt
 import tensorflow as tf
 import tree
-import trfl
 from acme.tf import losses
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
@@ -558,10 +557,6 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
                     obs_comb, act_comb
                 )
 
-                # Squeeze into the shape expected by the td_learning implementation.
-                q_values = tf.squeeze(q_values, axis=-1)  # [B]
-                target_q_values = tf.squeeze(target_q_values, axis=-1)  # [B]
-
                 # Critic loss.
                 # Compute the transformed n-step loss.
                 # TODO (dries): Is discounts and rewards correct?
@@ -572,12 +567,9 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
 
                 # Critic loss.
                 # TODO (dries): Change the critic losses to n step return losses?
-                critic_loss = trfl.td_learning(
-                    q_values,
-                    agent_rewards,
-                    discount * agent_discounts,
-                    target_q_values,
-                ).loss
+                critic_loss = losses.categorical(
+                    q_values, agent_rewards, discount * agent_discounts, target_q_values
+                )
 
                 # Actor learning.
                 obs_agent_feed = target_obs_trans[agent]
@@ -600,8 +592,8 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
                 # Get dpg Q values.
                 obs_comb, _ = self._combine_dim(target_obs_trans_feed)
                 act_comb, _ = self._combine_dim(dpg_actions_feed)
-                dpg_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
-
+                dpg_z_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                dpg_q_values = dpg_z_values.mean()
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
                 # dpg_q_values = tf.squeeze(dpg_q_values, axis=-1)  # [B]
 
