@@ -84,6 +84,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         n_step: int,
         discount: float,
         priority_fns: Optional[base.PriorityFnMapping] = None,
+        use_next_extras: bool = True,
     ) -> None:
         """Creates an N-step transition adder.
         Args:
@@ -111,6 +112,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             buffer_size=n_step,
             max_sequence_length=1,
             priority_fns=priority_fns,
+            use_next_extras=use_next_extras,
         )
 
     def _write(self) -> None:
@@ -232,11 +234,9 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             steps = list(self._buffer) + [final_step]
 
             # Calculate the priority for this transition.
-
             table_priorities = acme_utils.calculate_priorities(
                 self._priority_fns, steps
             )
-
             # Insert the transition into replay along with its priority.
             self._writer.append(transition)
             for table, priority in table_priorities.items():
@@ -304,6 +304,11 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             obs_specs,  # next_observation
             extras_spec,
         ]
+
+
+        return_val = tree.map_structure_with_path(
+            base.spec_like_to_tensor_spec, tuple(transition_spec)
+        )
 
         return tree.map_structure_with_path(
             base.spec_like_to_tensor_spec, tuple(transition_spec)

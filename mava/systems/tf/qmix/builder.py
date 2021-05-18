@@ -210,6 +210,7 @@ class QMIXBuilder:
             priority_fns=None,
             n_step=self._config.n_step,
             discount=self._config.discount,
+            use_next_extras=True,
         )
 
     def make_executor(

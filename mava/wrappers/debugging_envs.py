@@ -92,9 +92,6 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             discount=self._discounts,
             step_type=self._step_type,
         )
-
-        print(timestep)
-
         if self.return_state_info:
             assert state.shape == (13,)
 
@@ -144,7 +141,12 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         shape = self.environment._get_state().shape
-        return {"s_t": tf.TensorSpec(shape=shape)}
+
+        spec = specs.BoundedArray(shape=shape, dtype='float32', name='observation',
+                           minimum=[float('-inf')]*shape[0],
+                           maximum=[float('inf')]*shape[0])
+
+        return {"s_t": spec}
 
 
 class SwitchGameWrapper(PettingZooParallelEnvWrapper):
