@@ -297,19 +297,17 @@ class BaseMADDPGTrainer(mava.Trainer):
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
 
+        self.policy_losses = {}
+        self.critic_losses = {}
+
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            policy_losses = {}
-            critic_losses = {}
 
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
             a_t = self._target_policy_actions(o_t_trans)
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
-
-                # Cast the additional discount to match the environment discount dtype.
-                discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
@@ -330,10 +328,14 @@ class BaseMADDPGTrainer(mava.Trainer):
                 q_tm1 = tf.squeeze(q_tm1, axis=-1)  # [B]
                 q_t = tf.squeeze(q_t, axis=-1)  # [B]
 
+                # Cast the additional discount to match the environment discount dtype.
+                discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
+
                 # Critic loss.
                 critic_loss = trfl.td_learning(
                     q_tm1, r_t[agent], discount * d_t[agent], q_t
                 ).loss
+                self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
 
                 # Actor learning.
                 o_t_agent_feed = o_t_trans[agent]
@@ -355,14 +357,7 @@ class BaseMADDPGTrainer(mava.Trainer):
                     dqda_clipping=dqda_clipping,
                     clip_norm=self._clipping,
                 )
-                policy_loss = tf.reduce_mean(policy_loss, axis=0)
-                policy_losses[agent] = policy_loss
-
-                critic_loss = tf.reduce_mean(critic_loss, axis=0)
-                critic_losses[agent] = critic_loss
-
-        self.policy_losses = policy_losses
-        self.critic_losses = critic_losses
+                self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
@@ -1020,11 +1015,11 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         #  to be processed here at the start. Therefore it does not have
         #  to be done later on and saves processing time.
 
+        self.policy_losses: Dict[str, tf.Tensor] = {}
+        self.critic_losses: Dict[str, tf.Tensor] = {}
+
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            policy_losses: Dict[str, tf.Tensor] = {}
-            critic_losses: Dict[str, tf.Tensor] = {}
-
             # Note (dries): We are assuming that only the policy network
             # is recurrent and not the observation network.
 
@@ -1036,10 +1031,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
-
-                # Cast the additional discount to match
-                # the environment discount dtype.
-                discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
                 # Get critic feed
                 (
                     obs_trans_feed,
@@ -1080,6 +1071,10 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 agent_rewards, _ = self._combine_dim(rewards[agent][:, :-1])
                 agent_discounts, _ = self._combine_dim(discounts[agent][:, :-1])
 
+                # Cast the additional discount to match
+                # the environment discount dtype.
+                discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
+
                 # Critic loss.
                 # TODO (dries): Change the critic losses to n step return losses?
                 critic_loss = trfl.td_learning(
@@ -1088,6 +1083,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                     discount * agent_discounts,
                     target_q_values,
                 ).loss
+                self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
 
                 # Actor learning.
                 obs_agent_feed = target_obs_trans[agent]
@@ -1122,15 +1118,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                     dqda_clipping=dqda_clipping,
                     clip_norm=self._clipping,
                 )
-
-                policy_loss = tf.reduce_mean(policy_loss, axis=0)
-                policy_losses[agent] = policy_loss
-
-                critic_loss = tf.reduce_mean(critic_loss, axis=0)
-                critic_losses[agent] = critic_loss
-
-        self.policy_losses: Dict[str, tf.Tensor] = policy_losses
-        self.critic_losses: Dict[str, tf.Tensor] = critic_losses
+                self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
