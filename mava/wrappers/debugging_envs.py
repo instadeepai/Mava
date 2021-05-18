@@ -18,6 +18,7 @@ from typing import Dict, Tuple
 
 import dm_env
 import numpy as np
+import tensorflow as tf
 from acme import specs
 
 # from acme.specs import EnvironmentSpec
@@ -92,8 +93,12 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             step_type=self._step_type,
         )
 
+        print(timestep)
+
         if self.return_state_info:
-            return timestep, {"env_state": state}
+            assert state.shape == (13,)
+
+            return timestep, {"s_t": state}
         else:
             return timestep
 
@@ -136,6 +141,10 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
+
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        shape = self.environment._get_state().shape
+        return {"s_t": tf.TensorSpec(shape=shape)}
 
 
 class SwitchGameWrapper(PettingZooParallelEnvWrapper):

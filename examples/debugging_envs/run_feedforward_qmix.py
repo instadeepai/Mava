@@ -37,7 +37,7 @@ from mava.utils.loggers import Logger
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
-    "two_step",  # "simple_spread",
+    "simple_spread",  # "two_step" for Two Step Environment
     "Debugging environment name (str).",
 )
 flags.DEFINE_string(
