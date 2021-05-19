@@ -86,8 +86,17 @@ class DIAL(system.System):
         # TODO: Update args
         """Initialize the system.
         Args:
+            environment_factory: Callable to instantiate an environment on a compute node.
+            network_factory: Callable to instantiate system networks on a compute node.
+            logger_factory: Callable to instantiate a system logger on a compute node.
+            architecture: system architecture, e.g. decentralised or centralised.
+            trainer_fn: training type associated with executor and architecture,
+                e.g. centralised training.
+            executor_fn: executor type for example feedforward or recurrent.
+            num_executors: number of executor processes to run in parallel.
+            num_caches: number of trainer node caches.
             environment_spec: description of the actions, observations, etc.
-            networks: the online Q network (the one being optimized)
+            shared_weights: set whether agents should share network weights.
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
             target_update_period: number of learner steps to perform before updating

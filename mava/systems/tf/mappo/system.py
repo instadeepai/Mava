@@ -83,29 +83,43 @@ class MAPPO:
 
         """Initialize the system.
         Args:
-        environment_spec: description of the actions, observations, etc.
-        networks: ...
-        sequence_length: ...
-        sequence_period: ...
-        shared_weights: ...
-        counter: ...
-        entropy_cost: ...
-        baseline_cost: ...
-        clipping_epsilon: ...
-        max_abs_reward: ...
-        batch_size: batch size for updates.
-        max_queue_size: maximum queue size.
-        discount: discount to use for TD updates.
-        logger: logger object to be used by learner.
-        max_gradient_norm: used for gradient clipping.
-        checkpoint: ...
-        checkpoint_subpath: directory for checkpoints.
-        trainer_logger: logger for trainer class.
-        exec_logger: logger for executor.
-        eval_logger: logger for evaluator.
-        train_loop_fn: loop for training.
-        eval_loop_fn: loop for evaluation.
-        replay_table_name: string indicating what name to give the replay table."""
+            environment_factory: Callable to instantiate an environment on a compute node.
+            network_factory: Callable to instantiate system networks on a compute node.
+            logger_factory: Callable to instantiate a system logger on a compute node.
+            architecture: system architecture, e.g. decentralised or centralised.
+            trainer_fn: training type associated with executor and architecture,
+                e.g. centralised training.
+            executor_fn: executor type for example feedforward or recurrent.
+            num_executors: number of executor processes to run in parallel.
+            num_caches: number of trainer node caches.
+            environment_spec: description of the actions, observations, etc.
+            shared_weights: set whether agents should share network weights.
+            sequence_length: length of the sequences in the queue.
+            sequence_period: amount of overlap between sequences added to the queue.
+            entropy_cost: contribution of entropy regularization to the total loss.
+            baseline_cost: contribution of the value loss to the total loss.
+            lambda_gae: scalar determining the mix of bootstrapping
+                vs further accumulation of multi-step returns at each timestep.
+                See `High-Dimensional Continuous Control Using Generalized
+                Advantage Estimation` for more information.
+            clipping_epsilon: Hyper-parameter for clipping in the policy
+                objective. Roughly: how far can the new policy go from
+                the old policy while still profiting? The new policy can
+                still go farther than the clip_ratio says, but it doesn’t
+                help on the objective anymore.
+            max_abs_reward: max reward. If not None, the reward on which the agent
+                is trained will be clipped between -max_abs_reward and max_abs_reward.
+            batch_size: batch size for updates.
+            max_queue_size: maximum queue size.
+            discount: discount to use for TD updates.
+            logger: logger object to be used by learner.
+            max_gradient_norm: used for gradient clipping.
+            checkpoint: boolean indicating whether to checkpoint the trainers.
+            counter: count the number of steps and episodes.
+            checkpoint_subpath: directory for checkpoints.
+            train_loop_fn: loop for training.
+            eval_loop_fn: loop for evaluation.
+            replay_table_name: string indicating what name to give the replay table."""
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
