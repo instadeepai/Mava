@@ -294,6 +294,7 @@ class QMIX:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
+        eval_logger = self._logger_factory("evaluator")
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
@@ -301,7 +302,7 @@ class QMIX:
             environment,
             executor,
             counter=counter,
-            logger=self._eval_logger,
+            logger=eval_logger,
             **self._eval_loop_fn_kwargs,
         )
 

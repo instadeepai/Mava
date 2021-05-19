@@ -354,11 +354,12 @@ class DIAL(system.System):
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
+        eval_logger = self._logger_factory("evaluator")
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
         eval_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=self._eval_logger
+            environment, executor, counter=counter, logger=eval_logger
         )
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)
