@@ -149,7 +149,7 @@ class MADDPG:
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
 
-        if executor_fn == executors.RecurrentExecutor:
+        if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
         else:
             extra_specs = {}
