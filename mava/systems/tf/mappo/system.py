@@ -115,6 +115,7 @@ class MAPPO:
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
+        self._logger_factory = logger_factory
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors

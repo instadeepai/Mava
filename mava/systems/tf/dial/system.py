@@ -123,6 +123,7 @@ class DIAL(system.System):
         self._communication_module_fn = communication_module
         self._environment_factory = environment_factory
         self._network_factory = network_factory
+        self._logger_factory = logger_factory
         self._log_info = log_info
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
