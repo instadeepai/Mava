@@ -196,6 +196,9 @@ class QMIX:
             agent_networks=agent_networks,
         ).create_system()
 
+        # create logger
+        trainer_logger = self._logger_factory("trainer")
+
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
 
@@ -203,7 +206,7 @@ class QMIX:
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=self._trainer_logger,
+            logger=trainer_logger,
         )
 
     def executor(
