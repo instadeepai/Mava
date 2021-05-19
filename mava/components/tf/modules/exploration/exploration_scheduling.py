@@ -90,8 +90,10 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
     def decrement_epsilon(self) -> None:
         if self._epsilon == self._epsilon_min:
             return
+
         elif self._epsilon < self._epsilon_min:
             # Should only ever happen once.
             self._epsilon = self._epsilon_min
             return
+
         self._epsilon *= 1 - self._epsilon_decay
