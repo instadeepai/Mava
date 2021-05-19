@@ -25,7 +25,6 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
-from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.systems.tf.qmix import execution, training
 from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
@@ -66,19 +65,19 @@ class QMIXBuilder(MADQNBuilder):
     def __init__(
         self,
         config: QMIXConfig,
-        trainer_fn: Type[MADQNTrainer] = training.QMIXTrainer,
+        trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
     ) -> None:
         """Args:
-        _config: Configuration options for the MADQN system.
+        _config: Configuration options for the QMIX system.
         _trainer_fn: Trainer module to use.
         """
-        super(QMIXBuilder, self).__init__(  # type:ignore
+        super(QMIXBuilder, self).__init__(
             config=config,
-            trainer_fn=trainer_fn,  # type:ignore
+            trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             exploration_scheduler_fn=exploration_scheduler_fn,
         )
