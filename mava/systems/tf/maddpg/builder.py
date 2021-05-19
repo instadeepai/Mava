@@ -123,11 +123,11 @@ class MADDPGBuilder(SystemBuilder):
         """Create tables to insert data into."""
 
         # Select adder
-        if self._executor_fn == executors.FeedForwardExecutor:
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec, self._extra_specs
             )
-        elif self._executor_fn == executors.RecurrentExecutor:
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder_sig = reverb_adders.ParallelSequenceAdder.signature(
                 environment_spec, self._extra_specs
             )
@@ -167,7 +167,7 @@ class MADDPGBuilder(SystemBuilder):
 
         sequence_length = (
             self._config.sequence_length
-            if self._executor_fn == executors.RecurrentExecutor
+            if issubclass(self._executor_fn, executors.RecurrentExecutor)
             else None
         )
 
@@ -191,14 +191,15 @@ class MADDPGBuilder(SystemBuilder):
         """
 
         # Select adder
-        if self._executor_fn == executors.FeedForwardExecutor:
+
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=None,
                 client=replay_client,
                 n_step=self._config.n_step,
                 discount=self._config.discount,
             )
-        elif self._executor_fn == executors.RecurrentExecutor:
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder = reverb_adders.ParallelSequenceAdder(
                 priority_fns=None,
                 client=replay_client,
