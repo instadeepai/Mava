@@ -15,7 +15,6 @@
 
 """Defines the QMIX system class."""
 
-import copy
 from typing import Any, Callable, Dict, Optional, Type
 
 import acme

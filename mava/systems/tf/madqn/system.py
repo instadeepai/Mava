@@ -15,7 +15,6 @@
 
 """Defines the MADQN system class."""
 
-import copy
 from typing import Any, Callable, Dict, Optional, Type
 
 import acme

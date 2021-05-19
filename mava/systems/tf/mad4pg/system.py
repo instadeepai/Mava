@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
-import copy
 from typing import Any, Callable, Dict, Type
 
 import acme

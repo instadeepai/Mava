@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MAPPO system implementation."""
-import copy
+
 from typing import Any, Callable, Dict, Optional, Type
 
 import acme

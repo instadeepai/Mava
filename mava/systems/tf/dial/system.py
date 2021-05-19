@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """DIAL system implementation."""
-import copy
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 import acme
