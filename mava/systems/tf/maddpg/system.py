@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """MADDPG system implementation."""
-import copy
 from typing import Any, Callable, Dict, Type, Union
 
 import acme
@@ -51,6 +50,7 @@ class MADDPG:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        logger_factory: Callable[[str], MavaLogger],
         architecture: Type[
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
@@ -81,9 +81,6 @@ class MADDPG:
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        trainer_logger: MavaLogger = None,
-        exec_logger: MavaLogger = None,
-        eval_logger: MavaLogger = None,
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
@@ -118,9 +115,6 @@ class MADDPG:
             checkpoint: boolean indicating whether to checkpoint the trainers.
             checkpoint_subpath: directory for checkpoints.
             replay_table_name: string indicating what name to give the replay table.
-            trainer_logger: logger for trainer class.
-            exec_logger: logger for executor.
-            eval_logger: logger for evaluator.
             train_loop_fn: loop for training.
             eval_loop_fn: loop for evaluation.
 
@@ -134,6 +128,7 @@ class MADDPG:
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
+        self._logger_factory = logger_factory
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
@@ -141,9 +136,6 @@ class MADDPG:
         self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
-        self._trainer_logger = trainer_logger
-        self._exec_logger = exec_logger
-        self._eval_logger = eval_logger
         self._train_loop_fn = train_loop_fn
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
@@ -224,6 +216,9 @@ class MADDPG:
             environment_spec=self._environment_spec
         )
 
+        # create logger
+        trainer_logger = self._logger_factory("trainer")
+
         # Create system architecture with target networks.
         system_networks = self._architecture(
             environment_spec=self._environment_spec,
@@ -240,7 +235,7 @@ class MADDPG:
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=self._trainer_logger,
+            logger=trainer_logger,
         )
 
     def executor(
@@ -286,11 +281,8 @@ class MADDPG:
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
 
-        # Update label to include exec id
-        exec_logger = None
-        if self._exec_logger:
-            exec_logger = copy.deepcopy(self._exec_logger)
-            exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
+        # Create executor logger
+        exec_logger = self._logger_factory(f"executor_{executor_id}")
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
@@ -344,6 +336,7 @@ class MADDPG:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
+        eval_logger = self._logger_factory("evaluator")
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
@@ -351,7 +344,7 @@ class MADDPG:
             environment,
             executor,
             counter=counter,
-            logger=self._eval_logger,
+            logger=eval_logger,
             **self._eval_loop_fn_kwargs,
         )
 
