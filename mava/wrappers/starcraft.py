@@ -14,6 +14,7 @@
 # limitations under the License.
 
 # See SMAC here: https://github.com/oxwhirl/smac
+# Documentation available at smac/blob/master/docs/smac.md
 
 """Wraps a StarCraft II MARL environment (SMAC) as a dm_env environment."""
 import random
