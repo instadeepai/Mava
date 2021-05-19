@@ -171,6 +171,7 @@ def main(_: Any) -> None:
     program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         architecture=CentralisedValueCritic,
         trainer_fn=mappo.CentralisedMAPPOTrainer,
         num_executors=2,

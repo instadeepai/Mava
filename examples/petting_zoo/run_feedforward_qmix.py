@@ -151,6 +151,7 @@ def main(_: Any) -> None:
     program = qmix.QMIX(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         num_executors=2,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
