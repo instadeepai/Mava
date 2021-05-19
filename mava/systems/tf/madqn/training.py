@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
+import tree
 import trfl
 from acme.tf import utils as tf2_utils
 from acme.types import NestedArray
@@ -290,3 +291,97 @@ class MADQNTrainer(mava.Trainer):
                     self._system_network_variables[network_type][agent]
                 )
         return variables
+
+
+class RecurrentMADQNTrainer(MADQNTrainer):
+    """Recurrent MADQN trainer.
+    This is the trainer component of a MADQN system. IE it takes a dataset as input
+    and implements update functionality to learn from this dataset.
+    """
+
+    def __init__(
+        self,
+        agents: List[str],
+        agent_types: List[str],
+        q_networks: Dict[str, snt.Module],
+        target_q_networks: Dict[str, snt.Module],
+        target_update_period: int,
+        dataset: tf.data.Dataset,
+        optimizer: snt.Optimizer,
+        discount: float,
+        shared_weights: bool,
+        exploration_scheduler: LinearExplorationScheduler,
+        clipping: bool = True,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
+    ):
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            q_networks=q_networks,
+            target_q_networks=target_q_networks,
+            target_update_period=target_update_period,
+            dataset=dataset,
+            optimizer=optimizer,
+            discount=discount,
+            shared_weights=shared_weights,
+            exploration_scheduler=exploration_scheduler,
+            clipping=clipping,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+        )
+
+    def _forward(self, inputs: Any) -> None:
+        data = tree.map_structure(
+            lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
+        )
+        data = tf2_utils.batch_to_sequence(data)
+
+        observations, actions, rewards, discounts, _, extra = data
+
+        # core_states = extra["core_states"]
+        core_state = tree.map_structure(
+            lambda s: s[:, 0, :], inputs.data.extras["core_states"]
+        )
+
+        with tf.GradientTape(persistent=True) as tape:
+            q_network_losses: Dict[str, NestedArray] = {}
+
+            for agent in self._agents:
+                agent_key = self.agent_net_keys[agent]
+                # Cast the additional discount to match the environment discount dtype.
+                discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
+
+                q, s = snt.static_unroll(
+                    self._q_networks[agent_key],
+                    observations[agent].observation,
+                    core_state[agent][0],
+                )
+
+                q_targ, s = snt.static_unroll(
+                    self._target_q_networks[agent_key],
+                    observations[agent].observation,
+                    core_state[agent][0],
+                )
+
+                q_network_losses[agent] = {}
+                q_network_losses[agent]["q_value_loss"] = tf.zeros(())
+
+                for t in range(1, q.shape[0]):
+                    loss, _ = trfl.qlearning(
+                        q[t - 1],
+                        actions[agent][t - 1],
+                        rewards[agent][t],
+                        discount * discounts[agent][t],
+                        q_targ[t],
+                    )
+
+                    loss = tf.reduce_mean(loss)
+                    q_network_losses[agent]["q_value_loss"] += loss
+
+        self._q_network_losses = q_network_losses
+        self.tape = tape
