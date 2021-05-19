@@ -33,7 +33,7 @@ from mava.systems.tf import executors, maddpg
 from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 
@@ -166,9 +166,6 @@ def main(_: Any) -> None:
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
     ).build()
 
     # Launch gpu config - let trainer use gpu.

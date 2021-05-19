@@ -32,7 +32,7 @@ from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import qmix
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -157,9 +157,6 @@ def main(_: Any) -> None:
         epsilon_decay=1e-4,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
     ).build()
 
     # launch

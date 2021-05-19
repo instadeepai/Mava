@@ -33,7 +33,7 @@ from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import logger_utils
 from mava.wrappers import MonitorParallelEnvironmentLoop
 
 FLAGS = flags.FLAGS
@@ -164,9 +164,6 @@ def main(_: Any) -> None:
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
         eval_loop_fn=MonitorParallelEnvironmentLoop,
         eval_loop_fn_kwargs={"path": checkpoint_dir, "record_every": 100},
     ).build()

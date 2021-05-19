@@ -15,6 +15,7 @@
 
 """Example running centralized MAPPO on multiwalker."""
 
+import functools
 from datetime import datetime
 from typing import Any, Dict, Sequence, Union
 
@@ -33,7 +34,7 @@ from mava.components.tf.architectures import CentralisedValueCritic
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
-from mava.utils.loggers.base import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 
@@ -174,9 +175,6 @@ def main(_: Any) -> None:
         trainer_fn=mappo.CentralisedMAPPOTrainer,
         num_executors=2,
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
     ).build()
 
     # launch
