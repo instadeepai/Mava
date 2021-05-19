@@ -167,6 +167,34 @@ class MADQNTrainer(mava.Trainer):
 
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        # Compute elapsed time.
+        timestamp = time.time()
+        if self._timestamp:
+            elapsed_time = timestamp - self._timestamp
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        # Checkpoint and attempt to write the logs.
+        if self._checkpoint:
+            train_utils.checkpoint_networks(self._system_checkpointer)
+
+        # Log and decrement epsilon
+        epsilon = self.get_epsilon()
+        fetches["epsilon"] = epsilon
+        self._decrement_epsilon()
+
+        if self._logger:
+            self._logger.write(fetches)
+
     @tf.function
     def _step(
         self,
@@ -252,34 +280,6 @@ class MADQNTrainer(mava.Trainer):
             self._optimizer.apply(gradients, q_network_variables)
 
         train_utils.safe_del(self, "tape")
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        # Compute elapsed time.
-        timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        # Checkpoint and attempt to write the logs.
-        if self._checkpoint:
-            train_utils.checkpoint_networks(self._system_checkpointer)
-
-        # Log and decrement epsilon
-        epsilon = self.get_epsilon()
-        fetches["epsilon"] = epsilon
-        self._decrement_epsilon()
-
-        if self._logger:
-            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
