@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Example running recurrent MADDPG on the debug MPE environments."""
-
+import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
 
@@ -31,7 +31,7 @@ from mava.systems.tf import executors, maddpg
 from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(

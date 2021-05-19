@@ -33,7 +33,7 @@ from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import logger_utils
 from mava.wrappers import MonitorParallelEnvironmentLoop
 
 FLAGS = flags.FLAGS

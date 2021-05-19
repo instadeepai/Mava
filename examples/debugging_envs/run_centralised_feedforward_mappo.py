@@ -35,7 +35,7 @@ from mava.components.tf.architectures import CentralisedValueCritic
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers.base import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Example running MAD4PG on debug MPE environments."""
-
+import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
 
@@ -31,7 +31,7 @@ from mava import specs as mava_specs
 from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(

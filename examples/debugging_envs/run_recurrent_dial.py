@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Example running DIAL"""
-
+import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
 
@@ -32,7 +32,7 @@ from mava.components.tf.networks import DIALPolicy
 from mava.systems.tf import dial
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_episodes", 30000, "Number of training episodes to run for.")
