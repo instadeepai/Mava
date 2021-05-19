@@ -50,7 +50,7 @@ class MAD4PG:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
-        logger_factory: Callable[[str], MavaLogger],
+        logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,

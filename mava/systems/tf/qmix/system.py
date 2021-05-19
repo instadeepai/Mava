@@ -78,7 +78,7 @@ class QMIX:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
-        logger_factory: Callable[[str], MavaLogger],
+        logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,

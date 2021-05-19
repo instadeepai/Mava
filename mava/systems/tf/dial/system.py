@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """DIAL system implementation."""
+import functools
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 import acme
@@ -37,7 +38,7 @@ from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.dial import builder
 from mava.systems.tf.dial.execution import DIALExecutor
 from mava.utils import lp_utils
-from mava.utils.loggers import MavaLogger
+from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
 
 
@@ -53,10 +54,9 @@ class DIAL(system.System):
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
-        logger_factory: Callable[[str], MavaLogger],
+        logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedPolicyActor] = DecentralisedPolicyActor,
         executor_fn: Type[core.Executor] = DIALExecutor,
-        log_info: Tuple = None,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -125,12 +125,20 @@ class DIAL(system.System):
                 environment_factory(evaluation=False)  # type: ignore
             )
 
+        # set default logger if no logger provided
+        if not logger_factory:
+            logger_factory = functools.partial(
+                logger_utils.make_logger,
+                directory="~/mava",
+                to_terminal=True,
+                time_delta=10,
+            )
+
         self._architecture_fn = architecture
         self._communication_module_fn = communication_module
         self._environment_factory = environment_factory
         self._network_factory = network_factory
         self._logger_factory = logger_factory
-        self._log_info = log_info
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
