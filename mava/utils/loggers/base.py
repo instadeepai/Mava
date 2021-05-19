@@ -80,7 +80,7 @@ class Logger(MavaLogger):
             self._time_stamp,
         )
 
-    def update_label(label: str):
+    def update_label(self, label: str) -> None:
         self._label = f"{self._label}_{label}"
 
     def make_logger(
