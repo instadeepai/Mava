@@ -14,8 +14,7 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
-import functools
-from typing import Any, Callable, Dict, Type
+from typing import Callable, Dict, Type, Union
 
 import dm_env
 import sonnet as snt
@@ -26,12 +25,9 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
-from mava.systems.tf import savers as tf2_savers
-from mava.systems.tf.mad4pg import builder, training
-from mava.utils import lp_utils
-from mava.utils.loggers import MavaLogger, logger_utils
-from mava.wrappers import DetailedPerAgentStatistics
+from mava.systems.tf.mad4pg import training
 from mava.systems.tf.maddpg.system import MADDPG
+from mava.utils.loggers import MavaLogger
 
 
 class MAD4PG(MADDPG):
@@ -77,6 +73,7 @@ class MAD4PG(MADDPG):
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},

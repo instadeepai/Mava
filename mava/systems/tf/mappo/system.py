@@ -75,6 +75,7 @@ class MAPPO:
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
@@ -214,7 +215,13 @@ class MAPPO:
         ).create_system()
 
         # create logger
-        trainer_logger = self._logger_factory("trainer")
+        trainer_logger_config = {}
+        if self._logger_config:
+            if "trainer" in self._logger_config:
+                trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory(  # type: ignore
+            "trainer", **trainer_logger_config
+        )
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
@@ -270,7 +277,13 @@ class MAPPO:
         counter = counting.Counter(counter, "executor")
 
         # Create executor logger
-        exec_logger = self._logger_factory(f"executor_{executor_id}")
+        executor_logger_config = {}
+        if self._logger_config:
+            if "executor" in self._logger_config:
+                executor_logger_config = self._logger_config["executor"]
+        exec_logger = self._logger_factory(  # type: ignore
+            f"executor_{executor_id}", **executor_logger_config
+        )
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
@@ -324,7 +337,13 @@ class MAPPO:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
-        eval_logger = self._logger_factory("evaluator")
+        evaluator_logger_config = {}
+        if self._logger_config:
+            if "evaluator" in self._logger_config:
+                evaluator_logger_config = self._logger_config["evaluator"]
+        eval_logger = self._logger_factory(  # type: ignore
+            "evaluator", **evaluator_logger_config
+        )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
