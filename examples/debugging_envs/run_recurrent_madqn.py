@@ -175,6 +175,8 @@ def main(_: Any) -> None:
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,
         eval_logger=eval_logger,
+        n_step=1,
+        batch_size=32,
     ).build()
 
     # launch

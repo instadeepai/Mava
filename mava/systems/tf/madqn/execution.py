@@ -149,6 +149,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        store_recurrent_state: bool = True,
         trainer: MADQNTrainer = None,
     ):
         """Initializes the executor.
@@ -167,6 +168,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         self._q_networks = q_networks
         self._policy_networks = q_networks
         self._action_selectors = action_selectors
+        self._store_recurrent_state = store_recurrent_state
         self._trainer = trainer
         self._shared_weights = shared_weights
 

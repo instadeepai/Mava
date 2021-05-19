@@ -210,7 +210,7 @@ class MADQNBuilder:
 
         sequence_length = (
             self._config.sequence_length
-            if self._executor_fn == executors.RecurrentExecutor
+            if issubclass(self._executor_fn, executors.RecurrentExecutor)
             else None
         )
 
