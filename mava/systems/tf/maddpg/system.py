@@ -82,6 +82,7 @@ class MADDPG:
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
@@ -151,6 +152,7 @@ class MADDPG:
         self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
+        self._logger_config = logger_config
         self._train_loop_fn = train_loop_fn
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
@@ -232,7 +234,10 @@ class MADDPG:
         )
 
         # create logger
-        trainer_logger = self._logger_factory("trainer")
+        if self._logger_config:
+            if "trainer" in self._logger_config:
+                trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory("trainer", **trainer_logger_config)
 
         # Create system architecture with target networks.
         system_networks = self._architecture(
@@ -297,7 +302,12 @@ class MADDPG:
         counter = counting.Counter(counter, "executor")
 
         # Create executor logger
-        exec_logger = self._logger_factory(f"executor_{executor_id}")
+        if self._logger_config:
+            if "executor" in self._logger_config:
+                executor_logger_config = self._logger_config["executor"]
+        exec_logger = self._logger_factory(
+            f"executor_{executor_id}", **executor_logger_config
+        )
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
@@ -351,7 +361,10 @@ class MADDPG:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
-        eval_logger = self._logger_factory("evaluator")
+        if self._logger_config:
+            if "evaluator" in self._logger_config:
+                evaluator_logger_config = self._logger_config["evaluator"]
+        eval_logger = self._logger_factory("evaluator", **evaluator_logger_config)
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
