@@ -538,26 +538,16 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
                 # Remove the last sequence step for the normal network
                 obs_comb, dims = train_utils.combine_dim(obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(action_feed)
-                flat_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                q_values.set_dimensions(dims)
 
-                print("flat_q_values: ", flat_q_values)
-
-                print("flat_q_values: ", flat_q_values.reshape(dims))
-
-                print("dims: ", dims)
-
-                q_values = train_utils.extract_dim(flat_q_values, dims)[:, :, 0]
-                print("Done.")
-                exit()
                 # Remove first sequence step for the target
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(target_actions_feed)
-                flat_target_q_values = self._target_critic_networks[agent_key](
+                target_q_values = self._target_critic_networks[agent_key](
                     obs_comb, act_comb
                 )
-                target_q_values = train_utils.extract_dim(flat_target_q_values, dims)[
-                    :, :, 0
-                ]
+                target_q_values.set_dimensions(dims)
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
@@ -567,9 +557,9 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
                 # Critic loss.
                 critic_loss = train_utils.maddp4g_critic(
                     q_values,
+                    target_q_values,
                     rewards[agent],
                     discount * agent_discount,
-                    target_q_values,
                     bootstrap_n=self._bootstrap_n,
                     loss_fn=losses.categorical,
                 )
@@ -594,8 +584,8 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
                 )
 
                 # Get dpg Q values.
-                obs_comb, _ = self._combine_dim(target_obs_trans_feed)
-                act_comb, _ = self._combine_dim(dpg_actions_feed)
+                obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
+                act_comb, _ = train_utils.combine_dim(dpg_actions_feed)
                 dpg_z_values = self._critic_networks[agent_key](obs_comb, act_comb)
                 dpg_q_values = dpg_z_values.mean()
 

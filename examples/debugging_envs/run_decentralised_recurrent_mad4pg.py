@@ -28,6 +28,7 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf.networks.mad4pg import DiscreteValuedHead
 from mava.systems.tf import executors, mad4pg
 from mava.systems.tf.mad4pg.training import DecentralisedRecurrentMAD4PGTrainer
 from mava.utils import lp_utils
@@ -118,7 +119,7 @@ def make_networks(
                 networks.LayerNormMLP(
                     critic_networks_layer_sizes[key], activate_final=False
                 ),
-                networks.DiscreteValuedHead(vmin, vmax, num_atoms),
+                DiscreteValuedHead(vmin, vmax, num_atoms),
             ]
         )
 

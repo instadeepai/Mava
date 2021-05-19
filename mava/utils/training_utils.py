@@ -5,6 +5,8 @@ import tensorflow as tf
 import trfl
 from acme.tf import losses
 
+from mava.components.tf.networks.mad4pg import DiscreteValuedDistribution
+
 
 # Checkpoint the networks.
 def checkpoint_networks(system_checkpointer: Dict) -> None:
@@ -64,13 +66,24 @@ def maddp4g_critic(
 ) -> tf.Tensor:
 
     assert bootstrap_n < len(rewards[0])
-
-    check_rank([q_values, target_q_values, rewards, discounts], [2, 2, 2, 2])
+    if type(q_values) != DiscreteValuedDistribution:
+        check_rank([q_values, target_q_values, rewards, discounts], [2, 2, 2, 2])
 
     # Construct arguments to compute bootstrap target.
     # TODO (dries): Is the discount calculation correct?
-    q_tm1 = q_values[:, 0:-bootstrap_n]
-    q_t = target_q_values[:, bootstrap_n:]
+
+    if type(q_values) != DiscreteValuedDistribution:
+        q_tm1 = q_values[:, 0:-bootstrap_n]
+        q_t = target_q_values[:, bootstrap_n:]
+
+        q_tm1, _ = combine_dim(q_tm1)
+        q_t, _ = combine_dim(q_t)
+    else:
+        q_tm1 = q_values
+        q_tm1.cut_dimension(axis=1, end=-bootstrap_n)
+
+        q_t = target_q_values
+        q_t.cut_dimension(axis=1, start=bootstrap_n)
 
     n_step_rewards = rewards[:, :bootstrap_n]
     n_step_discount = discounts[:, :bootstrap_n]
@@ -78,17 +91,18 @@ def maddp4g_critic(
         n_step_rewards += rewards[:, i : i + bootstrap_n]
         # n_step_discount *= discounts[:, i:i+bootstrap_n]
 
-    q_tm1, _ = combine_dim(q_tm1)
     n_step_rewards, _ = combine_dim(n_step_rewards)
     n_step_discount, _ = combine_dim(n_step_discount)
-    q_t, _ = combine_dim(q_t)
 
     critic_loss = loss_fn(
         q_tm1,
         n_step_rewards,
         n_step_discount,
         q_t,
-    ).loss
+    )
+
+    if type(q_values) != DiscreteValuedDistribution:
+        critic_loss = critic_loss.loss
 
     return critic_loss
 
