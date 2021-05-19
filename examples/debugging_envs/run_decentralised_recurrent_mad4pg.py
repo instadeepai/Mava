@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MAD4PG on debug MPE environments."""
-import functools
+"""Example running recurrent MAD4PG on the debug MPE environments."""
+
 from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
 
@@ -29,10 +29,11 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.components.tf.networks.mad4pg import DiscreteValuedHead
-from mava.systems.tf import mad4pg
+from mava.systems.tf import executors, mad4pg
+from mava.systems.tf.mad4pg.training import DecentralisedRecurrentMAD4PGTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import logger_utils
+from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -50,7 +51,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "/home/mava_logs/", "Base dir to store experiments.")
 
 
 def make_networks(
@@ -92,15 +93,17 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
-        # Create the shared observation network; here simply a state-less operation.
+        # Create the observation network.
         observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
-        policy_network = snt.Sequential(
+        policy_network = snt.DeepRNN(
             [
-                networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key], activate_final=True
-                ),
+                observation_network,
+                snt.Flatten(),
+                snt.nets.MLP(policy_networks_layer_sizes[key]),
+                snt.LSTM(25),
+                snt.nets.MLP([128]),
                 networks.NearZeroInitializedLinear(num_dimensions),
                 networks.TanhToSpec(specs[key].actions),
                 networks.ClippedGaussian(sigma),
@@ -119,14 +122,15 @@ def make_networks(
                 DiscreteValuedHead(vmin, vmax, num_atoms),
             ]
         )
+
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
 
     return {
+        "observations": observation_networks,
         "policies": policy_networks,
         "critics": critic_networks,
-        "observations": observation_networks,
     }
 
 
@@ -139,16 +143,14 @@ def main(_: Any) -> None:
         action_space=FLAGS.action_space,
     )
 
-    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-    # loggers
     log_every = 10
-    logger_factory = functools.partial(
-        logger_utils.make_logger,
+    trainer_logger = Logger(
+        label="system_trainer",
         directory=FLAGS.base_dir,
         to_terminal=True,
         to_tensorboard=True,
@@ -156,16 +158,35 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
+    exec_logger = Logger(
+        # _{executor_id} gets appended to label in system.
+        label="train_loop_executor",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
+    eval_logger = Logger(
+        label="eval_loop",
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
     program = mad4pg.MAD4PG(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        logger_factory=logger_factory,
         num_executors=2,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        trainer_fn=DecentralisedRecurrentMAD4PGTrainer,
+        executor_fn=executors.RecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
-        max_gradient_norm=40.0,
+        trainer_logger=trainer_logger,
+        exec_logger=exec_logger,
+        eval_logger=eval_logger,
     ).build()
 
     # launch

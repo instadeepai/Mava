@@ -17,16 +17,10 @@
 import functools
 from typing import Any, Callable, Dict, Type
 
-import acme
 import dm_env
-import launchpad as lp
-import reverb
 import sonnet as snt
 from acme import specs as acme_specs
-from acme.tf import utils as tf2_utils
-from acme.utils import counting, loggers
 
-import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedQValueActorCritic
@@ -37,9 +31,10 @@ from mava.systems.tf.mad4pg import builder, training
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
+from mava.systems.tf.maddpg.system import MADDPG
 
 
-class MAD4PG:
+class MAD4PG(MADDPG):
     """MAD4PG system.
     This implements a single-process D4PG system. This is an actor-critic based
     system that generates data via a behavior policy, inserts N-step transitions into
@@ -55,8 +50,9 @@ class MAD4PG:
         architecture: Type[
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
-        trainer_fn: Type[
-            training.BaseMAD4PGTrainer
+        trainer_fn: Union[
+            Type[training.BaseMAD4PGTrainer],
+            Type[training.BaseRecurrentMAD4PGTrainer],
         ] = training.DecentralisedMAD4PGTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         num_executors: int = 1,
@@ -115,15 +111,20 @@ class MAD4PG:
             period: Overlapping period of sequences used in recurrent
             training (if using recurrence).
             sigma: standard deviation of zero-mean, Gaussian exploration noise.
+<<<<<<< HEAD
             clipping: whether to clip gradients by global norm.
+=======
+            max_gradient_norm:
+            logger: logger object to be used by trainers.
+>>>>>>> faebbc14bf962468577340df02ce44c1296490bb
             counter: counter object used to keep track of steps.
             checkpoint: boolean indicating whether to checkpoint the trainers.
             checkpoint_subpath: directory for checkpoints.
             replay_table_name: string indicating what name to give the replay table.
             train_loop_fn: loop for training.
             eval_loop_fn: loop for evaluation.
-
         """
+<<<<<<< HEAD
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
@@ -360,52 +361,41 @@ class MAD4PG:
             counter=counter,
             logger=eval_logger,
             **self._eval_loop_fn_kwargs,
+=======
+        super().__init__(
+            environment_factory=environment_factory,
+            network_factory=network_factory,
+            architecture=architecture,
+            trainer_fn=trainer_fn,
+            executor_fn=executor_fn,
+            num_executors=num_executors,
+            num_caches=num_caches,
+            environment_spec=environment_spec,
+            shared_weights=shared_weights,
+            discount=discount,
+            batch_size=batch_size,
+            prefetch_size=prefetch_size,
+            target_update_period=target_update_period,
+            executor_variable_update_period=executor_variable_update_period,
+            min_replay_size=min_replay_size,
+            max_replay_size=max_replay_size,
+            samples_per_insert=samples_per_insert,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            n_step=n_step,
+            sequence_length=sequence_length,
+            period=period,
+            sigma=sigma,
+            max_gradient_norm=max_gradient_norm,
+            max_executor_steps=max_executor_steps,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+            trainer_logger=trainer_logger,
+            exec_logger=exec_logger,
+            eval_logger=eval_logger,
+            train_loop_fn=train_loop_fn,
+            eval_loop_fn=eval_loop_fn,
+            train_loop_fn_kwargs=train_loop_fn_kwargs,
+            eval_loop_fn_kwargs=eval_loop_fn_kwargs,
+>>>>>>> faebbc14bf962468577340df02ce44c1296490bb
         )
-
-        eval_loop = DetailedPerAgentStatistics(eval_loop)
-        return eval_loop
-
-    def build(self, name: str = "mad4pg") -> Any:
-        """Build the distributed system topology."""
-        program = lp.Program(name=name)
-
-        with program.group("replay"):
-            replay = program.add_node(lp.ReverbNode(self.replay))
-
-        with program.group("counter"):
-            counter = program.add_node(lp.CourierNode(self.counter))
-
-        if self._max_executor_steps:
-            with program.group("coordinator"):
-                _ = program.add_node(lp.CourierNode(self.coordinator, counter))
-
-        with program.group("trainer"):
-            trainer = program.add_node(lp.CourierNode(self.trainer, replay, counter))
-
-        with program.group("evaluator"):
-            program.add_node(lp.CourierNode(self.evaluator, trainer, counter))
-
-        if not self._num_caches:
-            # Use the trainer as a single variable source.
-            sources = [trainer]
-        else:
-            with program.group("cacher"):
-                # Create a set of trainer caches.
-                sources = []
-                for _ in range(self._num_caches):
-                    cacher = program.add_node(
-                        lp.CacherNode(
-                            trainer, refresh_interval_ms=2000, stale_after_ms=4000
-                        )
-                    )
-                    sources.append(cacher)
-
-        with program.group("executor"):
-            # Add executors which pull round-robin from our variable sources.
-            for executor_id in range(self._num_exectors):
-                source = sources[executor_id % len(sources)]
-                program.add_node(
-                    lp.CourierNode(self.executor, executor_id, replay, source, counter)
-                )
-
-        return program
