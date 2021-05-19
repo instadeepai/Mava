@@ -1,12 +1,11 @@
 """Distributions, for use in acme/networks/distributional.py."""
-
 from typing import Any, Dict, Tuple, Union
 
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
-import tensorflow_probability.distributions as tfd
+from tensorflow_probability import distributions as tfd
 
 
 class DiscreteValuedHead(snt.Module):

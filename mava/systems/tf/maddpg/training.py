@@ -31,6 +31,7 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
@@ -1079,7 +1080,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 discount = tf.cast(self._discount, dtype=agent_discount.dtype)
 
                 # Critic loss.
-                critic_loss = train_utils.maddp4g_critic(
+                critic_loss = recurrent_n_step_critic_loss(
                     q_values,
                     rewards[agent],
                     discount * agent_discount,
