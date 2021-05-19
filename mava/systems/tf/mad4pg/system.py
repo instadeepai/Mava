@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
+import functools
 from typing import Any, Callable, Dict, Type
 
 import acme
@@ -34,7 +35,7 @@ from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.mad4pg import builder, training
 from mava.utils import lp_utils
-from mava.utils.loggers import MavaLogger
+from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
 
 
@@ -127,6 +128,15 @@ class MAD4PG:
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
                 environment_factory(evaluation=False)  # type: ignore
+            )
+
+        # set default logger if no logger provided
+        if not logger_factory:
+            logger_factory = functools.partial(
+                logger_utils.make_logger,
+                directory="~/mava",
+                to_terminal=True,
+                time_delta=10,
             )
 
         self._architecture = architecture

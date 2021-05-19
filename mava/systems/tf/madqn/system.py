@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Defines the MADQN system class."""
-
+import functools
 from typing import Any, Callable, Dict, Optional, Type, Union
 
 import acme
@@ -36,7 +36,7 @@ from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
 from mava.utils import lp_utils
-from mava.utils.loggers import MavaLogger
+from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
 
 
@@ -87,6 +87,15 @@ class MADQN:
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
                 environment_factory(evaluation=False)  # type: ignore
+            )
+
+        # set default logger if no logger provided
+        if not logger_factory:
+            logger_factory = functools.partial(
+                logger_utils.make_logger,
+                directory="~/mava",
+                to_terminal=True,
+                time_delta=10,
             )
 
         self._architecture = architecture
