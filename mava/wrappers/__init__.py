@@ -24,6 +24,7 @@ from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
+from mava.wrappers.starcraft import SMACEnvWrapper
 from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
     NetworkStatisticsActorCritic,

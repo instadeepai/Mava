@@ -17,12 +17,18 @@
 
 """Wraps a StarCraft II MARL environment (SMAC) as a dm_env environment."""
 import random
-from typing import Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
 
+import dm_env
 import numpy as np
+from acme import specs
+from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym.spaces import Box, Discrete
+from pettingzoo.utils.env import ParallelEnv
 from smac.env import StarCraft2Env  # type:ignore
 
+from mava import types
+from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper  # , SequentialEnvWrapper
 
 
@@ -39,8 +45,9 @@ class SMACEnvWrapper(ParallelEnvWrapper):
             smac_args (dict): Arguments to pass to the underlying
                 smac.env.starcraft.StarCraft2Env instance.
         """
-
         self._environment = StarCraft2Env(**smac_args)
+
+        self._reset_next_step = True
         self._ready_agents: List = []
         self.observation_space = Dict(
             {
@@ -50,23 +57,50 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         )
         self.action_space: Type[Discrete] = Discrete(self._env.get_total_actions())
 
-    def reset(self) -> Dict:
+    def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
         """Resets the env and returns observations from ready agents.
         Returns:
             obs (dict): New observations for each ready agent.
         """
+        self._reset_next_step = False
+        self._step_type = dm_env.StepType.FIRST
+
+        # TODO Check the form of this state list and convert for return.
         obs_list, state_list = self._env.reset()
-        return_obs = {}
+        observe: Dict[str, np.ndarray] = {}
         for i, obs in enumerate(obs_list):
-            return_obs[i] = {
+            agent = f"agent_{i}"
+            observe[agent] = {  # TODO Only obs in this Dict or mask too?
                 "action_mask": np.array(self._env.get_avail_agent_actions(i)),
                 "obs": obs,
             }
 
         self._ready_agents = list(range(len(obs_list)))
-        return return_obs  # TODO return global state for Mixers
 
-    def step(self, action_dict: Dict) -> Tuple:
+        discount_spec = self.discount_spec()
+        self._discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self._environment.possible_agents
+        }
+        observations = self._convert_observations(
+            observe, {agent: False for agent in self.possible_agents}
+        )
+        rewards_spec = self.reward_spec()
+        rewards = {
+            agent: convert_np_type(rewards_spec[agent].dtype, 0)
+            for agent in self.possible_agents
+        }
+        discount_spec = self.discount_spec()
+        self._discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self.possible_agents
+        }
+
+        timestep = parameterized_restart(rewards, self._discounts, observations)
+
+        return timestep, {"s_t": state_list}  # TODO Convert this to correct form
+
+    def step(self, action_dict: Dict) -> Tuple[dm_env.TimeStep, np.array]:
         """Returns observations from ready agents.
         The returns are dicts mapping from agent_id strings to values. The
         number of agents in the env can vary over time.
@@ -79,6 +113,8 @@ class SMACEnvWrapper(ParallelEnvWrapper):
                 "__all__" (required) is used to indicate env termination.
             infos (dict): Optional info values for each agent id.
         """
+        if self._reset_next_step:
+            return self.reset()
 
         actions = []
         for i in self._ready_agents:
@@ -92,20 +128,51 @@ class SMACEnvWrapper(ParallelEnvWrapper):
                     of ready agents (len(self._ready_agents))."
             )
 
-        rew, done, info = self._env.step(actions)
+        rewards, dones, infos = self._env.step(actions)
         obs_list = self._env.get_obs()
+
         return_obs = {}
         for i, obs in enumerate(obs_list):
             return_obs[i] = {
                 "action_mask": self._env.get_avail_agent_actions(i),
                 "obs": obs,
             }
-        rews = {i: rew / len(obs_list) for i in range(len(obs_list))}
-        dones = {i: done for i in range(len(obs_list))}
-        infos = {i: info for i in range(len(obs_list))}
-
+        rewards = {i: rewards / len(obs_list) for i in range(len(obs_list))}
+        dones = {i: dones for i in range(len(obs_list))}
+        infos = {i: infos for i in range(len(obs_list))}
         self._ready_agents = list(range(len(obs_list)))
-        return return_obs, rews, dones, infos
+
+        rewards_spec = self.reward_spec()
+
+        #  Handle empty rewards
+        if not rewards:
+            rewards = {
+                agent: convert_np_type(rewards_spec[agent].dtype, 0)
+                for agent in self.possible_agents
+            }
+        else:
+            rewards = {
+                agent: convert_np_type(rewards_spec[agent].dtype, reward)
+                for agent, reward in rewards.items()
+            }
+
+        if return_obs:
+            return_obs = self._convert_observations(return_obs, dones)
+
+        if self.env_done():
+            self._step_type = dm_env.StepType.LAST
+            self._reset_next_step = True
+        else:
+            self._step_type = dm_env.StepType.MID
+
+        timestep = dm_env.TimeStep(
+            observation=return_obs,
+            reward=rewards,
+            discount=self._discounts,
+            step_type=self._step_type,
+        )
+
+        return timestep  # TODO return global state as well
 
     def env_done(self) -> bool:
         """
@@ -113,19 +180,64 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         """
         return self._environment.env_done  # TODO Check SMAC has this function
 
+    def observation_spec(self) -> types.Observation:
+        observation_specs = {}
+        for agent in self._environment.possible_agents:
+            observation_specs[agent] = types.OLT(
+                observation=_convert_to_spec(
+                    self._environment.observation_spaces[agent]
+                ),
+                legal_actions=_convert_to_spec(self._environment.action_spaces[agent]),
+                terminal=specs.Array((1,), np.float32),
+            )
+        return observation_specs
+
+    def action_spec(self) -> Dict[str, specs.DiscreteArray]:
+        action_specs = {}
+        for agent in self._environment.possible_agents:
+            action_specs[agent] = _convert_to_spec(
+                self._environment.action_spaces[agent]
+            )
+        return action_specs
+
+    def reward_spec(self) -> Dict[str, specs.Array]:
+        reward_specs = {}
+        for agent in self._environment.possible_agents:
+            reward_specs[agent] = specs.Array((), np.float32)
+
+        return reward_specs
+
+    def discount_spec(self) -> Dict[str, specs.BoundedArray]:
+        discount_specs = {}
+        for agent in self._environment.possible_agents:
+            discount_specs[agent] = specs.BoundedArray(
+                (), np.float32, minimum=0, maximum=1.0
+            )
+        return discount_specs
+
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        return {}
+
     @property
     def agents(self) -> List:
-        """
-        Returns the active agents in the env.
-        """
-        return NotImplementedError  # type:ignore
+        return self._environment.agents
 
     @property
     def possible_agents(self) -> List:
-        """
-        Returns all the possible agents in the env.
-        """
-        return NotImplementedError  # type:ignore
+        return self._environment.possible_agents
+
+    @property
+    def environment(self) -> ParallelEnv:
+        """Returns the wrapped environment."""
+        return self._environment
+
+    @property
+    def current_agent(self) -> Any:
+        return self._environment.agent_selection
+
+    def __getattr__(self, name: str) -> Any:
+        """Expose any other attributes of the underlying environment."""
+        return getattr(self._environment, name)
 
     # Note sure we need these next methods. Comes from RLlib wrapper.
     def close(self) -> None:
