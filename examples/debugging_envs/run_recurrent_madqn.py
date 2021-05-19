@@ -13,23 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MAD4PG on debug MPE environments."""
-
+import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import launchpad as lp
-import numpy as np
 import sonnet as snt
+import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
-from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.components.tf.networks.mad4pg import DiscreteValuedHead
-from mava.systems.tf import mad4pg
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.networks import epsilon_greedy_action_selector
+from mava.systems.tf import madqn
+from mava.systems.tf.madqn.execution import MADQNRecurrentExecutor
+from mava.systems.tf.madqn.training import RecurrentMADQNTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
@@ -42,9 +43,10 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string(
     "action_space",
-    "continuous",
+    "discrete",
     "Environment action space type (str).",
 )
+
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
@@ -55,19 +57,15 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        256,
-        256,
+    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+        512,
+        512,
         256,
     ),
-    critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
-    sigma: float = 0.3,
-    vmin: float = -150.0,
-    vmax: float = 150.0,
-    num_atoms: int = 51,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
+
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
@@ -75,65 +73,53 @@ def make_networks(
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
-    if isinstance(policy_networks_layer_sizes, Sequence):
-        policy_networks_layer_sizes = {
-            key: policy_networks_layer_sizes for key in specs.keys()
-        }
-    if isinstance(critic_networks_layer_sizes, Sequence):
-        critic_networks_layer_sizes = {
-            key: critic_networks_layer_sizes for key in specs.keys()
-        }
+    if isinstance(q_networks_layer_sizes, Sequence):
+        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
-    observation_networks = {}
-    policy_networks = {}
-    critic_networks = {}
+    def action_selector_fn(
+        q_values: types.NestedTensor,
+        legal_actions: types.NestedTensor,
+        epsilon: Optional[tf.Variable] = None,
+    ) -> types.NestedTensor:
+        return epsilon_greedy_action_selector(
+            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
+        )
+
+    q_networks = {}
+    action_selectors = {}
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
-        num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
-
-        # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        num_dimensions = specs[key].actions.num_values
 
         # Create the policy network.
-        policy_network = snt.Sequential(
+        q_network = snt.DeepRNN(
             [
                 networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key], activate_final=True
+                    q_networks_layer_sizes[key], activate_final=False
                 ),
+                snt.LSTM(25),
+                snt.nets.MLP([128]),
                 networks.NearZeroInitializedLinear(num_dimensions),
-                networks.TanhToSpec(specs[key].actions),
-                networks.ClippedGaussian(sigma),
-                networks.ClipToSpec(specs[key].actions),
             ]
         )
 
-        # Create the critic network.
-        critic_network = snt.Sequential(
-            [
-                # The multiplexer concatenates the observations/actions.
-                networks.CriticMultiplexer(),
-                networks.LayerNormMLP(
-                    critic_networks_layer_sizes[key], activate_final=False
-                ),
-                DiscreteValuedHead(vmin, vmax, num_atoms),
-            ]
-        )
-        observation_networks[key] = observation_network
-        policy_networks[key] = policy_network
-        critic_networks[key] = critic_network
+        # epsilon greedy action selector
+        action_selector = action_selector_fn
+
+        q_networks[key] = q_network
+        action_selectors[key] = action_selector
 
     return {
-        "policies": policy_networks,
-        "critics": critic_networks,
-        "observations": observation_networks,
+        "q_networks": q_networks,
+        "action_selectors": action_selectors,
     }
 
 
 def main(_: Any) -> None:
 
     # environment
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
@@ -175,17 +161,22 @@ def main(_: Any) -> None:
     )
 
     # distributed program
-    program = mad4pg.MAD4PG(
+    program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        trainer_fn=RecurrentMADQNTrainer,
+        executor_fn=MADQNRecurrentExecutor,
+        exploration_scheduler_fn=LinearExplorationScheduler,
+        epsilon_min=0.05,
+        epsilon_decay=5e-4,
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        max_gradient_norm=40.0,
         trainer_logger=trainer_logger,
         exec_logger=exec_logger,
         eval_logger=eval_logger,
+        n_step=1,
+        batch_size=32,
     ).build()
 
     # launch
