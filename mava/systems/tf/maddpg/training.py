@@ -1058,7 +1058,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 obs_comb, dims = train_utils.combine_dim(obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(action_feed)
                 flat_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
-                q_values = train_utils.extract_dim(flat_q_values, dims)
+                q_values = train_utils.extract_dim(flat_q_values, dims)[:, :, 0]
 
                 # Remove first sequence step for the target
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
@@ -1075,16 +1075,17 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
-                agent_discount = discounts[agent][:, :, 0]
+                agent_discount = discounts[agent]
                 discount = tf.cast(self._discount, dtype=agent_discount.dtype)
 
                 # Critic loss.
-                critic_loss = train_utils.maddpg_critic(
+                critic_loss = train_utils.maddp4g_critic(
                     q_values,
                     rewards[agent],
                     discount * agent_discount,
                     target_q_values,
                     bootstrap_n=self._bootstrap_n,
+                    loss_fn=trfl.td_learning,
                 )
 
                 self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)

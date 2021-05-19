@@ -34,6 +34,7 @@ from mava.systems.tf.maddpg.training import (
     StateBasedMADDPGTrainer,
     StateBasedRecurrentMADDPGTrainer,
 )
+from mava.utils import training_utils as train_utils
 
 
 class BaseMAD4PGTrainer(BaseMADDPGTrainer):
@@ -535,33 +536,42 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
 
                 # Critic learning.
                 # Remove the last sequence step for the normal network
-                obs_comb, _ = self._combine_dim(obs_trans_feed[:, :-1])
-                act_comb, _ = self._combine_dim(action_feed[:, :-1])
-                q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                obs_comb, dims = train_utils.combine_dim(obs_trans_feed)
+                act_comb, _ = train_utils.combine_dim(action_feed)
+                flat_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
 
+                print("flat_q_values: ", flat_q_values)
+
+                print("flat_q_values: ", flat_q_values.reshape(dims))
+
+                print("dims: ", dims)
+
+                q_values = train_utils.extract_dim(flat_q_values, dims)[:, :, 0]
+                print("Done.")
+                exit()
                 # Remove first sequence step for the target
-                obs_comb, _ = self._combine_dim(target_obs_trans_feed[:, 1:])
-                act_comb, _ = self._combine_dim(target_actions_feed[:, 1:])
-                target_q_values = self._target_critic_networks[agent_key](
+                obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
+                act_comb, _ = train_utils.combine_dim(target_actions_feed)
+                flat_target_q_values = self._target_critic_networks[agent_key](
                     obs_comb, act_comb
                 )
+                target_q_values = train_utils.extract_dim(flat_target_q_values, dims)[
+                    :, :, 0
+                ]
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
-                discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
+                agent_discount = discounts[agent]
+                discount = tf.cast(self._discount, dtype=agent_discount.dtype)
 
                 # Critic loss.
-                # Compute the transformed n-step loss.
-                # TODO (dries): Is discounts and rewards correct?
-                #  Or should it be [:, 1:]?
-
-                agent_rewards, _ = self._combine_dim(rewards[agent][:, :-1])
-                agent_discounts, _ = self._combine_dim(discounts[agent][:, :-1])
-
-                # Critic loss.
-                # TODO (dries): Change the critic losses to n step return losses?
-                critic_loss = losses.categorical(
-                    q_values, agent_rewards, discount * agent_discounts, target_q_values
+                critic_loss = train_utils.maddp4g_critic(
+                    q_values,
+                    rewards[agent],
+                    discount * agent_discount,
+                    target_q_values,
+                    bootstrap_n=self._bootstrap_n,
+                    loss_fn=losses.categorical,
                 )
                 self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
 
