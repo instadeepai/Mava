@@ -1,5 +1,5 @@
 from typing import Any, Dict
-
+from typing import Iterable, Sequence
 import sonnet as snt
 import tensorflow as tf
 import trfl
@@ -43,28 +43,34 @@ def maddpg_critic(
     target_q_values: tf.Tensor,
     rewards: tf.Tensor,
     discounts: tf.Tensor,
+    bootstrap_n: int,
 ) -> tf.Tensor:
 
-    # TODO (dries): Fix this. Was just for debugging
-    bootstrap_n = int(len(rewards[0]) / 2)
+    assert bootstrap_n < len(rewards[0])
+
+    print("q_values: ", q_values.shape)
+    print("target_q_values: ", target_q_values.shape)
+    print("rewards: ", rewards.shape)
+    print("discounts: ", discounts.shape)
+
+    exit()
 
     # Require correct tensor ranks---as long as we have shape information
     # available to check. If there isn't any, we print a warning.
-    # def check_rank(tensors: Iterable[tf.Tensor], ranks: Sequence[int]):
-    #     for i, (tensor, rank) in enumerate(zip(tensors, ranks)):
-    #         if tensor.get_shape():
-    #             trfl.assert_rank_and_shape_compatibility([tensor], rank)
-    #         else:
-    #             raise ValueError(
-    #                 f'Tensor "{tensor.name}",
-    #                 which was offered as transformed_n_step_loss'
-    #                 f'parameter {i+1}, has no rank at construction
-    #                 time, so cannot verify'
-    #                 f'that it has the necessary rank of {rank}')
-    #
-    # check_rank(
-    #     [q_values, target_q_values, rewards, discounts],
-    #     [3, 3, 2, 2])
+    def check_rank(tensors: Iterable[tf.Tensor], ranks: Sequence[int]):
+        for i, (tensor, rank) in enumerate(zip(tensors, ranks)):
+            if tensor.get_shape():
+                trfl.assert_rank_and_shape_compatibility([tensor], rank)
+            else:
+                raise ValueError(
+                    f'Tensor "{tensor.name}", which was offered as '
+                    f'transformed_n_step_loss parameter {i+1}, has '
+                    f'no rank at construction time, so cannot verify'
+                    f'that it has the necessary rank of {rank}')
+
+    check_rank(
+        [q_values, target_q_values, rewards, discounts],
+        [2, 3, 2, 2])
 
     # Construct arguments to compute bootstrap target.
     # TODO (dries): Why is some tensors different in shape than the other.
@@ -81,10 +87,6 @@ def maddpg_critic(
     n_step_rewards, _ = combine_dim(n_step_rewards)
     n_step_discount, _ = combine_dim(n_step_discount)
     q_t, _ = combine_dim(q_t)
-
-    # print("bootstrap_n: ", bootstrap_n)
-    # print("n_step_rewards: ", n_step_rewards)
-    # print("n_step_discount: ", n_step_discount[:, 0])
 
     critic_loss = trfl.td_learning(
         q_tm1,

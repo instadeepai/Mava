@@ -748,6 +748,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        bootstrap_n: int = 10,
     ):
         """Initializes the learner.
         Args:
@@ -776,6 +777,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         self._agent_types = agent_types
         self._shared_weights = shared_weights
         self._checkpoint = checkpoint
+        self._bootstrap_n = bootstrap_n
 
         # Store online and target networks.
         self._policy_networks = policy_networks
@@ -1073,17 +1075,13 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 # the environment discount dtype.
                 discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
 
-                # print("q_values: ", q_values.shape)
-                # print("rewards: ", rewards[agent].shape)
-                # print("discounts: ", (discount * discounts[agent]).shape)
-                # print("target_q_values: ", target_q_values.shape)
-
                 # Critic loss.
                 critic_loss = train_utils.maddpg_critic(
                     q_values,
                     rewards[agent],
                     discount * discounts[agent],
                     target_q_values,
+                    bootstrap_n=self._bootstrap_n,
                 )
 
                 self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
