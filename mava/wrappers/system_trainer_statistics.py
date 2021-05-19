@@ -23,7 +23,7 @@ import tensorflow as tf
 from acme.utils import loggers
 
 import mava
-from mava.systems.tf.madqn import MADQNTrainer
+from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.utils import training_utils as train_utils
 from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics
@@ -71,14 +71,9 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         self._compute_statistics(fetches)
 
         # Compute elapsed time.
-        # NOTE (Arnu): getting type issues with the timestamp
-        # not sure why. Look into a fix for this.
         timestamp = time.time()
-        if self._timestamp:  # type: ignore
-            elapsed_time = timestamp - self._timestamp  # type: ignore
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp: float = timestamp
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
@@ -179,15 +174,9 @@ class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
         # compute statistics
         self._compute_statistics(fetches)
 
-        # Compute elapsed time.
-        # NOTE (Arnu): getting type issues with the timestamp
-        # not sure why. Look into a fix for this.
         timestamp = time.time()
-        if self._timestamp:  # type: ignore
-            elapsed_time = timestamp - self._timestamp  # type: ignore
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp = timestamp
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
