@@ -143,8 +143,6 @@ def make_networks(
 
 
 def main(_: Any) -> None:
-    # set loggers info
-    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
     # environment
     environment_factory = lp_utils.partial_kwargs(
@@ -175,7 +173,6 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=5,
         batch_size=1,
-        log_info=log_info,
         checkpoint_subpath=checkpoint_dir,
     ).build()
 

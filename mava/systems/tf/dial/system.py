@@ -14,7 +14,7 @@
 
 """DIAL system implementation."""
 import functools
-from typing import Any, Callable, Dict, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Optional, Type
 
 import acme
 import dm_env
