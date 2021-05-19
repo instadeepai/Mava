@@ -32,7 +32,8 @@ jobs:
           # For atari envs
           sudo apt-get update
           sudo apt-get install unrar
-          pip install autorom && echo y | AutoROM
+          pip install autorom
+          AutoROM -v
           # Open CV and Headless screen.
           sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
       - name: Format code
