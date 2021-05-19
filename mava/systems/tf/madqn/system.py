@@ -24,7 +24,7 @@ import launchpad as lp
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
-from acme.utils import counting, loggers
+from acme.utils import counting
 
 import mava
 from mava import core
@@ -40,7 +40,30 @@ from mava.wrappers import DetailedPerAgentStatistics
 
 
 class MADQN:
-    """Program definition for MADQN."""
+    """MADQN system.
+    This implements a single-process QMIX system.
+    Args:
+        environment_spec: description of the actions, observations, etc.
+        q_networks: the online Q network (the one being optimized)
+        epsilon: probability of taking a random action; ignored if a policy
+            network is given.
+        trainer_fn: the class used for training the agent and mixing networks.
+        shared_weights: boolean determining whether shared weights is used.
+        target_update_period: number of learner steps to perform before updating
+            the target networks.
+        clipping: whether to clip gradients by global norm.
+        replay_table_name: string indicating what name to give the replay table.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        prefetch_size: size to prefetch from replay.
+        batch_size: batch size for updates.
+        n_step: number of steps to squash into a single transition.
+        discount: discount to use for TD updates.
+        counter: counter object used to keep track of steps.
+        logger: logger object to be used by trainers.
+        checkpoint: boolean indicating whether to checkpoint the learner.
+    """
 
     def __init__(
         self,
@@ -83,7 +106,7 @@ class MADQN:
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
-                environment_factory(evaluation=False)  # type: ignore
+                environment_factory(evaluation=False)  # type:ignore
             )
 
         self._architecture = architecture
@@ -234,7 +257,6 @@ class MADQN:
         self,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        logger: loggers.Logger = None,
     ) -> Any:
         """The evaluation process."""
 
