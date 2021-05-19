@@ -15,6 +15,7 @@
 
 
 """Executor implementations for MADQN."""
+
 from typing import Dict, Optional
 
 import dm_env
@@ -102,7 +103,6 @@ class MADQNFeedForwardExecutor(core.Executor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-
         if self._adder:
             self._adder.add_first(timestep, extras)
 

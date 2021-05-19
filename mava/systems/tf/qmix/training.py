@@ -25,15 +25,15 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 from trfl.indexing_ops import batched_index
 
-import mava
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
 from mava.systems.tf import savers as tf2_savers
+from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.utils import training_utils as train_utils
 
 
-class QMIXTrainer(mava.Trainer):
+class QMIXTrainer(MADQNTrainer):
     """QMIX trainer.
     This is the trainer component of a QMIX system. i.e. it takes a dataset as input
     and implements update functionality to learn from this dataset.

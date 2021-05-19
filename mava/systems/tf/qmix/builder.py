@@ -25,11 +25,11 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
+from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.systems.tf.qmix import execution, training
 from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
 # TODO Clean up documentation
-# TODO (Arnu): For St John - Have VDN, QMIX inherit from MADQN and import stats wrapper
 
 
 @dataclasses.dataclass
@@ -66,7 +66,7 @@ class QMIXBuilder(MADQNBuilder):
     def __init__(
         self,
         config: QMIXConfig,
-        trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
+        trainer_fn: Type[MADQNTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
