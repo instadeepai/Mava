@@ -147,6 +147,7 @@ class DIAL(system.System):
         self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
+        self._logger_config = logger_config
 
         extra_specs = self._get_extra_specs()
 

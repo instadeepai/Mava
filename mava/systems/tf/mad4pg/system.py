@@ -146,6 +146,7 @@ class MAD4PG(MADDPG):
             max_executor_steps=max_executor_steps,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            logger_config=logger_config,
             train_loop_fn=train_loop_fn,
             eval_loop_fn=eval_loop_fn,
             train_loop_fn_kwargs=train_loop_fn_kwargs,
