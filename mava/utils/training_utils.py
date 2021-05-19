@@ -1,5 +1,5 @@
-from typing import Any, Dict
-from typing import Iterable, Sequence
+from typing import Any, Dict, Iterable, Sequence
+
 import sonnet as snt
 import tensorflow as tf
 import trfl
@@ -48,33 +48,32 @@ def maddpg_critic(
 
     assert bootstrap_n < len(rewards[0])
 
-    print("q_values: ", q_values.shape)
-    print("target_q_values: ", target_q_values.shape)
-    print("rewards: ", rewards.shape)
-    print("discounts: ", discounts.shape)
-
-    exit()
+    # print("q_values: ", q_values.shape)
+    # print("target_q_values: ", target_q_values.shape) # extra
+    # print("rewards: ", rewards.shape)
+    # print("discounts: ", discounts.shape) # extra
+    #
+    # exit()
 
     # Require correct tensor ranks---as long as we have shape information
     # available to check. If there isn't any, we print a warning.
-    def check_rank(tensors: Iterable[tf.Tensor], ranks: Sequence[int]):
+    def check_rank(tensors: Iterable[tf.Tensor], ranks: Sequence[int]) -> None:
         for i, (tensor, rank) in enumerate(zip(tensors, ranks)):
             if tensor.get_shape():
                 trfl.assert_rank_and_shape_compatibility([tensor], rank)
             else:
                 raise ValueError(
                     f'Tensor "{tensor.name}", which was offered as '
-                    f'transformed_n_step_loss parameter {i+1}, has '
-                    f'no rank at construction time, so cannot verify'
-                    f'that it has the necessary rank of {rank}')
+                    f"transformed_n_step_loss parameter {i+1}, has "
+                    f"no rank at construction time, so cannot verify"
+                    f"that it has the necessary rank of {rank}"
+                )
 
-    check_rank(
-        [q_values, target_q_values, rewards, discounts],
-        [2, 3, 2, 2])
+    check_rank([q_values, target_q_values, rewards, discounts], [2, 2, 2, 2])
 
     # Construct arguments to compute bootstrap target.
     # TODO (dries): Why is some tensors different in shape than the other.
-    q_tm1 = q_values[:, 0:-bootstrap_n, 0]
+    q_tm1 = q_values[:, 0:-bootstrap_n]
     q_t = target_q_values[:, bootstrap_n:]
 
     n_step_rewards = rewards[:, :bootstrap_n]
@@ -91,7 +90,7 @@ def maddpg_critic(
     critic_loss = trfl.td_learning(
         q_tm1,
         n_step_rewards,
-        n_step_discount[:, 0],
+        n_step_discount,
         q_t,
     ).loss
 
