@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.4.1-gpu
+FROM tensorflow/tensorflow:2.5.0-gpu
 
 RUN apt-get -y --fix-missing update
 
@@ -11,8 +11,10 @@ ENV CUDA_DEVICE_ORDER=PCI_BUS_ID
 ENV TF_CPP_MIN_LOG_LEVEL=3
 
 # PettingZoo
-RUN python -m pip install autorom  && echo y | AutoROM
 RUN apt-get install unrar
+RUN python -m pip install autorom
+RUN AutoROM -v
+
 
 # OpenCV
 RUN apt-get update
