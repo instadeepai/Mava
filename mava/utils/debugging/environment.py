@@ -152,7 +152,7 @@ class MultiAgentEnv(gym.Env):
 
         return obs_n, reward_n, done_n, state_n
 
-    def reset(self) -> Dict[str, np.array]:
+    def reset(self) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         # reset world
         if self.reset_callback is not None:
             self.reset_callback(self.world)
@@ -166,7 +166,8 @@ class MultiAgentEnv(gym.Env):
         for a_i, agent_id in enumerate(self.agent_ids):
             agent = self.agents[agent_id]
             obs_n[agent_id] = self._get_obs(a_i, agent)
-        return obs_n
+        state_n = self._get_state()
+        return obs_n, {"s_t": state_n}
 
     # get info used for benchmarking
     def _get_info(self, agent: Agent) -> Dict:
@@ -208,8 +209,11 @@ class MultiAgentEnv(gym.Env):
             agent_pos.append(agent.state.p_pos)
             agent_vel.append(agent.state.p_vel)
 
-        return np.concatenate(
-            [[self.world.current_step / 50]] + entity_pos + agent_pos + agent_vel
+        return np.array(
+            np.concatenate(
+                [[self.world.current_step / 50]] + entity_pos + agent_pos + agent_vel
+            ),
+            dtype=np.float32,
         )
 
     # set env action for a particular agent

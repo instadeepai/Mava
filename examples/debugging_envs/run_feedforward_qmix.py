@@ -37,7 +37,7 @@ from mava.utils.loggers import Logger
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
-    "two_step",  # "simple_spread",
+    "simple_spread",  # "two_step" for Two Step Environment
     "Debugging environment name (str).",
 )
 flags.DEFINE_string(
@@ -62,7 +62,7 @@ flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64,),
+    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -123,6 +123,7 @@ def main(_: Any) -> None:
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
         num_agents=2,
+        return_state_info=True,
     )
 
     # networks

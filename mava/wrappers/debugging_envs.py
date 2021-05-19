@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Wraps a Debugging MARL environment to be used as a dm_env environment."""
-from typing import Any, Dict, Tuple
+from typing import Dict, Tuple
 
 import dm_env
 import numpy as np
@@ -30,8 +30,6 @@ from mava.utils.debugging.environments.switch_game import MultiAgentSwitchGame
 from mava.utils.debugging.environments.two_step import TwoStepEnv
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
-
-# from gym import spaces
 
 
 class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
@@ -81,9 +79,8 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             discount=self._discounts,
             step_type=self._step_type,
         )
-
         if self.return_state_info:
-            return timestep, {"env_state": state}
+            return timestep, {"s_t": state}
         else:
             return timestep
 
@@ -127,9 +124,18 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             )
         return observation_specs
 
-    def __getattr__(self, name: str) -> Any:
-        """Expose any other attributes of the underlying environment."""
-        return getattr(self._environment, name)
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        shape = self.environment._get_state().shape
+
+        spec = specs.BoundedArray(
+            shape=shape,
+            dtype="float32",
+            name="observation",
+            minimum=[float("-inf")] * shape[0],
+            maximum=[float("inf")] * shape[0],
+        )
+
+        return {"s_t": spec}
 
 
 class SwitchGameWrapper(PettingZooParallelEnvWrapper):
