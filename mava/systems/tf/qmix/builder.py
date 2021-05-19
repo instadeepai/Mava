@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import dataclasses
-import time
 from typing import Any, Dict, Iterator, List, Optional, Type
 
 import reverb
@@ -29,57 +28,10 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
 from mava.systems.tf.qmix import execution, training
-from mava.utils import training_utils as train_utils
-from mava.wrappers import DetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
 # TODO Clean up documentation
 # TODO (Arnu): For St John - Have VDN, QMIX inherit from MADQN and import stats wrapper
-
-
-class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
-    def __init__(
-        self,
-        trainer: training.QMIXTrainer,
-        metrics: List[str] = ["q_value_loss"],
-        summary_stats: List = ["mean", "max", "min", "var", "std"],
-    ) -> None:
-        super().__init__(trainer, metrics, summary_stats)
-
-    def get_epsilon(self) -> float:
-        return self._trainer.get_epsilon()  # type: ignore
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        if self._require_loggers:
-            self._create_loggers(list(fetches.keys()))
-            self._require_loggers = False
-
-        # compute statistics
-        self._compute_statistics(fetches)
-
-        # Compute elapsed time.
-        # NOTE (Arnu): getting type issues with the timestamp
-        # not sure why. Look into a fix for this.
-        timestamp = time.time()
-        if self._timestamp:  # type: ignore
-            elapsed_time = timestamp - self._timestamp  # type: ignore
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        train_utils.checkpoint_networks(self._system_checkpointer)
-
-        fetches["epsilon"] = self.get_epsilon()
-        self._trainer._decrement_epsilon()  # type: ignore
-
-        if self._logger:
-            self._logger.write(fetches)
 
 
 @dataclasses.dataclass

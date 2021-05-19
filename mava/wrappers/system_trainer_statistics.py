@@ -153,6 +153,54 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
                 self._network_loggers[network].write(network_running_statistics)
 
 
+class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
+    """Custom DetailedTrainerStatistics class for exposing get_epsilon()"""
+
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+        metrics: List[str] = ["q_value_loss"],
+        summary_stats: List = ["mean", "max", "min", "var", "std"],
+    ) -> None:
+        super().__init__(trainer, metrics, summary_stats)
+
+    def get_epsilon(self) -> float:
+        return self._trainer.get_epsilon()  # type: ignore
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        if self._require_loggers:
+            self._create_loggers(list(fetches.keys()))
+            self._require_loggers = False
+
+        # compute statistics
+        self._compute_statistics(fetches)
+
+        # Compute elapsed time.
+        # NOTE (Arnu): getting type issues with the timestamp
+        # not sure why. Look into a fix for this.
+        timestamp = time.time()
+        if self._timestamp:  # type: ignore
+            elapsed_time = timestamp - self._timestamp  # type: ignore
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        train_utils.checkpoint_networks(self._system_checkpointer)
+
+        fetches["epsilon"] = self.get_epsilon()
+        self._trainer._decrement_epsilon()  # type: ignore
+
+        if self._logger:
+            self._logger.write(fetches)
+
+
 # TODO(Kale-ab): Is there a better way to do this?
 # Maybe using hooks or callbacks.
 class NetworkStatisticsBase(TrainerWrapperBase):
