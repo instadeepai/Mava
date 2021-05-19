@@ -38,19 +38,19 @@ run-madqn:
 	$(DOCKER_RUN) python  $(MADQN) --base_dir /home/app/mava/logs/
 
 run-mappo:
-	$(DOCKER_RUN) python $(MAPPO)
+	$(DOCKER_RUN) python $(MAPPO) --base_dir /home/app/mava/logs/
 
 run-qmix:
 	$(DOCKER_RUN) python  $(QMIX) --base_dir /home/app/mava/logs/
 
 run-vdn:
-	$(DOCKER_RUN) python $(VDN)
+	$(DOCKER_RUN) python $(VDN) --base_dir /home/app/mava/logs/
 
 run-qmix-pz:
 	$(DOCKER_RUN) python $(QMIX-PZ) --base_dir /home/app/mava/logs/
 
 run-vdn-pz:
-	$(DOCKER_RUN) python $(VDN-PZ)
+	$(DOCKER_RUN) python $(VDN-PZ) --base_dir /home/app/mava/logs/
 
 bash:
 	$(DOCKER_RUN) bash
