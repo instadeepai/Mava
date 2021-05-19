@@ -17,6 +17,7 @@ import dataclasses
 import time
 from typing import Any, Dict, Iterator, List, Optional, Type
 
+import numpy as np
 import reverb
 import sonnet as snt
 from acme import datasets
@@ -28,6 +29,7 @@ from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
+from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf.madqn import execution, training
 from mava.utils import training_utils as train_utils
 from mava.wrappers import DetailedTrainerStatistics
@@ -50,6 +52,9 @@ class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
 
     def get_epsilon(self) -> float:
         return self._trainer.get_epsilon()  # type: ignore
+
+    def get_trainer_steps(self) -> float:
+        return self._trainer.get_trainer_steps()  # type: ignore
 
     def step(self) -> None:
         # Run the learning step.
@@ -142,6 +147,7 @@ class MADQNBuilder:
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
+        replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ):
         """Args:
         _config: Configuration options for the MADQN system.
@@ -152,6 +158,7 @@ class MADQNBuilder:
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
         self._exploration_scheduler_fn = exploration_scheduler_fn
+        self._replay_stabiliser_fn = replay_stabilisation_fn
 
     def make_replay_tables(
         self,
@@ -171,6 +178,9 @@ class MADQNBuilder:
                 samples_per_insert=self._config.samples_per_insert,
                 error_buffer=error_buffer,
             )
+            # Check if we should use fingerprints
+            if self._replay_stabiliser_fn is not None:
+                extras_spec = {"fingerprint": np.array([1.0, 1.0])}
 
         replay_table = reverb.Table(
             name=self._config.replay_table_name,
@@ -179,7 +189,7 @@ class MADQNBuilder:
             max_size=self._config.max_replay_size,
             rate_limiter=limiter,
             signature=reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec
+                environment_spec, extras_spec
             ),
         )
 
@@ -217,6 +227,7 @@ class MADQNBuilder:
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
         trainer: Optional[training.MADQNTrainer] = None,
+        evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -249,6 +260,9 @@ class MADQNBuilder:
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
+        # Check if we should use fingerprints
+        fingerprint = True if self._replay_stabiliser_fn is not None else False
+
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
@@ -257,6 +271,8 @@ class MADQNBuilder:
             variable_client=variable_client,
             adder=adder,
             trainer=trainer,
+            evaluator=evaluator,
+            fingerprint=fingerprint,
         )
 
     def make_trainer(
@@ -288,6 +304,9 @@ class MADQNBuilder:
             epsilon_decay=self._config.epsilon_decay,
         )
 
+        # Check if we should use fingerprints
+        fingerprint = True if self._replay_stabiliser_fn is not None else False
+
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
             agents=agents,
@@ -302,6 +321,7 @@ class MADQNBuilder:
             exploration_scheduler=exploration_scheduler,
             dataset=dataset,
             counter=counter,
+            fingerprint=fingerprint,
             logger=logger,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
