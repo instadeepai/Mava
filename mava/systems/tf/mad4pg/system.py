@@ -283,11 +283,8 @@ class MAD4PG:
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
 
-        # Update label to include exec id
-        exec_logger = None
-        if self._exec_logger:
-            exec_logger = copy.deepcopy(self._exec_logger)
-            exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
+        # Create executor logger
+        exec_logger = self._logger_factory(f"executor_{executor_id}")
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
