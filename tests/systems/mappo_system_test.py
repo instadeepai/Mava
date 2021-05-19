@@ -33,7 +33,6 @@ from mava import specs as mava_specs
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import logger_utils
 
 
 def make_networks(
@@ -146,17 +145,9 @@ class TestMAPPO:
         # system
         checkpoint_dir = f"{base_dir}/{mava_id}"
 
-        # loggers
-        logger_factory = functools.partial(
-            logger_utils.make_logger,
-            directory=base_dir,
-            to_terminal=False,
-        )
-
         system = mappo.MAPPO(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            logger_factory=logger_factory,
             num_executors=2,
             batch_size=32,
             max_queue_size=1000,

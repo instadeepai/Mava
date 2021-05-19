@@ -234,6 +234,7 @@ class MADDPG:
         )
 
         # create logger
+        trainer_logger_config = {}
         if self._logger_config:
             if "trainer" in self._logger_config:
                 trainer_logger_config = self._logger_config["trainer"]
@@ -304,6 +305,7 @@ class MADDPG:
         counter = counting.Counter(counter, "executor")
 
         # Create executor logger
+        executor_logger_config = {}
         if self._logger_config:
             if "executor" in self._logger_config:
                 executor_logger_config = self._logger_config["executor"]
@@ -363,6 +365,7 @@ class MADDPG:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
+        evaluator_logger_config = {}
         if self._logger_config:
             if "evaluator" in self._logger_config:
                 evaluator_logger_config = self._logger_config["evaluator"]

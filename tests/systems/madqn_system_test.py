@@ -30,7 +30,6 @@ from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import logger_utils
 
 
 def make_networks(
@@ -110,17 +109,9 @@ class TestMADQN:
         # system
         checkpoint_dir = f"{base_dir}/{mava_id}"
 
-        # loggers
-        logger_factory = functools.partial(
-            logger_utils.make_logger,
-            directory=base_dir,
-            to_terminal=False,
-        )
-
         system = madqn.MADQN(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            logger_factory=logger_factory,
             num_executors=2,
             batch_size=32,
             min_replay_size=32,
