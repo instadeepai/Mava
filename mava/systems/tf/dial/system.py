@@ -86,7 +86,8 @@ class DIAL(system.System):
         # TODO: Update args
         """Initialize the system.
         Args:
-            environment_factory: Callable to instantiate an environment on a compute node.
+            environment_factory: Callable to instantiate an environment
+                on a compute node.
             network_factory: Callable to instantiate system networks on a compute node.
             logger_factory: Callable to instantiate a system logger on a compute node.
             architecture: system architecture, e.g. decentralised or centralised.

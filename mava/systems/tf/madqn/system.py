@@ -15,7 +15,7 @@
 
 """Defines the MADQN system class."""
 
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type, Union
 
 import acme
 import dm_env
