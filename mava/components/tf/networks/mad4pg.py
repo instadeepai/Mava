@@ -1,10 +1,13 @@
 """Distributions, for use in acme/networks/distributional.py."""
-from typing import Any, Dict, Tuple, Union
+from typing import Tuple, Union
 
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
+from acme.tf.networks.distributions import (
+    DiscreteValuedDistribution as acme_DiscreteValuedDistribution,
+)
 from tensorflow_probability import distributions as tfd
 
 
@@ -57,7 +60,7 @@ class DiscreteValuedHead(snt.Module):
 
 
 @tfp.experimental.register_composite
-class DiscreteValuedDistribution(tfd.Categorical):
+class DiscreteValuedDistribution(acme_DiscreteValuedDistribution):
     """This is a generalization of a categorical distribution.
 
     The support for the DiscreteValued distribution can be any real valued range,
@@ -89,42 +92,8 @@ class DiscreteValuedDistribution(tfd.Categorical):
             passed in.
           name: Name of the distribution object.
         """
-        self._values = tf.convert_to_tensor(values)
-        shape_strings = [f"D{i}" for i, _ in enumerate(values.shape)]
         self.true_dimensions = None
-        if logits is not None:
-            logits = tf.convert_to_tensor(logits)
-            tf.debugging.assert_shapes(
-                [(values, shape_strings), (logits, [..., *shape_strings])]
-            )
-        assert probs is None
-
-        super().__init__(logits=logits, probs=probs, name=name)
-
-        self._parameters = dict(values=values, logits=logits, probs=probs, name=name)
-
-    @property
-    def values(self) -> tf.Tensor:
-        return self._values
-
-    def _sample_n(self, n: int, seed: int = None) -> tf.Tensor:
-        indices = super()._sample_n(n, seed=seed)
-        return tf.gather(self.values, indices, axis=-1)
-
-    def _mean(self) -> tf.Tensor:
-        """Overrides the Categorical mean by incorporating category values."""
-        return tf.reduce_sum(self.probs_parameter() * self.values, axis=-1)
-
-    def _variance(self) -> tf.Tensor:
-        """Overrides the Categorical variance by incorporating category values."""
-        dist_squared = tf.square(tf.expand_dims(self.mean(), -1) - self.values)
-        return tf.reduce_sum(self.probs_parameter() * dist_squared, axis=-1)
-
-    # This function tells the TFP how many trailing dimensions of each named
-    # parameter are event dims, the rest are considered to be batch dims.
-    def _params_event_ndims(self) -> Dict[str, Any]:
-        values_rank = self._values.shape.rank
-        return dict(logits=values_rank, probs=values_rank)
+        super().__init__(values=values, logits=logits, probs=probs, name=name)
 
     def set_dimensions(self, dims: Tuple) -> tfd.Categorical:
         assert len(dims) == 2
@@ -145,25 +114,3 @@ class DiscreteValuedDistribution(tfd.Categorical):
                 self._true_dimensions[axis] = end - start
         else:
             raise NotImplementedError
-
-    def _batch_shape(self) -> Tuple:
-        params = self._probs if self._logits is None else self._logits
-        return params.shape[: -self._values.shape.rank]
-
-    def _batch_shape_tensor(self, x: tf.Tensor = None) -> Tuple:
-        if x is None:
-            params = self._probs if self._logits is None else self._logits
-            x = tf.convert_to_tensor(params)
-
-        return tf.shape(x)[: -tf.rank(self._values)]
-
-    def _event_shape(self) -> Tuple:
-        # Omit the atoms axis, to return just the shape of a single (i.e. unbatched)
-        # sample value.
-        return self._values.shape[:-1]
-
-    def _event_shape_tensor(self) -> Tuple:
-        return tf.shape(self._values)[:-1]
-
-    # This is required to create composite tensors from this distribution.
-    _composite_tensor_nonshape_params = ("values", "logits", "probs")

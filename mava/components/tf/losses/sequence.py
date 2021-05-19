@@ -41,7 +41,6 @@ def recurrent_n_step_critic_loss(
     n_step_discount = discounts[:, :bootstrap_n]
     for i in range(1, bootstrap_n + 1):
         n_step_rewards += rewards[:, i : i + bootstrap_n]
-        # n_step_discount *= discounts[:, i:i+bootstrap_n]
 
     n_step_rewards, _ = combine_dim(n_step_rewards)
     n_step_discount, _ = combine_dim(n_step_discount)
