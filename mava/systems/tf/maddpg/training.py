@@ -22,6 +22,7 @@ import time
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
+import reverb
 import sonnet as snt
 import tensorflow as tf
 import tree
@@ -269,11 +270,10 @@ class BaseMADDPGTrainer(mava.Trainer):
         # Update the target networks
         self._update_target_networks()
 
-        # Get data from replay (dropping extras if any). Note there is no
-        # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
+        # Draw a batch of data from replay.
+        sample: reverb.ReplaySample = next(self._iterator)
 
-        self._forward(inputs)
+        self._forward(sample)
 
         self._backward()
 
