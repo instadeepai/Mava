@@ -168,7 +168,7 @@ class MADQNTrainer(mava.Trainer):
 
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
-    # @tf.function
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -276,7 +276,7 @@ class MADQNTrainer(mava.Trainer):
 
         # Log and decrement epsilon
         epsilon = self.get_epsilon()
-        fetches["epsilon"] = epsilon  # type: ignore
+        fetches["epsilon"] = epsilon
         self._decrement_epsilon()
 
         if self._logger:
