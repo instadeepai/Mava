@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Implementations of a QMIX agent."""
+"""Implementations of a VDN agent."""
 
-from mava.systems.tf.qmix.execution import QMIXFeedForwardExecutor
-from mava.systems.tf.qmix.system import QMIX
-from mava.systems.tf.qmix.training import QMIXTrainer
+from mava.systems.tf.vdn.execution import VDNFeedForwardExecutor
+from mava.systems.tf.vdn.system import VDN
+from mava.systems.tf.vdn.training import VDNTrainer

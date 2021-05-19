@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Defines the QMIX system class."""
+"""Defines the VDN system class."""
 
 import copy
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 import acme
 import dm_env
@@ -34,16 +34,16 @@ from mava.components.tf.modules import mixing
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import savers as tf2_savers
-from mava.systems.tf.qmix import builder, execution, training
+from mava.systems.tf.vdn import builder, execution, training
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger
 from mava.wrappers import DetailedPerAgentStatistics
 
 
 # TODO Correct documentation
-class QMIX:
-    """QMIX system.
-    This implements a single-process QMIX system.
+class VDN:
+    """VDN system.
+    This implements a single-process VDN system.
     Args:
         environment_spec: description of the actions, observations, etc.
         q_networks: the online Q network (the one being optimized)
@@ -72,9 +72,9 @@ class QMIX:
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
-        trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
-        executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
-        mixer: Type[mixing.BaseMixingModule] = mixing.MonotonicMixing,
+        trainer_fn: Type[training.VDNTrainer] = training.VDNTrainer,
+        executor_fn: Type[core.Executor] = execution.VDNFeedForwardExecutor,
+        mixer: Type[mixing.BaseMixingModule] = mixing.AdditiveMixing,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
@@ -82,6 +82,7 @@ class QMIX:
         epsilon_decay: float = 1e-4,
         num_executors: int = 1,
         num_caches: int = 0,
+        log_info: Tuple = None,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = False,
         batch_size: int = 256,
@@ -116,6 +117,7 @@ class QMIX:
         self._environment_factory = environment_factory
         self._mixer = mixer
         self._network_factory = network_factory
+        self._log_info = log_info
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
@@ -131,8 +133,8 @@ class QMIX:
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
 
-        self._builder = builder.QMIXBuilder(
-            builder.QMIXConfig(
+        self._builder = builder.VDNBuilder(
+            builder.VDNConfig(
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
@@ -189,13 +191,9 @@ class QMIX:
             shared_weights=self._shared_weights,
         )
 
-        agent_networks = architecture.create_actor_variables()
-
         # Augment network architecture by adding mixing layer network.
         system_networks = self._mixer(
             architecture=architecture,
-            environment_spec=self._environment_spec,
-            agent_networks=agent_networks,
         ).create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
@@ -214,7 +212,7 @@ class QMIX:
         replay: reverb.Client,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        trainer: Optional[training.QMIXTrainer] = None,
+        trainer: Optional[training.VDNTrainer] = None,
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
 
@@ -310,7 +308,7 @@ class QMIX:
         eval_loop = DetailedPerAgentStatistics(eval_loop)
         return eval_loop
 
-    def build(self, name: str = "qmix") -> Any:
+    def build(self, name: str = "vdn") -> Any:
         """Build the distributed system topology."""
         program = lp.Program(name=name)
 

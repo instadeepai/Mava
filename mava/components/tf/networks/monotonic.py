@@ -79,7 +79,7 @@ class MonotonicMixingNetwork(snt.Module):
         )
 
     # TODO (St John) I need to set up states so that it is a global state
-    # This should be of shape [batch_size, 3] for my env. This is assuming
+    # This should be of shape [B, 3] for my env. This is assuming
     # I take global state as a one-hot input. e.g. State 2 => (0,0,1) has
     # dim=3.
 

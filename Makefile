@@ -18,8 +18,12 @@ DOCKER_RUN_TENSORBOARD=docker run $(RUN_FLAGS_TENSORBOARD) $(IMAGE)
 # Set example to run when using `make run`
 MADDPG=examples/debugging_envs/run_feedforward_maddpg.py
 MADQN=examples/debugging_envs/run_feedforward_madqn.py
+MAPPO=examples/debugging_envs/run_feedforward_mappo.py
 QMIX=examples/debugging_envs/run_feedforward_qmix.py
+VDN=examples/debugging_envs/run_feedforward_vdn.py
+
 QMIX-PZ=examples/petting_zoo/run_feedforward_qmix.py
+VDN-PZ==examples/petting_zoo/run_feedforward_vdn.py
 
 MADDPG_RECORD=examples/petting_zoo/run_feedforward_maddpg_record_video.py
 
@@ -33,11 +37,20 @@ run-maddpg:
 run-madqn:
 	$(DOCKER_RUN) python  $(MADQN) --base_dir /home/app/mava/logs/
 
+run-mappo:
+	$(DOCKER_RUN) python $(MAPPO)
+
 run-qmix:
 	$(DOCKER_RUN) python  $(QMIX) --base_dir /home/app/mava/logs/
 
+run-vdn:
+	$(DOCKER_RUN) python $(VDN)
+
 run-qmix-pz:
 	$(DOCKER_RUN) python $(QMIX-PZ) --base_dir /home/app/mava/logs/
+
+run-vdn-pz:
+	$(DOCKER_RUN) python $(VDN-PZ)
 
 bash:
 	$(DOCKER_RUN) bash

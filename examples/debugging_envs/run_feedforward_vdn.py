@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running QMIX on debugging environments."""
+"""Example running VDN on debugging environment."""
 import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Optional, Sequence, Union
@@ -29,7 +29,7 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 from mava import specs as mava_specs
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.networks import epsilon_greedy_action_selector
-from mava.systems.tf import qmix
+from mava.systems.tf import vdn
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import Logger
@@ -37,7 +37,7 @@ from mava.utils.loggers import Logger
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
-    "two_step",  # "simple_spread",
+    "two_step",  # "simple_spread"
     "Debugging environment name (str).",
 )
 flags.DEFINE_string(
@@ -89,10 +89,8 @@ def make_networks(
     q_networks = {}
     action_selectors = {}
     for key in specs.keys():
-
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
-
         # Create the policy network.
         q_network = snt.Sequential(
             [
@@ -105,7 +103,6 @@ def make_networks(
 
         # epsilon greedy action selector
         action_selector = action_selector_fn
-
         q_networks[key] = q_network
         action_selectors[key] = action_selector
 
@@ -116,6 +113,9 @@ def make_networks(
 
 
 def main(_: Any) -> None:
+
+    # set loggers info
+    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
     # environment
     environment_factory = functools.partial(
@@ -161,13 +161,14 @@ def main(_: Any) -> None:
     )
 
     # distributed program
-    program = qmix.QMIX(
+    program = vdn.VDN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         num_executors=2,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.01,
         epsilon_decay=1e-4,
+        log_info=log_info,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         trainer_logger=trainer_logger,
