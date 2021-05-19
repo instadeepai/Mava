@@ -1,5 +1,9 @@
 from typing import Any, Dict
 
+import sonnet as snt
+import tensorflow as tf
+import trfl
+
 
 # Checkpoint the networks.
 def checkpoint_networks(system_checkpointer: Dict) -> None:
@@ -23,6 +27,73 @@ def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
         }
 
     return logged_losses
+
+
+def combine_dim(tensor: tf.Tensor) -> tf.Tensor:
+    dims = tensor.shape[:2]
+    return snt.merge_leading_dims(tensor, num_dims=2), dims
+
+
+def extract_dim(tensor: tf.Tensor, dims: tf.Tensor) -> tf.Tensor:
+    return tf.reshape(tensor, [dims[0], dims[1], -1])
+
+
+def maddpg_critic(
+    q_values: tf.Tensor,
+    target_q_values: tf.Tensor,
+    rewards: tf.Tensor,
+    discounts: tf.Tensor,
+) -> tf.Tensor:
+
+    # TODO (dries): Fix this. Was just for debugging
+    bootstrap_n = int(len(rewards[0]) / 2)
+
+    # Require correct tensor ranks---as long as we have shape information
+    # available to check. If there isn't any, we print a warning.
+    # def check_rank(tensors: Iterable[tf.Tensor], ranks: Sequence[int]):
+    #     for i, (tensor, rank) in enumerate(zip(tensors, ranks)):
+    #         if tensor.get_shape():
+    #             trfl.assert_rank_and_shape_compatibility([tensor], rank)
+    #         else:
+    #             raise ValueError(
+    #                 f'Tensor "{tensor.name}",
+    #                 which was offered as transformed_n_step_loss'
+    #                 f'parameter {i+1}, has no rank at construction
+    #                 time, so cannot verify'
+    #                 f'that it has the necessary rank of {rank}')
+    #
+    # check_rank(
+    #     [q_values, target_q_values, rewards, discounts],
+    #     [3, 3, 2, 2])
+
+    # Construct arguments to compute bootstrap target.
+    # TODO (dries): Why is some tensors different in shape than the other.
+    q_tm1 = q_values[:, 0:-bootstrap_n, 0]
+    q_t = target_q_values[:, bootstrap_n:]
+
+    n_step_rewards = rewards[:, :bootstrap_n]
+    n_step_discount = discounts[:, :bootstrap_n]
+    for i in range(1, bootstrap_n + 1):
+        n_step_rewards += rewards[:, i : i + bootstrap_n]
+        # n_step_discount *= discounts[:, i:i+bootstrap_n]
+
+    q_tm1, _ = combine_dim(q_tm1)
+    n_step_rewards, _ = combine_dim(n_step_rewards)
+    n_step_discount, _ = combine_dim(n_step_discount)
+    q_t, _ = combine_dim(q_t)
+
+    # print("bootstrap_n: ", bootstrap_n)
+    # print("n_step_rewards: ", n_step_rewards)
+    # print("n_step_discount: ", n_step_discount[:, 0])
+
+    critic_loss = trfl.td_learning(
+        q_tm1,
+        n_step_rewards,
+        n_step_discount[:, 0],
+        q_t,
+    ).loss
+
+    return critic_loss
 
 
 # Safely delete object from class.

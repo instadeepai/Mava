@@ -893,13 +893,6 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                     dest.assign(src)
             self._num_steps.assign_add(1)
 
-    def _combine_dim(self, tensor: tf.Tensor) -> tf.Tensor:
-        dims = tensor.shape[:2]
-        return snt.merge_leading_dims(tensor, num_dims=2), dims
-
-    def _extract_dim(self, tensor: tf.Tensor, dims: tf.Tensor) -> tf.Tensor:
-        return tf.reshape(tensor, [dims[0], dims[1], -1])
-
     def _transform_observations(
         self, observations: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
@@ -910,13 +903,15 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
 
-            reshaped_obs, dims = self._combine_dim(observations[agent].observation)
+            reshaped_obs, dims = train_utils.combine_dim(
+                observations[agent].observation
+            )
 
-            obs_trans[agent] = self._extract_dim(
+            obs_trans[agent] = train_utils.extract_dim(
                 self._observation_networks[agent_key](reshaped_obs), dims
             )
 
-            obs_target_trans[agent] = self._extract_dim(
+            obs_target_trans[agent] = train_utils.extract_dim(
                 self._target_observation_networks[agent_key](reshaped_obs),
                 dims,
             )
@@ -1058,51 +1053,39 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
                 # Critic learning.
                 # Remove the last sequence step for the normal network
-                obs_comb, _ = self._combine_dim(obs_trans_feed[:, :-1])
-                act_comb, _ = self._combine_dim(action_feed[:, :-1])
-                q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                obs_comb, dims = train_utils.combine_dim(obs_trans_feed)
+                act_comb, _ = train_utils.combine_dim(action_feed)
+                flat_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                q_values = train_utils.extract_dim(flat_q_values, dims)
 
                 # Remove first sequence step for the target
-                obs_comb, _ = self._combine_dim(target_obs_trans_feed[:, 1:])
-                act_comb, _ = self._combine_dim(target_actions_feed[:, 1:])
-                target_q_values = self._target_critic_networks[agent_key](
+                obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
+                act_comb, _ = train_utils.combine_dim(target_actions_feed)
+                flat_target_q_values = self._target_critic_networks[agent_key](
                     obs_comb, act_comb
                 )
-
-                # Squeeze into the shape expected by the td_learning implementation.
-                q_values = tf.squeeze(q_values, axis=-1)  # [B]
-                target_q_values = tf.squeeze(target_q_values, axis=-1)  # [B]
+                target_q_values = train_utils.extract_dim(flat_target_q_values, dims)
 
                 # Critic loss.
                 # Compute the transformed n-step loss.
-                # TODO (dries): Is discounts and rewards correct?
-                #  Or should it be [:, 1:]?
-
-                agent_rewards, _ = self._combine_dim(rewards[agent][:, :-1])
-                agent_discounts, _ = self._combine_dim(discounts[agent][:, :-1])
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
                 discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
 
+                # print("q_values: ", q_values.shape)
+                # print("rewards: ", rewards[agent].shape)
+                # print("discounts: ", (discount * discounts[agent]).shape)
+                # print("target_q_values: ", target_q_values.shape)
+
                 # Critic loss.
-                # TODO (dries): Change the critic losses to n step return losses?
+                critic_loss = train_utils.maddpg_critic(
+                    q_values,
+                    rewards[agent],
+                    discount * discounts[agent],
+                    target_q_values,
+                )
 
-                critic_loss = 0 * discount
-
-                # critic_loss = train_utils.sequence_critic(
-                #     q_values,
-                #     agent_rewards,
-                #     discount * agent_discounts,
-                #     target_q_values,
-                # ).loss
-
-                # critic_loss = trfl.td_learning(
-                #     q_values,
-                #     agent_rewards,
-                #     discount * agent_discounts,
-                #     target_q_values,
-                # ).loss
                 self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
 
                 # Actor learning.
@@ -1122,8 +1105,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 )
 
                 # Get dpg Q values.
-                obs_comb, _ = self._combine_dim(target_obs_trans_feed)
-                act_comb, _ = self._combine_dim(dpg_actions_feed)
+                obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
+                act_comb, _ = train_utils.combine_dim(dpg_actions_feed)
                 dpg_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
