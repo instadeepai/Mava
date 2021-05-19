@@ -159,13 +159,11 @@ def main(_: Any) -> None:
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         num_executors=2,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
         eval_loop_fn=MonitorParallelEnvironmentLoop,
         eval_loop_fn_kwargs={"path": checkpoint_dir, "record_every": 100},
     ).build()

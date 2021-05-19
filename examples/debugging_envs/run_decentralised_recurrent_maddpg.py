@@ -157,13 +157,11 @@ def main(_: Any) -> None:
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         num_executors=2,
         trainer_fn=DecentralisedRecurrentMADDPGTrainer,
         executor_fn=executors.RecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
     ).build()
 
     lp.launch(

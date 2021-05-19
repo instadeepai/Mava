@@ -165,14 +165,12 @@ def main(_: Any) -> None:
     program = dial.DIAL(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         num_executors=10,
         log_info=log_info,
         batch_size=32,
         sequence_length=100,
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
     ).build()
 
     lp.launch(

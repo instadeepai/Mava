@@ -146,15 +146,13 @@ def main(_: Any) -> None:
     program = qmix.QMIX(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         num_executors=2,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.01,
         epsilon_decay=1e-4,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
     ).build()
 
     # launch
