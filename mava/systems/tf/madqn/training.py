@@ -38,7 +38,7 @@ class MADQNTrainer(mava.Trainer):
     and implements update functionality to learn from this dataset.
     """
 
-    def __init__(
+    def __init__(  # type:ignore
         self,
         agents: List[str],
         agent_types: List[str],

@@ -16,13 +16,14 @@
 """Generic environment loop wrapper to track system statistics"""
 
 import time
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Sequence, Union
 
 import numpy as np
 import tensorflow as tf
 from acme.utils import loggers
 
 import mava
+from mava.systems.tf.madqn import MADQNTrainer
 from mava.utils import training_utils as train_utils
 from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics
@@ -35,7 +36,7 @@ class TrainerWrapperBase(mava.Trainer):
 
     def __init__(
         self,
-        trainer: mava.Trainer,
+        trainer: Union[mava.Trainer, MADQNTrainer],
     ) -> None:
         self._trainer = trainer
 
@@ -53,7 +54,7 @@ class TrainerWrapperBase(mava.Trainer):
 class TrainerStatisticsBase(TrainerWrapperBase):
     def __init__(
         self,
-        trainer: mava.Trainer,
+        trainer: Union[mava.Trainer, MADQNTrainer],
     ) -> None:
         super().__init__(trainer)
         self._require_loggers = True
@@ -158,7 +159,7 @@ class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
 
     def __init__(
         self,
-        trainer: mava.Trainer,
+        trainer: Union[mava.Trainer, MADQNTrainer],
         metrics: List[str] = ["q_value_loss"],
         summary_stats: List = ["mean", "max", "min", "var", "std"],
     ) -> None:

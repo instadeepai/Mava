@@ -22,7 +22,7 @@ from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting
 
-from mava import adders, core, specs, types
+from mava import Trainer, adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
@@ -101,7 +101,7 @@ class MADQNBuilder:
 
     def make_replay_tables(
         self,
-        environment_spec: specs.EnvironmentSpec,
+        environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
         if self._config.samples_per_insert is None:
             # We will take a samples_per_insert ratio of None to mean that there is
@@ -134,7 +134,9 @@ class MADQNBuilder:
     def make_dataset_iterator(
         self, replay_client: reverb.Client
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the system."""
+        """Create a dataset iterator to use for learning/updating the system.
+        Args:
+            replay_client: Reverb Client which points to the replay server."""
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
@@ -162,15 +164,17 @@ class MADQNBuilder:
         action_selectors: Dict[str, Any],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
-        trainer: Optional[training.MADQNTrainer] = None,
+        trainer: Optional[Trainer] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
-            behavior_networks: A struct of instance of all
-                the different behaviour networks,
+            q_networks: A struct of instance of all
+                the different system q networks,
                 this should be a callable which takes as input observations
                 and returns actions.
             adder: How data is recorded (e.g. added to replay).
+            variable_source: collection of (nested) numpy arrays. Contains
+                source variables as defined in mava.core.
         """
 
         shared_weights = self._config.shared_weights
@@ -253,6 +257,6 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type: ignore
+        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type:ignore
 
         return trainer
