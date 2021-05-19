@@ -56,12 +56,15 @@ testing_formatting_requirements = [
 
 record_episode_requirements = ["array2gif"]
 
+flatland_requirements = ["flatland-rl"]
+
 long_description = """Mava is a library for building multi-agent reinforcement
 learning (MARL) systems. Mava builds off of Acme and in a similar way strives
 to expose simple, efficient, and readable components, as well as examples that
 serve both as reference implementations of popular algorithms and as strong
 baselines, while still providing enough flexibility to do novel research.
-For more information see [github repository](https://github.com/[...placeholder...]ai/mava)."""
+For more information see
+[github repository](https://github.com/[...placeholder...]ai/mava)."""
 
 # Get the version from metadata.
 version = _metadata.__version__  # type: ignore
@@ -95,6 +98,7 @@ setup(
     extras_require={
         "tf": tf_requirements,
         "envs": env_requirements,
+        "flatland": flatland_requirements,
         "reverb": reverb_requirements,
         "launchpad": launchpad_requirements,
         "testing_formatting": testing_formatting_requirements,

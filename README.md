@@ -26,7 +26,7 @@ loop.run()
 This will run a simple loop in which the given multi-agent system interacts with its
 environment and and each agent learns from this interaction. This assumes a `system` instance
 (implementations of which you can find [here][Systems]) and a multi-agent `environment`
-instance which implements the [DeepMind Environment API][dm_env]. 
+instance which implements the [DeepMind Environment API][dm_env].
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
@@ -113,6 +113,15 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
    or from source:
    ```bash
    pip install .[envs]
+   ```
+
+   NB: For flatland installation, It has to be installed separately using:
+   ```bash
+   pip install id-mava[flatland]
+   ```
+   or from source
+   ```bash
+   pip install .[flatland]
    ```
 
 We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functionality such as the use of Atari environments, environment wrappers, gpu support and agent episode recording.

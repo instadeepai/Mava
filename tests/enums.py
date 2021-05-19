@@ -19,6 +19,7 @@ from enum import Enum
 class EnvSource(str, Enum):
     PettingZoo = "pettingzoo"
     RLLibMultiEnv = "rllibmultienv"
+    Flatland = "flatland"
 
 
 class MockedEnvironments(str, Enum):
