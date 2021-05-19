@@ -330,6 +330,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
+        fingerprint: bool = False,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
@@ -347,6 +348,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
             clipping=clipping,
             counter=counter,
             logger=logger,
+            fingerprint=fingerprint,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
         )
