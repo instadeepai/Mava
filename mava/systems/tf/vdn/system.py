@@ -190,4 +190,4 @@ class VDN(MADQN):
 
     def build(self, name: str = "vdn") -> Any:
         """Build the distributed system topology."""
-        super().build(name=name)
+        return super().build(name=name)
