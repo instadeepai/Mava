@@ -237,7 +237,9 @@ class MADDPG:
         if self._logger_config:
             if "trainer" in self._logger_config:
                 trainer_logger_config = self._logger_config["trainer"]
-        trainer_logger = self._logger_factory("trainer", **trainer_logger_config)
+        trainer_logger = self._logger_factory(  # type: ignore
+            "trainer", **trainer_logger_config
+        )
 
         # Create system architecture with target networks.
         system_networks = self._architecture(
@@ -305,7 +307,7 @@ class MADDPG:
         if self._logger_config:
             if "executor" in self._logger_config:
                 executor_logger_config = self._logger_config["executor"]
-        exec_logger = self._logger_factory(
+        exec_logger = self._logger_factory(  # type: ignore
             f"executor_{executor_id}", **executor_logger_config
         )
 
@@ -364,7 +366,9 @@ class MADDPG:
         if self._logger_config:
             if "evaluator" in self._logger_config:
                 evaluator_logger_config = self._logger_config["evaluator"]
-        eval_logger = self._logger_factory("evaluator", **evaluator_logger_config)
+        eval_logger = self._logger_factory(  # type: ignore
+            "evaluator", **evaluator_logger_config
+        )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
