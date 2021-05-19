@@ -114,14 +114,10 @@ class MAD4PG:
             training (if using recurrence).
             sigma: standard deviation of zero-mean, Gaussian exploration noise.
             clipping: whether to clip gradients by global norm.
-            logger: logger object to be used by trainers.
             counter: counter object used to keep track of steps.
             checkpoint: boolean indicating whether to checkpoint the trainers.
             checkpoint_subpath: directory for checkpoints.
             replay_table_name: string indicating what name to give the replay table.
-            trainer_logger: logger for trainer class.
-            exec_logger: logger for executor.
-            eval_logger: logger for evaluator.
             train_loop_fn: loop for training.
             eval_loop_fn: loop for evaluation.
 

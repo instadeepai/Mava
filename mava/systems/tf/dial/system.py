@@ -114,12 +114,8 @@ class DIAL(system.System):
             epsilon: probability of taking a random action; ignored if a policy
                 network is given.
             discount: discount to use for TD updates.
-            logger: logger object to be used by learner.
             checkpoint: boolean indicating whether to checkpoint the learner.
             checkpoint_subpath: directory for the checkpoint.
-            policy_networks: if given, this will be used as the policy network.
-                Otherwise, an epsilon greedy policy using the online Q network will be
-                created. Policy network is used in the actor to sample actions.
             max_gradient_norm: used for gradient clipping.
             replay_table_name: string indicating what name to give the replay table."""
 

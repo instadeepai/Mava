@@ -115,7 +115,6 @@ class MADDPG:
             training (if using recurrence).
             sigma: standard deviation of zero-mean, Gaussian exploration noise.
             clipping: whether to clip gradients by global norm.
-            logger: logger object to be used by trainers.
             counter: counter object used to keep track of steps.
             checkpoint: boolean indicating whether to checkpoint the trainers.
             checkpoint_subpath: directory for checkpoints.

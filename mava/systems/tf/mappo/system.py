@@ -112,7 +112,6 @@ class MAPPO:
             batch_size: batch size for updates.
             max_queue_size: maximum queue size.
             discount: discount to use for TD updates.
-            logger: logger object to be used by learner.
             max_gradient_norm: used for gradient clipping.
             checkpoint: boolean indicating whether to checkpoint the trainers.
             counter: count the number of steps and episodes.
