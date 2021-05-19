@@ -97,7 +97,6 @@ class QMIXBuilder(MADQNBuilder):
           counter: a Counter which allows for recording of counts (trainer steps,
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the trainer checkpoints itself.
         """
         q_networks = networks["values"]
         target_q_networks = networks["target_values"]

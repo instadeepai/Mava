@@ -91,6 +91,8 @@ class VDN:
         max_replay_size: int = 1000,
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
+        sequence_length: int = 20,
+        period: int = 20,
         clipping: bool = True,
         discount: float = 0.99,
         optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
@@ -134,7 +136,7 @@ class VDN:
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
 
         self._builder = builder.VDNBuilder(
-            builder.VDNConfig(
+            builder.VDNConfig(  # type:ignore
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
@@ -148,6 +150,8 @@ class VDN:
                 max_replay_size=max_replay_size,
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
+                sequence_length=sequence_length,
+                period=period,
                 clipping=clipping,
                 checkpoint=checkpoint,
                 optimizer=optimizer,
