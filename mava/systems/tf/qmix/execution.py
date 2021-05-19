@@ -52,10 +52,10 @@ class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
             of the policies to the executor copy (in case they are separate).
         """
         super(QMIXFeedForwardExecutor, self).__init__(
-            q_networks,
-            action_selectors,
-            shared_weights,
-            adder,
-            variable_client,
-            trainer,
+            q_networks=q_networks,
+            action_selectors=action_selectors,
+            shared_weights=shared_weights,
+            adder=adder,
+            variable_client=variable_client,
+            trainer=trainer,
         )
