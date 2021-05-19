@@ -13,20 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn):
-#   - [] Complete class for monotonic mixing
-#   - [] Generalise Qmixing to allow for different activations,
-#          hypernetwork structures etc.
-#   - [] Decide on whether to accept an 'args' term or receive each arg individually.
-#   - [] Think about how to default values.
-
-# NOTE (StJohn): I'm still thinking about the structure in general. One of the biggest
-# design choices at the moment is how to structure what is passed to the __init__ when
-# instantiating vs what is passed to the forward functions.
-
-# Code inspired by PyMARL framework implementation
-# https://github.com/oxwhirl/pymarl/blob/master/src/modules/mixers/qmix.py
-
 """Sonnet module that takes two inputs
 [observation, fingerprint]"""
 
