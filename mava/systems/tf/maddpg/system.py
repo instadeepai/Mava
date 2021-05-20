@@ -266,6 +266,7 @@ class MADDPG:
             dataset=dataset,
             counter=counter,
             logger=trainer_logger,
+            connection_spec=self._connection_spec,
         )
 
     def executor(

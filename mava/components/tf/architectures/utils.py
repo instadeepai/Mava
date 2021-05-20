@@ -13,10 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
 
-from mava.utils.loggers.base import Logger
-
-
-def make_logger(label: str, **kwargs: Any) -> Logger:
-    return Logger(label=label, **kwargs)
+def fully_connected_network_spec(
+    agents_by_type: Dict[str, List[str]]
+) -> Dict[str, List[str]]:
+    """Creates network spec for fully connected agents by agent type"""
+    network_spec: Dict[str, List[str]] = {}
+    for agent_type, agents in agents_by_type.items():
+        all_agents = agents
+        for agent in agents:
+            network_spec[agent] = all_agents
+    return network_spec

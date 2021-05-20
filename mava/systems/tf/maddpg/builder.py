@@ -262,6 +262,7 @@ class MADDPGBuilder(SystemBuilder):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
+        connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -281,28 +282,33 @@ class MADDPGBuilder(SystemBuilder):
         discount = self._config.discount
         target_update_period = self._config.target_update_period
 
+        # trainer args
+        trainer_config = {
+            "agents": agents,
+            "agent_types": agent_types,
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "observation_networks": networks["observations"],
+            "target_policy_networks": networks["target_policies"],
+            "target_critic_networks": networks["target_critics"],
+            "target_observation_networks": networks["target_observations"],
+            "shared_weights": shared_weights,
+            "policy_optimizer": self._config.policy_optimizer,
+            "critic_optimizer": self._config.critic_optimizer,
+            "max_gradient_norm": max_gradient_norm,
+            "discount": discount,
+            "target_update_period": target_update_period,
+            "dataset": dataset,
+            "counter": counter,
+            "logger": logger,
+            "checkpoint": self._config.checkpoint,
+            "checkpoint_subpath": self._config.checkpoint_subpath,
+        }
+        if connection_spec:
+            trainer_config["connection_spec"] = connection_spec
+
         # The learner updates the parameters (and initializes them).
-        trainer = self._trainer_fn(
-            agents=agents,
-            agent_types=agent_types,
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            observation_networks=networks["observations"],
-            target_policy_networks=networks["target_policies"],
-            target_critic_networks=networks["target_critics"],
-            target_observation_networks=networks["target_observations"],
-            shared_weights=shared_weights,
-            policy_optimizer=self._config.policy_optimizer,
-            critic_optimizer=self._config.critic_optimizer,
-            max_gradient_norm=max_gradient_norm,
-            discount=discount,
-            target_update_period=target_update_period,
-            dataset=dataset,
-            counter=counter,
-            logger=logger,
-            checkpoint=self._config.checkpoint,
-            checkpoint_subpath=self._config.checkpoint_subpath,
-        )
+        trainer = self._trainer_fn(**trainer_config)
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.
         # NetworkStatistics needs to appear before TrainerStatistics.

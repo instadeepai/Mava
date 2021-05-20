@@ -29,18 +29,6 @@ from mava.components.tf.architectures.decentralised import (
 )
 
 
-def fully_connected_network_spec(
-    agents_by_type: Dict[str, List[str]]
-) -> Dict[str, List[str]]:
-    """Creates network spec for fully connected agents by agent type"""
-    network_spec: Dict[str, List[str]] = {}
-    for agent_type, agents in agents_by_type.items():
-        all_agents = agents
-        for agent in agents:
-            network_spec[agent] = all_agents
-    return network_spec
-
-
 class NetworkedPolicyActor(DecentralisedPolicyActor):
     """Networked multi-agent actor critic architecture."""
 
