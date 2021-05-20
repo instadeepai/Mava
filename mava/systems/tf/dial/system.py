@@ -225,7 +225,7 @@ class DIAL(system.System):
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -277,7 +277,7 @@ class DIAL(system.System):
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -345,7 +345,7 @@ class DIAL(system.System):
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
