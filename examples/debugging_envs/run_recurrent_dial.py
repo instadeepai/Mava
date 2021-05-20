@@ -26,6 +26,7 @@ from acme import types
 from acme.tf import utils as tf2_utils
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym import spaces
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import DIALPolicy
@@ -176,8 +177,19 @@ def main(_: Any) -> None:
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
+    # launch
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
     lp.launch(
-        program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="current_terminal"
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
     )
 
 
