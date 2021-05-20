@@ -17,7 +17,6 @@
 
 from typing import Dict, List
 
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme import specs as acme_specs
@@ -28,12 +27,14 @@ from mava.components.tf.architectures.decentralised import DecentralisedPolicyAc
 
 def fully_connected_network_spec(
     agents_by_type: Dict[str, List[str]]
-) -> Dict[str, np.ndarray]:
+) -> Dict[str, List[str]]:
     """Creates network spec for fully connected agents by agent type"""
-    network_spec: Dict[str, np.ndarray] = {}
+    network_spec: Dict[str, List[str]] = {}
     for agent_type, agents in agents_by_type.items():
         for agent in agents:
-            network_spec[agent] = np.ones((len(agents),))
+            connections = []
+            for other_agent in agents:
+                network_spec[agent] = connections.append(other_agent)
     return network_spec
 
 
@@ -75,7 +76,7 @@ class NetworkedPolicyActor(DecentralisedPolicyActor):
                 )
             )
             for agent in agents:
-                actor_obs_shape.insert(0, np.sum(self._network_spec[agent]))
+                actor_obs_shape.insert(0, len(self._network_spec[agent]))
                 actor_obs_specs[agent] = tf.TensorSpec(
                     shape=actor_obs_shape,
                     dtype=tf.dtypes.float32,
@@ -125,12 +126,12 @@ class NetworkedQValueCritic(DecentralisedQValueActorCritic):
             )
 
             for agent in agents:
-                critic_obs_shape.insert(0, np.sum(self._network_spec[agent]))
+                critic_obs_shape.insert(0, len(self._network_spec[agent]))
                 critic_obs_specs[agent] = tf.TensorSpec(
                     shape=critic_obs_shape,
                     dtype=tf.dtypes.float32,
                 )
-                critic_act_shape.insert(0, np.sum(self._network_spec[agent]))
+                critic_act_shape.insert(0, len(self._network_spec[agent]))
                 critic_act_specs[agent] = tf.TensorSpec(
                     shape=critic_act_shape,
                     dtype=tf.dtypes.float32,
