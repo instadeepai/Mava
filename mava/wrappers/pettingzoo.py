@@ -243,11 +243,6 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             for agent in self.possible_agents
         }
 
-        discount_spec = self.discount_spec()
-        self._discounts = {
-            agent: convert_np_type(discount_spec[agent].dtype, 1)
-            for agent in self.possible_agents
-        }
         return parameterized_restart(rewards, self._discounts, observations), env_extras
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:

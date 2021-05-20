@@ -40,8 +40,33 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         environment: MultiAgentEnv,
         return_state_info: bool = False,
     ):
-        self.return_state_info = return_state_info
         super().__init__(environment=environment)
+
+        self.return_state_info = return_state_info
+
+    def reset(self) -> dm_env.TimeStep:
+        """Resets the episode."""
+        self._reset_next_step = False
+        self._step_type = dm_env.StepType.FIRST
+        discount_spec = self.discount_spec()
+        self._discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self._environment.possible_agents
+        }
+        observe, env_extras = self._environment.reset()
+
+        observations = self._convert_observations(
+            observe, {agent: False for agent in self.possible_agents}
+        )
+        rewards_spec = self.reward_spec()
+        rewards = {
+            agent: convert_np_type(rewards_spec[agent].dtype, 0)
+            for agent in self.possible_agents
+        }
+        if not self.return_state_info:
+            env_extras = {}
+
+        return parameterized_restart(rewards, self._discounts, observations), env_extras
 
     def step(self, actions: Dict[str, np.ndarray]) -> Tuple[dm_env.TimeStep, np.array]:
         """Steps the environment."""
@@ -125,17 +150,19 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         return observation_specs
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
-        shape = self.environment._get_state().shape
+        extras = {}
+        if self.return_state_info:
+            shape = self.environment._get_state().shape
 
-        spec = specs.BoundedArray(
-            shape=shape,
-            dtype="float32",
-            name="observation",
-            minimum=[float("-inf")] * shape[0],
-            maximum=[float("inf")] * shape[0],
-        )
-
-        return {"s_t": spec}
+            ex_spec = specs.BoundedArray(
+                shape=shape,
+                dtype="float32",
+                name="observation",
+                minimum=[float("-inf")] * shape[0],
+                maximum=[float("inf")] * shape[0],
+            )
+            extras.update({"s_t": ex_spec})
+        return extras
 
 
 class SwitchGameWrapper(PettingZooParallelEnvWrapper):
