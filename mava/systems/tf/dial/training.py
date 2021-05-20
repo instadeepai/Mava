@@ -310,8 +310,8 @@ class DIALTrainer(mava.Trainer):
                     )
 
                     # Target policy
-                    target_state_in = policy["states"][t - 1][agent_id]
-                    target_message_in = policy["channel"][t - 1]
+                    target_state_in = target_policy["states"][t - 1][agent_id]
+                    target_message_in = target_policy["channel"][t - 1]
 
                     (
                         target_action,
@@ -328,13 +328,13 @@ class DIALTrainer(mava.Trainer):
                     target_policy["states"][t][agent_id] = target_state
                     target_policy["actions"][t][agent_id] = target_action
 
-            # policy['channel'][t] = self._communication_module.process_messages(
-            #     policy['messages'][t]
-            # )[self._agents[0]]
+            policy["channel"][t] = self._communication_module.process_messages(
+                policy["messages"][t]
+            )[self._agents[0]]
 
-            # target_policy['channel'][t] = self._communication_module.process_messages(
-            #     target_policy['messages'][t]
-            # )[self._agents[0]]
+            target_policy["channel"][t] = self._communication_module.process_messages(
+                target_policy["messages"][t]
+            )[self._agents[0]]
 
             # Backtrack episode and calculate loss
             # For t=T to 1, -1 do
