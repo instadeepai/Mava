@@ -186,6 +186,7 @@ def main(_: Any) -> None:
         max_gradient_norm=40.0,
         trainer_fn=maddpg.NetworkedMADDPGTrainer,
         connection_spec=fully_connected_network_spec,
+        shared_weights=False,
     ).build()
 
     # launch

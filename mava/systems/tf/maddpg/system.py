@@ -158,9 +158,13 @@ class MADDPG:
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
-        self._connection_spec = connection_spec(  # type: ignore
-            environment_spec.get_agents_by_type()
-        )
+
+        if connection_spec:
+            self._connection_spec = connection_spec(  # type: ignore
+                environment_spec.get_agents_by_type()
+            )
+        else:
+            self._connection_spec = None
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
@@ -234,7 +238,7 @@ class MADDPG:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # create logger
@@ -282,7 +286,7 @@ class MADDPG:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # architecture args
@@ -351,7 +355,7 @@ class MADDPG:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # architecture args
