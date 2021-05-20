@@ -69,7 +69,7 @@ class CentralisedPolicyActor(DecentralisedPolicyActor):
         actor_obs_specs = {}
         for agent_key in self._actor_agent_keys:
             agent_type = agent_key.split("_")[0]
-            # Get observation and action spec for critic.
+            # Get observation spec for actor.
             actor_obs_specs[agent_key] = obs_specs_per_type[agent_type]
         return actor_obs_specs
 
