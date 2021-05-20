@@ -42,8 +42,8 @@ class NetworkedPolicyActor(DecentralisedPolicyActor):
 
     def __init__(
         self,
-        network_spec: Dict[str, np.ndarray],
         environment_spec: specs.MAEnvironmentSpec,
+        network_spec: Dict[str, np.ndarray],
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
@@ -89,6 +89,7 @@ class NetworkedQValueCritic(DecentralisedQValueActorCritic):
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        network_spec: Dict[str, np.ndarray],
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
@@ -101,6 +102,13 @@ class NetworkedQValueCritic(DecentralisedQValueActorCritic):
             critic_networks=critic_networks,
             shared_weights=shared_weights,
         )
+
+        self._network_spec = network_spec
+
+        if self._shared_weights:
+            raise Exception(
+                "Networked architectures currently do not support weight sharing."
+            )
 
     def _get_critic_specs(
         self,
