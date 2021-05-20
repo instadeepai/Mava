@@ -91,7 +91,7 @@ class DIALPolicy(snt.RNNCore):
         if state is None:
             state = self.initial_state()
         if message is None:
-            message = tf.zeros((1, self._message_dim), dtype=tf.float32)
+            message = tf.zeros((x.shape[0], self._message_dim), dtype=tf.float32)
 
         x_task = self.task_mlp(x)
         x_message = self.message_in_mlp(message)

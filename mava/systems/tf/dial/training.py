@@ -233,42 +233,67 @@ class DIALTrainer(mava.Trainer):
 
         core_states = extra["core_states"]
 
-        bs = actions[self._agents[0]].shape[1]
-
-        self.bs = bs
-
-        T = actions[self._agents[0]].shape[0]
+        self.bs = actions[self._agents[0]].shape[1]  # Batch Size
+        T = actions[self._agents[0]].shape[0]  # Episode Length
 
         with tf.GradientTape(persistent=True) as tape:
-            policy_losses = {agent_id: tf.zeros(bs) for agent_id in self._agents}
-            # for each batch
-            # for b in range(bs):
-            # Unroll episode and store states, messages
+            policy_losses = {agent_id: tf.zeros(self.bs) for agent_id in self._agents}
 
-            messages = {
-                0: {
+            # Unroll episode and store states, messages, action values
+            # for policy and target policy
+            policy = {}
+            target_policy = {}
+
+            policy["messages"] = {
+                -1: {
                     agent_id: core_states[agent_id]["message"][0]
                     for agent_id in self._agents
                 }
-            }  # index of time t
-
-            channel = {}
-
-            states = {
-                0: {
+            }
+            policy["states"] = {
+                -1: {
                     agent_id: core_states[agent_id]["state"][0]
                     for agent_id in self._agents
                 }
-            }  # index of time t
+            }
+            policy["actions"] = {}
+            policy["channel"] = {}
+
+            target_policy["messages"] = {
+                -1: {
+                    agent_id: core_states[agent_id]["message"][0]
+                    for agent_id in self._agents
+                }
+            }
+            target_policy["states"] = {
+                -1: {
+                    agent_id: core_states[agent_id]["state"][0]
+                    for agent_id in self._agents
+                }
+            }
+            target_policy["actions"] = {}
+            target_policy["channel"] = {}
 
             # For all time-steps
             for t in range(0, T, 1):
-                channel[t] = self._communication_module.process_messages(messages[t])[
+                policy["channel"][t - 1] = self._communication_module.process_messages(
+                    policy["messages"][t - 1]
+                )[self._agents[0]]
+                target_policy["channel"][
+                    t - 1
+                ] = self._communication_module.process_messages(
+                    target_policy["messages"][t - 1]
+                )[
                     self._agents[0]
                 ]
 
-                messages[t + 1] = {}
-                states[t + 1] = {}
+                policy["messages"][t] = {}
+                policy["states"][t] = {}
+                policy["actions"][t] = {}
+
+                target_policy["messages"][t] = {}
+                target_policy["states"][t] = {}
+                target_policy["actions"][t] = {}
 
                 # For each agent
                 for agent_id in self._agents:
@@ -276,90 +301,83 @@ class DIALTrainer(mava.Trainer):
                     # Agent input at time t
                     obs_in = observations[agent_id].observation[t]
 
-                    state_in = states[t][agent_id]
-                    message_in = channel[t]
+                    # Policy
+                    state_in = policy["states"][t - 1][agent_id]
+                    message_in = policy["channel"][t - 1]
 
-                    batched_observation = obs_in
-                    batched_state = state_in
-                    batched_message = message_in
-
-                    (q_t, m_t), s_t = self._policy_networks[agent_type](
-                        batched_observation, batched_state, batched_message
+                    (action, message), state = self._policy_networks[agent_type](
+                        obs_in, state_in, message_in
                     )
 
-                    # TODO (dries): Why was this here? Is it still needed?
-                    # if obs_in[0] == 0:
-                    #     m_t = tf.zeros_like(m_t)
+                    # Target policy
+                    target_state_in = policy["states"][t - 1][agent_id]
+                    target_message_in = policy["channel"][t - 1]
 
-                    messages[t + 1][agent_id] = m_t
-                    states[t + 1][agent_id] = s_t
+                    (
+                        target_action,
+                        target_message,
+                    ), target_state = self._target_policy_networks[agent_type](
+                        obs_in, target_state_in, target_message_in
+                    )
 
-            channel[t + 1] = self._communication_module.process_messages(
-                messages[t + 1]
-            )[self._agents[0]]
+                    policy["messages"][t][agent_id] = message
+                    policy["states"][t][agent_id] = state
+                    policy["actions"][t][agent_id] = action
 
-            # Backtrack episode
+                    target_policy["messages"][t][agent_id] = target_message
+                    target_policy["states"][t][agent_id] = target_state
+                    target_policy["actions"][t][agent_id] = target_action
+
+            # policy['channel'][t] = self._communication_module.process_messages(
+            #     policy['messages'][t]
+            # )[self._agents[0]]
+
+            # target_policy['channel'][t] = self._communication_module.process_messages(
+            #     target_policy['messages'][t]
+            # )[self._agents[0]]
+
+            # Backtrack episode and calculate loss
             # For t=T to 1, -1 do
             for t in range(T - 1, 0, -1):
                 # For each agent a do
                 for agent_id in self._agents:
-                    agent_type = self.agent_net_keys[agent_id]
-
-                    # All at timestep t
-                    agent_input = observations[agent_id].observation
-                    # (sequence,batch,1)
-                    next_message = channel[t]
-                    message = channel[t - 1]
-                    next_state = states[t][agent_id]
-                    state = states[t - 1][agent_id]
-
-                    action = actions[agent_id]
-
-                    reward = rewards[agent_id]
+                    # agent_type = self.agent_net_keys[agent_id]
+                    # All at timestep t - 1
+                    action = actions[agent_id][t - 1]
+                    message = core_states[agent_id]["message"][t - 1]
+                    reward = rewards[agent_id][t - 1]
+                    terminal = t == T - 1
 
                     discount = tf.cast(
                         self._discount, dtype=discounts[agent_id][t, 0].dtype
                     )
 
-                    terminal = t == T - 1
-
                     # y_t_a = r_t
-                    y_action = reward[t - 1]
-                    y_message = reward[t - 1]
+                    y_action = reward
+                    y_message = reward
 
                     # y_t_a = r_t + discount * max_u Q(t)
                     if not terminal:
-                        batched_observation = agent_input[t]
-                        batched_state = next_state
-                        batched_message = next_message
-
-                        (q_t, m_t), s = self._target_policy_networks[agent_type](
-                            batched_observation, batched_state, batched_message
+                        y_action += discount * tf.reduce_max(
+                            target_policy["actions"][t][agent_id]
+                        )
+                        y_message += discount * tf.reduce_max(
+                            target_policy["messages"][t][agent_id]
                         )
 
-                        y_action += discount * tf.reduce_max(q_t)
-                        y_message += discount * tf.reduce_max(m_t)
-                        # y_message += discount * m_t
-
                     # d_Q_t_a = y_t_a - Q(t-1)
-                    batched_observation = agent_input[t - 1]
-                    batched_state = state
-                    batched_message = message
-
-                    # TODO (dries): Why is the policy values calculated
-                    #  again? Was this not done in the first loop?
-                    (q_t1, m_t1), s = self._policy_networks[agent_type](
-                        batched_observation, batched_state, batched_message
+                    td_action = y_action - tf.gather(
+                        policy["actions"][t - 1][agent_id], action, batch_dims=1
                     )
-
-                    td_action = y_action - tf.gather(q_t1, action[t - 1], batch_dims=1)
 
                     # d_theta = d_theta + d_Q_t_a ^ 2
                     policy_losses[agent_id] += td_action ** 2
 
                     # Communication grads
                     td_comm = y_message - tf.gather(
-                        m_t1, tf.argmax(next_message, axis=-1), batch_dims=1
+                        policy["messages"][t - 1][agent_id],
+                        tf.argmax(message, axis=-1),
+                        batch_dims=1,
                     )
                     policy_losses[agent_id] += td_comm ** 2
 
@@ -368,6 +386,7 @@ class DIALTrainer(mava.Trainer):
                 policy_losses[key] = {
                     "policy_loss": tf.reduce_mean(policy_losses[key], axis=0)
                 }
+
         self.policy_losses: Dict[str, Dict[str, tf.Tensor]] = policy_losses
         self.tape = tape
 
@@ -384,10 +403,11 @@ class DIALTrainer(mava.Trainer):
             agent_key = self.agent_net_keys[agent]
 
             # Get trainable variables.
-            policy_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._policy_networks[agent_key].trainable_variables
-            )
+            # policy_variables = (
+            #     self._observation_networks[agent_key].trainable_variables
+            #     + self._policy_networks[agent_key].trainable_variables
+            # )
+            policy_variables = self._policy_networks[agent_key].trainable_variables
 
             # Compute gradients.
             # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
