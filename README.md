@@ -124,6 +124,15 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
    pip install .[flatland]
    ```
 
+   NB: For StarCraft II installation, this must be installed separately according to your operating system.
+   To install the StarCraft II ML environment and associated packages, please follow the instructions on [PySC2](https://github.com/deepmind/pysc2) to install the StarCraft II game files.
+   Please ensure you have the required game maps (for both PySC2 and SMAC) extracted in the StarCraft II maps directory.
+   Once this is done you can install the packages for the single agent case (PySC2) and the multi-agent case (SMAC).
+    ```bash
+    pip install pysc2
+    pip install git+https://github.com/oxwhirl/smac.git
+    ```
+
 We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functionality such as the use of Atari environments, environment wrappers, gpu support and agent episode recording.
 
 ## Contributing
