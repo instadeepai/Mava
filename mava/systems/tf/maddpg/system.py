@@ -87,7 +87,7 @@ class MADDPG:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
-        connection_spec: Dict[str, List[str]] = None,
+        connection_spec: Callable[[Dict[str, List[str]]], Dict[str, List[str]]] = None,
     ):
         """Initialize the system.
         Args:
@@ -158,7 +158,9 @@ class MADDPG:
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
-        self._connection_spec = connection_spec(environment_spec.get_agents_by_type())
+        self._connection_spec = connection_spec(  # type: ignore
+            environment_spec.get_agents_by_type()
+        )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
