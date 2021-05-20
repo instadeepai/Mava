@@ -164,7 +164,7 @@ class MADDPG:
                 environment_spec.get_agents_by_type()
             )
         else:
-            self._connection_spec = None
+            self._connection_spec = None  # type: ignore
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
