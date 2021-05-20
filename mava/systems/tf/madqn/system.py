@@ -44,6 +44,15 @@ class MADQN:
     """MADQN system.
     This implements a single-process QMIX system.
     Args:
+        environment_factory: Callable to instantiate an environment on a compute node.
+        network_factory: Callable to instantiate system networks on a compute node.
+        logger_factory: Callable to instantiate a system logger on a compute node.
+        architecture: system architecture, e.g. decentralised or centralised.
+        trainer_fn: training type associated with executor and architecture,
+            e.g. centralised training.
+        executor_fn: executor type for example feedforward or recurrent.
+        num_executors: number of executor processes to run in parallel.
+        num_caches: number of trainer node caches.
         environment_spec: description of the actions, observations, etc.
         q_networks: the online Q network (the one being optimized)
         epsilon: probability of taking a random action; ignored if a policy
@@ -62,7 +71,6 @@ class MADQN:
         n_step: number of steps to squash into a single transition.
         discount: discount to use for TD updates.
         counter: counter object used to keep track of steps.
-        logger: logger object to be used by trainers.
         checkpoint: boolean indicating whether to checkpoint the learner.
     """
 
