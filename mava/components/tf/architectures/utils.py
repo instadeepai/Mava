@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Dict, List
+
 
 def fully_connected_network_spec(
     agents_by_type: Dict[str, List[str]]
