@@ -32,7 +32,7 @@ from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 
@@ -143,28 +143,11 @@ def main(_: Any) -> None:
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+
+    # loggers
     log_every = 10
-    trainer_logger = Logger(
-        label="system_trainer",
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
-    exec_logger = Logger(
-        # _{executor_id} gets appended to label in system.
-        label="train_loop_executor",
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
-    eval_logger = Logger(
-        label="eval_loop",
+    logger_factory = functools.partial(
+        logger_utils.make_logger,
         directory=FLAGS.base_dir,
         to_terminal=True,
         to_tensorboard=True,
@@ -175,13 +158,11 @@ def main(_: Any) -> None:
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         num_executors=2,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
     ).build()
 
     # Launch gpu config - let trainer use gpu.

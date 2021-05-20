@@ -12,39 +12,88 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-class LinearExplorationScheduler:
-    def __init__(self, epsilon_min: float = 0.05, epsilon_decay: float = 1e-4):
+
+import abc
+
+
+class BaseExplorationScheduler:
+    @abc.abstractmethod
+    def __init__(
+        self,
+        epsilon_start: float = 1.0,
+        epsilon_min: float = 0.05,
+        epsilon_decay: float = 1e-4,
+    ):
         """
-        Decays epsilon linearly to zero.
+        Base class for decaying epsilon by schedule.
         """
+        self._epsilon_start = epsilon_start
         self._epsilon_min = epsilon_min
         self._epsilon_decay = epsilon_decay
-        self._epsilon = 1.0
+        self._epsilon = epsilon_start
 
+    @abc.abstractmethod
     def decrement_epsilon(self) -> None:
-        if self._epsilon == self._epsilon_min:
-            return
-
-        self._epsilon -= self._epsilon_decay
-        if self._epsilon < self._epsilon_min:
-            self._epsilon = self._epsilon_min
+        """Decrement the epsilon decay value."""
 
     def get_epsilon(self) -> float:
         return self._epsilon
 
     def reset_epsilon(self) -> None:
-        self._epsilon = 1.0
+        self._epsilon = self._epsilon_start
 
 
-class ExponentialExplorationScheduler(LinearExplorationScheduler):
+class LinearExplorationScheduler(BaseExplorationScheduler):
     def __init__(
-        self, logdir: str, epsilon_min: float = 0.05, epsilon_decay: float = 1e-4
+        self,
+        epsilon_start: float = 1.0,
+        epsilon_min: float = 0.05,
+        epsilon_decay: float = 1e-4,
     ):
         """
-        Decays epsilon exponentially to zero.
+        Decays epsilon linearly to epsilon_min.
         """
-        super().__init__(epsilon_min=epsilon_min, epsilon_decay=epsilon_decay)
+        super(LinearExplorationScheduler, self).__init__(
+            epsilon_start,
+            epsilon_min,
+            epsilon_decay,
+        )
 
-    # TODO (Claude) implement exponential decay.
     def decrement_epsilon(self) -> None:
-        raise NotImplementedError
+        if self._epsilon == self._epsilon_min:
+            return
+
+        elif self._epsilon < self._epsilon_min:
+            # Should only ever happen once.
+            self._epsilon = self._epsilon_min
+            return
+
+        self._epsilon -= self._epsilon_decay
+
+
+class ExponentialExplorationScheduler(BaseExplorationScheduler):
+    def __init__(
+        self,
+        epsilon_start: float = 1.0,
+        epsilon_min: float = 0.05,
+        epsilon_decay: float = 1e-4,
+    ):
+        """
+        Decays epsilon exponentially to epsilon_start.
+        """
+        super(ExponentialExplorationScheduler, self).__init__(
+            epsilon_start,
+            epsilon_min,
+            epsilon_decay,
+        )
+
+    def decrement_epsilon(self) -> None:
+        if self._epsilon == self._epsilon_min:
+            return
+
+        elif self._epsilon < self._epsilon_min:
+            # Should only ever happen once.
+            self._epsilon = self._epsilon_min
+            return
+
+        self._epsilon *= 1 - self._epsilon_decay
