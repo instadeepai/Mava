@@ -31,6 +31,7 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.components.tf.architectures import NetworkedQValueCritic
+from mava.components.tf.architectures.utils import fully_connected_network_spec
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
@@ -177,13 +178,14 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_config=logger_config,
-        architecture=CentralisedQValueCritic,
+        architecture=NetworkedQValueCritic,
         num_executors=2,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
-        trainer_fn=maddpg.CentralisedMADDPGTrainer,
+        trainer_fn=maddpg.NetworkedMADDPGTrainer,
+        connection_spec=fully_connected_network_spec,
     ).build()
 
     # launch
