@@ -15,14 +15,18 @@
 
 """Architectures using networked agents for multi-agent RL systems"""
 
-from typing import Dict, List
+import copy
+from typing import Dict, List, Tuple
 
 import sonnet as snt
 import tensorflow as tf
 from acme import specs as acme_specs
 
-from mava import specs
-from mava.components.tf.architectures.decentralised import DecentralisedPolicyActor
+from mava import specs as mava_specs
+from mava.components.tf.architectures.decentralised import (
+    DecentralisedPolicyActor,
+    DecentralisedQValueActorCritic,
+)
 
 
 def fully_connected_network_spec(
@@ -31,10 +35,9 @@ def fully_connected_network_spec(
     """Creates network spec for fully connected agents by agent type"""
     network_spec: Dict[str, List[str]] = {}
     for agent_type, agents in agents_by_type.items():
+        all_agents = agents
         for agent in agents:
-            connections = []
-            for other_agent in agents:
-                network_spec[agent] = connections.append(other_agent)
+            network_spec[agent] = all_agents
     return network_spec
 
 
@@ -43,7 +46,7 @@ class NetworkedPolicyActor(DecentralisedPolicyActor):
 
     def __init__(
         self,
-        environment_spec: specs.MAEnvironmentSpec,
+        environment_spec: mava_specs.MAEnvironmentSpec,
         network_spec: Dict[str, List[str]],
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],

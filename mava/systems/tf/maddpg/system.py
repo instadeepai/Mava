@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import functools
-from typing import Any, Callable, Dict, Type, Union
+from typing import Any, Callable, Dict, List, Type, Union
 
 import acme
 import dm_env
@@ -363,7 +363,7 @@ class MADDPG:
             architecture_config["network_spec"] = self._connection_spec
 
         # Create system architecture with target networks.
-        system = self._architecture(**architecture_config).create_system()
+        system = self._architecture(**architecture_config)
 
         # create variables
         _ = system.create_system()
