@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MADDPG system implementation."""
-import copy
+import functools
 from typing import Any, Callable, Dict, Type, Union
 
 import acme
@@ -35,7 +35,7 @@ from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.maddpg import builder, training
 from mava.utils import lp_utils
-from mava.utils.loggers import MavaLogger
+from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
 
 
@@ -51,6 +51,7 @@ class MADDPG:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
@@ -81,9 +82,7 @@ class MADDPG:
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        trainer_logger: MavaLogger = None,
-        exec_logger: MavaLogger = None,
-        eval_logger: MavaLogger = None,
+        logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
@@ -91,12 +90,18 @@ class MADDPG:
     ):
         """Initialize the system.
         Args:
+            environment_factory: Callable to instantiate an environment
+                on a compute node.
+            network_factory: Callable to instantiate system networks on a compute node.
+            logger_factory: Callable to instantiate a system logger on a compute node.
+            architecture: system architecture, e.g. decentralised or centralised.
+            trainer_fn: training type associated with executor and architecture,
+                e.g. centralised training.
+            executor_fn: executor type for example feedforward or recurrent.
+            num_executors: number of executor processes to run in parallel.
+            num_caches: number of trainer node caches.
             environment_spec: description of the actions, observations, etc.
-            policy_networks: the online (optimized) policies for each agent in
-                the system.
-            critic_networks: the online critic for each agent in the system.
-            observation_networks: dictionary of optional networks to transform
-                the observations before they are fed into any network.
+            shared_weights: set whether agents should share network weights.
             discount: discount to use for TD updates.
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
@@ -113,14 +118,10 @@ class MADDPG:
             training (if using recurrence).
             sigma: standard deviation of zero-mean, Gaussian exploration noise.
             clipping: whether to clip gradients by global norm.
-            logger: logger object to be used by trainers.
             counter: counter object used to keep track of steps.
             checkpoint: boolean indicating whether to checkpoint the trainers.
             checkpoint_subpath: directory for checkpoints.
             replay_table_name: string indicating what name to give the replay table.
-            trainer_logger: logger for trainer class.
-            exec_logger: logger for executor.
-            eval_logger: logger for evaluator.
             train_loop_fn: loop for training.
             eval_loop_fn: loop for evaluation.
 
@@ -131,9 +132,19 @@ class MADDPG:
                 environment_factory(evaluation=False)  # type: ignore
             )
 
+        # set default logger if no logger provided
+        if not logger_factory:
+            logger_factory = functools.partial(
+                logger_utils.make_logger,
+                directory="~/mava",
+                to_terminal=True,
+                time_delta=10,
+            )
+
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
+        self._logger_factory = logger_factory
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
@@ -141,9 +152,7 @@ class MADDPG:
         self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
-        self._trainer_logger = trainer_logger
-        self._exec_logger = exec_logger
-        self._eval_logger = eval_logger
+        self._logger_config = logger_config
         self._train_loop_fn = train_loop_fn
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
@@ -224,6 +233,15 @@ class MADDPG:
             environment_spec=self._environment_spec
         )
 
+        # create logger
+        trainer_logger_config = {}
+        if self._logger_config:
+            if "trainer" in self._logger_config:
+                trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory(  # type: ignore
+            "trainer", **trainer_logger_config
+        )
+
         # Create system architecture with target networks.
         system_networks = self._architecture(
             environment_spec=self._environment_spec,
@@ -240,7 +258,7 @@ class MADDPG:
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=self._trainer_logger,
+            logger=trainer_logger,
         )
 
     def executor(
@@ -286,11 +304,14 @@ class MADDPG:
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
 
-        # Update label to include exec id
-        exec_logger = None
-        if self._exec_logger:
-            exec_logger = copy.deepcopy(self._exec_logger)
-            exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
+        # Create executor logger
+        executor_logger_config = {}
+        if self._logger_config:
+            if "executor" in self._logger_config:
+                executor_logger_config = self._logger_config["executor"]
+        exec_logger = self._logger_factory(  # type: ignore
+            f"executor_{executor_id}", **executor_logger_config
+        )
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
@@ -344,6 +365,13 @@ class MADDPG:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
+        evaluator_logger_config = {}
+        if self._logger_config:
+            if "evaluator" in self._logger_config:
+                evaluator_logger_config = self._logger_config["evaluator"]
+        eval_logger = self._logger_factory(  # type: ignore
+            "evaluator", **evaluator_logger_config
+        )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
@@ -351,7 +379,7 @@ class MADDPG:
             environment,
             executor,
             counter=counter,
-            logger=self._eval_logger,
+            logger=eval_logger,
             **self._eval_loop_fn_kwargs,
         )
 

@@ -42,6 +42,7 @@ class MAD4PG(MADDPG):
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
@@ -72,9 +73,7 @@ class MAD4PG(MADDPG):
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        trainer_logger: MavaLogger = None,
-        exec_logger: MavaLogger = None,
-        eval_logger: MavaLogger = None,
+        logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
@@ -82,12 +81,18 @@ class MAD4PG(MADDPG):
     ):
         """Initialize the system.
         Args:
+            environment_factory: Callable to instantiate an environment
+                on a compute node.
+            network_factory: Callable to instantiate system networks on a compute node.
+            logger_factory: Callable to instantiate a system logger on a compute node.
+            architecture: system architecture, e.g. decentralised or centralised.
+            trainer_fn: training type associated with executor and architecture,
+                e.g. centralised training.
+            executor_fn: executor type for example feedforward or recurrent.
+            num_executors: number of executor processes to run in parallel.
+            num_caches: number of trainer node caches.
             environment_spec: description of the actions, observations, etc.
-            policy_networks: the online (optimized) policies for each agent in
-                the system.
-            critic_networks: the online critic for each agent in the system.
-            observation_networks: dictionary of optional networks to transform
-                the observations before they are fed into any network.
+            shared_weights: set whether agents should share network weights.
             discount: discount to use for TD updates.
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
@@ -109,15 +114,13 @@ class MAD4PG(MADDPG):
             checkpoint: boolean indicating whether to checkpoint the trainers.
             checkpoint_subpath: directory for checkpoints.
             replay_table_name: string indicating what name to give the replay table.
-            trainer_logger: logger for trainer class.
-            exec_logger: logger for executor.
-            eval_logger: logger for evaluator.
             train_loop_fn: loop for training.
             eval_loop_fn: loop for evaluation.
         """
         super().__init__(
             environment_factory=environment_factory,
             network_factory=network_factory,
+            logger_factory=logger_factory,
             architecture=architecture,
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -143,9 +146,7 @@ class MAD4PG(MADDPG):
             max_executor_steps=max_executor_steps,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            trainer_logger=trainer_logger,
-            exec_logger=exec_logger,
-            eval_logger=eval_logger,
+            logger_config=logger_config,
             train_loop_fn=train_loop_fn,
             eval_loop_fn=eval_loop_fn,
             train_loop_fn_kwargs=train_loop_fn_kwargs,
