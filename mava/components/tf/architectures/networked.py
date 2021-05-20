@@ -81,3 +81,51 @@ class NetworkedPolicyActor(DecentralisedPolicyActor):
                     dtype=tf.dtypes.float32,
                 )
         return actor_obs_specs
+
+
+class NetworkedQValueCritic(DecentralisedQValueActorCritic):
+    """Centralised multi-agent actor critic architecture."""
+
+    def __init__(
+        self,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        shared_weights: bool = True,
+    ):
+        super().__init__(
+            environment_spec=environment_spec,
+            observation_networks=observation_networks,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            shared_weights=shared_weights,
+        )
+
+    def _get_critic_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        critic_obs_specs: Dict[str, acme_specs.Array] = {}
+        critic_act_specs: Dict[str, acme_specs.Array] = {}
+
+        agents_by_type = self._env_spec.get_agents_by_type()
+
+        for agent_type, agents in agents_by_type.items():
+            critic_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            critic_act_shape = list(
+                copy.copy(self._agent_specs[agents[0]].actions.shape)
+            )
+
+            for agent in agents:
+                critic_obs_shape.insert(0, np.sum(self._network_spec[agent]))
+                critic_obs_specs[agent] = tf.TensorSpec(
+                    shape=critic_obs_shape,
+                    dtype=tf.dtypes.float32,
+                )
+                critic_act_shape.insert(0, np.sum(self._network_spec[agent]))
+                critic_act_specs[agent] = tf.TensorSpec(
+                    shape=critic_act_shape,
+                    dtype=tf.dtypes.float32,
+                )
+
+        return critic_obs_specs, critic_act_specs
