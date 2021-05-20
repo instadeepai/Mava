@@ -626,7 +626,7 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        agent_network: Dict[str, np.ndarray],
+        connection_spec: Dict[str, List[str]],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -690,7 +690,7 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
             checkpoint_subpath=checkpoint_subpath,
         )
 
-        self._agent_network = agent_network
+        self._connection_spec = connection_spec
 
     def _get_critic_feed(
         self,
@@ -704,7 +704,7 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # Networked based
-        connections = self._agent_network[agent]
+        connections = self._connection_spec[agent]
         o_tm1_vals = []
         o_t_vals = []
         a_tm1_vals = []
