@@ -182,7 +182,6 @@ def main(_: Any) -> None:
         trainer_fn=mappo.CentralisedMAPPOTrainer,
         max_gradient_norm=40.0,
         checkpoint_subpath=checkpoint_dir,
-        shared_weights=False,
     ).build()
 
     # launch
