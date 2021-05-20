@@ -30,10 +30,10 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf.architectures import CentralisedQValueCritic
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.components.tf.architectures import CentralisedQValueCritic
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(

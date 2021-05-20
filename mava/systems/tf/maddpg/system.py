@@ -87,6 +87,7 @@ class MADDPG:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        connection_spec: Dict[str, List[str]] = None,
     ):
         """Initialize the system.
         Args:
@@ -157,6 +158,7 @@ class MADDPG:
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
+        self._connection_spec = connection_spec
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
@@ -242,14 +244,19 @@ class MADDPG:
             "trainer", **trainer_logger_config
         )
 
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "shared_weights": self._shared_weights,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
         # Create system architecture with target networks.
-        system_networks = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
-        ).create_system()
+        system_networks = self._architecture(**architecture_config).create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
@@ -275,14 +282,19 @@ class MADDPG:
             environment_spec=self._environment_spec
         )
 
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "shared_weights": self._shared_weights,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
         # Create system architecture with target networks.
-        system = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
-        )
+        system = self._architecture(**architecture_config)
 
         # create variables
         _ = system.create_system()
@@ -339,14 +351,19 @@ class MADDPG:
             environment_spec=self._environment_spec
         )
 
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "shared_weights": self._shared_weights,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
         # Create system architecture with target networks.
-        system = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
-        )
+        system = self._architecture(**architecture_config).create_system()
 
         # create variables
         _ = system.create_system()

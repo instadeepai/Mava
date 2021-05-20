@@ -44,7 +44,7 @@ class NetworkedPolicyActor(DecentralisedPolicyActor):
     def __init__(
         self,
         environment_spec: specs.MAEnvironmentSpec,
-        network_spec: Dict[str, np.ndarray],
+        network_spec: Dict[str, List[str]],
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
@@ -90,7 +90,7 @@ class NetworkedQValueCritic(DecentralisedQValueActorCritic):
     def __init__(
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
-        network_spec: Dict[str, np.ndarray],
+        network_spec: Dict[str, List[str]],
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
