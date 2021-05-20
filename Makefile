@@ -22,6 +22,7 @@ MADQN=examples/debugging_envs/run_feedforward_madqn.py
 QMIX=examples/debugging_envs/run_feedforward_qmix.py
 VDN=examples/debugging_envs/run_feedforward_vdn.py
 
+MADDPG-PZ=examples/petting_zoo/run_decentralised_feedforward_maddpg.py
 QMIX-PZ=examples/petting_zoo/run_feedforward_qmix.py
 VDN-PZ==examples/petting_zoo/run_feedforward_vdn.py
 
@@ -45,6 +46,9 @@ run-qmix:
 
 run-vdn:
 	$(DOCKER_RUN) python $(VDN) --base_dir /home/app/mava/logs/
+
+run-maddpg-pz:
+	$(DOCKER_RUN) python $(MADDPG-PZ) --base_dir /home/app/mava/logs/
 
 run-qmix-pz:
 	$(DOCKER_RUN) python $(QMIX-PZ) --base_dir /home/app/mava/logs/

@@ -39,7 +39,7 @@ class MADQNTrainer(mava.Trainer):
     and implements update functionality to learn from this dataset.
     """
 
-    def __init__(  # type:ignore
+    def __init__(
         self,
         agents: List[str],
         agent_types: List[str],
@@ -134,8 +134,7 @@ class MADQNTrainer(mava.Trainer):
         self._timestamp = None
 
     def get_epsilon(self) -> float:
-        epsilon = self._exploration_scheduler.get_epsilon()
-        return epsilon
+        return self._exploration_scheduler.get_epsilon()
 
     def _decrement_epsilon(self) -> None:
         self._exploration_scheduler.decrement_epsilon()
@@ -255,9 +254,7 @@ class MADQNTrainer(mava.Trainer):
 
                 loss = tf.reduce_mean(loss)
 
-                q_network_losses[agent] = {}
-                q_network_losses[agent]["q_value_loss"] = loss
-
+                q_network_losses[agent] = {"q_value_loss": loss}
         self._q_network_losses = q_network_losses
         self.tape = tape
 
@@ -285,11 +282,12 @@ class MADQNTrainer(mava.Trainer):
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
-            variables[network_type] = {}
-            for agent in self.unique_net_keys:
-                variables[network_type][agent] = tf2_utils.to_numpy(
+            variables[network_type] = {
+                agent: tf2_utils.to_numpy(
                     self._system_network_variables[network_type][agent]
                 )
+                for agent in self.unique_net_keys
+            }
         return variables
 
 
@@ -368,9 +366,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
                     core_state[agent][0],
                 )
 
-                q_network_losses[agent] = {}
-                q_network_losses[agent]["q_value_loss"] = tf.zeros(())
-
+                q_network_losses[agent] = {"q_value_loss": tf.zeros(())}
                 for t in range(1, q.shape[0]):
                     loss, _ = trfl.qlearning(
                         q[t - 1],

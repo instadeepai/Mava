@@ -155,12 +155,19 @@ class MADQNBuilder:
         """Create a dataset iterator to use for learning/updating the system.
         Args:
             replay_client: Reverb Client which points to the replay server."""
+
+        sequence_length = (
+            self._config.sequence_length
+            if issubclass(self._executor_fn, executors.RecurrentExecutor)
+            else None
+        )
+
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
-            sequence_length=self._config.sequence_length,
+            sequence_length=sequence_length,
         )
         return iter(dataset)
 
@@ -217,10 +224,7 @@ class MADQNBuilder:
             agent_keys = self._agent_types if shared_weights else self._agents
 
             # Create policy variables
-            variables = {}
-            for agent in agent_keys:
-                variables[agent] = q_networks[agent].variables
-
+            variables = {agent: q_networks[agent].variables for agent in agent_keys}
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
