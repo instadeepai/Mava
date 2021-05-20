@@ -196,7 +196,7 @@ class MAPPOTrainer(mava.Trainer):
             )
         return observation_trans
 
-    # @tf.function
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
