@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import dataclasses
-from typing import Dict, Iterator, Optional, Type
+from typing import Any, Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -67,6 +67,7 @@ class QMIXBuilder(MADQNBuilder):
         config: QMIXConfig,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
+        extra_specs: Dict[str, Any] = {},
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
@@ -79,6 +80,7 @@ class QMIXBuilder(MADQNBuilder):
             config=config,
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
+            extra_specs=extra_specs,
             exploration_scheduler_fn=exploration_scheduler_fn,
         )
 

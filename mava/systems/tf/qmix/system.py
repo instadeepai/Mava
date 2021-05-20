@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Defines the QMIX system class."""
-
+import functools
 from typing import Any, Callable, Dict, Optional, Type
 
 import dm_env
@@ -30,16 +30,27 @@ from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules import mixing
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.environment_loop import ParallelEnvironmentLoop
+from mava.systems.tf import executors
 from mava.systems.tf.madqn.system import MADQN
 from mava.systems.tf.qmix import builder, execution, training
-from mava.utils.loggers import MavaLogger
+from mava.utils.loggers import MavaLogger, logger_utils
 
 
 # TODO Correct documentation
+# TODO Implement recurrent option from MADQN
 class QMIX(MADQN):
     """QMIX system.
     This implements a single-process QMIX system.
     Args:
+        environment_factory: Callable to instantiate an environment on a compute node.
+        network_factory: Callable to instantiate system networks on a compute node.
+        logger_factory: Callable to instantiate a system logger on a compute node.
+        architecture: system architecture, e.g. decentralised or centralised.
+        trainer_fn: training type associated with executor and architecture,
+            e.g. centralised training.
+        executor_fn: executor type for example feedforward or recurrent.
+        num_executors: number of executor processes to run in parallel.
+        num_caches: number of trainer node caches.
         environment_spec: description of the actions, observations, etc.
         q_networks: the online Q network (the one being optimized)
         epsilon: probability of taking a random action; ignored if a policy
@@ -58,7 +69,6 @@ class QMIX(MADQN):
         n_step: number of steps to squash into a single transition.
         discount: discount to use for TD updates.
         counter: counter object used to keep track of steps.
-        logger: logger object to be used by trainers.
         checkpoint: boolean indicating whether to checkpoint the learner.
     """
 
@@ -66,6 +76,7 @@ class QMIX(MADQN):
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
@@ -95,9 +106,7 @@ class QMIX(MADQN):
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        trainer_logger: MavaLogger = None,
-        exec_logger: MavaLogger = None,
-        eval_logger: MavaLogger = None,
+        logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
@@ -111,10 +120,20 @@ class QMIX(MADQN):
                 environment_factory(evaluation=False)  # type:ignore
             )
 
+        # set default logger if no logger provided
+        if not logger_factory:
+            logger_factory = functools.partial(
+                logger_utils.make_logger,
+                directory="~/mava",
+                to_terminal=True,
+                time_delta=10,
+            )
+
         super(QMIX, self).__init__(
             architecture=architecture,
             environment_factory=environment_factory,
             network_factory=network_factory,
+            logger_factory=logger_factory,
             environment_spec=environment_spec,
             shared_weights=shared_weights,
             num_executors=num_executors,
@@ -122,14 +141,16 @@ class QMIX(MADQN):
             max_executor_steps=max_executor_steps,
             checkpoint_subpath=checkpoint_subpath,
             checkpoint=checkpoint,
-            trainer_logger=trainer_logger,
-            exec_logger=exec_logger,
-            eval_logger=eval_logger,
             train_loop_fn=train_loop_fn,
             train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn=eval_loop_fn,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
         )
+
+        if issubclass(executor_fn, executors.RecurrentExecutor):
+            extra_specs = self._get_extra_specs()
+        else:
+            extra_specs = {}
 
         self._builder = builder.QMIXBuilder(
             builder.QMIXConfig(
@@ -155,6 +176,7 @@ class QMIX(MADQN):
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
+            extra_specs=extra_specs,
             exploration_scheduler_fn=exploration_scheduler_fn,
         )
 
@@ -185,6 +207,14 @@ class QMIX(MADQN):
             agent_networks=agent_networks,
         ).create_system()
 
+        # create logger
+        trainer_logger_config = {}
+        if self._logger_config and "trainer" in self._logger_config:
+            trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory(  # type: ignore
+            "trainer", **trainer_logger_config
+        )
+
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
 
@@ -192,7 +222,7 @@ class QMIX(MADQN):
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=self._trainer_logger,
+            logger=trainer_logger,
         )
 
     def build(self, name: str = "qmix") -> Any:
