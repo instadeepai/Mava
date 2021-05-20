@@ -161,8 +161,6 @@ class QMIXTrainer(MADQNTrainer):
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            # a_t = self._policy_actions(o_t_trans)
-
             q_tm1 = []  # Q vals
             q_t = []  # Target Q vals
             for agent in self._agents:
@@ -248,9 +246,10 @@ class QMIXTrainer(MADQNTrainer):
                 # Includes the hypernet variables
                 variables[network_type] = self._mixing_network.variables
             else:  # Collect variables for each agent network
-                variables[network_type] = {}
-                for key in self.unique_net_keys:
-                    variables[network_type][key] = tf2_utils.to_numpy(
+                variables[network_type] = {
+                    key: tf2_utils.to_numpy(
                         self._system_network_variables[network_type][key]
                     )
+                    for key in self.unique_net_keys
+                }
         return variables

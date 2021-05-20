@@ -37,7 +37,7 @@ from mava.utils.loggers import logger_utils
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
-    "two_step",  # "simple_spread"
+    "simple_spread",  # "two_step"
     "Debugging environment name (str).",
 )
 flags.DEFINE_string(
@@ -121,6 +121,7 @@ def main(_: Any) -> None:
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
         num_agents=2,
+        return_state_info=True,
     )
 
     # networks
