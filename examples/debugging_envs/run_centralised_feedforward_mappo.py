@@ -180,8 +180,9 @@ def main(_: Any) -> None:
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
         architecture=CentralisedValueCritic,
         trainer_fn=mappo.CentralisedMAPPOTrainer,
-        max_gradient_norm=40,
+        max_gradient_norm=40.0,
         checkpoint_subpath=checkpoint_dir,
+        shared_weights=False,
     ).build()
 
     # launch
