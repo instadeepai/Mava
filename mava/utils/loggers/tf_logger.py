@@ -15,7 +15,7 @@
 
 """Utilities for logging to the terminal."""
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional, Type
 
 import tensorflow as tf
 from acme.utils.loggers import base
@@ -47,7 +47,7 @@ class TFSummaryLogger(base.Logger):
         self._time = time.time()
         self.label = label
         self._iter = 0
-        self._summary = None
+        self._summary: Optional[Type[tf.summary.SummaryWriter]] = None
         self._logdir = logdir
 
     def write(self, values: base.LoggingData) -> None:
@@ -59,18 +59,14 @@ class TFSummaryLogger(base.Logger):
         if self._summary is None:
             self._summary = tf.summary.create_file_writer(self._logdir)
 
-        with self._summary.as_default():  # type: ignore
+        with self._summary.as_default():
             for key, value in values.items():
-                if hasattr(value, "shape"):
-                    if len(value.shape) > 0:
-                        self.histogram_summary(key, value)
-                    else:
-                        self.scalar_summary(key, value)
+                if hasattr(value, "shape") and len(value.shape) > 0:
+                    self.histogram_summary(key, value)
+                elif hasattr(value, "shape") or not isinstance(value, dict):
+                    self.scalar_summary(key, value)
                 else:
-                    if isinstance(value, dict):
-                        self.dict_summary(key, value)
-                    else:
-                        self.scalar_summary(key, value)
+                    self.dict_summary(key, value)
             self._iter += 1
 
     def scalar_summary(self, key: str, value: float) -> None:
@@ -96,10 +92,7 @@ class TFSummaryLogger(base.Logger):
         items: List = []
         for k, v in dict_info.items():
             k = str(k)
-            if parent_key:
-                new_key = parent_key + sep + k
-            else:
-                new_key = k
+            new_key = parent_key + sep + k if parent_key else k
             if isinstance(v, dict):
                 items.extend(
                     self._flatten_dict(parent_key=new_key, dict_info=v, sep=sep).items()
