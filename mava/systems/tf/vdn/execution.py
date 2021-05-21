@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Executor implementations for QMIX."""
+"""Executor implementations for VDN."""
 
 from typing import Dict, Optional
 
@@ -25,7 +25,7 @@ from mava.systems.tf.madqn.execution import MADQNFeedForwardExecutor
 from mava.systems.tf.madqn.training import MADQNTrainer
 
 
-class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
+class VDNFeedForwardExecutor(MADQNFeedForwardExecutor):
     """A feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system
     which takes non-batched observations and outputs non-batched actions.
@@ -51,7 +51,7 @@ class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
           variable_client: object which allows to copy weights from the trainer copy
             of the policies to the executor copy (in case they are separate).
         """
-        super(QMIXFeedForwardExecutor, self).__init__(
+        super(VDNFeedForwardExecutor, self).__init__(
             q_networks=q_networks,
             action_selectors=action_selectors,
             shared_weights=shared_weights,

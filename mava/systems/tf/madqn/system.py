@@ -24,7 +24,7 @@ import reverb
 import sonnet as snt
 from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
-from acme.utils import counting, loggers
+from acme.utils import counting
 
 import mava
 from mava import core
@@ -41,7 +41,38 @@ from mava.wrappers import DetailedPerAgentStatistics
 
 
 class MADQN:
-    """Program definition for MADQN."""
+    """MADQN system.
+    This implements a single-process QMIX system.
+    Args:
+        environment_factory: Callable to instantiate an environment on a compute node.
+        network_factory: Callable to instantiate system networks on a compute node.
+        logger_factory: Callable to instantiate a system logger on a compute node.
+        architecture: system architecture, e.g. decentralised or centralised.
+        trainer_fn: training type associated with executor and architecture,
+            e.g. centralised training.
+        executor_fn: executor type for example feedforward or recurrent.
+        num_executors: number of executor processes to run in parallel.
+        num_caches: number of trainer node caches.
+        environment_spec: description of the actions, observations, etc.
+        q_networks: the online Q network (the one being optimized)
+        epsilon: probability of taking a random action; ignored if a policy
+            network is given.
+        trainer_fn: the class used for training the agent and mixing networks.
+        shared_weights: boolean determining whether shared weights is used.
+        target_update_period: number of learner steps to perform before updating
+            the target networks.
+        clipping: whether to clip gradients by global norm.
+        replay_table_name: string indicating what name to give the replay table.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        prefetch_size: size to prefetch from replay.
+        batch_size: batch size for updates.
+        n_step: number of steps to squash into a single transition.
+        discount: discount to use for TD updates.
+        counter: counter object used to keep track of steps.
+        checkpoint: boolean indicating whether to checkpoint the learner.
+    """
 
     def __init__(
         self,
@@ -87,7 +118,7 @@ class MADQN:
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
-                environment_factory(evaluation=False)  # type: ignore
+                environment_factory(evaluation=False)  # type:ignore
             )
 
         # set default logger if no logger provided
@@ -162,8 +193,7 @@ class MADQN:
                     networks["q_networks"][agent_type].initial_state(1)
                 ),
             )
-        extras = {"core_states": core_state_specs}
-        return extras
+        return {"core_states": core_state_specs}
 
     def replay(self) -> Any:
         """The replay storage."""
@@ -201,9 +231,8 @@ class MADQN:
 
         # create logger
         trainer_logger_config = {}
-        if self._logger_config:
-            if "trainer" in self._logger_config:
-                trainer_logger_config = self._logger_config["trainer"]
+        if self._logger_config and "trainer" in self._logger_config:
+            trainer_logger_config = self._logger_config["trainer"]
         trainer_logger = self._logger_factory(  # type: ignore
             "trainer", **trainer_logger_config
         )
@@ -258,9 +287,8 @@ class MADQN:
 
         # Create executor logger
         executor_logger_config = {}
-        if self._logger_config:
-            if "executor" in self._logger_config:
-                executor_logger_config = self._logger_config["executor"]
+        if self._logger_config and "executor" in self._logger_config:
+            executor_logger_config = self._logger_config["executor"]
         exec_logger = self._logger_factory(  # type: ignore
             f"executor_{executor_id}", **executor_logger_config
         )
@@ -282,7 +310,6 @@ class MADQN:
         self,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        logger: loggers.Logger = None,
     ) -> Any:
         """The evaluation process."""
 
@@ -311,9 +338,8 @@ class MADQN:
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
         evaluator_logger_config = {}
-        if self._logger_config:
-            if "evaluator" in self._logger_config:
-                evaluator_logger_config = self._logger_config["evaluator"]
+        if self._logger_config and "evaluator" in self._logger_config:
+            evaluator_logger_config = self._logger_config["evaluator"]
         eval_logger = self._logger_factory(  # type: ignore
             "evaluator", **evaluator_logger_config
         )
