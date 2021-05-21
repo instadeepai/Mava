@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -79,6 +79,9 @@ class Logger(MavaLogger):
             print_fn,
             self._time_stamp,
         )
+
+    def update_label(self, label: str) -> None:
+        self._label = f"{self._label}_{label}"
 
     def make_logger(
         self,

@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,7 +65,9 @@ class MADDPGConfig:
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
+    target_averaging: bool = False
     target_update_period: int = 100
+    target_update_rate: float = 0.01
     executor_variable_update_period: int = 1000
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
@@ -73,8 +75,8 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
+    max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
-    clipping: bool = True
     logger: loggers.Logger = None
     counter: counting.Counter = None
     checkpoint: bool = True
@@ -123,11 +125,11 @@ class MADDPGBuilder(SystemBuilder):
         """Create tables to insert data into."""
 
         # Select adder
-        if self._executor_fn == executors.FeedForwardExecutor:
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec, self._extra_specs
             )
-        elif self._executor_fn == executors.RecurrentExecutor:
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder_sig = reverb_adders.ParallelSequenceAdder.signature(
                 environment_spec, self._extra_specs
             )
@@ -167,7 +169,7 @@ class MADDPGBuilder(SystemBuilder):
 
         sequence_length = (
             self._config.sequence_length
-            if self._executor_fn == executors.RecurrentExecutor
+            if issubclass(self._executor_fn, executors.RecurrentExecutor)
             else None
         )
 
@@ -191,14 +193,15 @@ class MADDPGBuilder(SystemBuilder):
         """
 
         # Select adder
-        if self._executor_fn == executors.FeedForwardExecutor:
+
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=None,
                 client=replay_client,
                 n_step=self._config.n_step,
                 discount=self._config.discount,
             )
-        elif self._executor_fn == executors.RecurrentExecutor:
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder = reverb_adders.ParallelSequenceAdder(
                 priority_fns=None,
                 client=replay_client,
@@ -276,9 +279,11 @@ class MADDPGBuilder(SystemBuilder):
         agents = self._agents
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
-        clipping = self._config.clipping
+        max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         target_update_period = self._config.target_update_period
+        target_averaging = self._config.target_averaging
+        target_update_rate = self._config.target_update_rate
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
@@ -293,9 +298,11 @@ class MADDPGBuilder(SystemBuilder):
             shared_weights=shared_weights,
             policy_optimizer=self._config.policy_optimizer,
             critic_optimizer=self._config.critic_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             discount=discount,
+            target_averaging=target_averaging,
             target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
             dataset=dataset,
             counter=counter,
             logger=logger,

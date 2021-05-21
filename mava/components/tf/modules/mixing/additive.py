@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,9 +18,6 @@ from typing import Dict
 import sonnet as snt
 
 from mava.components.tf.architectures import BaseArchitecture
-
-# For some reason I can't import BaseMixingModule without .base
-# Should the __init__ file not handle this?
 from mava.components.tf.modules.mixing.base import BaseMixingModule
 from mava.components.tf.networks.additive import AdditiveMixingNetwork
 
@@ -33,13 +30,15 @@ class AdditiveMixing(BaseMixingModule):
         super(AdditiveMixing, self).__init__()
 
         self._architecture = architecture
+        self._agent_networks = self._architecture.create_actor_variables()
 
     def _create_mixing_layer(self) -> snt.Module:
         # Instantiate additive mixing network
-        return AdditiveMixingNetwork()
+        self._mixed_network = AdditiveMixingNetwork()
+        return self._mixed_network
 
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
-        # Implement method from base class
-        networks = self._architecture.create_actor_variables()
-        networks["mixing_network"] = self._create_mixing_layer()
-        return networks
+        self._agent_networks["mixing"] = self._create_mixing_layer()
+        self._agent_networks["target_mixing"] = self._create_mixing_layer()
+
+        return self._agent_networks

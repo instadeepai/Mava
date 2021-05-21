@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running Qmix on pettinzoo MPE environments."""
+"""Example running QMIX on debugging environments."""
 import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Optional, Sequence, Union
@@ -32,12 +32,12 @@ from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import qmix
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
-    "simple_spread",  # "two_step",
+    "simple_spread",  # "two_step" for Two Step Environment
     "Debugging environment name (str).",
 )
 flags.DEFINE_string(
@@ -62,7 +62,7 @@ flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64,),
+    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -89,7 +89,6 @@ def make_networks(
     q_networks = {}
     action_selectors = {}
     for key in specs.keys():
-
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
 
@@ -116,16 +115,13 @@ def make_networks(
 
 
 def main(_: Any) -> None:
-
-    # set loggers info
-    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
-
     # environment
     environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
         num_agents=2,
+        return_state_info=True,
     )
 
     # networks
@@ -134,28 +130,10 @@ def main(_: Any) -> None:
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
+    # loggers
     log_every = 10
-    trainer_logger = Logger(
-        label="system_trainer",
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
-    exec_logger = Logger(
-        # _{executor_id} gets appended to label in system.
-        label="train_loop_executor",
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
-    eval_logger = Logger(
-        label="eval_loop",
+    logger_factory = functools.partial(
+        logger_utils.make_logger,
         directory=FLAGS.base_dir,
         to_terminal=True,
         to_tensorboard=True,
@@ -167,16 +145,13 @@ def main(_: Any) -> None:
     program = qmix.QMIX(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         num_executors=2,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.01,
         epsilon_decay=1e-4,
-        log_info=log_info,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
     ).build()
 
     # launch

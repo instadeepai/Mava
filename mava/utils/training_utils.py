@@ -1,4 +1,8 @@
-from typing import Any, Dict
+from typing import Any, Dict, Iterable, Sequence
+
+import sonnet as snt
+import tensorflow as tf
+import trfl
 
 
 # Checkpoint the networks.
@@ -48,6 +52,30 @@ def map_losses_per_agent_acq(
         }
 
     return logged_losses
+
+
+def combine_dim(tensor: tf.Tensor) -> tf.Tensor:
+    dims = tensor.shape[:2]
+    return snt.merge_leading_dims(tensor, num_dims=2), dims
+
+
+def extract_dim(tensor: tf.Tensor, dims: tf.Tensor) -> tf.Tensor:
+    return tf.reshape(tensor, [dims[0], dims[1], -1])
+
+
+# Require correct tensor ranks---as long as we have shape information
+# available to check. If there isn't any, we print a warning.
+def check_rank(tensors: Iterable[tf.Tensor], ranks: Sequence[int]) -> None:
+    for i, (tensor, rank) in enumerate(zip(tensors, ranks)):
+        if tensor.get_shape():
+            trfl.assert_rank_and_shape_compatibility([tensor], rank)
+        else:
+            raise ValueError(
+                f'Tensor "{tensor.name}", which was offered as '
+                f"transformed_n_step_loss parameter {i+1}, has "
+                f"no rank at construction time, so cannot verify"
+                f"that it has the necessary rank of {rank}"
+            )
 
 
 # Safely delete object from class.

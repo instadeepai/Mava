@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ from mava.wrappers.pettingzoo import (
 )
 from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
+    DetailedTrainerStatisticsWithEpsilon,
     NetworkStatisticsActorCritic,
     NetworkStatisticsSoftActorCritic,
 )

@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ from _pytest.monkeypatch import MonkeyPatch
 
 from mava import types
 from tests.conftest import EnvSpec, EnvType, Helpers
+from tests.enums import EnvSource
 
 """
 TestEnvWrapper is a general purpose test class that runs tests for environment wrappers.
@@ -31,7 +32,7 @@ This is meant to flexibily test various environments wrappers.
     It is parametrize by an EnvSpec object:
         env_name: [name of env]
         env_type: [EnvType.Parallel/EnvType.Sequential]
-        env_source: [What is source env - e.g. PettingZoo/RLLibMultiEnv]
+        env_source: [What is source env - e.g. PettingZoo, RLLibMultiEnv or Flatland]
             - Used in confest to determine which envs and wrappers to load.
 
     For new environments - you might need to update the Helpers class in conftest.py.
@@ -46,6 +47,7 @@ This is meant to flexibily test various environments wrappers.
         EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
         EnvSpec("pettingzoo.sisl.multiwalker_v7", EnvType.Parallel),
         EnvSpec("pettingzoo.sisl.multiwalker_v7", EnvType.Sequential),
+        EnvSpec("flatland", EnvType.Parallel, EnvSource.Flatland),
     ],
 )
 class TestEnvWrapper:
@@ -94,7 +96,11 @@ class TestEnvWrapper:
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
         num_agents = len(wrapped_env.agents)
 
-        dm_env_timestep = wrapped_env.reset()
+        timestep = wrapped_env.reset()
+        if type(timestep) == tuple:
+            dm_env_timestep, env_extras = timestep
+        else:
+            dm_env_timestep = timestep
         props_which_should_not_be_none = [dm_env_timestep, dm_env_timestep.observation]
 
         assert helpers.verify_all_props_not_none(
@@ -239,7 +245,11 @@ class TestEnvWrapper:
         #  Get agent names from env
         agents = wrapped_env.agents
 
-        initial_dm_env_timestep = wrapped_env.reset()
+        timestep = wrapped_env.reset()
+        if type(timestep) == tuple:
+            initial_dm_env_timestep, env_extras = timestep
+        else:
+            initial_dm_env_timestep = timestep
         # Parallel env_types
         if env_spec.env_type == EnvType.Parallel:
             test_agents_actions = {

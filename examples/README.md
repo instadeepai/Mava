@@ -17,7 +17,9 @@ We include a number of systems running on continuous control tasks.
     an MA-D4PG system on the continuous action space simple_spread MPE debugging environment.
 -   [MA-DDPG (recurrent)](debugging_envs/run_recurrent_maddpg.py):
     an MA-DDPG system (with recurrence) on the continuous action space simple_spread MPE debugging environment.
--  [PPO (centralised)](petting_zoo/run_centralised_feedforward_mappo.py):
+-   [MA-D4PG (decentralised, recurrent)](debugging_envs/run_decentralised_recurrent_mad4pg.py):
+    an MA-D4PG system (with recurrence) on the continuous action space simple_spread MPE debugging environment.
+-  [PPO (centralised, feedforward)](petting_zoo/run_centralised_feedforward_mappo.py):
     a PPO system using a centralised critic on the continuous action space multiwalker_v7 PettingZoo environment.
 -  [MA-DDPG (centralised)](petting_zoo/run_feedforward_maddpg.py):
     an MA-DDPG system on the continuous action space multiwalker_v7 PettingZoo environment.
@@ -38,5 +40,7 @@ We also include a number of systems running on discrete action space environment
     a QMIX system on the two step custom environment.
 - [DIAL](debugging_envs/run_recurrent_dial.py):
     a DIAL system on the custom SwitchGame environment.
+- [DIAL](debugging_envs/run_recurrent_dial_spread.py):
+    a DIAL system on the discrete action space simple_spread MPE debugging environment.
 - [MA-DQN (feedforward)](debugging_envs/run_feedforward_madqn.py):
     an MA-DQN system running on the discrete action space maze_craze_v2 PettingZoo environment.

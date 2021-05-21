@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,5 @@
 """Implementations of a QMIX agent."""
 
 from mava.systems.tf.qmix.execution import QMIXFeedForwardExecutor
-from mava.systems.tf.qmix.system import QMIX  # type: ignore
+from mava.systems.tf.qmix.system import QMIX
 from mava.systems.tf.qmix.training import QMIXTrainer
-
-# from mava.system.tf.qmix

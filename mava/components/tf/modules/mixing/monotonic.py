@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ class MonotonicMixing(BaseMixingModule):
         # Need to figure out how to get the size of one-hot representation
         # of the global state that is returned by the environment.
         # One hot input dimension of global state
-        state_specs = tf.TensorSpec(shape=(1, 3))  # Check this shape
+        # state_specs = tf.TensorSpec(shape=(1, 3))  # Check this shape
         self._num_agents = len(self._agent_networks["values"])
         q_value_dim = tf.TensorSpec(self._num_agents)
 

@@ -1,3 +1,18 @@
+# python3
+# Copyright 2021 [...placeholder...]. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Adapted from https://github.com/openai/multiagent-particle-envs.
 # TODO (dries): Try using this class directly from PettingZoo and delete this file.
 
@@ -56,7 +71,7 @@ class MultiAgentEnv(gym.Env):
         self.info_callback = info_callback
         self.done_callback = done_callback
         # environment parameters
-        assert action_space == "continuous" or action_space == "discrete"
+        assert action_space in ["continuous", "discrete"]
 
         self.discrete_action_space = action_space == "discrete"
 
@@ -91,10 +106,8 @@ class MultiAgentEnv(gym.Env):
                 # all action spaces are discrete, so simplify to
                 # MultiDiscrete action space
                 if all(
-                    [
-                        isinstance(act_space, spaces.Discrete)
-                        for act_space in total_action_space
-                    ]
+                    isinstance(act_space, spaces.Discrete)
+                    for act_space in total_action_space
                 ):
                     act_space = MultiDiscrete(
                         [[0, act_space.n - 1] for act_space in total_action_space]
@@ -131,7 +144,6 @@ class MultiAgentEnv(gym.Env):
         obs_n = {}
         reward_n = {}
         done_n = {}
-        info_n: Dict[str, Dict[str, Any]] = {"n": {}}
         # set action for each agent
         for agent_id in self.agent_ids:
             agent = self.agents[agent_id]
@@ -145,14 +157,15 @@ class MultiAgentEnv(gym.Env):
             obs_n[agent_id] = self._get_obs(a_i, agent)
             reward_n[agent_id] = self._get_reward(a_i, agent)
             done_n[agent_id] = self._get_done(agent)
-            info_n["n"][agent_id] = self._get_info(agent)
 
             if done_n[agent_id]:
                 self.env_done = True
 
-        return obs_n, reward_n, done_n, info_n
+        state_n = self._get_state()
 
-    def reset(self) -> Dict[str, np.array]:
+        return obs_n, reward_n, done_n, state_n
+
+    def reset(self) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         # reset world
         if self.reset_callback is not None:
             self.reset_callback(self.world)
@@ -166,7 +179,8 @@ class MultiAgentEnv(gym.Env):
         for a_i, agent_id in enumerate(self.agent_ids):
             agent = self.agents[agent_id]
             obs_n[agent_id] = self._get_obs(a_i, agent)
-        return obs_n
+        state_n = self._get_state()
+        return obs_n, {"s_t": state_n}
 
     # get info used for benchmarking
     def _get_info(self, agent: Agent) -> Dict:
@@ -186,14 +200,33 @@ class MultiAgentEnv(gym.Env):
     def _get_done(self, agent: Agent) -> bool:
         if self.done_callback is None:
             raise ValueError("No done callback specified.")
-        done = self.done_callback(agent, self.world)
-        return done
+        return self.done_callback(agent, self.world)
 
     # get reward for a particular agent
     def _get_reward(self, a_i: int, agent: Agent) -> float:
         if self.reward_callback is None:
             return 0.0
         return self.reward_callback(agent, a_i, self.world)
+
+    def _get_state(self) -> np.array:
+        # get positions of all entities in this agent's reference frame
+        entity_pos = []
+        for entity in self.world.landmarks:  # world.entities:
+            entity_pos.append(entity.state.p_pos)
+        # entity colors
+
+        agent_pos = []
+        agent_vel = []
+        for i, agent in enumerate(self.world.agents):
+            agent_pos.append(agent.state.p_pos)
+            agent_vel.append(agent.state.p_vel)
+
+        return np.array(
+            np.concatenate(
+                [[self.world.current_step / 50]] + entity_pos + agent_pos + agent_vel
+            ),
+            dtype=np.float32,
+        )
 
     # set env action for a particular agent
     def _set_action(
@@ -316,7 +349,7 @@ class MultiAgentEnv(gym.Env):
             # render to display or array
             results.append(self.viewers[i].render(return_rgb_array=mode == "rgb_array"))
 
-        return results
+        return np.squeeze(results)
 
     # create receptor field locations in local coordinate frame
     def _make_receptor_locations(self) -> List[np.array]:

@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,31 +31,50 @@ from mava.utils.debugging.environments.two_step import TwoStepEnv
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.pettingzoo import PettingZooParallelEnvWrapper
 
-# from gym import spaces
-
 
 class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Debugging MARL environments."""
 
-    # Note: we don't inherit from base.EnvironmentWrapper because that class
-    # assumes that the wrapped environment is a dm_env.Environment.
-    def __init__(self, environment: MultiAgentEnv, render: bool = False):
-        self.render = render
+    def __init__(
+        self,
+        environment: MultiAgentEnv,
+        return_state_info: bool = False,
+    ):
         super().__init__(environment=environment)
 
-    def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
+        self.return_state_info = return_state_info
+
+    def reset(self) -> dm_env.TimeStep:
+        """Resets the episode."""
+        self._reset_next_step = False
+        self._step_type = dm_env.StepType.FIRST
+        discount_spec = self.discount_spec()
+        self._discounts = {
+            agent: convert_np_type(discount_spec[agent].dtype, 1)
+            for agent in self._environment.possible_agents
+        }
+        observe, env_extras = self._environment.reset()
+
+        observations = self._convert_observations(
+            observe, {agent: False for agent in self.possible_agents}
+        )
+        rewards_spec = self.reward_spec()
+        rewards = {
+            agent: convert_np_type(rewards_spec[agent].dtype, 0)
+            for agent in self.possible_agents
+        }
+        if not self.return_state_info:
+            env_extras = {}
+
+        return parameterized_restart(rewards, self._discounts, observations), env_extras
+
+    def step(self, actions: Dict[str, np.ndarray]) -> Tuple[dm_env.TimeStep, np.array]:
         """Steps the environment."""
 
         if self._reset_next_step:
             return self.reset()
 
-        observations, rewards, dones, infos = self._environment.step(actions)
-
-        if self.render:
-            self._environment.render(mode="not_human")
-            import time
-
-            time.sleep(0.1)
+        observations, rewards, dones, state = self._environment.step(actions)
 
         rewards_spec = self.reward_spec()
         #  Handle empty rewards
@@ -79,12 +98,16 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
         else:
             self._step_type = dm_env.StepType.MID
 
-        return dm_env.TimeStep(
+        timestep = dm_env.TimeStep(
             observation=observations,
             reward=rewards,
             discount=self._discounts,
             step_type=self._step_type,
         )
+        if self.return_state_info:
+            return timestep, {"s_t": state}
+        else:
+            return timestep
 
     # Convert Debugging environment observation so it's dm_env compatible.
     # Also, the list of legal actions must be converted to a legal actions mask.
@@ -97,7 +120,7 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 legals = observation["action_mask"]
                 observation = observation["observation"]
             else:
-                # TODO Handle legal actions better for continous envs,
+                # TODO Handle legal actions better for continuous envs,
                 #  maybe have min and max for each action and clip the agents actions
                 #  accordingly
                 legals = np.ones(
@@ -126,12 +149,25 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
             )
         return observation_specs
 
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        extras = {}
+        if self.return_state_info:
+            shape = self.environment._get_state().shape
+
+            ex_spec = specs.BoundedArray(
+                shape=shape,
+                dtype="float32",
+                name="observation",
+                minimum=[float("-inf")] * shape[0],
+                maximum=[float("inf")] * shape[0],
+            )
+            extras.update({"s_t": ex_spec})
+        return extras
+
 
 class SwitchGameWrapper(PettingZooParallelEnvWrapper):
     """Environment wrapper for Debugging Switch environment."""
 
-    # Note: we don't inherit from base.EnvironmentWrapper because that class
-    # assumes that the wrapped environment is a dm_env.Environment.
     def __init__(self, environment: MultiAgentSwitchGame):
         super().__init__(environment=environment)
 
@@ -172,9 +208,7 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
 
     def __init__(self, environment: TwoStepEnv) -> None:
         super().__init__(environment=environment)
-        self._reset_next_step = True
-
-        # TODO Do I need these? Seems like they should be handled in PettingZoo wrapper
+        self._reset_next_step = False
         self.environment.action_spaces = {}
         self.environment.observation_spaces = {}
         self.environment.extra_specs = {
@@ -186,6 +220,8 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
             self.environment.observation_spaces[agent_id] = spaces.Box(
                 0, 1, shape=(1,)
             )  # float32
+
+        self.reset()
 
     def step(self, actions: Dict[str, np.array]) -> Tuple[dm_env.TimeStep, np.array]:
         """Steps the environment."""

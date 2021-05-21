@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,16 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn):
-#   - [] Complete class for monotonic mixing
-#   - [] Generalise Qmixing to allow for different activations,
-#          hypernetwork structures etc.
-#   - [] Decide on whether to accept an 'args' term or receive each arg individually.
-#   - [] Think about how to default values.
-
-# NOTE (StJohn): I'm still thinking about the structure in general. One of the biggest
-# design choices at the moment is how to structure what is passed to the __init__ when
-# instantiating vs what is passed to the forward functions.
+# TODO (StJohn): Generalise Qmixing to allow for different activations,
+#  hypernetwork structures etc.
 
 # Code inspired by PyMARL framework implementation
 # https://github.com/oxwhirl/pymarl/blob/master/src/modules/mixers/qmix.py
@@ -78,11 +70,6 @@ class MonotonicMixingNetwork(snt.Module):
             self._hypernet_hidden_dim,
         )
 
-    # TODO (St John) I need to set up states so that it is a global state
-    # This should be of shape [batch_size, 3] for my env. This is assuming
-    # I take global state as a one-hot input. e.g. State 2 => (0,0,1) has
-    # dim=3.
-
     def __call__(
         self,
         q_values: tf.Tensor,  # [batch_size, n_agents] = [B,2]
@@ -103,5 +90,5 @@ class MonotonicMixingNetwork(snt.Module):
         # ELU -> Exp. linear unit
         hidden = tf.nn.elu(tf.matmul(q_values, w1) + b1)  # [B, 1, qmix_hidden_dim]
 
-        q_tot = tf.matmul(hidden, w2) + b2  # [B, 1, 1]
-        return q_tot  # [B, 1, 1]
+        # Qtot: [B, 1, 1]
+        return tf.matmul(hidden, w2) + b2

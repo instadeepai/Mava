@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,7 +52,11 @@ class TestEnvPreprocessWrapper:
                 (normalize_obs_v0, None),
             ],
         )
-        initial_dm_env_timestep = wrapped_env.reset()
+        timestep = wrapped_env.reset()
+        if type(timestep) == tuple:
+            initial_dm_env_timestep, env_extras = timestep
+        else:
+            initial_dm_env_timestep = timestep
 
         agents = wrapped_env.agents
 

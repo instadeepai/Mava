@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,13 +26,13 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
 from mava import specs as mava_specs
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import Logger
 
 
 def make_networks(
@@ -47,8 +47,6 @@ def make_networks(
 ) -> Dict[str, snt.Module]:
 
     """Creates networks used by the agents."""
-
-    # TODO handle observation networks.
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
@@ -133,7 +131,6 @@ class TestMAPPO:
         # passed in.
         mava_id = "tests/mappo"
         base_dir = "~/mava"
-        log_info = (base_dir, f"{mava_id}/logs")
 
         # environment
         environment_factory = functools.partial(
@@ -148,38 +145,9 @@ class TestMAPPO:
         # system
         checkpoint_dir = f"{base_dir}/{mava_id}"
 
-        log_every = 10
-        trainer_logger = Logger(
-            label="system_trainer",
-            directory=base_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=mava_id,
-            time_delta=log_every,
-        )
-
-        exec_logger = Logger(
-            # _{executor_id} gets appended to label in system.
-            label="train_loop_executor",
-            directory=base_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=mava_id,
-            time_delta=log_every,
-        )
-
-        eval_logger = Logger(
-            label="eval_loop",
-            directory=base_dir,
-            to_terminal=True,
-            to_tensorboard=True,
-            time_stamp=mava_id,
-            time_delta=log_every,
-        )
         system = mappo.MAPPO(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            log_info=log_info,
             num_executors=2,
             batch_size=32,
             max_queue_size=1000,
@@ -187,16 +155,26 @@ class TestMAPPO:
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
             checkpoint_subpath=checkpoint_dir,
-            trainer_logger=trainer_logger,
-            exec_logger=exec_logger,
-            eval_logger=eval_logger,
         )
         program = system.build()
 
         (trainer_node,) = program.groups["trainer"]
         trainer_node.disable_run()
 
-        lp.launch(program, launch_type="test_mt")
+        # Launch gpu config - don't use gpu
+        gpu_id = -1
+        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+        local_resources = {
+            "trainer": PythonProcess(env=env_vars),
+            "evaluator": PythonProcess(env=env_vars),
+            "executor": PythonProcess(env=env_vars),
+        }
+
+        lp.launch(
+            program,
+            launch_type="test_mt",
+            local_resources=local_resources,
+        )
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 

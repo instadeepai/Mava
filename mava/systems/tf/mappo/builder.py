@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf.mappo import execution, training
-from mava.wrappers import DetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
 
 
 @dataclasses.dataclass
@@ -264,7 +264,7 @@ class MAPPOBuilder(SystemBuilder):
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        # TODO (Kale-ab): networks stats for MAPPO
+        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
 
         trainer = DetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]

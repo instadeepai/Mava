@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
+# Copyright 2021 [...placeholder...]. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import dataclasses
-import time
 from typing import Any, Dict, Iterator, List, Optional, Type
 
 import reverb
@@ -23,66 +22,14 @@ from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting
 
-from mava import adders, core, specs, types
+from mava import Trainer, adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
+from mava.systems.tf import executors
 from mava.systems.tf.madqn import execution, training
-from mava.utils import training_utils as train_utils
-from mava.wrappers import DetailedTrainerStatistics
-
-# TODO (CLAUDE) I had to make a custom class here that
-# inherits DetailedTrainerStatistics
-# to expose the get_epsilon() function. For some
-# reason lp does not bind it otherwise.
-# Need to fix this.
-
-
-class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
-    def __init__(
-        self,
-        trainer: training.MADQNTrainer,
-        metrics: List[str] = ["q_value_loss"],
-        summary_stats: List = ["mean", "max", "min", "var", "std"],
-    ) -> None:
-        super().__init__(trainer, metrics, summary_stats)
-
-    def get_epsilon(self) -> float:
-        return self._trainer.get_epsilon()  # type: ignore
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        if self._require_loggers:
-            self._create_loggers(list(fetches.keys()))
-            self._require_loggers = False
-
-        # compute statistics
-        self._compute_statistics(fetches)
-
-        # Compute elapsed time.
-        # NOTE (Arnu): getting type issues with the timestamp
-        # not sure why. Look into a fix for this.
-        timestamp = time.time()
-        if self._timestamp:  # type: ignore
-            elapsed_time = timestamp - self._timestamp  # type: ignore
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        train_utils.checkpoint_networks(self._system_checkpointer)
-
-        fetches["epsilon"] = self.get_epsilon()
-        self._trainer._decrement_epsilon()  # type: ignore
-
-        if self._logger:
-            self._logger.write(fetches)
+from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
 
 @dataclasses.dataclass
@@ -117,6 +64,8 @@ class MADQNConfig:
     prefetch_size: int
     batch_size: int
     n_step: int
+    sequence_length: int
+    period: int
     discount: float
     checkpoint: bool
     optimizer: snt.Optimizer
@@ -139,6 +88,7 @@ class MADQNBuilder:
         config: MADQNConfig,
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
+        extra_specs: Dict[str, Any] = {},
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
@@ -147,6 +97,8 @@ class MADQNBuilder:
         _config: Configuration options for the MADQN system.
         _trainer_fn: Trainer module to use."""
         self._config = config
+        self._extra_specs = extra_specs
+
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
@@ -155,8 +107,22 @@ class MADQNBuilder:
 
     def make_replay_tables(
         self,
-        environment_spec: specs.EnvironmentSpec,
+        environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
+        """Create tables to insert data into."""
+
+        # Select adder
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+            adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
+                environment_spec, self._extra_specs
+            )
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
+            adder_sig = reverb_adders.ParallelSequenceAdder.signature(
+                environment_spec, self._extra_specs
+            )
+        else:
+            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+
         if self._config.samples_per_insert is None:
             # We will take a samples_per_insert ratio of None to mean that there is
             # no limit, i.e. this only implies a min size limit.
@@ -178,9 +144,7 @@ class MADQNBuilder:
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
             rate_limiter=limiter,
-            signature=reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec
-            ),
+            signature=adder_sig,
         )
 
         return [replay_table]
@@ -188,12 +152,22 @@ class MADQNBuilder:
     def make_dataset_iterator(
         self, replay_client: reverb.Client
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the system."""
+        """Create a dataset iterator to use for learning/updating the system.
+        Args:
+            replay_client: Reverb Client which points to the replay server."""
+
+        sequence_length = (
+            self._config.sequence_length
+            if issubclass(self._executor_fn, executors.RecurrentExecutor)
+            else None
+        )
+
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
+            sequence_length=sequence_length,
         )
         return iter(dataset)
 
@@ -203,12 +177,26 @@ class MADQNBuilder:
         """Create an adder which records data generated by the executor/environment.
         Args:
           replay_client: Reverb Client which points to the replay server."""
-        return reverb_adders.ParallelNStepTransitionAdder(
-            client=replay_client,
-            priority_fns=None,
-            n_step=self._config.n_step,
-            discount=self._config.discount,
-        )
+
+        # Select adder
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+            adder = reverb_adders.ParallelNStepTransitionAdder(
+                priority_fns=None,
+                client=replay_client,
+                n_step=self._config.n_step,
+                discount=self._config.discount,
+            )
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
+            adder = reverb_adders.ParallelSequenceAdder(
+                priority_fns=None,
+                client=replay_client,
+                sequence_length=self._config.sequence_length,
+                period=self._config.period,
+            )
+        else:
+            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+
+        return adder
 
     def make_executor(
         self,
@@ -216,15 +204,17 @@ class MADQNBuilder:
         action_selectors: Dict[str, Any],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
-        trainer: Optional[training.MADQNTrainer] = None,
+        trainer: Optional[Trainer] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
-            behavior_networks: A struct of instance of all
-                the different behaviour networks,
+            q_networks: A struct of instance of all
+                the different system q networks,
                 this should be a callable which takes as input observations
                 and returns actions.
             adder: How data is recorded (e.g. added to replay).
+            variable_source: collection of (nested) numpy arrays. Contains
+                source variables as defined in mava.core.
         """
 
         shared_weights = self._config.shared_weights
@@ -234,10 +224,7 @@ class MADQNBuilder:
             agent_keys = self._agent_types if shared_weights else self._agents
 
             # Create policy variables
-            variables = {}
-            for agent in agent_keys:
-                variables[agent] = q_networks[agent].variables
-
+            variables = {agent: q_networks[agent].variables for agent in agent_keys}
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
@@ -307,12 +294,6 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        # TODO (CLAUDE) if I add this wrapper then epsilon doesnt get logged.
-        # Without the wrapper, q-losses dont get logged.
-        # Not sure how to fix this.
-
-        # NOTE (Claude) use my custom statistics
-        # wrapper to expose get_epsilon() for lp.
-        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type: ignore
+        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type:ignore
 
         return trainer
