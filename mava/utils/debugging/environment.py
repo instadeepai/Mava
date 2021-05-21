@@ -1,3 +1,18 @@
+# python3
+# Copyright 2021 [...placeholder...]. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Adapted from https://github.com/openai/multiagent-particle-envs.
 # TODO (dries): Try using this class directly from PettingZoo and delete this file.
 
@@ -56,7 +71,7 @@ class MultiAgentEnv(gym.Env):
         self.info_callback = info_callback
         self.done_callback = done_callback
         # environment parameters
-        assert action_space == "continuous" or action_space == "discrete"
+        assert action_space in ["continuous", "discrete"]
 
         self.discrete_action_space = action_space == "discrete"
 
@@ -91,10 +106,8 @@ class MultiAgentEnv(gym.Env):
                 # all action spaces are discrete, so simplify to
                 # MultiDiscrete action space
                 if all(
-                    [
-                        isinstance(act_space, spaces.Discrete)
-                        for act_space in total_action_space
-                    ]
+                    isinstance(act_space, spaces.Discrete)
+                    for act_space in total_action_space
                 ):
                     act_space = MultiDiscrete(
                         [[0, act_space.n - 1] for act_space in total_action_space]
@@ -187,8 +200,7 @@ class MultiAgentEnv(gym.Env):
     def _get_done(self, agent: Agent) -> bool:
         if self.done_callback is None:
             raise ValueError("No done callback specified.")
-        done = self.done_callback(agent, self.world)
-        return done
+        return self.done_callback(agent, self.world)
 
     # get reward for a particular agent
     def _get_reward(self, a_i: int, agent: Agent) -> float:

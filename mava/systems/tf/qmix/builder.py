@@ -33,7 +33,6 @@ from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
 @dataclasses.dataclass
 class QMIXConfig(MADQNConfig):
-    # TODO Match documentation with MADQNConfig once cleaned.
     """Configuration options for the QMIX system.
     Args:
             environment_spec: description of the actions, observations, etc.
