@@ -199,20 +199,16 @@ class QMIXTrainer(MADQNTrainer):
             q_tot_mixed = self._mixing_network(q_tm1, s_tm1)  # [B, 1, 1]
             q_tot_target_mixed = self._target_mixing_network(q_t, s_t)  # [B, 1, 1]
 
-            # Cast the additional discount to match the environment discount dtype.
-            # discount = tf.cast(self._discount, dtype=d_t.dtype)
-
             # Calculate Q loss.
-            # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
-            discount = tf.constant(0.99)  # TODO Generalise
-
             targets = (
-                rewards + discount * (tf.constant(1.0) - dones) * q_tot_target_mixed
+                rewards
+                + self._discount * (tf.constant(1.0) - dones) * q_tot_target_mixed
             )
             targets = tf.stop_gradient(targets)
             td_error = targets - q_tot_mixed
-            self.loss = 0.5 * tf.reduce_mean(tf.square(td_error))
 
+            # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
+            self.loss = 0.5 * tf.reduce_mean(tf.square(td_error))
             self.tape = tape
 
     def _backward(self) -> None:
