@@ -13,10 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Dict, List
 
-from mava.components.tf.networks.additive import AdditiveMixingNetwork
-from mava.components.tf.networks.dial import DIALPolicy
-from mava.components.tf.networks.epsilon_greedy import epsilon_greedy_action_selector
-from mava.components.tf.networks.monotonic import MonotonicMixingNetwork
-from mava.components.tf.networks.transformed import QTranAlt, QTranBase
-from mava.components.tf.networks.weighted import WeightedMixing
+
+def fully_connected_network_spec(
+    agents_by_type: Dict[str, List[str]]
+) -> Dict[str, List[str]]:
+    """Creates network spec for fully connected agents by agent type"""
+    network_spec: Dict[str, List[str]] = {}
+    for agent_type, agents in agents_by_type.items():
+        all_agents = agents
+        for agent in agents:
+            network_spec[agent] = all_agents
+    return network_spec

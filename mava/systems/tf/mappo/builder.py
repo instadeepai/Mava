@@ -174,7 +174,7 @@ class MAPPOBuilder(SystemBuilder):
 
     def make_executor(
         self,
-        policy_networks: Dict[str, Dict[str, snt.Module]],
+        policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
@@ -189,9 +189,10 @@ class MAPPOBuilder(SystemBuilder):
         variable_client = None
         if variable_source:
             # Create policy variables.
-            variables = {}
-            for network_key in policy_networks.keys():
-                variables[network_key] = policy_networks[network_key].variables  # type: ignore # noqa: E501
+            variables = {
+                network_key: policy_networks[network_key].variables
+                for network_key in policy_networks
+            }
 
             # Get new policy variables.
             # TODO Should the variable update period be in the MAPPO config?

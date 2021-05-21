@@ -119,9 +119,9 @@ class MockedSystem(MockedExecutor, System):
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, Any]]:
         variables: Dict = {}
         for network_type in names:
-            variables[network_type] = {}
-            for agent in self.agents:
-                variables[network_type][agent] = self.variables[network_type][agent]
+            variables[network_type] = {
+                agent: self.variables[network_type][agent] for agent in self.agents
+            }
         return variables
 
 
