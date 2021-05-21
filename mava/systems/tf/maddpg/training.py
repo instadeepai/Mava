@@ -19,7 +19,7 @@
 import copy
 import os
 import time
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import reverb
@@ -195,7 +195,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.
-        self._timestamp = None
+        self._timestamp: Optional[float] = None
 
     def _update_target_networks(self) -> None:
         assert 0.0 < self._target_update_rate < 1.0
@@ -363,7 +363,7 @@ class BaseMADDPGTrainer(mava.Trainer):
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
                 dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
-                clip_norm = True if self._max_gradient_norm is not None else False
+                clip_norm = self._max_gradient_norm is not None
 
                 policy_loss = losses.dpg(
                     dpg_q_t,
@@ -422,11 +422,8 @@ class BaseMADDPGTrainer(mava.Trainer):
 
         # Compute elapsed time.
         timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp = timestamp
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
@@ -442,11 +439,12 @@ class BaseMADDPGTrainer(mava.Trainer):
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
-            variables[network_type] = {}
-            for agent in self.unique_net_keys:
-                variables[network_type][agent] = tf2_utils.to_numpy(
+            variables[network_type] = {
+                agent: tf2_utils.to_numpy(
                     self._system_network_variables[network_type][agent]
                 )
+                for agent in self.unique_net_keys
+            }
         return variables
 
 
@@ -1028,7 +1026,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.
-        self._timestamp = None
+        self._timestamp: Optional[float] = None
 
     def _update_target_networks(self) -> None:
         assert 0.0 < self._target_update_rate < 1.0
@@ -1335,11 +1333,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
         # Compute elapsed time.
         timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp = timestamp
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
@@ -1355,11 +1350,12 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
-            variables[network_type] = {}
-            for agent in self.unique_net_keys:
-                variables[network_type][agent] = tf2_utils.to_numpy(
+            variables[network_type] = {
+                agent: tf2_utils.to_numpy(
                     self._system_network_variables[network_type][agent]
                 )
+                for agent in self.unique_net_keys
+            }
         return variables
 
 

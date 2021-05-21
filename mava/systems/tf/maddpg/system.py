@@ -215,8 +215,7 @@ class MADDPG:
                     networks["policies"][agent_type].initial_state(1)
                 ),
             )
-        extras = {"core_states": core_state_specs}
-        return extras
+        return {"core_states": core_state_specs}
 
     def replay(self) -> Any:
         """The replay storage."""
@@ -231,7 +230,7 @@ class MADDPG:
         )
 
     def coordinator(self, counter: counting.Counter) -> Any:
-        return lp_utils.StepsLimiter(counter, self._max_executor_steps)  # type: ignore
+        return lp_utils.StepsLimiter(counter, self._max_executor_steps)
 
     def trainer(
         self,
@@ -247,9 +246,8 @@ class MADDPG:
 
         # create logger
         trainer_logger_config = {}
-        if self._logger_config:
-            if "trainer" in self._logger_config:
-                trainer_logger_config = self._logger_config["trainer"]
+        if self._logger_config and "trainer" in self._logger_config:
+            trainer_logger_config = self._logger_config["trainer"]
         trainer_logger = self._logger_factory(  # type: ignore
             "trainer", **trainer_logger_config
         )
@@ -329,9 +327,8 @@ class MADDPG:
 
         # Create executor logger
         executor_logger_config = {}
-        if self._logger_config:
-            if "executor" in self._logger_config:
-                executor_logger_config = self._logger_config["executor"]
+        if self._logger_config and "executor" in self._logger_config:
+            executor_logger_config = self._logger_config["executor"]
         exec_logger = self._logger_factory(  # type: ignore
             f"executor_{executor_id}", **executor_logger_config
         )
@@ -394,9 +391,8 @@ class MADDPG:
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
         evaluator_logger_config = {}
-        if self._logger_config:
-            if "evaluator" in self._logger_config:
-                evaluator_logger_config = self._logger_config["evaluator"]
+        if self._logger_config and "evaluator" in self._logger_config:
+            evaluator_logger_config = self._logger_config["evaluator"]
         eval_logger = self._logger_factory(  # type: ignore
             "evaluator", **evaluator_logger_config
         )
