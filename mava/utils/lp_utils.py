@@ -18,7 +18,7 @@
 import functools
 import inspect
 import time
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 import launchpad as lp
 from absl import flags, logging
@@ -67,7 +67,7 @@ class StepsLimiter:
     def __init__(
         self,
         counter: counting.Counter,
-        max_steps: int,
+        max_steps: Optional[int],
         steps_key: str = "executor_steps",
     ):
         self._counter = counter

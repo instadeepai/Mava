@@ -14,5 +14,5 @@
 # limitations under the License.
 
 from mava.systems.tf.dial.execution import DIALExecutor
-from mava.systems.tf.dial.system import DIAL  # type: ignore
+from mava.systems.tf.dial.system import DIAL
 from mava.systems.tf.dial.training import DIALTrainer
