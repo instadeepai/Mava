@@ -382,7 +382,7 @@ def decorate_step_method(env: RailEnv) -> None:
     decorates the step method so that it accepts an action dict where the keys are the
     agent ids
     """
-    env.step_ = env.step  # type: ignore
+    env.step_ = env.step
 
     def _step(
         self: RailEnv, actions: Dict[str, Union[int, float, Any]]

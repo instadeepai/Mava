@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import time
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import sonnet as snt
@@ -133,7 +133,7 @@ class MADQNTrainer(mava.Trainer):
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.
 
-        self._timestamp = None
+        self._timestamp: Optional[float] = None
 
     def get_epsilon(self) -> float:
         return self._exploration_scheduler.get_epsilon()
