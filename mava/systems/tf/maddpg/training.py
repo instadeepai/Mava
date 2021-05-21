@@ -309,7 +309,9 @@ class BaseMADDPGTrainer(mava.Trainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
-        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+        o_tm1, _, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+
+        a_tm1 = e_tm1["policy_outputs"]
 
         self.policy_losses = {}
         self.critic_losses = {}

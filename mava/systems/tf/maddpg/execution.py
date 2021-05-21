@@ -27,16 +27,17 @@ from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders, core
+from mava.systems import executors
 
 tfd = tfp.distributions
 
 
-class MAPPOFeedForwardExecutor(core.Executor):
-    """A recurrent Executor for MAPPO.
-    An executor based on a recurrent policy for each agent in the system which
-    takes non-batched observations and outputs non-batched actions, and keeps
-    track of the recurrent state inside. It also allows adding experiences to
-    replay and updating the weights from the policy on the learner.
+class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
+    """A feed-forward executor for discrete actions in MADDPG.
+    An executor based on a feed-forward policy for each agent in the system
+    which takes non-batched observations and outputs non-batched actions.
+    It also allows adding experiences to replay and updating the weights
+    from the policy on the learner.
     """
 
     def __init__(
@@ -62,33 +63,26 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self._variable_client = variable_client
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights
-        self._prev_log_probs: Dict[str, Any] = {}
+        self.self._policy_outputs: Dict[str, Any] = {}
 
     @tf.function
     def _policy(
-        self,
-        agent: str,
-        observation: types.NestedTensor,
-    ) -> Tuple[types.NestedTensor, types.NestedTensor]:
-        # Index network either on agent type or on agent id.
-        network_key = agent.split("_")[0] if self._shared_weights else agent
+        self, agent: str, observation: types.NestedTensor
+    ) -> types.NestedTensor:
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
-        observation = tf2_utils.add_batch_dim(observation.observation)
+        batched_observation = tf2_utils.add_batch_dim(observation)
+
+        # index network either on agent type or on agent id
+        agent_key = agent.split("_")[0] if self._shared_weights else agent
 
         # Compute the policy, conditioned on the observation.
-        policy = self._policy_networks[network_key](observation)
+        policy = self._policy_networks[agent_key](batched_observation)
 
-        # Sample from the policy and compute the log likelihood.
-        action = policy.sample()
-        log_prob = policy.log_prob(action)
+        # Sample from the policy if it is stochastic.
+        action = tf.math.argmax(policy)
 
-        # Cast for compatibility with reverb.
-        # sample() returns a 'int32', which is a problem.
-        if isinstance(policy, tfp.distributions.Categorical):
-            action = tf.cast(action, "int64")
-
-        return log_prob, action
+        return action, policy
 
     def select_action(
         self, agent: str, observation: types.NestedArray
@@ -96,17 +90,10 @@ class MAPPOFeedForwardExecutor(core.Executor):
 
         # Step the recurrent policy/value network forward
         # given the current observation and state.
-        self._prev_log_probs[agent], action = self._policy(agent, observation)
+        action, self._policy_outputs[agent] = self._policy(agent, observation)
 
         # Return a numpy array with squeezed out batch dimension.
         action = tf2_utils.to_numpy_squeeze(action)
-
-        # TODO(Kale-ab) : Remove. This is for debugging.
-        if np.isnan(action).any():
-            print(
-                f"Value error- Log Probs:{self._prev_log_probs[agent]} Action: {action} "  # noqa: E501
-            )
-
         return action
 
     def select_actions(
@@ -127,6 +114,10 @@ class MAPPOFeedForwardExecutor(core.Executor):
     ) -> None:
 
         if self._adder:
+
+            # Generate dummy policy values to send through
+            self.select_actions(timestep.observation)
+            extras.update({"policy_out": self._policy_outputs})
             self._adder.add_first(timestep)
 
     def observe(
@@ -139,7 +130,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         if not self._adder:
             return
 
-        next_extras.update({"log_probs": self._prev_log_probs})
+        next_extras.update({"policy_out": self._policy_outputs})
 
         next_extras = tf2_utils.to_numpy_squeeze(next_extras)
 
