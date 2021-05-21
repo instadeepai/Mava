@@ -84,14 +84,14 @@ class Helpers:
         if env_spec.env_source == EnvSource.PettingZoo:
             mod = importlib.import_module(env_spec.env_name)
             if env_spec.env_type == EnvType.Parallel:
-                env = mod.parallel_env()  # type: ignore
+                env = mod.parallel_env()  # type:ignore
             elif env_spec.env_type == EnvType.Sequential:
-                env = mod.env()  # type: ignore
+                env = mod.env()  # type:ignore
         elif env_spec.env_source == EnvSource.Flatland:
             env = load_flatland_env(flatland_env_config)
         else:
             raise Exception("Env_spec is not valid.")
-        env.reset()  # type: ignore
+        env.reset()  # type:ignore
         return env
 
     # Returns a wrapper function.

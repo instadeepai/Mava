@@ -230,11 +230,7 @@ class StandardizeReward:
                 gamma_dict = self._discount  # type: ignore
 
             for agent in self.env.possible_agents:  # type:ignore
-                if gamma_dict:
-                    gamma = gamma_dict[agent]
-                else:
-                    gamma = 1
-
+                gamma = gamma_dict[agent] if gamma_dict else 1
                 params[agent] = {
                     "return": 0,
                     "ret_rms": RunningMeanStd(shape=()),
