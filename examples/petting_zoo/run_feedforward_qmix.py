@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running Qmix on pettinzoo MPE environments."""
+"""Example running QMIX on pettinzoo MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Optional, Sequence, Union
@@ -92,7 +92,6 @@ def make_networks(
     q_networks = {}
     action_selectors = {}
     for key in specs.keys():
-
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
 
@@ -121,7 +120,6 @@ def make_networks(
 
 
 def main(_: Any) -> None:
-
     # environment
     environment_factory = functools.partial(
         pettingzoo_utils.make_environment,

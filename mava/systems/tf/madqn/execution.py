@@ -15,6 +15,7 @@
 
 
 """Executor implementations for MADQN."""
+
 from typing import Any, Dict, Optional
 
 import dm_env
@@ -132,7 +133,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         if self._fingerprint and self._trainer is not None:
             trainer_step = self._trainer.get_trainer_steps()
             epsilon = self._trainer.get_epsilon()
-            fingerprint = np.array([epsilon, trainer_step])  # TODO add itter num
+            fingerprint = np.array([epsilon, trainer_step])
             next_extras.update({"fingerprint": fingerprint})
 
         if self._adder:

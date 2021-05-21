@@ -70,14 +70,9 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         self._compute_statistics(fetches)
 
         # Compute elapsed time.
-        # NOTE (Arnu): getting type issues with the timestamp
-        # not sure why. Look into a fix for this.
         timestamp = time.time()
-        if self._timestamp:  # type: ignore
-            elapsed_time = timestamp - self._timestamp  # type: ignore
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp: float = timestamp
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
@@ -153,6 +148,51 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
                 self._network_loggers[network].write(network_running_statistics)
 
 
+class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
+    """Custom DetailedTrainerStatistics class for exposing get_epsilon()"""
+
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+        metrics: List[str] = ["q_value_loss"],
+        summary_stats: List = ["mean", "max", "min", "var", "std"],
+    ) -> None:
+        super().__init__(trainer, metrics, summary_stats)
+
+    def get_epsilon(self) -> float:
+        return self._trainer.get_epsilon()  # type: ignore
+
+    def get_trainer_steps(self) -> float:
+        return self._trainer.get_trainer_steps()  # type: ignore
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        if self._require_loggers:
+            self._create_loggers(list(fetches.keys()))
+            self._require_loggers = False
+
+        # compute statistics
+        self._compute_statistics(fetches)
+
+        timestamp = time.time()
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp = timestamp
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        train_utils.checkpoint_networks(self._system_checkpointer)
+
+        fetches["epsilon"] = self.get_epsilon()
+        self._trainer._decrement_epsilon()  # type: ignore
+
+        if self._logger:
+            self._logger.write(fetches)
+
+
 # TODO(Kale-ab): Is there a better way to do this?
 # Maybe using hooks or callbacks.
 class NetworkStatisticsBase(TrainerWrapperBase):
@@ -184,19 +224,16 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         self.log_gradients = log_gradients
 
         assert (
-            self.log_weights is True or self.log_gradients is True
+            self.log_weights or self.log_gradients
         ), "Nothing is selected to be logged."
 
     def _log_step(self) -> bool:
-        if (
+        return bool(
             self._counter
             and self._counter._counts
             and self._counter._counts.get("steps")
             and self._counter._counts.get("steps") % self.log_interval == 0
-        ):
-            return True
-        else:
-            return False
+        )
 
     def _create_loggers(self, keys: List[str]) -> None:
         trainer_label = self._logger._label
@@ -230,18 +267,12 @@ class NetworkStatisticsBase(TrainerWrapperBase):
     # Try getting layer type from policy or critic networks
     def _log_data(self, name: str) -> bool:
         # Log linear and conv weights and not bias units.
-        if ("linear" in name.lower() or "conv" in name.lower()) and not (
+        return ("linear" in name.lower() or "conv" in name.lower()) and not (
             "b:" in name.lower()
-        ):
-            return True
-        else:
-            return False
+        )
 
     def _apply_norms(self, value: tf.Tensor, norms_list: List) -> Dict:
-        return_data = {}
-        for norm in norms_list:
-            return_data[norm] = tf.norm(value, ord=norm).numpy()
-        return return_data
+        return {norm: tf.norm(value, ord=norm).numpy() for norm in norms_list}
 
     def _log_gradients(
         self, label: str, agent: str, variables_names: List, gradients: List
@@ -295,11 +326,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
 
         # Compute elapsed time.
         timestamp = time.time()
-        if self._timestamp:  # type: ignore
-            elapsed_time = timestamp - self._timestamp  # type: ignore
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp: float = timestamp
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
