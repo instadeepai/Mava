@@ -30,10 +30,9 @@ from smac.env import StarCraft2Env  # type:ignore
 
 from mava import types
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
-from mava.wrappers.env_wrappers import ParallelEnvWrapper  # , SequentialEnvWrapper
+from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
 
-# Is it ParallelEnvWrapper or SequentialEnvWrapper
 class SMACEnvWrapper(ParallelEnvWrapper):
     """
     Wraps a StarCraft II MARL environment (SMAC) as a Mava Parallel environment.
@@ -182,39 +181,34 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         return self._environment.env_done  # TODO Check SMAC has this function
 
     def observation_spec(self) -> types.Observation:
-        observation_specs = {}
-        for agent in self._environment.possible_agents:
-            observation_specs[agent] = types.OLT(
+        return {
+            agent: types.OLT(
                 observation=_convert_to_spec(
                     self._environment.observation_spaces[agent]
                 ),
                 legal_actions=_convert_to_spec(self._environment.action_spaces[agent]),
                 terminal=specs.Array((1,), np.float32),
             )
-        return observation_specs
+            for agent in self._environment.possible_agents
+        }
 
     def action_spec(self) -> Dict[str, specs.DiscreteArray]:
-        action_specs = {}
-        for agent in self._environment.possible_agents:
-            action_specs[agent] = _convert_to_spec(
-                self._environment.action_spaces[agent]
-            )
-        return action_specs
+        return {
+            agent: _convert_to_spec(self._environment.action_spaces[agent])
+            for agent in self._environment.possible_agents
+        }
 
     def reward_spec(self) -> Dict[str, specs.Array]:
-        reward_specs = {}
-        for agent in self._environment.possible_agents:
-            reward_specs[agent] = specs.Array((), np.float32)
-
-        return reward_specs
+        return {
+            agent: specs.Array((), np.float32)
+            for agent in self._environment.possible_agents
+        }
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
-        discount_specs = {}
-        for agent in self._environment.possible_agents:
-            discount_specs[agent] = specs.BoundedArray(
-                (), np.float32, minimum=0, maximum=1.0
-            )
-        return discount_specs
+        return {
+            agent: specs.BoundedArray((), np.float32, minimum=0, maximum=1.0)
+            for agent in self._environment.possible_agents
+        }
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         return {}
