@@ -54,7 +54,9 @@ class BaseMADDPGTrainer(mava.Trainer):
         policy_optimizer: snt.Optimizer,
         critic_optimizer: snt.Optimizer,
         discount: float,
+        target_averaging: bool,
         target_update_period: int,
+        target_update_rate: float,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
@@ -73,8 +75,12 @@ class BaseMADDPGTrainer(mava.Trainer):
             policy).
           target_critic_network: the target critic.
           discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
+          target_averaging: If true the target values are updated gradually otherwise
+          they are updated completely after target_update_period steps.
+          target_update_period: if target_averaging is false this represents the number
+          of learner steps to perform before updating the target networks.
+          target_update_rate: if target_averaging is true this value is used specify
+          how fast to update the target networks.
           dataset: dataset to learn from, whether fixed or from a replay buffer
             (see `acme.datasets.reverb.make_dataset` documentation).
           observation_network: an optional online network to process observations
@@ -123,7 +129,9 @@ class BaseMADDPGTrainer(mava.Trainer):
 
         # Necessary to track when to update target networks.
         self._num_steps = tf.Variable(0, dtype=tf.int32)
+        self._target_averaging = target_averaging
         self._target_update_period = target_update_period
+        self._target_update_rate = target_update_rate
 
         # Create an iterator to go through the dataset.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
@@ -190,6 +198,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         self._timestamp = None
 
     def _update_target_networks(self) -> None:
+        assert 0.0 < self._target_update_rate < 1.0
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (
@@ -203,10 +212,15 @@ class BaseMADDPGTrainer(mava.Trainer):
                 *self._target_policy_networks[key].variables,
             )
 
-            # Make online -> target network update ops.
-            if tf.math.mod(self._num_steps, self._target_update_period) == 0:
+            if self._target_averaging:
+                tau = self._target_update_rate
                 for src, dest in zip(online_variables, target_variables):
-                    dest.assign(src)
+                    dest.assign(dest * (1.0 - tau) + src * tau)
+            else:
+                # Make online -> target network update ops.
+                if tf.math.mod(self._num_steps, self._target_update_period) == 0:
+                    for src, dest in zip(online_variables, target_variables):
+                        dest.assign(src)
             self._num_steps.assign_add(1)
 
     def _transform_observations(
@@ -450,11 +464,13 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        discount: float,
-        target_update_period: int,
-        dataset: tf.data.Dataset,
         policy_optimizer: snt.Optimizer,
         critic_optimizer: snt.Optimizer,
+        discount: float,
+        target_averaging: bool,
+        target_update_period: int,
+        target_update_rate: float,
+        dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
@@ -495,7 +511,9 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
             discount=discount,
+            target_averaging=target_averaging,
             target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
@@ -524,14 +542,16 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         discount: float,
+        target_averaging: bool,
         target_update_period: int,
+        target_update_rate: float,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -569,7 +589,9 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
             discount=discount,
+            target_averaging=target_averaging,
             target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
@@ -750,14 +772,16 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         discount: float,
+        target_averaging: bool,
         target_update_period: int,
+        target_update_rate: float,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -795,7 +819,9 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
             discount=discount,
+            target_averaging=target_averaging,
             target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
@@ -859,7 +885,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         policy_optimizer: snt.Optimizer,
         critic_optimizer: snt.Optimizer,
         discount: float,
+        target_averaging: bool,
         target_update_period: int,
+        target_update_rate: float,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
@@ -930,7 +958,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
         # Necessary to track when to update target networks.
         self._num_steps = tf.Variable(0, dtype=tf.int32)
+        self._target_averaging = target_averaging
         self._target_update_period = target_update_period
+        self._target_update_rate = target_update_rate
 
         # Create an iterator to go through the dataset.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
@@ -997,6 +1027,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         self._timestamp = None
 
     def _update_target_networks(self) -> None:
+        assert 0.0 < self._target_update_rate < 1.0
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (
@@ -1010,10 +1041,15 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 *self._target_policy_networks[key].variables,
             )
 
-            # Make online -> target network update ops.
-            if tf.math.mod(self._num_steps, self._target_update_period) == 0:
+            if self._target_averaging:
+                tau = self._target_update_rate
                 for src, dest in zip(online_variables, target_variables):
-                    dest.assign(src)
+                    dest.assign(dest * (1.0 - tau) + src * tau)
+            else:
+                # Make online -> target network update ops.
+                if tf.math.mod(self._num_steps, self._target_update_period) == 0:
+                    for src, dest in zip(online_variables, target_variables):
+                        dest.assign(src)
             self._num_steps.assign_add(1)
 
     def _transform_observations(
@@ -1337,19 +1373,22 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         discount: float,
+        target_averaging: bool,
         target_update_period: int,
+        target_update_rate: float,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
         shared_weights: bool = False,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        bootstrap_n: int = 10,
     ):
         """Initializes the learner.
         Args:
@@ -1382,7 +1421,9 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
             discount=discount,
+            target_averaging=target_averaging,
             target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
@@ -1394,6 +1435,7 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            bootstrap_n=bootstrap_n,
         )
 
 
@@ -1411,19 +1453,22 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         discount: float,
+        target_averaging: bool,
         target_update_period: int,
+        target_update_rate: float,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        bootstrap_n: int = 10,
     ):
         """Initializes the learner.
         Args:
@@ -1455,7 +1500,9 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
             discount=discount,
+            target_averaging=target_averaging,
             target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
@@ -1467,6 +1514,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            bootstrap_n=bootstrap_n,
         )
 
     def _get_critic_feed(
@@ -1518,19 +1566,22 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         discount: float,
+        target_averaging: bool,
         target_update_period: int,
+        target_update_rate: float,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        bootstrap_n: int = 10,
     ):
         """Initializes the learner.
         Args:
@@ -1562,7 +1613,9 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
             discount=discount,
+            target_averaging=target_averaging,
             target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
@@ -1574,6 +1627,7 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            bootstrap_n=bootstrap_n,
         )
 
     def _get_critic_feed(

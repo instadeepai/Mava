@@ -65,7 +65,9 @@ class MADDPGConfig:
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
+    target_averaging: bool = False
     target_update_period: int = 100
+    target_update_rate: float = 0.01
     executor_variable_update_period: int = 1000
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
@@ -281,6 +283,8 @@ class MADDPGBuilder(SystemBuilder):
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         target_update_period = self._config.target_update_period
+        target_averaging = self._config.target_averaging
+        target_update_rate = self._config.target_update_rate
 
         # trainer args
         trainer_config = {

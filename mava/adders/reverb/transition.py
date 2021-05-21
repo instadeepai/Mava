@@ -111,6 +111,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             buffer_size=n_step,
             max_sequence_length=1,
             priority_fns=priority_fns,
+            use_next_extras=True,
         )
 
     def _write(self) -> None:
@@ -231,7 +232,6 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             table_priorities = acme_utils.calculate_priorities(
                 self._priority_fns, steps
             )
-
             # Insert the transition into replay along with its priority.
             self._writer.append(transition)
             for table, priority in table_priorities.items():

@@ -134,8 +134,7 @@ class MADQNTrainer(mava.Trainer):
         self._timestamp = None
 
     def get_epsilon(self) -> float:
-        epsilon = self._exploration_scheduler.get_epsilon()
-        return epsilon
+        return self._exploration_scheduler.get_epsilon()
 
     def _decrement_epsilon(self) -> None:
         self._exploration_scheduler.decrement_epsilon()
@@ -167,6 +166,34 @@ class MADQNTrainer(mava.Trainer):
         a_tm1_feed = a_tm1[agent]
 
         return o_tm1_feed, o_t_feed, a_tm1_feed
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        # Compute elapsed time.
+        timestamp = time.time()
+        if self._timestamp:
+            elapsed_time = timestamp - self._timestamp
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        # Checkpoint and attempt to write the logs.
+        if self._checkpoint:
+            train_utils.checkpoint_networks(self._system_checkpointer)
+
+        # Log and decrement epsilon
+        epsilon = self.get_epsilon()
+        fetches["epsilon"] = epsilon
+        self._decrement_epsilon()
+
+        if self._logger:
+            self._logger.write(fetches)
 
     @tf.function
     def _step(
@@ -227,9 +254,7 @@ class MADQNTrainer(mava.Trainer):
 
                 loss = tf.reduce_mean(loss)
 
-                q_network_losses[agent] = {}
-                q_network_losses[agent]["q_value_loss"] = loss
-
+                q_network_losses[agent] = {"q_value_loss": loss}
         self._q_network_losses = q_network_losses
         self.tape = tape
 
@@ -254,42 +279,15 @@ class MADQNTrainer(mava.Trainer):
 
         train_utils.safe_del(self, "tape")
 
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        # Compute elapsed time.
-        timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        # Checkpoint and attempt to write the logs.
-        if self._checkpoint:
-            train_utils.checkpoint_networks(self._system_checkpointer)
-
-        # Log and decrement epsilon
-        epsilon = self.get_epsilon()
-        fetches["epsilon"] = epsilon
-        self._decrement_epsilon()
-
-        if self._logger:
-            self._logger.write(fetches)
-
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
-            variables[network_type] = {}
-            for agent in self.unique_net_keys:
-                variables[network_type][agent] = tf2_utils.to_numpy(
+            variables[network_type] = {
+                agent: tf2_utils.to_numpy(
                     self._system_network_variables[network_type][agent]
                 )
+                for agent in self.unique_net_keys
+            }
         return variables
 
 
@@ -368,9 +366,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
                     core_state[agent][0],
                 )
 
-                q_network_losses[agent] = {}
-                q_network_losses[agent]["q_value_loss"] = tf.zeros(())
-
+                q_network_losses[agent] = {"q_value_loss": tf.zeros(())}
                 for t in range(1, q.shape[0]):
                     loss, _ = trfl.qlearning(
                         q[t - 1],
