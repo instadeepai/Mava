@@ -231,14 +231,21 @@ class MADQNTrainer(mava.Trainer):
                     f_t = tf.cast(f_t, "float32")
 
                     q_tm1 = self._q_networks[agent_key](o_tm1_feed, f_tm1)
-                    q_t = self._target_q_networks[agent_key](o_t_feed, f_t)
+                    q_t_value = self._target_q_networks[agent_key](o_t_feed, f_t)
+                    q_t_selector = self._q_networks[agent_key](o_t_feed, f_t)
                 else:
                     q_tm1 = self._q_networks[agent_key](o_tm1_feed)
-                    q_t = self._target_q_networks[agent_key](o_t_feed)
+                    q_t_value = self._target_q_networks[agent_key](o_t_feed)
+                    q_t_selector = self._q_networks[agent_key](o_t_feed)
 
                 # Q-network learning
-                loss, _ = trfl.qlearning(
-                    q_tm1, a_tm1_feed, r_t[agent], discount * d_t[agent], q_t
+                loss, _ = trfl.double_qlearning(
+                    q_tm1,
+                    a_tm1_feed,
+                    r_t[agent],
+                    discount * d_t[agent],
+                    q_t_value,
+                    q_t_selector,
                 )
 
                 loss = tf.reduce_mean(loss)
