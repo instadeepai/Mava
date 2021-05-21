@@ -79,7 +79,7 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
         epsilon_decay: float = 1e-4,
     ):
         """
-        Decays epsilon exponentially to epsilon_start.
+        Decays epsilon exponentially to epsilon_min.
         """
         super(ExponentialExplorationScheduler, self).__init__(
             epsilon_start,

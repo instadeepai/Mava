@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import dataclasses
-import time
 from typing import Any, Dict, Iterator, List, Optional, Type
 
 import reverb
@@ -23,67 +22,14 @@ from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting
 
-from mava import adders, core, specs, types
+from mava import Trainer, adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import execution, training
-from mava.utils import training_utils as train_utils
-from mava.wrappers import DetailedTrainerStatistics
-
-# TODO (Claude) I had to make a custom class here that
-# inherits DetailedTrainerStatistics
-# to expose the get_epsilon() function. For some
-# reason lp does not bind it otherwise.
-# Need to fix this.
-
-
-class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
-    def __init__(
-        self,
-        trainer: training.MADQNTrainer,
-        metrics: List[str] = ["q_value_loss"],
-        summary_stats: List = ["mean", "max", "min", "var", "std"],
-    ) -> None:
-        super().__init__(trainer, metrics, summary_stats)
-
-    def get_epsilon(self) -> float:
-        return self._trainer.get_epsilon()  # type: ignore
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        if self._require_loggers:
-            self._create_loggers(list(fetches.keys()))
-            self._require_loggers = False
-
-        # compute statistics
-        self._compute_statistics(fetches)
-
-        # Compute elapsed time.
-        # NOTE (Arnu): getting type issues with the timestamp
-        # not sure why. Look into a fix for this.
-        timestamp = time.time()
-        if self._timestamp:  # type: ignore
-            elapsed_time = timestamp - self._timestamp  # type: ignore
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        train_utils.checkpoint_networks(self._system_checkpointer)
-
-        fetches["epsilon"] = self.get_epsilon()
-        self._trainer._decrement_epsilon()  # type: ignore
-
-        if self._logger:
-            self._logger.write(fetches)
+from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
 
 @dataclasses.dataclass
@@ -161,7 +107,7 @@ class MADQNBuilder:
 
     def make_replay_tables(
         self,
-        environment_spec: specs.EnvironmentSpec,
+        environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
         """Create tables to insert data into."""
 
@@ -206,7 +152,9 @@ class MADQNBuilder:
     def make_dataset_iterator(
         self, replay_client: reverb.Client
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the system."""
+        """Create a dataset iterator to use for learning/updating the system.
+        Args:
+            replay_client: Reverb Client which points to the replay server."""
 
         sequence_length = (
             self._config.sequence_length
@@ -256,15 +204,17 @@ class MADQNBuilder:
         action_selectors: Dict[str, Any],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
-        trainer: Optional[training.MADQNTrainer] = None,
+        trainer: Optional[Trainer] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
-            behavior_networks: A struct of instance of all
-                the different behaviour networks,
+            q_networks: A struct of instance of all
+                the different system q networks,
                 this should be a callable which takes as input observations
                 and returns actions.
             adder: How data is recorded (e.g. added to replay).
+            variable_source: collection of (nested) numpy arrays. Contains
+                source variables as defined in mava.core.
         """
 
         shared_weights = self._config.shared_weights
@@ -274,10 +224,7 @@ class MADQNBuilder:
             agent_keys = self._agent_types if shared_weights else self._agents
 
             # Create policy variables
-            variables = {}
-            for agent in agent_keys:
-                variables[agent] = q_networks[agent].variables
-
+            variables = {agent: q_networks[agent].variables for agent in agent_keys}
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
@@ -347,6 +294,6 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type: ignore
+        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type:ignore
 
         return trainer

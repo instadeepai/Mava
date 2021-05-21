@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Defines the QMIX system class."""
+"""Defines the VDN system class."""
 import functools
 from typing import Any, Callable, Dict, Optional, Type
 
@@ -32,15 +32,15 @@ from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.madqn.system import MADQN
-from mava.systems.tf.qmix import builder, execution, training
+from mava.systems.tf.vdn import builder, execution, training
 from mava.utils.loggers import MavaLogger, logger_utils
 
 
 # TODO Correct documentation
 # TODO Implement recurrent option from MADQN
-class QMIX(MADQN):
-    """QMIX system.
-    This implements a single-process QMIX system.
+class VDN(MADQN):
+    """VDN system.
+    This implements a single-process VDN system.
     Args:
         environment_factory: Callable to instantiate an environment on a compute node.
         network_factory: Callable to instantiate system networks on a compute node.
@@ -78,9 +78,9 @@ class QMIX(MADQN):
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
-        trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
-        executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
-        mixer: Type[mixing.BaseMixingModule] = mixing.MonotonicMixing,
+        trainer_fn: Type[training.VDNTrainer] = training.VDNTrainer,
+        executor_fn: Type[core.Executor] = execution.VDNFeedForwardExecutor,
+        mixer: Type[mixing.BaseMixingModule] = mixing.AdditiveMixing,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
@@ -129,7 +129,7 @@ class QMIX(MADQN):
                 time_delta=10,
             )
 
-        super(QMIX, self).__init__(
+        super(VDN, self).__init__(
             architecture=architecture,
             environment_factory=environment_factory,
             network_factory=network_factory,
@@ -152,8 +152,8 @@ class QMIX(MADQN):
         else:
             extra_specs = {}
 
-        self._builder = builder.QMIXBuilder(
-            builder.QMIXConfig(
+        self._builder = builder.VDNBuilder(
+            builder.VDNConfig(
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
@@ -197,14 +197,9 @@ class QMIX(MADQN):
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
         )
-
-        agent_networks = architecture.create_actor_variables()
-
         # Augment network architecture by adding mixing layer network.
         system_networks = self._mixer(
             architecture=architecture,
-            environment_spec=self._environment_spec,
-            agent_networks=agent_networks,
         ).create_system()
 
         # create logger
@@ -225,6 +220,6 @@ class QMIX(MADQN):
             logger=trainer_logger,
         )
 
-    def build(self, name: str = "qmix") -> Any:
+    def build(self, name: str = "vdn") -> Any:
         """Build the distributed system topology."""
         return super().build(name=name)
