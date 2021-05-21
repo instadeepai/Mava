@@ -28,7 +28,7 @@ from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.masac import training
-from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
+from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsSoftActorCritic
 
 
 @dataclasses.dataclass
@@ -86,6 +86,7 @@ class MASACConfig:
     logger: loggers.Logger = None
     counter: counting.Counter = None
     checkpoint: bool = True
+    checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
@@ -335,7 +336,7 @@ class MASACBuilder(SystemBuilder):
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.
         # NetworkStatistics needs to appear before TrainerStatistics.
         # TODO(Kale-ab/Arnu): need to fix wrapper type issues
-        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
+        trainer = NetworkStatisticsSoftActorCritic(trainer)  # type: ignore
 
         trainer = DetailedTrainerStatistics(  # type: ignore
             trainer,

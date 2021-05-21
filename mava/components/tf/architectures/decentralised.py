@@ -491,16 +491,13 @@ class DecentralisedSoftQValueActorCritic(BaseSoftActorCritic):
 
             # get specs
             emb_spec = embed_specs[agent_key]
-            act_spec = act_specs[agent_key]
 
             # Create variables.
-            tf2_utils.create_variables(
-                self._critic_V_networks[agent_key], [emb_spec, act_spec]
-            )
+            tf2_utils.create_variables(self._critic_V_networks[agent_key], [emb_spec])
 
             # create target network variables
             tf2_utils.create_variables(
-                self._target_critic_V_networks[agent_key], [emb_spec, act_spec]
+                self._target_critic_V_networks[agent_key], [emb_spec]
             )
 
         critic_V_networks["critics_V"] = self._critic_V_networks

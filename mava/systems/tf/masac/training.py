@@ -210,13 +210,12 @@ class BaseMASACTrainer(mava.Trainer):
                     "num_steps": self._num_steps,
                 }
 
-                checkpointer_dir = os.path.join(checkpoint_subpath, agent_key)
+                subdir = os.path.join("trainer", agent_key)
                 checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=1,
-                    add_uid=False,
-                    directory=checkpointer_dir,
+                    time_delta_minutes=15,
+                    directory=checkpoint_subpath,
                     objects_to_save=objects_to_save,
-                    enable_checkpointing=True,
+                    subdirectory=subdir,
                 )
                 self._system_checkpointer[agent_key] = checkpointer
 
@@ -306,7 +305,7 @@ class BaseMASACTrainer(mava.Trainer):
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     @tf.function
-    def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
+    def _target_policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         log_probs = {}
         for agent in self._agents:
@@ -315,6 +314,7 @@ class BaseMASACTrainer(mava.Trainer):
             actions[agent], log_probs[agent] = self._target_policy_networks[agent_key](
                 next_observation
             )
+        # self.log_probs = log_probs
         return actions, log_probs
 
     # NOTE (Arnu): the decorator below was causing this _step() function not
@@ -368,10 +368,26 @@ class BaseMASACTrainer(mava.Trainer):
             critic_Q_2_losses = {}
 
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-            a_t, log_prob = self._policy_actions(o_t_trans)
+            a_t, log_probs = self._target_policy_actions(o_t_trans)
+            # log_probs = self.log_probs
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
+
+                # policy_variables = (
+                #     self._observation_networks[agent_key].trainable_variables
+                #     + self._policy_networks[agent_key].trainable_variables
+                # )
+
+                # policy_gradients = tape.gradient(
+                #     self._target_policy_networks[agent_key](o_t_trans[agent])[0],
+                #     policy_variables,
+                #     unconnected_gradients=tf.UnconnectedGradients.ZERO,
+                # )
+
+                # print("Policy grad here", policy_gradients)
+
+                # self._policy_optimizer.apply(policy_gradients, policy_variables)
 
                 # Cast the additional discount to match the environment discount dtype.
                 discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
@@ -395,6 +411,7 @@ class BaseMASACTrainer(mava.Trainer):
                 # Squeeze into the shape expected by the td_learning implementation.
                 q_1_pred = tf.squeeze(q_1_pred, axis=-1)  # [B]
                 q_2_pred = tf.squeeze(q_2_pred, axis=-1)  # [B]
+                v_target = tf.squeeze(v_target, axis=-1)
 
                 q_1_loss = trfl.td_learning(
                     q_1_pred, r_t[agent], discount * d_t[agent], v_target
@@ -402,28 +419,26 @@ class BaseMASACTrainer(mava.Trainer):
                 q_2_loss = trfl.td_learning(
                     q_2_pred, r_t[agent], discount * d_t[agent], v_target
                 ).loss
-                critic_Q_1_losses[agent] = q_1_loss
-                critic_Q_2_losses[agent] = q_2_loss
+                critic_Q_1_losses[agent] = tf.reduce_mean(q_1_loss, axis=0)
+                critic_Q_2_losses[agent] = tf.reduce_mean(q_2_loss, axis=0)
 
                 v_pred = self._critic_V_networks[agent_key](o_tm1_feed)
                 q_pred = tf.math.minimum(
-                    self._critic_Q_1_networks[agent_key](o_tm1_feed, a_t[agent]),
-                    self._critic_Q_2_networks[agent_key](o_tm1_feed, a_t[agent]),
+                    self._critic_Q_1_networks[agent_key](o_tm1_feed, a_t_feed),
+                    self._critic_Q_2_networks[agent_key](o_tm1_feed, a_t_feed),
                 )
-                v_targ = tf.math.subtract(
-                    q_pred, tf.math.multiply(self._temperature, log_prob[agent])
-                )
+                v_targ = q_pred - tf.multiply(self._temperature, log_probs[agent])
+
                 v_loss = tf.reduce_mean(tf.square(v_pred - v_targ), axis=0)
-                critic_V_losses[agent] = v_loss
+                critic_V_losses[agent] = v_loss[0]
 
                 # Actor Learning
                 advantage = q_pred - v_pred
                 actor_loss = tf.reduce_mean(
-                    tf.subtract(
-                        tf.multiply(self._temperature, log_prob[agent]), advantage
-                    ),
+                    tf.multiply(self._temperature, log_probs[agent]) - advantage,
                     axis=0,
-                )
+                )[0]
+
                 policy_losses[agent] = actor_loss
 
         self.policy_losses = policy_losses
@@ -455,13 +470,11 @@ class BaseMASACTrainer(mava.Trainer):
                 self._observation_networks[agent_key].trainable_variables
                 + self._critic_V_networks[agent_key].trainable_variables
             )
-
             critic_Q_1_variables = (
                 # In this agent, the critic loss trains the observation network.
                 self._observation_networks[agent_key].trainable_variables
                 + self._critic_Q_1_networks[agent_key].trainable_variables
             )
-
             critic_Q_2_variables = (
                 # In this agent, the critic loss trains the observation network.
                 self._observation_networks[agent_key].trainable_variables

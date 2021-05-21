@@ -62,7 +62,12 @@ class FeedForwardExecutor(core.Executor):
         policy = self._policy_networks[agent_key](batched_observation)
 
         # Sample from the policy if it is stochastic.
-        action = policy.sample() if isinstance(policy, tfd.Distribution) else policy
+        if isinstance(policy, tfd.Distribution):
+            action = policy.sample()
+        elif isinstance(policy, tuple):
+            action = policy[0]
+        else:
+            action = policy
 
         return action
 

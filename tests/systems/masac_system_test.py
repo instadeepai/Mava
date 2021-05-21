@@ -15,13 +15,14 @@
 
 """Tests for MASAC."""
 
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, Mapping, Sequence, Union
+import functools
+from typing import Any, Dict, Mapping, Sequence, Union
 
 import launchpad as lp
 import numpy as np
 import sonnet as snt
+import tensorflow as tf
+import tensorflow_probability as tfp
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
@@ -31,6 +32,55 @@ from mava import specs as mava_specs
 from mava.systems.tf import masac
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
+from mava.utils.loggers import Logger
+
+
+class ActorNetwork(snt.Module):
+    def __init__(
+        self,
+        n_hidden_unit1: int,
+        n_hidden_unit2: int,
+        n_actions: int,
+        logprob_epsilon: float,
+        observation_netork: snt.Module,
+    ):
+        super(ActorNetwork, self).__init__()
+        self.logprob_epsilon = tf.Variable(logprob_epsilon)
+        self.observation_network = observation_netork
+        w_bound = tf.Variable(3e-3)
+        self.hidden1 = snt.Linear(n_hidden_unit1)
+        self.hidden2 = snt.Linear(n_hidden_unit2)
+
+        self.mean = snt.Linear(
+            n_actions,
+            w_init=snt.initializers.RandomUniform(-w_bound, w_bound),
+            b_init=snt.initializers.RandomUniform(-w_bound, w_bound),
+        )
+        self.log_std = snt.Linear(
+            n_actions,
+            w_init=snt.initializers.RandomUniform(-w_bound, w_bound),
+            b_init=snt.initializers.RandomUniform(-w_bound, w_bound),
+        )
+
+    def __call__(self, x: Any) -> Any:
+        """forward call for sonnet module"""
+        x = self.observation_network(x)
+        x = self.hidden1(x)
+        x = tf.nn.relu(x)
+        x = self.hidden2(x)
+        x = tf.nn.relu(x)
+
+        mean = self.mean(x)
+        log_std = self.log_std(x)
+        log_std_clipped = tf.clip_by_value(log_std, -20, 2)
+        normal_dist = tfp.distributions.Normal(mean, tf.exp(log_std_clipped))
+        action = tf.stop_gradient(normal_dist.sample())
+        squashed_actions = tf.tanh(action)
+        logprob = normal_dist.log_prob(action) - tf.math.log(
+            1.0 - tf.pow(squashed_actions, 2) + self.logprob_epsilon
+        )
+        logprob = tf.reduce_sum(logprob, axis=-1, keepdims=True)
+        return squashed_actions, logprob
 
 
 def make_networks(
@@ -97,23 +147,14 @@ def make_networks(
         observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
-        policy_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key], activate_final=True
-                ),
-                networks.NearZeroInitializedLinear(num_dimensions),
-                networks.TanhToSpec(specs[key].actions),
-                networks.ClippedGaussian(sigma),
-                networks.ClipToSpec(specs[key].actions),
-            ]
+        policy_network = ActorNetwork(
+            256, 256, num_dimensions, 0.3, observation_network
         )
 
         # Create the critic network.
         critic_V_network = snt.Sequential(
             [
                 # The multiplexer concatenates the observations/actions.
-                networks.CriticMultiplexer(),
                 networks.LayerNormMLP(
                     critic_networks_V_layer_sizes[key], activate_final=False
                 ),
@@ -167,14 +208,14 @@ class TestMASAC:
         debugging environment without crashing."""
 
         # set loggers info
-        base_dir = Path.cwd()
-        log_dir = base_dir / "logs"
-        log_time_stamp = str(datetime.now())
-
-        log_info = (log_dir, log_time_stamp)
+        # TODO Allow for no checkpointing and no loggers to be
+        # passed in.
+        mava_id = "tests/maddpg"
+        base_dir = "~/mava"
+        log_info = (base_dir, f"{mava_id}/logs")
 
         # environment
-        environment_factory = lp_utils.partial_kwargs(
+        environment_factory = functools.partial(
             debugging_utils.make_environment,
             env_name="simple_spread",
             action_space="continuous",
@@ -182,6 +223,38 @@ class TestMASAC:
 
         # networks
         network_factory = lp_utils.partial_kwargs(make_networks)
+
+        # system
+        checkpoint_dir = f"{base_dir}/{mava_id}"
+
+        log_every = 10
+        trainer_logger = Logger(
+            label="system_trainer",
+            directory=base_dir,
+            to_terminal=True,
+            to_tensorboard=True,
+            time_stamp=mava_id,
+            time_delta=log_every,
+        )
+
+        exec_logger = Logger(
+            # _{executor_id} gets appended to label in system.
+            label="train_loop_executor",
+            directory=base_dir,
+            to_terminal=True,
+            to_tensorboard=True,
+            time_stamp=mava_id,
+            time_delta=log_every,
+        )
+
+        eval_logger = Logger(
+            label="eval_loop",
+            directory=base_dir,
+            to_terminal=True,
+            to_tensorboard=True,
+            time_stamp=mava_id,
+            time_delta=log_every,
+        )
 
         # system
         system = masac.MASAC(
@@ -192,6 +265,15 @@ class TestMASAC:
             batch_size=32,
             min_replay_size=32,
             max_replay_size=1000,
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_V_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_Q_1_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_Q_2_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            checkpoint=False,
+            checkpoint_subpath=checkpoint_dir,
+            trainer_logger=trainer_logger,
+            exec_logger=exec_logger,
+            eval_logger=eval_logger,
         )
         program = system.build()
 

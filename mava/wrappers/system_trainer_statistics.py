@@ -505,3 +505,165 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
                     )
 
         train_utils.safe_del(self, "tape")
+
+
+class NetworkStatisticsSoftActorCritic(NetworkStatisticsBase):
+    """
+    A class for logging network statistics.
+    This class assumes the trainer has the following:
+        _forward: Forward pass. Stores a policy loss, critic loss and tf.GradientTape.
+        _backward: Updates network using policy loss, critic loss and tf.GradientTape.
+    """
+
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+        # Log only l2 norm by default.
+        gradient_norms: List = [2],
+        weight_norms: List = [2],
+        log_interval: int = 100,
+        log_weights: bool = True,
+        log_gradients: bool = True,
+    ) -> None:
+        super().__init__(
+            trainer,
+            gradient_norms,
+            weight_norms,
+            log_interval,
+            log_weights,
+            log_gradients,
+        )
+
+    def _step(
+        self,
+    ) -> Dict[str, Dict[str, Any]]:
+
+        # Update the target networks
+        # Trying not to assume off policy.
+        if hasattr(self, "_update_target_networks"):
+            self._update_target_networks()
+
+        # Get data from replay (dropping extras if any). Note there is no
+        # extra data here because we do not insert any into Reverb.
+        inputs = next(self._iterator)
+
+        self._forward(inputs)
+
+        self._backward()
+
+        # Log losses per agent
+        return train_utils.map_losses_per_agent_acq(
+            self.policy_losses,
+            self.critic_V_losses,
+            self.critic_Q_1_losses,
+            self.critic_Q_2_losses,
+        )
+
+    def _backward(self) -> None:
+        # Calculate the gradients and update the networks
+        policy_losses = self.policy_losses
+        critic_V_losses = self.critic_V_losses
+        critic_Q_1_losses = self.critic_Q_1_losses
+        critic_Q_2_losses = self.critic_Q_2_losses
+        tape = self.tape
+        log_current_timestep = self._log_step()
+
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
+
+            # Get trainable variables.
+            policy_variables = (
+                self._observation_networks[agent_key].trainable_variables
+                + self._policy_networks[agent_key].trainable_variables
+            )
+            critic_V_variables = (
+                # In this agent, the critic loss trains the observation network.
+                self._observation_networks[agent_key].trainable_variables
+                + self._critic_V_networks[agent_key].trainable_variables
+            )
+            critic_Q_1_variables = (
+                # In this agent, the critic loss trains the observation network.
+                self._observation_networks[agent_key].trainable_variables
+                + self._critic_Q_1_networks[agent_key].trainable_variables
+            )
+            critic_Q_2_variables = (
+                # In this agent, the critic loss trains the observation network.
+                self._observation_networks[agent_key].trainable_variables
+                + self._critic_Q_2_networks[agent_key].trainable_variables
+            )
+
+            # Compute gradients.
+            policy_gradients = tape.gradient(
+                policy_losses[agent],
+                policy_variables,
+                unconnected_gradients=tf.UnconnectedGradients.ZERO,
+            )
+            critic_V_gradients = tape.gradient(
+                critic_V_losses[agent], critic_V_variables
+            )
+            critic_Q_1_gradients = tape.gradient(
+                critic_Q_1_losses[agent], critic_Q_1_variables
+            )
+            critic_Q_2_gradients = tape.gradient(
+                critic_Q_2_losses[agent], critic_Q_2_variables
+            )
+
+            # Maybe clip gradients.
+            if self._clipping:
+                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
+                critic_V_gradients = tf.clip_by_global_norm(critic_V_gradients, 40.0)[0]
+                critic_Q_1_gradients = tf.clip_by_global_norm(
+                    critic_Q_1_gradients, 40.0
+                )[0]
+                critic_Q_2_gradients = tf.clip_by_global_norm(
+                    critic_Q_2_gradients, 40.0
+                )[0]
+
+            # Apply gradients.
+            self._policy_optimizer.apply(policy_gradients, policy_variables)
+            self._critic_V_optimizer.apply(critic_V_gradients, critic_V_variables)
+            self._critic_Q_1_optimizer.apply(critic_Q_1_gradients, critic_Q_1_variables)
+            self._critic_Q_2_optimizer.apply(critic_Q_2_gradients, critic_Q_2_variables)
+
+            if log_current_timestep:
+                if self.log_weights:
+                    self._log_weights(
+                        label="Policy", agent=agent, weights=policy_variables
+                    )
+                    self._log_weights(
+                        label="Critic_V", agent=agent, weights=critic_V_variables
+                    )
+                    self._log_weights(
+                        label="Critic_Q_1", agent=agent, weights=critic_Q_1_variables
+                    )
+                    self._log_weights(
+                        label="Critic_Q_2", agent=agent, weights=critic_Q_2_variables
+                    )
+
+                if self.log_gradients:
+                    self._log_gradients(
+                        label="Policy",
+                        agent=agent,
+                        variables_names=[vars.name for vars in policy_variables],
+                        gradients=policy_gradients,
+                    )
+                    self._log_gradients(
+                        label="Critic_V",
+                        agent=agent,
+                        variables_names=[vars.name for vars in critic_V_variables],
+                        gradients=critic_V_gradients,
+                    )
+                    self._log_gradients(
+                        label="Critic_Q_1",
+                        agent=agent,
+                        variables_names=[vars.name for vars in critic_Q_1_variables],
+                        gradients=critic_Q_1_gradients,
+                    )
+                    self._log_gradients(
+                        label="Critic_Q_2",
+                        agent=agent,
+                        variables_names=[vars.name for vars in critic_Q_2_variables],
+                        gradients=critic_Q_2_gradients,
+                    )
+
+        train_utils.safe_del(self, "tape")

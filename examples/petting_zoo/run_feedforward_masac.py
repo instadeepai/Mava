@@ -28,23 +28,26 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.systems.tf import masac
 from mava.utils import lp_utils
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import Logger
 
 FLAGS = flags.FLAGS
+
+flags.DEFINE_string(
+    "env_class",
+    "sisl",
+    "Pettingzoo environment class, e.g. atari (str).",
+)
+
 flags.DEFINE_string(
     "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "continuous",
-    "Environment action space type (str).",
+    "multiwalker_v7",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 flags.DEFINE_string(
     "mava_id",
@@ -167,7 +170,7 @@ def make_networks(
 
         # Create the policy network.
         policy_network = ActorNetwork(
-            256, 256, num_dimensions, 0.3, observation_network
+            256, 256, num_dimensions, 1e-6, observation_network
         )
 
         # Create the critic network.
@@ -221,25 +224,20 @@ def make_networks(
 
 def main(_: Any) -> None:
 
-    # TODO(Arnu): make logging optional, currently log_info
-    # is required for all systems
-    # set loggers info
     # set loggers info
     log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
 
-    # environment
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        remove_on_fall=False,
     )
 
-    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
-
     log_every = 10
     trainer_logger = Logger(
         label="system_trainer",
@@ -269,7 +267,6 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
     program = masac.MASAC(
         environment_factory=environment_factory,
         network_factory=network_factory,
@@ -285,8 +282,21 @@ def main(_: Any) -> None:
         eval_logger=eval_logger,
     ).build()
 
-    # launch
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING)
+    # Launch gpu config - let trainer use gpu.
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
+    )
 
 
 if __name__ == "__main__":
