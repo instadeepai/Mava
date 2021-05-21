@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Any, Dict, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 import gym
 import numpy as np
@@ -96,9 +96,12 @@ class StandardizeObservation:
     """
 
     def __init__(
-        self, env: PettingZooEnv = None, load_params: Dict = None, alpha: float = 0.999
+        self,
+        env: PettingZooEnv = None,
+        load_params: Dict = None,
+        alpha: float = 0.999,
     ):
-        self.env = env
+        self.env: Optional[PettingZooEnv] = env
         self.alpha = alpha
         self._ini_params(load_params)
 
@@ -106,13 +109,14 @@ class StandardizeObservation:
         if load_params:
             self._internal_state = load_params
         else:
-            params = {}
-            for agent in self.env.possible_agents:  # type:ignore
-                params[agent] = {
+            params = {
+                agent: {
                     "state_mean": 0,
                     "state_std": 0,
                     "num_steps": 0,
                 }
+                for agent in self.env.possible_agents  # type:ignore
+            }
             self._internal_state = params
 
     def _get_updated_observation(
