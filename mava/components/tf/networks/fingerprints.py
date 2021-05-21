@@ -23,7 +23,10 @@ import tensorflow as tf
 
 class ObservationNetworkWithFingerprint(snt.Module):
     """Sonnet module that takes two inputs
-    [observation, fingerprint]."""
+    [observation, fingerprint] and returns an observation
+    embedding and concatenates the fingerprint to the
+    embedding. Downstream layers can then be trained
+    on the embedding+fingerprint."""
 
     def __init__(
         self,
@@ -32,10 +35,10 @@ class ObservationNetworkWithFingerprint(snt.Module):
         """Initializes network.
         Args:
             observation_network: ...
-            fingerprint_dim: ...
         """
         super(ObservationNetworkWithFingerprint, self).__init__()
         self._observation_network = observation_network
+        self._flatten_layer = tf.keras.layers.Flatten()
 
     def __call__(
         self,
@@ -44,12 +47,7 @@ class ObservationNetworkWithFingerprint(snt.Module):
     ) -> tf.Tensor:
 
         hidden = self._observation_network(obs)
-
-        # TODO (Claude) when observation network is a
-        # Conv net we will need to do some sort of flattening.
-        # I dont think the below is exactly right.
-        # hidden = tf.keras.layers.Flatten(hidden)
-
-        hidden_with_fingerprint = tf.concat([hidden, fingerprint], axis=1)
+        flatten = self._flatten_layer(hidden)
+        hidden_with_fingerprint = tf.concat([flatten, fingerprint], axis=1)
 
         return hidden_with_fingerprint
