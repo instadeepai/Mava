@@ -13,13 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Implementations of a MADDPG agent."""
+from typing import Dict, List
 
-from mava.systems.tf.maddpg.system import MADDPG
-from mava.systems.tf.maddpg.training import (
-    BaseMADDPGTrainer,
-    CentralisedMADDPGTrainer,
-    DecentralisedMADDPGTrainer,
-    NetworkedMADDPGTrainer,
-    StateBasedMADDPGTrainer,
-)
+
+def fully_connected_network_spec(
+    agents_by_type: Dict[str, List[str]]
+) -> Dict[str, List[str]]:
+    """Creates network spec for fully connected agents by agent type"""
+    network_spec: Dict[str, List[str]] = {}
+    for agent_type, agents in agents_by_type.items():
+        all_agents = agents
+        for agent in agents:
+            network_spec[agent] = all_agents
+    return network_spec

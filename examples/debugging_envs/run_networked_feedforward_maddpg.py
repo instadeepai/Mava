@@ -13,29 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running centralized MAPPO on simple spread debug env."""
+"""Example running feedforward MADDPG on debug MPE environments."""
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Sequence, Union
+from typing import Any, Dict, Mapping, Sequence, Union
 
-import acme.tf.networks as networks
-import dm_env
 import launchpad as lp
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-import tensorflow_probability as tfp
 from absl import app, flags
+from acme import types
+from acme.tf import networks
 from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
-import mava.specs as mava_specs
-from mava.components.tf.architectures import CentralisedValueCritic
-from mava.systems.tf import mappo
+from mava import specs as mava_specs
+from mava.components.tf.architectures import NetworkedQValueCritic
+from mava.components.tf.architectures.utils import fully_connected_network_spec
+from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -48,7 +47,6 @@ flags.DEFINE_string(
     "continuous",
     "Environment action space type (str).",
 )
-
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
@@ -66,12 +64,12 @@ def make_networks(
     ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
-) -> Dict[str, snt.Module]:
-
+    sigma: float = 0.3,
+) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
-
-    # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
+
+    # Create agent_type specs
     if shared_weights:
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
@@ -90,46 +88,36 @@ def make_networks(
     critic_networks = {}
     for key in specs.keys():
 
+        # Get total number of action dimensions from action spec.
+        num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
+
         # Create the shared observation network; here simply a state-less operation.
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
-        # Note: The discrete case must be placed first as it inherits from BoundedArray.
-        if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discrete
-            num_actions = specs[key].actions.num_values
-            policy_network = snt.Sequential(
-                [
-                    networks.LayerNormMLP(
-                        tuple(policy_networks_layer_sizes[key]) + (num_actions,),
-                        activate_final=False,
-                    ),
-                    tf.keras.layers.Lambda(
-                        lambda logits: tfp.distributions.Categorical(logits=logits)
-                    ),
-                ]
-            )
-        elif isinstance(specs[key].actions, dm_env.specs.BoundedArray):  # continuous
-            num_actions = np.prod(specs[key].actions.shape, dtype=int)
-            policy_network = snt.Sequential(
-                [
-                    networks.LayerNormMLP(
-                        policy_networks_layer_sizes[key], activate_final=True
-                    ),
-                    networks.MultivariateNormalDiagHead(num_dimensions=num_actions),
-                    networks.TanhToSpec(specs[key].actions),
-                ]
-            )
-        else:
-            raise ValueError(f"Unknown action_spec type, got {specs[key].actions}.")
-
-        critic_network = snt.Sequential(
+        # Create the policy network.
+        policy_network = snt.Sequential(
             [
                 networks.LayerNormMLP(
-                    critic_networks_layer_sizes[key], activate_final=True
+                    policy_networks_layer_sizes[key], activate_final=True
                 ),
-                networks.NearZeroInitializedLinear(1),
+                networks.NearZeroInitializedLinear(num_dimensions),
+                networks.TanhToSpec(specs[key].actions),
+                networks.ClippedGaussian(sigma),
+                networks.ClipToSpec(specs[key].actions),
             ]
         )
 
+        # Create the critic network.
+        critic_network = snt.Sequential(
+            [
+                # The multiplexer concatenates the observations/actions.
+                networks.CriticMultiplexer(),
+                networks.LayerNormMLP(
+                    critic_networks_layer_sizes[key], activate_final=False
+                ),
+                snt.Linear(1),
+            ]
+        )
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
@@ -143,9 +131,6 @@ def make_networks(
 
 def main(_: Any) -> None:
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
-
     # environment
     environment_factory = functools.partial(
         debugging_utils.make_environment,
@@ -156,32 +141,52 @@ def main(_: Any) -> None:
     # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
+    # loggers
+    # set custom logger config for each process
+    # -- log trainer,executor and evaluator to TF
+    # -- log only evaluator to terminal
+    log_every = 10
+    logger_config = {
+        "trainer": {
+            "directory": FLAGS.base_dir,
+            "to_terminal": False,
+            "to_tensorboard": True,
+            "time_stamp": FLAGS.mava_id,
+            "time_delta": log_every,
+        },
+        "executor": {
+            "directory": FLAGS.base_dir,
+            "to_terminal": False,
+            "to_tensorboard": True,
+            "time_stamp": FLAGS.mava_id,
+            "time_delta": log_every,
+        },
+        "evaluator": {
+            "directory": FLAGS.base_dir,
+            "to_terminal": True,
+            "to_tensorboard": True,
+            "time_stamp": FLAGS.mava_id,
+            "time_delta": log_every,
+        },
+    }
+
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-    # loggers
-    log_every = 10
-    logger_factory = functools.partial(
-        logger_utils.make_logger,
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
     # distributed program
-    program = mappo.MAPPO(
+    program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        logger_factory=logger_factory,
+        logger_config=logger_config,
+        architecture=NetworkedQValueCritic,
         num_executors=2,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-5),
-        architecture=CentralisedValueCritic,
-        trainer_fn=mappo.CentralisedMAPPOTrainer,
-        max_gradient_norm=40.0,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        max_gradient_norm=40.0,
+        trainer_fn=maddpg.NetworkedMADDPGTrainer,
+        connection_spec=fully_connected_network_spec,
+        shared_weights=False,
     ).build()
 
     # launch

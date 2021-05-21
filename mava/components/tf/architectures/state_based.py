@@ -54,8 +54,6 @@ class StateBasedPolicyActor(DecentralisedPolicyActor):
 
         agents_by_type = self._env_spec.get_agents_by_type()
 
-        # Create one critic per agent. Each critic gets the concatenated
-        # observations/actions of each agent of the same type as the agent.
         for agent_type, agents in agents_by_type.items():
             actor_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
             obs_specs_per_type[agent_type] = tf.TensorSpec(
@@ -66,7 +64,7 @@ class StateBasedPolicyActor(DecentralisedPolicyActor):
         actor_obs_specs = {}
         for agent_key in self._actor_agent_keys:
             agent_type = agent_key.split("_")[0]
-            # Get observation and action spec for critic.
+            # Get observation spec for actor.
             actor_obs_specs[agent_key] = obs_specs_per_type[agent_type]
         return actor_obs_specs
 
