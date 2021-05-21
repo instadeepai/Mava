@@ -63,8 +63,6 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
         self._variable_client = variable_client
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights
-        self.self._policy_outputs: Dict[str, Any] = {}
-
     @tf.function
     def _policy(
         self, agent: str, observation: types.NestedTensor
@@ -90,22 +88,24 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
 
         # Step the recurrent policy/value network forward
         # given the current observation and state.
-        action, self._policy_outputs[agent] = self._policy(agent, observation)
+        action, policy = self._policy(agent, observation)
 
         # Return a numpy array with squeezed out batch dimension.
         action = tf2_utils.to_numpy_squeeze(action)
-        return action
+        return [action, policy]
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Dict[str, types.NestedArray]:
 
         actions = {}
+        policies = {}
         for agent, observation in observations.items():
-            action = self.select_action(agent, observation)
-            actions[agent] = action
+            action, policy = self.select_action(agent, observation)
+            actions[agent] = action[0]
+            policies[agent] = policy
 
-        return actions
+        return [actions, policies]
 
     def observe_first(
         self,
@@ -116,8 +116,6 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
         if self._adder:
 
             # Generate dummy policy values to send through
-            self.select_actions(timestep.observation)
-            extras.update({"policy_out": self._policy_outputs})
             self._adder.add_first(timestep)
 
     def observe(
@@ -130,8 +128,7 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
         if not self._adder:
             return
 
-        next_extras.update({"policy_out": self._policy_outputs})
-
+        self.adder.next_extras.update({"policy_out": self._policy_outputs})
         next_extras = tf2_utils.to_numpy_squeeze(next_extras)
 
         self._adder.add(actions, next_timestep, next_extras)

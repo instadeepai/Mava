@@ -280,7 +280,14 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             # Generate an action from the agent's policy and step the environment.
             actions = self._get_actions(timestep)
-            timestep = self._environment.step(actions)
+
+            if type(actions) == tuple:
+                # Return other extra action information like the policy information as well
+                env_actions, _ = actions
+            else:
+                env_actions = actions
+
+            timestep = self._environment.step(env_actions)
 
             if type(timestep) == tuple:
                 timestep, env_extras = timestep
