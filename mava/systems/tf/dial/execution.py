@@ -25,6 +25,8 @@
 from typing import Any, Dict, Optional
 
 import sonnet as snt
+import tensorflow as tf
+from acme import types
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
@@ -77,3 +79,29 @@ class DIALExecutor(MADQNRecurrentCommExecutor):
 
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}
+
+    def _policy(
+        self,
+        agent: str,
+        observation: types.NestedTensor,
+        state: types.NestedTensor,
+        message: types.NestedTensor,
+        legal_actions: types.NestedTensor,
+        epsilon: tf.Tensor,
+    ) -> types.NestedTensor:
+
+        (action, m_values), new_state = super()._policy(
+            agent,
+            observation,
+            state,
+            message,
+            legal_actions,
+            epsilon,
+        )
+
+        # Mask message if obs[0] == 1.
+        # Note: this is specific to switch env
+        if observation[0] == 0:
+            m_values = tf.zeros_like(m_values)
+
+        return (action, m_values), new_state

@@ -16,10 +16,14 @@
 
 """DIAL trainer implementation."""
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import sonnet as snt
 import tensorflow as tf
+import tree
+import trfl
+from acme.tf import utils as tf2_utils
+from acme.types import NestedArray
 from acme.utils import counting, loggers
 
 from mava.components.tf.modules.communication import BaseCommunicationModule
@@ -74,3 +78,94 @@ class DIALTrainer(RecurrentCommMADQNTrainer):
             checkpoint_subpath=checkpoint_subpath,
             communication_module=communication_module,
         )
+
+    def _forward(self, inputs: Any) -> None:
+        data = tree.map_structure(
+            lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
+        )
+        data = tf2_utils.batch_to_sequence(data)
+
+        observations, actions, rewards, discounts, _, extra = data
+
+        # core_states = extra["core_states"]
+        core_state = tree.map_structure(
+            lambda s: s[:, 0, :], inputs.data.extras["core_states"]
+        )
+        core_message = tree.map_structure(
+            lambda s: s[:, 0, :], inputs.data.extras["core_messages"]
+        )
+
+        with tf.GradientTape(persistent=True) as tape:
+            q_network_losses: Dict[str, NestedArray] = {
+                agent: {"q_value_loss": tf.zeros(())} for agent in self._agents
+            }
+
+            T = actions[self._agents[0]].shape[0]
+
+            state = {agent: core_state[agent][0] for agent in self._agents}
+            target_state = {agent: core_state[agent][0] for agent in self._agents}
+
+            message = {agent: core_message[agent][0] for agent in self._agents}
+            target_message = {agent: core_message[agent][0] for agent in self._agents}
+
+            # _target_q_networks must be 1 step ahead
+            target_channel = self._communication_module.process_messages(target_message)
+            for agent in self._agents:
+                agent_key = self.agent_net_keys[agent]
+                (q_targ, m), s = self._target_q_networks[agent_key](
+                    observations[agent].observation[0],
+                    target_state[agent],
+                    target_channel[agent],
+                )
+                target_state[agent] = s
+                target_message[agent] = m
+
+            for t in range(1, T, 1):
+                channel = self._communication_module.process_messages(message)
+                target_channel = self._communication_module.process_messages(
+                    target_message
+                )
+
+                for agent in self._agents:
+                    agent_key = self.agent_net_keys[agent]
+
+                    # Cast the additional discount
+                    # to match the environment discount dtype.
+
+                    discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
+
+                    (q_targ, m), s = self._target_q_networks[agent_key](
+                        observations[agent].observation[t],
+                        target_state[agent],
+                        target_channel[agent],
+                    )
+                    print(m.shape)
+                    target_state[agent] = s
+                    target_message[agent] = tf.math.multiply(
+                        m, observations[agent].observation[t][:, :1]
+                    )
+
+                    (q, m), s = self._q_networks[agent_key](
+                        observations[agent].observation[t - 1],
+                        state[agent],
+                        channel[agent],
+                    )
+                    print("m2 ", m.shape)
+                    state[agent] = s
+                    message[agent] = tf.math.multiply(
+                        m, observations[agent].observation[t - 1][:, :1]
+                    )
+
+                    loss, _ = trfl.qlearning(
+                        q,
+                        actions[agent][t - 1],
+                        rewards[agent][t - 1],
+                        discount * discounts[agent][t],
+                        q_targ,
+                    )
+
+                    loss = tf.reduce_mean(loss)
+                    q_network_losses[agent]["q_value_loss"] += loss
+
+        self._q_network_losses = q_network_losses
+        self.tape = tape
