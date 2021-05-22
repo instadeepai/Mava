@@ -53,6 +53,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         trainer: MADQNTrainer = None,
+        communication_module: Optional[BaseCommunicationModule] = None,
     ):
         """Initializes the executor.
         Args:
@@ -156,6 +157,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
         trainer: MADQNTrainer = None,
+        communication_module: Optional[BaseCommunicationModule] = None,
     ):
         """Initializes the executor.
         Args:
