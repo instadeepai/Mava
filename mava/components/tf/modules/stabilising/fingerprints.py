@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Claude): complete class for fingerprint stabilisation
 
 """Stabilising for multi-agent RL systems"""
 from typing import Dict
