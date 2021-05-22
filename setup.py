@@ -39,17 +39,12 @@ tf_requirements = [
     "trfl",
 ]
 
-# NOTE (St John, for Kale-ab) The SMAC installed when callling `pip install
-# smac` seems to be a different package. We actually need to install SMAC
-# via pip `install git+https://github.com/oxwhirl/smac.git`. PySC2 is the
-# single agent env for StarCraft II, required by SMAC.
 env_requirements = [
     "pettingzoo>=1.8.2",
     "multi_agent_ale_py",
     "supersuit",
     "pygame",
     "pysc2",
-    "smac",
 ]
 
 launchpad_requirements = [
