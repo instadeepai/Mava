@@ -147,3 +147,4 @@ mava/workspace.code-workspace
 .DS_Store
 mava_testing
 .devcontainer/devcontainer.json
+3rdparty
