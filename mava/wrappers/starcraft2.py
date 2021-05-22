@@ -51,7 +51,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         self._ready_agents: List = []
         self.observation_space = Dict(
             {
-                "obs": Box(-1, 1, shape=(self._env.get_obs_size(),)),
+                "observation": Box(-1, 1, shape=(self._env.get_obs_size(),)),
                 "action_mask": Box(0, 1, shape=(self._env.get_total_actions(),)),
             }
         )
@@ -62,45 +62,49 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         Returns:
             obs (dict): New observations for each ready agent.
         """
+        self._env_done = False
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
 
-        # TODO Check the form of this state list and convert for return.
-        obs_list, state_list = self._env.reset()
+        # reset internal SC2 env
+        obs_list, state = self._env.reset()
+
+        # Convert observations
         observe: Dict[str, np.ndarray] = {}
+        self.possible_agents = []
         for i, obs in enumerate(obs_list):
             agent = f"agent_{i}"
-            observe[agent] = {  # TODO Only obs in this Dict or mask too?
+            observe[agent] = {
                 "action_mask": np.array(self._env.get_avail_agent_actions(i)),
-                "obs": obs,
+                "observation": obs,
             }
+            self.possible_agents.append(agent)
+        observations = self._convert_observations(
+            observe, {agent: False for agent in self.possible_agents}
+        )
 
         self._ready_agents = list(range(len(obs_list)))
 
+        # create discount spec
         discount_spec = self.discount_spec()
         self._discounts = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self._environment.possible_agents
         }
-        observations = self._convert_observations(
-            observe, {agent: False for agent in self.possible_agents}
-        )
+
+        # create rewards spec
         rewards_spec = self.reward_spec()
         rewards = {
             agent: convert_np_type(rewards_spec[agent].dtype, 0)
             for agent in self.possible_agents
         }
-        discount_spec = self.discount_spec()
-        self._discounts = {
-            agent: convert_np_type(discount_spec[agent].dtype, 1)
-            for agent in self.possible_agents
-        }
 
+        # dm_env timestep
         timestep = parameterized_restart(rewards, self._discounts, observations)
 
-        return timestep, {"s_t": state_list}  # TODO Convert this to correct form
+        return timestep, {"s_t": state}
 
-    def step(self, action_dict: Dict) -> Tuple[dm_env.TimeStep, np.array]:
+    def step(self, actions: Dict[str, np.ndarray]) -> Tuple[dm_env.TimeStep, np.array]:
         """Returns observations from ready agents.
         The returns are dicts mapping from agent_id strings to values. The
         number of agents in the env can vary over time.
@@ -116,34 +120,36 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         if self._reset_next_step:
             return self.reset()
 
-        actions = []
-        for i in self._ready_agents:
-            if i not in action_dict:
-                raise ValueError(f"You must supply an action for agent: {i}")
-            actions.append(action_dict[i])
+        # actions = []
+        # for i in self._ready_agents:
+        #     if i not in action_dict:
+        #         raise ValueError(f"You must supply an action for agent: {i}")
+        #     actions.append(action_dict[i])
 
-        if len(actions) != len(self._ready_agents):
-            raise ValueError(
-                f"Number of actions ({len(actions)}) does not match number \
-                    of ready agents (len(self._ready_agents))."
-            )
+        # if len(actions) != len(self._ready_agents):
+        #     raise ValueError(
+        #         f"Number of actions ({len(actions)}) does not match number \
+        #             of ready agents (len(self._ready_agents))."
+        #     )
 
-        rewards, dones, infos = self._env.step(actions)
-        obs_list = self._env.get_obs()
+        actions_feed = list(actions.values())
+        reward, terminated, info = self._env.step(actions_feed)
+        obs_list = self._environment.get_obs()
+        state = self._environment.get_state()
+        self._env_done = terminated
 
-        return_obs = {}
+        observations = {}
         for i, obs in enumerate(obs_list):
-            return_obs[i] = {
+            observations[f"agent_{i}"] = {
                 "action_mask": self._env.get_avail_agent_actions(i),
-                "obs": obs,
+                "observation": obs,
             }
-        rewards = {i: rewards / len(obs_list) for i in range(len(obs_list))}
-        dones = {i: dones for i in range(len(obs_list))}
-        infos = {i: infos for i in range(len(obs_list))}
-        self._ready_agents = list(range(len(obs_list)))
+        rewards = {agent: reward for agent in actions.keys()}
+        dones = {agent: terminated for agent in actions.keys()}
+
+        # self._ready_agents = list(range(len(obs_list)))
 
         rewards_spec = self.reward_spec()
-
         #  Handle empty rewards
         if not rewards:
             rewards = {
@@ -156,8 +162,8 @@ class SMACEnvWrapper(ParallelEnvWrapper):
                 for agent, reward in rewards.items()
             }
 
-        if return_obs:
-            return_obs = self._convert_observations(return_obs, dones)
+        if observations:
+            observations = self._convert_observations(observations, dones)
 
         if self.env_done():
             self._step_type = dm_env.StepType.LAST
@@ -166,48 +172,64 @@ class SMACEnvWrapper(ParallelEnvWrapper):
             self._step_type = dm_env.StepType.MID
 
         timestep = dm_env.TimeStep(
-            observation=return_obs,
+            observation=observations,
             reward=rewards,
             discount=self._discounts,
             step_type=self._step_type,
         )
 
-        return timestep  # TODO return global state as well
+        return timestep, state
 
     def env_done(self) -> bool:
         """
         Returns a bool indicating if all agents in env are done.
         """
-        return self._environment.env_done  # TODO Check SMAC has this function
+        return self._env_done
+
+    def _convert_observations(
+        self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
+    ) -> types.Observation:
+        observations: Dict[str, types.OLT] = {}
+        for agent, observation in observes.items():
+            if isinstance(observation, dict) and "action_mask" in observation:
+                legals = observation["action_mask"]
+                observation = observation["observation"]
+            else:
+                legals = np.ones(
+                    _convert_to_spec(self.action_space).shape,
+                    dtype=self.action_space.dtype,
+                )
+            observations[agent] = types.OLT(
+                observation=observation,
+                legal_actions=legals,
+                terminal=np.asarray([dones[agent]], dtype=np.float32),
+            )
+
+        return observations
 
     def observation_spec(self) -> types.Observation:
         return {
             agent: types.OLT(
-                observation=_convert_to_spec(
-                    self._environment.observation_spaces[agent]
-                ),
-                legal_actions=_convert_to_spec(self._environment.action_spaces[agent]),
+                observation=_convert_to_spec(self.observation_space["observation"]),
+                legal_actions=_convert_to_spec(self.observation_space["action_mask"]),
                 terminal=specs.Array((1,), np.float32),
             )
-            for agent in self._environment.possible_agents
+            for agent in self.possible_agents
         }
 
     def action_spec(self) -> Dict[str, specs.DiscreteArray]:
         return {
-            agent: _convert_to_spec(self._environment.action_spaces[agent])
-            for agent in self._environment.possible_agents
+            agent: _convert_to_spec(self._environment.action_space)
+            for agent in self.possible_agents
         }
 
     def reward_spec(self) -> Dict[str, specs.Array]:
-        return {
-            agent: specs.Array((), np.float32)
-            for agent in self._environment.possible_agents
-        }
+        return {agent: specs.Array((), np.float32) for agent in self.possible_agents}
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
         return {
             agent: specs.BoundedArray((), np.float32, minimum=0, maximum=1.0)
-            for agent in self._environment.possible_agents
+            for agent in self.possible_agents
         }
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
@@ -218,27 +240,10 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         return self._environment.agents
 
     @property
-    def possible_agents(self) -> List:
-        return self._environment.possible_agents
-
-    @property
     def environment(self) -> ParallelEnv:
         """Returns the wrapped environment."""
         return self._environment
 
-    @property
-    def current_agent(self) -> Any:
-        return self._environment.agent_selection
-
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment."""
         return getattr(self._environment, name)
-
-    # Note sure we need these next methods. Comes from RLlib wrapper.
-    def close(self) -> None:
-        """Close the environment"""
-        self._env.close()
-
-    def seed(self, seed: int) -> None:
-        random.seed(seed)
-        np.random.seed(seed)
