@@ -14,8 +14,7 @@
 # limitations under the License.
 
 """Defines the MADQN system class."""
-
-import copy
+import functools
 from typing import Any, Callable, Dict, Optional, Type, Union
 
 import acme
@@ -25,7 +24,7 @@ import reverb
 import sonnet as snt
 from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
-from acme.utils import counting, loggers
+from acme.utils import counting
 
 import mava
 from mava import core
@@ -33,22 +32,55 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
 from mava.utils import lp_utils
-from mava.utils.loggers import MavaLogger
+from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
 
 
 class MADQN:
-    """Program definition for MADQN."""
+    """MADQN system.
+    This implements a single-process QMIX system.
+    Args:
+        environment_factory: Callable to instantiate an environment on a compute node.
+        network_factory: Callable to instantiate system networks on a compute node.
+        logger_factory: Callable to instantiate a system logger on a compute node.
+        architecture: system architecture, e.g. decentralised or centralised.
+        trainer_fn: training type associated with executor and architecture,
+            e.g. centralised training.
+        executor_fn: executor type for example feedforward or recurrent.
+        num_executors: number of executor processes to run in parallel.
+        num_caches: number of trainer node caches.
+        environment_spec: description of the actions, observations, etc.
+        q_networks: the online Q network (the one being optimized)
+        epsilon: probability of taking a random action; ignored if a policy
+            network is given.
+        trainer_fn: the class used for training the agent and mixing networks.
+        shared_weights: boolean determining whether shared weights is used.
+        target_update_period: number of learner steps to perform before updating
+            the target networks.
+        clipping: whether to clip gradients by global norm.
+        replay_table_name: string indicating what name to give the replay table.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        prefetch_size: size to prefetch from replay.
+        batch_size: batch size for updates.
+        n_step: number of steps to squash into a single transition.
+        discount: discount to use for TD updates.
+        counter: counter object used to keep track of steps.
+        checkpoint: boolean indicating whether to checkpoint the learner.
+    """
 
     def __init__(
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Union[
             Type[training.MADQNTrainer], Type[training.RecurrentMADQNTrainer]
@@ -58,6 +90,7 @@ class MADQN:
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
+        replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
         epsilon_min: float = 0.05,
         epsilon_decay: float = 1e-4,
         num_executors: int = 1,
@@ -80,9 +113,7 @@ class MADQN:
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        trainer_logger: MavaLogger = None,
-        exec_logger: MavaLogger = None,
-        eval_logger: MavaLogger = None,
+        logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
@@ -91,13 +122,23 @@ class MADQN:
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
-                environment_factory(evaluation=False)  # type: ignore
+                environment_factory(evaluation=False)  # type:ignore
+            )
+
+        # set default logger if no logger provided
+        if not logger_factory:
+            logger_factory = functools.partial(
+                logger_utils.make_logger,
+                directory="~/mava",
+                to_terminal=True,
+                time_delta=10,
             )
 
         self._architecture = architecture
         self._communication_module_fn = communication_module
         self._environment_factory = environment_factory
         self._network_factory = network_factory
+        self._logger_factory = logger_factory
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
@@ -105,9 +146,7 @@ class MADQN:
         self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
-        self._trainer_logger = trainer_logger
-        self._exec_logger = exec_logger
-        self._eval_logger = eval_logger
+        self._logger_config = logger_config
         self._train_loop_fn = train_loop_fn
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
@@ -144,6 +183,7 @@ class MADQN:
             executor_fn=executor_fn,
             extra_specs=extra_specs,
             exploration_scheduler_fn=exploration_scheduler_fn,
+            replay_stabilisation_fn=replay_stabilisation_fn,
         )
 
     def _get_extra_specs(self) -> Any:
@@ -198,7 +238,7 @@ class MADQN:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -207,6 +247,11 @@ class MADQN:
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
         )
+
+        if self._builder._replay_stabiliser_fn is not None:
+            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
+                architecture
+            )
 
         communication_module = None
         if self._communication_module_fn is not None:
@@ -220,6 +265,14 @@ class MADQN:
         else:
             system_networks = architecture.create_system()
 
+        # create logger
+        trainer_logger_config = {}
+        if self._logger_config and "trainer" in self._logger_config:
+            trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory(  # type: ignore
+            "trainer", **trainer_logger_config
+        )
+
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
 
@@ -227,8 +280,8 @@ class MADQN:
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=self._trainer_logger,
             communication_module=communication_module,
+            logger=trainer_logger,
         )
 
     def executor(
@@ -243,7 +296,7 @@ class MADQN:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -252,6 +305,11 @@ class MADQN:
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
         )
+
+        if self._builder._replay_stabiliser_fn is not None:
+            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
+                architecture
+            )
 
         communication_module = None
         if self._communication_module_fn is not None:
@@ -282,11 +340,13 @@ class MADQN:
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
 
-        # Update label to include exec id
-        exec_logger = None
-        if self._exec_logger:
-            exec_logger = copy.deepcopy(self._exec_logger)
-            exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
+        # Create executor logger
+        executor_logger_config = {}
+        if self._logger_config and "executor" in self._logger_config:
+            executor_logger_config = self._logger_config["executor"]
+        exec_logger = self._logger_factory(  # type: ignore
+            f"executor_{executor_id}", **executor_logger_config
+        )
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
@@ -305,13 +365,13 @@ class MADQN:
         self,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        logger: loggers.Logger = None,
+        trainer: training.MADQNTrainer,
     ) -> Any:
         """The evaluation process."""
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -320,6 +380,11 @@ class MADQN:
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
         )
+
+        if self._builder._replay_stabiliser_fn is not None:
+            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
+                architecture
+            )
 
         communication_module = None
         if self._communication_module_fn is not None:
@@ -339,6 +404,8 @@ class MADQN:
             action_selectors=networks["action_selectors"],
             variable_source=variable_source,
             communication_module=communication_module,
+            trainer=trainer,
+            evaluator=True,
         )
 
         # Make the environment.
@@ -346,6 +413,12 @@ class MADQN:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
+        evaluator_logger_config = {}
+        if self._logger_config and "evaluator" in self._logger_config:
+            evaluator_logger_config = self._logger_config["evaluator"]
+        eval_logger = self._logger_factory(  # type: ignore
+            "evaluator", **evaluator_logger_config
+        )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
@@ -353,7 +426,7 @@ class MADQN:
             environment,
             executor,
             counter=counter,
-            logger=self._eval_logger,
+            logger=eval_logger,
             **self._eval_loop_fn_kwargs,
         )
 
@@ -378,7 +451,7 @@ class MADQN:
             trainer = program.add_node(lp.CourierNode(self.trainer, replay, counter))
 
         with program.group("evaluator"):
-            program.add_node(lp.CourierNode(self.evaluator, trainer, counter))
+            program.add_node(lp.CourierNode(self.evaluator, trainer, counter, trainer))
 
         if not self._num_caches:
             # Use the trainer as a single variable source.

@@ -172,7 +172,7 @@ class MAPPOTrainer(mava.Trainer):
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.
-        self._timestamp = None
+        self._timestamp: Optional[float] = None
 
     def _get_critic_feed(
         self,
@@ -196,7 +196,7 @@ class MAPPOTrainer(mava.Trainer):
             )
         return observation_trans
 
-    # @tf.function
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -377,11 +377,8 @@ class MAPPOTrainer(mava.Trainer):
 
         # Compute elapsed time.
         timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp = timestamp
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
@@ -397,11 +394,12 @@ class MAPPOTrainer(mava.Trainer):
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
-            variables[network_type] = {}
-            for agent in self.unique_net_keys:
-                variables[network_type][agent] = tf2_utils.to_numpy(
+            variables[network_type] = {
+                agent: tf2_utils.to_numpy(
                     self._system_network_variables[network_type][agent]
                 )
+                for agent in self.unique_net_keys
+            }
         return variables
 
 

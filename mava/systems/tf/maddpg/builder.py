@@ -65,7 +65,9 @@ class MADDPGConfig:
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
+    target_averaging: bool = False
     target_update_period: int = 100
+    target_update_rate: float = 0.01
     executor_variable_update_period: int = 1000
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
@@ -123,11 +125,11 @@ class MADDPGBuilder(SystemBuilder):
         """Create tables to insert data into."""
 
         # Select adder
-        if self._executor_fn == executors.FeedForwardExecutor:
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec, self._extra_specs
             )
-        elif self._executor_fn == executors.RecurrentExecutor:
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder_sig = reverb_adders.ParallelSequenceAdder.signature(
                 environment_spec, self._extra_specs
             )
@@ -167,7 +169,7 @@ class MADDPGBuilder(SystemBuilder):
 
         sequence_length = (
             self._config.sequence_length
-            if self._executor_fn == executors.RecurrentExecutor
+            if issubclass(self._executor_fn, executors.RecurrentExecutor)
             else None
         )
 
@@ -191,14 +193,15 @@ class MADDPGBuilder(SystemBuilder):
         """
 
         # Select adder
-        if self._executor_fn == executors.FeedForwardExecutor:
+
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=None,
                 client=replay_client,
                 n_step=self._config.n_step,
                 discount=self._config.discount,
             )
-        elif self._executor_fn == executors.RecurrentExecutor:
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder = reverb_adders.ParallelSequenceAdder(
                 priority_fns=None,
                 client=replay_client,
@@ -261,6 +264,7 @@ class MADDPGBuilder(SystemBuilder):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
+        connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -279,29 +283,38 @@ class MADDPGBuilder(SystemBuilder):
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         target_update_period = self._config.target_update_period
+        target_averaging = self._config.target_averaging
+        target_update_rate = self._config.target_update_rate
+
+        # trainer args
+        trainer_config = {
+            "agents": agents,
+            "agent_types": agent_types,
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "observation_networks": networks["observations"],
+            "target_policy_networks": networks["target_policies"],
+            "target_critic_networks": networks["target_critics"],
+            "target_observation_networks": networks["target_observations"],
+            "shared_weights": shared_weights,
+            "policy_optimizer": self._config.policy_optimizer,
+            "critic_optimizer": self._config.critic_optimizer,
+            "max_gradient_norm": max_gradient_norm,
+            "discount": discount,
+            "target_averaging": target_averaging,
+            "target_update_period": target_update_period,
+            "target_update_rate": target_update_rate,
+            "dataset": dataset,
+            "counter": counter,
+            "logger": logger,
+            "checkpoint": self._config.checkpoint,
+            "checkpoint_subpath": self._config.checkpoint_subpath,
+        }
+        if connection_spec:
+            trainer_config["connection_spec"] = connection_spec
 
         # The learner updates the parameters (and initializes them).
-        trainer = self._trainer_fn(
-            agents=agents,
-            agent_types=agent_types,
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            observation_networks=networks["observations"],
-            target_policy_networks=networks["target_policies"],
-            target_critic_networks=networks["target_critics"],
-            target_observation_networks=networks["target_observations"],
-            shared_weights=shared_weights,
-            policy_optimizer=self._config.policy_optimizer,
-            critic_optimizer=self._config.critic_optimizer,
-            max_gradient_norm=max_gradient_norm,
-            discount=discount,
-            target_update_period=target_update_period,
-            dataset=dataset,
-            counter=counter,
-            logger=logger,
-            checkpoint=self._config.checkpoint,
-            checkpoint_subpath=self._config.checkpoint_subpath,
-        )
+        trainer = self._trainer_fn(**trainer_config)
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.
         # NetworkStatistics needs to appear before TrainerStatistics.

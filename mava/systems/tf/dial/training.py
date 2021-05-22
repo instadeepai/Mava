@@ -163,7 +163,7 @@ class DIALTrainer(mava.Trainer):
                 )
                 self._system_checkpointer[agent_key] = checkpointer
 
-        self._timestamp = None
+        self._timestamp: Optional[float] = None
 
     @tf.function
     def _update_target_networks(self) -> None:
@@ -399,11 +399,8 @@ class DIALTrainer(mava.Trainer):
 
         # Compute elapsed time.
         timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp = timestamp
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
@@ -420,9 +417,10 @@ class DIALTrainer(mava.Trainer):
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
-            variables[network_type] = {}
-            for agent in self.unique_net_keys:
-                variables[network_type][agent] = tf2_utils.to_numpy(
+            variables[network_type] = {
+                agent: tf2_utils.to_numpy(
                     self._system_network_variables[network_type][agent]
                 )
+                for agent in self.unique_net_keys
+            }
         return variables

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MAPPO system implementation."""
-import copy
+import functools
 from typing import Any, Callable, Dict, Optional, Type
 
 import acme
@@ -33,7 +33,7 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.mappo import builder, execution, training
 from mava.utils import lp_utils
-from mava.utils.loggers import MavaLogger
+from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
 
 
@@ -49,6 +49,7 @@ class MAPPO:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[
             DecentralisedValueActorCritic
         ] = DecentralisedValueActorCritic,
@@ -74,9 +75,7 @@ class MAPPO:
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        trainer_logger: MavaLogger = None,
-        exec_logger: MavaLogger = None,
-        eval_logger: MavaLogger = None,
+        logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
@@ -85,38 +84,64 @@ class MAPPO:
 
         """Initialize the system.
         Args:
-        environment_spec: description of the actions, observations, etc.
-        networks: ...
-        sequence_length: ...
-        sequence_period: ...
-        shared_weights: ...
-        counter: ...
-        entropy_cost: ...
-        baseline_cost: ...
-        clipping_epsilon: ...
-        max_abs_reward: ...
-        batch_size: batch size for updates.
-        max_queue_size: maximum queue size.
-        discount: discount to use for TD updates.
-        logger: logger object to be used by learner.
-        max_gradient_norm: used for gradient clipping.
-        checkpoint: ...
-        checkpoint_subpath: directory for checkpoints.
-        trainer_logger: logger for trainer class.
-        exec_logger: logger for executor.
-        eval_logger: logger for evaluator.
-        train_loop_fn: loop for training.
-        eval_loop_fn: loop for evaluation.
-        replay_table_name: string indicating what name to give the replay table."""
+            environment_factory: Callable to instantiate an environment
+                on a compute node.
+            network_factory: Callable to instantiate system networks
+                on a compute node.
+            logger_factory: Callable to instantiate a system logger
+                on a compute node.
+            architecture: system architecture, e.g. decentralised or centralised.
+            trainer_fn: training type associated with executor and architecture,
+                e.g. centralised training.
+            executor_fn: executor type for example feedforward or recurrent.
+            num_executors: number of executor processes to run in parallel.
+            num_caches: number of trainer node caches.
+            environment_spec: description of the actions, observations, etc.
+            shared_weights: set whether agents should share network weights.
+            sequence_length: length of the sequences in the queue.
+            sequence_period: amount of overlap between sequences added to the queue.
+            entropy_cost: contribution of entropy regularization to the total loss.
+            baseline_cost: contribution of the value loss to the total loss.
+            lambda_gae: scalar determining the mix of bootstrapping
+                vs further accumulation of multi-step returns at each timestep.
+                See `High-Dimensional Continuous Control Using Generalized
+                Advantage Estimation` for more information.
+            clipping_epsilon: Hyper-parameter for clipping in the policy
+                objective. Roughly: how far can the new policy go from
+                the old policy while still profiting? The new policy can
+                still go farther than the clip_ratio says, but it doesn’t
+                help on the objective anymore.
+            max_abs_reward: max reward. If not None, the reward on which the agent
+                is trained will be clipped between -max_abs_reward and max_abs_reward.
+            batch_size: batch size for updates.
+            max_queue_size: maximum queue size.
+            discount: discount to use for TD updates.
+            max_gradient_norm: used for gradient clipping.
+            checkpoint: boolean indicating whether to checkpoint the trainers.
+            counter: count the number of steps and episodes.
+            checkpoint_subpath: directory for checkpoints.
+            train_loop_fn: loop for training.
+            eval_loop_fn: loop for evaluation.
+            replay_table_name: string indicating what name to give the replay table."""
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
                 environment_factory(evaluation=False)  # type: ignore
             )
 
+        # set default logger if no logger provided
+        if not logger_factory:
+            logger_factory = functools.partial(
+                logger_utils.make_logger,
+                directory="~/mava",
+                to_terminal=True,
+                time_delta=10,
+            )
+
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
+        self._logger_factory = logger_factory
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
@@ -124,9 +149,7 @@ class MAPPO:
         self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
-        self._trainer_logger = trainer_logger
-        self._exec_logger = exec_logger
-        self._eval_logger = eval_logger
+        self._logger_config = logger_config
         self._train_loop_fn = train_loop_fn
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
@@ -180,7 +203,7 @@ class MAPPO:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -192,6 +215,15 @@ class MAPPO:
             shared_weights=self._shared_weights,
         ).create_system()
 
+        # create logger
+        trainer_logger_config = {}
+        if self._logger_config:
+            if "trainer" in self._logger_config:
+                trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory(  # type: ignore
+            "trainer", **trainer_logger_config
+        )
+
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
 
@@ -199,7 +231,7 @@ class MAPPO:
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=self._trainer_logger,
+            logger=trainer_logger,
         )
 
     def executor(
@@ -213,7 +245,7 @@ class MAPPO:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -245,11 +277,14 @@ class MAPPO:
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
 
-        # Update label to include exec id
-        exec_logger = None
-        if self._exec_logger:
-            exec_logger = copy.deepcopy(self._exec_logger)
-            exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
+        # Create executor logger
+        executor_logger_config = {}
+        if self._logger_config:
+            if "executor" in self._logger_config:
+                executor_logger_config = self._logger_config["executor"]
+        exec_logger = self._logger_factory(  # type: ignore
+            f"executor_{executor_id}", **executor_logger_config
+        )
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
@@ -274,7 +309,7 @@ class MAPPO:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -303,6 +338,13 @@ class MAPPO:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
+        evaluator_logger_config = {}
+        if self._logger_config:
+            if "evaluator" in self._logger_config:
+                evaluator_logger_config = self._logger_config["evaluator"]
+        eval_logger = self._logger_factory(  # type: ignore
+            "evaluator", **evaluator_logger_config
+        )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
@@ -310,7 +352,7 @@ class MAPPO:
             environment,
             executor,
             counter=counter,
-            logger=self._eval_logger,
+            logger=eval_logger,
             **self._eval_loop_fn_kwargs,
         )
 

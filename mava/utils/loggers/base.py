@@ -80,6 +80,9 @@ class Logger(MavaLogger):
             self._time_stamp,
         )
 
+    def update_label(self, label: str) -> None:
+        self._label = f"{self._label}_{label}"
+
     def make_logger(
         self,
         to_terminal: bool,
@@ -115,12 +118,12 @@ class Logger(MavaLogger):
                 loggers.CSVLogger(
                     directory_or_file=self._path("csv"), label=self._label
                 )
-            ]  # type: ignore
+            ]
 
         if to_tensorboard:
             logger += [
                 TFSummaryLogger(logdir=self._path("tensorboard"), label=self._label)
-            ]  # type: ignore
+            ]
 
         if external_logger:
             logger += [

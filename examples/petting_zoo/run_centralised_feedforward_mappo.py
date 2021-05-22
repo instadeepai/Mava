@@ -15,6 +15,7 @@
 
 """Example running centralized MAPPO on multiwalker."""
 
+import functools
 from datetime import datetime
 from typing import Any, Dict, Sequence, Union
 
@@ -27,13 +28,14 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from absl import app, flags
 from acme.tf import utils as tf2_utils
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava.specs as mava_specs
 from mava.components.tf.architectures import CentralisedValueCritic
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
-from mava.utils.loggers.base import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 
@@ -155,28 +157,10 @@ def main(_: Any) -> None:
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
+    # loggers
     log_every = 10
-    trainer_logger = Logger(
-        label="system_trainer",
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
-    exec_logger = Logger(
-        # _{executor_id} gets appended to label in system.
-        label="train_loop_executor",
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
-    eval_logger = Logger(
-        label="eval_loop",
+    logger_factory = functools.partial(
+        logger_utils.make_logger,
         directory=FLAGS.base_dir,
         to_terminal=True,
         to_tensorboard=True,
@@ -188,17 +172,27 @@ def main(_: Any) -> None:
     program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         architecture=CentralisedValueCritic,
         trainer_fn=mappo.CentralisedMAPPOTrainer,
         num_executors=2,
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
     ).build()
 
     # launch
-    lp.launch(program, lp.LaunchType.LOCAL_MULTI_PROCESSING, terminal="gnome-terminal")
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
+    )
 
 
 if __name__ == "__main__":

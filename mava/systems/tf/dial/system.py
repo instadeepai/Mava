@@ -13,8 +13,8 @@
 # limitations under the License.
 
 """DIAL system implementation."""
-import copy
-from typing import Any, Callable, Dict, Optional, Tuple, Type
+import functools
+from typing import Any, Callable, Dict, Optional, Type
 
 import acme
 import dm_env
@@ -38,7 +38,7 @@ from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.dial import builder
 from mava.systems.tf.dial.execution import DIALExecutor
 from mava.utils import lp_utils
-from mava.utils.loggers import MavaLogger
+from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
 
 
@@ -54,9 +54,9 @@ class DIAL(system.System):
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedPolicyActor] = DecentralisedPolicyActor,
         executor_fn: Type[core.Executor] = DIALExecutor,
-        log_info: Tuple = None,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -80,18 +80,26 @@ class DIAL(system.System):
         max_executor_steps: int = None,
         checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava/",
+        logger_config: Dict = {},
         max_gradient_norm: Optional[float] = None,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
         communication_module: Type[BroadcastedCommunication] = BroadcastedCommunication,
-        trainer_logger: MavaLogger = None,
-        exec_logger: MavaLogger = None,
-        eval_logger: MavaLogger = None,
     ):
         # TODO: Update args
         """Initialize the system.
         Args:
+            environment_factory: Callable to instantiate an environment
+                on a compute node.
+            network_factory: Callable to instantiate system networks on a compute node.
+            logger_factory: Callable to instantiate a system logger on a compute node.
+            architecture: system architecture, e.g. decentralised or centralised.
+            trainer_fn: training type associated with executor and architecture,
+                e.g. centralised training.
+            executor_fn: executor type for example feedforward or recurrent.
+            num_executors: number of executor processes to run in parallel.
+            num_caches: number of trainer node caches.
             environment_spec: description of the actions, observations, etc.
-            networks: the online Q network (the one being optimized)
+            shared_weights: set whether agents should share network weights.
             batch_size: batch size for updates.
             prefetch_size: size to prefetch from replay.
             target_update_period: number of learner steps to perform before updating
@@ -109,12 +117,8 @@ class DIAL(system.System):
             epsilon: probability of taking a random action; ignored if a policy
                 network is given.
             discount: discount to use for TD updates.
-            logger: logger object to be used by learner.
             checkpoint: boolean indicating whether to checkpoint the learner.
             checkpoint_subpath: directory for the checkpoint.
-            policy_networks: if given, this will be used as the policy network.
-                Otherwise, an epsilon greedy policy using the online Q network will be
-                created. Policy network is used in the actor to sample actions.
             max_gradient_norm: used for gradient clipping.
             replay_table_name: string indicating what name to give the replay table."""
 
@@ -123,11 +127,20 @@ class DIAL(system.System):
                 environment_factory(evaluation=False)  # type: ignore
             )
 
+        # set default logger if no logger provided
+        if not logger_factory:
+            logger_factory = functools.partial(
+                logger_utils.make_logger,
+                directory="~/mava",
+                to_terminal=True,
+                time_delta=10,
+            )
+
         self._architecture_fn = architecture
         self._communication_module_fn = communication_module
         self._environment_factory = environment_factory
         self._network_factory = network_factory
-        self._log_info = log_info
+        self._logger_factory = logger_factory
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
@@ -135,9 +148,7 @@ class DIAL(system.System):
         self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
-        self._trainer_logger = trainer_logger
-        self._exec_logger = exec_logger
-        self._eval_logger = eval_logger
+        self._logger_config = logger_config
 
         extra_specs = self._get_extra_specs()
 
@@ -215,7 +226,7 @@ class DIAL(system.System):
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -235,6 +246,15 @@ class DIAL(system.System):
 
         system_networks = communication_module.create_system()
 
+        # create logger
+        trainer_logger_config = {}
+        if self._logger_config:
+            if "trainer" in self._logger_config:
+                trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory(  # type: ignore
+            "trainer", **trainer_logger_config
+        )
+
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
 
@@ -244,7 +264,7 @@ class DIAL(system.System):
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=self._trainer_logger,
+            logger=trainer_logger,
         )
 
     def executor(
@@ -258,7 +278,7 @@ class DIAL(system.System):
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -298,11 +318,14 @@ class DIAL(system.System):
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
 
-        # Update label to include exec id
-        exec_logger = None
-        if self._exec_logger:
-            exec_logger = copy.deepcopy(self._exec_logger)
-            exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
+        # Create executor logger
+        executor_logger_config = {}
+        if self._logger_config:
+            if "executor" in self._logger_config:
+                executor_logger_config = self._logger_config["executor"]
+        exec_logger = self._logger_factory(  # type: ignore
+            f"executor_{executor_id}", **executor_logger_config
+        )
 
         # Create the loop to connect environment and executor.
         train_loop = ParallelEnvironmentLoop(
@@ -323,7 +346,7 @@ class DIAL(system.System):
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
@@ -360,11 +383,18 @@ class DIAL(system.System):
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
+        evaluator_logger_config = {}
+        if self._logger_config:
+            if "evaluator" in self._logger_config:
+                evaluator_logger_config = self._logger_config["evaluator"]
+        eval_logger = self._logger_factory(  # type: ignore
+            "evaluator", **evaluator_logger_config
+        )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
         eval_loop = ParallelEnvironmentLoop(
-            environment, executor, counter=counter, logger=self._eval_logger
+            environment, executor, counter=counter, logger=eval_logger
         )
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)

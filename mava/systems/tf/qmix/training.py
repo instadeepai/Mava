@@ -15,8 +15,7 @@
 
 """Qmix trainer implementation."""
 
-import time
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Sequence
 
 import numpy as np
 import sonnet as snt
@@ -25,15 +24,16 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 from trfl.indexing_ops import batched_index
 
-import mava
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
-from mava.systems.tf import savers as tf2_savers
+
+# from mava.systems.tf import savers as tf2_savers
+from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.utils import training_utils as train_utils
 
 
-class QMIXTrainer(mava.Trainer):
+class QMIXTrainer(MADQNTrainer):
     """QMIX trainer.
     This is the trainer component of a QMIX system. i.e. it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -60,106 +60,48 @@ class QMIXTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
     ) -> None:
 
-        self._agents = agents
-        self._agent_types = agent_types
-        self._shared_weights = shared_weights
-        self._optimizer = optimizer
-        self._checkpoint = checkpoint
-
-        # Store online and target networks.
-        self._q_networks = q_networks
-        self._target_q_networks = target_q_networks
         self._mixing_network = mixing_network
         self._target_mixing_network = target_mixing_network
 
-        # General learner book-keeping and loggers.
-        self._counter = counter or counting.Counter()
-        self._logger = logger
+        super(QMIXTrainer, self).__init__(
+            agents=agents,
+            agent_types=agent_types,
+            q_networks=q_networks,
+            target_q_networks=target_q_networks,
+            target_update_period=target_update_period,
+            dataset=dataset,
+            optimizer=optimizer,
+            discount=discount,
+            shared_weights=shared_weights,
+            exploration_scheduler=exploration_scheduler,
+            clipping=clipping,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+        )
 
-        # Other learner parameters.
-        self._discount = discount
-        self._clipping = clipping
-
-        # Necessary to track when to update target networks.
-        self._num_steps = tf.Variable(0, dtype=tf.int32)
-        self._target_update_period = target_update_period
-
-        # Create an iterator to go through the dataset.
-        self._iterator = dataset
-
-        # Store the exploration scheduler
-        self._exploration_scheduler = exploration_scheduler
-
-        # Dictionary with network keys for each agent.
-        self.agent_net_keys = {agent: agent for agent in self._agents}
-        if self._shared_weights:
-            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
-
-        self.unique_net_keys = self._agent_types if shared_weights else self._agents
-
-        # Expose the variables.
-        q_networks_to_expose = {}
-        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
-            "q_network": {},
-        }
-        for agent_key in self.unique_net_keys:
-            q_network_to_expose = self._target_q_networks[agent_key]
-            q_networks_to_expose[agent_key] = q_network_to_expose
-
-            self._system_network_variables["q_network"][
-                agent_key
-            ] = q_network_to_expose.variables
-
-        # Checkpointer
-        self._system_checkpointer = {}
-        if checkpoint:
-            # TODO Checkpointing of mixing networks not playing nicely...
-            # self._system_checkpointer["mixing_network"] = tf2_savers.Checkpointer(
-            #     directory=checkpoint_subpath,
-            #     time_delta_minutes=15,
-            #     objects_to_save={
-            #         "mixing_network": self._mixing_network,
-            #     },
-            #     enable_checkpointing=checkpoint,
-            # )
-            # self._system_checkpointer[
-            #     "target_mixing_network"
-            # ] = tf2_savers.Checkpointer(
-            #     directory=checkpoint_subpath,
-            #     time_delta_minutes=15,
-            #     objects_to_save={
-            #         "target_mixing_network": self._target_mixing_network,
-            #     },
-            #     enable_checkpointing=checkpoint,
-            # )
-            for agent_key in self.unique_net_keys:
-                agent_checkpointer = tf2_savers.Checkpointer(
-                    directory=checkpoint_subpath,
-                    time_delta_minutes=15,
-                    objects_to_save={
-                        "counter": self._counter,
-                        "q_network": self._q_networks[agent_key],
-                        "target_q_network": self._target_q_networks[agent_key],
-                        "optimizer": self._optimizer,
-                        "num_steps": self._num_steps,
-                    },
-                    enable_checkpointing=checkpoint,
-                )
-
-                self._system_checkpointer[agent_key] = agent_checkpointer
-
-        # Do not record timestamps until after the first learning step is done.
-        # This is to avoid including the time it takes for actors to come online and
-        # fill the replay buffer.
-
-        self._timestamp = None
-
-    def get_epsilon(self) -> float:
-        epsilon = self._exploration_scheduler.get_epsilon()
-        return epsilon
-
-    def _decrement_epsilon(self) -> None:
-        self._exploration_scheduler.decrement_epsilon()
+        # Checkpoint the mixing networks
+        # if checkpoint:
+        # TODO Checkpointing of mixing networks not playing nicely...
+        # self._system_checkpointer["mixing_network"] = tf2_savers.Checkpointer(
+        #     directory=checkpoint_subpath,
+        #     time_delta_minutes=15,
+        #     objects_to_save={
+        #         "mixing_network": self._mixing_network,
+        #     },
+        #     enable_checkpointing=checkpoint,
+        # )
+        # self._system_checkpointer[
+        #     "target_mixing_network"
+        # ] = tf2_savers.Checkpointer(
+        #     directory=checkpoint_subpath,
+        #     time_delta_minutes=15,
+        #     objects_to_save={
+        #         "target_mixing_network": self._target_mixing_network,
+        #     },
+        #     enable_checkpointing=checkpoint,
+        # )
 
     def _update_target_networks(self) -> None:
         online_variables = []
@@ -178,48 +120,6 @@ class QMIXTrainer(mava.Trainer):
                 dest.assign(src)
 
         self._num_steps.assign_add(1)
-
-    def _get_feed(
-        self,
-        o_tm1_trans: Dict[str, np.ndarray],
-        o_t_trans: Dict[str, np.ndarray],
-        a_tm1: Dict[str, np.ndarray],
-        agent: str,
-    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-
-        o_tm1_feed = o_tm1_trans[agent].observation
-        o_t_feed = o_t_trans[agent].observation
-        a_tm1_feed = a_tm1[agent]
-
-        return o_tm1_feed, o_t_feed, a_tm1_feed
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        # Compute elapsed time.
-        timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        # Checkpoint and attempt to write the logs.
-        if self._checkpoint:
-            train_utils.checkpoint_networks(self._system_checkpointer)
-
-        # Log and decrement epsilon
-        epsilon = self.get_epsilon()
-        fetches["epsilon"] = epsilon
-        self._decrement_epsilon()
-
-        if self._logger:
-            self._logger.write(fetches)
 
     @tf.function
     def _step(self) -> Dict[str, Dict[str, Any]]:
@@ -246,14 +146,21 @@ class QMIXTrainer(mava.Trainer):
         # e_t = [Optional] = extra data that the agents persist in replay.
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
 
-        # Global state (for hypernetwork) one-hot encoded
-        s_tm1 = tf.one_hot(e_tm1["s_t"], depth=3)  # TODO Get depth from state specs
-        s_t = tf.one_hot(e_t["s_t"], depth=3)
+        # Global state (for hypernetwork)
+        # TODO Switch between one-hot for discrete state space and no one-hot
+        # for continuous state spaces. `depth` param should be taken from
+        # state specs - or somewhere else in a cleaner way?
+
+        # One-hot if discrete states
+        # s_tm1 = tf.one_hot(e_tm1["s_t"], depth=3)
+        # s_t = tf.one_hot(e_t["s_t"], depth=3)
+
+        # Don't one-hot for continuous states
+        s_tm1 = e_tm1["s_t"]
+        s_t = e_t["s_t"]
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            # a_t = self._policy_actions(o_t_trans)
-
             q_tm1 = []  # Q vals
             q_t = []  # Target Q vals
             for agent in self._agents:
@@ -292,20 +199,16 @@ class QMIXTrainer(mava.Trainer):
             q_tot_mixed = self._mixing_network(q_tm1, s_tm1)  # [B, 1, 1]
             q_tot_target_mixed = self._target_mixing_network(q_t, s_t)  # [B, 1, 1]
 
-            # Cast the additional discount to match the environment discount dtype.
-            # discount = tf.cast(self._discount, dtype=d_t.dtype)
-
             # Calculate Q loss.
-            # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
-            discount = tf.constant(0.99)  # TODO Generalise
-
             targets = (
-                rewards + discount * (tf.constant(1.0) - dones) * q_tot_target_mixed
+                rewards
+                + self._discount * (tf.constant(1.0) - dones) * q_tot_target_mixed
             )
             targets = tf.stop_gradient(targets)
             td_error = targets - q_tot_mixed
-            self.loss = 0.5 * tf.reduce_mean(tf.square(td_error))
 
+            # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
+            self.loss = 0.5 * tf.reduce_mean(tf.square(td_error))
             self.tape = tape
 
     def _backward(self) -> None:
@@ -339,9 +242,10 @@ class QMIXTrainer(mava.Trainer):
                 # Includes the hypernet variables
                 variables[network_type] = self._mixing_network.variables
             else:  # Collect variables for each agent network
-                variables[network_type] = {}
-                for key in self.unique_net_keys:
-                    variables[network_type][key] = tf2_utils.to_numpy(
+                variables[network_type] = {
+                    key: tf2_utils.to_numpy(
                         self._system_network_variables[network_type][key]
                     )
+                    for key in self.unique_net_keys
+                }
         return variables
