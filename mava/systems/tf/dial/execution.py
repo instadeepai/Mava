@@ -22,90 +22,58 @@
 #   - multi-agent generic executors in mava: mava/systems/tf/executors.py
 
 """DIAL executor implementation."""
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import sonnet as snt
-import tensorflow as tf
-import tensorflow_probability as tfp
-from acme import types
-from acme.specs import EnvironmentSpec
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.systems.tf.executors import RecurrentExecutorWithComms
+from mava.systems.tf.madqn.execution import MADQNRecurrentCommExecutor
+from mava.systems.tf.madqn.training import MADQNTrainer
 
-tfd = tfp.distributions
 
-
-class DIALExecutor(RecurrentExecutorWithComms):
-    """DIAL implementation of a recurrent Executor."""
+class DIALExecutor(MADQNRecurrentCommExecutor):
+    """DIAL executor.
+    An executor based on a recurrent communicating policy for each agent in the system
+    which takes non-batched observations and outputs non-batched actions.
+    It also allows adding experiences to replay and updating the weights
+    from the policy on the learner.
+    """
 
     def __init__(
         self,
-        policy_networks: Dict[str, snt.RNNCore],
+        q_networks: Dict[str, snt.Module],
+        action_selectors: Dict[str, snt.Module],
         communication_module: BaseCommunicationModule,
-        agent_specs: Dict[str, EnvironmentSpec],
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
-        is_eval: bool = False,
-        epsilon: float = 0.05,
+        trainer: MADQNTrainer = None,
+        fingerprint: bool = False,
+        evaluator: bool = False,
     ):
         """Initializes the executor.
-        TODO: Update docstring
         Args:
-          policy_networks: the (recurrent) policy to run for each agent in the system.
+          policy_network: the policy to run for each agent in the system.
           shared_weights: specify if weights are shared between agent networks.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
             of the policies to the executor copy (in case they are separate).
-          store_recurrent_state: Whether to pass the recurrent state to the adder.
         """
+
         # Store these for later use.
-        self._agent_specs = agent_specs
-        self._is_eval = is_eval
-        self._epsilon = epsilon
+        self._adder = adder
+        self._variable_client = variable_client
+        self._q_networks = q_networks
+        self._policy_networks = q_networks
+        self._communication_module = communication_module
+        self._action_selectors = action_selectors
+        self._store_recurrent_state = store_recurrent_state
+        self._trainer = trainer
+        self._shared_weights = shared_weights
 
-        super().__init__(
-            adder=adder,
-            variable_client=variable_client,
-            policy_networks=policy_networks,
-            store_recurrent_state=store_recurrent_state,
-            communication_module=communication_module,
-            shared_weights=shared_weights,
-        )
-
-    def _sample_action(
-        self, action_policy: types.NestedTensor, agent: str
-    ) -> types.NestedTensor:
-        action = tf.argmax(action_policy, axis=1)
-        if tf.random.uniform([]) < self._epsilon and not self._is_eval:
-            action_spec = self._agent_specs[agent].actions
-            action = tf.random.uniform(
-                action_spec.shape, 0, action_spec.num_values, dtype=tf.dtypes.int64
-            )
-
-        # Hard coded perfect policy:
-        # if observation[1].item()==5 and observation[0].item()==1:
-        #   action = tf.constant([1], dtype=tf.dtypes.int64)
-        # else:
-        #   tf.constant([0], dtype=tf.dtypes.int64)
-
-        return action
-
-    def _process_message(
-        self, observation: types.NestedTensor, message_policy: types.NestedTensor
-    ) -> types.NestedTensor:
-        # Only one agent can message at each timestep
-        if observation[0] == 0:
-            message = tf.zeros_like(message_policy)
-        else:
-            message = (
-                message_policy.sample()
-                if isinstance(message_policy, tfd.Distribution)
-                else message_policy
-            )
-        return message
+        self._states: Dict[str, Any] = {}
+        self._messages: Dict[str, Any] = {}

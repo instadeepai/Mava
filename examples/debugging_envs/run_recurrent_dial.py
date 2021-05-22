@@ -13,30 +13,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running DIAL"""
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any, Mapping, Optional
 
 import launchpad as lp
-import numpy as np
+import sonnet as snt
 import tensorflow as tf
 from absl import app, flags
 from acme import types
-from acme.tf import utils as tf2_utils
-from acme.wrappers.gym_wrapper import _convert_to_spec
-from gym import spaces
+from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.components.tf.networks import DIALPolicy
+from mava.components.tf.modules.communication.broadcasted import (
+    BroadcastedCommunication,
+)
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.networks import (
+    CommunicationNetwork,
+    epsilon_greedy_action_selector,
+)
 from mava.systems.tf import dial
+from mava.systems.tf.madqn.execution import MADQNRecurrentCommExecutor
+from mava.systems.tf.madqn.training import RecurrentCommMADQNTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer("num_episodes", 30000, "Number of training episodes to run for.")
 flags.DEFINE_string(
     "env_name",
     "switch",
@@ -47,11 +52,6 @@ flags.DEFINE_string(
     "discrete",
     "Environment action space type (str).",
 )
-flags.DEFINE_integer(
-    "num_episodes_per_eval",
-    100,
-    "Number of training episodes to run between evaluation " "episodes.",
-)
 
 flags.DEFINE_string(
     "mava_id",
@@ -61,103 +61,88 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
-# TODO Kevin: Define message head node correctly
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_network_gru_hidden_sizes: Union[Dict[str, int], int] = 128,
-    policy_network_gru_layers: Union[Dict[str, int], int] = 2,
-    policy_network_task_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    policy_network_message_in_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    policy_network_message_out_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    policy_network_output_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    message_size: int = 1,
+    message_size: int = 10,
     shared_weights: bool = True,
-    sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
+
     specs = environment_spec.get_agent_specs()
-    # extra_specs = environment_spec.get_extra_specs()
 
     # Create agent_type specs
     if shared_weights:
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
-    if isinstance(policy_network_gru_hidden_sizes, int):
-        policy_network_gru_hidden_sizes = {
-            key: policy_network_gru_hidden_sizes for key in specs.keys()
-        }
-
-    if isinstance(policy_network_gru_layers, int):
-        policy_network_gru_layers = {
-            key: policy_network_gru_layers for key in specs.keys()
-        }
-
-    if isinstance(policy_network_task_mlp_sizes, Sequence):
-        policy_network_task_mlp_sizes = {
-            key: policy_network_task_mlp_sizes for key in specs.keys()
-        }
-
-    if isinstance(policy_network_message_in_mlp_sizes, Sequence):
-        policy_network_message_in_mlp_sizes = {
-            key: policy_network_message_in_mlp_sizes for key in specs.keys()
-        }
-
-    if isinstance(policy_network_message_out_mlp_sizes, Sequence):
-        policy_network_message_out_mlp_sizes = {
-            key: policy_network_message_out_mlp_sizes for key in specs.keys()
-        }
-
-    if isinstance(policy_network_output_mlp_sizes, Sequence):
-        policy_network_output_mlp_sizes = {
-            key: policy_network_output_mlp_sizes for key in specs.keys()
-        }
-
-    observation_networks = {}
-    policy_networks = {}
-
-    for key in specs.keys():
-        # Create the shared observation network
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
-
-        # Create the policy network.
-        policy_network = DIALPolicy(
-            action_spec=specs[key].actions,
-            message_spec=_convert_to_spec(
-                spaces.Box(-np.inf, np.inf, (message_size,), dtype=np.float32)
-            ),
-            gru_hidden_size=policy_network_gru_hidden_sizes[key],
-            gru_layers=policy_network_gru_layers[key],
-            task_mlp_size=policy_network_task_mlp_sizes[key],
-            message_in_mlp_size=policy_network_message_in_mlp_sizes[key],
-            message_out_mlp_size=policy_network_message_out_mlp_sizes[key],
-            output_mlp_size=policy_network_output_mlp_sizes[key],
+    def action_selector_fn(
+        q_values: types.NestedTensor,
+        legal_actions: types.NestedTensor,
+        epsilon: Optional[tf.Variable] = None,
+    ) -> types.NestedTensor:
+        return epsilon_greedy_action_selector(
+            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
         )
 
-        observation_networks[key] = observation_network
-        policy_networks[key] = policy_network
+    q_networks = {}
+    action_selectors = {}
+    for key in specs.keys():
+
+        # Get total number of action dimensions from action spec.
+        num_dimensions = specs[key].actions.num_values
+
+        q_network = CommunicationNetwork(
+            networks.LayerNormMLP(
+                (128,),
+                activate_final=True,
+            ),
+            networks.LayerNormMLP(
+                (128,),
+                activate_final=True,
+            ),
+            snt.GRU(128),
+            snt.Sequential(
+                [
+                    networks.LayerNormMLP((128,), activate_final=True),
+                    networks.NearZeroInitializedLinear(num_dimensions),
+                    networks.TanhToSpec(specs[key].actions),
+                ]
+            ),
+            snt.Sequential(
+                [
+                    networks.LayerNormMLP((128, message_size), activate_final=True),
+                ]
+            ),
+            message_size=message_size,
+        )
+
+        # epsilon greedy action selector
+        action_selector = action_selector_fn
+
+        q_networks[key] = q_network
+        action_selectors[key] = action_selector
 
     return {
-        "policies": policy_networks,
-        "observations": observation_networks,
+        "q_networks": q_networks,
+        "action_selectors": action_selectors,
     }
 
 
 def main(_: Any) -> None:
 
     # environment
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
     )
 
+    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-    # loggers
     log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
@@ -168,13 +153,23 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
+    # distributed program
     program = dial.DIAL(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=5,
-        batch_size=1,
+        num_executors=2,
+        trainer_fn=RecurrentCommMADQNTrainer,
+        executor_fn=MADQNRecurrentCommExecutor,
+        exploration_scheduler_fn=LinearExplorationScheduler,
+        communication_module=BroadcastedCommunication,
+        sequence_length=6,
+        epsilon_min=0.05,
+        epsilon_decay=5e-4,
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        n_step=1,
+        batch_size=32,
     ).build()
 
     # launch
