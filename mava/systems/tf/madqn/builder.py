@@ -14,9 +14,9 @@
 # limitations under the License.
 
 import dataclasses
-import time
 from typing import Any, Dict, Iterator, List, Optional, Type
 
+import numpy as np
 import reverb
 import sonnet as snt
 from acme import datasets
@@ -28,62 +28,10 @@ from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
+from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import execution, training
-from mava.utils import training_utils as train_utils
-from mava.wrappers import DetailedTrainerStatistics
-
-# TODO (Claude) I had to make a custom class here that
-# inherits DetailedTrainerStatistics
-# to expose the get_epsilon() function. For some
-# reason lp does not bind it otherwise.
-# Need to fix this.
-
-
-class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
-    def __init__(
-        self,
-        trainer: training.MADQNTrainer,
-        metrics: List[str] = ["q_value_loss"],
-        summary_stats: List = ["mean", "max", "min", "var", "std"],
-    ) -> None:
-        super().__init__(trainer, metrics, summary_stats)
-
-    def get_epsilon(self) -> float:
-        return self._trainer.get_epsilon()  # type: ignore
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        if self._require_loggers:
-            self._create_loggers(list(fetches.keys()))
-            self._require_loggers = False
-
-        # compute statistics
-        self._compute_statistics(fetches)
-
-        # Compute elapsed time.
-        # NOTE (Arnu): getting type issues with the timestamp
-        # not sure why. Look into a fix for this.
-        timestamp = time.time()
-        if self._timestamp:  # type: ignore
-            elapsed_time = timestamp - self._timestamp  # type: ignore
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        train_utils.checkpoint_networks(self._system_checkpointer)
-
-        fetches["epsilon"] = self.get_epsilon()
-        self._trainer._decrement_epsilon()  # type: ignore
-
-        if self._logger:
-            self._logger.write(fetches)
+from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
 
 @dataclasses.dataclass
@@ -146,6 +94,7 @@ class MADQNBuilder:
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
+        replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ):
         """Args:
         _config: Configuration options for the MADQN system.
@@ -158,15 +107,19 @@ class MADQNBuilder:
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
         self._exploration_scheduler_fn = exploration_scheduler_fn
+        self._replay_stabiliser_fn = replay_stabilisation_fn
 
     def make_replay_tables(
         self,
-        environment_spec: specs.EnvironmentSpec,
+        environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
         """Create tables to insert data into."""
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+            # Check if we should use fingerprints
+            if self._replay_stabiliser_fn is not None:
+                self._extra_specs.update({"fingerprint": np.array([1.0, 1.0])})
             adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec, self._extra_specs
             )
@@ -206,7 +159,9 @@ class MADQNBuilder:
     def make_dataset_iterator(
         self, replay_client: reverb.Client
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the system."""
+        """Create a dataset iterator to use for learning/updating the system.
+        Args:
+            replay_client: Reverb Client which points to the replay server."""
 
         sequence_length = (
             self._config.sequence_length
@@ -257,14 +212,17 @@ class MADQNBuilder:
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
         trainer: Optional[training.MADQNTrainer] = None,
+        evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
-            behavior_networks: A struct of instance of all
-                the different behaviour networks,
+            q_networks: A struct of instance of all
+                the different system q networks,
                 this should be a callable which takes as input observations
                 and returns actions.
             adder: How data is recorded (e.g. added to replay).
+            variable_source: collection of (nested) numpy arrays. Contains
+                source variables as defined in mava.core.
         """
 
         shared_weights = self._config.shared_weights
@@ -274,10 +232,7 @@ class MADQNBuilder:
             agent_keys = self._agent_types if shared_weights else self._agents
 
             # Create policy variables
-            variables = {}
-            for agent in agent_keys:
-                variables[agent] = q_networks[agent].variables
-
+            variables = {agent: q_networks[agent].variables for agent in agent_keys}
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
@@ -289,6 +244,9 @@ class MADQNBuilder:
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
+        # Check if we should use fingerprints
+        fingerprint = True if self._replay_stabiliser_fn is not None else False
+
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
@@ -297,6 +255,8 @@ class MADQNBuilder:
             variable_client=variable_client,
             adder=adder,
             trainer=trainer,
+            evaluator=evaluator,
+            fingerprint=fingerprint,
         )
 
     def make_trainer(
@@ -328,6 +288,9 @@ class MADQNBuilder:
             epsilon_decay=self._config.epsilon_decay,
         )
 
+        # Check if we should use fingerprints
+        fingerprint = True if self._replay_stabiliser_fn is not None else False
+
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
             agents=agents,
@@ -342,11 +305,12 @@ class MADQNBuilder:
             exploration_scheduler=exploration_scheduler,
             dataset=dataset,
             counter=counter,
+            fingerprint=fingerprint,
             logger=logger,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type: ignore
+        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type:ignore
 
         return trainer

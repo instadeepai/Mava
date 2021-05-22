@@ -96,7 +96,11 @@ class TestEnvWrapper:
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
         num_agents = len(wrapped_env.agents)
 
-        dm_env_timestep = wrapped_env.reset()
+        timestep = wrapped_env.reset()
+        if type(timestep) == tuple:
+            dm_env_timestep, env_extras = timestep
+        else:
+            dm_env_timestep = timestep
         props_which_should_not_be_none = [dm_env_timestep, dm_env_timestep.observation]
 
         assert helpers.verify_all_props_not_none(
@@ -241,7 +245,11 @@ class TestEnvWrapper:
         #  Get agent names from env
         agents = wrapped_env.agents
 
-        initial_dm_env_timestep = wrapped_env.reset()
+        timestep = wrapped_env.reset()
+        if type(timestep) == tuple:
+            initial_dm_env_timestep, env_extras = timestep
+        else:
+            initial_dm_env_timestep = timestep
         # Parallel env_types
         if env_spec.env_type == EnvType.Parallel:
             test_agents_actions = {

@@ -25,14 +25,15 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
-from mava.systems.tf.qmix import execution, training
+from mava.systems.tf.vdn import execution, training
 from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
 # TODO Clean up documentation
 
 
 @dataclasses.dataclass
-class QMIXConfig(MADQNConfig):
+class VDNConfig(MADQNConfig):
+    # TODO Match documentation with MADQNConfig once cleaned.
     """Configuration options for the QMIX system.
     Args:
             environment_spec: description of the actions, observations, etc.
@@ -51,8 +52,8 @@ class QMIXConfig(MADQNConfig):
             replay_table_name: string indicating what name to give the replay table."""
 
 
-class QMIXBuilder(MADQNBuilder):
-    """Builder for QMIX which constructs individual components of the system."""
+class VDNBuilder(MADQNBuilder):
+    """Builder for VDN which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an MARL system.
       Implementations of this interface contain a complete specification of a
@@ -63,9 +64,9 @@ class QMIXBuilder(MADQNBuilder):
 
     def __init__(
         self,
-        config: QMIXConfig,
-        trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
-        executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
+        config: VDNConfig,
+        trainer_fn: Type[training.VDNTrainer] = training.VDNTrainer,
+        executor_fn: Type[core.Executor] = execution.VDNFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
@@ -75,7 +76,7 @@ class QMIXBuilder(MADQNBuilder):
         _config: Configuration options for the QMIX system.
         _trainer_fn: Trainer module to use.
         """
-        super(QMIXBuilder, self).__init__(
+        super(VDNBuilder, self).__init__(
             config=config,
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,

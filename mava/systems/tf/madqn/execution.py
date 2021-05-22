@@ -15,9 +15,11 @@
 
 
 """Executor implementations for MADQN."""
+
 from typing import Any, Dict, Optional
 
 import dm_env
+import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme import types
@@ -44,10 +46,12 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         self,
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
+        trainer: MADQNTrainer,
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        trainer: MADQNTrainer = None,
+        fingerprint: bool = False,
+        evaluator: bool = False,
     ):
         """Initializes the executor.
         Args:
@@ -66,6 +70,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         self._action_selectors = action_selectors
         self._trainer = trainer
         self._shared_weights = shared_weights
+        self._fingerprint = fingerprint
+        self._evaluator = evaluator
 
     @tf.function
     def _policy(
@@ -74,6 +80,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         observation: types.NestedTensor,
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
+        fingerprint: Optional[tf.Tensor] = None,
     ) -> types.NestedTensor:
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
@@ -83,8 +90,12 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         # index network either on agent type or on agent id
         agent_key = agent.split("_")[0] if self._shared_weights else agent
 
-        # Compute the policy, conditioned on the observation.
-        q_values = self._q_networks[agent_key](batched_observation)
+        # Compute the policy, conditioned on the observation and
+        # possibly the fingerprint.
+        if fingerprint is not None:
+            q_values = self._q_networks[agent_key](batched_observation, fingerprint)
+        else:
+            q_values = self._q_networks[agent_key](batched_observation)
 
         # select legal action
         action = self._action_selectors[agent_key](
@@ -104,8 +115,29 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
 
+        if self._fingerprint and self._trainer is not None:
+            epsilon = self._trainer.get_epsilon()
+            trainer_step = self._trainer.get_trainer_steps()
+            fingerprint = np.array([epsilon, trainer_step])
+            extras.update({"fingerprint": fingerprint})
+
         if self._adder:
             self._adder.add_first(timestep, extras)
+
+    def observe(
+        self,
+        actions: Dict[str, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
+        next_extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
+        if self._fingerprint and self._trainer is not None:
+            trainer_step = self._trainer.get_trainer_steps()
+            epsilon = self._trainer.get_epsilon()
+            fingerprint = np.array([epsilon, trainer_step])
+            next_extras.update({"fingerprint": fingerprint})
+
+        if self._adder:
+            self._adder.add(actions, next_timestep, next_extras)
 
     def select_actions(
         self, observations: Dict[str, OLT]
@@ -113,15 +145,27 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         actions = {}
         for agent, observation in observations.items():
             # Pass the observation through the policy network.
-            if self._trainer is not None:
+            if not self._evaluator:
                 epsilon = self._trainer.get_epsilon()
             else:
                 epsilon = 0.0
 
             epsilon = tf.convert_to_tensor(epsilon)
 
+            if self._fingerprint:
+                trainer_step = self._trainer.get_trainer_steps()
+                fingerprint = tf.concat([epsilon, trainer_step], axis=0)
+                fingerprint = tf.expand_dims(fingerprint, axis=0)
+                fingerprint = tf.cast(fingerprint, "float32")
+            else:
+                fingerprint = None
+
             action = self._policy(
-                agent, observation.observation, observation.legal_actions, epsilon
+                agent,
+                observation.observation,
+                observation.legal_actions,
+                epsilon,
+                fingerprint,
             )
 
             actions[agent] = tf2_utils.to_numpy_squeeze(action)
@@ -151,6 +195,8 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
         trainer: MADQNTrainer = None,
+        evaluator: bool = False,
+        fingerprint: bool = False,
     ):
         """Initializes the executor.
         Args:

@@ -20,5 +20,6 @@ from mava.systems.tf.maddpg.training import (
     BaseMADDPGTrainer,
     CentralisedMADDPGTrainer,
     DecentralisedMADDPGTrainer,
+    NetworkedMADDPGTrainer,
     StateBasedMADDPGTrainer,
 )

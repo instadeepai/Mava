@@ -69,7 +69,7 @@ class CentralisedPolicyActor(DecentralisedPolicyActor):
         actor_obs_specs = {}
         for agent_key in self._actor_agent_keys:
             agent_type = agent_key.split("_")[0]
-            # Get observation and action spec for critic.
+            # Get observation spec for actor.
             actor_obs_specs[agent_key] = obs_specs_per_type[agent_type]
         return actor_obs_specs
 
@@ -98,7 +98,8 @@ class CentralisedValueCritic(DecentralisedValueActorCritic):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            critic_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            agent_key = agent_type if self._shared_weights else agents[0]
+            critic_obs_shape = list(copy.copy(self._embed_specs[agent_key].shape))
             critic_obs_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=critic_obs_shape,
@@ -141,7 +142,8 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            critic_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            agent_key = agent_type if self._shared_weights else agents[0]
+            critic_obs_shape = list(copy.copy(self._embed_specs[agent_key].shape))
             critic_obs_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=critic_obs_shape,

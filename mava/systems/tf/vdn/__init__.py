@@ -13,11 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Implementations of a VDN agent."""
 
-from mava.components.tf.networks.additive import AdditiveMixingNetwork
-from mava.components.tf.networks.dial import DIALPolicy
-from mava.components.tf.networks.epsilon_greedy import epsilon_greedy_action_selector
-from mava.components.tf.networks.fingerprints import ObservationNetworkWithFingerprint
-from mava.components.tf.networks.monotonic import MonotonicMixingNetwork
-from mava.components.tf.networks.transformed import QTranAlt, QTranBase
-from mava.components.tf.networks.weighted import WeightedMixing
+from mava.systems.tf.vdn.execution import VDNFeedForwardExecutor
+from mava.systems.tf.vdn.system import VDN
+from mava.systems.tf.vdn.training import VDNTrainer
