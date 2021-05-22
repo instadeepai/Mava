@@ -17,6 +17,7 @@
 from mava.components.tf.networks.additive import AdditiveMixingNetwork
 from mava.components.tf.networks.dial import DIALPolicy
 from mava.components.tf.networks.epsilon_greedy import epsilon_greedy_action_selector
+from mava.components.tf.networks.fingerprints import ObservationNetworkWithFingerprint
 from mava.components.tf.networks.monotonic import MonotonicMixingNetwork
 from mava.components.tf.networks.transformed import QTranAlt, QTranBase
 from mava.components.tf.networks.weighted import WeightedMixing

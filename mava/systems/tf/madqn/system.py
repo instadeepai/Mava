@@ -31,6 +31,7 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
@@ -87,6 +88,7 @@ class MADQN:
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
+        replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
         epsilon_min: float = 0.05,
         epsilon_decay: float = 1e-4,
         num_executors: int = 1,
@@ -178,6 +180,7 @@ class MADQN:
             executor_fn=executor_fn,
             extra_specs=extra_specs,
             exploration_scheduler_fn=exploration_scheduler_fn,
+            replay_stabilisation_fn=replay_stabilisation_fn,
         )
 
     def _get_extra_specs(self) -> Any:
@@ -223,11 +226,18 @@ class MADQN:
         )
 
         # Create system architecture with target networks.
-        system_networks = self._architecture(
+        architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        if self._builder._replay_stabiliser_fn is not None:
+            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
+                architecture
+            )
+
+        system_networks = architecture.create_system()
 
         # create logger
         trainer_logger_config = {}
@@ -263,11 +273,18 @@ class MADQN:
         )
 
         # Create system architecture with target networks.
-        system_networks = self._architecture(
+        architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        if self._builder._replay_stabiliser_fn is not None:
+            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
+                architecture
+            )
+
+        system_networks = architecture.create_system()
 
         # Create the executor.
         executor = self._builder.make_executor(
@@ -310,6 +327,7 @@ class MADQN:
         self,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
+        trainer: training.MADQNTrainer,
     ) -> Any:
         """The evaluation process."""
 
@@ -319,17 +337,26 @@ class MADQN:
         )
 
         # Create system architecture with target networks.
-        system_networks = self._architecture(
+        architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
             shared_weights=self._shared_weights,
-        ).create_system()
+        )
+
+        if self._builder._replay_stabiliser_fn is not None:
+            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
+                architecture
+            )
+
+        system_networks = architecture.create_system()
 
         # Create the agent.
         executor = self._builder.make_executor(
             q_networks=system_networks["values"],
             action_selectors=networks["action_selectors"],
             variable_source=variable_source,
+            trainer=trainer,
+            evaluator=True,
         )
 
         # Make the environment.
@@ -375,7 +402,7 @@ class MADQN:
             trainer = program.add_node(lp.CourierNode(self.trainer, replay, counter))
 
         with program.group("evaluator"):
-            program.add_node(lp.CourierNode(self.evaluator, trainer, counter))
+            program.add_node(lp.CourierNode(self.evaluator, trainer, counter, trainer))
 
         if not self._num_caches:
             # Use the trainer as a single variable source.
