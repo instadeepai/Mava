@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import functools
-from typing import Any, Callable, Dict, Type, Union
+from typing import Any, Callable, Dict, List, Type, Union
 
 import acme
 import dm_env
@@ -89,6 +89,7 @@ class MADDPG:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        connection_spec: Callable[[Dict[str, List[str]]], Dict[str, List[str]]] = None,
     ):
         """Initialize the system.
         Args:
@@ -160,6 +161,13 @@ class MADDPG:
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
 
+        if connection_spec:
+            self._connection_spec = connection_spec(  # type: ignore
+                environment_spec.get_agents_by_type()
+            )
+        else:
+            self._connection_spec = None  # type: ignore
+
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
         else:
@@ -207,8 +215,7 @@ class MADDPG:
                     networks["policies"][agent_type].initial_state(1)
                 ),
             )
-        extras = {"core_states": core_state_specs}
-        return extras
+        return {"core_states": core_state_specs}
 
     def replay(self) -> Any:
         """The replay storage."""
@@ -223,7 +230,7 @@ class MADDPG:
         )
 
     def coordinator(self, counter: counting.Counter) -> Any:
-        return lp_utils.StepsLimiter(counter, self._max_executor_steps)  # type: ignore
+        return lp_utils.StepsLimiter(counter, self._max_executor_steps)
 
     def trainer(
         self,
@@ -234,26 +241,30 @@ class MADDPG:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # create logger
         trainer_logger_config = {}
-        if self._logger_config:
-            if "trainer" in self._logger_config:
-                trainer_logger_config = self._logger_config["trainer"]
+        if self._logger_config and "trainer" in self._logger_config:
+            trainer_logger_config = self._logger_config["trainer"]
         trainer_logger = self._logger_factory(  # type: ignore
             "trainer", **trainer_logger_config
         )
 
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "shared_weights": self._shared_weights,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
         # Create system architecture with target networks.
-        system_networks = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
-        ).create_system()
+        system_networks = self._architecture(**architecture_config).create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
@@ -263,6 +274,7 @@ class MADDPG:
             dataset=dataset,
             counter=counter,
             logger=trainer_logger,
+            connection_spec=self._connection_spec,
         )
 
     def executor(
@@ -276,17 +288,22 @@ class MADDPG:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "shared_weights": self._shared_weights,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
         # Create system architecture with target networks.
-        system = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
-        )
+        system = self._architecture(**architecture_config)
 
         # create variables
         _ = system.create_system()
@@ -310,9 +327,8 @@ class MADDPG:
 
         # Create executor logger
         executor_logger_config = {}
-        if self._logger_config:
-            if "executor" in self._logger_config:
-                executor_logger_config = self._logger_config["executor"]
+        if self._logger_config and "executor" in self._logger_config:
+            executor_logger_config = self._logger_config["executor"]
         exec_logger = self._logger_factory(  # type: ignore
             f"executor_{executor_id}", **executor_logger_config
         )
@@ -340,17 +356,22 @@ class MADDPG:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "shared_weights": self._shared_weights,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
         # Create system architecture with target networks.
-        system = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
-        )
+        system = self._architecture(**architecture_config)
 
         # create variables
         _ = system.create_system()
@@ -370,9 +391,8 @@ class MADDPG:
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
         evaluator_logger_config = {}
-        if self._logger_config:
-            if "evaluator" in self._logger_config:
-                evaluator_logger_config = self._logger_config["evaluator"]
+        if self._logger_config and "evaluator" in self._logger_config:
+            evaluator_logger_config = self._logger_config["evaluator"]
         eval_logger = self._logger_factory(  # type: ignore
             "evaluator", **evaluator_logger_config
         )

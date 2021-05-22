@@ -118,12 +118,12 @@ class Logger(MavaLogger):
                 loggers.CSVLogger(
                     directory_or_file=self._path("csv"), label=self._label
                 )
-            ]  # type: ignore
+            ]
 
         if to_tensorboard:
             logger += [
                 TFSummaryLogger(logdir=self._path("tensorboard"), label=self._label)
-            ]  # type: ignore
+            ]
 
         if external_logger:
             logger += [
