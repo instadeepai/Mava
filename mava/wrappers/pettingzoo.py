@@ -218,7 +218,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
                 self._environment, env_preprocess_wrappers
             )
 
-    def reset(self) -> dm_env.TimeStep:
+    def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
         """Resets the episode."""
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
