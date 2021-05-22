@@ -1,5 +1,5 @@
 """Generic executor implementations, using TensorFlow and Sonnet."""
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import dm_env
 import sonnet as snt
@@ -69,7 +69,7 @@ class FeedForwardExecutor(core.Executor):
 
     def select_action(
         self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
+    ) -> Union[types.NestedArray, Tuple[types.NestedArray, types.NestedArray]]:
         # Pass the observation through the policy network.
         action = self._policy(agent, observation.observation)
 
@@ -99,7 +99,10 @@ class FeedForwardExecutor(core.Executor):
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
+    ) -> Union[
+        Dict[str, types.NestedArray],
+        Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
+    ]:
         actions = {}
         for agent, observation in observations.items():
             # Pass the observation through the policy network.

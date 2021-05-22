@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import dm_env
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -26,8 +25,8 @@ from acme import types
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
-from mava import adders, core
-from mava.systems import executors
+from mava import adders
+from mava.systems.tf import executors
 
 tfd = tfp.distributions
 
@@ -63,7 +62,9 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
         self._variable_client = variable_client
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights
-    @tf.function
+
+    # TODO: Add this back in
+    # @tf.function
     def _policy(
         self, agent: str, observation: types.NestedTensor
     ) -> types.NestedTensor:
@@ -78,34 +79,34 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
         policy = self._policy_networks[agent_key](batched_observation)
 
         # Sample from the policy if it is stochastic.
-        action = tf.math.argmax(policy)
+        action = tf.math.argmax(policy, axis=1)
 
         return action, policy
 
     def select_action(
         self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
+    ) -> Tuple[types.NestedArray, types.NestedArray]:
 
         # Step the recurrent policy/value network forward
         # given the current observation and state.
-        action, policy = self._policy(agent, observation)
+        action, policy = self._policy(agent, observation.observation)
 
         # Return a numpy array with squeezed out batch dimension.
         action = tf2_utils.to_numpy_squeeze(action)
-        return [action, policy]
+        policy = tf2_utils.to_numpy_squeeze(policy)
+        return action, policy
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
+    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
 
         actions = {}
         policies = {}
         for agent, observation in observations.items():
             action, policy = self.select_action(agent, observation)
-            actions[agent] = action[0]
+            actions[agent] = action
             policies[agent] = policy
-
-        return [actions, policies]
+        return actions, policies
 
     def observe_first(
         self,
@@ -114,25 +115,16 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
     ) -> None:
 
         if self._adder:
-
-            # Generate dummy policy values to send through
-            self._adder.add_first(timestep)
+            self._adder.add_first(timestep, extras)
 
     def observe(
         self,
-        actions: Dict[str, types.NestedArray],
+        actions: Union[
+            Dict[str, types.NestedArray], List[Dict[str, types.NestedArray]]
+        ],
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-
-        if not self._adder:
-            return
-
-        self.adder.next_extras.update({"policy_out": self._policy_outputs})
-        next_extras = tf2_utils.to_numpy_squeeze(next_extras)
-
-        self._adder.add(actions, next_timestep, next_extras)
-
-    def update(self, wait: bool = False) -> None:
-        if self._variable_client:
-            self._variable_client.update(wait)
+        if self._adder:
+            env_actions, policy = actions
+            self._adder.add(policy, next_timestep, next_extras)  # type: ignore

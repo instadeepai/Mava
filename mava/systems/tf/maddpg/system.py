@@ -247,8 +247,11 @@ class MADDPG:
         )
 
         # Create system architecture with target networks.
+        adder_env_spec = self._builder.convert_discrete_to_bounded(
+            self._environment_spec
+        )
         system_networks = self._architecture(
-            environment_spec=self._environment_spec,
+            environment_spec=adder_env_spec,
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
