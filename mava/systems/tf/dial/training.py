@@ -176,38 +176,7 @@ class DIALTrainer(mava.Trainer):
             if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                 for src, dest in zip(online_variables, target_variables):
                     dest.assign(src)
-            self._num_steps.assign_add(1)
-
-    @tf.function
-    def _policy_actions_messages(
-        self,
-        target_obs_trans: Dict[str, np.ndarray],
-        target_core_state: Dict[str, np.ndarray],
-        target_core_message: Dict[str, np.ndarray],
-    ) -> Any:
-        actions = {}
-        messages = {}
-
-        for agent in self._agents:
-            time.time()
-            agent_key = self.agent_net_keys[agent]
-            target_trans_obs = target_obs_trans[agent]
-            # TODO (dries): Why is there an extra tuple
-            #  wrapping that needs to be removed?
-            agent_core_state = target_core_state[agent][0]
-            agent_core_message = target_core_message[agent][0]
-
-            transposed_obs = tf2_utils.batch_to_sequence(target_trans_obs)
-
-            (output_actions, output_messages), _ = snt.static_unroll(
-                self._target_policy_networks[agent_key],
-                transposed_obs,
-                agent_core_state,
-                agent_core_message,
-            )
-            actions[agent] = tf2_utils.batch_to_sequence(output_actions)
-            messages[agent] = tf2_utils.batch_to_sequence(output_messages)
-        return actions, messages
+        self._num_steps.assign_add(1)
 
     def _step(self) -> Dict[str, Dict[str, Any]]:
         # Update the target networks
@@ -373,13 +342,13 @@ class DIALTrainer(mava.Trainer):
                     # d_theta = d_theta + d_Q_t_a ^ 2
                     policy_losses[agent_id] += td_action ** 2
 
-                    # Communication grads
-                    td_comm = y_message - tf.gather(
-                        policy["messages"][t - 1][agent_id],
-                        tf.argmax(message, axis=-1),
-                        batch_dims=1,
-                    )
-                    policy_losses[agent_id] += td_comm ** 2
+                    # Communication grads for RIAL
+                    # td_comm = y_message - tf.gather(
+                    #     policy["messages"][t - 1][agent_id],
+                    #     tf.argmax(message, axis=-1),
+                    #     batch_dims=1,
+                    # )
+                    # policy_losses[agent_id] += td_comm ** 2
 
             # Average over batches
             for key in policy_losses.keys():
