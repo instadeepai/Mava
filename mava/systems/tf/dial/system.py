@@ -30,14 +30,17 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
-from mava.components.tf.modules.communication import BaseCommunicationModule
+from mava.components.tf.modules.communication import (
+    BaseCommunicationModule,
+    BroadcastedCommunication,
+)
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
-from mava.systems.tf.dial import builder, training
-from mava.systems.tf.madqn import execution
+from mava.systems.tf.dial import builder
+from mava.systems.tf.madqn import execution, training
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
@@ -83,8 +86,10 @@ class DIAL:
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
-        trainer_fn: Type[training.DIALTrainer] = training.DIALTrainer,
-        communication_module: Type[BaseCommunicationModule] = None,
+        trainer_fn: Type[
+            training.RecurrentCommMADQNTrainer
+        ] = training.RecurrentCommMADQNTrainer,
+        communication_module: Type[BaseCommunicationModule] = BroadcastedCommunication,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
@@ -289,7 +294,7 @@ class DIAL:
         replay: reverb.Client,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        trainer: Optional[training.DIALTrainer] = None,
+        trainer: Optional[training.RecurrentCommMADQNTrainer] = None,
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
 
@@ -364,7 +369,7 @@ class DIAL:
         self,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        trainer: training.DIALTrainer,
+        trainer: training.RecurrentCommMADQNTrainer,
     ) -> Any:
         """The evaluation process."""
 

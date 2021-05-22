@@ -31,8 +31,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 )
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf import executors
-from mava.systems.tf.dial import training
-from mava.systems.tf.madqn import execution
+from mava.systems.tf.madqn import execution, training
 
 
 @dataclasses.dataclass
@@ -89,7 +88,9 @@ class DIALBuilder:
     def __init__(
         self,
         config: DIALConfig,
-        trainer_fn: Type[training.DIALTrainer] = training.DIALTrainer,
+        trainer_fn: Type[
+            training.RecurrentCommMADQNTrainer
+        ] = training.RecurrentCommMADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNRecurrentCommExecutor,
         extra_specs: Dict[str, Any] = {},
         exploration_scheduler_fn: Type[
@@ -218,10 +219,10 @@ class DIALBuilder:
         self,
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, Any],
+        communication_module: BaseCommunicationModule,
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
-        trainer: Optional[training.DIALTrainer] = None,
-        communication_module: Optional[BaseCommunicationModule] = None,
+        trainer: Optional[training.RecurrentCommMADQNTrainer] = None,
         evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
@@ -274,9 +275,9 @@ class DIALBuilder:
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
+        communication_module: BaseCommunicationModule,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        communication_module: Optional[BaseCommunicationModule] = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
