@@ -52,6 +52,7 @@ class MADQNTrainer(mava.Trainer):
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
         clipping: bool = True,
+        fingerprint: bool = False,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -75,6 +76,7 @@ class MADQNTrainer(mava.Trainer):
         # Other learner parameters.
         self._discount = discount
         self._clipping = clipping
+        self._fingerprint = fingerprint
 
         # Necessary to track when to update target networks.
         self._num_steps = tf.Variable(0, dtype=tf.int32)
@@ -135,6 +137,9 @@ class MADQNTrainer(mava.Trainer):
 
     def get_epsilon(self) -> float:
         return self._exploration_scheduler.get_epsilon()
+
+    def get_trainer_steps(self) -> float:
+        return self._num_steps.numpy()
 
     def _decrement_epsilon(self) -> None:
         self._exploration_scheduler.decrement_epsilon()
@@ -224,8 +229,7 @@ class MADQNTrainer(mava.Trainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data that the agents persist in replay.
-        o_tm1, a_tm1, _, r_t, d_t, o_t, _ = inputs.data
-
+        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
         with tf.GradientTape(persistent=True) as tape:
             q_network_losses: Dict[str, NestedArray] = {}
 
@@ -244,12 +248,31 @@ class MADQNTrainer(mava.Trainer):
                     o_tm1, o_t, a_tm1, agent
                 )
 
-                # Q-network learning
-                q_tm1 = self._q_networks[agent_key](o_tm1_feed)
-                q_t = self._target_q_networks[agent_key](o_t_feed)
+                if self._fingerprint:
+                    f_tm1 = e_tm1["fingerprint"]
+                    f_tm1 = tf.convert_to_tensor(f_tm1)
+                    f_tm1 = tf.cast(f_tm1, "float32")
 
-                loss, _ = trfl.qlearning(
-                    q_tm1, a_tm1_feed, r_t[agent], discount * d_t[agent], q_t
+                    f_t = e_t["fingerprint"]
+                    f_t = tf.convert_to_tensor(f_t)
+                    f_t = tf.cast(f_t, "float32")
+
+                    q_tm1 = self._q_networks[agent_key](o_tm1_feed, f_tm1)
+                    q_t_value = self._target_q_networks[agent_key](o_t_feed, f_t)
+                    q_t_selector = self._q_networks[agent_key](o_t_feed, f_t)
+                else:
+                    q_tm1 = self._q_networks[agent_key](o_tm1_feed)
+                    q_t_value = self._target_q_networks[agent_key](o_t_feed)
+                    q_t_selector = self._q_networks[agent_key](o_t_feed)
+
+                # Q-network learning
+                loss, _ = trfl.double_qlearning(
+                    q_tm1,
+                    a_tm1_feed,
+                    r_t[agent],
+                    discount * d_t[agent],
+                    q_t_value,
+                    q_t_selector,
                 )
 
                 loss = tf.reduce_mean(loss)
@@ -312,6 +335,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
         clipping: bool = True,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
+        fingerprint: bool = False,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
@@ -329,6 +353,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
             clipping=clipping,
             counter=counter,
             logger=logger,
+            fingerprint=fingerprint,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
         )
