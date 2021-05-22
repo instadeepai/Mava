@@ -308,8 +308,6 @@ class RecurrentExecutorWithComms(RecurrentExecutor):
         self._policy_networks = policy_networks
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}
-        self._prev_states: Dict[str, Any] = {}
-        self._prev_messages: Dict[str, Any] = {}
         self._store_recurrent_state = store_recurrent_state
         self._communication_module = communication_module
         self._shared_weights = shared_weights
@@ -371,14 +369,20 @@ class RecurrentExecutorWithComms(RecurrentExecutor):
 
         if self._adder is not None:
             numpy_states = {
-                agent: {
-                    "state": tf2_utils.to_numpy_squeeze(_state),
-                    "message": tf2_utils.to_numpy_squeeze(self._messages[agent]),
-                }
+                agent: tf2_utils.to_numpy_squeeze(_state)
                 for agent, _state in self._states.items()
             }
+            numpy_messages = {
+                agent: tf2_utils.to_numpy_squeeze(_message)
+                for agent, _message in self._messages.items()
+            }
             if extras is not None:
-                extras.update({"core_states": numpy_states})
+                extras.update(
+                    {
+                        "core_states": numpy_states,
+                        "core_messages": numpy_messages,
+                    }
+                )
                 self._adder.add_first(timestep, extras)
             else:
                 raise NotImplementedError("Why is extras None?")
@@ -400,17 +404,28 @@ class RecurrentExecutorWithComms(RecurrentExecutor):
             return
 
         numpy_states = {
-            agent: {
-                "state": tf2_utils.to_numpy_squeeze(_state),
-                "message": tf2_utils.to_numpy_squeeze(self._messages[agent]),
-            }
+            agent: tf2_utils.to_numpy_squeeze(_state)
             for agent, _state in self._states.items()
         }
+        numpy_messages = {
+            agent: tf2_utils.to_numpy_squeeze(_message)
+            for agent, _message in self._messages.items()
+        }
+
         if next_extras:
-            next_extras.update({"core_states": numpy_states})
+            next_extras.update(
+                {
+                    "core_states": numpy_states,
+                    "core_messages": numpy_messages,
+                }
+            )
             self._adder.add(actions, next_timestep, next_extras)
         else:
-            self._adder.add(actions, next_timestep, numpy_states)
+            next_extras = {
+                "core_states": numpy_states,
+                "core_messages": numpy_messages,
+            }
+            self._adder.add(actions, next_timestep, next_extras)
 
     def select_action(
         self,
