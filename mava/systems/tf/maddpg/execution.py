@@ -127,4 +127,5 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
     ) -> None:
         if self._adder:
             env_actions, policy = actions
+            # TODO (dries): Sort out this mypy issue.
             self._adder.add(policy, next_timestep, next_extras)  # type: ignore
