@@ -14,6 +14,10 @@
 # limitations under the License.
 
 """Implementations of a MAD4PG agent."""
+from mava.systems.tf.mad4pg.execution import (
+    MAD4PGFeedForwardExecutor,
+    MAD4PGRecurrentExecutor,
+)
 from mava.systems.tf.mad4pg.system import MAD4PG
 from mava.systems.tf.mad4pg.training import (
     BaseMAD4PGTrainer,
@@ -21,5 +25,3 @@ from mava.systems.tf.mad4pg.training import (
     DecentralisedMAD4PGTrainer,
     StateBasedMAD4PGTrainer,
 )
-from mava.systems.tf.mad4pg.execution import (MAD4PGFeedForwardExecutor,
-                                              MAD4PGRecurrentExecutor)

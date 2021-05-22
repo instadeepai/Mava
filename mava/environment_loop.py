@@ -282,7 +282,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             actions = self._get_actions(timestep)
 
             if type(actions) == tuple:
-                # Return other extra action information like the policy information as well
+                # Return other action information
+                # e.g. the policy information.
                 env_actions, _ = actions
             else:
                 env_actions = actions

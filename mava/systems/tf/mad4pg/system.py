@@ -24,8 +24,8 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
-from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.mad4pg import training
+from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.maddpg.system import MADDPG
 from mava.utils.loggers import MavaLogger
 

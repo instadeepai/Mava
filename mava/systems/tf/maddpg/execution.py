@@ -20,18 +20,20 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
 from acme import types
-from dm_env import specs
-Array = specs.Array
-BoundedArray = specs.BoundedArray
-DiscreteArray = specs.DiscreteArray
+from acme.specs import EnvironmentSpec
 
 # Internal imports.
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
+from dm_env import specs
 
 from mava import adders
 from mava.systems.tf import executors
-from acme.specs import EnvironmentSpec
+
+Array = specs.Array
+BoundedArray = specs.BoundedArray
+DiscreteArray = specs.DiscreteArray
+
 tfd = tfp.distributions
 
 
@@ -141,12 +143,13 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             # TODO (dries): Sort out this mypy issue.
             self._adder.add(policy, next_timestep, next_extras)  # type: ignore
 
+
 class MADDPGRecurrentExecutor(executors.FeedForwardExecutor):
     def __init__(
-            self,
-            policy_networks: Dict[str, snt.Module],
-            adder: Optional[adders.ParallelAdder] = None,
-            variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-            shared_weights: bool = True,
+        self,
+        policy_networks: Dict[str, snt.Module],
+        adder: Optional[adders.ParallelAdder] = None,
+        variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        shared_weights: bool = True,
     ):
         raise NotImplementedError
