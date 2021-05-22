@@ -31,6 +31,7 @@ from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
+from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
 
 BoundedArray = dm_specs.BoundedArray
@@ -107,7 +108,7 @@ class MADDPGBuilder(SystemBuilder):
             Type[training.BaseMADDPGTrainer],
             Type[training.BaseRecurrentMADDPGTrainer],
         ] = training.DecentralisedMADDPGTrainer,
-        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):
         """Args:
@@ -287,6 +288,7 @@ class MADDPGBuilder(SystemBuilder):
         # Create the actor which defines how we take actions.
         return self._executor_fn(
             policy_networks=policy_networks,
+            agent_specs=self._config.environment_spec.get_agent_specs(),
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,

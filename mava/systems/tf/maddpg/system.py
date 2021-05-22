@@ -32,12 +32,12 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
+from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.maddpg import builder, training
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
-
 
 class MADDPG:
     """MADDPG system.
@@ -59,7 +59,7 @@ class MADDPG:
             Type[training.BaseMADDPGTrainer],
             Type[training.BaseRecurrentMADDPGTrainer],
         ] = training.DecentralisedMADDPGTrainer,
-        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,

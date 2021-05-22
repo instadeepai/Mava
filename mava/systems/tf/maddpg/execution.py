@@ -20,6 +20,10 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
 from acme import types
+from dm_env import specs
+Array = specs.Array
+BoundedArray = specs.BoundedArray
+DiscreteArray = specs.DiscreteArray
 
 # Internal imports.
 from acme.tf import utils as tf2_utils
@@ -27,11 +31,11 @@ from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
 from mava.systems.tf import executors
-
+from acme.specs import EnvironmentSpec
 tfd = tfp.distributions
 
 
-class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
+class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
     """A feed-forward executor for discrete actions in MADDPG.
     An executor based on a feed-forward policy for each agent in the system
     which takes non-batched observations and outputs non-batched actions.
@@ -42,6 +46,7 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],
+        agent_specs: Dict[str, EnvironmentSpec],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         shared_weights: bool = True,
@@ -61,10 +66,10 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
         self._adder = adder
         self._variable_client = variable_client
         self._policy_networks = policy_networks
+        self._agent_specs = agent_specs
         self._shared_weights = shared_weights
 
-    # TODO: Add this back in
-    # @tf.function
+    @tf.function
     def _policy(
         self, agent: str, observation: types.NestedTensor
     ) -> types.NestedTensor:
@@ -78,8 +83,14 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
         # Compute the policy, conditioned on the observation.
         policy = self._policy_networks[agent_key](batched_observation)
 
-        # Sample from the policy if it is stochastic.
-        action = tf.math.argmax(policy, axis=1)
+        # TODO (dries): Make this support hybrid action spaces.
+        if type(self._agent_specs[agent].actions) == BoundedArray:
+            # Continuous action
+            action = policy
+        elif type(self._agent_specs[agent].actions) == DiscreteArray:
+            action = tf.math.argmax(policy, axis=1)
+        else:
+            raise NotImplementedError
 
         return action, policy
 
@@ -129,3 +140,13 @@ class MADDPGDiscreteFeedForwardExecutor(executors.FeedForwardExecutor):
             env_actions, policy = actions
             # TODO (dries): Sort out this mypy issue.
             self._adder.add(policy, next_timestep, next_extras)  # type: ignore
+
+class MADDPGRecurrentExecutor(executors.FeedForwardExecutor):
+    def __init__(
+            self,
+            policy_networks: Dict[str, snt.Module],
+            adder: Optional[adders.ParallelAdder] = None,
+            variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+            shared_weights: bool = True,
+    ):
+        raise NotImplementedError

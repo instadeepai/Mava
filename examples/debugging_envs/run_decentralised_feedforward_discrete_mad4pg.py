@@ -31,7 +31,6 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 from mava import specs as mava_specs
 from mava.components.tf.networks.mad4pg import DiscreteValuedHead
 from mava.systems.tf import mad4pg
-from mava.systems.tf.mad4pg.execution import MAD4PGDiscreteFeedForwardExecutor
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -183,7 +182,6 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        executor_fn=MAD4PGDiscreteFeedForwardExecutor,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
