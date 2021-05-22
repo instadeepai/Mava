@@ -37,10 +37,11 @@ class VDNFeedForwardExecutor(MADQNFeedForwardExecutor):
         self,
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
+        trainer: MADQNTrainer,
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        trainer: MADQNTrainer = None,
+        evaluator: bool = False,
     ):
         """Initializes the executor.
         Args:
@@ -58,4 +59,5 @@ class VDNFeedForwardExecutor(MADQNFeedForwardExecutor):
             adder=adder,
             variable_client=variable_client,
             trainer=trainer,
+            evaluator=evaluator,
         )
