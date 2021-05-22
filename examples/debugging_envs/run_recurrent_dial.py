@@ -36,7 +36,7 @@ from mava.components.tf.networks import (
 )
 from mava.systems.tf import dial
 from mava.systems.tf.dial.execution import DIALExecutor
-from mava.systems.tf.madqn.training import RecurrentCommMADQNTrainer
+from mava.systems.tf.dial.training import DIALTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -159,7 +159,7 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=RecurrentCommMADQNTrainer,
+        trainer_fn=DIALTrainer,
         executor_fn=DIALExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
         communication_module=BroadcastedCommunication,
