@@ -15,16 +15,14 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Mapping, Optional
 
 import launchpad as lp
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from absl import app, flags
 from acme import types
-from acme.wrappers.gym_wrapper import _convert_to_spec
-from gym import spaces
+from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
@@ -32,7 +30,10 @@ from mava.components.tf.modules.communication.broadcasted import (
     BroadcastedCommunication,
 )
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.components.tf.networks import DIALPolicy, epsilon_greedy_action_selector
+from mava.components.tf.networks import (
+    CommunicationNetwork,
+    epsilon_greedy_action_selector,
+)
 from mava.systems.tf import madqn
 from mava.systems.tf.madqn.execution import MADQNRecurrentCommExecutor
 from mava.systems.tf.madqn.training import RecurrentCommMADQNTrainer
@@ -62,11 +63,7 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        512,
-        512,
-        256,
-    ),
+    message_size: int = 10,
     shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -77,9 +74,6 @@ def make_networks(
     if shared_weights:
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
-
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
     def action_selector_fn(
         q_values: types.NestedTensor,
@@ -95,34 +89,31 @@ def make_networks(
     for key in specs.keys():
 
         # Get total number of action dimensions from action spec.
-        # num_dimensions = specs[key].actions.num_values
+        num_dimensions = specs[key].actions.num_values
 
-        # Create the policy network.
-        # q_network = snt.DeepRNN(
-        #     [
-        #         networks.LayerNormMLP(
-        #             q_networks_layer_sizes[key], activate_final=False
-        #         ),
-        #         snt.LSTM(25),
-        #         snt.nets.MLP([128]),
-        #         networks.NearZeroInitializedLinear(num_dimensions),
-        #     ]
-        # )
-
-        q_network = DIALPolicy(
-            action_spec=specs[key].actions,
-            message_spec=_convert_to_spec(
-                spaces.Box(-np.inf, np.inf, (10,), dtype=np.float32)
+        q_network = CommunicationNetwork(
+            networks.LayerNormMLP(
+                (128,),
+                activate_final=True,
             ),
-            gru_hidden_size=256,
-            gru_layers=2,
-            task_mlp_size=(
-                256,
-                256,
+            networks.LayerNormMLP(
+                (128,),
+                activate_final=True,
             ),
-            message_in_mlp_size=(256,),
-            message_out_mlp_size=(256,),
-            output_mlp_size=(256,),
+            snt.LSTM(128),
+            snt.Sequential(
+                [
+                    networks.LayerNormMLP((128,), activate_final=True),
+                    networks.NearZeroInitializedLinear(num_dimensions),
+                    networks.TanhToSpec(specs[key].actions),
+                ]
+            ),
+            snt.Sequential(
+                [
+                    networks.LayerNormMLP((128, message_size), activate_final=True),
+                ]
+            ),
+            message_size=message_size,
         )
 
         # epsilon greedy action selector
