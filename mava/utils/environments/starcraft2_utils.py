@@ -15,31 +15,27 @@
 
 """Starcraft 2 environment factory."""
 
-import importlib
-from typing import Any, List, Optional, Union
+from typing import Any, Optional
 
 import dm_env
-import numpy as np
-
 from smac.env import StarCraft2Env
-from mava.wrappers import ParallelEnvWrapper, SMACEnvWrapper
+
+from mava.wrappers import SMACEnvWrapper
 
 
 def make_environment(
     evaluation: bool = False,
-    map_name="3m",
+    map_name: str = "3m",
     random_seed: Optional[int] = None,
     **kwargs: Any,
 ) -> dm_env.Environment:
-    """Wraps an Pettingzoo environment.
+    """Wraps an starcraft 2 environment.
 
     Args:
-        env_class: str, class of the environment, e.g. MPE or Atari.
-        env_name: str, name of environment, .e.g simple_spread or Pong.
-        evaluation: bool, to change the behaviour during evaluation.
+        map_name: str, name of micromanagement level.
 
     Returns:
-        A Pettingzoo environment wrapped as a DeepMind environment.
+        A starcraft 2 smac environment wrapped as a DeepMind environment.
     """
     del evaluation
 

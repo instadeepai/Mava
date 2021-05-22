@@ -17,8 +17,8 @@
 # Documentation available at smac/blob/master/docs/smac.md
 
 """Wraps a StarCraft II MARL environment (SMAC) as a dm_env environment."""
-import random
-from typing import Any, Dict, List, Optional, Tuple, Type
+
+from typing import Any, Dict, List, Tuple, Type
 
 import dm_env
 import numpy as np
@@ -39,16 +39,16 @@ class SMACEnvWrapper(ParallelEnvWrapper):
     Based on RLlib wrapper provided by SMAC.
     """
 
-    def __init__(self, **smac_args: Optional[Tuple]) -> None:
+    def __init__(self, environment: StarCraft2Env) -> None:
         """Create a new multi-agent StarCraft env compatible with RLlib.
         Arguments:
             smac_args (dict): Arguments to pass to the underlying
                 smac.env.starcraft.StarCraft2Env instance.
         """
-        self._environment = StarCraft2Env(**smac_args)
+        self._environment = environment
 
         self._reset_next_step = True
-        self._ready_agents: List = []
+        self._agents: List = []
         self.observation_space = Dict(
             {
                 "observation": Box(-1, 1, shape=(self._env.get_obs_size(),)),
@@ -71,32 +71,32 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
         # Convert observations
         observe: Dict[str, np.ndarray] = {}
-        self.possible_agents = []
+        self._possible_agents = []
         for i, obs in enumerate(obs_list):
             agent = f"agent_{i}"
             observe[agent] = {
-                "action_mask": np.array(self._env.get_avail_agent_actions(i)),
                 "observation": obs,
+                "action_mask": np.array(self._env.get_avail_agent_actions(i)),
             }
-            self.possible_agents.append(agent)
+            self._possible_agents.append(agent)
         observations = self._convert_observations(
-            observe, {agent: False for agent in self.possible_agents}
+            observe, {agent: False for agent in self._possible_agents}
         )
 
-        self._ready_agents = list(range(len(obs_list)))
+        self._agents = list(range(len(obs_list)))
 
         # create discount spec
         discount_spec = self.discount_spec()
         self._discounts = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
-            for agent in self._environment.possible_agents
+            for agent in self._possible_agents
         }
 
         # create rewards spec
         rewards_spec = self.reward_spec()
         rewards = {
             agent: convert_np_type(rewards_spec[agent].dtype, 0)
-            for agent in self.possible_agents
+            for agent in self._possible_agents
         }
 
         # dm_env timestep
@@ -133,37 +133,38 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         #     )
 
         actions_feed = list(actions.values())
-        reward, terminated, info = self._env.step(actions_feed)
+        reward, terminated, info = self._environment.step(actions_feed)
         obs_list = self._environment.get_obs()
         state = self._environment.get_state()
         self._env_done = terminated
 
-        observations = {}
+        observe = {}
+        rewards = {}
+        dones = {}
         for i, obs in enumerate(obs_list):
-            observations[f"agent_{i}"] = {
-                "action_mask": self._env.get_avail_agent_actions(i),
+            agent = f"agent_{i}"
+            observe[agent] = {
                 "observation": obs,
+                "action_mask": np.array(self._env.get_avail_agent_actions(i)),
             }
-        rewards = {agent: reward for agent in actions.keys()}
-        dones = {agent: terminated for agent in actions.keys()}
+            rewards[agent] = reward
+            dones[agent] = terminated
 
-        # self._ready_agents = list(range(len(obs_list)))
-
+        observations = self._convert_observations(observe, dones)
+        self._agents = list(range(len(obs_list)))
         rewards_spec = self.reward_spec()
+
         #  Handle empty rewards
         if not rewards:
             rewards = {
                 agent: convert_np_type(rewards_spec[agent].dtype, 0)
-                for agent in self.possible_agents
+                for agent in self._possible_agents
             }
         else:
             rewards = {
                 agent: convert_np_type(rewards_spec[agent].dtype, reward)
                 for agent, reward in rewards.items()
             }
-
-        if observations:
-            observations = self._convert_observations(observations, dones)
 
         if self.env_done():
             self._step_type = dm_env.StepType.LAST
@@ -214,22 +215,22 @@ class SMACEnvWrapper(ParallelEnvWrapper):
                 legal_actions=_convert_to_spec(self.observation_space["action_mask"]),
                 terminal=specs.Array((1,), np.float32),
             )
-            for agent in self.possible_agents
+            for agent in self._possible_agents
         }
 
     def action_spec(self) -> Dict[str, specs.DiscreteArray]:
         return {
             agent: _convert_to_spec(self._environment.action_space)
-            for agent in self.possible_agents
+            for agent in self._possible_agents
         }
 
     def reward_spec(self) -> Dict[str, specs.Array]:
-        return {agent: specs.Array((), np.float32) for agent in self.possible_agents}
+        return {agent: specs.Array((), np.float32) for agent in self._possible_agents}
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
         return {
             agent: specs.BoundedArray((), np.float32, minimum=0, maximum=1.0)
-            for agent in self.possible_agents
+            for agent in self._possible_agents
         }
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
@@ -237,7 +238,11 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     @property
     def agents(self) -> List:
-        return self._environment.agents
+        return self._agents
+
+    @property
+    def possible_agents(self) -> List:
+        return self._possible_agents
 
     @property
     def environment(self) -> ParallelEnv:
