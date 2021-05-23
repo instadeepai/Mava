@@ -241,7 +241,6 @@ class BaseMASACTrainer(mava.Trainer):
 
     @tf.function
     def _update_target_networks(self) -> None:
-        assert 0.0 < self._target_update_rate < 1.0
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (
@@ -265,6 +264,7 @@ class BaseMASACTrainer(mava.Trainer):
                         )
                     )
             elif self._target_averaging:
+                assert 0.0 < self._target_update_rate < 1.0
                 tau = self._target_update_rate
                 for src, dest in zip(online_variables, target_variables):
                     dest.assign(dest * (1.0 - tau) + src * tau)
