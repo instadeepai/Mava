@@ -17,7 +17,7 @@
 """MASAC trainer implementation."""
 import os
 import time
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import reverb
@@ -52,7 +52,9 @@ class BaseMASACTrainer(mava.Trainer):
         discount: float,
         tau: float,
         temperature: float,
+        target_averaging: bool,
         target_update_period: int,
+        target_update_rate: float,
         policy_update_frequency: int,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
@@ -63,7 +65,7 @@ class BaseMASACTrainer(mava.Trainer):
         critic_V_optimizer: snt.Optimizer = None,
         critic_Q_1_optimizer: snt.Optimizer = None,
         critic_Q_2_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -103,6 +105,7 @@ class BaseMASACTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
+        self._checkpoint = checkpoint
 
         # Store online and target networks.
         self._policy_networks = policy_networks
@@ -133,16 +136,22 @@ class BaseMASACTrainer(mava.Trainer):
 
         # Other learner parameters.
         self._discount = discount
-        self._clipping = clipping
+
+        # Set up gradient clipping.
+        if max_gradient_norm is not None:
+            self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        else:  # A very large number. Infinity results in NaNs.
+            self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
         self._num_steps = tf.Variable(0, dtype=tf.int32)
+        self._target_averaging = target_averaging
         self._target_update_period = target_update_period
+        self._target_update_rate = target_update_rate
         self._soft_target_update = soft_target_update
         self._tau = tau
 
         # Create an iterator to go through the dataset.
-        # TODO(b/155086959): Fix type stubs and remove.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         # Create optimizers if they aren't given.
@@ -225,14 +234,14 @@ class BaseMASACTrainer(mava.Trainer):
                     subdirectory=subdir,
                 )
                 self._system_checkpointer[agent_key] = checkpointer
-
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.
-        self._timestamp = None
+        self._timestamp: Optional[float] = None
 
     @tf.function
     def _update_target_networks(self) -> None:
+        assert 0.0 < self._target_update_rate < 1.0
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (
@@ -255,6 +264,10 @@ class BaseMASACTrainer(mava.Trainer):
                             tf.math.multiply(dest, 1.0 - self._tau),
                         )
                     )
+            elif self._target_averaging:
+                tau = self._target_update_rate
+                for src, dest in zip(online_variables, target_variables):
+                    dest.assign(dest * (1.0 - tau) + src * tau)
             else:
                 if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                     for src, dest in zip(online_variables, target_variables):
@@ -278,18 +291,6 @@ class BaseMASACTrainer(mava.Trainer):
             # evaluated at o_t, this also means the policy loss does not influence
             # the observation network training.
             o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
-
-            # TODO (dries): Why is there a stop gradient here? The target
-            #  will not be updated unless included into the
-            #  policy_variables or critic_variables sets.
-            #  One reason might be that it helps with preventing the observation
-            #  network from being updated from the policy_loss.
-            #  But why would we want that? Don't we want both the critic
-            #  and policy to update the observation network?
-            #  Or is it bad to have two optimisation processes optimising
-            #  the same set of weights? But the
-            #  StateBasedActorCritic will then not work as the critic
-            #  is not dependent on the behavior networks.
         return o_tm1, o_t
 
     @tf.function
@@ -311,7 +312,7 @@ class BaseMASACTrainer(mava.Trainer):
         a_t_feed = tf.stack([x for x in a_t.values()], 1)
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
-    @tf.function
+    # @tf.function
     def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         log_probs = {}
@@ -324,11 +325,7 @@ class BaseMASACTrainer(mava.Trainer):
         # self.log_probs = log_probs
         return actions, log_probs
 
-    # NOTE (Arnu): the decorator below was causing this _step() function not
-    # to be called by the step() function below. Removing it makes the code
-    # work. The docs on tf.function says it is useful for speed improvements
-    # but as far as I can see, we can go ahead without it. At least for now.
-    # @tf.function
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -473,13 +470,10 @@ class BaseMASACTrainer(mava.Trainer):
             )
 
             # Compute gradients.
-            # TODO: Address warning. WARNING:tensorflow:Calling GradientTape.gradient
+            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
             #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context (it causes the gradient ops to be
-            #  recorded on the tape, leading to increased CPU and memory usage).
-            #  Only call GradientTape.gradient inside the context if you actually want
-            #  to trace the gradient in order to compute higher order derivatives.
-            #  to trace the gradient in order to compute higher order derivatives.
+            #  than calling it outside the context." caused by losses.dpg, which calls
+            #  tape.gradient.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
             critic_V_gradients = tape.gradient(
                 critic_V_losses[agent], critic_V_variables
@@ -492,15 +486,18 @@ class BaseMASACTrainer(mava.Trainer):
             )
 
             # Maybe clip gradients.
-            if self._clipping:
-                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
-                critic_V_gradients = tf.clip_by_global_norm(critic_V_gradients, 40.0)[0]
-                critic_Q_1_gradients = tf.clip_by_global_norm(
-                    critic_Q_1_gradients, 40.0
-                )[0]
-                critic_Q_2_gradients = tf.clip_by_global_norm(
-                    critic_Q_2_gradients, 40.0
-                )[0]
+            policy_gradients = tf.clip_by_global_norm(
+                policy_gradients, self._max_gradient_norm
+            )[0]
+            critic_V_gradients = tf.clip_by_global_norm(
+                critic_V_gradients, self._max_gradient_norm
+            )[0]
+            critic_Q_1_gradients = tf.clip_by_global_norm(
+                critic_Q_1_gradients, self._max_gradient_norm
+            )[0]
+            critic_Q_2_gradients = tf.clip_by_global_norm(
+                critic_Q_2_gradients, self._max_gradient_norm
+            )[0]
 
             # Apply gradients.
             self._policy_optimizer.apply(policy_gradients, policy_variables)
@@ -515,32 +512,29 @@ class BaseMASACTrainer(mava.Trainer):
 
         # Compute elapsed time.
         timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp = timestamp
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        # Checkpoint the networks.
-        if len(self._system_checkpointer.keys()) > 0:
-            for agent_key in self.unique_net_keys:
-                checkpointer = self._system_checkpointer[agent_key]
-                checkpointer.save()
+        # Checkpoint and attempt to write the logs.
+        if self._checkpoint:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
-        self._logger.write(fetches)
+        if self._logger:
+            self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
-            variables[network_type] = {}
-            for agent in self.unique_net_keys:
-                variables[network_type][agent] = tf2_utils.to_numpy(
+            variables[network_type] = {
+                agent: tf2_utils.to_numpy(
                     self._system_network_variables[network_type][agent]
                 )
+                for agent in self.unique_net_keys
+            }
         return variables
 
 
@@ -563,7 +557,9 @@ class CentralisedMASACTrainer(BaseMASACTrainer):
         discount: float,
         tau: float,
         temperature: float,
+        target_averaging: bool,
         target_update_period: int,
+        target_update_rate: float,
         policy_update_frequency: int,
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
@@ -574,7 +570,7 @@ class CentralisedMASACTrainer(BaseMASACTrainer):
         critic_V_optimizer: snt.Optimizer = None,
         critic_Q_1_optimizer: snt.Optimizer = None,
         critic_Q_2_optimizer: snt.Optimizer = None,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -623,7 +619,9 @@ class CentralisedMASACTrainer(BaseMASACTrainer):
             discount=discount,
             tau=tau,
             temperature=temperature,
+            target_averaging=target_averaging,
             target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
             policy_update_frequency=policy_update_frequency,
             dataset=dataset,
             observation_networks=observation_networks,
@@ -634,7 +632,7 @@ class CentralisedMASACTrainer(BaseMASACTrainer):
             critic_V_optimizer=critic_V_optimizer,
             critic_Q_1_optimizer=critic_Q_1_optimizer,
             critic_Q_2_optimizer=critic_Q_2_optimizer,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,

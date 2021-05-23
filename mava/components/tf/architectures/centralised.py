@@ -350,3 +350,9 @@ class CentralisedSoftQValueActorCritic(  # type: ignore
             critic_Q_2_networks=critic_Q_2_networks,
             shared_weights=shared_weights,
         )
+
+    def create_behaviour_policy(self) -> Dict[str, snt.Module]:
+        behaviour_policy_networks: Dict[str, snt.Module] = {}
+        for agent_key in self._actor_agent_keys:
+            behaviour_policy_networks[agent_key] = self._policy_networks[agent_key]
+        return behaviour_policy_networks

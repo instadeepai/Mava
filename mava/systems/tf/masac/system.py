@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """MASAC system implementation."""
-import copy
-from typing import Any, Callable, Dict, Tuple, Type, Union
+import functools
+from typing import Any, Callable, Dict, List, Type, Union
 
 import acme
 import dm_env
@@ -34,8 +34,9 @@ from mava.components.tf.architectures import CentralisedSoftQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.masac import builder, training
+from mava.systems.tf.masac.execution import MASACFeedForwardExecutor
 from mava.utils import lp_utils
-from mava.utils.loggers import MavaLogger
+from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
 
 
@@ -51,14 +52,14 @@ class MASAC:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
-        log_info: Tuple,
+        logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[
             CentralisedSoftQValueActorCritic
         ] = CentralisedSoftQValueActorCritic,
         trainer_fn: Union[
             Type[training.BaseMASACTrainer],
         ] = training.CentralisedMASACTrainer,
-        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executor_fn: Type[core.Executor] = MASACFeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -72,6 +73,8 @@ class MASAC:
         batch_size: int = 256,
         prefetch_size: int = 4,
         target_update_period: int = 100,
+        target_averaging: bool = False,
+        target_update_rate: float = 0.01,
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
         samples_per_insert: float = 32.0,
@@ -83,18 +86,16 @@ class MASAC:
         sequence_length: int = 20,
         period: int = 20,
         sigma: float = 0.3,
-        clipping: bool = True,
-        log_every: float = 10.0,
+        max_gradient_norm: float = None,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        trainer_logger: MavaLogger = None,
-        exec_logger: MavaLogger = None,
-        eval_logger: MavaLogger = None,
+        logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        connection_spec: Callable[[Dict[str, List[str]]], Dict[str, List[str]]] = None,
     ):
         """Initialize the system.
         Args:
@@ -138,27 +139,40 @@ class MASAC:
                 environment_factory(evaluation=False)  # type: ignore
             )
 
+        # set default logger if no logger provided
+        if not logger_factory:
+            logger_factory = functools.partial(
+                logger_utils.make_logger,
+                directory="~/mava",
+                to_terminal=True,
+                time_delta=10,
+            )
+
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
-        self._log_info = log_info
+        self._logger_factory = logger_factory
         self._environment_spec = environment_spec
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
-        self._log_every = log_every
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
-        self._trainer_logger = trainer_logger
-        self._exec_logger = exec_logger
-        self._eval_logger = eval_logger
+        self._logger_config = logger_config
         self._train_loop_fn = train_loop_fn
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
 
-        if executor_fn == executors.RecurrentExecutor:
+        if connection_spec:
+            self._connection_spec = connection_spec(  # type: ignore
+                environment_spec.get_agents_by_type()
+            )
+        else:
+            self._connection_spec = None  # type: ignore
+
+        if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
         else:
             extra_specs = {}
@@ -174,7 +188,9 @@ class MASAC:
                 soft_target_update=soft_target_update,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
+                target_averaging=target_averaging,
                 target_update_period=target_update_period,
+                target_update_rate=target_update_rate,
                 executor_variable_update_period=executor_variable_update_period,
                 min_replay_size=min_replay_size,
                 max_replay_size=max_replay_size,
@@ -183,7 +199,7 @@ class MASAC:
                 sequence_length=sequence_length,
                 period=period,
                 sigma=sigma,
-                clipping=clipping,
+                max_gradient_norm=max_gradient_norm,
                 policy_optimizer=policy_optimizer,
                 critic_V_optimizer=critic_V_optimizer,
                 critic_Q_1_optimizer=critic_Q_1_optimizer,
@@ -209,8 +225,7 @@ class MASAC:
                     networks["policies"][agent_type].initial_state(1)
                 ),
             )
-        extras = {"core_states": core_state_specs}
-        return extras
+        return {"core_states": core_state_specs}
 
     def replay(self) -> Any:
         """The replay storage."""
@@ -225,7 +240,7 @@ class MASAC:
         )
 
     def coordinator(self, counter: counting.Counter) -> Any:
-        return lp_utils.StepsLimiter(counter, self._max_executor_steps)  # type: ignore
+        return lp_utils.StepsLimiter(counter, self._max_executor_steps)
 
     def trainer(
         self,
@@ -239,16 +254,33 @@ class MASAC:
             environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
+        # create logger
+        trainer_logger_config = {}
+        if self._logger_config and "trainer" in self._logger_config:
+            trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory(  # type: ignore
+            "trainer", **trainer_logger_config
+        )
+
         # Create system architecture with target networks.
-        system_networks = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_V_networks=networks["critics_V"],
-            critic_Q_1_networks=networks["critics_Q_1"],
-            critic_Q_2_networks=networks["critics_Q_2"],
-            shared_weights=self._shared_weights,
-        ).create_system()
+        adder_env_spec = self._builder.convert_discrete_to_bounded(
+            self._environment_spec
+        )
+
+        # architecture args
+        architecture_config = {
+            "environment_spec": adder_env_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_V_networks": networks["critics_V"],
+            "critic_Q_1_networks": networks["critics_Q_1"],
+            "critic_Q_2_networks": networks["critics_Q_2"],
+            "shared_weights": self._shared_weights,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
+        system_networks = self._architecture(**architecture_config).create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
@@ -257,7 +289,8 @@ class MASAC:
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            logger=self._trainer_logger,
+            logger=trainer_logger,
+            connection_spec=self._connection_spec,
         )
 
     def executor(
@@ -271,23 +304,34 @@ class MASAC:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_V_networks": networks["critics_V"],
+            "critic_Q_1_networks": networks["critics_Q_1"],
+            "critic_Q_2_networks": networks["critics_Q_2"],
+            "shared_weights": self._shared_weights,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_V_networks=networks["critics_V"],
-            critic_Q_1_networks=networks["critics_Q_1"],
-            critic_Q_2_networks=networks["critics_Q_2"],
-            shared_weights=self._shared_weights,
-        ).create_system()
+        system = self._architecture(**architecture_config)
+
+        # create variables
+        _ = system.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the executor.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
         )
@@ -299,11 +343,13 @@ class MASAC:
         # Create logger and counter; actors will not spam bigtable.
         counter = counting.Counter(counter, "executor")
 
-        # Update label to include exec id
-        exec_logger = None
-        if self._exec_logger:
-            exec_logger = copy.deepcopy(self._exec_logger)
-            exec_logger._label = f"{exec_logger._label}_{executor_id}"  # type: ignore
+        # Create executor logger
+        executor_logger_config = {}
+        if self._logger_config and "executor" in self._logger_config:
+            executor_logger_config = self._logger_config["executor"]
+        exec_logger = self._logger_factory(  # type: ignore
+            f"executor_{executor_id}", **executor_logger_config
+        )
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
@@ -328,23 +374,34 @@ class MASAC:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_V_networks": networks["critics_V"],
+            "critic_Q_1_networks": networks["critics_Q_1"],
+            "critic_Q_2_networks": networks["critics_Q_2"],
+            "shared_weights": self._shared_weights,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
         # Create system architecture with target networks.
-        executor_networks = self._architecture(
-            environment_spec=self._environment_spec,
-            observation_networks=networks["observations"],
-            policy_networks=networks["policies"],
-            critic_V_networks=networks["critics_V"],
-            critic_Q_1_networks=networks["critics_Q_1"],
-            critic_Q_2_networks=networks["critics_Q_2"],
-            shared_weights=self._shared_weights,
-        ).create_system()
+        system = self._architecture(**architecture_config)
+
+        # create variables
+        _ = system.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the agent.
         executor = self._builder.make_executor(
-            policy_networks=executor_networks["policies"],
+            policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
         )
 
@@ -353,14 +410,20 @@ class MASAC:
 
         # Create logger and counter.
         counter = counting.Counter(counter, "evaluator")
+        evaluator_logger_config = {}
+        if self._logger_config and "evaluator" in self._logger_config:
+            evaluator_logger_config = self._logger_config["evaluator"]
+        eval_logger = self._logger_factory(  # type: ignore
+            "evaluator", **evaluator_logger_config
+        )
 
         # Create the run loop and return it.
         # Create the loop to connect environment and executor.
-        eval_loop = ParallelEnvironmentLoop(
+        eval_loop = self._eval_loop_fn(
             environment,
             executor,
             counter=counter,
-            logger=self._eval_logger,
+            logger=eval_logger,
             **self._eval_loop_fn_kwargs,
         )
 

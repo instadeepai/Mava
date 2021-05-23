@@ -14,21 +14,28 @@
 # limitations under the License.
 
 """MASAC system implementation."""
+import copy
 import dataclasses
 from typing import Any, Dict, Iterator, List, Optional, Type
 
 import reverb
 import sonnet as snt
 from acme import datasets
+from acme.specs import EnvironmentSpec
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
+from dm_env import specs as dm_specs
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.masac import training
+from mava.systems.tf.masac.execution import MASACFeedForwardExecutor
 from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsSoftActorCritic
+
+BoundedArray = dm_specs.BoundedArray
+DiscreteArray = dm_specs.DiscreteArray
 
 
 @dataclasses.dataclass
@@ -78,6 +85,8 @@ class MASACConfig:
     batch_size: int = 256
     prefetch_size: int = 4
     target_update_period: int = 100
+    target_averaging: bool = False
+    target_update_rate: float = 0.01
     executor_variable_update_period: int = 1000
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
@@ -85,8 +94,8 @@ class MASACConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
+    max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
-    clipping: bool = True
     logger: loggers.Logger = None
     counter: counting.Counter = None
     checkpoint: bool = True
@@ -108,7 +117,7 @@ class MASACBuilder(SystemBuilder):
         self,
         config: MASACConfig,
         trainer_fn: Type[training.BaseMASACTrainer] = training.CentralisedMASACTrainer,
-        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executor_fn: Type[core.Executor] = MASACFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):
         """Args:
@@ -125,20 +134,49 @@ class MASACBuilder(SystemBuilder):
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
 
+    def convert_discrete_to_bounded(
+        self, environment_spec: specs.MAEnvironmentSpec
+    ) -> specs.MAEnvironmentSpec:
+        env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
+        keys = env_adder_spec._keys
+        for key in keys:
+            agent_spec = env_adder_spec._specs[key]
+            if type(agent_spec.actions) == DiscreteArray:
+                num_actions = agent_spec.actions.num_values
+                minimum = [float("-inf")] * num_actions
+                maximum = [float("inf")] * num_actions
+                new_act_spec = BoundedArray(
+                    shape=(num_actions,),
+                    minimum=minimum,
+                    maximum=maximum,
+                    dtype="float32",
+                    name="actions",
+                )
+
+                env_adder_spec._specs[key] = EnvironmentSpec(
+                    observations=agent_spec.observations,
+                    actions=new_act_spec,
+                    rewards=agent_spec.rewards,
+                    discounts=agent_spec.discounts,
+                )
+        return env_adder_spec
+
     def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
         """Create tables to insert data into."""
 
+        env_adder_spec = self.convert_discrete_to_bounded(environment_spec)
+
         # Select adder
-        if self._executor_fn == executors.FeedForwardExecutor:
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec, self._extra_specs
+                env_adder_spec, self._extra_specs
             )
-        elif self._executor_fn == executors.RecurrentExecutor:
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder_sig = reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec, self._extra_specs
+                env_adder_spec, self._extra_specs
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
@@ -200,23 +238,22 @@ class MASACBuilder(SystemBuilder):
         """
 
         # Select adder
-        if self._executor_fn == executors.FeedForwardExecutor:
+        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=None,
                 client=replay_client,
                 n_step=self._config.n_step,
                 discount=self._config.discount,
             )
-        elif self._executor_fn == executors.RecurrentExecutor:
+        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder = reverb_adders.ParallelSequenceAdder(
-                priority_fns=None,  # {self._config.replay_table_name: lambda x: 1.0},
+                priority_fns=None,
                 client=replay_client,
                 sequence_length=self._config.sequence_length,
                 period=self._config.period,
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
-
         return adder
 
     def make_executor(
@@ -248,14 +285,8 @@ class MASACBuilder(SystemBuilder):
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policy": variables},
-                update_period=1000,
+                update_period=self._config.executor_variable_update_period,
             )
-
-            # Update variables
-            # TODO: Is this needed? Probably not because
-            #  in acme they only update policy.variables.
-            # for agent in agent_keys:
-            #     policy_networks[agent].variables = variables[agent]
 
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
@@ -264,6 +295,7 @@ class MASACBuilder(SystemBuilder):
         # Create the actor which defines how we take actions.
         return self._executor_fn(
             policy_networks=policy_networks,
+            agent_specs=self._config.environment_spec.get_agent_specs(),
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
@@ -276,6 +308,7 @@ class MASACBuilder(SystemBuilder):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
+        connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -292,44 +325,53 @@ class MASACBuilder(SystemBuilder):
         agents = self._agents
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
-        clipping = self._config.clipping
+        max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         tau = self._config.tau
         temperature = self._config.temperature
         policy_update_frequency = self._config.policy_update_frequency
         soft_target_update = self._config.soft_target_update
         target_update_period = self._config.target_update_period
+        target_averaging = self._config.target_averaging
+        target_update_rate = self._config.target_update_rate
+
+        # trainer args
+        trainer_config = {
+            "agents": agents,
+            "agent_types": agent_types,
+            "policy_networks": networks["policies"],
+            "critic_V_networks": networks["critics_V"],
+            "critic_Q_1_networks": networks["critics_Q_1"],
+            "critic_Q_2_networks": networks["critics_Q_2"],
+            "observation_networks": networks["observations"],
+            "target_policy_networks": networks["target_policies"],
+            "target_critic_V_networks": networks["target_critics_V"],
+            "target_observation_networks": networks["target_observations"],
+            "shared_weights": shared_weights,
+            "policy_optimizer": self._config.policy_optimizer,
+            "critic_V_optimizer": self._config.critic_V_optimizer,
+            "critic_Q_1_optimizer": self._config.critic_Q_1_optimizer,
+            "critic_Q_2_optimizer": self._config.critic_Q_2_optimizer,
+            "max_gradient_norm": max_gradient_norm,
+            "discount": discount,
+            "tau": tau,
+            "temperature": temperature,
+            "soft_target_update": soft_target_update,
+            "target_averaging": target_averaging,
+            "target_update_period": target_update_period,
+            "target_update_rate": target_update_rate,
+            "policy_update_frequency": policy_update_frequency,
+            "dataset": dataset,
+            "counter": counter,
+            "logger": logger,
+            "checkpoint": self._config.checkpoint,
+            "checkpoint_subpath": self._config.checkpoint_subpath,
+        }
+        if connection_spec:
+            trainer_config["connection_spec"] = connection_spec
 
         # The learner updates the parameters (and initializes them).
-        trainer = self._trainer_fn(
-            agents=agents,
-            agent_types=agent_types,
-            policy_networks=networks["policies"],
-            critic_Q_1_networks=networks["critics_Q_1"],
-            critic_Q_2_networks=networks["critics_Q_2"],
-            critic_V_networks=networks["critics_V"],
-            observation_networks=networks["observations"],
-            target_policy_networks=networks["target_policies"],
-            target_critic_V_networks=networks["target_critics_V"],
-            target_observation_networks=networks["target_observations"],
-            discount=discount,
-            tau=tau,
-            temperature=temperature,
-            target_update_period=target_update_period,
-            policy_update_frequency=policy_update_frequency,
-            dataset=dataset,
-            soft_target_update=soft_target_update,
-            shared_weights=shared_weights,
-            policy_optimizer=self._config.policy_optimizer,
-            critic_V_optimizer=self._config.critic_V_optimizer,
-            critic_Q_1_optimizer=self._config.critic_Q_1_optimizer,
-            critic_Q_2_optimizer=self._config.critic_Q_2_optimizer,
-            clipping=clipping,
-            counter=counter,
-            logger=logger,
-            checkpoint=self._config.checkpoint,
-            checkpoint_subpath=self._config.checkpoint_subpath,
-        )
+        trainer = self._trainer_fn(**trainer_config)
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.
         # NetworkStatistics needs to appear before TrainerStatistics.

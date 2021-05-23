@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for MASAC."""
+"""Example running MASAC on pettinzoo MPE environments."""
 
 import functools
+from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import launchpad as lp
@@ -23,16 +24,35 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
+from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
-import mava
 from mava import specs as mava_specs
+from mava.components.tf.architectures import CentralisedSoftQValueActorCritic
 from mava.systems.tf import masac
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
+
+FLAGS = flags.FLAGS
+flags.DEFINE_string(
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "continuous",
+    "Environment action space type (str).",
+)
+flags.DEFINE_string(
+    "mava_id",
+    str(datetime.now()),
+    "Experiment identifier that can be used to continue experiments.",
+)
+flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 class ActorNetwork(snt.Module):
@@ -90,17 +110,17 @@ def make_networks(
         256,
         256,
     ),
-    critic_networks_V_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+    critic_V_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         512,
         512,
         256,
     ),
-    critic_networks_Q_1_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+    critic_Q_1_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         512,
         512,
         256,
     ),
-    critic_networks_Q_2_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+    critic_Q_2_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         512,
         512,
         256,
@@ -120,17 +140,17 @@ def make_networks(
         policy_networks_layer_sizes = {
             key: policy_networks_layer_sizes for key in specs.keys()
         }
-    if isinstance(critic_networks_V_layer_sizes, Sequence):
-        critic_networks_V_layer_sizes = {
-            key: critic_networks_V_layer_sizes for key in specs.keys()
+    if isinstance(critic_V_networks_layer_sizes, Sequence):
+        critic_V_networks_layer_sizes = {
+            key: critic_V_networks_layer_sizes for key in specs.keys()
         }
-    if isinstance(critic_networks_Q_1_layer_sizes, Sequence):
-        critic_networks_Q_1_layer_sizes = {
-            key: critic_networks_Q_1_layer_sizes for key in specs.keys()
+    if isinstance(critic_Q_1_networks_layer_sizes, Sequence):
+        critic_Q_1_networks_layer_sizes = {
+            key: critic_Q_1_networks_layer_sizes for key in specs.keys()
         }
-    if isinstance(critic_networks_Q_2_layer_sizes, Sequence):
-        critic_networks_Q_2_layer_sizes = {
-            key: critic_networks_Q_2_layer_sizes for key in specs.keys()
+    if isinstance(critic_Q_2_networks_layer_sizes, Sequence):
+        critic_Q_2_networks_layer_sizes = {
+            key: critic_Q_2_networks_layer_sizes for key in specs.keys()
         }
 
     observation_networks = {}
@@ -156,7 +176,7 @@ def make_networks(
             [
                 # The multiplexer concatenates the observations/actions.
                 networks.LayerNormMLP(
-                    critic_networks_V_layer_sizes[key], activate_final=False
+                    critic_V_networks_layer_sizes[key], activate_final=False
                 ),
                 snt.Linear(1),
             ]
@@ -168,7 +188,7 @@ def make_networks(
                 # The multiplexer concatenates the observations/actions.
                 networks.CriticMultiplexer(),
                 networks.LayerNormMLP(
-                    critic_networks_Q_1_layer_sizes[key], activate_final=False
+                    critic_Q_1_networks_layer_sizes[key], activate_final=False
                 ),
                 snt.Linear(1),
             ]
@@ -180,7 +200,7 @@ def make_networks(
                 # The multiplexer concatenates the observations/actions.
                 networks.CriticMultiplexer(),
                 networks.LayerNormMLP(
-                    critic_networks_Q_2_layer_sizes[key], activate_final=False
+                    critic_Q_2_networks_layer_sizes[key], activate_final=False
                 ),
                 snt.Linear(1),
             ]
@@ -200,68 +220,81 @@ def make_networks(
     }
 
 
-class TestMASAC:
-    """Simple integration/smoke test for MASAC."""
+def main(_: Any) -> None:
 
-    def test_masac_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
+    # environment
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+    )
 
-        # set loggers info
-        # TODO Allow for no checkpointing and no loggers to be
-        # passed in.
-        mava_id = "tests/maddpg"
-        base_dir = "~/mava"
+    # networks
+    network_factory = lp_utils.partial_kwargs(make_networks)
 
-        # environment
-        environment_factory = functools.partial(
-            debugging_utils.make_environment,
-            env_name="simple_spread",
-            action_space="continuous",
-        )
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-        # networks
-        network_factory = lp_utils.partial_kwargs(make_networks)
+    # loggers
+    # set custom logger config for each process
+    # -- log trainer,executor and evaluator to TF
+    # -- log only evaluator to terminal
+    log_every = 10
+    logger_config = {
+        "trainer": {
+            "directory": FLAGS.base_dir,
+            "to_terminal": False,
+            "to_tensorboard": True,
+            "time_stamp": FLAGS.mava_id,
+            "time_delta": log_every,
+        },
+        "executor": {
+            "directory": FLAGS.base_dir,
+            "to_terminal": False,
+            "to_tensorboard": True,
+            "time_stamp": FLAGS.mava_id,
+            "time_delta": log_every,
+        },
+        "evaluator": {
+            "directory": FLAGS.base_dir,
+            "to_terminal": True,
+            "to_tensorboard": True,
+            "time_stamp": FLAGS.mava_id,
+            "time_delta": log_every,
+        },
+    }
 
-        # system
-        checkpoint_dir = f"{base_dir}/{mava_id}"
+    # distributed program
+    program = masac.MASAC(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        logger_config=logger_config,
+        architecture=CentralisedSoftQValueActorCritic,
+        num_executors=2,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_V_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_Q_1_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_Q_2_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        checkpoint_subpath=checkpoint_dir,
+        max_gradient_norm=40.0,
+        trainer_fn=masac.CentralisedMASACTrainer,
+    ).build()
 
-        # system
-        system = masac.MASAC(
-            environment_factory=environment_factory,
-            network_factory=network_factory,
-            num_executors=2,
-            batch_size=32,
-            min_replay_size=32,
-            max_replay_size=1000,
-            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-            critic_V_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-            critic_Q_1_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-            critic_Q_2_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-            checkpoint=False,
-            checkpoint_subpath=checkpoint_dir,
-        )
-        program = system.build()
+    # launch
+    gpu_id = -1
+    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+    local_resources = {
+        "trainer": [],
+        "evaluator": PythonProcess(env=env_vars),
+        "executor": PythonProcess(env=env_vars),
+    }
+    lp.launch(
+        program,
+        lp.LaunchType.LOCAL_MULTI_PROCESSING,
+        terminal="current_terminal",
+        local_resources=local_resources,
+    )
 
-        (trainer_node,) = program.groups["trainer"]
-        trainer_node.disable_run()
 
-        # Launch gpu config - don't use gpu
-        gpu_id = -1
-        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
-        local_resources = {
-            "trainer": PythonProcess(env=env_vars),
-            "evaluator": PythonProcess(env=env_vars),
-            "executor": PythonProcess(env=env_vars),
-        }
-
-        lp.launch(
-            program,
-            launch_type="test_mt",
-            local_resources=local_resources,
-        )
-
-        trainer: mava.Trainer = trainer_node.create_handle().dereference()
-
-        for _ in range(5):
-            trainer.step()
+if __name__ == "__main__":
+    app.run(main)

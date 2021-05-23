@@ -18,6 +18,7 @@ DOCKER_RUN_TENSORBOARD=docker run $(RUN_FLAGS_TENSORBOARD) $(IMAGE)
 # Set example to run when using `make run`
 MADDPG=examples/debugging_envs/run_decentralised_feedforward_maddpg.py
 MAPPO=examples/debugging_envs/run_decentralised_feedforward_mappo.py
+MASAC=examples/debugging_envs/run_centralised_feedforward_masac.py
 MADQN=examples/debugging_envs/run_feedforward_madqn.py
 QMIX=examples/debugging_envs/run_feedforward_qmix.py
 VDN=examples/debugging_envs/run_feedforward_vdn.py

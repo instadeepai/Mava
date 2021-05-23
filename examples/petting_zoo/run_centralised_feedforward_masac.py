@@ -31,13 +31,13 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf.architectures import CentralisedSoftQValueActorCritic
 from mava.systems.tf import masac
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
-from mava.utils.loggers import Logger
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
-
 flags.DEFINE_string(
     "env_class",
     "sisl",
@@ -170,7 +170,7 @@ def make_networks(
 
         # Create the policy network.
         policy_network = ActorNetwork(
-            256, 256, num_dimensions, 1e-6, observation_network
+            256, 256, num_dimensions, 0.3, observation_network
         )
 
         # Create the critic network.
@@ -224,9 +224,7 @@ def make_networks(
 
 def main(_: Any) -> None:
 
-    # set loggers info
-    log_info = (FLAGS.base_dir, f"{FLAGS.mava_id}/logs")
-
+    # environment
     environment_factory = functools.partial(
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
@@ -234,13 +232,16 @@ def main(_: Any) -> None:
         remove_on_fall=False,
     )
 
+    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+
+    # loggers
     log_every = 10
-    trainer_logger = Logger(
-        label="system_trainer",
+    logger_factory = functools.partial(
+        logger_utils.make_logger,
         directory=FLAGS.base_dir,
         to_terminal=True,
         to_tensorboard=True,
@@ -248,41 +249,23 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    exec_logger = Logger(
-        # _{executor_id} gets appended to label in system.
-        label="train_loop_executor",
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
-    eval_logger = Logger(
-        label="eval_loop",
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
+    # distributed program
     program = masac.MASAC(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
+        architecture=CentralisedSoftQValueActorCritic,
         num_executors=2,
-        log_info=log_info,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_V_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_Q_1_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_Q_2_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        trainer_logger=trainer_logger,
-        exec_logger=exec_logger,
-        eval_logger=eval_logger,
+        max_gradient_norm=40.0,
+        trainer_fn=masac.CentralisedMASACTrainer,
     ).build()
 
-    # Launch gpu config - let trainer use gpu.
+    # launch
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
@@ -290,7 +273,6 @@ def main(_: Any) -> None:
         "evaluator": PythonProcess(env=env_vars),
         "executor": PythonProcess(env=env_vars),
     }
-
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
