@@ -21,11 +21,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
+          pip install --upgrade pip setuptools
           export PIP_DEFAULT_TIMEOUT=100
           # Ensure encoding consistency
           export LC_ALL=en_US.UTF-8
           export LANG=en_US.UTF-8
-          # pip install --upgrade pip setuptools
+          # Mava dependencies
           pip install .
           pip install .[flatland]
           pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
