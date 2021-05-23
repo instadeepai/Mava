@@ -37,7 +37,7 @@ jobs:
           # Open CV and Headless screen.
           sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
           # SC2
-          sudo apt-get -y install git
+          sudo apt-get install git -y
           pip install git+https://github.com/oxwhirl/smac.git
       - name: Format code
         run: |
