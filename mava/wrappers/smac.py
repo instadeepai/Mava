@@ -241,7 +241,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         return {}
 
-    def seed(self, random_seed):
+    def seed(self, random_seed: int) -> None:
         self._environment._seed = random_seed
 
     @property

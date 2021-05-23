@@ -15,7 +15,7 @@
 
 """Starcraft 2 environment factory."""
 
-from typing import Any, Optional, Dict
+from typing import Any, Dict, Optional
 
 import dm_env
 from smac.env import StarCraft2Env
