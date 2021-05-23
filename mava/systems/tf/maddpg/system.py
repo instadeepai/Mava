@@ -34,6 +34,7 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.maddpg import builder, training
+from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
@@ -59,7 +60,7 @@ class MADDPG:
             Type[training.BaseMADDPGTrainer],
             Type[training.BaseRecurrentMADDPGTrainer],
         ] = training.DecentralisedMADDPGTrainer,
-        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -252,9 +253,14 @@ class MADDPG:
             "trainer", **trainer_logger_config
         )
 
+        # Create system architecture with target networks.
+        adder_env_spec = self._builder.convert_discrete_to_bounded(
+            self._environment_spec
+        )
+
         # architecture args
         architecture_config = {
-            "environment_spec": self._environment_spec,
+            "environment_spec": adder_env_spec,
             "observation_networks": networks["observations"],
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
@@ -263,7 +269,6 @@ class MADDPG:
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
 
-        # Create system architecture with target networks.
         system_networks = self._architecture(**architecture_config).create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
