@@ -84,7 +84,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
             observe, {agent: False for agent in self._possible_agents}
         )
 
-        self._agents = list(range(len(obs_list)))
+        self._agents = list(observe.keys())
 
         # create discount spec
         discount_spec = self.discount_spec()
@@ -152,7 +152,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
             dones[agent] = terminated
 
         observations = self._convert_observations(observe, dones)
-        self._agents = list(range(len(obs_list)))
+        self._agents = list(observe.keys())
         rewards_spec = self.reward_spec()
 
         #  Handle empty rewards
