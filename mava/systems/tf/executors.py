@@ -1,5 +1,5 @@
 """Generic executor implementations, using TensorFlow and Sonnet."""
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import dm_env
 import sonnet as snt
@@ -43,10 +43,10 @@ class FeedForwardExecutor(core.Executor):
         """
 
         # Store these for later use.
+        self._shared_weights = shared_weights
+        self._policy_networks = policy_networks
         self._adder = adder
         self._variable_client = variable_client
-        self._policy_networks = policy_networks
-        self._shared_weights = shared_weights
 
     @tf.function
     def _policy(
@@ -69,7 +69,7 @@ class FeedForwardExecutor(core.Executor):
 
     def select_action(
         self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
+    ) -> Union[types.NestedArray, Tuple[types.NestedArray, types.NestedArray]]:
         # Pass the observation through the policy network.
         action = self._policy(agent, observation.observation)
 
@@ -99,7 +99,10 @@ class FeedForwardExecutor(core.Executor):
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
+    ) -> Union[
+        Dict[str, types.NestedArray],
+        Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
+    ]:
         actions = {}
         for agent, observation in observations.items():
             # Pass the observation through the policy network.
@@ -143,12 +146,11 @@ class RecurrentExecutor(core.Executor):
           store_recurrent_state: Whether to pass the recurrent state to the adder.
         """
         # Store these for later use.
+        self._policy_networks = policy_networks
+        self._shared_weights = shared_weights
         self._adder = adder
         self._variable_client = variable_client
-        self._policy_networks = policy_networks
         self._store_recurrent_state = store_recurrent_state
-        self._shared_weights = shared_weights
-
         self._states: Dict[str, Any] = {}
 
     @tf.function
@@ -157,7 +159,10 @@ class RecurrentExecutor(core.Executor):
         agent: str,
         observation: types.NestedTensor,
         state: types.NestedTensor,
-    ) -> Tuple[types.NestedTensor, types.NestedTensor]:
+    ) -> Union[
+        Tuple[types.NestedTensor, types.NestedTensor],
+        Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor],
+    ]:
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
@@ -173,9 +178,9 @@ class RecurrentExecutor(core.Executor):
 
         return action, new_state
 
-    # def _update_state(self, agent: str, new_state: types.NestedArray) -> None:
-    #     self._prev_states[agent] = self._states[agent]
-    #     self._states[agent] = new_state
+    def _update_state(self, agent: str, new_state: types.NestedArray) -> None:
+        # Bookkeeping of recurrent states for the observe method.
+        self._states[agent] = new_state
 
     def select_action(
         self, agent: str, observation: types.NestedArray
@@ -206,7 +211,6 @@ class RecurrentExecutor(core.Executor):
         timestep: dm_env.TimeStep,
         extras: Optional[Dict[str, types.NestedArray]] = {},
     ) -> None:
-
         # Re-initialize the RNN state.
         for agent, _ in timestep.observation.items():
             # index network either on agent type or on agent id
@@ -253,24 +257,14 @@ class RecurrentExecutor(core.Executor):
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
+    ) -> Union[
+        Dict[str, types.NestedArray],
+        Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
+    ]:
         actions = {}
         for agent, observation in observations.items():
-
             # Step the recurrent policy forward given the current observation and state.
-            policy_output, new_state = self._policy(
-                agent, observation.observation, self._states[agent]
-            )
-
-            # Bookkeeping of recurrent states for the observe method.
-            self._states[agent] = new_state
-            # self._update_state(agent, new_state)
-
-            # TODO Mask actions here using observation.legal_actions
-            # What happens in discrete vs cont case
-            actions[agent] = tf2_utils.to_numpy_squeeze(policy_output)
-
-        # Return a numpy array with squeezed out batch dimension.
+            actions[agent] = self.select_action(agent=agent, observation=observation)
         return actions
 
     def update(self, wait: bool = False) -> None:
@@ -443,27 +437,7 @@ class RecurrentExecutorWithComms(RecurrentExecutor):
         self, observations: Dict[str, types.NestedArray]
     ) -> Dict[str, types.NestedArray]:
         actions = {}
-
-        message_inputs = self._communication_module.process_messages(self._messages)
-
         for agent, observation in observations.items():
-
-            # Step the recurrent policy forward given the current observation and state.
-            policy_output, message, new_state = self._policy(
-                agent,
-                observation.observation,
-                self._states[agent],
-                message_inputs[agent],
-            )
-
-            # Bookkeeping of recurrent states for the observe method.
-            self._states[agent] = new_state
-
-            self._messages[agent] = message
-
-            # TODO Mask actions here using observation.legal_actions
-            # What happens in discrete vs cont case
-            actions[agent] = tf2_utils.to_numpy_squeeze(policy_output)
-
+            actions[agent] = self._select_action(agent, observations)
         # Return a numpy array with squeezed out batch dimension.
         return actions

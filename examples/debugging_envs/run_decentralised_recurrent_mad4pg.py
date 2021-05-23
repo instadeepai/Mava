@@ -30,7 +30,8 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.components.tf.networks.mad4pg import DiscreteValuedHead
-from mava.systems.tf import executors, mad4pg
+from mava.systems.tf import mad4pg
+from mava.systems.tf.mad4pg.execution import MAD4PGRecurrentExecutor
 from mava.systems.tf.mad4pg.training import DecentralisedRecurrentMAD4PGTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
@@ -166,7 +167,7 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=2,
         trainer_fn=DecentralisedRecurrentMAD4PGTrainer,
-        executor_fn=executors.RecurrentExecutor,
+        executor_fn=MAD4PGRecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
