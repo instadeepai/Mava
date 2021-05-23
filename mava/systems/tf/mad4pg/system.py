@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
-from typing import Callable, Dict, Type, Union
+from typing import Callable, Dict, Optional, Type, Union
 
 import dm_env
 import sonnet as snt
@@ -60,7 +60,7 @@ class MAD4PG(MADDPG):
         prefetch_size: int = 4,
         target_averaging: bool = False,
         target_update_period: int = 100,
-        target_update_rate: float = None,
+        target_update_rate: Optional[float] = None,
         executor_variable_update_period: int = 1000,
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
