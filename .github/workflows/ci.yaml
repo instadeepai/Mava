@@ -25,6 +25,7 @@ jobs:
           # Ensure encoding consistency
           export LC_ALL=en_US.UTF-8
           export LANG=en_US.UTF-8
+          pip uninstall -y enum34
           pip install --upgrade pip setuptools
           pip install .
           pip install .[flatland]
