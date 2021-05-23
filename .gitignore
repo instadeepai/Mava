@@ -33,6 +33,9 @@ MANIFEST
 *.manifest
 *.spec
 
+# mac
+__MACOSX
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -147,3 +150,4 @@ mava/workspace.code-workspace
 .DS_Store
 mava_testing
 .devcontainer/devcontainer.json
+3rdparty
