@@ -48,14 +48,17 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         self._environment = environment
 
         self._reset_next_step = True
-        self._agents: List = []
-        self.observation_space = Dict(
-            {
-                "observation": Box(-1, 1, shape=(self._env.get_obs_size(),)),
-                "action_mask": Box(0, 1, shape=(self._env.get_total_actions(),)),
-            }
+        self._possible_agents = [
+            f"agent_{i}" for i in range(self._environment.get_env_info()["n_agents"])
+        ]
+        self._agents = self._possible_agents
+        self.observation_space = {
+            "observation": Box(-1, 1, shape=(self._environment.get_obs_size(),)),
+            "action_mask": Box(0, 1, shape=(self._environment.get_total_actions(),)),
+        }
+        self.action_space: Type[Discrete] = Discrete(
+            self._environment.get_total_actions()
         )
-        self.action_space: Type[Discrete] = Discrete(self._env.get_total_actions())
 
     def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
         """Resets the env and returns observations from ready agents.
@@ -67,18 +70,16 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         self._step_type = dm_env.StepType.FIRST
 
         # reset internal SC2 env
-        obs_list, state = self._env.reset()
+        obs_list, state = self._environment.reset()
 
         # Convert observations
         observe: Dict[str, np.ndarray] = {}
-        self._possible_agents = []
+
         for i, obs in enumerate(obs_list):
-            agent = f"agent_{i}"
-            observe[agent] = {
+            observe[f"agent_{i}"] = {
                 "observation": obs,
-                "action_mask": np.array(self._env.get_avail_agent_actions(i)),
+                "action_mask": np.array(self._environment.get_avail_agent_actions(i)),
             }
-            self._possible_agents.append(agent)
         observations = self._convert_observations(
             observe, {agent: False for agent in self._possible_agents}
         )
@@ -145,7 +146,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
             agent = f"agent_{i}"
             observe[agent] = {
                 "observation": obs,
-                "action_mask": np.array(self._env.get_avail_agent_actions(i)),
+                "action_mask": np.array(self._environment.get_avail_agent_actions(i)),
             }
             rewards[agent] = reward
             dones[agent] = terminated
@@ -220,7 +221,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def action_spec(self) -> Dict[str, specs.DiscreteArray]:
         return {
-            agent: _convert_to_spec(self._environment.action_space)
+            agent: _convert_to_spec(self.action_space)
             for agent in self._possible_agents
         }
 
