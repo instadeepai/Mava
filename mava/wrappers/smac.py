@@ -82,8 +82,11 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         for i, obs in enumerate(obs_list):
             observe[f"agent_{i}"] = {
                 "observation": obs,
-                "action_mask": np.array(self._environment.get_avail_agent_actions(i)),
+                "action_mask": np.array(
+                    self._environment.get_avail_agent_actions(i), dtype=np.float32
+                ),
             }
+
         observations = self._convert_observations(
             observe, {agent: False for agent in self._possible_agents}
         )
@@ -150,7 +153,9 @@ class SMACEnvWrapper(ParallelEnvWrapper):
             agent = f"agent_{i}"
             observe[agent] = {
                 "observation": obs,
-                "action_mask": np.array(self._environment.get_avail_agent_actions(i)),
+                "action_mask": np.array(
+                    self._environment.get_avail_agent_actions(i), dtype=np.float32
+                ),
             }
             rewards[agent] = reward
             dones[agent] = terminated
@@ -239,7 +244,13 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         }
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
-        return {}
+        state = self._environment.get_state()
+        # TODO (dries): What should the real bounds be of the state spec?
+        return {
+            "s_t": specs.BoundedArray(
+                state.shape, np.float32, minimum=float("-inf"), maximum=float("inf")
+            )
+        }
 
     def seed(self, random_seed: int) -> None:
         self._environment._seed = random_seed
