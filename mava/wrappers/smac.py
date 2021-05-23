@@ -180,7 +180,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
             step_type=self._step_type,
         )
 
-        return timestep, state
+        return timestep, {"s_t": state}
 
     def env_done(self) -> bool:
         """
