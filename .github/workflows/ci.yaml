@@ -25,7 +25,7 @@ jobs:
           # Ensure encoding consistency
           export LC_ALL=en_US.UTF-8
           export LANG=en_US.UTF-8
-          pip install --upgrade pip setuptools
+          # pip install --upgrade pip setuptools
           pip install .
           pip install .[flatland]
           pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
