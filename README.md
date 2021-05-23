@@ -65,6 +65,12 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```
     and navigate to `http://127.0.0.1:6006/`.
 
+3. Install multi-agent Starcraft 2 environment [Optional]:
+    To install the environment, please run the provided bash script.
+    ```bash
+    chmod +x install_sc2.sh
+    ./install_sc2.sh
+
 ### Python virtual environment
 
 1.  If not using docker, we strongly recommend using a
