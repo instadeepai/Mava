@@ -62,12 +62,14 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],
+        agent_specs: Dict[str, EnvironmentSpec],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         shared_weights: bool = True,
     ):
         super().__init__(
             policy_networks=policy_networks,
+            agent_specs=agent_specs,
             adder=adder,
             variable_client=variable_client,
             shared_weights=shared_weights,

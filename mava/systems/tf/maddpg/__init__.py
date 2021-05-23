@@ -15,7 +15,7 @@
 
 """Implementations of a MADDPG agent."""
 
-from mava.systems.tf.mad4pg.execution import (
+from mava.systems.tf.maddpg.execution import (
     MADDPGFeedForwardExecutor,
     MADDPGRecurrentExecutor,
 )
