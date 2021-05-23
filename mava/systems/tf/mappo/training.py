@@ -290,7 +290,7 @@ class MAPPOTrainer(mava.Trainer):
 
                 # Do not use the loss provided by td_lambda as they sum the losses over
                 # the sequence length rather than averaging them.
-                critic_loss = tf.reduce_mean(
+                critic_loss = self._baseline_cost * tf.reduce_mean(
                     tf.square(td_lambda_extra.temporal_differences), name="CriticLoss"
                 )
 
