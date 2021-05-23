@@ -15,12 +15,22 @@
 
 """Starcraft 2 environment factory."""
 
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
 import dm_env
 from smac.env import StarCraft2Env
 
 from mava.wrappers import SMACEnvWrapper
+
+
+def load_smac_env(env_config: Dict[str, Any]) -> StarCraft2Env:
+    """Loads a smac environment given a config dict. Also, the possible agents in the
+    environment are set"""
+
+    env = StarCraft2Env(**env_config)
+    env.possible_agents = list(range(env.n_agents))
+
+    return env
 
 
 def make_environment(

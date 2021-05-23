@@ -56,9 +56,13 @@ class SMACEnvWrapper(ParallelEnvWrapper):
             "observation": Box(-1, 1, shape=(self._environment.get_obs_size(),)),
             "action_mask": Box(0, 1, shape=(self._environment.get_total_actions(),)),
         }
+        self.observation_spaces = {
+            agent: self.observation_space["observation"] for agent in self._agents
+        }
         self.action_space: Type[Discrete] = Discrete(
             self._environment.get_total_actions()
         )
+        self.action_spaces = {agent: self.action_space for agent in self._agents}
 
     def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
         """Resets the env and returns observations from ready agents.
@@ -236,6 +240,9 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         return {}
+
+    def seed(self, random_seed):
+        self._environment._seed = random_seed
 
     @property
     def agents(self) -> List:

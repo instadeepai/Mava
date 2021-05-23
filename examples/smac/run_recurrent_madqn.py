@@ -142,7 +142,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=2,
+        num_executors=1,
         trainer_fn=RecurrentMADQNTrainer,
         executor_fn=MADQNRecurrentExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
