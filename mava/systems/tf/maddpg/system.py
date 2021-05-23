@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import functools
-from typing import Any, Callable, Dict, List, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 import acme
 import dm_env
@@ -70,7 +70,7 @@ class MADDPG:
         prefetch_size: int = 4,
         target_averaging: bool = False,
         target_update_period: int = 100,
-        target_update_rate: float = 0.01,
+        target_update_rate: Optional[float] = None,
         executor_variable_update_period: int = 1000,
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,

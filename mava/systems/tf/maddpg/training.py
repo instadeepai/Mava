@@ -198,7 +198,6 @@ class BaseMADDPGTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def _update_target_networks(self) -> None:
-        assert 0.0 < self._target_update_rate < 1.0
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (
@@ -213,6 +212,7 @@ class BaseMADDPGTrainer(mava.Trainer):
             )
 
             if self._target_averaging:
+                assert 0.0 < self._target_update_rate < 1.0
                 tau = self._target_update_rate
                 for src, dest in zip(online_variables, target_variables):
                     dest.assign(dest * (1.0 - tau) + src * tau)
@@ -1029,7 +1029,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def _update_target_networks(self) -> None:
-        assert 0.0 < self._target_update_rate < 1.0
+
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (
@@ -1044,6 +1044,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             )
 
             if self._target_averaging:
+                assert 0.0 < self._target_update_rate < 1.0
                 tau = self._target_update_rate
                 for src, dest in zip(online_variables, target_variables):
                     dest.assign(dest * (1.0 - tau) + src * tau)
