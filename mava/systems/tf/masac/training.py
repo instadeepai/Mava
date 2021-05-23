@@ -20,6 +20,7 @@ import time
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
+import reverb
 import sonnet as snt
 import tensorflow as tf
 import tree
@@ -111,8 +112,14 @@ class BaseMASACTrainer(mava.Trainer):
         self._target_policy_networks = target_policy_networks
         self._target_critic_V_networks = target_critic_V_networks
 
-        self._observation_networks = observation_networks
-        self._target_observation_networks = target_observation_networks
+        # Ensure obs and target networks are sonnet modules
+        self._observation_networks = {
+            k: tf2_utils.to_sonnet_module(v) for k, v in observation_networks.items()
+        }
+        self._target_observation_networks = {
+            k: tf2_utils.to_sonnet_module(v)
+            for k, v in target_observation_networks.items()
+        }
 
         # Temperature
         self._temperature = temperature
@@ -305,13 +312,13 @@ class BaseMASACTrainer(mava.Trainer):
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     @tf.function
-    def _target_policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
+    def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         log_probs = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
             next_observation = next_obs[agent]
-            actions[agent], log_probs[agent] = self._target_policy_networks[agent_key](
+            actions[agent], log_probs[agent] = self._policy_networks[agent_key](
                 next_observation
             )
         # self.log_probs = log_probs
@@ -329,11 +336,10 @@ class BaseMASACTrainer(mava.Trainer):
         # Update the target networks
         self._update_target_networks()
 
-        # Get data from replay (dropping extras if any). Note there is no
-        # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
+        # Draw a batch of data from replay.
+        sample: reverb.ReplaySample = next(self._iterator)
 
-        self._forward(inputs)
+        self._forward(sample)
 
         self._backward()
 
@@ -368,26 +374,11 @@ class BaseMASACTrainer(mava.Trainer):
             critic_Q_2_losses = {}
 
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-            a_t, log_probs = self._target_policy_actions(o_t_trans)
+            a_t, log_probs = self._policy_actions(o_t_trans)
             # log_probs = self.log_probs
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
-
-                # policy_variables = (
-                #     self._observation_networks[agent_key].trainable_variables
-                #     + self._policy_networks[agent_key].trainable_variables
-                # )
-
-                # policy_gradients = tape.gradient(
-                #     self._target_policy_networks[agent_key](o_t_trans[agent])[0],
-                #     policy_variables,
-                #     unconnected_gradients=tf.UnconnectedGradients.ZERO,
-                # )
-
-                # print("Policy grad here", policy_gradients)
-
-                # self._policy_optimizer.apply(policy_gradients, policy_variables)
 
                 # Cast the additional discount to match the environment discount dtype.
                 discount = tf.cast(self._discount, dtype=d_t[agent].dtype)

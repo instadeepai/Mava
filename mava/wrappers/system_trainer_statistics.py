@@ -627,7 +627,6 @@ class NetworkStatisticsSoftActorCritic(NetworkStatisticsBase):
             policy_gradients = tape.gradient(
                 policy_losses[agent],
                 policy_variables,
-                unconnected_gradients=tf.UnconnectedGradients.ZERO,
             )
             critic_V_gradients = tape.gradient(
                 critic_V_losses[agent], critic_V_variables

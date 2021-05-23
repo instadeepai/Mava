@@ -65,6 +65,10 @@ class MASACConfig:
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
+    policy_optimizer: snt.Optimizer
+    critic_V_optimizer: snt.Optimizer
+    critic_Q_1_optimizer: snt.Optimizer
+    critic_Q_2_optimizer: snt.Optimizer
     tau: float
     temperature: float
     policy_update_frequency: int
@@ -272,7 +276,6 @@ class MASACBuilder(SystemBuilder):
         replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        checkpoint: bool = False,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -297,12 +300,6 @@ class MASACBuilder(SystemBuilder):
         soft_target_update = self._config.soft_target_update
         target_update_period = self._config.target_update_period
 
-        # Create optimizers.
-        policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-        critic_V_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-        critic_Q_1_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-        critic_Q_2_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
-
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
             agents=agents,
@@ -323,14 +320,15 @@ class MASACBuilder(SystemBuilder):
             dataset=dataset,
             soft_target_update=soft_target_update,
             shared_weights=shared_weights,
-            policy_optimizer=policy_optimizer,
-            critic_V_optimizer=critic_V_optimizer,
-            critic_Q_1_optimizer=critic_Q_1_optimizer,
-            critic_Q_2_optimizer=critic_Q_2_optimizer,
+            policy_optimizer=self._config.policy_optimizer,
+            critic_V_optimizer=self._config.critic_V_optimizer,
+            critic_Q_1_optimizer=self._config.critic_Q_1_optimizer,
+            critic_Q_2_optimizer=self._config.critic_Q_2_optimizer,
             clipping=clipping,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
+            checkpoint=self._config.checkpoint,
+            checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.

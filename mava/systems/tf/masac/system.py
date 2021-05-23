@@ -181,8 +181,14 @@ class MASAC:
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
                 sequence_length=sequence_length,
+                period=period,
                 sigma=sigma,
                 clipping=clipping,
+                policy_optimizer=policy_optimizer,
+                critic_V_optimizer=critic_V_optimizer,
+                critic_Q_1_optimizer=critic_Q_1_optimizer,
+                critic_Q_2_optimizer=critic_Q_2_optimizer,
+                checkpoint=checkpoint,
                 checkpoint_subpath=checkpoint_subpath,
             ),
             trainer_fn=trainer_fn,
@@ -230,7 +236,7 @@ class MASAC:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec, shared_weights=self._shared_weights
         )
 
         # Create system architecture with target networks.
