@@ -162,6 +162,9 @@ class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
     def get_epsilon(self) -> float:
         return self._trainer.get_epsilon()  # type: ignore
 
+    def get_trainer_steps(self) -> float:
+        return self._trainer.get_trainer_steps()  # type: ignore
+
     def step(self) -> None:
         # Run the learning step.
         fetches = self._step()
