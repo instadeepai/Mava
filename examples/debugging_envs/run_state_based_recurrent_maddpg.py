@@ -30,7 +30,8 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.systems.tf.maddpg.execution import MADDPGRecurrentExecutor
-from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
+from mava.components.tf.architectures import StateBasedQValueCritic
+from mava.systems.tf.maddpg.training import StateBasedRecurrentMADDPGTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -132,12 +133,13 @@ def make_networks(
 
 
 def main(_: Any) -> None:
-
     # environment
-    environment_factory = lp_utils.partial_kwargs(
+    environment_factory = functools.partial(
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        num_agents=3,
+        return_state_info=True,
     )
 
     network_factory = lp_utils.partial_kwargs(make_networks)
@@ -161,7 +163,8 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
+        architecture=StateBasedQValueCritic,
+        trainer_fn=StateBasedRecurrentMADDPGTrainer,
         executor_fn=MADDPGRecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
     ).build()
@@ -180,7 +183,6 @@ def main(_: Any) -> None:
         terminal="current_terminal",
         local_resources=local_resources,
     )
-
 
 if __name__ == "__main__":
     app.run(main)

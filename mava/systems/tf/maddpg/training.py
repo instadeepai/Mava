@@ -848,8 +848,8 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         # State based
-        o_tm1_feed = e_tm1["env_state"]
-        o_t_feed = e_t["env_state"]
+        o_tm1_feed = e_tm1["s_t"]
+        o_t_feed = e_t["s_t"]
         a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
         a_t_feed = tf.stack([x for x in a_t.values()], 1)
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
@@ -1268,7 +1268,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 # Get dpg Q values.
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(dpg_actions_feed)
-                dpg_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                dpg_actions_comb, _ = train_utils.combine_dim(dpg_actions)
+                dpg_q_values = tf.squeeze(self._critic_networks[agent_key](obs_comb, act_comb))
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
                 # dpg_q_values = tf.squeeze(dpg_q_values, axis=-1)  # [B]
@@ -1276,14 +1277,21 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
                 clip_norm = True if self._max_gradient_norm is not None else False
 
+                print("dpg_q_values: ", dpg_q_values.shape)
+                print("dpg_actions_comb: ", dpg_actions_comb.shape)
+
                 policy_loss = losses.dpg(
                     dpg_q_values,
-                    act_comb,
+                    dpg_actions_comb,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
+                print("policy_loss: ", policy_loss.shape)
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
+                print("policy_loss reduced: ", self.policy_losses[agent].shape)
+                exit()
+
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
@@ -1641,8 +1649,8 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # State based
-        obs_trans_feed = extras["env_state"]
-        target_obs_trans_feed = extras["env_state"]
+        obs_trans_feed = extras["s_t"]
+        target_obs_trans_feed = extras["s_t"]
         action_feed = tf.stack([x for x in actions.values()], -1)
         target_actions_feed = tf.stack([x for x in target_actions.values()], -1)
         return obs_trans_feed, target_obs_trans_feed, action_feed, target_actions_feed
