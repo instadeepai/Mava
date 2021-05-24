@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
-from typing import Callable, Dict, Type, Union
+from typing import Callable, Dict, Optional, Type, Union
 
 import dm_env
 import sonnet as snt
@@ -24,8 +24,8 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
-from mava.systems.tf import executors
 from mava.systems.tf.mad4pg import training
+from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.maddpg.system import MADDPG
 from mava.utils.loggers import MavaLogger
 
@@ -50,7 +50,7 @@ class MAD4PG(MADDPG):
             Type[training.BaseMAD4PGTrainer],
             Type[training.BaseRecurrentMAD4PGTrainer],
         ] = training.DecentralisedMAD4PGTrainer,
-        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+        executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -58,7 +58,9 @@ class MAD4PG(MADDPG):
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
+        target_averaging: bool = False,
         target_update_period: int = 100,
+        target_update_rate: Optional[float] = None,
         executor_variable_update_period: int = 1000,
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
@@ -151,4 +153,6 @@ class MAD4PG(MADDPG):
             eval_loop_fn=eval_loop_fn,
             train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
+            target_averaging=target_averaging,
+            target_update_rate=target_update_rate,
         )

@@ -62,7 +62,6 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self._variable_client = variable_client
         self._policy_networks = policy_networks
         self._shared_weights = shared_weights
-
         self._prev_log_probs: Dict[str, Any] = {}
 
     @tf.function
@@ -85,7 +84,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         log_prob = policy.log_prob(action)
 
         # Cast for compatibility with reverb.
-        # smaple() returns a 'int32', which is a problem.
+        # sample() returns a 'int32', which is a problem.
         if isinstance(policy, tfp.distributions.Categorical):
             action = tf.cast(action, "int64")
 

@@ -15,7 +15,7 @@
 
 """The base system interface."""
 
-from typing import Dict, Sequence, Union
+from typing import Any, Dict, Sequence, Tuple, Union
 
 import dm_env
 from acme import types
@@ -77,7 +77,7 @@ class System(mava.core.Executor, mava.core.VariableSource):
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
+    ) -> Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
         return self._executor.select_actions(observations)
 
     def observe_first(

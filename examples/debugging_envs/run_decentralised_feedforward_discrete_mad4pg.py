@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADDPG on pettinzoo MPE environments."""
-
+"""Example running MAD4PG on debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
@@ -26,28 +25,30 @@ from absl import app, flags
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
+from dm_env import specs
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.systems.tf import maddpg
-from mava.systems.tf.maddpg.execution import MADDPGRecurrentExecutor
-from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
+from mava.components.tf.networks.mad4pg import DiscreteValuedHead
+from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
+from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
+Array = specs.Array
+BoundedArray = specs.BoundedArray
+DiscreteArray = specs.DiscreteArray
+
 FLAGS = flags.FLAGS
-
-flags.DEFINE_string(
-    "env_class",
-    "sisl",
-    "Pettingzoo environment class, e.g. atari (str).",
-)
-
 flags.DEFINE_string(
     "env_name",
-    "multiwalker_v7",
-    "Pettingzoo environment name, e.g. pong (str).",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "discrete",
+    "Environment action space type (str).",
 )
 flags.DEFINE_string(
     "mava_id",
@@ -67,6 +68,9 @@ def make_networks(
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
     sigma: float = 0.3,
+    vmin: float = -150.0,
+    vmax: float = 150.0,
+    num_atoms: int = 51,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
@@ -89,25 +93,38 @@ def make_networks(
     policy_networks = {}
     critic_networks = {}
     for key in specs.keys():
+        # TODO (dries): Make specs[key].actions
+        #  return a list of specs for hybrid action space
+        # Get total number of action dimensions from action spec.
+        agent_act_spec = specs[key].actions
+        if type(specs[key].actions) == DiscreteArray:
+            num_actions = agent_act_spec.num_values
+            minimum = [-1.0] * num_actions
+            maximum = [1.0] * num_actions
+            agent_act_spec = BoundedArray(
+                shape=(num_actions,),
+                minimum=minimum,
+                maximum=maximum,
+                dtype="float32",
+                name="actions",
+            )
 
         # Get total number of action dimensions from action spec.
-        num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
+        num_dimensions = np.prod(agent_act_spec.shape, dtype=int)
 
-        # Create the observation network.
+        # Create the shared observation network; here simply a state-less operation.
         observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
-        policy_network = snt.DeepRNN(
+        policy_network = snt.Sequential(
             [
-                observation_network,
-                snt.Flatten(),
-                snt.nets.MLP(policy_networks_layer_sizes[key]),
-                snt.LSTM(25),
-                snt.nets.MLP([128]),
+                networks.LayerNormMLP(
+                    policy_networks_layer_sizes[key], activate_final=True
+                ),
                 networks.NearZeroInitializedLinear(num_dimensions),
-                networks.TanhToSpec(specs[key].actions),
+                networks.TanhToSpec(agent_act_spec),
                 networks.ClippedGaussian(sigma),
-                networks.ClipToSpec(specs[key].actions),
+                networks.ClipToSpec(agent_act_spec),
             ]
         )
 
@@ -119,29 +136,30 @@ def make_networks(
                 networks.LayerNormMLP(
                     critic_networks_layer_sizes[key], activate_final=False
                 ),
-                snt.Linear(1),
+                DiscreteValuedHead(vmin, vmax, num_atoms),
             ]
         )
-
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
 
     return {
-        "observations": observation_networks,
         "policies": policy_networks,
         "critics": critic_networks,
+        "observations": observation_networks,
     }
 
 
 def main(_: Any) -> None:
 
-    environment_factory = functools.partial(
-        pettingzoo_utils.make_environment,
-        env_class=FLAGS.env_class,
+    # environment
+    environment_factory = lp_utils.partial_kwargs(
+        debugging_utils.make_environment,
         env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
     )
 
+    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -158,19 +176,19 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    program = maddpg.MADDPG(
+    # distributed program
+    program = mad4pg.MAD4PG(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
-        executor_fn=MADDPGRecurrentExecutor,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        max_gradient_norm=40.0,
     ).build()
 
-    # Launch gpu config - let trainer use gpu.
+    # launch
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
@@ -178,7 +196,6 @@ def main(_: Any) -> None:
         "evaluator": PythonProcess(env=env_vars),
         "executor": PythonProcess(env=env_vars),
     }
-
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
