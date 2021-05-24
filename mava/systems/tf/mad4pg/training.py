@@ -52,8 +52,8 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizers: Dict[str, snt.Optimizer],
-        critic_optimizers: Dict[str, snt.Optimizer],
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -83,8 +83,8 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizers: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizers: the optimizer to be applied to the critic loss.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
@@ -98,8 +98,8 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
-            policy_optimizers=policy_optimizers,
-            critic_optimizers=critic_optimizers,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             discount=discount,
             target_averaging=target_averaging,
             target_update_period=target_update_period,
@@ -203,8 +203,8 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizers: Dict[str, snt.Optimizer],
-        critic_optimizers: Dict[str, snt.Optimizer],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -234,8 +234,8 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizers: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizers: the optimizer to be applied to the critic loss.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
@@ -257,8 +257,8 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             shared_weights=shared_weights,
-            policy_optimizers=policy_optimizers,
-            critic_optimizers=critic_optimizers,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
@@ -281,8 +281,8 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizers: Dict[str, snt.Optimizer],
-        critic_optimizers: Dict[str, snt.Optimizer],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -312,8 +312,8 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizers: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizers: the optimizer to be applied to the critic loss.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
@@ -335,8 +335,8 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             shared_weights=shared_weights,
-            policy_optimizers=policy_optimizers,
-            critic_optimizers=critic_optimizers,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
@@ -359,8 +359,8 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizers: Dict[str, snt.Optimizer],
-        critic_optimizers: Dict[str, snt.Optimizer],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -390,8 +390,8 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizers: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizers: the optimizer to be applied to the critic loss.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
@@ -413,8 +413,8 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             shared_weights=shared_weights,
-            policy_optimizers=policy_optimizers,
-            critic_optimizers=critic_optimizers,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
@@ -437,8 +437,8 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizers: Dict[str, snt.Optimizer],
-        critic_optimizers: Dict[str, snt.Optimizer],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -469,8 +469,8 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizers: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizers: the optimizer to be applied to the critic loss.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
@@ -492,8 +492,8 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             shared_weights=shared_weights,
-            policy_optimizers=policy_optimizers,
-            critic_optimizers=critic_optimizers,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
@@ -643,8 +643,8 @@ class DecentralisedRecurrentMAD4PGTrainer(
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizers: Dict[str, snt.Optimizer],
-        critic_optimizers: Dict[str, snt.Optimizer],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -675,8 +675,8 @@ class DecentralisedRecurrentMAD4PGTrainer(
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizers: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizers: the optimizer to be applied to the critic loss.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
@@ -698,8 +698,8 @@ class DecentralisedRecurrentMAD4PGTrainer(
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             shared_weights=shared_weights,
-            policy_optimizers=policy_optimizers,
-            critic_optimizers=critic_optimizers,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
@@ -725,8 +725,8 @@ class CentralisedRecurrentMAD4PGTrainer(
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizers: Dict[str, snt.Optimizer],
-        critic_optimizers: Dict[str, snt.Optimizer],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -757,8 +757,8 @@ class CentralisedRecurrentMAD4PGTrainer(
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizers: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizers: the optimizer to be applied to the critic loss.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
@@ -780,8 +780,8 @@ class CentralisedRecurrentMAD4PGTrainer(
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             shared_weights=shared_weights,
-            policy_optimizers=policy_optimizers,
-            critic_optimizers=critic_optimizers,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
@@ -807,8 +807,8 @@ class StateBasedRecurrentMAD4PGTrainer(
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizers: Dict[str, snt.Optimizer],
-        critic_optimizers: Dict[str, snt.Optimizer],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -839,8 +839,8 @@ class StateBasedRecurrentMAD4PGTrainer(
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizers: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizers: the optimizer to be applied to the critic loss.
+          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
@@ -862,8 +862,8 @@ class StateBasedRecurrentMAD4PGTrainer(
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             shared_weights=shared_weights,
-            policy_optimizers=policy_optimizers,
-            critic_optimizers=critic_optimizers,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
