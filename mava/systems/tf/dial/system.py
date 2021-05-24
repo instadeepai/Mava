@@ -96,7 +96,7 @@ class DIAL:
         ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
         epsilon_min: float = 0.05,
-        epsilon_decay: float = 1e-4,
+        epsilon_decay: float = 1e-3,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,

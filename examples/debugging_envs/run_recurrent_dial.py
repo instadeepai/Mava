@@ -168,7 +168,7 @@ def main(_: Any) -> None:
         communication_module=BroadcastedCommunication,
         sequence_length=6,
         epsilon_min=0.05,
-        epsilon_decay=5e-4,
+        epsilon_decay=1e-2,
         # optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         optimizer=snt.optimizers.RMSProp(learning_rate=1e-4, momentum=0.95),
         checkpoint_subpath=checkpoint_dir,

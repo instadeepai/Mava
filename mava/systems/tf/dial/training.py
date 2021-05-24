@@ -99,7 +99,7 @@ class DIALSwitchTrainer(RecurrentCommMADQNTrainer):
 
         # Use fact that end of episode always has the reward to
         # find episode lengths. This is used to mask loss.
-        # ep_end = tf.argmax(tf.math.abs(rewards[self._agents[0]]), axis=0)
+        ep_end = tf.argmax(tf.math.abs(rewards[self._agents[0]]), axis=0)
 
         with tf.GradientTape(persistent=True) as tape:
             q_network_losses: Dict[str, NestedArray] = {
@@ -160,19 +160,34 @@ class DIALSwitchTrainer(RecurrentCommMADQNTrainer):
                         m, observations[agent].observation[t - 1][:, :1]
                     )
 
+                    # Mask target
+                    q_targ = tf.concat(
+                        [
+                            [q_targ[i]]
+                            if t <= ep_end[i]
+                            else [tf.zeros_like(q_targ[i])]
+                            for i in range(q_targ.shape[0])
+                        ],
+                        axis=0,
+                    )
+
                     loss, _ = trfl.qlearning(
                         q,
                         actions[agent][t - 1],
                         rewards[agent][t - 1],
                         discount * discounts[agent][t],
                         q_targ,
-                        # q_targ*(ep_end <= t), # mask last episode
                     )
 
                     # Index loss (mask ended episodes)
-                    # loss = tf.reduce_mean(loss[ep_end <= t])
-                    loss = tf.reduce_mean(loss)
+                    if not tf.reduce_any(t - 1 <= ep_end):
+                        continue
+
+                    loss = tf.reduce_mean(loss[t - 1 <= ep_end])
+                    # loss = tf.reduce_mean(loss)
                     q_network_losses[agent]["q_value_loss"] += loss
 
+        # print(q_network_losses['agent_0'])
         self._q_network_losses = q_network_losses
         self.tape = tape
+        # {}.t
