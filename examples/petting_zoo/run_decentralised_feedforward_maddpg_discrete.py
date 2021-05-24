@@ -46,7 +46,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_string(
     "env_name",
-    "simple_adversary_v2",
+    "simple_speaker_listener_v3",
     "Pettingzoo environment name, e.g. pong (str).",
 )
 flags.DEFINE_string(
