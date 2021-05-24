@@ -149,9 +149,9 @@ def main(_: Any) -> None:
         num_executors=2,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
-        epsilon_decay=5e-4,
+        epsilon_decay=3e-4,
         mixer_fn=QMixer,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer=snt.optimizers.RMSProp(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
