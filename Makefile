@@ -37,7 +37,7 @@ run-maddpg:
 	$(DOCKER_RUN) python $(MADDPG) --base_dir /home/app/mava/logs/
 
 run-masac:
-	$(DOCKER_RUN) python $(MASAC)
+	$(DOCKER_RUN) python $(MASAC) --base_dir /home/app/mava/logs/
 
 run-madqn:
 	$(DOCKER_RUN) python  $(MADQN) --base_dir /home/app/mava/logs/

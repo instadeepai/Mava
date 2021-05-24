@@ -22,8 +22,6 @@ from typing import Any, Dict, Mapping, Sequence, Union
 import launchpad as lp
 import numpy as np
 import sonnet as snt
-import tensorflow as tf
-import tensorflow_probability as tfp
 from absl import app, flags
 from acme import types
 from acme.tf import networks
@@ -32,6 +30,7 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.components.tf.architectures import CentralisedSoftQValueActorCritic
+from mava.components.tf.networks import ActorNetwork
 from mava.systems.tf import masac
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
@@ -55,54 +54,6 @@ flags.DEFINE_string(
     "Experiment identifier that can be used to continue experiments.",
 )
 flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
-
-
-class ActorNetwork(snt.Module):
-    def __init__(
-        self,
-        n_hidden_unit1: int,
-        n_hidden_unit2: int,
-        n_actions: int,
-        logprob_epsilon: float,
-        observation_netork: snt.Module,
-    ):
-        super(ActorNetwork, self).__init__()
-        self.logprob_epsilon = tf.Variable(logprob_epsilon)
-        self.observation_network = observation_netork
-        w_bound = tf.Variable(3e-3)
-        self.hidden1 = snt.Linear(n_hidden_unit1)
-        self.hidden2 = snt.Linear(n_hidden_unit2)
-
-        self.mean = snt.Linear(
-            n_actions,
-            w_init=snt.initializers.RandomUniform(-w_bound, w_bound),
-            b_init=snt.initializers.RandomUniform(-w_bound, w_bound),
-        )
-        self.log_std = snt.Linear(
-            n_actions,
-            w_init=snt.initializers.RandomUniform(-w_bound, w_bound),
-            b_init=snt.initializers.RandomUniform(-w_bound, w_bound),
-        )
-
-    def __call__(self, x: Any) -> Any:
-        """forward call for sonnet module"""
-        x = self.observation_network(x)
-        x = self.hidden1(x)
-        x = tf.nn.relu(x)
-        x = self.hidden2(x)
-        x = tf.nn.relu(x)
-
-        mean = self.mean(x)
-        log_std = self.log_std(x)
-        log_std_clipped = tf.clip_by_value(log_std, -20, 2)
-        normal_dist = tfp.distributions.Normal(mean, tf.exp(log_std_clipped))
-        action = tf.stop_gradient(normal_dist.sample())
-        squashed_actions = tf.tanh(action)
-        logprob = normal_dist.log_prob(action) - tf.math.log(
-            1.0 - tf.pow(squashed_actions, 2) + self.logprob_epsilon
-        )
-        logprob = tf.reduce_sum(logprob, axis=-1, keepdims=True)
-        return squashed_actions, logprob
 
 
 def make_networks(
