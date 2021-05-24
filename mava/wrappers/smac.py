@@ -128,18 +128,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         if self._reset_next_step:
             return self.reset()
 
-        # actions = []
-        # for i in self._ready_agents:
-        #     if i not in action_dict:
-        #         raise ValueError(f"You must supply an action for agent: {i}")
-        #     actions.append(action_dict[i])
-
-        # if len(actions) != len(self._ready_agents):
-        #     raise ValueError(
-        #         f"Number of actions ({len(actions)}) does not match number \
-        #             of ready agents (len(self._ready_agents))."
-        #     )
-
         actions_feed = list(actions.values())
         reward, terminated, info = self._environment.step(actions_feed)
         obs_list = self._environment.get_obs()
