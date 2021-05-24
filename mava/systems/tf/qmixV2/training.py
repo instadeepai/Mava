@@ -297,11 +297,12 @@ class QMixTrainer(mava.Trainer):
                 q_acts = tf.concat(q_acts, axis=1)  # [B, num_agents]
                 q_targets = tf.concat(q_targets, axis=1)  # [B, num_agents]
 
-                # q_tot_mixed = self._mixer(q_acts, s_tm1)  # [B, 1, 1]
-                # q_tot_target_mixed = self._target_mixer(q_targets, s_t)  # [B, 1, 1]
 
-                q_tot_mixed = tf.reduce_sum(q_acts, axis=1)  # [B, 1, 1]
-                q_tot_target_mixed = tf.reduce_sum(q_targets, axis=1)  # [B, 1, 1]
+                q_tot_mixed = self._mixer(q_acts, s_tm1)  # [B, 1, 1]
+                q_tot_target_mixed = self._target_mixer(q_targets, s_t)  # [B, 1, 1]
+
+                # q_tot_mixed = tf.reduce_sum(q_acts, axis=1)  # [B, 1, 1]
+                # q_tot_target_mixed = tf.reduce_sum(q_targets, axis=1)  # [B, 1, 1]
 
                 q_tot_mixed = tf.reshape(q_tot_mixed, (-1,))
                 q_tot_target_mixed = tf.reshape(q_tot_target_mixed, (-1,))

@@ -298,7 +298,7 @@ class QMixBuilder:
         # Mixer
         if self._mixer_fn:
             state_spec = self._config.environment_spec.get_extra_specs()["s_t"]
-            mixer = self._mixer_fn(len(agents), state_spec.shape, 256)
+            mixer = self._mixer_fn(len(agents), state_spec.shape, 32)
             tf_utils.create_variables(mixer, [tf.ones(len(agents)), state_spec])
 
         # The learner updates the parameters (and initializes them).
