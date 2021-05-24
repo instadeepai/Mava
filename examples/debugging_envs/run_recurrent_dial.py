@@ -64,7 +64,7 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    message_size: int = 10,
+    message_size: int = 1,
     shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -168,7 +168,7 @@ def main(_: Any) -> None:
         communication_module=BroadcastedCommunication,
         sequence_length=6,
         epsilon_min=0.05,
-        epsilon_decay=1e-2,
+        epsilon_decay=5e-4,
         # optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         optimizer=snt.optimizers.RMSProp(learning_rate=1e-4, momentum=0.95),
         checkpoint_subpath=checkpoint_dir,
