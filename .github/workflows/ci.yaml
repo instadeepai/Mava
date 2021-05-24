@@ -25,6 +25,8 @@ jobs:
           # Ensure encoding consistency
           export LC_ALL=en_US.UTF-8
           export LANG=en_US.UTF-8
+
+          # Mava dependencies
           pip uninstall -y enum34
           pip install --upgrade pip setuptools
           pip install .
@@ -37,6 +39,9 @@ jobs:
           AutoROM -v
           # Open CV and Headless screen.
           sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
+          # SC2
+          sudo apt-get install git -y
+          pip install git+https://github.com/oxwhirl/smac.git
       - name: Format code
         run: |
           # Check code follows black formatting.

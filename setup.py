@@ -39,7 +39,13 @@ tf_requirements = [
     "trfl",
 ]
 
-env_requirements = ["pettingzoo>=1.8.2", "multi_agent_ale_py", "supersuit", "pygame"]
+env_requirements = [
+    "pettingzoo>=1.8.2",
+    "multi_agent_ale_py",
+    "supersuit",
+    "pygame",
+    "pysc2",
+]
 
 launchpad_requirements = [
     "dm-launchpad",
