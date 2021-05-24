@@ -372,6 +372,7 @@ class BaseMADDPGTrainer(mava.Trainer):
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
+
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
         self.tape = tape
 
@@ -631,8 +632,8 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
         dpg_a_t_feed = copy.copy(a_t)
-        dpg_a_t_feed[agent] = dpg_a_t
         tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
+        dpg_a_t_feed[agent] = dpg_a_t
         return dpg_a_t_feed
 
 
@@ -755,8 +756,8 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
         dpg_a_t_feed = copy.copy(a_t)
-        dpg_a_t_feed[agent] = dpg_a_t
         tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
+        dpg_a_t_feed[agent] = dpg_a_t
         return dpg_a_t_feed
 
 
@@ -864,8 +865,8 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
         dpg_a_t_feed = copy.copy(a_t)
-        dpg_a_t_feed[agent] = dpg_a_t
         tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
+        dpg_a_t_feed[agent] = dpg_a_t
 
         return dpg_a_t_feed
 
@@ -1261,6 +1262,13 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
                 dpg_actions = tf2_utils.batch_to_sequence(outputs)
 
+                # Note (dries): This is done to so that losses.dpg can verify using gradient.tape that there is a
+                # gradient relationship between dpg_q_values and dpg_actions_comb.
+                dpg_actions_comb, dim = train_utils.combine_dim(dpg_actions)
+
+                # Note (dries): This seemingly useless line is is important! Don't remove it. See above note.
+                dpg_actions = train_utils.extract_dim(dpg_actions_comb, dim)
+
                 # Get dpg actions
                 dpg_actions_feed = self._get_dpg_feed(
                     target_actions, dpg_actions, agent
@@ -1269,17 +1277,12 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 # Get dpg Q values.
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(dpg_actions_feed)
-                dpg_actions_comb, _ = train_utils.combine_dim(dpg_actions)
+
                 dpg_q_values = tf.squeeze(self._critic_networks[agent_key](obs_comb, act_comb))
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
-                # dpg_q_values = tf.squeeze(dpg_q_values, axis=-1)  # [B]
-
                 dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
                 clip_norm = True if self._max_gradient_norm is not None else False
-
-                print("dpg_q_values: ", dpg_q_values.shape)
-                print("dpg_actions_comb: ", dpg_actions_comb.shape)
 
                 policy_loss = losses.dpg(
                     dpg_q_values,
@@ -1288,11 +1291,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
-                print("policy_loss: ", policy_loss.shape)
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
-                print("policy_loss reduced: ", self.policy_losses[agent].shape)
-                exit()
-
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
@@ -1553,11 +1552,11 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
         dpg_actions_feed = copy.copy(actions)
+        tree.map_structure(tf.stop_gradient, dpg_actions_feed)
         dpg_actions_feed[agent] = dpg_actions
         dpg_actions_feed = tf.squeeze(
             tf.stack([x for x in dpg_actions_feed.values()], -1)
         )
-        tree.map_structure(tf.stop_gradient, dpg_actions_feed)
         return dpg_actions_feed
 
 
@@ -1666,9 +1665,9 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
         dpg_actions_feed = copy.copy(actions)
+        tree.map_structure(tf.stop_gradient, dpg_actions_feed)
         dpg_actions_feed[agent] = dpg_actions
         dpg_actions_feed = tf.squeeze(
             tf.stack([x for x in dpg_actions_feed.values()], -1)
         )
-        tree.map_structure(tf.stop_gradient, dpg_actions_feed)
         return dpg_actions_feed

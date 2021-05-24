@@ -601,6 +601,13 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
 
                 dpg_actions = tf2_utils.batch_to_sequence(outputs)
 
+                # Note (dries): This is done to so that losses.dpg can verify using gradient.tape that there is a
+                # gradient relationship between dpg_q_values and dpg_actions_comb.
+                dpg_actions_comb, dim = train_utils.combine_dim(dpg_actions)
+
+                # Note (dries): This seemingly useless line is is important! Don't remove it. See above note.
+                dpg_actions = train_utils.extract_dim(dpg_actions_comb, dim)
+
                 # Get dpg actions
                 dpg_actions_feed = self._get_dpg_feed(
                     target_actions, dpg_actions, agent
@@ -618,7 +625,7 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
 
                 policy_loss = losses.dpg(
                     dpg_q_values,
-                    act_comb,
+                    dpg_actions_comb,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
