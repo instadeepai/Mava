@@ -1,5 +1,6 @@
 #!/bin/bash
 # Install SC2 and add the custom maps
+# Script adapted from https://github.com/oxwhirl/pymarl
 
 mkdir 3rdparty
 cd 3rdparty
