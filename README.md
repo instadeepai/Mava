@@ -68,7 +68,6 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
 3. Install multi-agent Starcraft 2 environment [Optional]:
     To install the environment, please run the provided bash script.
     ```bash
-    chmod +x install_sc2.sh
     ./install_sc2.sh
 
 ### Python virtual environment
