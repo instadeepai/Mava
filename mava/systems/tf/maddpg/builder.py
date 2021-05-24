@@ -323,8 +323,16 @@ class MADDPGBuilder(SystemBuilder):
         target_averaging = self._config.target_averaging
         target_update_rate = self._config.target_update_rate
 
+        # Create optimizers for different agent types.
+        # TODO(Kale-ab): Allow this to be passed as a system param.
+        policy_optimizers: Dict[str, snt.Optimizer] = {}
+        critic_optimizers: Dict[str, snt.Optimizer] = {}
+        for agent in self._agent_types:
+            policy_optimizers[agent] = copy.deepcopy(self._config.policy_optimizer)
+            critic_optimizers[agent] = copy.deepcopy(self._config.critic_optimizer)
+
         # trainer args
-        trainer_config = {
+        trainer_config: Dict[str, Any] = {
             "agents": agents,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],
@@ -334,8 +342,8 @@ class MADDPGBuilder(SystemBuilder):
             "target_critic_networks": networks["target_critics"],
             "target_observation_networks": networks["target_observations"],
             "shared_weights": shared_weights,
-            "policy_optimizer": self._config.policy_optimizer,
-            "critic_optimizer": self._config.critic_optimizer,
+            "policy_optimizers": policy_optimizers,
+            "critic_optimizers": critic_optimizers,
             "max_gradient_norm": max_gradient_norm,
             "discount": discount,
             "target_averaging": target_averaging,
