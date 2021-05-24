@@ -33,10 +33,11 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.systems.tf.madqn.training import RecurrentCommMADQNTrainer
 
 
-class DIALTrainer(RecurrentCommMADQNTrainer):
-    """Recurrent Comm DIAL trainer.
-    This is the trainer component of a MADQN system. IE it takes a dataset as input
+class DIALSwitchTrainer(RecurrentCommMADQNTrainer):
+    """Recurrent Comm DIAL Switch trainer.
+    This is the trainer component of a DIAL system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
+    Note: this trainer is specific to switch game env.
     """
 
     def __init__(
@@ -94,13 +95,16 @@ class DIALTrainer(RecurrentCommMADQNTrainer):
         core_message = tree.map_structure(
             lambda s: s[:, 0, :], inputs.data.extras["core_messages"]
         )
+        T = actions[self._agents[0]].shape[0]
+
+        # Use fact that end of episode always has the reward to
+        # find episode lengths. This is used to mask loss.
+        ep_end = tf.argmax(tf.math.abs(rewards[self._agents[0]]), axis=0)
 
         with tf.GradientTape(persistent=True) as tape:
             q_network_losses: Dict[str, NestedArray] = {
                 agent: {"q_value_loss": tf.zeros(())} for agent in self._agents
             }
-
-            T = actions[self._agents[0]].shape[0]
 
             state = {agent: core_state[agent][0] for agent in self._agents}
             target_state = {agent: core_state[agent][0] for agent in self._agents}
@@ -139,7 +143,7 @@ class DIALTrainer(RecurrentCommMADQNTrainer):
                         target_state[agent],
                         target_channel[agent],
                     )
-                    print(m.shape)
+
                     target_state[agent] = s
                     target_message[agent] = tf.math.multiply(
                         m, observations[agent].observation[t][:, :1]
@@ -150,7 +154,7 @@ class DIALTrainer(RecurrentCommMADQNTrainer):
                         state[agent],
                         channel[agent],
                     )
-                    print("m2 ", m.shape)
+
                     state[agent] = s
                     message[agent] = tf.math.multiply(
                         m, observations[agent].observation[t - 1][:, :1]
@@ -162,8 +166,11 @@ class DIALTrainer(RecurrentCommMADQNTrainer):
                         rewards[agent][t - 1],
                         discount * discounts[agent][t],
                         q_targ,
+                        # q_targ*(ep_end <= t), # mask last episode
                     )
 
+                    # Index loss (mask ended episodes)
+                    loss = tf.reduce_mean(loss[ep_end <= t])
                     loss = tf.reduce_mean(loss)
                     q_network_losses[agent]["q_value_loss"] += loss
 

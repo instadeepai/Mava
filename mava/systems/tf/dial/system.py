@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Defines the MADQN system class."""
+"""Defines the DIAL system class."""
 import functools
 from typing import Any, Callable, Dict, Optional, Type
 
@@ -115,7 +115,7 @@ class DIAL:
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         max_executor_steps: int = None,
-        checkpoint: bool = True,
+        checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava/",
         logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,

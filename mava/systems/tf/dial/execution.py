@@ -13,14 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Kevin): implement DIAL executor (if required)
-# Helper resources
-#   - single agent generic actors in acme:
-#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/actors.py
-#   - single agent custom actor for Impala in acme:
-#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/impala/acting.py
-#   - multi-agent generic executors in mava: mava/systems/tf/executors.py
-
 """DIAL executor implementation."""
 from typing import Any, Dict, Optional
 
@@ -35,12 +27,13 @@ from mava.systems.tf.madqn.execution import MADQNRecurrentCommExecutor
 from mava.systems.tf.madqn.training import MADQNTrainer
 
 
-class DIALExecutor(MADQNRecurrentCommExecutor):
+class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
     """DIAL executor.
     An executor based on a recurrent communicating policy for each agent in the system
     which takes non-batched observations and outputs non-batched actions.
     It also allows adding experiences to replay and updating the weights
     from the policy on the learner.
+    Note: this executor is specific to switch game env.
     """
 
     def __init__(
