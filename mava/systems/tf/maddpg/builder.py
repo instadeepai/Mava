@@ -74,7 +74,7 @@ class MADDPGConfig:
     prefetch_size: int = 4
     target_averaging: bool = False
     target_update_period: int = 100
-    target_update_rate: float = 0.01
+    target_update_rate: Optional[float] = None
     executor_variable_update_period: int = 1000
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
