@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """MAPPO builder and config."""
+import copy
 import dataclasses
 from typing import Dict, Iterator, List, Optional, Type
 
@@ -242,6 +243,13 @@ class MAPPOBuilder(SystemBuilder):
         policy_networks = networks["policies"]
         critic_networks = networks["critics"]
 
+        # Create optimizers for different agent types.
+        policy_optimizers: Dict[str, snt.Optimizer] = {}
+        critic_optimizers: Dict[str, snt.Optimizer] = {}
+        for agent in self._agent_types:
+            policy_optimizers[agent] = copy.deepcopy(self._config.policy_optimizer)
+            critic_optimizers[agent] = copy.deepcopy(self._config.critic_optimizer)
+
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(
             agents=agents,
@@ -251,8 +259,8 @@ class MAPPOBuilder(SystemBuilder):
             critic_networks=critic_networks,
             dataset=dataset,
             shared_weights=shared_weights,
-            critic_optimizer=self._config.critic_optimizer,
-            policy_optimizer=self._config.policy_optimizer,
+            critic_optimizers=critic_optimizers,
+            policy_optimizers=policy_optimizers,
             discount=self._config.discount,
             lambda_gae=self._config.lambda_gae,
             entropy_cost=self._config.entropy_cost,

@@ -51,7 +51,7 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     make run EXAMPLE=dir/to/example/example.py
     ```
-    For example, `make run EXAMPLE=examples/petting_zoo/run_decentralised_feedforward_maddpg.py`.
+    For example, `make run EXAMPLE=examples/petting_zoo/run_decentralised_feedforward_maddpg_continous.py`.
 
     Alternatively, you can also run a specific system that is defined in the `Makefile`:
     ```bash

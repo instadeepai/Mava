@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADDPG on pettinzoo MPE environments."""
+"""Example running discrete MADDPG on pettinzoo MPE environments."""
 
 import functools
 from datetime import datetime
@@ -22,8 +22,10 @@ from typing import Any, Dict, Mapping, Sequence, Union
 import launchpad as lp
 import numpy as np
 import sonnet as snt
+import tensorflow as tf
 from absl import app, flags
 from acme import types
+from acme.specs import BoundedArray, DiscreteArray
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
@@ -38,13 +40,13 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
     "env_class",
-    "sisl",
+    "mpe",
     "Pettingzoo environment class, e.g. atari (str).",
 )
 
 flags.DEFINE_string(
     "env_name",
-    "multiwalker_v7",
+    "simple_adversary_v2",
     "Pettingzoo environment name, e.g. pong (str).",
 )
 flags.DEFINE_string(
@@ -87,24 +89,35 @@ def make_networks(
     policy_networks = {}
     critic_networks = {}
     for key in specs.keys():
-
+        # TODO (dries): Make specs[key].actions
+        #  return a list of specs for hybrid action space
         # Get total number of action dimensions from action spec.
-        num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
+        agent_act_spec = specs[key].actions
+        if type(specs[key].actions) == DiscreteArray:
+            num_actions = agent_act_spec.num_values
+            minimum = [-1.0] * num_actions
+            maximum = [1.0] * num_actions
+            agent_act_spec = BoundedArray(
+                shape=(num_actions,),
+                minimum=minimum,
+                maximum=maximum,
+                dtype="float32",
+                name="actions",
+            )
 
+        num_dimensions = np.prod(agent_act_spec.shape, dtype=int)
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
-
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
         # Create the policy network.
         policy_network = snt.Sequential(
             [
-                observation_network,
                 networks.LayerNormMLP(
                     policy_networks_layer_sizes[key], activate_final=True
                 ),
                 networks.NearZeroInitializedLinear(num_dimensions),
-                networks.TanhToSpec(specs[key].actions),
+                networks.TanhToSpec(agent_act_spec),
                 networks.ClippedGaussian(sigma),
-                networks.ClipToSpec(specs[key].actions),
+                networks.ClipToSpec(agent_act_spec),
             ]
         )
 
@@ -136,7 +149,6 @@ def main(_: Any) -> None:
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        remove_on_fall=False,
     )
 
     network_factory = lp_utils.partial_kwargs(make_networks)

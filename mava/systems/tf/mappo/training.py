@@ -47,8 +47,8 @@ class MAPPOTrainer(mava.Trainer):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
+        policy_optimizers: Dict[str, snt.Optimizer],
+        critic_optimizers: Dict[str, snt.Optimizer],
         shared_weights: bool,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
@@ -65,8 +65,8 @@ class MAPPOTrainer(mava.Trainer):
         Args:
             policy_networks: ...
             critic_networks: ...
-            policy_optimizer: policy optimizer,
-            critic_optimizer: critic optimizer,
+            policy_optimizers: policy optimizer,
+            critic_optimizers: critic optimizer,
             shared_weights: ...
             discount: discount to use for TD updates.
             dataset: dataset to learn from, whether fixed or from a replay buffer
@@ -96,8 +96,8 @@ class MAPPOTrainer(mava.Trainer):
         self._critic_networks = critic_networks
 
         # Get optimizers
-        self._policy_optimizer = policy_optimizer
-        self._critic_optimizer = critic_optimizer
+        self._policy_optimizers = policy_optimizers
+        self._critic_optimizers = critic_optimizers
 
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
@@ -156,8 +156,8 @@ class MAPPOTrainer(mava.Trainer):
                     "policy": self._policy_networks[agent_key],
                     "critic": self._critic_networks[agent_key],
                     "observation": self._observation_networks[agent_key],
-                    "policy_optimizer": self._policy_optimizer,
-                    "critic_optimizer": self._critic_optimizer,
+                    "policy_optimizers": self._policy_optimizers,
+                    "critic_optimizers": self._critic_optimizers,
                 }
 
                 subdir = os.path.join("trainer", agent_key)
@@ -255,9 +255,9 @@ class MAPPOTrainer(mava.Trainer):
                 discount = discount[:-1]
 
                 # Get agent network
-                network_key = agent.split("_")[0] if self._shared_weights else agent
-                policy_network = self._policy_networks[network_key]
-                critic_network = self._critic_networks[network_key]
+                agent_key = agent.split("_")[0] if self._shared_weights else agent
+                policy_network = self._policy_networks[agent_key]
+                critic_network = self._critic_networks[agent_key]
 
                 # Reshape inputs.
                 dims = actor_observation.shape[:2]
@@ -342,15 +342,15 @@ class MAPPOTrainer(mava.Trainer):
         tape = self.tape
 
         for agent in self._agents:
-            # Get network_key.
-            network_key = agent.split("_")[0] if self._shared_weights else agent
+            # Get agent_key.
+            agent_key = agent.split("_")[0] if self._shared_weights else agent
 
             # Get trainable variables.
             policy_variables = (
-                self._observation_networks[network_key].trainable_variables
-                + self._policy_networks[network_key].trainable_variables
+                self._observation_networks[agent_key].trainable_variables
+                + self._policy_networks[agent_key].trainable_variables
             )
-            critic_variables = self._critic_networks[network_key].trainable_variables
+            critic_variables = self._critic_networks[agent_key].trainable_variables
 
             # Get gradients.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
@@ -365,8 +365,8 @@ class MAPPOTrainer(mava.Trainer):
             )
 
             # Apply gradients.
-            self._critic_optimizer.apply(critic_grads, critic_variables)
-            self._policy_optimizer.apply(policy_grads, policy_variables)
+            self._critic_optimizers[agent_key].apply(critic_grads, critic_variables)
+            self._policy_optimizers[agent_key].apply(policy_grads, policy_variables)
 
         train_utils.safe_del(self, "tape")
 
@@ -412,8 +412,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
+        policy_optimizers: Dict[str, snt.Optimizer],
+        critic_optimizers: Dict[str, snt.Optimizer],
         shared_weights: bool,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
@@ -435,8 +435,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             observation_networks=observation_networks,
             dataset=dataset,
             shared_weights=shared_weights,
-            policy_optimizer=policy_optimizer,
-            critic_optimizer=critic_optimizer,
+            policy_optimizers=policy_optimizers,
+            critic_optimizers=critic_optimizers,
             discount=discount,
             lambda_gae=lambda_gae,
             entropy_cost=entropy_cost,
