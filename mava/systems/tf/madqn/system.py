@@ -83,7 +83,7 @@ class MADQN:
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Union[
-            Type[training.MADQNTrainer], Type[training.RecurrentMADQNTrainer]
+            Type[training.MADQNTrainer], Type[training.MADQNRecurrentTrainer]
         ] = training.MADQNTrainer,
         communication_module: Type[BaseCommunicationModule] = None,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,

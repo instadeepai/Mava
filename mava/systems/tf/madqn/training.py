@@ -322,7 +322,7 @@ class MADQNTrainer(mava.Trainer):
         return variables
 
 
-class RecurrentMADQNTrainer(MADQNTrainer):
+class MADQNRecurrentTrainer(MADQNTrainer):
     """Recurrent MADQN trainer.
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -417,7 +417,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
         self.tape = tape
 
 
-class RecurrentCommMADQNTrainer(MADQNTrainer):
+class MADQNRecurrentCommTrainer(MADQNTrainer):
     """Recurrent MADQN trainer.
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.

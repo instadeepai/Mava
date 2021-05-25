@@ -30,10 +30,10 @@ from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
-from mava.systems.tf.madqn.training import RecurrentCommMADQNTrainer
+from mava.systems.tf.madqn.training import MADQNRecurrentCommTrainer
 
 
-class DIALSwitchTrainer(RecurrentCommMADQNTrainer):
+class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
     """Recurrent Comm DIAL Switch trainer.
     This is the trainer component of a DIAL system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.

@@ -89,8 +89,8 @@ class DIALBuilder:
         self,
         config: DIALConfig,
         trainer_fn: Type[
-            training.RecurrentCommMADQNTrainer
-        ] = training.RecurrentCommMADQNTrainer,
+            training.MADQNRecurrentCommTrainer
+        ] = training.MADQNRecurrentCommTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNRecurrentCommExecutor,
         extra_specs: Dict[str, Any] = {},
         exploration_scheduler_fn: Type[
@@ -222,7 +222,7 @@ class DIALBuilder:
         communication_module: BaseCommunicationModule,
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
-        trainer: Optional[training.RecurrentCommMADQNTrainer] = None,
+        trainer: Optional[training.MADQNRecurrentCommTrainer] = None,
         evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.

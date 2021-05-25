@@ -87,8 +87,8 @@ class DIAL:
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[
-            training.RecurrentCommMADQNTrainer
-        ] = training.RecurrentCommMADQNTrainer,
+            training.MADQNRecurrentCommTrainer
+        ] = training.MADQNRecurrentCommTrainer,
         communication_module: Type[BaseCommunicationModule] = BroadcastedCommunication,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         exploration_scheduler_fn: Type[
@@ -294,7 +294,7 @@ class DIAL:
         replay: reverb.Client,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        trainer: Optional[training.RecurrentCommMADQNTrainer] = None,
+        trainer: Optional[training.MADQNRecurrentCommTrainer] = None,
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
 
@@ -369,7 +369,7 @@ class DIAL:
         self,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        trainer: training.RecurrentCommMADQNTrainer,
+        trainer: training.MADQNRecurrentCommTrainer,
     ) -> Any:
         """The evaluation process."""
 
