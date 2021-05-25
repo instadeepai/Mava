@@ -578,7 +578,6 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
           target_observation_network: the target observation network.
           policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
           critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.

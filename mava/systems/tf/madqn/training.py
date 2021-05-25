@@ -52,7 +52,7 @@ class MADQNTrainer(mava.Trainer):
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         fingerprint: bool = False,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -75,7 +75,12 @@ class MADQNTrainer(mava.Trainer):
 
         # Other learner parameters.
         self._discount = discount
-        self._clipping = clipping
+        # Set up gradient clipping.
+        if max_gradient_norm is not None:
+            self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        else:  # A very large number. Infinity results in NaNs.
+            self._max_gradient_norm = tf.convert_to_tensor(1e10)
+
         self._fingerprint = fingerprint
 
         # Necessary to track when to update target networks.
@@ -299,9 +304,8 @@ class MADQNTrainer(mava.Trainer):
             # Compute gradients
             gradients = tape.gradient(q_network_losses[agent], q_network_variables)
 
-            # Maybe clip gradients.
-            if self._clipping:
-                gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+            # Clip gradients.
+            gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
 
             # Apply gradients.
             self._optimizers[agent_key].apply(gradients, q_network_variables)
@@ -338,7 +342,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         fingerprint: bool = False,
@@ -356,7 +360,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
             discount=discount,
             shared_weights=shared_weights,
             exploration_scheduler=exploration_scheduler,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             fingerprint=fingerprint,
