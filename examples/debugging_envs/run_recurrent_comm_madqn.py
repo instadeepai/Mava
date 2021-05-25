@@ -26,9 +26,7 @@ from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.components.tf.modules.communication.broadcasted import (
-    BroadcastedCommunication,
-)
+from mava.components.tf.modules.communication import BroadcastedCommunication
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.networks import (
     CommunicationNetwork,

@@ -32,8 +32,8 @@ from mava import adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.systems.tf.executors import (
     FeedForwardExecutor,
+    RecurrentCommExecutor,
     RecurrentExecutor,
-    RecurrentExecutorWithComms,
 )
 from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.types import OLT
@@ -290,7 +290,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         return actions
 
 
-class MADQNRecurrentCommExecutor(RecurrentExecutorWithComms):
+class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
     """A feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system
     which takes non-batched observations and outputs non-batched actions.
