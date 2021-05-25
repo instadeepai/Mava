@@ -621,10 +621,25 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # Centralised based
-        o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
-        o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
-        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        a_t_feed = tf.stack([x for x in a_t.values()], 1)
+        # o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
+        # o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
+        # a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
+        # a_t_feed = tf.stack([x for x in a_t.values()], 1)
+
+        o_tm1_vals = []
+        o_t_vals = []
+        a_tm1_vals = []
+        a_t_vals = []
+        for connected_agent in o_tm1_trans.keys():
+            o_tm1_vals.append(o_tm1_trans[connected_agent])
+            o_t_vals.append(o_t_trans[connected_agent])
+            a_tm1_vals.append(a_tm1[connected_agent])
+            a_t_vals.append(a_t[connected_agent])
+        o_tm1_feed = tf.stack(o_tm1_vals, 1)
+        o_t_feed = tf.stack(o_t_vals, 1)
+        a_tm1_feed = tf.stack(a_tm1_vals, 1)
+        a_t_feed = tf.stack(a_t_vals, 1)
+
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     def _get_dpg_feed(
@@ -749,6 +764,7 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         o_t_feed = tf.stack(o_t_vals, 1)
         a_tm1_feed = tf.stack(a_tm1_vals, 1)
         a_t_feed = tf.stack(a_t_vals, 1)
+
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     def _get_dpg_feed(
