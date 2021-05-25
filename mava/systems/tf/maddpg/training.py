@@ -136,15 +136,20 @@ class BaseMADDPGTrainer(mava.Trainer):
         # Create an iterator to go through the dataset.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        self._critic_optimizer = critic_optimizer
-        self._policy_optimizer = policy_optimizer
-
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
         if self._shared_weights:
             self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
+
+        # Create optimizers for different agent types.
+        # TODO(Kale-ab): Allow this to be passed as a system param.
+        self._policy_optimizers: snt.Optimizer = {}
+        self._critic_optimizers: snt.Optimizer = {}
+        for agent in self.unique_net_keys:
+            self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
+            self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -179,8 +184,8 @@ class BaseMADDPGTrainer(mava.Trainer):
                     "target_policy": self._target_policy_networks[agent_key],
                     "target_critic": self._target_critic_networks[agent_key],
                     "target_observation": self._target_observation_networks[agent_key],
-                    "policy_optimizer": self._policy_optimizer,
-                    "critic_optimizer": self._critic_optimizer,
+                    "policy_optimizer": self._policy_optimizers,
+                    "critic_optimizer": self._critic_optimizers,
                     "num_steps": self._num_steps,
                 }
 
@@ -413,8 +418,8 @@ class BaseMADDPGTrainer(mava.Trainer):
             )[0]
 
             # Apply gradients.
-            self._policy_optimizer.apply(policy_gradients, policy_variables)
-            self._critic_optimizer.apply(critic_gradients, critic_variables)
+            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
+            self._critic_optimizers[agent_key].apply(critic_gradients, critic_variables)
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
@@ -494,8 +499,8 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
+          policy_optimizer: the optimizers to be applied to the DPG (policy) loss.
+          critic_optimizer: the optimizers to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
@@ -657,11 +662,11 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         target_update_period: int,
         target_update_rate: float,
         dataset: tf.data.Dataset,
+        policy_optimizer: snt.Optimizer,
+        critic_optimizer: snt.Optimizer,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         shared_weights: bool = False,
-        policy_optimizer: snt.Optimizer = None,
-        critic_optimizer: snt.Optimizer = None,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -968,15 +973,20 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         # Create an iterator to go through the dataset.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        self._critic_optimizer = critic_optimizer
-        self._policy_optimizer = policy_optimizer
-
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
         if self._shared_weights:
             self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
+
+        # Create optimizers for different agent types.
+        # TODO(Kale-ab): Allow this to be passed as a system param.
+        self._policy_optimizers: snt.Optimizer = {}
+        self._critic_optimizers: snt.Optimizer = {}
+        for agent in self.unique_net_keys:
+            self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
+            self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -1011,8 +1021,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                     "target_policy": self._target_policy_networks[agent_key],
                     "target_critic": self._target_critic_networks[agent_key],
                     "target_observation": self._target_observation_networks[agent_key],
-                    "policy_optimizer": self._policy_optimizer,
-                    "critic_optimizer": self._critic_optimizer,
+                    "policy_optimizer": self._policy_optimizers,
+                    "critic_optimizer": self._critic_optimizers,
                     "num_steps": self._num_steps,
                 }
 
@@ -1331,8 +1341,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             )[0]
 
             # Apply gradients.
-            self._policy_optimizer.apply(policy_gradients, policy_variables)
-            self._critic_optimizer.apply(critic_gradients, critic_variables)
+            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
+            self._critic_optimizers[agent_key].apply(critic_gradients, critic_variables)
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
