@@ -324,7 +324,7 @@ class MADDPGBuilder(SystemBuilder):
         target_update_rate = self._config.target_update_rate
 
         # trainer args
-        trainer_config = {
+        trainer_config: Dict[str, Any] = {
             "agents": agents,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],
