@@ -184,6 +184,7 @@ def main(_: Any) -> None:
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
         trainer_fn=maddpg.CentralisedMADDPGTrainer,
+        shared_weights=False,
     ).build()
 
     # launch

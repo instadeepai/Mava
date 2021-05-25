@@ -636,8 +636,8 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
+        tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
-        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
         dpg_a_t_feed[agent] = dpg_a_t
         return dpg_a_t_feed
 
@@ -760,8 +760,8 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
+        tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
-        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
         dpg_a_t_feed[agent] = dpg_a_t
         return dpg_a_t_feed
 
@@ -869,8 +869,8 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
+        tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
-        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
         dpg_a_t_feed[agent] = dpg_a_t
 
         return dpg_a_t_feed
@@ -1565,8 +1565,8 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
+        tree.map_structure(tf.stop_gradient, actions)
         dpg_actions_feed = copy.copy(actions)
-        tree.map_structure(tf.stop_gradient, dpg_actions_feed)
         dpg_actions_feed[agent] = dpg_actions
         dpg_actions_feed = tf.squeeze(
             tf.stack([x for x in dpg_actions_feed.values()], -1)
@@ -1678,8 +1678,8 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
+        tree.map_structure(tf.stop_gradient, actions)
         dpg_actions_feed = copy.copy(actions)
-        tree.map_structure(tf.stop_gradient, dpg_actions_feed)
         dpg_actions_feed[agent] = dpg_actions
         dpg_actions_feed = tf.squeeze(
             tf.stack([x for x in dpg_actions_feed.values()], -1)

@@ -167,6 +167,7 @@ def main(_: Any) -> None:
         trainer_fn=StateBasedRecurrentMADDPGTrainer,
         executor_fn=MADDPGRecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
+        shared_weights=False,
     ).build()
 
     # launch
