@@ -170,21 +170,20 @@ class VDNTrainer(MADQNTrainer):
 
     def _backward(self) -> None:
         # Calculate the gradients and update the networks
-        trainable_variables = []
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
             # Get trainable variables.
-            trainable_variables += self._q_networks[agent_key].trainable_variables
+            trainable_variables = self._q_networks[agent_key].trainable_variables
 
-        # Compute gradients.
-        gradients = self.tape.gradient(self.loss, trainable_variables)
+            # Compute gradients.
+            gradients = self.tape.gradient(self.loss, trainable_variables)
 
-        # Maybe clip gradients.
-        if self._clipping:
-            gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+            # Maybe clip gradients.
+            if self._clipping:
+                gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
 
-        # Apply gradients.
-        self._optimizers[agent_key].apply(gradients, trainable_variables)
+            # Apply gradients.
+            self._optimizers[agent_key].apply(gradients, trainable_variables)
 
         # Delete the tape manually because of the persistent=True flag.
         train_utils.safe_del(self, "tape")

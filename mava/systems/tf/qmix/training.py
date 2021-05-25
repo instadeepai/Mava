@@ -15,7 +15,7 @@
 
 """Qmix trainer implementation."""
 
-from typing import Any, Dict, List, Sequence, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 import sonnet as snt
@@ -65,6 +65,7 @@ class QMIXTrainer(MADQNTrainer):
 
         self._mixing_network = mixing_network
         self._target_mixing_network = target_mixing_network
+        self._optimizer = optimizer
 
         super(QMIXTrainer, self).__init__(
             agents=agents,
@@ -110,18 +111,29 @@ class QMIXTrainer(MADQNTrainer):
 
     def _update_target_networks(self) -> None:
         # Update target networks (incl. mixing networks).
-        for key in self.unique_net_keys:
-            online_variables = [*self._q_networks[key].variables,]
-            target_variables = [*self._target_q_networks[key].variables,]
+        if tf.math.mod(self._num_steps, self._target_update_period) == 0:
+            for key in self.unique_net_keys:
+                online_variables = [
+                    *self._q_networks[key].variables,
+                ]
+                target_variables = [
+                    *self._target_q_networks[key].variables,
+                ]
 
-            # NOTE These shouldn't really be in the agent for loop.
-            online_variables += self._mixing_network.variables
-            target_variables += self._target_mixing_network.variables
-
-            # Make online -> target network update ops.
-            if tf.math.mod(self._num_steps, self._target_update_period) == 0:
+                # Make online -> target network update ops.
                 for src, dest in zip(online_variables, target_variables):
                     dest.assign(src)
+
+            # NOTE These shouldn't really be in the agent for loop.
+            online_variables = [
+                *self._mixing_network.variables,
+            ]
+            target_variables = [
+                *self._target_mixing_network.variables,
+            ]
+            # Make online -> target network update ops.
+            for src, dest in zip(online_variables, target_variables):
+                dest.assign(src)
 
         self._num_steps.assign_add(1)
 
@@ -199,38 +211,37 @@ class QMIXTrainer(MADQNTrainer):
             q_targets = tf.concat(q_targets, axis=1)  # [B, num_agents]
 
             q_tot_mixed = self._mixing_network(q_acts, s_tm1)  # [B, 1, 1]
-            q_tot_target_mixed = self._target_mixing_network(q_targets, s_t)  # [B, 1, 1]
+            q_tot_target_mixed = self._target_mixing_network(
+                q_targets, s_t
+            )  # [B, 1, 1]
 
             # Calculate Q loss.
             targets = rewards + pcont * q_tot_target_mixed
             targets = tf.stop_gradient(targets)
             td_error = targets - q_tot_mixed
-            
+
             # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
             self.loss = 0.5 * tf.reduce_mean(tf.square(td_error))
             self.tape = tape
 
     def _backward(self) -> None:
-        # Calculate the gradients and update the networks
-        trainable_variables = []
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-            # Get trainable variables.
-            trainable_variables += self._q_networks[agent_key].trainable_variables
 
-        trainable_variables += self._mixing_network.trainable_variables
+            # Update agent networks
+            variables = self._q_networks[agent_key].trainable_variables
+            gradients = self.tape.gradient(self.loss, variables)
+            if self._clipping:
+                gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+            self._optimizers[agent_key].apply(gradients, variables)
 
-        # Compute gradients.
-        gradients = self.tape.gradient(self.loss, trainable_variables)
-
-        # Maybe clip gradients.
+        # Update mixing network
+        variables = self._mixing_network.trainable_variables
+        gradients = self.tape.gradient(self.loss, variables)
         if self._clipping:
             gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+        self._optimizer.apply(gradients, variables)
 
-        # Apply gradients.
-        self._optimizers[agent_key].apply(gradients, trainable_variables)
-
-        # Delete the tape manually because of the persistent=True flag.
         train_utils.safe_del(self, "tape")
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
