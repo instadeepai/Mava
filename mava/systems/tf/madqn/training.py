@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -64,7 +65,6 @@ class MADQNTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
-        self._optimizer = optimizer
         self._checkpoint = checkpoint
 
         # Store online and target q-networks.
@@ -97,6 +97,12 @@ class MADQNTrainer(mava.Trainer):
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
+        # Create optimizers for different agent types.
+        # TODO(Kale-ab): Allow this to be passed as a system param.
+        self._optimizers: snt.Optimizer = {}
+        for agent in self.unique_net_keys:
+            self._optimizers[agent] = copy.deepcopy(optimizer)
+
         # Expose the variables.
         q_networks_to_expose = {}
         self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
@@ -123,7 +129,7 @@ class MADQNTrainer(mava.Trainer):
                         "counter": self._counter,
                         "q_network": self._q_networks[agent_key],
                         "target_q_network": self._target_q_networks[agent_key],
-                        "optimizer": self._optimizer,
+                        "optimizer": self._optimizers,
                         "num_steps": self._num_steps,
                     },
                     enable_checkpointing=checkpoint,
@@ -300,7 +306,7 @@ class MADQNTrainer(mava.Trainer):
                 gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
 
             # Apply gradients.
-            self._optimizer.apply(gradients, q_network_variables)
+            self._optimizers[agent_key].apply(gradients, q_network_variables)
 
         train_utils.safe_del(self, "tape")
 

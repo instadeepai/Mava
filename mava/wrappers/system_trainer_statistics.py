@@ -409,7 +409,7 @@ class NetworkStatistics(NetworkStatisticsBase):
                 policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
 
             # Apply gradients.
-            self._policy_optimizer.apply(policy_gradients, policy_variables)
+            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
 
             if log_current_timestep:
                 if self.log_weights:
@@ -509,8 +509,8 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             )[0]
 
             # Apply gradients.
-            self._policy_optimizer.apply(policy_gradients, policy_variables)
-            self._critic_optimizer.apply(critic_gradients, critic_variables)
+            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
+            self._critic_optimizers[agent_key].apply(critic_gradients, critic_variables)
 
             if log_current_timestep:
                 if self.log_weights:
