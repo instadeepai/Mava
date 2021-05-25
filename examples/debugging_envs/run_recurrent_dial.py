@@ -35,9 +35,6 @@ from mava.components.tf.networks import (
     epsilon_greedy_action_selector,
 )
 from mava.systems.tf import dial
-
-# from mava.systems.tf.madqn.execution import MADQNRecurrentCommExecutor
-# from mava.systems.tf.madqn.training import RecurrentCommMADQNTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -162,13 +159,11 @@ def main(_: Any) -> None:
         num_executors=2,
         trainer_fn=dial.DIALSwitchTrainer,
         executor_fn=dial.DIALSwitchExecutor,
-        # trainer_fn=RecurrentCommMADQNTrainer,
-        # executor_fn=MADQNRecurrentCommExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
         communication_module=BroadcastedCommunication,
         sequence_length=6,
         epsilon_min=0.05,
-        epsilon_decay=5e-4,
+        epsilon_decay=2.5e-4,
         # optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         optimizer=snt.optimizers.RMSProp(learning_rate=1e-4, momentum=0.95),
         checkpoint_subpath=checkpoint_dir,
