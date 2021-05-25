@@ -1401,6 +1401,7 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
+        communication_module: Optional[BaseCommunicationModule] = None,
     ):
         """Initializes the learner.
         Args:
@@ -1481,6 +1482,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
+        communication_module: Optional[BaseCommunicationModule] = None,
     ):
         """Initializes the learner.
         Args:
@@ -1759,6 +1761,51 @@ class DecentralisedRecurrentCommMADDPGTrainer(BaseRecurrentMADDPGTrainer):
 
         self._communication_module = communication_module
 
+    def _policy_actions_messages(
+        self,
+        network: snt.Module,
+        obs_trans: Dict[str, np.ndarray],
+        core_state: Dict[str, np.ndarray],
+        core_messages: Dict[str, np.ndarray],
+    ) -> Any:
+        actions: Dict[str, tf.Tensor] = {agent: [] for agent in self._agents}
+
+        states = {agent: core_state[agent][0] for agent in self._agents}
+
+        messages = {agent: core_messages[agent][0] for agent in self._agents}
+
+        obs = {
+            agent: tf2_utils.batch_to_sequence(obs_trans[agent])
+            for agent in self._agents
+        }
+
+        T = obs[self._agents[0]].shape[0]
+
+        for t in range(0, T, 1):
+            channel = self._communication_module.process_messages(messages)
+            for agent in self._agents:
+                time.time()
+                agent_key = self.agent_net_keys[agent]
+
+                (output, m), s = network[agent_key](
+                    obs[agent][t],
+                    states[agent],
+                    channel[agent],
+                )
+
+                messages[agent] = m
+                states[agent] = s
+
+                actions[agent].append(output)
+
+        actions = {
+            agent: tf.concat([[action] for action in actions[agent]], axis=0)
+            for agent in self._agents
+        }
+
+        # print(actions[self._agents[0]])
+        return actions
+
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
         data = inputs.data
@@ -1777,6 +1824,8 @@ class DecentralisedRecurrentCommMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         # extract the first state in the sequence..
         core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
         target_core_state = tree.map_structure(tf.identity, core_state)
+        core_message = tree.map_structure(lambda s: s[:, 0, :], extras["core_messages"])
+        target_core_message = core_message
 
         # TODO (dries): Take out all the data_points that does not need
         #  to be processed here at the start. Therefore it does not have
@@ -1792,8 +1841,19 @@ class DecentralisedRecurrentCommMADDPGTrainer(BaseRecurrentMADDPGTrainer):
 
             obs_trans, target_obs_trans = self._transform_observations(observations)
 
-            target_actions = self._target_policy_actions(
-                target_obs_trans, target_core_state
+            target_actions = self._policy_actions_messages(
+                self._target_policy_networks,
+                target_obs_trans,
+                target_core_state,
+                target_core_message,
+            )
+
+            # transposed_obs = tf2_utils.batch_to_sequence(obs_agent_feed)
+            actions = self._policy_actions_messages(
+                self._policy_networks,
+                target_obs_trans,
+                core_state,
+                core_message,
             )
 
             for agent in self._agents:
@@ -1851,13 +1911,7 @@ class DecentralisedRecurrentCommMADDPGTrainer(BaseRecurrentMADDPGTrainer):
                 self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
 
                 # Actor learning.
-                obs_agent_feed = target_obs_trans[agent]
-                # TODO (dries): Why is there an extra tuple?
-                agent_core_state = core_state[agent][0]
-                transposed_obs = tf2_utils.batch_to_sequence(obs_agent_feed)
-                outputs, updated_states = snt.static_unroll(
-                    self._policy_networks[agent_key], transposed_obs, agent_core_state
-                )
+                outputs = actions[agent]
 
                 dpg_actions = tf2_utils.batch_to_sequence(outputs)
 

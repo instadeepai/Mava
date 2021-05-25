@@ -288,13 +288,22 @@ class MADDPGBuilder(SystemBuilder):
             variable_client.update_and_wait()
 
         # Create the actor which defines how we take actions.
+        if communication_module is not None:
+            return self._executor_fn(
+                policy_networks=policy_networks,
+                agent_specs=self._config.environment_spec.get_agent_specs(),
+                shared_weights=shared_weights,
+                variable_client=variable_client,
+                adder=adder,
+                communication_module=communication_module,
+            )
+
         return self._executor_fn(
             policy_networks=policy_networks,
             agent_specs=self._config.environment_spec.get_agent_specs(),
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
-            communication_module=communication_module,
         )
 
     def make_trainer(
@@ -350,12 +359,15 @@ class MADDPGBuilder(SystemBuilder):
             "logger": logger,
             "checkpoint": self._config.checkpoint,
             "checkpoint_subpath": self._config.checkpoint_subpath,
-            "communication_module": communication_module,
         }
+        if communication_module is not None:
+            trainer_config["communication_module"] = (communication_module,)
+
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
 
         # The learner updates the parameters (and initializes them).
+
         trainer = self._trainer_fn(**trainer_config)
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.

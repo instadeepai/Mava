@@ -394,4 +394,4 @@ class MADDPGRecurrentCommExecutor(executors.RecurrentCommExecutor):
                 "core_states": numpy_states,
                 "core_messages": numpy_messages,
             }
-            self._adder.add(actions, next_timestep, next_extras)  # type: ignore
+            self._adder.add(policy, next_timestep, next_extras)  # type: ignore

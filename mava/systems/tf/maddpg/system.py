@@ -345,7 +345,8 @@ class MADDPG:
                 channel_size=1,
                 channel_noise=0,
             )
-            behaviour_policy_networks = communication_module.create_system()
+            networks = communication_module.create_system()
+            behaviour_policy_networks = networks["policies"]
         else:
             # create variables
             _ = system.create_system()
@@ -416,6 +417,7 @@ class MADDPG:
         # Create system architecture with target networks.
         system = self._architecture(**architecture_config)
 
+        communication_module = None
         if self._communication_module_fn is not None:
             communication_module = self._communication_module_fn(
                 architecture=system,
@@ -423,7 +425,8 @@ class MADDPG:
                 channel_size=1,
                 channel_noise=0,
             )
-            behaviour_policy_networks = communication_module.create_system()
+            networks = communication_module.create_system()
+            behaviour_policy_networks = networks["policies"]
         else:
             # create variables
             _ = system.create_system()
@@ -432,11 +435,17 @@ class MADDPG:
             behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the agent.
-        executor = self._builder.make_executor(
-            policy_networks=behaviour_policy_networks,
-            variable_source=variable_source,
-            communication_module=communication_module,
-        )
+        if communication_module is not None:
+            executor = self._builder.make_executor(
+                policy_networks=behaviour_policy_networks,
+                variable_source=variable_source,
+                communication_module=communication_module,
+            )
+        else:
+            executor = self._builder.make_executor(
+                policy_networks=behaviour_policy_networks,
+                variable_source=variable_source,
+            )
 
         # Make the environment.
         environment = self._environment_factory(evaluation=True)  # type: ignore
