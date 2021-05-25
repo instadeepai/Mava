@@ -169,7 +169,7 @@ class VDNTrainer(MADQNTrainer):
             gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
 
         # Apply gradients.
-        self._optimizer.apply(gradients, trainable_variables)
+        self._optimizers[agent_key].apply(gradients, trainable_variables)
 
         # Delete the tape manually because of the persistent=True flag.
         train_utils.safe_del(self, "tape")

@@ -13,38 +13,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running DIAL"""
+"""Example running continous MADDPG on pettinzoo MPE environments."""
+
 import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
 
 import launchpad as lp
 import numpy as np
-import tensorflow as tf
+import sonnet as snt
 from absl import app, flags
 from acme import types
+from acme.tf import networks
 from acme.tf import utils as tf2_utils
-from acme.wrappers.gym_wrapper import _convert_to_spec
-from gym import spaces
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.components.tf.networks import DIALPolicy
-from mava.systems.tf import dial
+from mava.systems.tf import maddpg
 from mava.utils import lp_utils
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
+
+flags.DEFINE_string(
+    "env_class",
+    "sisl",
+    "Pettingzoo environment class, e.g. atari (str).",
+)
+
 flags.DEFINE_string(
     "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "multiwalker_v7",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 flags.DEFINE_string(
     "mava_id",
@@ -54,95 +55,88 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
-# TODO Kevin: Define message head node correctly
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_network_gru_hidden_sizes: Union[Dict[str, int], int] = 128,
-    policy_network_gru_layers: Union[Dict[str, int], int] = 2,
-    policy_network_task_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    policy_network_message_in_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    policy_network_message_out_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    policy_network_output_mlp_sizes: Union[Dict[str, Sequence], Sequence] = (128,),
-    message_size: int = 10,
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+        256,
+        256,
+        256,
+    ),
+    critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
-    # extra_specs = environment_spec.get_extra_specs()
 
     # Create agent_type specs
     if shared_weights:
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
-    if isinstance(policy_network_gru_hidden_sizes, int):
-        policy_network_gru_hidden_sizes = {
-            key: policy_network_gru_hidden_sizes for key in specs.keys()
+    if isinstance(policy_networks_layer_sizes, Sequence):
+        policy_networks_layer_sizes = {
+            key: policy_networks_layer_sizes for key in specs.keys()
         }
-
-    if isinstance(policy_network_gru_layers, int):
-        policy_network_gru_layers = {
-            key: policy_network_gru_layers for key in specs.keys()
-        }
-
-    if isinstance(policy_network_task_mlp_sizes, Sequence):
-        policy_network_task_mlp_sizes = {
-            key: policy_network_task_mlp_sizes for key in specs.keys()
-        }
-
-    if isinstance(policy_network_message_in_mlp_sizes, Sequence):
-        policy_network_message_in_mlp_sizes = {
-            key: policy_network_message_in_mlp_sizes for key in specs.keys()
-        }
-
-    if isinstance(policy_network_message_out_mlp_sizes, Sequence):
-        policy_network_message_out_mlp_sizes = {
-            key: policy_network_message_out_mlp_sizes for key in specs.keys()
-        }
-
-    if isinstance(policy_network_output_mlp_sizes, Sequence):
-        policy_network_output_mlp_sizes = {
-            key: policy_network_output_mlp_sizes for key in specs.keys()
+    if isinstance(critic_networks_layer_sizes, Sequence):
+        critic_networks_layer_sizes = {
+            key: critic_networks_layer_sizes for key in specs.keys()
         }
 
     observation_networks = {}
     policy_networks = {}
-
+    critic_networks = {}
     for key in specs.keys():
-        # Create the shared observation network
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
+
+        # Get total number of action dimensions from action spec.
+        num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
+
+        # Create the shared observation network; here simply a state-less operation.
+        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
-        policy_network = DIALPolicy(
-            action_spec=specs[key].actions,
-            message_spec=_convert_to_spec(
-                spaces.Box(-np.inf, np.inf, (message_size,), dtype=np.float32)
-            ),
-            gru_hidden_size=policy_network_gru_hidden_sizes[key],
-            gru_layers=policy_network_gru_layers[key],
-            task_mlp_size=policy_network_task_mlp_sizes[key],
-            message_in_mlp_size=policy_network_message_in_mlp_sizes[key],
-            message_out_mlp_size=policy_network_message_out_mlp_sizes[key],
-            output_mlp_size=policy_network_output_mlp_sizes[key],
+        policy_network = snt.Sequential(
+            [
+                observation_network,
+                networks.LayerNormMLP(
+                    policy_networks_layer_sizes[key], activate_final=True
+                ),
+                networks.NearZeroInitializedLinear(num_dimensions),
+                networks.TanhToSpec(specs[key].actions),
+                networks.ClippedGaussian(sigma),
+                networks.ClipToSpec(specs[key].actions),
+            ]
         )
 
+        # Create the critic network.
+        critic_network = snt.Sequential(
+            [
+                # The multiplexer concatenates the observations/actions.
+                networks.CriticMultiplexer(),
+                networks.LayerNormMLP(
+                    critic_networks_layer_sizes[key], activate_final=False
+                ),
+                snt.Linear(1),
+            ]
+        )
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
+        critic_networks[key] = critic_network
 
     return {
         "policies": policy_networks,
+        "critics": critic_networks,
         "observations": observation_networks,
     }
 
 
 def main(_: Any) -> None:
 
-    # environment
-    environment_factory = lp_utils.partial_kwargs(
-        debugging_utils.make_environment,
+    environment_factory = functools.partial(
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        remove_on_fall=False,
     )
 
     network_factory = lp_utils.partial_kwargs(make_networks)
@@ -161,17 +155,17 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    program = dial.DIAL(
+    program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=10,
-        batch_size=32,
-        sequence_length=100,
+        num_executors=2,
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
-    # launch
+    # Launch gpu config - let trainer use gpu.
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
@@ -179,6 +173,7 @@ def main(_: Any) -> None:
         "evaluator": PythonProcess(env=env_vars),
         "executor": PythonProcess(env=env_vars),
     }
+
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
