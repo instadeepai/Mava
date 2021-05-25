@@ -1272,11 +1272,13 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
                 dpg_actions = tf2_utils.batch_to_sequence(outputs)
 
-                # Note (dries): This is done to so that losses.dpg can verify using gradient.tape that there is a
+                # Note (dries): This is done to so that losses.dpg
+                # can verify using gradient.tape that there is a
                 # gradient relationship between dpg_q_values and dpg_actions_comb.
                 dpg_actions_comb, dim = train_utils.combine_dim(dpg_actions)
 
-                # Note (dries): This seemingly useless line is is important! Don't remove it. See above note.
+                # Note (dries): This seemingly useless line is is important!
+                # Don't remove it. See above note.
                 dpg_actions = train_utils.extract_dim(dpg_actions_comb, dim)
 
                 # Get dpg actions
@@ -1288,7 +1290,9 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(dpg_actions_feed)
 
-                dpg_q_values = tf.squeeze(self._critic_networks[agent_key](obs_comb, act_comb))
+                dpg_q_values = tf.squeeze(
+                    self._critic_networks[agent_key](obs_comb, act_comb)
+                )
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
                 dqda_clipping = 1.0 if self._max_gradient_norm is not None else None

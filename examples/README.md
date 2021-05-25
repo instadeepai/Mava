@@ -29,7 +29,7 @@ We include a number of systems running on continuous control tasks.
     an MA-DDPG system (with video wrapping) on the continuous action space simple_spread MPE debugging environment.
 -   [MA-DDPG (networked, feedforward)](debugging_envs/run_networked_feedforward_maddpg.py):
     an MA-D4PG system on the continuous action space simple_spread MPE debugging environment.
-    
+
 -   [MA-DDPG (state-based, recurrent)](debugging_envs/run_state_based_recurrent_maddpg.py):
     an MA-D4PG system on the continuous action space simple_spread MPE debugging environment.
 -   [PPO (centralised, feedforward)](petting_zoo/run_centralised_feedforward_mappo.py):
@@ -49,7 +49,7 @@ We include a number of systems running on continuous control tasks.
 
 We also include a number of systems running on discrete action space environments.
 -   [MA-D4PG (decentralised, feedforward)](debugging_envs/run_decentralised_feedforward_discrete_mad4pg.py):
-    an MA-D4PG system on the discrete action space simple_spread MPE debugging environment.    
+    an MA-D4PG system on the discrete action space simple_spread MPE debugging environment.
 -   [MA-DDPG (decentralised, feedforward)](debugging_envs/run_decentralised_feedforward_discrete_maddpg.py):
     an MA-DDPG system on the discrete action space simple_spread MPE debugging environment.
 -   [MA-DQN (feedforward)](debugging_envs/run_feedforward_madqn.py):
@@ -74,4 +74,3 @@ We also include a number of systems running on discrete action space environment
     a QMIX system on the two step custom environment.
 -   [VDN](petting_zoo/run_feedforward_vdn.py):
     a VDN system on the two step custom environment.
-
