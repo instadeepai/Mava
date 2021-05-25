@@ -15,7 +15,7 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Mapping, Optional
 
 import launchpad as lp
 import sonnet as snt
@@ -26,11 +26,15 @@ from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf.modules.communication import BroadcastedCommunication
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.components.tf.networks import epsilon_greedy_action_selector
+from mava.components.tf.networks import (
+    CommunicationNetwork,
+    epsilon_greedy_action_selector,
+)
 from mava.systems.tf import madqn
-from mava.systems.tf.madqn.execution import MADQNRecurrentExecutor
-from mava.systems.tf.madqn.training import MADQNRecurrentTrainer
+from mava.systems.tf.madqn.execution import MADQNRecurrentCommExecutor
+from mava.systems.tf.madqn.training import MADQNRecurrentCommTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -57,11 +61,7 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        512,
-        512,
-        256,
-    ),
+    message_size: int = 10,
     shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -72,9 +72,6 @@ def make_networks(
     if shared_weights:
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
-
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
     def action_selector_fn(
         q_values: types.NestedTensor,
@@ -92,16 +89,29 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
 
-        # Create the policy network.
-        q_network = snt.DeepRNN(
-            [
-                networks.LayerNormMLP(
-                    q_networks_layer_sizes[key], activate_final=False
-                ),
-                snt.LSTM(25),
-                snt.nets.MLP([128]),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
+        q_network = CommunicationNetwork(
+            networks.LayerNormMLP(
+                (128,),
+                activate_final=True,
+            ),
+            networks.LayerNormMLP(
+                (128,),
+                activate_final=True,
+            ),
+            snt.LSTM(128),
+            snt.Sequential(
+                [
+                    networks.LayerNormMLP((128,), activate_final=True),
+                    networks.NearZeroInitializedLinear(num_dimensions),
+                    networks.TanhToSpec(specs[key].actions),
+                ]
+            ),
+            snt.Sequential(
+                [
+                    networks.LayerNormMLP((128, message_size), activate_final=True),
+                ]
+            ),
+            message_size=message_size,
         )
 
         # epsilon greedy action selector
@@ -131,7 +141,6 @@ def main(_: Any) -> None:
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-    # loggers
     log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
@@ -148,9 +157,10 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=MADQNRecurrentTrainer,
-        executor_fn=MADQNRecurrentExecutor,
+        trainer_fn=MADQNRecurrentCommTrainer,
+        executor_fn=MADQNRecurrentCommExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
+        communication_module=BroadcastedCommunication,
         epsilon_min=0.05,
         epsilon_decay=5e-4,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
