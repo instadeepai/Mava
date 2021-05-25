@@ -53,7 +53,9 @@ class HyperNetwork(snt.Module):
 
         # Set up hypernetwork configuration
         if self._num_hypernet_layers == 1:
-            self.hyper_w1 = snt.nets.MLP(output_sizes=[self._qmix_hidden_dim])
+            self.hyper_w1 = snt.nets.MLP(
+                output_sizes=[self._qmix_hidden_dim * self._n_agents]
+            )
             self.hyper_w2 = snt.nets.MLP(output_sizes=[self._qmix_hidden_dim])
 
         # Default

@@ -20,6 +20,7 @@ MADDPG=examples/debugging_envs/run_decentralised_feedforward_maddpg_continous.py
 MAPPO=examples/debugging_envs/run_decentralised_feedforward_mappo.py
 MADQN=examples/debugging_envs/run_feedforward_madqn.py
 QMIX=examples/debugging_envs/run_feedforward_qmix.py
+QMIXv2=examples/debugging_envs/run_feedforward_qmix_V2.py
 VDN=examples/debugging_envs/run_feedforward_vdn.py
 
 MADDPG-PZ=examples/petting_zoo/run_decentralised_feedforward_maddpg_continous.py
@@ -43,6 +44,9 @@ run-mappo:
 
 run-qmix:
 	$(DOCKER_RUN) python  $(QMIX) --base_dir /home/app/mava/logs/
+
+run-qmix-v2:
+	$(DOCKER_RUN) python  $(QMIXv2) --base_dir /home/app/mava/logs/
 
 run-vdn:
 	$(DOCKER_RUN) python $(VDN) --base_dir /home/app/mava/logs/

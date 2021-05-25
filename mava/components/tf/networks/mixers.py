@@ -3,7 +3,6 @@ from typing import Any
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-from tensorflow import keras
 
 
 class AdditiveMixingNetwork(snt.Module):
@@ -25,7 +24,7 @@ class QMixer(snt.Module):
         self.embed_dim = mixing_embed_dim
         self.state_dim = int(np.prod(state_shape))
 
-        self.hyper_w_1 = snt.Linear(self.embed_dim*self.n_agents)
+        self.hyper_w_1 = snt.Linear(self.embed_dim * self.n_agents)
         self.hyper_w_final = snt.Linear(self.embed_dim)
 
         # State dependent bias for hidden layer
@@ -65,7 +64,6 @@ class QMixer(snt.Module):
         # print("w_final: ", w_final.shape)
         # print("v: ", v.shape)
         y = tf.linalg.matmul(hidden, w_final) + v
-        # print("tf.linalg.matmul(hidden, w_final): ", tf.linalg.matmul(hidden, w_final).shape)
         # print("y: ", y.shape)
         # Reshape and return
         q_tot = tf.reshape(y, (bs, -1, 1))

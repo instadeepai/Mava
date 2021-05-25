@@ -62,7 +62,7 @@ flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64,),
+    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -148,9 +148,10 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=2,
         exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.01,
-        epsilon_decay=1e-4,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        epsilon_min=0.05,
+        epsilon_decay=3e-4,
+        max_replay_size=1000000,
+        optimizer=snt.optimizers.RMSProp(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()
 

@@ -57,8 +57,9 @@ flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        64,
-        64,
+        512,
+        512,
+        256,
     ),
     shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:

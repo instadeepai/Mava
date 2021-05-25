@@ -80,7 +80,7 @@ class QMIX(MADQN):
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
-        mixer: Type[mixing.BaseMixingModule] = mixing.MonotonicMixing,
+        mixer: Type[mixing.MonotonicMixing] = mixing.MonotonicMixing,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
@@ -93,7 +93,7 @@ class QMIX(MADQN):
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
-        max_replay_size: int = 1000,
+        max_replay_size: int = 1000000,
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
         sequence_length: int = 20,
@@ -205,6 +205,7 @@ class QMIX(MADQN):
             architecture=architecture,
             environment_spec=self._environment_spec,
             agent_networks=agent_networks,
+            num_hypernet_layers=1,
         ).create_system()
 
         # create logger
