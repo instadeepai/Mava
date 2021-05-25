@@ -306,6 +306,10 @@ class RecurrentCommExecutor(RecurrentExecutor):
         self._communication_module = communication_module
         self._shared_weights = shared_weights
 
+    def _update_message(self, agent: str, new_message: types.NestedArray) -> None:
+        # Bookkeeping of recurrent messages for the observe method.
+        self._messages[agent] = new_message
+
     def _sample_action(
         self, action_policy: types.NestedTensor, agent: str
     ) -> types.NestedTensor:
@@ -448,9 +452,7 @@ class RecurrentCommExecutor(RecurrentExecutor):
         # Return a numpy array with squeezed out batch dimension.
         return tf2_utils.to_numpy_squeeze(policy_output)
 
-    def select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
+    def select_actions(self, observations: Dict[str, types.NestedArray]) -> Any:
         actions = {}
         for agent, observation in observations.items():
             actions[agent] = self._select_action(agent, observations)

@@ -28,6 +28,7 @@ from acme.tf import variable_utils as tf2_variable_utils
 from dm_env import specs
 
 from mava import adders
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.systems.tf import executors
 
 Array = specs.Array
@@ -255,3 +256,142 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             self._adder.add(policy, next_timestep, next_extras)  # type: ignore
         else:
             self._adder.add(policy, next_timestep, numpy_states)  # type: ignore
+
+
+class MADDPGRecurrentCommExecutor(executors.RecurrentCommExecutor):
+    def __init__(
+        self,
+        policy_networks: Dict[str, snt.Module],
+        communication_module: BaseCommunicationModule,
+        agent_specs: Dict[str, EnvironmentSpec],
+        adder: Optional[adders.ParallelAdder] = None,
+        variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        shared_weights: bool = True,
+        store_recurrent_state: bool = True,
+    ):
+        # Store these for later use.
+        self._agent_specs = agent_specs
+
+        super().__init__(
+            policy_networks=policy_networks,
+            communication_module=communication_module,
+            shared_weights=shared_weights,
+            adder=adder,
+            variable_client=variable_client,
+            store_recurrent_state=store_recurrent_state,
+        )
+
+    @tf.function
+    def _policy(
+        self,
+        agent: str,
+        observation: types.NestedTensor,
+        state: types.NestedTensor,
+        message: types.NestedTensor,
+    ) -> Tuple[
+        types.NestedTensor, types.NestedTensor, types.NestedTensor, types.NestedTensor
+    ]:
+
+        # Add a dummy batch dimension and as a side effect convert numpy to TF.
+        batched_observation = tf2_utils.add_batch_dim(observation)
+
+        # index network either on agent type or on agent id
+        agent_key = agent.split("_")[0] if self._shared_weights else agent
+
+        # Compute the policy, conditioned on the observation.
+        (policy, message_policy), new_state = self._policy_networks[agent_key](
+            batched_observation,
+            state,
+            message,
+        )
+
+        # TODO (dries): Make this support hybrid action spaces.
+        if type(self._agent_specs[agent].actions) == BoundedArray:
+            # Continuous action
+            action = policy
+        elif type(self._agent_specs[agent].actions) == DiscreteArray:
+            action = tf.math.argmax(policy, axis=1)
+        else:
+            raise NotImplementedError
+
+        return action, policy, new_state, message_policy
+
+    def select_action(
+        self, agent: str, observation: types.NestedArray
+    ) -> types.NestedArray:
+
+        # TODO Mask actions here using observation.legal_actions
+        # Initialize the RNN state if necessary.
+        if self._states[agent] is None:
+            # index network either on agent type or on agent id
+            agent_key = agent.split("_")[0] if self._shared_weights else agent
+            self._states[agent] = self._policy_networks[agent_key].initia_state(1)
+            self._messages[agent] = self._policy_networks[agent_key].initia_message(1)
+
+        # Step the recurrent policy forward given the current observation and state.
+        action, policy, new_state, new_message = self._policy(
+            agent,
+            observation.observation,
+            self._states[agent],
+            self._messages[agent],
+        )
+
+        # Bookkeeping of recurrent states for the observe method.
+        self._update_state(agent, new_state)
+        self._update_message(agent, new_message)
+
+        # Return a numpy array with squeezed out batch dimension.
+        action = tf2_utils.to_numpy_squeeze(action)
+        policy = tf2_utils.to_numpy_squeeze(policy)
+        return action, policy
+
+    def select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+
+        actions = {}
+        policies = {}
+        for agent, observation in observations.items():
+            actions[agent], policies[agent] = self.select_action(agent, observation)
+        return actions, policies
+
+    def observe(
+        self,
+        actions: Dict[str, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
+        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+    ) -> None:
+        if not self._adder:
+            return
+        _, policy = actions
+        if not self._store_recurrent_state:
+            if next_extras:
+                # TODO (dries): Sort out this mypy issue.
+                self._adder.add(policy, next_timestep, next_extras)  # type: ignore
+            else:
+                self._adder.add(policy, next_timestep)  # type: ignore
+            return
+
+        numpy_states = {
+            agent: tf2_utils.to_numpy_squeeze(_state)
+            for agent, _state in self._states.items()
+        }
+        numpy_messages = {
+            agent: tf2_utils.to_numpy_squeeze(_message)
+            for agent, _message in self._messages.items()
+        }
+
+        if next_extras:
+            next_extras.update(
+                {
+                    "core_states": numpy_states,
+                    "core_messages": numpy_messages,
+                }
+            )
+            self._adder.add(policy, next_timestep, next_extras)  # type: ignore
+        else:
+            next_extras = {
+                "core_states": numpy_states,
+                "core_messages": numpy_messages,
+            }
+            self._adder.add(actions, next_timestep, next_extras)  # type: ignore

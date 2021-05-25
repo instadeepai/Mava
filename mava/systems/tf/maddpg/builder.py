@@ -28,6 +28,7 @@ from dm_env import specs as dm_specs
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
@@ -253,6 +254,7 @@ class MADDPGBuilder(SystemBuilder):
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
+        communication_module: Optional[BaseCommunicationModule] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -292,6 +294,7 @@ class MADDPGBuilder(SystemBuilder):
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
+            communication_module=communication_module,
         )
 
     def make_trainer(
@@ -302,6 +305,7 @@ class MADDPGBuilder(SystemBuilder):
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
+        communication_module: Optional[BaseCommunicationModule] = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -346,6 +350,7 @@ class MADDPGBuilder(SystemBuilder):
             "logger": logger,
             "checkpoint": self._config.checkpoint,
             "checkpoint_subpath": self._config.checkpoint_subpath,
+            "communication_module": communication_module,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec

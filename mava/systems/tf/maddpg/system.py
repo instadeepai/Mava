@@ -30,6 +30,7 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedQValueActorCritic
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
@@ -61,6 +62,7 @@ class MADDPG:
             Type[training.BaseRecurrentMADDPGTrainer],
         ] = training.DecentralisedMADDPGTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
+        communication_function: Type[BaseCommunicationModule] = None,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -146,6 +148,7 @@ class MADDPG:
             )
 
         self._architecture = architecture
+        self._communication_module_fn = communication_function
         self._environment_factory = environment_factory
         self._network_factory = network_factory
         self._logger_factory = logger_factory
@@ -206,6 +209,8 @@ class MADDPG:
     def _get_extra_specs(self) -> Any:
         agents = self._environment_spec.get_agent_ids()
         core_state_specs = {}
+        core_message_specs = {}
+
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec
         )
@@ -216,7 +221,16 @@ class MADDPG:
                     networks["policies"][agent_type].initial_state(1)
                 ),
             )
-        return {"core_states": core_state_specs}
+            if self._communication_module_fn is not None:
+                core_message_specs[agent] = (
+                    tf2_utils.squeeze_batch_dim(
+                        networks["policies"][agent_type].initial_message(1)
+                    ),
+                )
+        return {
+            "core_states": core_state_specs,
+            "core_messages": core_message_specs,
+        }
 
     def replay(self) -> Any:
         """The replay storage."""
@@ -269,7 +283,19 @@ class MADDPG:
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
 
-        system_networks = self._architecture(**architecture_config).create_system()
+        architecture = self._architecture(**architecture_config)
+
+        communication_module = None
+        if self._communication_module_fn is not None:
+            communication_module = self._communication_module_fn(
+                architecture=architecture,
+                shared=True,
+                channel_size=1,
+                channel_noise=0,
+            )
+            system_networks = communication_module.create_system()
+        else:
+            system_networks = architecture.create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
@@ -280,6 +306,7 @@ class MADDPG:
             counter=counter,
             logger=trainer_logger,
             connection_spec=self._connection_spec,
+            communication_module=communication_module,
         )
 
     def executor(
@@ -310,17 +337,28 @@ class MADDPG:
         # Create system architecture with target networks.
         system = self._architecture(**architecture_config)
 
-        # create variables
-        _ = system.create_system()
+        communication_module = None
+        if self._communication_module_fn is not None:
+            communication_module = self._communication_module_fn(
+                architecture=system,
+                shared=True,
+                channel_size=1,
+                channel_noise=0,
+            )
+            behaviour_policy_networks = communication_module.create_system()
+        else:
+            # create variables
+            _ = system.create_system()
 
-        # behaviour policy networks (obs net + policy head)
-        behaviour_policy_networks = system.create_behaviour_policy()
+            # behaviour policy networks (obs net + policy head)
+            behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the executor.
         executor = self._builder.make_executor(
             policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
+            communication_module=communication_module,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -378,16 +416,26 @@ class MADDPG:
         # Create system architecture with target networks.
         system = self._architecture(**architecture_config)
 
-        # create variables
-        _ = system.create_system()
+        if self._communication_module_fn is not None:
+            communication_module = self._communication_module_fn(
+                architecture=system,
+                shared=True,
+                channel_size=1,
+                channel_noise=0,
+            )
+            behaviour_policy_networks = communication_module.create_system()
+        else:
+            # create variables
+            _ = system.create_system()
 
-        # behaviour policy networks (obs net + policy head)
-        behaviour_policy_networks = system.create_behaviour_policy()
+            # behaviour policy networks (obs net + policy head)
+            behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the agent.
         executor = self._builder.make_executor(
             policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
+            communication_module=communication_module,
         )
 
         # Make the environment.

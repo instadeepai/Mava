@@ -28,15 +28,11 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-
-# from mava.components.tf.modules.communication import (
-#     BroadcastedCommunication,
-# )
-# from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.communication import BroadcastedCommunication
 from mava.components.tf.networks import CommunicationNetwork
 from mava.systems.tf import maddpg
-from mava.systems.tf.mad4pg.execution import MADDPGRecurrentExecutor
-from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
+from mava.systems.tf.maddpg.execution import MADDPGRecurrentCommExecutor
+from mava.systems.tf.maddpg.training import DecentralisedRecurrentCommMADDPGTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -184,8 +180,9 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
-        executor_fn=MADDPGRecurrentExecutor,
+        trainer_fn=DecentralisedRecurrentCommMADDPGTrainer,
+        executor_fn=MADDPGRecurrentCommExecutor,
+        communication_function=BroadcastedCommunication,
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
