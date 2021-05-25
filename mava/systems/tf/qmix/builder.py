@@ -13,11 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import dataclasses
 from typing import Any, Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
+import tensorflow as tf
+from acme.tf import utils as tf_utils
 from acme.utils import counting
 
 from mava import core, types
@@ -26,6 +29,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
+from mava.components.tf.networks import MonotonicMixingNetwork
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.qmix import execution, training
 from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
@@ -69,6 +73,7 @@ class QMIXBuilder(MADQNBuilder):
         config: QMIXConfig,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
+        mixer: Type[MonotonicMixingNetwork] = MonotonicMixingNetwork,
         extra_specs: Dict[str, Any] = {},
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
@@ -87,6 +92,7 @@ class QMIXBuilder(MADQNBuilder):
             exploration_scheduler_fn=exploration_scheduler_fn,
             replay_stabilisation_fn=replay_stabilisation_fn,
         )
+        self._mixer = mixer
 
     def make_trainer(
         self,
@@ -105,13 +111,16 @@ class QMIXBuilder(MADQNBuilder):
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
         """
-        q_networks = networks["values"]
-        target_q_networks = networks["target_values"]
-        mixing_network = networks["mixing"]
-        target_mixing_network = networks["target_mixing"]
-
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
+
+        q_networks = networks["values"]
+        target_q_networks = networks["target_values"]
+
+        mixing_network = self._mixer(len(agents))
+        state_spec = self._config.environment_spec.get_extra_specs()["s_t"]
+        tf_utils.create_variables(mixing_network, [tf.ones(len(agents)), state_spec])
+        target_mixing_network = copy.deepcopy(mixing_network)
 
         # Make epsilon scheduler
         exploration_scheduler = self._exploration_scheduler_fn(

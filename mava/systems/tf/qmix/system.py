@@ -27,8 +27,10 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
-from mava.components.tf.modules import mixing
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.stabilising import FingerPrintStabalisation
+from mava.components.tf.networks import MonotonicMixingNetwork
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.madqn.system import MADQN
@@ -80,10 +82,12 @@ class QMIX(MADQN):
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
-        mixer: Type[mixing.MonotonicMixing] = mixing.MonotonicMixing,
+        mixer: Type[MonotonicMixingNetwork] = MonotonicMixingNetwork,
+        communication_module: Type[BaseCommunicationModule] = None,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
+        replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
         epsilon_min: float = 0.05,
         epsilon_decay: float = 1e-4,
         num_executors: int = 1,
@@ -130,20 +134,41 @@ class QMIX(MADQN):
             )
 
         super(QMIX, self).__init__(
-            architecture=architecture,
             environment_factory=environment_factory,
             network_factory=network_factory,
             logger_factory=logger_factory,
-            environment_spec=environment_spec,
-            shared_weights=shared_weights,
+            architecture=architecture,
+            trainer_fn=trainer_fn,
+            communication_module=communication_module,
+            executor_fn=executor_fn,
+            exploration_scheduler_fn=exploration_scheduler_fn,
+            replay_stabilisation_fn=replay_stabilisation_fn,
+            epsilon_min=epsilon_min,
+            epsilon_decay=epsilon_decay,
             num_executors=num_executors,
             num_caches=num_caches,
+            environment_spec=environment_spec,
+            shared_weights=shared_weights,
+            batch_size=batch_size,
+            prefetch_size=prefetch_size,
+            min_replay_size=min_replay_size,
+            max_replay_size=max_replay_size,
+            samples_per_insert=samples_per_insert,
+            n_step=n_step,
+            sequence_length=sequence_length,
+            period=period,
+            clipping=clipping,
+            discount=discount,
+            optimizer=optimizer,
+            target_update_period=target_update_period,
+            executor_variable_update_period=executor_variable_update_period,
             max_executor_steps=max_executor_steps,
-            checkpoint_subpath=checkpoint_subpath,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+            logger_config=logger_config,
             train_loop_fn=train_loop_fn,
-            train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn=eval_loop_fn,
+            train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
         )
 
@@ -178,6 +203,8 @@ class QMIX(MADQN):
             executor_fn=executor_fn,
             extra_specs=extra_specs,
             exploration_scheduler_fn=exploration_scheduler_fn,
+            replay_stabilisation_fn=replay_stabilisation_fn,
+            mixer=mixer,
         )
 
     def trainer(
@@ -198,15 +225,29 @@ class QMIX(MADQN):
             shared_weights=self._shared_weights,
         )
 
-        agent_networks = architecture.create_actor_variables()
+        if self._builder._replay_stabiliser_fn is not None:
+            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
+                architecture
+            )
 
-        # Augment network architecture by adding mixing layer network.
-        system_networks = self._mixer(
-            architecture=architecture,
-            environment_spec=self._environment_spec,
-            agent_networks=agent_networks,
-            num_hypernet_layers=1,
-        ).create_system()
+        communication_module = None
+        if self._communication_module_fn is not None:
+            communication_module = self._communication_module_fn(
+                architecture=architecture,
+                shared=True,
+                channel_size=1,
+                channel_noise=0,
+            )
+            system_networks = communication_module.create_system()
+        else:
+            system_networks = architecture.create_system()
+
+        # # Augment network architecture by adding mixing layer network.
+        # system_networks = self._mixer(
+        #     environment_spec=self._environment_spec,
+        #     agent_networks=system_networks,
+        #     num_hypernet_layers=1,
+        # ).create_system()
 
         # create logger
         trainer_logger_config = {}
@@ -223,6 +264,7 @@ class QMIX(MADQN):
             networks=system_networks,
             dataset=dataset,
             counter=counter,
+            communication_module=communication_module,
             logger=trainer_logger,
         )
 

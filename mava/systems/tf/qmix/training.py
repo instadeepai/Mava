@@ -15,6 +15,7 @@
 
 """Qmix trainer implementation."""
 
+import time
 from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
@@ -127,15 +128,45 @@ class QMIXTrainer(MADQNTrainer):
             # NOTE These shouldn't really be in the agent for loop.
             online_variables = [
                 *self._mixing_network.variables,
+                # *self._mixing_network._hypernetworks.variables,
             ]
             target_variables = [
                 *self._target_mixing_network.variables,
+                # *self._target_mixing_network._hypernetworks.variables,
             ]
             # Make online -> target network update ops.
             for src, dest in zip(online_variables, target_variables):
                 dest.assign(src)
 
         self._num_steps.assign_add(1)
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        # Compute elapsed time.
+        timestamp = time.time()
+        if self._timestamp:
+            elapsed_time = timestamp - self._timestamp
+        else:
+            elapsed_time = 0
+        self._timestamp = timestamp  # type: ignore
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        # Checkpoint and attempt to write the logs.
+        if self._checkpoint:
+            train_utils.checkpoint_networks(self._system_checkpointer)
+
+        # Log and decrement epsilon
+        epsilon = self.get_epsilon()
+        fetches["epsilon"] = epsilon
+        self._decrement_epsilon()
+
+        if self._logger:
+            self._logger.write(fetches)
 
     @tf.function
     def _step(
@@ -229,14 +260,17 @@ class QMIXTrainer(MADQNTrainer):
             agent_key = self.agent_net_keys[agent]
 
             # Update agent networks
-            variables = self._q_networks[agent_key].trainable_variables
+            variables = [*self._q_networks[agent_key].trainable_variables]
             gradients = self.tape.gradient(self.loss, variables)
             if self._clipping:
                 gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
             self._optimizers[agent_key].apply(gradients, variables)
 
         # Update mixing network
-        variables = self._mixing_network.trainable_variables
+        variables = [
+            *self._mixing_network.trainable_variables,
+            # *self._mixing_network._hypernetworks.trainable_variables,
+        ]
         gradients = self.tape.gradient(self.loss, variables)
         if self._clipping:
             gradients = tf.clip_by_global_norm(gradients, 40.0)[0]

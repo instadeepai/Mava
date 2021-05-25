@@ -120,7 +120,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
-        num_agents=2,
+        num_agents=3,
         return_state_info=True,
     )
 

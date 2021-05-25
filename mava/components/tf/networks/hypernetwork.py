@@ -74,16 +74,14 @@ class HyperNetwork(snt.Module):
         self.hyper_b1 = snt.nets.MLP(output_sizes=[self._qmix_hidden_dim])
         self.hyper_b2 = snt.nets.MLP(output_sizes=[self._qmix_hidden_dim, 1])
 
-    def __call__(
-        self, states: Tensor  # [batch_size=B, self._state_dim=3]
-    ) -> Dict[str, float]:
+    def __call__(self, states: Tensor) -> Dict[str, float]:  # [batch_size=B, state_dim]
         w1 = tf.abs(
             self.hyper_w1(states)
         )  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
         w1 = tf.reshape(
             w1,
             (-1, self._n_agents, self._qmix_hidden_dim),
-        )  # [B, n_agents, qmix_hidden_dim] = [B, 2, qmix_hidden_dim]
+        )  # [B, n_agents, qmix_hidden_dim]
 
         b1 = self.hyper_b1(states)  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
         b1 = tf.reshape(b1, [-1, 1, self._qmix_hidden_dim])  # [B, 1, qmix_hidden_dim]
@@ -97,7 +95,7 @@ class HyperNetwork(snt.Module):
         b2 = tf.reshape(b2, shape=(-1, 1, 1))  # [B, 1, 1]
 
         hyperparams = {}
-        hyperparams["w1"] = w1  # [B, 2, qmix_hidden_dim]
+        hyperparams["w1"] = w1  # [B, n_agents, qmix_hidden_dim]
         hyperparams["b1"] = b1  # [B, 1, qmix_hidden_dim]
         hyperparams["w2"] = w2  # [B, qmix_hidden_dim]
         hyperparams["b2"] = b2  # [B, 1]

@@ -119,6 +119,7 @@ class VDN(MADQN):
             environment_spec = mava_specs.MAEnvironmentSpec(
                 environment_factory(evaluation=False)  # type:ignore
             )
+        self._environment_spec = environment_spec
 
         # set default logger if no logger provided
         if not logger_factory:
