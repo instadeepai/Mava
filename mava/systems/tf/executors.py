@@ -272,7 +272,7 @@ class RecurrentExecutor(core.Executor):
             self._variable_client.update(wait)
 
 
-class RecurrentExecutorWithComms(RecurrentExecutor):
+class RecurrentCommExecutor(RecurrentExecutor):
     """Recurrent executor where agents can communicate."""
 
     def __init__(
