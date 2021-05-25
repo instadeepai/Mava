@@ -1277,7 +1277,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 # gradient relationship between dpg_q_values and dpg_actions_comb.
                 dpg_actions_comb, dim = train_utils.combine_dim(dpg_actions)
 
-                # Note (dries): This seemingly useless line is is important!
+                # Note (dries): This seemingly useless line is important!
                 # Don't remove it. See above note.
                 dpg_actions = train_utils.extract_dim(dpg_actions_comb, dim)
 
