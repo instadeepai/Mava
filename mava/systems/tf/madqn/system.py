@@ -30,6 +30,7 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
@@ -82,8 +83,9 @@ class MADQN:
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Union[
-            Type[training.MADQNTrainer], Type[training.RecurrentMADQNTrainer]
+            Type[training.MADQNTrainer], Type[training.MADQNRecurrentTrainer]
         ] = training.MADQNTrainer,
+        communication_module: Type[BaseCommunicationModule] = None,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
@@ -133,6 +135,7 @@ class MADQN:
             )
 
         self._architecture = architecture
+        self._communication_module_fn = communication_module
         self._environment_factory = environment_factory
         self._network_factory = network_factory
         self._logger_factory = logger_factory
@@ -186,6 +189,8 @@ class MADQN:
     def _get_extra_specs(self) -> Any:
         agents = self._environment_spec.get_agent_ids()
         core_state_specs = {}
+        core_message_specs = {}
+
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec
         )
@@ -196,7 +201,18 @@ class MADQN:
                     networks["q_networks"][agent_type].initial_state(1)
                 ),
             )
-        return {"core_states": core_state_specs}
+            if self._communication_module_fn is not None:
+                core_message_specs[agent] = (
+                    tf2_utils.squeeze_batch_dim(
+                        networks["q_networks"][agent_type].initial_message(1)
+                    ),
+                )
+
+        extras = {
+            "core_states": core_state_specs,
+            "core_messages": core_message_specs,
+        }
+        return extras
 
     def replay(self) -> Any:
         """The replay storage."""
@@ -237,7 +253,17 @@ class MADQN:
                 architecture
             )
 
-        system_networks = architecture.create_system()
+        communication_module = None
+        if self._communication_module_fn is not None:
+            communication_module = self._communication_module_fn(
+                architecture=architecture,
+                shared=True,
+                channel_size=1,
+                channel_noise=0,
+            )
+            system_networks = communication_module.create_system()
+        else:
+            system_networks = architecture.create_system()
 
         # create logger
         trainer_logger_config = {}
@@ -254,6 +280,7 @@ class MADQN:
             networks=system_networks,
             dataset=dataset,
             counter=counter,
+            communication_module=communication_module,
             logger=trainer_logger,
         )
 
@@ -284,12 +311,23 @@ class MADQN:
                 architecture
             )
 
-        system_networks = architecture.create_system()
+        communication_module = None
+        if self._communication_module_fn is not None:
+            communication_module = self._communication_module_fn(
+                architecture=architecture,
+                shared=True,
+                channel_size=1,
+                channel_noise=0,
+            )
+            system_networks = communication_module.create_system()
+        else:
+            system_networks = architecture.create_system()
 
         # Create the executor.
         executor = self._builder.make_executor(
             q_networks=system_networks["values"],
             action_selectors=networks["action_selectors"],
+            communication_module=communication_module,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
             trainer=trainer,
@@ -348,13 +386,24 @@ class MADQN:
                 architecture
             )
 
-        system_networks = architecture.create_system()
+        communication_module = None
+        if self._communication_module_fn is not None:
+            communication_module = self._communication_module_fn(
+                architecture=architecture,
+                shared=True,
+                channel_size=1,
+                channel_noise=0,
+            )
+            system_networks = communication_module.create_system()
+        else:
+            system_networks = architecture.create_system()
 
         # Create the agent.
         executor = self._builder.make_executor(
             q_networks=system_networks["values"],
             action_selectors=networks["action_selectors"],
             variable_source=variable_source,
+            communication_module=communication_module,
             trainer=trainer,
             evaluator=True,
         )

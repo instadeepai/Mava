@@ -21,6 +21,7 @@ import sonnet as snt
 from acme.utils import counting
 
 from mava import core, types
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
@@ -89,6 +90,7 @@ class QMIXBuilder(MADQNBuilder):
         dataset: Iterator[reverb.ReplaySample],
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
+        communication_module: Optional[BaseCommunicationModule] = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:

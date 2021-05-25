@@ -16,4 +16,4 @@
 """Implementations of a IDQN agent."""
 
 from mava.systems.tf.madqn.system import MADQN
-from mava.systems.tf.madqn.training import MADQNTrainer, RecurrentMADQNTrainer
+from mava.systems.tf.madqn.training import MADQNRecurrentTrainer, MADQNTrainer
