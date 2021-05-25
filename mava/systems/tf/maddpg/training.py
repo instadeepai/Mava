@@ -629,11 +629,11 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         o_t_vals = []
         a_tm1_vals = []
         a_t_vals = []
-        for connected_agent in o_tm1_trans.keys():
-            o_tm1_vals.append(o_tm1_trans[connected_agent])
-            o_t_vals.append(o_t_trans[connected_agent])
-            a_tm1_vals.append(a_tm1[connected_agent])
-            a_t_vals.append(a_t[connected_agent])
+        for agent_key in o_tm1_trans.keys():
+            o_tm1_vals.append(o_tm1_trans[agent_key])
+            o_t_vals.append(o_t_trans[agent_key])
+            a_tm1_vals.append(a_tm1[agent_key])
+            a_t_vals.append(a_t[agent_key])
         o_tm1_feed = tf.stack(o_tm1_vals, 1)
         o_t_feed = tf.stack(o_t_vals, 1)
         a_tm1_feed = tf.stack(a_tm1_vals, 1)
