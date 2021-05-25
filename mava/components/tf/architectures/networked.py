@@ -126,4 +126,5 @@ class NetworkedQValueCritic(DecentralisedQValueActorCritic):
                     shape=critic_act_shape,
                     dtype=tf.dtypes.float32,
                 )
+
         return critic_obs_specs, critic_act_specs
