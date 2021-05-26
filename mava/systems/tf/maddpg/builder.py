@@ -361,7 +361,7 @@ class MADDPGBuilder(SystemBuilder):
             "checkpoint_subpath": self._config.checkpoint_subpath,
         }
         if communication_module is not None:
-            trainer_config["communication_module"] = (communication_module,)
+            trainer_config["communication_module"] = communication_module
 
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec

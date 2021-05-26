@@ -328,12 +328,14 @@ class MADDPGRecurrentCommExecutor(executors.RecurrentCommExecutor):
             self._states[agent] = self._policy_networks[agent_key].initia_state(1)
             self._messages[agent] = self._policy_networks[agent_key].initia_message(1)
 
+        channel = self._communication_module.process_messages(self._messages)
+
         # Step the recurrent policy forward given the current observation and state.
         action, policy, new_state, new_message = self._policy(
             agent,
             observation.observation,
             self._states[agent],
-            self._messages[agent],
+            channel[agent],
         )
 
         # Bookkeeping of recurrent states for the observe method.
