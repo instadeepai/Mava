@@ -625,10 +625,6 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         a_tm1_feed = tf.stack([a_tm1[agent] for agent in self._agents], 1)
         a_t_feed = tf.stack([a_t[agent] for agent in self._agents], 1)
 
-        # TODO (dries): Make sure self._agents are always in the same order.
-        #  It might be that if a checkpoint is loaded the order might be
-        #  different if one uses python 3.6 due to a .keys() call.
-
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     def _get_dpg_feed(
