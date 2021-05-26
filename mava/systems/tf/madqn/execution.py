@@ -154,7 +154,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             if not self._evaluator:
                 epsilon = self._trainer.get_epsilon()
             else:
-                # Note (dries): For some reason 0 epsilon breaks on StarCraft
+                # Note (dries): For some reason 0 epsilon breaks on StarCraft.
                 epsilon = 1e-10
 
             epsilon = tf.convert_to_tensor(epsilon)
