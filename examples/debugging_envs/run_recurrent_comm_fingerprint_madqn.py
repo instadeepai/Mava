@@ -28,6 +28,7 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 from mava import specs as mava_specs
 from mava.components.tf.modules.communication import BroadcastedCommunication
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.stabilising.fingerprints import FingerPrintStabalisation
 from mava.components.tf.networks import (
     CommunicationNetwork,
     epsilon_greedy_action_selector,
@@ -161,11 +162,10 @@ def main(_: Any) -> None:
         executor_fn=MADQNRecurrentCommExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
         communication_module=BroadcastedCommunication,
+        replay_stabilisation_fn=FingerPrintStabalisation,
         epsilon_min=0.05,
-        sequence_length=3,
-        period=1,
-        epsilon_decay=2e-4,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+        epsilon_decay=3e-4,
+        optimizer=snt.optimizers.Adam(learning_rate=5e-4),
         checkpoint_subpath=checkpoint_dir,
         n_step=1,
         batch_size=200,
