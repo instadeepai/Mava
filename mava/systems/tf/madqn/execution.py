@@ -177,8 +177,6 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
 
             actions[agent] = tf2_utils.to_numpy_squeeze(action)
 
-        print("actions: ", actions, ". Evaluator: ", self._evaluator)
-
         # Return a numpy array with squeezed out batch dimension.
         return actions
 
