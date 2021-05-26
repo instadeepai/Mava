@@ -26,19 +26,19 @@ from acme.utils import counting, loggers
 
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf.maddpg.training import (
-    BaseMADDPGTrainer,
-    BaseRecurrentMADDPGTrainer,
-    CentralisedMADDPGTrainer,
-    CentralisedRecurrentMADDPGTrainer,
-    DecentralisedMADDPGTrainer,
-    DecentralisedRecurrentMADDPGTrainer,
-    StateBasedMADDPGTrainer,
-    StateBasedRecurrentMADDPGTrainer,
+    MADDPGBaseRecurrentTrainer,
+    MADDPGBaseTrainer,
+    MADDPGCentralisedRecurrentTrainer,
+    MADDPGCentralisedTrainer,
+    MADDPGDecentralisedRecurrentTrainer,
+    MADDPGDecentralisedTrainer,
+    MADDPGStateBasedRecurrentTrainer,
+    MADDPGStateBasedTrainer,
 )
 from mava.utils import training_utils as train_utils
 
 
-class BaseMAD4PGTrainer(BaseMADDPGTrainer):
+class MAD4PGBaseTrainer(MADDPGBaseTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -189,7 +189,7 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
         self.tape = tape
 
 
-class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
+class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -267,7 +267,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
         )
 
 
-class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
+class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -345,7 +345,7 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
         )
 
 
-class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
+class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -423,7 +423,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
         )
 
 
-class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
+class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -601,6 +601,15 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
 
                 dpg_actions = tf2_utils.batch_to_sequence(outputs)
 
+                # Note (dries): This is done to so that losses.dpg can verify
+                # using gradient.tape that there is a
+                # gradient relationship between dpg_q_values and dpg_actions_comb.
+                dpg_actions_comb, dim = train_utils.combine_dim(dpg_actions)
+
+                # Note (dries): This seemingly useless line is important!
+                # Don't remove it. See above note.
+                dpg_actions = train_utils.extract_dim(dpg_actions_comb, dim)
+
                 # Get dpg actions
                 dpg_actions_feed = self._get_dpg_feed(
                     target_actions, dpg_actions, agent
@@ -618,7 +627,7 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
 
                 policy_loss = losses.dpg(
                     dpg_q_values,
-                    act_comb,
+                    dpg_actions_comb,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
@@ -627,8 +636,8 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
         self.tape = tape
 
 
-class DecentralisedRecurrentMAD4PGTrainer(
-    BaseRecurrentMAD4PGTrainer, DecentralisedRecurrentMADDPGTrainer
+class MAD4PGDecentralisedRecurrentTrainer(
+    MAD4PGBaseRecurrentTrainer, MADDPGDecentralisedRecurrentTrainer
 ):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
@@ -709,8 +718,8 @@ class DecentralisedRecurrentMAD4PGTrainer(
         )
 
 
-class CentralisedRecurrentMAD4PGTrainer(
-    BaseRecurrentMAD4PGTrainer, CentralisedRecurrentMADDPGTrainer
+class MAD4PGCentralisedRecurrentTrainer(
+    MAD4PGBaseRecurrentTrainer, MADDPGCentralisedRecurrentTrainer
 ):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
@@ -791,8 +800,8 @@ class CentralisedRecurrentMAD4PGTrainer(
         )
 
 
-class StateBasedRecurrentMAD4PGTrainer(
-    BaseRecurrentMAD4PGTrainer, StateBasedRecurrentMADDPGTrainer
+class MAD4PGStateBasedRecurrentTrainer(
+    MAD4PGBaseRecurrentTrainer, MADDPGStateBasedRecurrentTrainer
 ):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input

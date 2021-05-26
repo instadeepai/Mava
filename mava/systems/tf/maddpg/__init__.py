@@ -21,9 +21,13 @@ from mava.systems.tf.maddpg.execution import (
 )
 from mava.systems.tf.maddpg.system import MADDPG
 from mava.systems.tf.maddpg.training import (
-    BaseMADDPGTrainer,
-    CentralisedMADDPGTrainer,
-    DecentralisedMADDPGTrainer,
-    NetworkedMADDPGTrainer,
-    StateBasedMADDPGTrainer,
+    MADDPGBaseRecurrentTrainer,
+    MADDPGBaseTrainer,
+    MADDPGCentralisedRecurrentTrainer,
+    MADDPGCentralisedTrainer,
+    MADDPGDecentralisedRecurrentTrainer,
+    MADDPGDecentralisedTrainer,
+    MADDPGNetworkedTrainer,
+    MADDPGStateBasedRecurrentTrainer,
+    MADDPGStateBasedTrainer,
 )

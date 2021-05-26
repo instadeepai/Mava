@@ -20,8 +20,12 @@ from mava.systems.tf.mad4pg.execution import (
 )
 from mava.systems.tf.mad4pg.system import MAD4PG
 from mava.systems.tf.mad4pg.training import (
-    BaseMAD4PGTrainer,
-    CentralisedMAD4PGTrainer,
-    DecentralisedMAD4PGTrainer,
-    StateBasedMAD4PGTrainer,
+    MAD4PGBaseRecurrentTrainer,
+    MAD4PGBaseTrainer,
+    MAD4PGCentralisedRecurrentTrainer,
+    MAD4PGCentralisedTrainer,
+    MAD4PGDecentralisedRecurrentTrainer,
+    MAD4PGDecentralisedTrainer,
+    MAD4PGStateBasedRecurrentTrainer,
+    MAD4PGStateBasedTrainer,
 )
