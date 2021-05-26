@@ -25,6 +25,7 @@ class ActorNetwork(snt.Module):
         self,
         n_hidden_unit1: int,
         n_hidden_unit2: int,
+        n_hidden_unit3: int,
         n_actions: int,
         logprob_epsilon: float,
         observation_netork: snt.Module,
@@ -35,6 +36,7 @@ class ActorNetwork(snt.Module):
         w_bound = tf.Variable(3e-3)
         self.hidden1 = snt.Linear(n_hidden_unit1)
         self.hidden2 = snt.Linear(n_hidden_unit2)
+        self.hidden3 = snt.Linear(n_hidden_unit3)
 
         self.mean = snt.Linear(
             n_actions,
@@ -53,6 +55,8 @@ class ActorNetwork(snt.Module):
         x = self.hidden1(x)
         x = tf.nn.relu(x)
         x = self.hidden2(x)
+        x = tf.nn.relu(x)
+        x = self.hidden3(x)
         x = tf.nn.relu(x)
 
         mean = self.mean(x)

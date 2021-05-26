@@ -99,7 +99,7 @@ def make_networks(
 
         # Create the policy network.
         policy_network = ActorNetwork(
-            256, 256, num_dimensions, 0.3, observation_network
+            256, 256, 256, num_dimensions, 1e-6, observation_network
         )
 
         # Create the critic network.
