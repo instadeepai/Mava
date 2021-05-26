@@ -37,7 +37,7 @@ from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
 
-class BaseMADDPGTrainer(mava.Trainer):
+class MADDPGBaseTrainer(mava.Trainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -454,7 +454,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         return variables
 
 
-class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
+class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -532,7 +532,7 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
         )
 
 
-class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
+class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -647,7 +647,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         return dpg_a_t_feed
 
 
-class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
+class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -775,7 +775,7 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         return dpg_a_t_feed
 
 
-class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
+class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -890,7 +890,7 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         return dpg_a_t_feed
 
 
-class BaseRecurrentMADDPGTrainer(mava.Trainer):
+class MADDPGBaseRecurrentTrainer(mava.Trainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -1395,7 +1395,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         return variables
 
 
-class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
+class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -1475,7 +1475,7 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         )
 
 
-class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
+class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -1593,7 +1593,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         return dpg_actions_feed
 
 
-class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
+class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.

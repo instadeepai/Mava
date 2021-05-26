@@ -31,7 +31,7 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 from mava import specs as mava_specs
 from mava.systems.tf import maddpg
 from mava.systems.tf.maddpg.execution import MADDPGRecurrentExecutor
-from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
+from mava.systems.tf.maddpg.training import MADDPGDecentralisedRecurrentTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
@@ -163,7 +163,7 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
+        trainer_fn=MADDPGDecentralisedRecurrentTrainer,
         executor_fn=MADDPGRecurrentExecutor,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),

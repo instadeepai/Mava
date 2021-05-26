@@ -31,7 +31,7 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures import StateBasedQValueCritic
 from mava.systems.tf import maddpg
 from mava.systems.tf.maddpg.execution import MADDPGRecurrentExecutor
-from mava.systems.tf.maddpg.training import StateBasedRecurrentMADDPGTrainer
+from mava.systems.tf.maddpg.training import MADDPGStateBasedRecurrentTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -164,7 +164,7 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=2,
         architecture=StateBasedQValueCritic,
-        trainer_fn=StateBasedRecurrentMADDPGTrainer,
+        trainer_fn=MADDPGStateBasedRecurrentTrainer,
         executor_fn=MADDPGRecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
         shared_weights=False,

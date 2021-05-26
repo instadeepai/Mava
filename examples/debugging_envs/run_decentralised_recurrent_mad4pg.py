@@ -32,7 +32,7 @@ from mava import specs as mava_specs
 from mava.components.tf.networks.mad4pg import DiscreteValuedHead
 from mava.systems.tf import mad4pg
 from mava.systems.tf.mad4pg.execution import MAD4PGRecurrentExecutor
-from mava.systems.tf.mad4pg.training import DecentralisedRecurrentMAD4PGTrainer
+from mava.systems.tf.mad4pg.training import MAD4PGDecentralisedRecurrentTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -166,7 +166,7 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=DecentralisedRecurrentMAD4PGTrainer,
+        trainer_fn=MAD4PGDecentralisedRecurrentTrainer,
         executor_fn=MAD4PGRecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
     ).build()

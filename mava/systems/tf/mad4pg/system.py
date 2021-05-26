@@ -47,9 +47,9 @@ class MAD4PG(MADDPG):
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
         trainer_fn: Union[
-            Type[training.BaseMAD4PGTrainer],
-            Type[training.BaseRecurrentMAD4PGTrainer],
-        ] = training.DecentralisedMAD4PGTrainer,
+            Type[training.MAD4PGBaseTrainer],
+            Type[training.MAD4PGBaseRecurrentTrainer],
+        ] = training.MAD4PGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
