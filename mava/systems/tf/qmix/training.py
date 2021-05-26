@@ -56,7 +56,6 @@ class QMIXTrainer(MADQNTrainer):
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: Optional[BaseCommunicationModule] = None,
-        clipping: bool = True,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         fingerprint: bool = False,
@@ -81,7 +80,6 @@ class QMIXTrainer(MADQNTrainer):
             shared_weights=shared_weights,
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
-            clipping=clipping,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             fingerprint=fingerprint,
@@ -264,8 +262,7 @@ class QMIXTrainer(MADQNTrainer):
             # Update agent networks
             variables = [*self._q_networks[agent_key].trainable_variables]
             gradients = self.tape.gradient(self.loss, variables)
-            if self._clipping:
-                gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+            gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
             self._optimizers[agent_key].apply(gradients, variables)
 
         # Update mixing network
@@ -274,16 +271,9 @@ class QMIXTrainer(MADQNTrainer):
             # *self._mixing_network._hypernetworks.trainable_variables,
         ]
         gradients = self.tape.gradient(self.loss, variables)
-        if self._clipping:
-            gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
-        self._optimizer.apply(gradients, variables)
-        trainable_variables += self._mixing_network.trainable_variables
-
-        # Compute gradients.
-        gradients = self.tape.gradient(self.loss, trainable_variables)
-
-        # Clip gradients.
         gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
+        self._optimizer.apply(gradients, variables)
+        variables += self._mixing_network.trainable_variable
 
         train_utils.safe_del(self, "tape")
 

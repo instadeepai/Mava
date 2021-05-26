@@ -157,7 +157,6 @@ class QMIX(MADQN):
             n_step=n_step,
             sequence_length=sequence_length,
             period=period,
-            clipping=clipping,
             discount=discount,
             optimizer=optimizer,
             target_update_period=target_update_period,
