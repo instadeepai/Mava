@@ -1767,6 +1767,7 @@ class DecentralisedRecurrentCommMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         obs_trans: Dict[str, np.ndarray],
         core_state: Dict[str, np.ndarray],
         core_messages: Dict[str, np.ndarray],
+        batch_first: bool = True,
     ) -> Any:
         actions: Dict[str, tf.Tensor] = {agent: [] for agent in self._agents}
 
@@ -1790,7 +1791,7 @@ class DecentralisedRecurrentCommMADDPGTrainer(BaseRecurrentMADDPGTrainer):
                 (output, m), s = network[agent_key](
                     obs[agent][t],
                     states[agent],
-                    channel[agent],
+                    # channel[agent],
                 )
 
                 messages[agent] = m
@@ -1803,11 +1804,192 @@ class DecentralisedRecurrentCommMADDPGTrainer(BaseRecurrentMADDPGTrainer):
             for agent in self._agents
         }
 
-        # print(actions[self._agents[0]])
+        if batch_first:
+            actions = {
+                agent: tf2_utils.batch_to_sequence(actions[agent])
+                for agent in self._agents
+            }
+
+        print(actions[self._agents[0]].shape)
+        return actions
+
+    def _target_policy_actions(
+        self,
+        target_obs_trans: Dict[str, np.ndarray],
+        target_core_state: Dict[str, np.ndarray],
+    ) -> Any:
+        actions = {}
+
+        for agent in self._agents:
+            time.time()
+            agent_key = self.agent_net_keys[agent]
+            target_trans_obs = target_obs_trans[agent]
+            # TODO (dries): Why is there an extra tuple
+            #  wrapping that needs to be removed?
+            agent_core_state = target_core_state[agent][0]
+
+            transposed_obs = tf2_utils.batch_to_sequence(target_trans_obs)
+
+            (outputs, _), _ = snt.static_unroll(
+                self._target_policy_networks[agent_key],
+                transposed_obs,
+                agent_core_state,
+            )
+            actions[agent] = tf2_utils.batch_to_sequence(outputs)
+
+        # print(actions[self._agents[0]].shape)
         return actions
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
+        data = inputs.data
+
+        # Note (dries): The unused variable is start_of_episodes.
+        observations, actions, rewards, discounts, _, extras = (
+            data.observations,
+            data.actions,
+            data.rewards,
+            data.discounts,
+            data.start_of_episode,
+            data.extras,
+        )
+
+        # Get initial state for the LSTM from replay and
+        # extract the first state in the sequence..
+        core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
+        target_core_state = tree.map_structure(tf.identity, core_state)
+        core_message = tree.map_structure(lambda s: s[:, 0, :], extras["core_messages"])
+        target_core_message = core_message
+
+        # TODO (dries): Take out all the data_points that does not need
+        #  to be processed here at the start. Therefore it does not have
+        #  to be done later on and saves processing time.
+
+        self.policy_losses: Dict[str, tf.Tensor] = {}
+        self.critic_losses: Dict[str, tf.Tensor] = {}
+
+        # Do forward passes through the networks and calculate the losses
+        with tf.GradientTape(persistent=True) as tape:
+            # Note (dries): We are assuming that only the policy network
+            # is recurrent and not the observation network.
+
+            obs_trans, target_obs_trans = self._transform_observations(observations)
+
+            target_actions = self._target_policy_actions(
+                target_obs_trans, target_core_state
+            )
+
+            target_actions = self._policy_actions_messages(
+                self._target_policy_networks,
+                target_obs_trans,
+                target_core_state,
+                target_core_message,
+            )
+
+            p_actions = self._policy_actions_messages(
+                self._policy_networks,
+                target_obs_trans,
+                core_state,
+                core_message,
+            )
+
+            for agent in self._agents:
+                agent_key = self.agent_net_keys[agent]
+                # Get critic feed
+                (
+                    obs_trans_feed,
+                    target_obs_trans_feed,
+                    action_feed,
+                    target_actions_feed,
+                ) = self._get_critic_feed(
+                    obs_trans=obs_trans,
+                    target_obs_trans=target_obs_trans,
+                    actions=actions,
+                    target_actions=target_actions,
+                    extras=extras,
+                    agent=agent,
+                )
+
+                # Critic learning.
+                # Remove the last sequence step for the normal network
+                obs_comb, dims = train_utils.combine_dim(obs_trans_feed)
+                act_comb, _ = train_utils.combine_dim(action_feed)
+                flat_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                q_values = train_utils.extract_dim(flat_q_values, dims)[:, :, 0]
+
+                # Remove first sequence step for the target
+                obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
+                act_comb, _ = train_utils.combine_dim(target_actions_feed)
+                flat_target_q_values = self._target_critic_networks[agent_key](
+                    obs_comb, act_comb
+                )
+                target_q_values = train_utils.extract_dim(flat_target_q_values, dims)[
+                    :, :, 0
+                ]
+
+                # Critic loss.
+                # Compute the transformed n-step loss.
+
+                # Cast the additional discount to match
+                # the environment discount dtype.
+                agent_discount = discounts[agent]
+                discount = tf.cast(self._discount, dtype=agent_discount.dtype)
+
+                # Critic loss.
+                critic_loss = recurrent_n_step_critic_loss(
+                    q_values,
+                    rewards[agent],
+                    discount * agent_discount,
+                    target_q_values,
+                    bootstrap_n=self._bootstrap_n,
+                    loss_fn=trfl.td_learning,
+                )
+
+                self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
+
+                # Actor learning.
+                obs_agent_feed = target_obs_trans[agent]
+                # TODO (dries): Why is there an extra tuple?
+                agent_core_state = core_state[agent][0]
+                transposed_obs = tf2_utils.batch_to_sequence(obs_agent_feed)
+                outputs, updated_states = snt.static_unroll(
+                    self._policy_networks[agent_key], transposed_obs, agent_core_state
+                )
+
+                outputs = outputs[0]
+
+                dpg_actions = tf2_utils.batch_to_sequence(outputs)
+
+                dpg_actions = p_actions[agent]
+
+                # Get dpg actions
+                dpg_actions_feed = self._get_dpg_feed(
+                    target_actions, dpg_actions, agent
+                )
+
+                # Get dpg Q values.
+                obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
+                act_comb, _ = train_utils.combine_dim(dpg_actions_feed)
+                dpg_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+
+                # Actor loss. If clipping is true use dqda clipping and clip the norm.
+                # dpg_q_values = tf.squeeze(dpg_q_values, axis=-1)  # [B]
+
+                dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
+                clip_norm = True if self._max_gradient_norm is not None else False
+
+                policy_loss = losses.dpg(
+                    dpg_q_values,
+                    act_comb,
+                    tape=tape,
+                    dqda_clipping=dqda_clipping,
+                    clip_norm=clip_norm,
+                )
+                self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
+        self.tape = tape
+
+    # Forward pass that calculates loss.
+    def _forward_(self, inputs: Any) -> None:
         data = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
@@ -1911,9 +2093,11 @@ class DecentralisedRecurrentCommMADDPGTrainer(BaseRecurrentMADDPGTrainer):
                 self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
 
                 # Actor learning.
-                outputs = actions[agent]
+                # outputs = actions[agent]
 
-                dpg_actions = tf2_utils.batch_to_sequence(outputs)
+                # dpg_actions = tf2_utils.batch_to_sequence(outputs)
+
+                dpg_actions = actions[agent]
 
                 # Get dpg actions
                 dpg_actions_feed = self._get_dpg_feed(

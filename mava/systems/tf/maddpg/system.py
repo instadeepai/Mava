@@ -291,7 +291,7 @@ class MADDPG:
                 architecture=architecture,
                 shared=True,
                 channel_size=1,
-                channel_noise=0,
+                channel_noise=2,
             )
             system_networks = communication_module.create_system()
         else:
@@ -343,7 +343,7 @@ class MADDPG:
                 architecture=system,
                 shared=True,
                 channel_size=1,
-                channel_noise=0,
+                channel_noise=2,
             )
             networks = communication_module.create_system()
             behaviour_policy_networks = networks["policies"]
@@ -423,7 +423,7 @@ class MADDPG:
                 architecture=system,
                 shared=True,
                 channel_size=1,
-                channel_noise=0,
+                channel_noise=2,
             )
             networks = communication_module.create_system()
             behaviour_policy_networks = networks["policies"]

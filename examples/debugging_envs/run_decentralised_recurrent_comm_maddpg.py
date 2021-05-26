@@ -59,13 +59,12 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        256,
-        256,
-        256,
+        32,
+        32,
     ),
-    critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
+    critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (128, 128, 64),
     shared_weights: bool = True,
-    message_size: int = 10,
+    message_size: int = 4,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -106,13 +105,13 @@ def make_networks(
                 ]
             ),
             networks.LayerNormMLP(
-                (128,),
+                (32,),
                 activate_final=True,
             ),
-            snt.LSTM(25),
+            snt.LSTM(16),
             snt.Sequential(
                 [
-                    snt.nets.MLP([128]),
+                    snt.nets.MLP([32]),
                     networks.NearZeroInitializedLinear(num_dimensions),
                     networks.TanhToSpec(specs[key].actions),
                     networks.ClippedGaussian(sigma),
@@ -121,7 +120,7 @@ def make_networks(
             ),
             snt.Sequential(
                 [
-                    networks.LayerNormMLP((128, message_size), activate_final=True),
+                    networks.LayerNormMLP((32, message_size), activate_final=True),
                 ]
             ),
             message_size=message_size,
