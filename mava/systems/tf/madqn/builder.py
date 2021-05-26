@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import tensorflow as tf
 
 import dataclasses
 from typing import Any, Dict, Iterator, List, Optional, Type
@@ -116,11 +117,12 @@ class MADQNBuilder:
     ) -> List[reverb.Table]:
         """Create tables to insert data into."""
 
+        if self._replay_stabiliser_fn is not None:
+            self._extra_specs.update({"fingerprint": np.array([1.0, 1.0])})
+
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             # Check if we should use fingerprints
-            if self._replay_stabiliser_fn is not None:
-                self._extra_specs.update({"fingerprint": np.array([1.0, 1.0])})
             adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec, self._extra_specs
             )

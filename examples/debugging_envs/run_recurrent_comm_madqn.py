@@ -15,6 +15,7 @@
 
 import functools
 from datetime import datetime
+from mava.components.tf.modules.stabilising.fingerprints import FingerPrintStabalisation
 from typing import Any, Mapping, Optional
 
 import launchpad as lp
@@ -91,24 +92,24 @@ def make_networks(
 
         q_network = CommunicationNetwork(
             networks.LayerNormMLP(
-                (128,),
+                (64,),
                 activate_final=True,
             ),
             networks.LayerNormMLP(
-                (128,),
+                (64,),
                 activate_final=True,
             ),
-            snt.LSTM(128),
+            snt.LSTM(20),
             snt.Sequential(
                 [
-                    networks.LayerNormMLP((128,), activate_final=True),
+                    networks.LayerNormMLP((64,), activate_final=True),
                     networks.NearZeroInitializedLinear(num_dimensions),
                     networks.TanhToSpec(specs[key].actions),
                 ]
             ),
             snt.Sequential(
                 [
-                    networks.LayerNormMLP((128, message_size), activate_final=True),
+                    networks.LayerNormMLP((64, message_size), activate_final=True),
                 ]
             ),
             message_size=message_size,
@@ -161,12 +162,15 @@ def main(_: Any) -> None:
         executor_fn=MADQNRecurrentCommExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
         communication_module=BroadcastedCommunication,
+        replay_stabilisation_fn=FingerPrintStabalisation,
         epsilon_min=0.05,
-        epsilon_decay=5e-4,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        sequence_length=3,
+        period=1,
+        epsilon_decay=2e-4,
+        optimizer=snt.optimizers.Adam(learning_rate=1e-3),
         checkpoint_subpath=checkpoint_dir,
         n_step=1,
-        batch_size=32,
+        batch_size=200,
     ).build()
 
     # launch

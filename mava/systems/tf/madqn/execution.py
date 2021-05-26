@@ -331,6 +331,8 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         self._store_recurrent_state = store_recurrent_state
         self._trainer = trainer
         self._shared_weights = shared_weights
+        self._fingerprint = fingerprint
+        self._evaluator = evaluator
 
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}
@@ -344,6 +346,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         message: types.NestedTensor,
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
+        fingerprint: tf.Tensor
     ) -> types.NestedTensor:
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
@@ -355,7 +358,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
 
         # Compute the policy, conditioned on the observation.
         (q_values, m_values), new_state = self._q_networks[agent_key](
-            batched_observation, state, message
+            batched_observation, fingerprint, state, message
         )
 
         # select legal action
@@ -380,12 +383,20 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         for agent, observation in observations.items():
 
             # Pass the observation through the policy network.
-            if self._trainer is not None:
+            if not self._evaluator and self._trainer:
                 epsilon = self._trainer.get_epsilon()
             else:
                 epsilon = 0.0
 
             epsilon = tf.convert_to_tensor(epsilon)
+
+            if self._fingerprint and self._trainer:
+                trainer_step = self._trainer.get_trainer_steps()
+                fingerprint = tf.concat([epsilon, trainer_step], axis=0)
+                fingerprint = tf.expand_dims(fingerprint, axis=0)
+                fingerprint = tf.cast(fingerprint, "float32")
+            else:
+                fingerprint = None
 
             (policy_output, new_message), new_state = self._policy(
                 agent,
@@ -394,6 +405,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
                 message_inputs[agent],
                 observation.legal_actions,
                 epsilon,
+                fingerprint
             )
 
             self._states[agent] = new_state
@@ -403,3 +415,47 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
 
         # Return a numpy array with squeezed out batch dimension.
         return actions
+
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Optional[Dict[str, types.NestedArray]] = {},
+    ) -> None:
+
+        if self._fingerprint and self._trainer:
+            trainer_step = self._trainer.get_trainer_steps()
+            epsilon = self._trainer.get_epsilon()
+            fingerprint = np.array([epsilon, trainer_step])
+            if extras:
+                extras.update({"fingerprint": fingerprint})
+            else:
+                extras = {"fingerprint": fingerprint}
+
+        super(MADQNRecurrentCommExecutor, self).observe_first(
+            timestep,
+            extras
+        )
+
+    def observe(
+        self,
+        actions: Dict[str, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
+        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+    ) -> None:
+
+        if self._fingerprint and self._trainer:
+            trainer_step = self._trainer.get_trainer_steps()
+            epsilon = self._trainer.get_epsilon()
+            fingerprint = np.array([epsilon, trainer_step])
+            if next_extras:
+                next_extras.update({"fingerprint": fingerprint})
+            else:
+                next_extras = {"fingerprint": fingerprint}
+
+        super(MADQNRecurrentCommExecutor, self).observe(
+            actions,
+            next_timestep,
+            next_extras
+        )
+
+        

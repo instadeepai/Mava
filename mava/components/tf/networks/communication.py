@@ -51,6 +51,7 @@ class CommunicationNetwork(snt.Module):
     def __call__(
         self,
         x: snt.Module,
+        fingerprint: Optional[snt.Module] = None,
         state: Optional[snt.Module] = None,
         message: Optional[snt.Module] = None,
     ) -> snt.Module:
@@ -58,6 +59,9 @@ class CommunicationNetwork(snt.Module):
             state = self.initial_state(x.shape[0])
         if message is None:
             message = self.initial_message(x.shape[0])
+
+        if fingerprint is not None:
+            x = tf2_utils.batch_concat([x, fingerprint])
 
         obs_in = self._obs_in_network(x)
         comm_in = self._comm_in_network(message)

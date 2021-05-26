@@ -484,6 +484,12 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             lambda s: s[:, 0, :], inputs.data.extras["core_messages"]
         )
 
+        if self._fingerprint:
+            f = extra['fingerprint']
+            f = tf.cast(f, 'float32')
+        else:
+            f = None
+
         with tf.GradientTape(persistent=True) as tape:
             q_network_losses: Dict[str, NestedArray] = {
                 agent: {"q_value_loss": tf.zeros(())} for agent in self._agents
@@ -503,6 +509,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
                 agent_key = self.agent_net_keys[agent]
                 (q_targ, m), s = self._target_q_networks[agent_key](
                     observations[agent].observation[0],
+                    f[0] if f is not None else None,
                     target_state[agent],
                     target_channel[agent],
                 )
@@ -525,6 +532,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
 
                     (q_targ, m), s = self._target_q_networks[agent_key](
                         observations[agent].observation[t],
+                        f[t] if f is not None else None,
                         target_state[agent],
                         target_channel[agent],
                     )
@@ -533,6 +541,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
 
                     (q, m), s = self._q_networks[agent_key](
                         observations[agent].observation[t - 1],
+                        f[t - 1] if f is not None else None,
                         state[agent],
                         channel[agent],
                     )
