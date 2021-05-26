@@ -620,30 +620,14 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # Centralised based
-        # o_tm1_feed_cen = tf.stack([x for x in o_tm1_trans.values()], 1)
-        # o_t_feed_cen = tf.stack([x for x in o_t_trans.values()], 1)
-        # a_tm1_feed_cen = tf.stack([x for x in a_tm1.values()], 1)
-        # a_t_feed_cen = tf.stack([x for x in a_t.values()], 1)
+        o_tm1_feed = tf.stack([o_tm1_trans[agent] for agent in self._agents], 1)
+        o_t_feed = tf.stack([o_t_trans[agent] for agent in self._agents], 1)
+        a_tm1_feed = tf.stack([a_tm1[agent] for agent in self._agents], 1)
+        a_t_feed = tf.stack([a_t[agent] for agent in self._agents], 1)
 
-        o_tm1_vals = []
-        o_t_vals = []
-        a_tm1_vals = []
-        a_t_vals = []
-        for agent_key in o_tm1_trans.keys():
-            o_tm1_vals.append(o_tm1_trans[agent_key])
-            o_t_vals.append(o_t_trans[agent_key])
-            a_tm1_vals.append(a_tm1[agent_key])
-            a_t_vals.append(a_t[agent_key])
-        o_tm1_feed = tf.stack(o_tm1_vals, 1)
-        o_t_feed = tf.stack(o_t_vals, 1)
-        a_tm1_feed = tf.stack(a_tm1_vals, 1)
-        a_t_feed = tf.stack(a_t_vals, 1)
-
-        # assert o_tm1_feed.numpy() == o_tm1_feed_cen.numpy()
-
-        # print(
-        #     "o_tm1_feed: ", o_tm1_feed.shape, "o_tm1_feed_cen: ", o_tm1_feed_cen.shape
-        # )
+        # TODO (dries): Make sure self._agents are always in the same order.
+        #  It might be that if a checkpoint is loaded the order might be
+        #  different if one uses python 3.6 due to a .keys() call.
 
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
@@ -659,6 +643,11 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
+
+        dpg_a_t_feed = tf.squeeze(
+            tf.stack([dpg_a_t_feed[agent] for agent in self._agents], 1)
+        )
+
         return dpg_a_t_feed
 
 
@@ -784,6 +773,9 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
+        dpg_a_t_feed = tf.squeeze(
+            tf.stack([dpg_a_t_feed[agent] for agent in self._agents], 1)
+        )
         return dpg_a_t_feed
 
 
@@ -877,17 +869,9 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         # State based
         o_tm1_feed = e_tm1["s_t"]
         o_t_feed = e_t["s_t"]
+        a_tm1_feed = tf.stack([a_tm1[agent] for agent in self._agents], 1)
+        a_t_feed = tf.stack([a_t[agent] for agent in self._agents], 1)
 
-        a_tm1_vals = []
-        a_t_vals = []
-        for agent_key in o_tm1_trans.keys():
-            a_tm1_vals.append(a_tm1[agent_key])
-            a_t_vals.append(a_t[agent_key])
-        a_tm1_feed = tf.stack(a_tm1_vals, 1)
-        a_t_feed = tf.stack(a_t_vals, 1)
-
-        # a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        # a_t_feed = tf.stack([x for x in a_t.values()], 1)
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     def _get_dpg_feed(
@@ -902,6 +886,10 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
+
+        dpg_a_t_feed = tf.squeeze(
+            tf.stack([dpg_a_t_feed[agent] for agent in self._agents], 1)
+        )
 
         return dpg_a_t_feed
 
@@ -1580,24 +1568,15 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # Centralised based
-        obs_trans_vals = []
-        target_obs_trans_vals = []
-        actions_vals = []
-        target_actions_vals = []
-        for agent_key in obs_trans.keys():
-            obs_trans_vals.append(obs_trans[agent_key])
-            target_obs_trans_vals.append(target_obs_trans[agent_key])
-            actions_vals.append(actions[agent_key])
-            target_actions_vals.append(target_actions[agent_key])
-        obs_trans_feed = tf.stack(obs_trans_vals, 1)
-        target_obs_trans_feed = tf.stack(target_obs_trans_vals, 1)
-        actions_feed = tf.stack(actions_vals, 1)
-        target_actions_feed = tf.stack(target_actions_vals, 1)
+        obs_trans_feed = tf.stack([obs_trans[agent] for agent in self._agents], -1)
+        target_obs_trans_feed = tf.stack(
+            [target_obs_trans[agent] for agent in self._agents], -1
+        )
+        actions_feed = tf.stack([actions[agent] for agent in self._agents], -1)
+        target_actions_feed = tf.stack(
+            [target_actions[agent] for agent in self._agents], -1
+        )
 
-        # obs_trans_feed = tf.stack([x for x in obs_trans.values()], -1)
-        # target_obs_trans_feed = tf.stack([x for x in target_obs_trans.values()], -1)
-        # actions_feed = tf.stack([x for x in actions.values()], -1)
-        # target_actions_feed = tf.stack([x for x in target_actions.values()], -1)
         return obs_trans_feed, target_obs_trans_feed, actions_feed, target_actions_feed
 
     def _get_dpg_feed(
@@ -1613,7 +1592,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dpg_actions_feed = copy.copy(actions)
         dpg_actions_feed[agent] = dpg_actions
         dpg_actions_feed = tf.squeeze(
-            tf.stack([x for x in dpg_actions_feed.values()], -1)
+            tf.stack([dpg_actions_feed[agent] for agent in self._agents], -1)
         )
         return dpg_actions_feed
 
@@ -1709,16 +1688,11 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         # State based
         obs_trans_feed = extras["s_t"]
         target_obs_trans_feed = extras["s_t"]
-        actions_vals = []
-        target_actions_vals = []
-        for agent_key in obs_trans.keys():
-            actions_vals.append(actions[agent_key])
-            target_actions_vals.append(target_actions[agent_key])
-        actions_feed = tf.stack(actions_vals, 1)
-        target_actions_feed = tf.stack(target_actions_vals, 1)
+        actions_feed = tf.stack([actions[agent] for agent in self._agents], -1)
+        target_actions_feed = tf.stack(
+            [target_actions[agent] for agent in self._agents], -1
+        )
 
-        # actions_feed = tf.stack([x for x in actions.values()], -1)
-        # target_actions_feed = tf.stack([x for x in target_actions.values()], -1)
         return obs_trans_feed, target_obs_trans_feed, actions_feed, target_actions_feed
 
     def _get_dpg_feed(
@@ -1734,6 +1708,6 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         dpg_actions_feed = copy.copy(actions)
         dpg_actions_feed[agent] = dpg_actions
         dpg_actions_feed = tf.squeeze(
-            tf.stack([x for x in dpg_actions_feed.values()], -1)
+            tf.stack([dpg_actions_feed[agent] for agent in self._agents], -1)
         )
         return dpg_actions_feed

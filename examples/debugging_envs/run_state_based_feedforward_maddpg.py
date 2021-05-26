@@ -135,6 +135,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        return_state_info=True,
     )
 
     # networks
@@ -177,13 +178,13 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_config=logger_config,
-        architecture=architectures.CentralisedQValueCritic,
+        architecture=architectures.StateBasedQValueCritic,
         num_executors=2,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
-        trainer_fn=maddpg.CentralisedMADDPGTrainer,
+        trainer_fn=maddpg.StateBasedMADDPGTrainer,
         shared_weights=False,
     ).build()
 

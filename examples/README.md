@@ -23,15 +23,14 @@ We include a number of systems running on continuous control tasks.
     an MA-D4PG system on the continuous action space simple_spread MPE debugging environment.
 -   [MA-DDPG (decentralised, recurrent)](debugging_envs/run_decentralised_recurrent_maddpg.py):
     an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
--   [MA-DDPG (decentralised, recurrent)](debugging_envs/run_decentralised_recurrent_maddpg.py):
-    an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
 -   [MA-DDPG (decentralised, feedforward)](debugging_envs/run_feedforward_maddpg_record_video.py):
     an MA-DDPG system (with video wrapping) on the continuous action space simple_spread MPE debugging environment.
 -   [MA-DDPG (networked, feedforward)](debugging_envs/run_networked_feedforward_maddpg.py):
-    an MA-D4PG system on the continuous action space simple_spread MPE debugging environment.
-
+    an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
+-   [MA-DDPG (state-based, feedforward)](debugging_envs/run_state_based_feedforward_maddpg.py):
+    an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
 -   [MA-DDPG (state-based, recurrent)](debugging_envs/run_state_based_recurrent_maddpg.py):
-    an MA-D4PG system on the continuous action space simple_spread MPE debugging environment.
+    an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
 -   [PPO (centralised, feedforward)](petting_zoo/run_centralised_feedforward_mappo.py):
     a PPO system using a centralised critic on the continuous action space multiwalker_v7 PettingZoo environment.
 -   [MA-D4PG (decentralised, feedforward)](petting_zoo/run_decentralised_feedforward_mad4pg.py):
