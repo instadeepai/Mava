@@ -26,7 +26,7 @@ from mava.wrappers.pettingzoo import (
 )
 
 # TODO only import smac if the user needs it.
-# from mava.wrappers.smac import SMACEnvWrapper
+from mava.wrappers.smac import SMACEnvWrapper
 from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
     DetailedTrainerStatisticsWithEpsilon,
