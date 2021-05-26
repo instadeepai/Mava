@@ -261,12 +261,17 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         return timestep
 
     def _retrieve_render(self) -> np.ndarray:
-        if self._format == "video":
-            render = self._environment.render(mode="rgb_array")
-        elif self._format == "gif":
-            render = np.transpose(
-                self._environment.render(mode="rgb_array"), axes=(1, 0, 2)
-            )
+        render = None
+        try:
+            if self._format == "video":
+                render = self._environment.render(mode="rgb_array")
+            elif self._format == "gif":
+                render = np.transpose(
+                    self._environment.render(mode="rgb_array"), axes=(1, 0, 2)
+                )
+        except Exception as ex:
+            print(f"Render frames exception: {ex}")
+            pass
         return render
 
     def _append_frame(self) -> None:
