@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -26,6 +27,7 @@ from acme.types import NestedArray
 from acme.utils import counting, loggers
 
 import mava
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
@@ -51,18 +53,18 @@ class MADQNTrainer(mava.Trainer):
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         fingerprint: bool = False,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        communication_module: Optional[BaseCommunicationModule] = None,
     ):
 
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
-        self._optimizer = optimizer
         self._checkpoint = checkpoint
 
         # Store online and target q-networks.
@@ -75,7 +77,12 @@ class MADQNTrainer(mava.Trainer):
 
         # Other learner parameters.
         self._discount = discount
-        self._clipping = clipping
+        # Set up gradient clipping.
+        if max_gradient_norm is not None:
+            self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        else:  # A very large number. Infinity results in NaNs.
+            self._max_gradient_norm = tf.convert_to_tensor(1e10)
+
         self._fingerprint = fingerprint
 
         # Necessary to track when to update target networks.
@@ -94,6 +101,12 @@ class MADQNTrainer(mava.Trainer):
             self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
+
+        # Create optimizers for different agent types.
+        # TODO(Kale-ab): Allow this to be passed as a system param.
+        self._optimizers: snt.Optimizer = {}
+        for agent in self.unique_net_keys:
+            self._optimizers[agent] = copy.deepcopy(optimizer)
 
         # Expose the variables.
         q_networks_to_expose = {}
@@ -121,7 +134,7 @@ class MADQNTrainer(mava.Trainer):
                         "counter": self._counter,
                         "q_network": self._q_networks[agent_key],
                         "target_q_network": self._target_q_networks[agent_key],
-                        "optimizer": self._optimizer,
+                        "optimizer": self._optimizers,
                         "num_steps": self._num_steps,
                     },
                     enable_checkpointing=checkpoint,
@@ -293,12 +306,11 @@ class MADQNTrainer(mava.Trainer):
             # Compute gradients
             gradients = tape.gradient(q_network_losses[agent], q_network_variables)
 
-            # Maybe clip gradients.
-            if self._clipping:
-                gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+            # Clip gradients.
+            gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
 
             # Apply gradients.
-            self._optimizer.apply(gradients, q_network_variables)
+            self._optimizers[agent_key].apply(gradients, q_network_variables)
 
         train_utils.safe_del(self, "tape")
 
@@ -314,7 +326,7 @@ class MADQNTrainer(mava.Trainer):
         return variables
 
 
-class RecurrentMADQNTrainer(MADQNTrainer):
+class MADQNRecurrentTrainer(MADQNTrainer):
     """Recurrent MADQN trainer.
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -332,12 +344,13 @@ class RecurrentMADQNTrainer(MADQNTrainer):
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         fingerprint: bool = False,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        communication_module: Optional[BaseCommunicationModule] = None,
     ):
         super().__init__(
             agents=agents,
@@ -350,7 +363,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
             discount=discount,
             shared_weights=shared_weights,
             exploration_scheduler=exploration_scheduler,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             fingerprint=fingerprint,
@@ -399,6 +412,139 @@ class RecurrentMADQNTrainer(MADQNTrainer):
                         rewards[agent][t],
                         discount * discounts[agent][t],
                         q_targ[t],
+                    )
+
+                    loss = tf.reduce_mean(loss)
+                    q_network_losses[agent]["q_value_loss"] += loss
+
+        self._q_network_losses = q_network_losses
+        self.tape = tape
+
+
+class MADQNRecurrentCommTrainer(MADQNTrainer):
+    """Recurrent MADQN trainer.
+    This is the trainer component of a MADQN system. IE it takes a dataset as input
+    and implements update functionality to learn from this dataset.
+    """
+
+    def __init__(
+        self,
+        agents: List[str],
+        agent_types: List[str],
+        q_networks: Dict[str, snt.Module],
+        target_q_networks: Dict[str, snt.Module],
+        target_update_period: int,
+        dataset: tf.data.Dataset,
+        optimizer: snt.Optimizer,
+        discount: float,
+        shared_weights: bool,
+        exploration_scheduler: LinearExplorationScheduler,
+        communication_module: BaseCommunicationModule,
+        max_gradient_norm: float = None,
+        fingerprint: bool = False,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
+    ):
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            q_networks=q_networks,
+            target_q_networks=target_q_networks,
+            target_update_period=target_update_period,
+            dataset=dataset,
+            optimizer=optimizer,
+            discount=discount,
+            shared_weights=shared_weights,
+            exploration_scheduler=exploration_scheduler,
+            max_gradient_norm=max_gradient_norm,
+            fingerprint=fingerprint,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+        )
+
+        self._communication_module = communication_module
+
+    def _forward(self, inputs: Any) -> None:
+        data = tree.map_structure(
+            lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
+        )
+        data = tf2_utils.batch_to_sequence(data)
+
+        observations, actions, rewards, discounts, _, extra = data
+
+        # core_states = extra["core_states"]
+        core_state = tree.map_structure(
+            lambda s: s[:, 0, :], inputs.data.extras["core_states"]
+        )
+        core_message = tree.map_structure(
+            lambda s: s[:, 0, :], inputs.data.extras["core_messages"]
+        )
+
+        with tf.GradientTape(persistent=True) as tape:
+            q_network_losses: Dict[str, NestedArray] = {
+                agent: {"q_value_loss": tf.zeros(())} for agent in self._agents
+            }
+
+            T = actions[self._agents[0]].shape[0]
+
+            state = {agent: core_state[agent][0] for agent in self._agents}
+            target_state = {agent: core_state[agent][0] for agent in self._agents}
+
+            message = {agent: core_message[agent][0] for agent in self._agents}
+            target_message = {agent: core_message[agent][0] for agent in self._agents}
+
+            # _target_q_networks must be 1 step ahead
+            target_channel = self._communication_module.process_messages(target_message)
+            for agent in self._agents:
+                agent_key = self.agent_net_keys[agent]
+                (q_targ, m), s = self._target_q_networks[agent_key](
+                    observations[agent].observation[0],
+                    target_state[agent],
+                    target_channel[agent],
+                )
+                target_state[agent] = s
+                target_message[agent] = m
+
+            for t in range(1, T, 1):
+                channel = self._communication_module.process_messages(message)
+                target_channel = self._communication_module.process_messages(
+                    target_message
+                )
+
+                for agent in self._agents:
+                    agent_key = self.agent_net_keys[agent]
+
+                    # Cast the additional discount
+                    # to match the environment discount dtype.
+
+                    discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
+
+                    (q_targ, m), s = self._target_q_networks[agent_key](
+                        observations[agent].observation[t],
+                        target_state[agent],
+                        target_channel[agent],
+                    )
+                    target_state[agent] = s
+                    target_message[agent] = m
+
+                    (q, m), s = self._q_networks[agent_key](
+                        observations[agent].observation[t - 1],
+                        state[agent],
+                        channel[agent],
+                    )
+                    state[agent] = s
+                    message[agent] = m
+
+                    loss, _ = trfl.qlearning(
+                        q,
+                        actions[agent][t - 1],
+                        rewards[agent][t - 1],
+                        discount * discounts[agent][t],
+                        q_targ,
                     )
 
                     loss = tf.reduce_mean(loss)

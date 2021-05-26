@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADDPG on pettinzoo MPE environments."""
-
+"""Example running recurrent MADDPG on the debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
@@ -29,25 +28,24 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf.architectures import StateBasedQValueCritic
 from mava.systems.tf import maddpg
 from mava.systems.tf.maddpg.execution import MADDPGRecurrentExecutor
-from mava.systems.tf.maddpg.training import MADDPGDecentralisedRecurrentTrainer
+from mava.systems.tf.maddpg.training import MADDPGStateBasedRecurrentTrainer
 from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
+from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
-
-flags.DEFINE_string(
-    "env_class",
-    "sisl",
-    "Pettingzoo environment class, e.g. atari (str).",
-)
-
 flags.DEFINE_string(
     "env_name",
-    "multiwalker_v7",
-    "Pettingzoo environment name, e.g. pong (str).",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "continuous",
+    "Environment action space type (str).",
 )
 flags.DEFINE_string(
     "mava_id",
@@ -135,11 +133,13 @@ def make_networks(
 
 
 def main(_: Any) -> None:
-
+    # environment
     environment_factory = functools.partial(
-        pettingzoo_utils.make_environment,
-        env_class=FLAGS.env_class,
+        debugging_utils.make_environment,
         env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+        num_agents=3,
+        return_state_info=True,
     )
 
     network_factory = lp_utils.partial_kwargs(make_networks)
@@ -163,14 +163,14 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=MADDPGDecentralisedRecurrentTrainer,
+        architecture=StateBasedQValueCritic,
+        trainer_fn=MADDPGStateBasedRecurrentTrainer,
         executor_fn=MADDPGRecurrentExecutor,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        shared_weights=False,
     ).build()
 
-    # Launch gpu config - let trainer use gpu.
+    # launch
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
@@ -178,7 +178,6 @@ def main(_: Any) -> None:
         "evaluator": PythonProcess(env=env_vars),
         "executor": PythonProcess(env=env_vars),
     }
-
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,

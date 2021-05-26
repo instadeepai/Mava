@@ -144,6 +144,10 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
 
         for agent_type, agents in agents_by_type.items():
             agent_key = agent_type if self._shared_weights else agents[0]
+
+            # TODO (dries): Add a check to see if all
+            #  self._embed_specs[agent_key].shape are of the same shape
+
             critic_obs_shape = list(copy.copy(self._embed_specs[agent_key].shape))
             critic_obs_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
@@ -154,6 +158,9 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
             critic_act_shape = list(
                 copy.copy(self._agent_specs[agents[0]].actions.shape)
             )
+            # TODO (dries): Add a check to see if all
+            #  self._agent_specs[agents[0]].actions.shape are of the same shape
+
             critic_act_shape.insert(0, len(agents))
             action_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=critic_act_shape,

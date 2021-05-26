@@ -25,6 +25,7 @@ from acme.utils import counting
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
@@ -57,9 +58,9 @@ class MADQNConfig:
     epsilon_min: float
     epsilon_decay: float
     shared_weights: bool
+    max_gradient_norm: Optional[float]
     target_update_period: int
     executor_variable_update_period: int
-    clipping: bool
     min_replay_size: int
     max_replay_size: int
     samples_per_insert: Optional[float]
@@ -212,6 +213,7 @@ class MADQNBuilder:
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
         trainer: Optional[training.MADQNTrainer] = None,
+        communication_module: Optional[BaseCommunicationModule] = None,
         evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
@@ -255,6 +257,7 @@ class MADQNBuilder:
             variable_client=variable_client,
             adder=adder,
             trainer=trainer,
+            communication_module=communication_module,
             evaluator=evaluator,
             fingerprint=fingerprint,
         )
@@ -265,6 +268,7 @@ class MADQNBuilder:
         dataset: Iterator[reverb.ReplaySample],
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
+        communication_module: Optional[BaseCommunicationModule] = None,
     ) -> core.Trainer:
         """Creates an instance of the trainer.
         Args:
@@ -301,8 +305,9 @@ class MADQNBuilder:
             shared_weights=self._config.shared_weights,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
-            clipping=self._config.clipping,
+            max_gradient_norm=self._config.max_gradient_norm,
             exploration_scheduler=exploration_scheduler,
+            communication_module=communication_module,
             dataset=dataset,
             counter=counter,
             fingerprint=fingerprint,

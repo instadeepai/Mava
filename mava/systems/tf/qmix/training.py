@@ -53,7 +53,7 @@ class QMIXTrainer(MADQNTrainer):
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
@@ -74,7 +74,7 @@ class QMIXTrainer(MADQNTrainer):
             discount=discount,
             shared_weights=shared_weights,
             exploration_scheduler=exploration_scheduler,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
@@ -224,12 +224,11 @@ class QMIXTrainer(MADQNTrainer):
         # Compute gradients.
         gradients = self.tape.gradient(self.loss, trainable_variables)
 
-        # Maybe clip gradients.
-        if self._clipping:
-            gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+        # Clip gradients.
+        gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
 
         # Apply gradients.
-        self._optimizer.apply(gradients, trainable_variables)
+        self._optimizers[agent_key].apply(gradients, trainable_variables)
 
         # Delete the tape manually because of the persistent=True flag.
         train_utils.safe_del(self, "tape")

@@ -105,9 +105,9 @@ class MADDPGBuilder(SystemBuilder):
         self,
         config: MADDPGConfig,
         trainer_fn: Union[
-            Type[training.BaseMADDPGTrainer],
-            Type[training.BaseRecurrentMADDPGTrainer],
-        ] = training.DecentralisedMADDPGTrainer,
+            Type[training.MADDPGBaseTrainer],
+            Type[training.MADDPGBaseRecurrentTrainer],
+        ] = training.MADDPGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):
@@ -324,7 +324,7 @@ class MADDPGBuilder(SystemBuilder):
         target_update_rate = self._config.target_update_rate
 
         # trainer args
-        trainer_config = {
+        trainer_config: Dict[str, Any] = {
             "agents": agents,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],

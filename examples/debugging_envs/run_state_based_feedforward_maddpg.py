@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADDPG on pettinzoo MPE environments."""
+"""Example running feedforward MADDPG on debug MPE environments."""
 
 import functools
 from datetime import datetime
@@ -22,6 +22,7 @@ from typing import Any, Dict, Mapping, Sequence, Union
 import launchpad as lp
 import numpy as np
 import sonnet as snt
+import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
@@ -29,25 +30,21 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf import architectures
 from mava.systems.tf import maddpg
-from mava.systems.tf.maddpg.execution import MADDPGRecurrentExecutor
-from mava.systems.tf.maddpg.training import MADDPGDecentralisedRecurrentTrainer
 from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
-from mava.utils.loggers import logger_utils
+from mava.utils.environments import debugging_utils
 
 FLAGS = flags.FLAGS
-
-flags.DEFINE_string(
-    "env_class",
-    "sisl",
-    "Pettingzoo environment class, e.g. atari (str).",
-)
-
 flags.DEFINE_string(
     "env_name",
-    "multiwalker_v7",
-    "Pettingzoo environment name, e.g. pong (str).",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "continuous",
+    "Environment action space type (str).",
 )
 flags.DEFINE_string(
     "mava_id",
@@ -93,17 +90,15 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
-        # Create the observation network.
-        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        # Create the shared observation network; here simply a state-less operation.
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
-        policy_network = snt.DeepRNN(
+        policy_network = snt.Sequential(
             [
-                observation_network,
-                snt.Flatten(),
-                snt.nets.MLP(policy_networks_layer_sizes[key]),
-                snt.LSTM(25),
-                snt.nets.MLP([128]),
+                networks.LayerNormMLP(
+                    policy_networks_layer_sizes[key], activate_final=True
+                ),
                 networks.NearZeroInitializedLinear(num_dimensions),
                 networks.TanhToSpec(specs[key].actions),
                 networks.ClippedGaussian(sigma),
@@ -122,55 +117,78 @@ def make_networks(
                 snt.Linear(1),
             ]
         )
-
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
 
     return {
-        "observations": observation_networks,
         "policies": policy_networks,
         "critics": critic_networks,
+        "observations": observation_networks,
     }
 
 
 def main(_: Any) -> None:
 
+    # environment
     environment_factory = functools.partial(
-        pettingzoo_utils.make_environment,
-        env_class=FLAGS.env_class,
+        debugging_utils.make_environment,
         env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+        return_state_info=True,
     )
 
+    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
+
+    # loggers
+    # set custom logger config for each process
+    # -- log trainer,executor and evaluator to TF
+    # -- log only evaluator to terminal
+    log_every = 10
+    logger_config = {
+        "trainer": {
+            "directory": FLAGS.base_dir,
+            "to_terminal": False,
+            "to_tensorboard": True,
+            "time_stamp": FLAGS.mava_id,
+            "time_delta": log_every,
+        },
+        "executor": {
+            "directory": FLAGS.base_dir,
+            "to_terminal": False,
+            "to_tensorboard": True,
+            "time_stamp": FLAGS.mava_id,
+            "time_delta": log_every,
+        },
+        "evaluator": {
+            "directory": FLAGS.base_dir,
+            "to_terminal": True,
+            "to_tensorboard": True,
+            "time_stamp": FLAGS.mava_id,
+            "time_delta": log_every,
+        },
+    }
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-    # loggers
-    log_every = 10
-    logger_factory = functools.partial(
-        logger_utils.make_logger,
-        directory=FLAGS.base_dir,
-        to_terminal=True,
-        to_tensorboard=True,
-        time_stamp=FLAGS.mava_id,
-        time_delta=log_every,
-    )
-
+    # distributed program
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        logger_factory=logger_factory,
+        logger_config=logger_config,
+        architecture=architectures.StateBasedQValueCritic,
         num_executors=2,
-        trainer_fn=MADDPGDecentralisedRecurrentTrainer,
-        executor_fn=MADDPGRecurrentExecutor,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        max_gradient_norm=40.0,
+        trainer_fn=maddpg.MADDPGStateBasedTrainer,
+        shared_weights=False,
     ).build()
 
-    # Launch gpu config - let trainer use gpu.
+    # launch
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
@@ -178,7 +196,6 @@ def main(_: Any) -> None:
         "evaluator": PythonProcess(env=env_vars),
         "executor": PythonProcess(env=env_vars),
     }
-
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
