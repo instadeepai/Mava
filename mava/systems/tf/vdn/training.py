@@ -52,6 +52,7 @@ class VDNTrainer(MADQNTrainer):
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: Optional[BaseCommunicationModule] = None,
         clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         fingerprint: bool = False,
         logger: loggers.Logger = None,
@@ -75,6 +76,7 @@ class VDNTrainer(MADQNTrainer):
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             fingerprint=fingerprint,
             logger=logger,
@@ -181,6 +183,9 @@ class VDNTrainer(MADQNTrainer):
             # Maybe clip gradients.
             if self._clipping:
                 gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+
+            # Clip gradients.
+            gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
 
             # Apply gradients.
             self._optimizers[agent_key].apply(gradients, trainable_variables)

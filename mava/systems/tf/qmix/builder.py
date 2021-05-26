@@ -143,7 +143,7 @@ class QMIXBuilder(MADQNBuilder):
             shared_weights=self._config.shared_weights,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
-            clipping=self._config.clipping,
+            max_gradient_norm=self._config.max_gradient_norm,
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             dataset=dataset,

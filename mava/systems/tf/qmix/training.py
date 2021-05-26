@@ -57,6 +57,7 @@ class QMIXTrainer(MADQNTrainer):
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: Optional[BaseCommunicationModule] = None,
         clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         fingerprint: bool = False,
         logger: loggers.Logger = None,
@@ -81,6 +82,7 @@ class QMIXTrainer(MADQNTrainer):
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             fingerprint=fingerprint,
             logger=logger,
@@ -275,6 +277,13 @@ class QMIXTrainer(MADQNTrainer):
         if self._clipping:
             gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
         self._optimizer.apply(gradients, variables)
+        trainable_variables += self._mixing_network.trainable_variables
+
+        # Compute gradients.
+        gradients = self.tape.gradient(self.loss, trainable_variables)
+
+        # Clip gradients.
+        gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
 
         train_utils.safe_del(self, "tape")
 

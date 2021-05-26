@@ -50,7 +50,6 @@ class VDNConfig(MADQNConfig):
               that is made.
             n_step: number of steps to squash into a single transition.
             sigma: standard deviation of zero-mean, Gaussian exploration noise.
-            clipping: whether to clip gradients by global norm.
             replay_table_name: string indicating what name to give the replay table."""
 
 
@@ -134,7 +133,7 @@ class VDNBuilder(MADQNBuilder):
             shared_weights=self._config.shared_weights,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
-            clipping=self._config.clipping,
+            max_gradient_norm=self._config.max_gradient_norm,
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             dataset=dataset,
