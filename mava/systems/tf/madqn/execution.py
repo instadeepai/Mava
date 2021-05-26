@@ -154,7 +154,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             if not self._evaluator:
                 epsilon = self._trainer.get_epsilon()
             else:
-                epsilon = 0.0
+                # Note (dries): For some reason 0 epsilon breaks on StarCraft
+                epsilon = 1e-10
 
             epsilon = tf.convert_to_tensor(epsilon)
 
@@ -175,6 +176,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             )
 
             actions[agent] = tf2_utils.to_numpy_squeeze(action)
+
+        print("actions: ", actions, ". Evaluator: ", self._evaluator)
 
         # Return a numpy array with squeezed out batch dimension.
         return actions
