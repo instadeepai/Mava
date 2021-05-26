@@ -15,6 +15,7 @@
 
 
 """MASAC trainer implementation."""
+import copy
 import os
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -33,7 +34,7 @@ import mava
 from mava.utils import training_utils as train_utils
 
 
-class BaseMASACTrainer(mava.Trainer):
+class MASACBaseTrainer(mava.Trainer):
     """MASAC trainer.
     This is the trainer component of a MASAC system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -92,11 +93,10 @@ class BaseMASACTrainer(mava.Trainer):
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_V_optimizer: the optimizer to be applied to the critic_V loss.
-          critic_Q_1_optimizer: the optimizer to be applied to the critic_Q_1 loss.
-          critic_Q_2_optimizer: the optimizer to be applied to the critic_Q_2 loss.
-          clipping: whether to clip gradients by global norm.
+          policy_optimizer: the optimizers to be applied to the DPG (policy) loss.
+          critic_V_optimizer: the optimizers to be applied to the critic_V loss.
+          critic_Q_1_optimizer: the optimizers to be applied to the critic_Q_1 loss.
+          critic_Q_2_optimizer: the optimizers to be applied to the critic_Q_2 loss.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.
@@ -154,18 +154,24 @@ class BaseMASACTrainer(mava.Trainer):
         # Create an iterator to go through the dataset.
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
-        # Create optimizers if they aren't given.
-        self._critic_V_optimizer = critic_V_optimizer or snt.optimizers.Adam(3e-4)
-        self._critic_Q_1_optimizer = critic_Q_1_optimizer or snt.optimizers.Adam(3e-4)
-        self._critic_Q_2_optimizer = critic_Q_2_optimizer or snt.optimizers.Adam(3e-4)
-        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(3e-4)
-
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
         if self._shared_weights:
             self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
+
+        # Create optimizers for different agent types.
+        # TODO(Kale-ab): Allow this to be passed as a system param.
+        self._policy_optimizers: snt.Optimizer = {}
+        self._critic_V_optimizers: snt.Optimizer = {}
+        self._critic_Q_1_optimizers: snt.Optimizer = {}
+        self._critic_Q_2_optimizers: snt.Optimizer = {}
+        for agent_key in self.unique_net_keys:
+            self._policy_optimizers[agent_key] = copy.deepcopy(policy_optimizer)
+            self._critic_V_optimizers[agent_key] = copy.deepcopy(critic_V_optimizer)
+            self._critic_Q_1_optimizers[agent_key] = copy.deepcopy(critic_Q_1_optimizer)
+            self._critic_Q_2_optimizers[agent_key] = copy.deepcopy(critic_Q_2_optimizer)
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -219,10 +225,10 @@ class BaseMASACTrainer(mava.Trainer):
                     "target_policy": self._target_policy_networks[agent_key],
                     "target_critic_V": self._target_critic_V_networks[agent_key],
                     "target_observation": self._target_observation_networks[agent_key],
-                    "policy_optimizer": self._policy_optimizer,
-                    "critic_V_optimizer": self._critic_V_optimizer,
-                    "critic_Q_1_optimizer": self._critic_Q_1_optimizer,
-                    "critic__Q_2_optimizer": self._critic_Q_2_optimizer,
+                    "policy_optimizer": self._policy_optimizers,
+                    "critic_V_optimizer": self._critic_V_optimizers,
+                    "critic_Q_1_optimizer": self._critic_Q_1_optimizers,
+                    "critic__Q_2_optimizer": self._critic_Q_2_optimizers,
                     "num_steps": self._num_steps,
                 }
 
@@ -500,10 +506,16 @@ class BaseMASACTrainer(mava.Trainer):
             )[0]
 
             # Apply gradients.
-            self._policy_optimizer.apply(policy_gradients, policy_variables)
-            self._critic_V_optimizer.apply(critic_V_gradients, critic_V_variables)
-            self._critic_Q_1_optimizer.apply(critic_Q_1_gradients, critic_Q_1_variables)
-            self._critic_Q_2_optimizer.apply(critic_Q_2_gradients, critic_Q_2_variables)
+            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
+            self._critic_V_optimizers[agent_key].apply(
+                critic_V_gradients, critic_V_variables
+            )
+            self._critic_Q_1_optimizers[agent_key].apply(
+                critic_Q_1_gradients, critic_Q_1_variables
+            )
+            self._critic_Q_2_optimizers[agent_key].apply(
+                critic_Q_2_gradients, critic_Q_2_variables
+            )
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
@@ -538,7 +550,7 @@ class BaseMASACTrainer(mava.Trainer):
         return variables
 
 
-class CentralisedMASACTrainer(BaseMASACTrainer):
+class MASACCentralisedTrainer(MASACBaseTrainer):
     """MASAC trainer.
     This is the trainer component of a MASAC system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -597,11 +609,10 @@ class CentralisedMASACTrainer(BaseMASACTrainer):
           observation_network: an optional online network to process observations
             before the policy and the critic.
           target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_V_optimizer: the optimizer to be applied to the critic_V loss.
-          critic_Q_1_optimizer: the optimizer to be applied to the critic_Q_1 loss.
-          critic_Q_2_optimizer: the optimizer to be applied to the critic_Q_2 loss.
-          clipping: whether to clip gradients by global norm.
+          policy_optimizer: the optimizers to be applied to the DPG (policy) loss.
+          critic_V_optimizer: the optimizers to be applied to the critic_V loss.
+          critic_Q_1_optimizer: the optimizers to be applied to the critic_Q_1 loss.
+          critic_Q_2_optimizer: the optimizers to be applied to the critic_Q_2 loss.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.

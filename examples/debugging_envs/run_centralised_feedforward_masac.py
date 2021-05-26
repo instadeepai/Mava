@@ -29,7 +29,7 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.components.tf.architectures import CentralisedSoftQValueActorCritic
+from mava.components.tf import architectures
 from mava.components.tf.networks import ActorNetwork
 from mava.systems.tf import masac
 from mava.utils import lp_utils
@@ -220,7 +220,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_config=logger_config,
-        architecture=CentralisedSoftQValueActorCritic,
+        architecture=architectures.CentralisedSoftQValueActorCritic,
         num_executors=2,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_V_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
@@ -228,7 +228,8 @@ def main(_: Any) -> None:
         critic_Q_2_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
-        trainer_fn=masac.CentralisedMASACTrainer,
+        trainer_fn=masac.MASACCentralisedTrainer,
+        shared_weights=False,
     ).build()
 
     # launch

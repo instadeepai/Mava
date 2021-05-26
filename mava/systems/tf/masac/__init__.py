@@ -17,4 +17,4 @@
 
 from mava.systems.tf.masac.execution import MASACFeedForwardExecutor
 from mava.systems.tf.masac.system import MASAC
-from mava.systems.tf.masac.training import BaseMASACTrainer, CentralisedMASACTrainer
+from mava.systems.tf.masac.training import MASACBaseTrainer, MASACCentralisedTrainer

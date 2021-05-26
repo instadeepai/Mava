@@ -116,7 +116,7 @@ class MASACBuilder(SystemBuilder):
     def __init__(
         self,
         config: MASACConfig,
-        trainer_fn: Type[training.BaseMASACTrainer] = training.CentralisedMASACTrainer,
+        trainer_fn: Type[training.MASACBaseTrainer] = training.MASACCentralisedTrainer,
         executor_fn: Type[core.Executor] = MASACFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):
@@ -336,7 +336,7 @@ class MASACBuilder(SystemBuilder):
         target_update_rate = self._config.target_update_rate
 
         # trainer args
-        trainer_config = {
+        trainer_config: Dict[str, Any] = {
             "agents": agents,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],

@@ -57,8 +57,8 @@ class MASAC:
             CentralisedSoftQValueActorCritic
         ] = CentralisedSoftQValueActorCritic,
         trainer_fn: Union[
-            Type[training.BaseMASACTrainer],
-        ] = training.CentralisedMASACTrainer,
+            Type[training.MASACBaseTrainer],
+        ] = training.MASACCentralisedTrainer,
         executor_fn: Type[core.Executor] = MASACFeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,

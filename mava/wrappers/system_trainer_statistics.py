@@ -653,10 +653,16 @@ class NetworkStatisticsSoftActorCritic(NetworkStatisticsBase):
             )[0]
 
             # Apply gradients.
-            self._policy_optimizer.apply(policy_gradients, policy_variables)
-            self._critic_V_optimizer.apply(critic_V_gradients, critic_V_variables)
-            self._critic_Q_1_optimizer.apply(critic_Q_1_gradients, critic_Q_1_variables)
-            self._critic_Q_2_optimizer.apply(critic_Q_2_gradients, critic_Q_2_variables)
+            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
+            self._critic_V_optimizers[agent_key].apply(
+                critic_V_gradients, critic_V_variables
+            )
+            self._critic_Q_1_optimizers[agent_key].apply(
+                critic_Q_1_gradients, critic_Q_1_variables
+            )
+            self._critic_Q_2_optimizers[agent_key].apply(
+                critic_Q_2_gradients, critic_Q_2_variables
+            )
 
             if log_current_timestep:
                 if self.log_weights:
