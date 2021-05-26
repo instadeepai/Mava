@@ -73,3 +73,7 @@ We also include a number of systems running on discrete action space environment
     a QMIX system on the two step custom environment.
 -   [VDN](petting_zoo/run_feedforward_vdn.py):
     a VDN system on the two step custom environment.
+-   [MA-DQN (feedforward)](smac/run_feedforward_madqn.py):
+    an MA-DQN system running on the StarCraft 3m environment.
+-   [MA-DQN (recurrent)](smac/run_recurrent_madqn.py):
+    an MA-DQN system running on the StarCraft 3m environment.
