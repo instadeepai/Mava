@@ -347,7 +347,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         message: types.NestedTensor,
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
-        fingerprint: tf.Tensor
+        fingerprint: tf.Tensor,
     ) -> types.NestedTensor:
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
@@ -406,7 +406,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
                 message_inputs[agent],
                 observation.legal_actions,
                 epsilon,
-                fingerprint
+                fingerprint,
             )
 
             self._states[agent] = new_state
@@ -432,10 +432,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
             else:
                 extras = {"fingerprint": fingerprint}
 
-        super(MADQNRecurrentCommExecutor, self).observe_first(
-            timestep,
-            extras
-        )
+        super(MADQNRecurrentCommExecutor, self).observe_first(timestep, extras)
 
     def observe(
         self,
@@ -454,9 +451,5 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
                 next_extras = {"fingerprint": fingerprint}
 
         super(MADQNRecurrentCommExecutor, self).observe(
-            actions,
-            next_timestep,
-            next_extras
+            actions, next_timestep, next_extras
         )
-
-        

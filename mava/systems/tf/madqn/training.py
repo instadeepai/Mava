@@ -485,8 +485,8 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         )
 
         if self._fingerprint:
-            f = extra['fingerprint']
-            f = tf.cast(f, 'float32')
+            f = extra["fingerprint"]
+            f = tf.cast(f, "float32")
         else:
             f = None
 
