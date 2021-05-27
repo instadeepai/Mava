@@ -163,6 +163,7 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationScheduler,
         communication_module=BroadcastedCommunication,
         replay_stabilisation_fn=FingerPrintStabalisation,
+        fingerprint_scale=10000.0,
         epsilon_min=0.05,
         epsilon_decay=8e-4,
         optimizer=snt.optimizers.Adam(learning_rate=5e-4),

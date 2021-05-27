@@ -154,6 +154,7 @@ def main(_: Any) -> None:
         epsilon_min=0.05,
         epsilon_decay=5e-4,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        fingerprint_scale=10000.0,
         checkpoint_subpath=checkpoint_dir,
         logger_factory=logger_factory,
     ).build()

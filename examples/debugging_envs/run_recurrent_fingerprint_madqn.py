@@ -145,6 +145,7 @@ def main(_: Any) -> None:
         executor_fn=MADQNRecurrentExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
         replay_stabilisation_fn=FingerPrintStabalisation,
+        fingerprint_scale=10000.0,
         epsilon_min=0.05,
         epsilon_decay=5e-4,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
