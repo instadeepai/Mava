@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running continous MADDPG on pettinzoo SISL environments."""
+"""Example running continous,networked MADDPG on pettinzoo SISL environments."""
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any, Dict, List, Mapping, Sequence, Union
 
 import launchpad as lp
 import numpy as np
@@ -29,6 +29,7 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
+from mava.components.tf.architectures.networked import NetworkedQValueCritic
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
@@ -130,6 +131,18 @@ def make_networks(
     }
 
 
+def custom_connected_network_spec(
+    agents_by_type: Dict[str, List[str]]
+) -> Dict[str, List[str]]:
+    del agents_by_type
+
+    return {
+        "walker_0": ["walker_0", "walker_1"],
+        "walker_1": ["walker_1", "walker_0", "walker_2"],
+        "walker_2": ["walker_2", "walker_1"],
+    }
+
+
 def main(_: Any) -> None:
 
     environment_factory = functools.partial(
@@ -163,6 +176,10 @@ def main(_: Any) -> None:
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        connection_spec=custom_connected_network_spec,
+        shared_weights=False,
+        architecture=NetworkedQValueCritic,
+        trainer_fn=maddpg.MADDPGNetworkedTrainer,
     ).build()
 
     # Launch gpu config - let trainer use gpu.
