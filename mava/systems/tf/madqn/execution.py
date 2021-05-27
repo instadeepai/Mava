@@ -58,6 +58,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         communication_module: Optional[BaseCommunicationModule] = None,
         fingerprint: bool = False,
         evaluator: bool = False,
+        fingerprint_scale: float = 1,
     ):
         """Initializes the executor.
         Args:
@@ -78,6 +79,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         self._shared_weights = shared_weights
         self._fingerprint = fingerprint
         self._evaluator = evaluator
+        self._scale = fingerprint_scale
 
     @tf.function
     def _policy(
@@ -124,7 +126,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         if self._fingerprint and self._trainer is not None:
             epsilon = self._trainer.get_epsilon()
             trainer_step = self._trainer.get_trainer_steps()
-            fingerprint = np.array([epsilon, trainer_step])
+            fingerprint = np.array([epsilon, trainer_step / self._scale])
             extras.update({"fingerprint": fingerprint})
 
         if self._adder:
@@ -139,7 +141,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         if self._fingerprint and self._trainer is not None:
             trainer_step = self._trainer.get_trainer_steps()
             epsilon = self._trainer.get_epsilon()
-            fingerprint = np.array([epsilon, trainer_step])
+            fingerprint = np.array([epsilon, trainer_step / self._scale])
             next_extras.update({"fingerprint": fingerprint})
 
         if self._adder:
@@ -161,7 +163,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
 
             if self._fingerprint:
                 trainer_step = self._trainer.get_trainer_steps()
-                fingerprint = tf.concat([epsilon, trainer_step], axis=0)
+                fingerprint = tf.concat([epsilon, trainer_step / self._scale], axis=0)
                 fingerprint = tf.expand_dims(fingerprint, axis=0)
                 fingerprint = tf.cast(fingerprint, "float32")
             else:
@@ -201,10 +203,11 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
-        trainer: MADQNTrainer = None,
         communication_module: Optional[BaseCommunicationModule] = None,
+        trainer: MADQNTrainer = None,
         evaluator: bool = False,
         fingerprint: bool = False,
+        fingerprint_scale: float = 10000,
     ):
         """Initializes the executor.
         Args:
@@ -225,6 +228,9 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         self._store_recurrent_state = store_recurrent_state
         self._trainer = trainer
         self._shared_weights = shared_weights
+        self._fingerprint = fingerprint
+        self._evaluator = evaluator
+        self._scale = fingerprint_scale
 
         self._states: Dict[str, Any] = {}
 
@@ -236,6 +242,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         state: types.NestedTensor,
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
+        fingerprint: Optional[tf.Tensor] = None,
     ) -> types.NestedTensor:
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
@@ -246,7 +253,14 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         agent_key = agent.split("_")[0] if self._shared_weights else agent
 
         # Compute the policy, conditioned on the observation.
-        q_values, new_state = self._q_networks[agent_key](batched_observation, state)
+        if fingerprint is None:
+            q_values, new_state = self._q_networks[agent_key](
+                batched_observation, state
+            )
+        else:
+            q_values, new_state = self._q_networks[agent_key](
+                batched_observation, fingerprint=fingerprint, state=state
+            )
 
         # select legal action
         action = self._action_selectors[agent_key](
@@ -267,13 +281,23 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
 
         for agent, observation in observations.items():
 
-            # Pass the observation through the policy network.
-            if self._trainer is not None:
+            if not self._evaluator and self._trainer:
                 epsilon = self._trainer.get_epsilon()
             else:
                 epsilon = 0.0
 
             epsilon = tf.convert_to_tensor(epsilon)
+
+            if self._fingerprint and self._trainer:
+                trainer_step = self._trainer.get_trainer_steps()
+                fingerprint_epsilon = self._trainer.get_epsilon()
+                fingerprint = tf.concat(
+                    [fingerprint_epsilon, trainer_step / self._scale], axis=0
+                )
+                fingerprint = tf.expand_dims(fingerprint, axis=0)
+                fingerprint = tf.cast(fingerprint, "float32")
+            else:
+                fingerprint = None
 
             policy_output, new_state = self._policy(
                 agent,
@@ -281,6 +305,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
                 self._states[agent],
                 observation.legal_actions,
                 epsilon,
+                fingerprint,
             )
 
             self._states[agent] = new_state
@@ -289,6 +314,41 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
 
         # Return a numpy array with squeezed out batch dimension.
         return actions
+
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Optional[Dict[str, types.NestedArray]] = {},
+    ) -> None:
+
+        if self._fingerprint and self._trainer:
+            trainer_step = self._trainer.get_trainer_steps()
+            epsilon = self._trainer.get_epsilon()
+            fingerprint = np.array([epsilon, trainer_step / self._scale])
+            if extras:
+                extras.update({"fingerprint": fingerprint})
+            else:
+                extras = {"fingerprint": fingerprint}
+
+        super(MADQNRecurrentExecutor, self).observe_first(timestep, extras)
+
+    def observe(
+        self,
+        actions: Dict[str, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
+        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+    ) -> None:
+
+        if self._fingerprint and self._trainer:
+            trainer_step = self._trainer.get_trainer_steps()
+            epsilon = self._trainer.get_epsilon()
+            fingerprint = np.array([epsilon, trainer_step / self._scale])
+            if next_extras:
+                next_extras.update({"fingerprint": fingerprint})
+            else:
+                next_extras = {"fingerprint": fingerprint}
+
+        super(MADQNRecurrentExecutor, self).observe(actions, next_timestep, next_extras)
 
 
 class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
@@ -311,6 +371,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         trainer: MADQNTrainer = None,
         fingerprint: bool = False,
         evaluator: bool = False,
+        fingerprint_scale: float = 10000,
     ):
         """Initializes the executor.
         Args:
@@ -334,6 +395,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         self._shared_weights = shared_weights
         self._fingerprint = fingerprint
         self._evaluator = evaluator
+        self._scale = fingerprint_scale
 
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}
@@ -393,7 +455,10 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
 
             if self._fingerprint and self._trainer:
                 trainer_step = self._trainer.get_trainer_steps()
-                fingerprint = tf.concat([epsilon, trainer_step], axis=0)
+                fingerprint_epsilon = self._trainer.get_epsilon()
+                fingerprint = tf.concat(
+                    [fingerprint_epsilon, trainer_step / self._scale], axis=0
+                )
                 fingerprint = tf.expand_dims(fingerprint, axis=0)
                 fingerprint = tf.cast(fingerprint, "float32")
             else:
@@ -426,7 +491,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         if self._fingerprint and self._trainer:
             trainer_step = self._trainer.get_trainer_steps()
             epsilon = self._trainer.get_epsilon()
-            fingerprint = np.array([epsilon, trainer_step])
+            fingerprint = np.array([epsilon, trainer_step / self._scale])
             if extras:
                 extras.update({"fingerprint": fingerprint})
             else:
@@ -444,7 +509,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         if self._fingerprint and self._trainer:
             trainer_step = self._trainer.get_trainer_steps()
             epsilon = self._trainer.get_epsilon()
-            fingerprint = np.array([epsilon, trainer_step])
+            fingerprint = np.array([epsilon, trainer_step / self._scale])
             if next_extras:
                 next_extras.update({"fingerprint": fingerprint})
             else:

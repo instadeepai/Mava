@@ -26,16 +26,15 @@ from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.components.tf.modules.communication import BroadcastedCommunication
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.modules.stabilising.fingerprints import FingerPrintStabalisation
 from mava.components.tf.networks import (
-    CommunicationNetwork,
+    ObservationNetworkWithFingerprint,
     epsilon_greedy_action_selector,
 )
 from mava.systems.tf import madqn
-from mava.systems.tf.madqn.execution import MADQNRecurrentCommExecutor
-from mava.systems.tf.madqn.training import MADQNRecurrentCommTrainer
+from mava.systems.tf.madqn.execution import MADQNRecurrentExecutor
+from mava.systems.tf.madqn.training import MADQNRecurrentTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -62,7 +61,6 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    message_size: int = 10,
     shared_weights: bool = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -90,29 +88,13 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
 
-        q_network = CommunicationNetwork(
-            networks.LayerNormMLP(
-                (64,),
-                activate_final=True,
+        # Create the policy network.
+        q_network = ObservationNetworkWithFingerprint(
+            observation_network=networks.LayerNormMLP((256,), activate_final=True),
+            recurrent_network=snt.LSTM(25),
+            output_head=networks.LayerNormMLP(
+                (512, 256, num_dimensions), activate_final=False
             ),
-            networks.LayerNormMLP(
-                (64,),
-                activate_final=True,
-            ),
-            snt.LSTM(20),
-            snt.Sequential(
-                [
-                    networks.LayerNormMLP((64,), activate_final=True),
-                    networks.NearZeroInitializedLinear(num_dimensions),
-                    networks.TanhToSpec(specs[key].actions),
-                ]
-            ),
-            snt.Sequential(
-                [
-                    networks.LayerNormMLP((64, message_size), activate_final=True),
-                ]
-            ),
-            message_size=message_size,
         )
 
         # epsilon greedy action selector
@@ -142,6 +124,7 @@ def main(_: Any) -> None:
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
+    # loggers
     log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
@@ -158,17 +141,16 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=MADQNRecurrentCommTrainer,
-        executor_fn=MADQNRecurrentCommExecutor,
+        trainer_fn=MADQNRecurrentTrainer,
+        executor_fn=MADQNRecurrentExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
-        communication_module=BroadcastedCommunication,
         replay_stabilisation_fn=FingerPrintStabalisation,
         epsilon_min=0.05,
-        epsilon_decay=8e-4,
-        optimizer=snt.optimizers.Adam(learning_rate=5e-4),
+        epsilon_decay=5e-4,
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         n_step=1,
-        batch_size=200,
+        batch_size=100,
     ).build()
 
     # launch

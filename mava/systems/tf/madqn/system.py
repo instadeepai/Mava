@@ -91,6 +91,7 @@ class MADQN:
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
+        fingerprint_scale: float = 10000.0,
         epsilon_min: float = 0.05,
         epsilon_decay: float = 1e-4,
         num_executors: int = 1,
@@ -105,7 +106,6 @@ class MADQN:
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
-        clipping: bool = True,
         max_gradient_norm: float = None,
         discount: float = 0.99,
         optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
@@ -172,6 +172,7 @@ class MADQN:
                 min_replay_size=min_replay_size,
                 max_replay_size=max_replay_size,
                 samples_per_insert=samples_per_insert,
+                fingerprint_scale=fingerprint_scale,
                 n_step=n_step,
                 sequence_length=sequence_length,
                 period=period,

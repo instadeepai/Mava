@@ -71,6 +71,7 @@ class MADQNConfig:
     discount: float
     checkpoint: bool
     optimizer: snt.Optimizer
+    fingerprint_scale: float = 1
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
 
@@ -260,6 +261,7 @@ class MADQNBuilder:
             communication_module=communication_module,
             evaluator=evaluator,
             fingerprint=fingerprint,
+            fingerprint_scale=self._config.fingerprint_scale,
         )
 
     def make_trainer(

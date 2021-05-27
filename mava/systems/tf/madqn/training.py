@@ -384,34 +384,72 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             lambda s: s[:, 0, :], inputs.data.extras["core_states"]
         )
 
-        with tf.GradientTape(persistent=True) as tape:
-            q_network_losses: Dict[str, NestedArray] = {}
+        if self._fingerprint:
+            f = extra["fingerprint"]
+            f = tf.cast(f, "float32")
+        else:
+            f = None
 
+        with tf.GradientTape(persistent=True) as tape:
+            q_network_losses: Dict[str, NestedArray] = {
+                agent: {"q_value_loss": tf.zeros(())} for agent in self._agents
+            }
+
+            T = actions[self._agents[0]].shape[0]
+
+            state = {agent: core_state[agent][0] for agent in self._agents}
+            target_state = {agent: core_state[agent][0] for agent in self._agents}
+
+            # _target_q_networks must be 1 step ahead
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
-                # Cast the additional discount to match the environment discount dtype.
-                discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
+                if f is not None:
+                    args = [f[0], target_state[agent]]
+                else:
+                    args = [target_state[agent]]
 
-                q, s = snt.static_unroll(
-                    self._q_networks[agent_key],
-                    observations[agent].observation,
-                    core_state[agent][0],
+                q_targ, s = self._target_q_networks[agent_key](
+                    observations[agent].observation[0], *args
                 )
+                target_state[agent] = s
 
-                q_targ, s = snt.static_unroll(
-                    self._target_q_networks[agent_key],
-                    observations[agent].observation,
-                    core_state[agent][0],
-                )
+            for t in range(1, T, 1):
 
-                q_network_losses[agent] = {"q_value_loss": tf.zeros(())}
-                for t in range(1, q.shape[0]):
+                for agent in self._agents:
+                    agent_key = self.agent_net_keys[agent]
+
+                    # Cast the additional discount
+                    # to match the environment discount dtype.
+
+                    discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
+
+                    if f is not None:
+                        args = [f[t], target_state[agent]]
+                    else:
+                        args = [target_state[agent]]
+
+                    q_targ, s = self._target_q_networks[agent_key](
+                        observations[agent].observation[t],
+                        *args,
+                    )
+                    target_state[agent] = s
+
+                    if f is not None:
+                        args = [f[t - 1], state[agent]]
+                    else:
+                        args = [state[agent]]
+
+                    q, s = self._q_networks[agent_key](
+                        observations[agent].observation[t - 1], *args
+                    )
+                    state[agent] = s
+
                     loss, _ = trfl.qlearning(
-                        q[t - 1],
+                        q,
                         actions[agent][t - 1],
-                        rewards[agent][t],
+                        rewards[agent][t - 1],
                         discount * discounts[agent][t],
-                        q_targ[t],
+                        q_targ,
                     )
 
                     loss = tf.reduce_mean(loss)
