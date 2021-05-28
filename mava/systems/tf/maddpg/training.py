@@ -745,6 +745,9 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         a_tm1_vals = []
         a_t_vals = []
 
+        # The agent has to be in the connections for training to work
+        assert agent in connections
+
         for connected_agent in connections:
             o_tm1_vals.append(o_tm1_trans[connected_agent])
             o_t_vals.append(o_t_trans[connected_agent])
@@ -763,15 +766,20 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        # Centralised and StateBased DPG
-        # Note (dries): Copy has to be made because the input
-        # variables cannot be changed.
+        # Networked based
         tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
-        dpg_a_t_feed = tf.squeeze(
-            tf.stack([dpg_a_t_feed[agent] for agent in self._agents], 1)
-        )
+
+        connections = self._connection_spec[agent]
+
+        # The agent has to be in the connections for training to work
+        assert agent in connections
+
+        a_t_vals = []
+        for connected_agent in connections:
+            a_t_vals.append(dpg_a_t_feed[connected_agent])
+        dpg_a_t_feed = tf.squeeze(tf.stack(a_t_vals, 1))
         return dpg_a_t_feed
 
 

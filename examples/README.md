@@ -41,7 +41,8 @@ We include a number of systems running on continuous control tasks.
     an MA-DDPG system on the continuous action space multiwalker_v7 PettingZoo environment.
 -   [MA-DDPG (decentralised, feedforward)](petting_zoo/run_feedforward_maddpg_record_video.py):
     an MA-DDPG system (with video wrapping) on the continuous action space multiwalker_v7 PettingZoo environment.
-
+-   [MA-DDPG (networked, feedforward)](petting_zoo/run_networked_feedforward_maddpg_sparse.py):
+    an MA-DDPG system oon the continuous action space multiwalker_v7 PettingZoo environm
 [petting_zoo]: https://github.com/PettingZoo-Team/PettingZoo
 
 ## Discrete control
