@@ -21,6 +21,7 @@ from typing import Dict, Mapping, Sequence, Union
 import launchpad as lp
 import numpy as np
 import sonnet as snt
+import tensorflow as tf
 from acme import types
 from acme.tf import networks
 from acme.tf import utils as tf2_utils
@@ -28,6 +29,7 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
 from mava import specs as mava_specs
+from mava.components.tf import architectures
 from mava.components.tf.networks import ActorNetwork
 from mava.systems.tf import masac
 from mava.utils import lp_utils
@@ -41,17 +43,17 @@ def make_networks(
         256,
         256,
     ),
-    critic_networks_V_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+    critic_V_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         512,
         512,
         256,
     ),
-    critic_networks_Q_1_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+    critic_Q_1_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         512,
         512,
         256,
     ),
-    critic_networks_Q_2_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+    critic_Q_2_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         512,
         512,
         256,
@@ -71,17 +73,17 @@ def make_networks(
         policy_networks_layer_sizes = {
             key: policy_networks_layer_sizes for key in specs.keys()
         }
-    if isinstance(critic_networks_V_layer_sizes, Sequence):
-        critic_networks_V_layer_sizes = {
-            key: critic_networks_V_layer_sizes for key in specs.keys()
+    if isinstance(critic_V_networks_layer_sizes, Sequence):
+        critic_V_networks_layer_sizes = {
+            key: critic_V_networks_layer_sizes for key in specs.keys()
         }
-    if isinstance(critic_networks_Q_1_layer_sizes, Sequence):
-        critic_networks_Q_1_layer_sizes = {
-            key: critic_networks_Q_1_layer_sizes for key in specs.keys()
+    if isinstance(critic_Q_1_networks_layer_sizes, Sequence):
+        critic_Q_1_networks_layer_sizes = {
+            key: critic_Q_1_networks_layer_sizes for key in specs.keys()
         }
-    if isinstance(critic_networks_Q_2_layer_sizes, Sequence):
-        critic_networks_Q_2_layer_sizes = {
-            key: critic_networks_Q_2_layer_sizes for key in specs.keys()
+    if isinstance(critic_Q_2_networks_layer_sizes, Sequence):
+        critic_Q_2_networks_layer_sizes = {
+            key: critic_Q_2_networks_layer_sizes for key in specs.keys()
         }
 
     observation_networks = {}
@@ -95,19 +97,25 @@ def make_networks(
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        # observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
         policy_network = ActorNetwork(
-            256, 256, 256, num_dimensions, 1e-6, observation_network
+            256,
+            256,
+            256,
+            num_dimensions,
+            1e-6,
+            observation_network,
+            is_deterministic=False,
         )
 
         # Create the critic network.
         critic_V_network = snt.Sequential(
             [
-                # The multiplexer concatenates the observations/actions.
                 networks.LayerNormMLP(
-                    critic_networks_V_layer_sizes[key], activate_final=False
+                    critic_V_networks_layer_sizes[key], activate_final=False
                 ),
                 snt.Linear(1),
             ]
@@ -119,7 +127,7 @@ def make_networks(
                 # The multiplexer concatenates the observations/actions.
                 networks.CriticMultiplexer(),
                 networks.LayerNormMLP(
-                    critic_networks_Q_1_layer_sizes[key], activate_final=False
+                    critic_Q_1_networks_layer_sizes[key], activate_final=False
                 ),
                 snt.Linear(1),
             ]
@@ -131,7 +139,7 @@ def make_networks(
                 # The multiplexer concatenates the observations/actions.
                 networks.CriticMultiplexer(),
                 networks.LayerNormMLP(
-                    critic_networks_Q_2_layer_sizes[key], activate_final=False
+                    critic_Q_2_networks_layer_sizes[key], activate_final=False
                 ),
                 snt.Linear(1),
             ]
@@ -161,7 +169,7 @@ class TestMASAC:
         # set loggers info
         # TODO Allow for no checkpointing and no loggers to be
         # passed in.
-        mava_id = "tests/maddpg"
+        mava_id = "tests/masac"
         base_dir = "~/mava"
 
         # environment
@@ -181,6 +189,7 @@ class TestMASAC:
         system = masac.MASAC(
             environment_factory=environment_factory,
             network_factory=network_factory,
+            architecture=architectures.CentralisedSoftQValueCritic,
             num_executors=2,
             batch_size=32,
             min_replay_size=32,
@@ -191,6 +200,7 @@ class TestMASAC:
             critic_Q_2_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             checkpoint=False,
             checkpoint_subpath=checkpoint_dir,
+            # shared_weights=False,
         )
         program = system.build()
 
