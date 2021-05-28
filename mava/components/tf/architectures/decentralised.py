@@ -349,7 +349,7 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         return networks
 
 
-class DecentralisedSoftQValueActorCritic(BaseSoftActorCritic):
+class DecentralisedSoftValueActorCritic(BaseSoftActorCritic):
     """Decentralised (independent) multi-agent soft actor critic architecture."""
 
     def __init__(
@@ -407,35 +407,17 @@ class DecentralisedSoftQValueActorCritic(BaseSoftActorCritic):
     def _get_critic_V_specs(
         self,
     ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
-        critic_V_act_specs = {}
-        for agent_key in self._critic_V_agent_keys:
-            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
-
-            # Get observation and action spec for critic.
-            critic_V_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
-        return self._embed_specs, critic_V_act_specs
+        return self._embed_specs, {}
 
     def _get_critic_Q_1_specs(
         self,
     ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
-        critic_Q_1_act_specs = {}
-        for agent_key in self._critic_Q_1_agent_keys:
-            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
-
-            # Get observation and action spec for critic.
-            critic_Q_1_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
-        return self._embed_specs, critic_Q_1_act_specs
+        return self._embed_specs, {}
 
     def _get_critic_Q_2_specs(
         self,
     ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
-        critic_Q_1_act_specs = {}
-        for agent_key in self._critic_Q_1_agent_keys:
-            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
-
-            # Get observation and action spec for critic.
-            critic_Q_1_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
-        return self._embed_specs, critic_Q_1_act_specs
+        return self._embed_specs, {}
 
     def create_actor_variables(self) -> Dict[str, Dict[str, snt.Module]]:
 
@@ -485,6 +467,157 @@ class DecentralisedSoftQValueActorCritic(BaseSoftActorCritic):
 
         # get critic specs
         embed_specs, act_specs = self._get_critic_V_specs()
+
+        # create critics
+        for agent_key in self._critic_V_agent_keys:
+
+            # get specs
+            emb_spec = embed_specs[agent_key]
+            act_spec = act_specs[agent_key]
+
+            # Create variables.
+            tf2_utils.create_variables(
+                self._critic_V_networks[agent_key], [emb_spec, act_spec]
+            )
+
+            # create target network variables
+            tf2_utils.create_variables(
+                self._target_critic_V_networks[agent_key], [emb_spec, act_spec]
+            )
+
+        critic_V_networks["critics_V"] = self._critic_V_networks
+        critic_V_networks["target_critics_V"] = self._target_critic_V_networks
+        return critic_V_networks
+
+    def create_critic_Q_1_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+
+        critic_Q_1_networks: Dict[str, Dict[str, snt.Module]] = {"critics_Q_1": {}}
+
+        # get critic specs
+        embed_specs, act_specs = self._get_critic_Q_1_specs()
+
+        # create critics
+        for agent_key in self._critic_Q_1_agent_keys:
+
+            # get specs
+            emb_spec = embed_specs[agent_key]
+            act_spec = act_specs[agent_key]
+
+            # Create variables.
+            tf2_utils.create_variables(
+                self._critic_Q_1_networks[agent_key], [emb_spec, act_spec]
+            )
+
+        critic_Q_1_networks["critics_Q_1"] = self._critic_Q_1_networks
+        return critic_Q_1_networks
+
+    def create_critic_Q_2_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+
+        critic_Q_2_networks: Dict[str, Dict[str, snt.Module]] = {"critics_Q_2": {}}
+
+        # get critic specs
+        embed_specs, act_specs = self._get_critic_Q_2_specs()
+
+        # create critics
+        for agent_key in self._critic_Q_2_agent_keys:
+
+            # get specs
+            emb_spec = embed_specs[agent_key]
+            act_spec = act_specs[agent_key]
+
+            # Create variables.
+            tf2_utils.create_variables(
+                self._critic_Q_2_networks[agent_key], [emb_spec, act_spec]
+            )
+
+        critic_Q_2_networks["critics_Q_2"] = self._critic_Q_2_networks
+        return critic_Q_2_networks
+
+    def create_behaviour_policy(self) -> Dict[str, snt.Module]:
+        behaviour_policy_networks: Dict[str, snt.Module] = {}
+        for agent_key in self._actor_agent_keys:
+            behaviour_policy_networks[agent_key] = self._policy_networks[agent_key]
+        return behaviour_policy_networks
+
+    def create_system(
+        self,
+    ) -> Dict[str, Dict[str, snt.Module]]:
+        networks = self.create_actor_variables()
+        critic_V_networks = self.create_critic_V_variables()
+        critic_Q_1_networks = self.create_critic_Q_1_variables()
+        critic_Q_2_networks = self.create_critic_Q_2_variables()
+        networks.update(critic_V_networks)
+        networks.update(critic_Q_1_networks)
+        networks.update(critic_Q_2_networks)
+        return networks
+
+
+class DecentralisedSoftQValueActorCritic(DecentralisedSoftValueActorCritic):
+    """Decentralised (independent) multi-agent soft actor critic architecture."""
+
+    def __init__(
+        self,
+        environment_spec: mava_specs.MAEnvironmentSpec,
+        observation_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
+        critic_V_networks: Dict[str, snt.Module],
+        critic_Q_1_networks: Dict[str, snt.Module],
+        critic_Q_2_networks: Dict[str, snt.Module],
+        shared_weights: bool = True,
+    ):
+
+        super().__init__(
+            environment_spec=environment_spec,
+            observation_networks=observation_networks,
+            policy_networks=policy_networks,
+            critic_V_networks=critic_V_networks,
+            critic_Q_1_networks=critic_Q_1_networks,
+            critic_Q_2_networks=critic_Q_2_networks,
+            shared_weights=shared_weights,
+        )
+
+    def _get_critic_V_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        critic_V_act_specs = {}
+        for agent_key in self._critic_V_agent_keys:
+            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
+
+            # Get observation and action spec for critic.
+            critic_V_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
+        return self._embed_specs, critic_V_act_specs
+
+    def _get_critic_Q_1_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        critic_Q_1_act_specs = {}
+        for agent_key in self._critic_Q_1_agent_keys:
+            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
+
+            # Get observation and action spec for critic.
+            critic_Q_1_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
+        return self._embed_specs, critic_Q_1_act_specs
+
+    def _get_critic_Q_2_specs(
+        self,
+    ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
+        critic_Q_1_act_specs = {}
+        for agent_key in self._critic_Q_1_agent_keys:
+            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
+
+            # Get observation and action spec for critic.
+            critic_Q_1_act_specs[agent_key] = self._agent_specs[agent_spec_key].actions
+        return self._embed_specs, critic_Q_1_act_specs
+
+    def create_critic_V_variables(self) -> Dict[str, Dict[str, snt.Module]]:
+
+        critic_V_networks: Dict[str, Dict[str, snt.Module]] = {
+            "critics_V": {},
+            "target_critics_V": {},
+        }
+
+        # get critic specs
+        embed_specs, _ = self._get_critic_V_specs()
 
         # create critics
         for agent_key in self._critic_V_agent_keys:
@@ -548,18 +681,6 @@ class DecentralisedSoftQValueActorCritic(BaseSoftActorCritic):
         critic_Q_2_networks["critics_Q_2"] = self._critic_Q_2_networks
         return critic_Q_2_networks
 
-    def create_system(
-        self,
-    ) -> Dict[str, Dict[str, snt.Module]]:
-        networks = self.create_actor_variables()
-        critic_V_networks = self.create_critic_V_variables()
-        critic_Q_1_networks = self.create_critic_Q_1_variables()
-        critic_Q_2_networks = self.create_critic_Q_2_variables()
-        networks.update(critic_V_networks)
-        networks.update(critic_Q_1_networks)
-        networks.update(critic_Q_2_networks)
-        return networks
-
 
 class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
     def __init__(
@@ -598,23 +719,20 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
         }
 
         # get critic specs
-        embed_specs, act_specs = self._get_critic_specs()
+        embed_specs, _ = self._get_critic_specs()
 
         # create critics
         for agent_key in self._critic_agent_keys:
 
             # get specs
             emb_spec = embed_specs[agent_key]
-            act_spec = act_specs[agent_key]
 
             # Create variables.
-            tf2_utils.create_variables(
-                self._critic_networks[agent_key], [emb_spec, act_spec]
-            )
+            tf2_utils.create_variables(self._critic_networks[agent_key], [emb_spec])
 
             # create target network variables
             tf2_utils.create_variables(
-                self._target_critic_networks[agent_key], [emb_spec, act_spec]
+                self._target_critic_networks[agent_key], [emb_spec]
             )
 
         critic_networks["critics"] = self._critic_networks

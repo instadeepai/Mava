@@ -30,7 +30,7 @@ from acme.utils import counting, loggers
 import mava
 from mava import core
 from mava import specs as mava_specs
-from mava.components.tf.architectures import CentralisedSoftQValueActorCritic
+from mava.components.tf.architectures import DecentralisedSoftQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.masac import builder, training
@@ -54,8 +54,8 @@ class MASAC:
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[
-            CentralisedSoftQValueActorCritic
-        ] = CentralisedSoftQValueActorCritic,
+            DecentralisedSoftQValueActorCritic
+        ] = DecentralisedSoftQValueActorCritic,
         trainer_fn: Union[
             Type[training.MASACBaseTrainer],
         ] = training.MASACCentralisedTrainer,
@@ -66,7 +66,7 @@ class MASAC:
         shared_weights: bool = True,
         discount: float = 0.99,
         tau: float = 5e-03,
-        temperature: float = 0.9,
+        temperature: float = 0.2,
         policy_update_frequency: int = 2,
         soft_target_update: bool = False,
         executor_variable_update_period: int = 1000,

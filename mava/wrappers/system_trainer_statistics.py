@@ -607,26 +607,22 @@ class NetworkStatisticsSoftActorCritic(NetworkStatisticsBase):
                 self._observation_networks[agent_key].trainable_variables
                 + self._policy_networks[agent_key].trainable_variables
             )
-            critic_V_variables = (
-                # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_V_networks[agent_key].trainable_variables
-            )
-            critic_Q_1_variables = (
-                # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_Q_1_networks[agent_key].trainable_variables
-            )
-            critic_Q_2_variables = (
-                # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_Q_2_networks[agent_key].trainable_variables
-            )
+
+            critic_V_variables = self._critic_V_networks[agent_key].trainable_variables
+
+            critic_Q_1_variables = self._critic_Q_1_networks[
+                agent_key
+            ].trainable_variables
+
+            critic_Q_2_variables = self._critic_Q_2_networks[
+                agent_key
+            ].trainable_variables
 
             # Compute gradients.
             policy_gradients = tape.gradient(
                 policy_losses[agent],
                 policy_variables,
+                unconnected_gradients=tf.UnconnectedGradients.ZERO,
             )
             critic_V_gradients = tape.gradient(
                 critic_V_losses[agent], critic_V_variables

@@ -209,7 +209,9 @@ class CentralisedSoftQValueCritic(DecentralisedSoftQValueActorCritic):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            critic_V_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            agent_key = agent_type if self._shared_weights else agents[0]
+
+            critic_V_obs_shape = list(copy.copy(self._embed_specs[agent_key].shape))
             critic_V_obs_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=critic_V_obs_shape,
@@ -243,7 +245,9 @@ class CentralisedSoftQValueCritic(DecentralisedSoftQValueActorCritic):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            critic_Q_1_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            agent_key = agent_type if self._shared_weights else agents[0]
+
+            critic_Q_1_obs_shape = list(copy.copy(self._embed_specs[agent_key].shape))
             critic_Q_1_obs_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=critic_Q_1_obs_shape,
@@ -277,7 +281,9 @@ class CentralisedSoftQValueCritic(DecentralisedSoftQValueActorCritic):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            critic_Q_2_obs_shape = list(copy.copy(self._embed_specs[agent_type].shape))
+            agent_key = agent_type if self._shared_weights else agents[0]
+
+            critic_Q_2_obs_shape = list(copy.copy(self._embed_specs[agent_key].shape))
             critic_Q_2_obs_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=critic_Q_2_obs_shape,

@@ -312,24 +312,52 @@ class MASACBaseTrainer(mava.Trainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # Centralised based
-        o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
-        o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
-        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        a_t_feed = tf.stack([x for x in a_t.values()], 1)
+        o_tm1_feed = tf.stack([o_tm1_trans[agent] for agent in self._agents], 1)
+        o_t_feed = tf.stack([o_t_trans[agent] for agent in self._agents], 1)
+        a_tm1_feed = tf.stack([a_tm1[agent] for agent in self._agents], 1)
+        a_t_feed = tf.stack([a_t[agent] for agent in self._agents], 1)
+
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
-    # @tf.function
-    def _policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
+    def _target_policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
         actions = {}
         log_probs = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
             next_observation = next_obs[agent]
-            actions[agent], log_probs[agent] = self._policy_networks[agent_key](
+            actions[agent], log_probs[agent] = self._target_policy_networks[agent_key](
                 next_observation
             )
-        # self.log_probs = log_probs
+            # print("agent action....", actions[agent])
         return actions, log_probs
+
+    def _get_dpg_feed(
+        self,
+        a_t: Dict[str, np.ndarray],
+        dpg_a_t: np.ndarray,
+        log_probs: Dict[str, np.ndarray],
+        dpg_log_probs: np.ndarray,
+        agent: str,
+    ) -> tf.Tensor:
+        # Centralised and StateBased DPG
+        # Note (dries): Copy has to be made because the input
+        # variables cannot be changed.
+        tree.map_structure(tf.stop_gradient, a_t)
+        tree.map_structure(tf.stop_gradient, log_probs)
+        dpg_a_t_feed = copy.copy(a_t)
+        dpg_log_prob_feed = copy.copy(log_probs)
+        dpg_a_t_feed[agent] = dpg_a_t
+        dpg_log_prob_feed[agent] = dpg_log_probs
+
+        dpg_a_t_feed = tf.squeeze(
+            tf.stack([dpg_a_t_feed[agent] for agent in self._agents], 1)
+        )
+
+        dpg_log_prob_feed = tf.squeeze(
+            tf.stack([dpg_log_prob_feed[agent] for agent in self._agents], 1)
+        )
+
+        return dpg_a_t_feed, dpg_log_prob_feed
 
     @tf.function
     def _step(
@@ -377,8 +405,7 @@ class MASACBaseTrainer(mava.Trainer):
             critic_Q_2_losses = {}
 
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
-            a_t, log_probs = self._policy_actions(o_t_trans)
-            # log_probs = self.log_probs
+            a_t, log_probs = self._target_policy_actions(o_t_trans)
 
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
@@ -387,7 +414,7 @@ class MASACBaseTrainer(mava.Trainer):
                 discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
 
                 # Get critic feed
-                o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
+                (o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed,) = self._get_critic_feed(
                     o_tm1_trans=o_tm1_trans,
                     o_t_trans=o_t_trans,
                     a_tm1=a_tm1,
@@ -416,22 +443,37 @@ class MASACBaseTrainer(mava.Trainer):
                 critic_Q_1_losses[agent] = tf.reduce_mean(q_1_loss, axis=0)
                 critic_Q_2_losses[agent] = tf.reduce_mean(q_2_loss, axis=0)
 
+                # Actor and critic V Learning
+                o_tm1_agent_feed = o_tm1_trans[agent]
+                dpg_at, dpg_log_probs = self._policy_networks[agent_key](
+                    o_tm1_agent_feed
+                )
+
+                dpg_a_t_feed, dpg_log_prob_feed = self._get_dpg_feed(
+                    a_t, dpg_at, log_probs, dpg_log_probs, agent
+                )
+
                 v_pred = self._critic_V_networks[agent_key](o_tm1_feed)
                 q_pred = tf.math.minimum(
-                    self._critic_Q_1_networks[agent_key](o_tm1_feed, a_t_feed),
-                    self._critic_Q_2_networks[agent_key](o_tm1_feed, a_t_feed),
+                    self._critic_Q_1_networks[agent_key](o_tm1_feed, dpg_a_t_feed),
+                    self._critic_Q_2_networks[agent_key](o_tm1_feed, dpg_a_t_feed),
                 )
-                v_targ = q_pred - tf.multiply(self._temperature, log_probs[agent])
+                v_targ = q_pred - tf.multiply(self._temperature, dpg_log_prob_feed)
+                v_targ = tf.stop_gradient(v_targ)
 
                 v_loss = tf.reduce_mean(tf.square(v_pred - v_targ), axis=0)
                 critic_V_losses[agent] = v_loss[0]
 
-                # Actor Learning
-                advantage = q_pred - v_pred
-                actor_loss = tf.reduce_mean(
-                    tf.multiply(self._temperature, log_probs[agent]) - advantage,
-                    axis=0,
-                )[0]
+                count = self._counter.get_counts().get("trainer_steps", 0)
+
+                if count % self._policy_update_frequency == 0:
+                    advantage = q_pred - v_pred
+                    actor_loss = tf.reduce_mean(
+                        tf.multiply(self._temperature, dpg_log_prob_feed) - advantage,
+                        axis=0,
+                    )[0]
+                else:
+                    actor_loss = tf.zeros((), tf.float32)
 
                 policy_losses[agent] = actor_loss
 
@@ -459,21 +501,15 @@ class MASACBaseTrainer(mava.Trainer):
                 self._observation_networks[agent_key].trainable_variables
                 + self._policy_networks[agent_key].trainable_variables
             )
-            critic_V_variables = (
-                # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_V_networks[agent_key].trainable_variables
-            )
-            critic_Q_1_variables = (
-                # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_Q_1_networks[agent_key].trainable_variables
-            )
-            critic_Q_2_variables = (
-                # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_Q_2_networks[agent_key].trainable_variables
-            )
+            critic_V_variables = self._critic_V_networks[agent_key].trainable_variables
+
+            critic_Q_1_variables = self._critic_Q_1_networks[
+                agent_key
+            ].trainable_variables
+
+            critic_Q_2_variables = self._critic_Q_2_networks[
+                agent_key
+            ].trainable_variables
 
             # Compute gradients.
             # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient

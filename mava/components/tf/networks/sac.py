@@ -29,6 +29,7 @@ class ActorNetwork(snt.Module):
         n_actions: int,
         logprob_epsilon: float,
         observation_netork: snt.Module,
+        is_deterministic: bool = False,
     ):
         super(ActorNetwork, self).__init__()
         self.logprob_epsilon = tf.Variable(logprob_epsilon)
@@ -37,6 +38,7 @@ class ActorNetwork(snt.Module):
         self.hidden1 = snt.Linear(n_hidden_unit1)
         self.hidden2 = snt.Linear(n_hidden_unit2)
         self.hidden3 = snt.Linear(n_hidden_unit3)
+        self.is_deterministic = is_deterministic
 
         self.mean = snt.Linear(
             n_actions,
@@ -60,7 +62,9 @@ class ActorNetwork(snt.Module):
         x = tf.nn.relu(x)
 
         mean = self.mean(x)
+        # mean = tf.tanh(mean)
         log_std = self.log_std(x)
+        log_std = tf.tanh(log_std)
         log_std_clipped = tf.clip_by_value(log_std, -20, 2)
         normal_dist = tfp.distributions.Normal(mean, tf.exp(log_std_clipped))
         action = tf.stop_gradient(normal_dist.sample())
@@ -69,4 +73,7 @@ class ActorNetwork(snt.Module):
             1.0 - tf.pow(squashed_actions, 2) + self.logprob_epsilon
         )
         logprob = tf.reduce_sum(logprob, axis=-1, keepdims=True)
+
+        if self.is_deterministic:
+            return tf.tanh(mean), logprob
         return squashed_actions, logprob

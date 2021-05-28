@@ -22,6 +22,7 @@ from typing import Any, Dict, Mapping, Sequence, Union
 import launchpad as lp
 import numpy as np
 import sonnet as snt
+import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
@@ -115,17 +116,23 @@ def make_networks(
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        # observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
         policy_network = ActorNetwork(
-            256, 256, 256, num_dimensions, 1e-6, observation_network
+            256,
+            256,
+            256,
+            num_dimensions,
+            1e-6,
+            observation_network,
+            is_deterministic=False,
         )
 
         # Create the critic network.
         critic_V_network = snt.Sequential(
             [
-                # The multiplexer concatenates the observations/actions.
                 networks.LayerNormMLP(
                     critic_V_networks_layer_sizes[key], activate_final=False
                 ),
@@ -220,16 +227,17 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_config=logger_config,
-        architecture=architectures.CentralisedSoftQValueActorCritic,
+        architecture=architectures.CentralisedSoftQValueCritic,
         num_executors=2,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-        critic_V_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-        critic_Q_1_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-        critic_Q_2_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+        critic_V_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+        critic_Q_1_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+        critic_Q_2_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
         trainer_fn=masac.MASACCentralisedTrainer,
         shared_weights=False,
+        policy_update_frequency=4,
     ).build()
 
     # launch
