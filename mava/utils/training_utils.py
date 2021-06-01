@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, Iterable, Sequence
 
 import sonnet as snt
@@ -11,6 +12,15 @@ def checkpoint_networks(system_checkpointer: Dict) -> None:
         for network_key in system_checkpointer.keys():
             checkpointer = system_checkpointer[network_key]
             checkpointer.save()
+
+
+def set_growing_gpu_memory() -> None:
+    # Solve gpu mem issues.
+    os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+    physical_devices = tf.config.list_physical_devices("GPU")
+    if physical_devices:
+        for device in physical_devices:
+            tf.config.experimental.set_memory_growth(device, True)
 
 
 # Map critic and polic losses to dict, grouped by agent.
