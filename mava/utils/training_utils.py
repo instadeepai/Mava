@@ -19,7 +19,8 @@ def set_growing_gpu_memory() -> None:
     os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
     physical_devices = tf.config.list_physical_devices("GPU")
     if physical_devices:
-        tf.config.experimental.set_memory_growth(physical_devices[0], True)
+        for device in physical_devices:
+            tf.config.experimental.set_memory_growth(device, True)
 
 
 # Map critic and polic losses to dict, grouped by agent.
