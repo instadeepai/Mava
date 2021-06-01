@@ -22,7 +22,7 @@ class NaiveBot(object):
         # self._action_size = 7
 
     def reset_brain(self):
-        pass
+        self.kicked = False
 
     def get_action(self, observation):
         obs_dict = {
