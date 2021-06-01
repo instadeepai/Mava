@@ -99,7 +99,7 @@ def create_robocup_environment(
         game_setting=game_name,
         team_names=["Team_A", "Team_B"],
         players_per_team=players_per_team,
-        render_game=True,
+        render_game=False,
         include_wait=False,
         game_length=1000,
         port=rand_port,
