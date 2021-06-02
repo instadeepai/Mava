@@ -123,10 +123,6 @@ Please read our [contributing docs](./CONTRIBUTING.md) for details on how to sub
 ## Troubleshooting and FAQs
 
 Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
-
-### <i class="fab fa-gitlab fa-fw" style="color:rgb(107,79,187); font-size:.85em" aria-hidden="true"></i> Purple GitLab Tanuki
-{: #tanuki-purple}
-
 ## Citing Mava
 
 If you use Mava in your work, please cite the accompanying
