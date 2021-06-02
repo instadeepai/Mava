@@ -1,6 +1,6 @@
 <img src="docs/images/mava.png" width="80%">
 
-# Mava: a research framework for multi-agent reinforcement learning
+# Mava: a research framework for distributed multi-agent reinforcement learning
 
 **[Overview](#overview)** | **[Installation](#installation)** | **[Systems]** | **[Examples]** |
 
@@ -51,9 +51,7 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     make run EXAMPLE=dir/to/example/example.py
     ```
-    For example, `make run EXAMPLE=examples/petting_zoo/run_decentralised_feedforward_maddpg_continous.py`.
-
-    Alternatively, run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
+    For example, `make run EXAMPLE=examples/petting_zoo/run_decentralised_feedforward_maddpg_continous.py`. Alternatively, run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
 
     To run an example with tensorboard viewing enabled, you can run
     ```bash
@@ -70,7 +68,7 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
 
 1.  If not using docker, we strongly recommend using a
     [Python virtual environment](https://docs.python.org/3/tutorial/venv.html)
-    to manage your dependencies in order to avoid version conflicts:
+    to manage your dependencies in order to avoid version conflicts. Please note that since Launchpad only supports Linux based OSes, using a python virtual environment will only work in these cases:
 
     ```bash
     python3 -m venv mava
@@ -78,57 +76,25 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     pip install --upgrade pip setuptools
     ```
 
-2.  To install the core libraries (including [Reverb], our storage backend):
+2.  To install the core libraries with dependencies from source (from root directory): 
 
     ```bash
-    pip install id-mava
+    pip install -e ".[tf,envs,reverb,launchpad]"
     ```
 
-    or install from source (from root directory):
+    Note that the dependencies may be installed selectively by adding and removing their identifiers. Additional optional dependencies include `record_episode` for installing packages required to make video recordings of evaluation runs and `testing_formatting` for running tests and code formatting checks. Extra information on optional installs are given below.
+
+3.  **NB**: Flatland and SMAC installations have to be done separately. Flatland can be installed using:
+   
     ```bash
-    pip install .
+    pip install .[flatland]
     ```
-
-
-3. To install Acme dependencies for [TensorFlow]-based Acme agents:
-
-   ```
-   pip install id-mava[reverb]
-   pip install id-mava[tf]
-   ```
-
-   or from source:
-
-   ```bash
-   pip install .[reverb]
-   pip install .[tf]
-   ```
-
-4. To install a few example environments (including [pettingzoo],
-   [openspiel], and [flatland]):
-
-   ```bash
-   pip install id-mava[envs]
-   ```
-
-   or from source:
-   ```bash
-   pip install .[envs]
-   ```
-
-   NB: For flatland installation, It has to be installed separately using:
-   ```bash
-   pip install id-mava[flatland]
-   ```
-   or from source
-   ```bash
-   pip install .[flatland]
-   ```
-
-   NB: For StarCraft II installation, this must be installed separately according to your operating system.
-   To install the StarCraft II ML environment and associated packages, please follow the instructions on [PySC2](https://github.com/deepmind/pysc2) to install the StarCraft II game files.
-   Please ensure you have the required game maps (for both PySC2 and SMAC) extracted in the StarCraft II maps directory.
-   Once this is done you can install the packages for the single agent case (PySC2) and the multi-agent case (SMAC).
+   
+    For StarCraft II installation, this must be installed separately according to your operating system.
+    To install the StarCraft II ML environment and associated packages, please follow the instructions on [PySC2](https://github.com/deepmind/pysc2) to install the StarCraft II game files.
+    Please ensure you have the required game maps (for both PySC2 and SMAC) extracted in the StarCraft II maps directory.
+    Once this is done you can install the packages for the single agent case (PySC2) and the multi-agent case (SMAC).
+   
     ```bash
     pip install pysc2
     pip install git+https://github.com/oxwhirl/smac.git
@@ -139,6 +105,22 @@ We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functi
 ## Debugging
 
 Simple spread debugging environment. 
+
+<p style="text-align:center;">
+<img src="docs/images/simple_spread.png" style="max-width:20%;">
+</p>
+
+## Roadmap
+
+[![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel/vote)
+[![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training/vote)
+[![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures/vote)
+
+
+* Improved testing and verification of system implementations.
+* Sequential environment support including OpenSpiel.
+* Population based training.
+* Additional systems and modules.
 ## Contributing
 
 Please read our [contributing docs](./CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
@@ -146,6 +128,21 @@ Please read our [contributing docs](./CONTRIBUTING.md) for details on how to sub
 ## Troubleshooting and FAQs
 
 Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
+
+## Citing Mava
+
+If you use Mava in your work, please cite the accompanying
+[technical report][Paper]:
+
+```bibtex
+@article{anon2021mava,
+    title={Mava: A Research Framework for Distributed Multi-Agent Reinforcement Learning},
+    author={Anonymous authors},
+    year={2021},
+    journal={arXiv preprint},
+    url={},
+}
+```
 
 [Acme]: https://github.com/deepmind/acme
 [Systems]: mava/systems/
