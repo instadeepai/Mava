@@ -16,9 +16,9 @@ baselines, while still providing enough flexibility to do novel research.
 At the core of the Mava framework is the concept of a `system`. A system refers to a full multi-agent reinforcement learning algorithm consisting of the following specific components: an `Executor`, a `Trainer` and a `Dataset`. 
 
 <p style="text-align:center;">
-<img src="docs/images/mava_system.png" style="max-width:30%;">
+<img src="docs/images/mava_system.png" width="45%">
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<img src="docs/images/mava_distributed_training.png" style="max-width:30%;">
+<img src="docs/images/mava_distributed_training.png" width="45%">
 </p>
 
 The `Executor` is the part of the system that interacts with the environment, takes actions for each agent and observes the next state as a collection of observations, one for each agent in the system. Essentially, executors are the multi-agent version of the Actor class in Acme and are themselves constructed through feeding to the executor a dictionary of policy networks. The `Trainer` is responsible for sampling data from the Dataset originally collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner class in Acme. The `Dataset` stores all of the information collected by the executors in the form of a collection of dictionaries for the actions, observations and rewards with keys corresponding to the individual agent ids.
@@ -32,7 +32,7 @@ Mava shares much of the design philosophy of Acme for the same reason: to allow 
 
 A given multi-agent system interacts with its environment via an `EnvironmentLoop`. This loop takes as input a `system` instance and a multi-agent `environment`
 instance which implements the [DeepMind Environment API][dm_env]. Mava currently supports multi-agent environment loops and environment wrappers for the following environments and environment suites: [PettingZoo][pettingzoo], [SMAC][smac], [Flatland][flatland] and [2D RoboCup][robocup]. 
-### Examples
+## Examples
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
@@ -107,7 +107,7 @@ We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functi
 Simple spread debugging environment. 
 
 <p style="text-align:center;">
-<img src="docs/images/simple_spread.png" style="max-width:20%;">
+<img src="docs/images/simple_spread.png" width="30%">
 </p>
 
 ## Roadmap
@@ -116,11 +116,6 @@ Simple spread debugging environment.
 [![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training/vote) <br /> 
 [![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures/vote)
 
-
-* Improved testing and verification of system implementations.
-* Sequential environment support including OpenSpiel.
-* Population based training.
-* Additional systems and modules.
 ## Contributing
 
 Please read our [contributing docs](./CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
@@ -128,6 +123,9 @@ Please read our [contributing docs](./CONTRIBUTING.md) for details on how to sub
 ## Troubleshooting and FAQs
 
 Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
+
+### <i class="fab fa-gitlab fa-fw" style="color:rgb(107,79,187); font-size:.85em" aria-hidden="true"></i> Purple GitLab Tanuki
+{: #tanuki-purple}
 
 ## Citing Mava
 
