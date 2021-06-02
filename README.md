@@ -31,8 +31,46 @@ Mava shares much of the design philosophy of Acme for the same reason: to allow 
 ### Supported environments and the system-environment loop
 
 A given multi-agent system interacts with its environment via an `EnvironmentLoop`. This loop takes as input a `system` instance and a multi-agent `environment`
-instance which implements the [DeepMind Environment API][dm_env]. Mava currently supports multi-agent environment loops and environment wrappers for the following environments and environment suites: [PettingZoo][pettingzoo], [SMAC][smac], [Flatland][flatland] and [2D RoboCup][robocup]. 
+instance which implements the [DeepMind Environment API][dm_env]. Mava currently supports multi-agent environment loops and environment wrappers for the following environments and environment suites: 
+* [PettingZoo][pettingzoo]
+* [SMAC][smac]
+* [Flatland][flatland]
+* [2D RoboCup][robocup] 
+
+## Implementations
+
+* 🟩 - Multi-Agent Deep Q-Networks (MADQN).
+* 🟩 - Multi-Agent Deep Deterministic Policy Gradient (MADDPG).
+* 🟩 - Multi-Agent Distributed Distributional Deep Deterministic Policy Gradient (MAD4PG).
+* 🟨 - Multi-Agent Proximal Policy Optimisation (MAPPO).
+* 🟥 - Value Decomposition Networks (VDN).
+* 🟥 - Monotonic value function factorisation (QMIX).
+
 ## Examples
+
+```python
+# Mava imports
+from mava.systems.tf import madqn
+from mava.components.tf.architectures import DecentralisedPolicyActor
+from mava.systems.tf.system.helpers import environment_factory, network_factory
+
+# Launchpad imports
+import launchpad
+
+# Distributed program
+program = madqn.MADQN(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        architecture=DecentralisedPolicyActor,
+        num_executors=2,
+    ).build()
+
+# Launch
+launchpad.launch(
+        program,
+        launchpad.LaunchType.LOCAL_MULTI_PROCESSING,
+    )
+```
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
@@ -123,9 +161,6 @@ Please read our [contributing docs](./CONTRIBUTING.md) for details on how to sub
 ## Troubleshooting and FAQs
 
 Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
-
-### <i class="fab fa-gitlab fa-fw" style="color:rgb(107,79,187); font-size:.85em" aria-hidden="true"></i> Purple GitLab Tanuki
-{: #tanuki-purple}
 
 ## Citing Mava
 
