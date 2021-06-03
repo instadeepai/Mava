@@ -32,12 +32,21 @@ Mava shares much of the design philosophy of Acme for the same reason: to allow 
 
 A given multi-agent system interacts with its environment via an `EnvironmentLoop`. This loop takes as input a `system` instance and a multi-agent `environment`
 instance which implements the [DeepMind Environment API][dm_env]. Mava currently supports multi-agent environment loops and environment wrappers for the following environments and environment suites: 
+
+<figure >
+    <img align="right" src="docs/images/animation.gif" width="40%">
+</figure>
+
 * [PettingZoo][pettingzoo]
 * [SMAC][smac]
 * [Flatland][flatland]
 * [2D RoboCup][robocup] 
 
+The animation on the right shows MAD4PG solving the Multi-Walker environment from PettingZoo.
+
 ## Implementations
+
+Mava includes several system implementations. Below we list these together with an indication of the maturity of the system using the following keys: 🟩  -- Tested and working well, 🟨  -- Running and training on simple environments, but not extensively tested and 🟥  -- Implemented but untested and yet to show clear signs of stable training. 
 
 * 🟩 - Multi-Agent Deep Q-Networks (MADQN).
 * 🟩 - Multi-Agent Deep Deterministic Policy Gradient (MADDPG).
@@ -46,21 +55,25 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * 🟥 - Value Decomposition Networks (VDN).
 * 🟥 - Monotonic value function factorisation (QMIX).
 
+As we develop Mava further, we aim to have all systems well tested on a wide variety of environments.
+
 ## Examples
+
+To get a sense of how Mava systems are used we provide the following simplified example of launching a distributed MADQN system.
 
 ```python
 # Mava imports
 from mava.systems.tf import madqn
 from mava.components.tf.architectures import DecentralisedPolicyActor
-from mava.systems.tf.system.helpers import environment_factory, network_factory
+from . import helpers
 
 # Launchpad imports
 import launchpad
 
 # Distributed program
 program = madqn.MADQN(
-        environment_factory=environment_factory,
-        network_factory=network_factory,
+        environment_factory=helpers.environment_factory,
+        network_factory=helpers.network_factory,
         architecture=DecentralisedPolicyActor,
         num_executors=2,
     ).build()
@@ -72,8 +85,33 @@ launchpad.launch(
     )
 ```
 
+The first two arguments to the program are environment and network factory functions.
+These helper functions are responsible for creating the networks for the system, initialising their parameters on the different compute nodes and providing a copy of the environment for each executor. The next argument `num_executors` sets the number of executor processes to be run. 
+After building the program we feed it to Launchpad's `launch` function and specify the launch type to perform local multi-processing, i.e. running the distributed program on a single machine. Scaling up or down is simply a matter of adjusting the number of executor processes. 
+
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
+
+### Components
+
+Mava provides several components to support the design of MARL systems such as different system `architectures` and `modules`. You can change the architecture to support a different form of information sharing between agents, or add a module to enhance system capabilities. For example, you can update the above system code in MADQN to use a communication module by wrapping the architecture fed to the system as shown below.
+
+```python
+from mava.components.tf.modules import communication
+
+...
+
+# Wrap architecture in communication module                
+communication.BroadcastedCommunication(
+    architecture=architecture,
+    shared=True,
+    channel_size=1,
+    channel_noise=0,
+)
+```
+
+All modules in Mava work in this way.
+
 ## Installation
 
 We have tested `mava` on Python 3.6, 3.7 and 3.8.
@@ -142,11 +180,21 @@ We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functi
 
 ## Debugging
 
-Simple spread debugging environment. 
+<figure>
+    <img align="right" src="docs/images/simple_spread.png" width="25%">
+</figure>
+                                                                  
+To test and debug new system implementations, we use a simplified version of the spread environment from the [MPE][mpe] suite.
+Debuggin in MARL can be very difficult and time consuming, therefore it is important to use a small environment for debugging that is simple and fast but at the same time still able to clearly show whether a system is able to learn. An illustration of the debugging environment is shown on the right. Agents start at random locations and are assigned specific landmarks which they should attempt to reach in as few steps as possible. Rewards are given to each agent independently as a function of the distance that agent is from their landmark. To test both discrete and continous control systems we feature two version of the environment. In the discrete version the action space for each agent consists of the following five actions: `left`, `right`, `up`, `down`, `stand-still`. In the continuous case, the action space consists of real-values bounded between -1 and 1 for the acceleration of the agent in the x and y direction.
+
+### Feedforward systems
 
 <p style="text-align:center;">
-<img src="docs/images/simple_spread.png" width="30%">
+<img src="docs/images/discrete.png" width="45%">
+<img src="docs/images/continuous.png" width="45%">
 </p>
+
+### Recurrent systems
 
 ## Roadmap
 
@@ -190,3 +238,4 @@ If you use Mava in your work, please cite the accompanying
 [robocup]: https://github.com/rcsoccersim/rcssserver
 [dm_env]: https://github.com/deepmind/dm_env
 [pymarl]: https://github.com/oxwhirl/pymarl
+[mpe]: https://github.com/openai/multiagent-particle-envs
