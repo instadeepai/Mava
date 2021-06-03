@@ -207,9 +207,13 @@ Debugging in MARL can be very difficult and time consuming, therefore it is impo
 
 ## Roadmap
 
+We have big ambitions for Mava! 🚀 But there is still much work that needs to be done. We have a clear roadmap for expanding our system implementations and associated modules, improving testing and robustness and providing support for across-machine training. Furthermore, in the near future, we also plan to implement the following features (feel free to vote for any one of them by clicking on the name!).
+
 [![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel/vote) <br /> 
 [![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training/vote) <br /> 
 [![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures/vote)
+
+In the slightly more longer term, the Mava team plans to release benchmarking results for several different systems and environments and contribute a MARL specific behavioural environment suite specifically engineered to study aspects of MARL such as cooperation and coordination.
 
 ## Contributing
 
