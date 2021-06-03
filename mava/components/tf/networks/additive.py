@@ -26,4 +26,5 @@ class AdditiveMixingNetwork(snt.Module):
 
     def __call__(self, q_values: tf.Tensor) -> tf.Tensor:
         """Monotonic mixing logic."""
-        return tf.math.reduce_sum(q_values, axis=1)
+        # return tf.math.reduce_sum(q_values, axis=1)
+        return tf.math.reduce_sum(q_values, keepdims=True)
