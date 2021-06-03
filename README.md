@@ -2,9 +2,11 @@
 
 # Mava: a research framework for distributed multi-agent reinforcement learning
 
+![pytest](https://github.com/arnupretorius/mava/workflows/format_and_test/badge.svg)
+
 # Table of Contents
 1. [Overview](#overview)
-2. [Support Environments](#supported-environments)
+2. [Supported Environments](#supported-environments)
 3. [System implementations](#system-implementations)
 4. [Examples](#examples)
 5. [Installation](#installation)
@@ -17,7 +19,7 @@
 
 <!-- ![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava) -->
 <!-- ![PyPI version](https://badge.fury.io/py/id-mava.svg) -->
-![pytest](https://github.com/arnupretorius/mava/workflows/format_and_test/badge.svg)
+
 
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava builds off of [Acme][Acme] and in a similar way strives to expose simple, efficient, and readable components, as well as examples that serve both as reference implementations of popular algorithms and as strong
 baselines, while still providing enough flexibility to do novel research.
@@ -32,12 +34,12 @@ At the core of the Mava framework is the concept of a `system`. A system refers 
 <img src="docs/images/mava_distributed_training.png" width="45%">
 </p>
 
-The `Executor` is the part of the system that interacts with the environment, takes actions for each agent and observes the next state as a collection of observations, one for each agent in the system. Essentially, executors are the multi-agent version of the Actor class in Acme and are themselves constructed through feeding to the executor a dictionary of policy networks. The `Trainer` is responsible for sampling data from the Dataset originally collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner class in Acme. The `Dataset` stores all of the information collected by the executors in the form of a collection of dictionaries for the actions, observations and rewards with keys corresponding to the individual agent ids.
+The `Executor` is the part of the system that interacts with the environment, takes actions for each agent and observes the next state as a collection of observations, one for each agent in the system. Essentially, executors are the multi-agent version of the Actor class in Acme and are themselves constructed through feeding to the executor a dictionary of policy networks. The `Trainer` is responsible for sampling data from the Dataset originally collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner class in Acme. The `Dataset` stores all of the information collected by the executors in the form of a collection of dictionaries for the actions, observations and rewards with keys corresponding to the individual agent ids. The basic system design is shown on the left in the above figure.
 Several examples of system implementations can be viewed [here][Systems].
 
 ### Distributed system training
 
-Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to scale systems in a simple way, using the same underlying multi-agent RL system code. In the latter case, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of the actor networks used within each executor.
+Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to scale systems in a simple way, using the same underlying multi-agent RL system code. Mava uses [Launchpad](launchpad) for creating distributed programs. In Mava, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of all the actor networks used within each executor. This approach to distributed system training is illustrated on the right in the figure above.
 
 ## Supported environments
 
@@ -250,3 +252,4 @@ If you use Mava in your work, please cite the accompanying
 [dm_env]: https://github.com/deepmind/dm_env
 [pymarl]: https://github.com/oxwhirl/pymarl
 [mpe]: https://github.com/openai/multiagent-particle-envs
+[launchpad]: https://github.com/deepmind/launchpad
