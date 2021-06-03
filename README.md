@@ -249,7 +249,7 @@ If you use Mava in your work, please cite the accompanying
 [smac]: https://github.com/oxwhirl/smac
 [openspiel]: https://github.com/deepmind/open_spiel
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
-[robocup]: https://github.com/rcsoccersim/rcssserver
+[robocup]: https://github.com/rcsoccersim
 [dm_env]: https://github.com/deepmind/dm_env
 [pymarl]: https://github.com/oxwhirl/pymarl
 [mpe]: https://github.com/openai/multiagent-particle-envs
