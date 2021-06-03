@@ -91,26 +91,7 @@ class QMIXTrainer(MADQNTrainer):
         )
 
         # Checkpoint the mixing networks
-        # if checkpoint:
-        # TODO Checkpointing of mixing networks not playing nicely...
-        # self._system_checkpointer["mixing_network"] = tf2_savers.Checkpointer(
-        #     directory=checkpoint_subpath,
-        #     time_delta_minutes=15,
-        #     objects_to_save={
-        #         "mixing_network": self._mixing_network,
-        #     },
-        #     enable_checkpointing=checkpoint,
-        # )
-        # self._system_checkpointer[
-        #     "target_mixing_network"
-        # ] = tf2_savers.Checkpointer(
-        #     directory=checkpoint_subpath,
-        #     time_delta_minutes=15,
-        #     objects_to_save={
-        #         "target_mixing_network": self._target_mixing_network,
-        #     },
-        #     enable_checkpointing=checkpoint,
-        # )
+        # TODO add checkpointing for mixing networks
 
     def _update_target_networks(self) -> None:
         # Update target networks (incl. mixing networks).
@@ -275,7 +256,6 @@ class QMIXTrainer(MADQNTrainer):
         gradients = self.tape.gradient(self.loss, variables)
         gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
         self._optimizer.apply(gradients, variables)
-        variables += self._mixing_network.trainable_variable
 
         train_utils.safe_del(self, "tape")
 
