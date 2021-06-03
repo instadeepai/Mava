@@ -29,8 +29,8 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.components.tf.modules.mixing import MonotonicMixing
+from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.madqn.system import MADQN

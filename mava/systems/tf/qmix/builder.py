@@ -13,14 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import dataclasses
 from typing import Any, Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
-import tensorflow as tf
-from acme.tf import utils as tf_utils
 from acme.utils import counting
 
 from mava import core, types
@@ -28,8 +25,8 @@ from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
-from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.components.tf.modules.mixing import MonotonicMixing
+from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.qmix import execution, training
 from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
