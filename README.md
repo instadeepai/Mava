@@ -2,7 +2,18 @@
 
 # Mava: a research framework for distributed multi-agent reinforcement learning
 
-**[Overview](#overview)** | **[Installation](#installation)** | **[Systems]** | **[Examples]** |
+# Table of Contents
+1. [Overview](#overview)
+2. [Support Environments](#supported-environments)
+3. [System implementations](#system-implementations)
+4. [Examples](#examples)
+5. [Installation](#installation)
+6. [Debugging](#debugging)
+7. [Roadmap](#roadmap)
+8. [Contributing](#contributing)
+9. [Troubleshooting and FAQ](#troubleshooting-and-faqs)
+
+<!-- **[Overview](#overview)** | **[Installation](#installation)** | **[Systems]** | **[Examples]** | -->
 
 <!-- ![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava) -->
 <!-- ![PyPI version](https://badge.fury.io/py/id-mava.svg) -->
@@ -28,7 +39,7 @@ Several examples of system implementations can be viewed [here][Systems].
 
 Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to scale systems in a simple way, using the same underlying multi-agent RL system code. In the latter case, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of the actor networks used within each executor.
 
-### Supported environments and the system-environment loop
+## Supported environments
 
 A given multi-agent system interacts with its environment via an `EnvironmentLoop`. This loop takes as input a `system` instance and a multi-agent `environment`
 instance which implements the [DeepMind Environment API][dm_env]. Mava currently supports multi-agent environment loops and environment wrappers for the following environments and environment suites: 
@@ -44,7 +55,7 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 
 The animation on the right shows MAD4PG solving the Multi-Walker environment from PettingZoo.
 
-## Implementations
+## System implementations
 
 Mava includes several system implementations. Below we list these together with an indication of the maturity of the system using the following keys: 🟩  -- Tested and working well, 🟨  -- Running and training on simple environments, but not extensively tested and 🟥  -- Implemented but untested and yet to show clear signs of stable training. 
 
