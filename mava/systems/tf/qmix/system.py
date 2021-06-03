@@ -30,7 +30,7 @@ from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
-from mava.components.tf.networks import MonotonicMixingNetwork
+from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.madqn.system import MADQN
@@ -82,7 +82,7 @@ class QMIX(MADQN):
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
-        mixer: Type[MonotonicMixingNetwork] = MonotonicMixingNetwork,
+        mixer: Type[MonotonicMixing] = MonotonicMixing,
         communication_module: Type[BaseCommunicationModule] = None,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
@@ -242,11 +242,12 @@ class QMIX(MADQN):
             system_networks = architecture.create_system()
 
         # # Augment network architecture by adding mixing layer network.
-        # system_networks = self._mixer(
-        #     environment_spec=self._environment_spec,
-        #     agent_networks=system_networks,
-        #     num_hypernet_layers=1,
-        # ).create_system()
+        system_networks = self._mixer(
+            architecture=architecture,
+            environment_spec=self._environment_spec,
+            agent_networks=system_networks,
+            num_hypernet_layers=1,
+        ).create_system()
 
         # create logger
         trainer_logger_config = {}

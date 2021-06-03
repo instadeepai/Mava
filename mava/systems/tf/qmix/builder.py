@@ -29,7 +29,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
-from mava.components.tf.networks import MonotonicMixingNetwork
+from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.qmix import execution, training
 from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
@@ -73,7 +73,7 @@ class QMIXBuilder(MADQNBuilder):
         config: QMIXConfig,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
-        mixer: Type[MonotonicMixingNetwork] = MonotonicMixingNetwork,
+        mixer: Type[MonotonicMixing] = MonotonicMixing,
         extra_specs: Dict[str, Any] = {},
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
@@ -117,10 +117,8 @@ class QMIXBuilder(MADQNBuilder):
         q_networks = networks["values"]
         target_q_networks = networks["target_values"]
 
-        mixing_network = self._mixer(len(agents))
-        state_spec = self._config.environment_spec.get_extra_specs()["s_t"]
-        tf_utils.create_variables(mixing_network, [tf.ones(len(agents)), state_spec])
-        target_mixing_network = copy.deepcopy(mixing_network)
+        mixing_network = networks["mixing"]
+        target_mixing_network = networks["target_mixing"]
 
         # Make epsilon scheduler
         exploration_scheduler = self._exploration_scheduler_fn(
