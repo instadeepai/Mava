@@ -1,6 +1,6 @@
 # Systems
 
-As with Acme, Mava includes a number of pre-built agents as listed below. All the systems are
+Mava includes a number of pre-built systems as listed below. All the systems are
 implemented using [Launchpad](https://github.com/deepmind/launchpad), which is used for distributed
 training. This allows for easy scaling of computational resources by changing only one variable.
 
@@ -11,26 +11,26 @@ Below we list the different systems in Mava based on the action spaces they use.
 The following systems focus on this
 setting:
 
-Agent                                                                | Paper                    | Code
+System                                                                | Paper                    | Code
 -------------------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Deep Deterministic Policy Gradient (MA-DDPG)             | [Lowe et al., 2017]   | [![TF](../../docs/logos/tf-small.png)][MADDPG_TF2]
-Multi-Agent Distributed Distributional DDPG (MA-D4PG)    | [Barth-Maron et al., 2018] | [![TF](../../docs/logos/tf-small.png)][MAD4PG_TF2]
+Multi-Agent Deep Deterministic Policy Gradient (MA-DDPG)             | [Lowe et al., 2017]   | [![TF](../../docs/images/tf-small.png)][MADDPG_TF2]
+Multi-Agent Distributed Distributional DDPG (MA-D4PG)    | [Barth-Maron et al., 2018] | [![TF](../../docs/images/tf-small.png)][MAD4PG_TF2]
 
 ### Discrete control
 We also include a number of systems built with discrete action-spaces in mind listed below:
 
-Agent                                                    | Paper                    | Code
+System                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
-Deep Q-Networks (DQN)                                    | [Horgan et al., 2018]      | [![TF](../../docs/logos/tf-small.png)][DQN_TF2]
-Differentiable Inter-Agent Learning (DIAL)               | [Foerster et al., 2016]    | [![TF](../../docs/logos/tf-small.png)][DIAL_TF2]
-QMIX                                                     | [Rashid et al., 2018]      | [![TF](../../docs/logos/tf-small.png)][QMIX_TF2]
+Deep Q-Networks (DQN)                                    | [Horgan et al., 2018]      | [![TF](../../docs/images/tf-small.png)][DQN_TF2]
+Differentiable Inter-Agent Learning (DIAL)               | [Foerster et al., 2016]    | [![TF](../../docs/images/tf-small.png)][DIAL_TF2]
+QMIX                                                     | [Rashid et al., 2018]      | [![TF](../../docs/images/tf-small.png)][QMIX_TF2]
 
 ### Mixed
 We also have a system that works with either discrete or continuous action-spaces:
 
-Agent                                                    | Paper                    | Code
+System                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Proximal Policy Optimization (MA-PPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![TF](../../docs/logos/tf-small.png)][MAPPO_TF2]
+Multi-Agent Proximal Policy Optimization (MA-PPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![TF](../../docs/images/tf-small.png)][MAPPO_TF2]
 
 <!-- TF agents -->
 
