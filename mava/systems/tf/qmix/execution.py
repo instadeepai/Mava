@@ -21,6 +21,7 @@ import sonnet as snt
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.systems.tf.madqn.execution import MADQNFeedForwardExecutor
 from mava.systems.tf.madqn.training import MADQNTrainer
 
@@ -41,6 +42,8 @@ class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        communication_module: Optional[BaseCommunicationModule] = None,
+        fingerprint: bool = False,
         evaluator: bool = False,
     ):
         """Initializes the executor.
@@ -58,6 +61,8 @@ class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
             shared_weights=shared_weights,
             adder=adder,
             variable_client=variable_client,
+            communication_module=communication_module,
+            fingerprint=fingerprint,
             trainer=trainer,
             evaluator=evaluator,
         )

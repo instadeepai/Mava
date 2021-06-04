@@ -93,7 +93,7 @@ class VDN(MADQN):
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
-        max_replay_size: int = 1000,
+        max_replay_size: int = 1000000,
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
         sequence_length: int = 20,
@@ -119,6 +119,7 @@ class VDN(MADQN):
             environment_spec = mava_specs.MAEnvironmentSpec(
                 environment_factory(evaluation=False)  # type:ignore
             )
+        self._environment_spec = environment_spec
 
         # set default logger if no logger provided
         if not logger_factory:

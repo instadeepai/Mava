@@ -18,5 +18,3 @@
 from mava.components.tf.modules.mixing.additive import AdditiveMixing
 from mava.components.tf.modules.mixing.base import BaseMixingModule
 from mava.components.tf.modules.mixing.monotonic import MonotonicMixing
-from mava.components.tf.modules.mixing.transformed import QTranAlt, QTranBase
-from mava.components.tf.modules.mixing.weighted import WeightedMixing

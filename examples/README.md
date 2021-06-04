@@ -4,7 +4,7 @@ This directory includes working examples of Mava systems.
 ## Environments
 
 In Mava we use a variety of different environments which include the
-[petting_zoo] environment set as well as a few custom [environments](utils/debugging) inside Mava.
+[PettingZoo][pettingzoo] and [Flatland][flatland] environment set as well as a few custom [environments][debug] inside Mava.
 
 ## Continuous control
 We include a number of systems running on continuous control tasks.
@@ -78,3 +78,7 @@ We also include a number of systems running on discrete action space environment
     an MA-DQN system running on the StarCraft 3m environment.
 -   [MA-DQN (recurrent)](smac/run_recurrent_madqn.py):
     an MA-DQN system running on the StarCraft 3m environment.
+
+[debug]: ../mava/utils/debugging
+[pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
+[flatland]: https://gitlab.aicrowd.com/flatland/flatland
