@@ -224,28 +224,28 @@ class QMIX(MADQN):
             shared_weights=self._shared_weights,
         )
 
+        # Fingerprint module
         if self._builder._replay_stabiliser_fn is not None:
             architecture = self._builder._replay_stabiliser_fn(  # type: ignore
                 architecture
             )
 
-        communication_module = None
+        # Communication module
+        # NOTE: this is currently not expected to work with qmix
+        # since we do not have a recurrent version.
         if self._communication_module_fn is not None:
-            communication_module = self._communication_module_fn(
-                architecture=architecture,
-                shared=True,
-                channel_size=1,
-                channel_noise=0,
+            raise Exception(
+                "QMIX currently does not support recurrence and therefore cannot use a communication module."
             )
-            system_networks = communication_module.create_system()
-        else:
-            system_networks = architecture.create_system()
 
-        # # Augment network architecture by adding mixing layer network.
+        # extract agent networks
+        agent_networks = architecture.create_actor_variables()
+
+        # Mixing module
         system_networks = self._mixer(
             architecture=architecture,
             environment_spec=self._environment_spec,
-            agent_networks=system_networks,
+            agent_networks=agent_networks,
             num_hypernet_layers=1,
         ).create_system()
 
@@ -264,7 +264,7 @@ class QMIX(MADQN):
             networks=system_networks,
             dataset=dataset,
             counter=counter,
-            communication_module=communication_module,
+            communication_module=None,
             logger=trainer_logger,
         )
 
