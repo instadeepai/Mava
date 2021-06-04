@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# type: ignore
+
 import os
 from typing import Any, Dict, Mapping, MutableSequence, Sequence, Union
 

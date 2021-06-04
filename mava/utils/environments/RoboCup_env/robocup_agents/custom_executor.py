@@ -1,4 +1,3 @@
-# type: ignore
 # python3
 # Copyright 2021 [...placeholder...]. All rights reserved.
 #
@@ -13,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# type: ignore
 
 from typing import Dict, Optional
 
