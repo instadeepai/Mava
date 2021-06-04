@@ -18,12 +18,13 @@
 
 """Mixing for multi-agent RL systems"""
 
-# import launchpad as lp
+from typing import Dict
+
 import sonnet as snt
 import tensorflow as tf
 
-# from mava.components.tf.architectures.base import BaseArchitecture
-# from mava.components.tf.networks.hypernetwork import HyperNetwork
+from mava.components.tf.architectures.base import BaseArchitecture
+from mava.components.tf.networks.hypernetwork import HyperNetwork
 
 
 class MonotonicMixingNetwork(snt.Module):
@@ -34,6 +35,8 @@ class MonotonicMixingNetwork(snt.Module):
 
     def __init__(
         self,
+        architecture: BaseArchitecture,
+        agent_networks: Dict[str, snt.Module],
         n_agents: int,
         qmix_hidden_dim: int = 64,
         num_hypernet_layers: int = 2,
@@ -49,24 +52,20 @@ class MonotonicMixingNetwork(snt.Module):
                 layer. Relevant for num_hypernet_layers > 1.
         """
         super(MonotonicMixingNetwork, self).__init__()
+        self._architecture = architecture
+        self._agent_networks = agent_networks
         self._n_agents = n_agents
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
 
         # Create hypernetwork
-        # self._hypernetworks = HyperNetwork(
-        #     self._agent_networks,
-        #     self._qmix_hidden_dim,
-        #     self._num_hypernet_layers,
-        #     self._hypernet_hidden_dim,
-        # )
-        self.hyper_w1 = snt.nets.MLP(
-            output_sizes=[self._qmix_hidden_dim * self._n_agents]
+        self._hypernetworks = HyperNetwork(
+            self._agent_networks,
+            self._qmix_hidden_dim,
+            self._num_hypernet_layers,
+            self._hypernet_hidden_dim,
         )
-        self.hyper_w2 = snt.nets.MLP(output_sizes=[self._qmix_hidden_dim])
-        self.hyper_b1 = snt.nets.MLP(output_sizes=[self._qmix_hidden_dim])
-        self.hyper_b2 = snt.nets.MLP(output_sizes=[self._qmix_hidden_dim, 1])
 
     def __call__(
         self,
@@ -75,36 +74,15 @@ class MonotonicMixingNetwork(snt.Module):
     ) -> tf.Tensor:
         """Monotonic mixing logic."""
 
-        # Expand dimensions to [B, 1, n_agents] = [B,1,2] for matmul
-        q_values = tf.expand_dims(q_values, axis=1)
+        # Create hypernetwork
+        self._hyperparams = self._hypernetworks(states)
 
-        # --- HYPERNET ----
-        w1 = tf.abs(
-            self.hyper_w1(states)
-        )  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
-        w1 = tf.reshape(
-            w1,
-            (-1, self._n_agents, self._qmix_hidden_dim),
-        )  # [B, n_agents, qmix_hidden_dim]
-
-        b1 = self.hyper_b1(states)  # [B, qmix_hidden_dim] = [B, qmix_hidden_dim]
-        b1 = tf.reshape(b1, [-1, 1, self._qmix_hidden_dim])  # [B, 1, qmix_hidden_dim]
-
-        w2 = tf.abs(self.hyper_w2(states))
-        w2 = tf.reshape(
-            w2, shape=(-1, self._qmix_hidden_dim, 1)
-        )  # [B, qmix_hidden_dim, 1]
-
-        b2 = self.hyper_b2(states)  # [B, 1]
-        b2 = tf.reshape(b2, shape=(-1, 1, 1))  # [B, 1, 1]
-        # -----------------
-        # self._hyperparams = self._hypernetworks(states)
-
-        # For convenience
-        # w1 = self._hyperparams["w1"]  # [B, n_agents, qmix_hidden_dim]
-        # b1 = self._hyperparams["b1"]  # [B, 1, qmix_hidden_dim]
-        # w2 = self._hyperparams["w2"]  # [B, qmix_hidden_dim, 1]
-        # b2 = self._hyperparams["b2"]  # [B, 1, 1]
+        # Extract hypernetwork layers
+        # TODO: make more general -> this assumes two layer hypernetwork
+        w1 = self._hyperparams["w1"]  # [B, n_agents, qmix_hidden_dim]
+        b1 = self._hyperparams["b1"]  # [B, 1, qmix_hidden_dim]
+        w2 = self._hyperparams["w2"]  # [B, qmix_hidden_dim, 1]
+        b2 = self._hyperparams["b2"]  # [B, 1, 1]
 
         # ELU -> Exp. linear unit
         hidden = tf.nn.elu(tf.matmul(q_values, w1) + b1)  # [B, 1, qmix_hidden_dim]
