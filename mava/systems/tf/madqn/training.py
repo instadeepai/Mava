@@ -34,6 +34,8 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
+train_utils.set_growing_gpu_memory()
+
 
 class MADQNTrainer(mava.Trainer):
     """MADQN trainer.
