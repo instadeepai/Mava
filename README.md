@@ -153,6 +153,12 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     ./install_sc2.sh
 
+3. Install 2D RoboCup environment [Optional]:
+    To install the environment, please run the robocup docker build command after running the Mava docker build command.
+    ```bash
+    make build
+    make build_robocup
+    ```
 ### Python virtual environment
 
 1.  If not using docker, we strongly recommend using a
@@ -188,7 +194,10 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     pip install pysc2
     pip install git+https://github.com/oxwhirl/smac.git
     ```
-
+3. Install 2D RoboCup environment:
+    A local install of the 2D RoboCup environment has only been tested using the Ubuntu 18.04 operating system.
+    The installation can be performed by running all the commands, inside the Dockerfile.robocup, manually while inside the Mava
+    python virtual environment.
 We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functionality such as the use of Atari environments, environment wrappers, gpu support and agent episode recording.
 
 ## Debugging
