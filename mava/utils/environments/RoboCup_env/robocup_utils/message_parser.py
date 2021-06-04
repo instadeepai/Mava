@@ -1,4 +1,17 @@
-# type: ignore
+# Copyright 2021 [...placeholder...]. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import re
 
 # used to convert server value strings into actual python values
@@ -43,7 +56,6 @@ def parse(text):  # noqa: C901
         # the last character seen, None to begin with
         prev_c = None
 
-        # raise ValueError("Message text has unmatching parenthesis: ", text)
         for c in text:
             # prevent parsing parens when inside a string (also ignores escaped
             # '"'s as well). doesn't add the quotes so we don't have to recognize
@@ -137,28 +149,4 @@ def parse(text):  # noqa: C901
         # append the first '('.
         return result[0]
     else:
-        # print("Ignored messages because of unequal parenthesis")
         return None
-
-
-# if __name__ == "__main__":
-#     import sys
-
-#     # interactive mode if any args were specified
-#     if len(sys.argv) > 2:
-#         from pprint import pprint
-
-#         with open(sys.argv[1], "r") as f:
-#             for line in f:
-#                 print("raw message:\n", line.strip())
-#                 print()
-#                 print("parsed message:")
-#                 pprint(parse(line.strip()))
-#                 print("----")
-#                 raw_input()
-#                 print()
-#     else:
-#         # just parse the message file
-#         with open(sys.argv[1], "r") as f:
-#             for line in f:
-#                 parse(line.strip())

@@ -1,4 +1,17 @@
-# type: ignore
+# Copyright 2021 [...placeholder...]. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import collections
 import queue
 
@@ -10,12 +23,6 @@ from mava.utils.environments.RoboCup_env.robocup_utils import (
 from mava.utils.environments.RoboCup_env.robocup_utils.player_world_model import (
     WorldModel,
 )
-
-# import time
-
-
-# from multiprocessing import Queue as queue
-
 
 # should we print messages received from the server?
 PRINT_SERVER_MESSAGES = False
@@ -258,10 +265,6 @@ class MessageHandler:
         the world model.
         """
 
-        # the simulation cycle of the soccer server
-        # print("msg: ", msg)
-        # sim_time = msg[1]
-
         # store new values before changing those in the world model.  all new
         # values replace those in the world model at the end of parsing.
         ball = None
@@ -339,10 +342,6 @@ class MessageHandler:
             sender = msg[1]  # name (or direction) of who sent the message
 
         message = msg[3]  # message string
-        # if message.startswith("goal_"):
-        #     print("time_recvd: ", time_recvd)
-        #     print("sender: ", sender)
-        #     print("message: ", message)
 
         # ignore messages sent by self (NOTE: would anybody really want these?)
         if sender == "self":
@@ -600,8 +599,6 @@ class ActionHandler:
                 print("sent:", primary_cmd.text, "\n")
 
             self.sock.send(primary_cmd.text)
-            # self.__sock.send("(turn 30)\x00", append_null_terminator=False)
-            # time.sleep(0.01)
         self.sock.send("(done)")
 
     def move(self, x, y):
