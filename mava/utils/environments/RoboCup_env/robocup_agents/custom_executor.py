@@ -1,3 +1,4 @@
+# type: ignore
 # python3
 # Copyright 2021 [...placeholder...]. All rights reserved.
 #

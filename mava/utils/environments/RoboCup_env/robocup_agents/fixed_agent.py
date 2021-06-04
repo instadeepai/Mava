@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# type: ignore
+
 import numpy as np
 
 from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import (

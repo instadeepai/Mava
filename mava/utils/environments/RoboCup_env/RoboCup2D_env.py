@@ -148,9 +148,6 @@ class RoboCup2D:
 
         self.beta = 0.01
 
-        # max_dist = 200
-        # self.alpha = 1/(max_dist*game_length*(1+beta))
-
         # Start the server
         start_server(game_setting, include_wait, port)
 
@@ -206,9 +203,6 @@ class RoboCup2D:
         # start_step = time.time()
         self.game_step += 1
 
-        # if self.game_step > 1:
-        #     self.tot_out_step += start_step-self.end_step
-
         for agent_key, agent in self.agents.items():
             agent.do_action(actions[agent_key])
 
@@ -216,24 +210,11 @@ class RoboCup2D:
         if self.trainer:
             self.trainer.send_done()
 
-        # if self.game_step > 1:
-        #     inside_step_done = time.time()
-        #     self.tot_in_step_no_wait += inside_step_done-start_step
-
         # Wait for the environment to step and provide the next observations
         wait_for_next_observations([self.trainer])
 
         # Check if done with game
         done = self.game_step > self.game_length
-
-        # if done:
-        # print("Time outside step: ", self.tot_out_step)
-        # print("Time inside step without wait: ", self.tot_in_step_no_wait)
-        # print("Time waiting for the server: ", self.tot_server_wait)
-        #
-        # self.tot_out_step = 0.0
-        # self.tot_in_step_no_wait = 0.0
-        # self.tot_server_wait = 0.0
 
         # Calculate rewards
         rewards = {}
@@ -286,15 +267,8 @@ class RoboCup2D:
                 )
                 ball_towards_goal = ball_goal_dist - ball_goal_delta_dist
 
-                # player_ball_dist = wm.euclidean_distance(
-                #     player["coords"], wm.ball["coords"]
-                # )
                 next_x = float(player["coords"][0]) + float(player["delta_coords"][0])
                 next_y = float(player["coords"][1]) + float(player["delta_coords"][1])
-                # player_ball_delta_dist = wm.euclidean_distance(
-                #     (next_x, next_y), wm.ball["coords"]
-                # )
-                # player_towards_ball = player_ball_dist - player_ball_delta_dist
 
                 scored = score_add[team_id] - score_add[opponent_id]
 
@@ -322,22 +296,6 @@ class RoboCup2D:
                 raise NotImplementedError("Unknown game setting: ", self.game_setting)
 
             rewards[agent_key] = np.array(reward, np.float32)
-
-        # self.end_step = time.time()
-        # if self.game_step > 1:
-        #     self.tot_server_wait += self.end_step - inside_step_done
-
-        # Return latest observations and states
-
-        # obs = self.__get_latest_obs()
-        # state = self.__get_state()
-
-        # if "estimated_coords" in obs["player_0"]:
-        #     print("Coords: ", (obs["player_0"]["estimated_coords"].tolist(),
-        # state["players"][0]["coords"]), "Body angle: ",
-        #           (obs["player_0"]["ang_offs"], state["players"][0]["body_angle"]))
-        # else:
-        #     print("No location info.")
 
         return self.__get_latest_obs(), rewards, self.__get_state(), done
 
@@ -425,21 +383,4 @@ class RoboCup2D:
 
             obs[agent_key] = obs_dict
 
-        # TODO: Delete the if else below
-        # if len(obs) == 1:
-        #     state = self.trainer.get_state_dict()
-        #
-        #     if len(state["players"]) > 0:
-        #         obs["player_0"]["estimated_coords"] =
-        # np.array(state["players"][0]["coords"])
-        #         obs["player_0"]["ang_offs"] = state["players"][0]["body_angle"]
-        #     else:
-        #         obs["player_0"]["estimated_coords"] = [0.0, 0.0]
-        #         obs["player_0"]["ang_offs"] = 0.0
-        #
-        #     # print("Agent: ", obs["player_0"])
-        #     # print("Trainer: ", self.trainer.get_state_dict())
-        # else:
-        #     print("Remove this trainer overwrite this!!!")
-        #     exit()
         return obs
