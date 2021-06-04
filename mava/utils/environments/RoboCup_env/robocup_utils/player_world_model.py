@@ -1,4 +1,17 @@
-# type: ignore
+# Copyright 2021 [...placeholder...]. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import math
 
 import numpy as np
@@ -17,8 +30,6 @@ def rotate(origin, point, angle):
 
     The angle should be given in radians.
     """
-
-    # print("origin: ", origin)
 
     ox, oy = origin
     px, py = point
@@ -166,176 +177,6 @@ class WorldModel:
         # create a new server parameter object for holding all server params
         self.server_parameters = ServerParameters()
 
-    # def triangulate_direction(self, flags, flag_dict):
-    #     """
-    #     Determines absolute view angle for the player given a list of visible
-    #     flags.  We find the absolute angle to each flag, then return the average
-    #     of those angles.  Returns 'None' if no angle could be determined.
-    #     """
-    #
-    #     # average all flag angles together and save that as absolute angle
-    #     abs_angles = []
-    #     for f in self.flags:
-    #         # if the flag has useful data, consider it
-    #         if f.distance is not None and f.flag_id in flag_dict:
-    #             flag_point = flag_dict[f.flag_id]
-    #             abs_dir = self.angle_between_points(self.abs_coords, flag_point)
-    #             abs_angles.append(abs_dir)
-    #
-    #     # return the average if available
-    #     if len(abs_angles) > 0:
-    #         return sum(abs_angles) / len(abs_angles)
-    #
-    #     return None
-
-    # def triangulate_position(self, flags, flag_dict, angle_step=36):
-    #     """
-    #     Returns a best-guess position based on the triangulation via distances
-    #     to all flags in the flag list given.  'angle_step' specifies the
-    #     increments between angles for projecting points onto the circle
-    #     surrounding a flag.
-    #     """
-    #
-    #     points = []
-    #     for f in flags:
-    #         # skip flags without distance information or without a specific id
-    #         if f.distance is None or f.flag_id not in flag_dict:
-    #             continue
-    #
-    #         # generate points every 'angle_step' degrees around each flag,
-    #         # discarding those off-field.
-    #         for i in range(0, 360, angle_step):
-    #             dy = f.distance * math.sin(math.radians(i))
-    #             dx = f.distance * math.cos(math.radians(i))
-    #
-    #             fcoords = flag_dict[f.flag_id]
-    #             new_point = (fcoords[0] + dx, fcoords[1] + dy)
-    #
-    #             # skip points with a coordinate outside the play boundaries
-    #             if (new_point[0] > 60 or new_point[0] < -60 or
-    #                     new_point[1] < -40 or new_point[1] > 40):
-    #                 continue
-    #
-    #             # add point to list of all points
-    #             points.append(new_point)
-    #
-    #     # get the dict of clusters mapped to centers
-    #     clusters = self.cluster_points(points)
-    #
-    #     # return the center that has the most points as an approximation to our
-    #     # absolute position.
-    #     center_with_most_points = (0, 0)
-    #     max_points = 0
-    #     for c in clusters:
-    #         if len(clusters[c]) > max_points:
-    #             center_with_most_points = c
-    #             max_points = len(clusters[c])
-    #
-    #     return center_with_most_points
-
-    # def cluster_points(self, points, num_cluster_iterations=15):
-    #     """
-    #     Cluster a set of points into a dict of centers mapped to point lists.
-    #     Uses the k-means clustering algorithm with random initial centers and a
-    #     fixed number of iterations to find clusters.
-    #     """
-    #
-    #     # generate initial random centers, ignoring identical ones
-    #     centers = set([])
-    #     for i in range(int(math.sqrt(len(points) / 2))):
-    #         # a random coordinate somewhere within the field boundaries
-    #         rand_center = (random.randint(-55, 55), random.randint(-35, 35))
-    #         centers.add(rand_center)
-    #
-    #     # cluster for some iterations before the latest result
-    #     latest = {}
-    #     cur = {}
-    #     for i in range(num_cluster_iterations):
-    #         # initialze cluster lists
-    #         for c in centers:
-    #             cur[c] = []
-    #
-    #         # put every point into the list of its nearest cluster center
-    #         for p in points:
-    #             # get a list of (distance to center, center coords) tuples
-    #             c_dists = map(lambda c: (self.euclidean_distance(c, p), c),
-    #                          centers)
-    #
-    #             # find the smallest tuple's c (second item)
-    #             nearest_center = min(c_dists)[1]
-    #
-    #             # add point to this center's cluster
-    #             cur[nearest_center].append(p)
-    #
-    #         # recompute centers
-    #         new_centers = set([])
-    #         for cluster in cur.values():
-    #             tot_x = 0
-    #             tot_y = 0
-    #
-    #             # remove empty clusters
-    #             if len(cluster) == 0:
-    #                 continue
-    #
-    #             # generate average center of cluster
-    #             for p in cluster:
-    #                 tot_x += p[0]
-    #                 tot_y += p[1]
-    #
-    #             # get average center and add to new centers set
-    #             ave_center = (tot_x / len(cluster), tot_y / len(cluster))
-    #             new_centers.add(ave_center)
-    #
-    #         # move on to next iteration
-    #         centers = new_centers
-    #         latest = cur
-    #         cur = {}
-    #
-    #     # return latest cluster iteration
-    #     return latest
-
-    # def euclidean_distance(self, point1, point2):
-    #     """
-    #     Returns the Euclidean distance between two points on a plane.
-    #     """
-    #
-    #     try:
-    #         x1 = point1[0]
-    #         y1 = point1[1]
-    #         x2 = point2[0]
-    #         y2 = point2[1]
-    #
-    #         return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-    #     except:
-    #         return 200
-
-    # def angle_between_points(self, point1, point2):
-    #     """
-    #     Returns the angle from the first point to the second, assuming that
-    #     these points exist on a plane, and that the positive x-axis is 0 degrees
-    #     and the positive y-axis is 90 degrees.  All returned angles are positive
-    #     and relative to the positive x-axis.
-    #     """
-    #
-    #     try:
-    #         x1 = point1[0]
-    #         y1 = point1[1]
-    #         x2 = point2[0]
-    #         y2 = point2[1]
-    #
-    #         # get components of vector between the points
-    #         dx = x2 - x1
-    #         dy = y2 - y1
-    #
-    #         # return the angle in degrees
-    #         a = math.degrees(math.atan2(dy, dx))
-    #         if a < 0:
-    #             a = 360 + a
-    #
-    #         return a
-    #     except:
-    #         return 0
-
     def __calculate_abs_info(self):
         if self.flags is not None:
             rel_coords = []
@@ -442,8 +283,6 @@ class WorldModel:
 
         ko_left = WorldModel.PlayModes.KICK_OFF_L
         ko_right = WorldModel.PlayModes.KICK_OFF_R
-
-        # print self.play_mode
 
         # return whether we're on the side that's kicking off
         return (
