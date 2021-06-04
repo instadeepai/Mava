@@ -24,6 +24,7 @@ from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
 )
+from mava.wrappers.robocup import RoboCupWrapper
 
 # TODO only import smac if the user needs it.
 from mava.wrappers.smac import SMACEnvWrapper

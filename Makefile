@@ -35,6 +35,9 @@ record:
 build:
 	docker build --tag $(IMAGE) .
 
+build_robocup:
+	docker build --tag $(IMAGE) -f ./Dockerfile.robocup .
+
 push:
 	docker login
 	-docker push $(IMAGE)
