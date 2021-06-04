@@ -4,7 +4,6 @@ import functools
 from datetime import datetime
 from typing import Any
 
-import dm_env
 import launchpad as lp
 from absl import app, flags
 from launchpad.nodes.python.local_multi_processing import PythonProcess
@@ -14,10 +13,10 @@ from mava.systems.tf import mad4pg
 from mava.systems.tf.mad4pg.execution import MAD4PGRecurrentExecutor
 from mava.systems.tf.mad4pg.training import MAD4PGStateBasedRecurrentTrainer
 from mava.utils import lp_utils
+from mava.utils.environments import robocup_utils
 from mava.utils.environments.RoboCup_env.robocup_agents.nn_agent import (
     make_recurrent_networks as make_networks,
 )
-from mava.utils.environments.RoboCup_env.robocup_base import create_robocup_environment
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -27,27 +26,17 @@ flags.DEFINE_string(
     "Experiment identifier that can be used to continue experiments.",
 )
 
-flags.DEFINE_string("num_executors", "6", "The number of executors to run.")
+flags.DEFINE_string("num_executors", "2", "The number of executors to run.")
 flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
-
-
-def make_environment(**kwargs) -> dm_env.Environment:
-    """Creates a MPE environment."""
-
-    def environment_fn(**kwargs):
-        return create_robocup_environment(game_name="domain_randomisation", **kwargs)
-
-    return environment_fn
 
 
 def main(_: Any) -> None:
     # Environment
     # Create an environment, grab the spec, and use it to create networks.
-    environment_fn = make_environment()
 
     # Neural Networks
     # Create the networks
-    environment_factory = lp_utils.partial_kwargs(environment_fn)
+    environment_factory = lp_utils.partial_kwargs(robocup_utils.make_environment)
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
