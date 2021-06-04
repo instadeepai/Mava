@@ -24,6 +24,8 @@ from acme import types
 from mava.utils.environments.RoboCup_env.RoboCup2D_env import RoboCup2D
 from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import SpecWrapper
 
+# TODO: move wrapper to mava/wrappers folder
+
 
 class RoboCupWrapper(SpecWrapper):
     """Environment wrapper for 2D RoboCup environment."""
