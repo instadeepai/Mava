@@ -37,7 +37,6 @@ build:
 
 build_robocup:
 	docker build --tag $(IMAGE) -f ./Dockerfile.robocup .
-	# sudo rm -r ./*.rcl ./*.rcg ./rcssserver-16.0.0* ./rcssserver-rcssserver-16.0.0 ./rcssmonitor*
 
 push:
 	docker login
