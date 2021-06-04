@@ -1,4 +1,18 @@
-# type: ignore
+# python3
+# Copyright 2021 [...placeholder...]. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import numpy as np
 
 from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import (
@@ -16,10 +30,6 @@ class NaiveBot(object):
         self.num_players = num_players
         assert self.scaling == 200.0
         self.kicked = False
-        # self.obs_norm = 200.0
-        # self.action_scaling = 180
-        # self.obs_size = 17
-        # self._action_size = 7
 
     def reset_brain(self):
         self.kicked = False
@@ -80,7 +90,6 @@ class NaiveBot(object):
         action = np.zeros(22)
         if see_ball < 0.5:
             # Search for the ball
-            # print("Searching..")
             action[command["do_turn"]] = 1
             x, y = deg_rot_to_xy(20)
             action[command["turn_dir_x"]] = x
@@ -89,7 +98,7 @@ class NaiveBot(object):
             if not self.kicked:
                 # Kick the ball
                 self.kicked = True
-                # goal_locs = np.array([np.random.randn()*20, np.random.randn()*20])
+
                 goal_locs = np.array([52.5, 0])
 
                 x_diff, y_diff = goal_locs - p_loc
@@ -109,7 +118,6 @@ class NaiveBot(object):
                 # print("Waiting..")
         elif np.abs(b_deg) > 10:
             # Turn towards the ball
-            # print("Turning..")
             action[command["do_turn"]] = 1
             x, y = deg_rot_to_xy(b_deg / 3)
             action[command["turn_dir_x"]] = x
@@ -117,7 +125,6 @@ class NaiveBot(object):
         else:
             # Dash towards the ball
             action[command["do_dash"]] = 1
-            # print("Dashing..")
             speed = 100
 
             if b_dist < 5:
@@ -132,14 +139,3 @@ class NaiveBot(object):
             self.kicked = False
 
         return action
-
-
-# class RotateBot(object):
-#     def __init__(self, num_actions=9):
-#         pass
-#
-#     def reset_brain(self):
-#         pass
-#
-#     def get_action(self, observations, last_action, reward=None):
-#         return "(turn 30)"
