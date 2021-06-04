@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# type: ignore
 from typing import Tuple
 
 import dm_env
@@ -22,7 +21,9 @@ import numpy as np
 from acme import types
 
 from mava.utils.environments.RoboCup_env.RoboCup2D_env import RoboCup2D
-from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import SpecWrapper
+from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import (  # type: ignore # noqa: E501
+    SpecWrapper,
+)
 
 
 class RoboCupWrapper(SpecWrapper):
@@ -80,6 +81,3 @@ class RoboCupWrapper(SpecWrapper):
     def environment(self) -> gym.Env:
         """Returns the wrapped environment."""
         return self._environment
-
-    def close(self):
-        self._environment.close()

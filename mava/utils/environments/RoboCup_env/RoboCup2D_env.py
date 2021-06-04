@@ -1,20 +1,25 @@
-# type: ignore
 import multiprocessing as mp
 import os
 import time
-from typing import Dict
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 
-from mava.utils.environments.RoboCup_env.robocup_utils.agent import Agent as basic_agent
-from mava.utils.environments.RoboCup_env.robocup_utils.trainer import Trainer
-from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import (
+from mava.utils.environments.RoboCup_env.robocup_utils.agent import (  # type: ignore # noqa: E501
+    Agent as basic_agent,
+)
+from mava.utils.environments.RoboCup_env.robocup_utils.trainer import (  # type: ignore # noqa: E501
+    Trainer,
+)
+from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import (  # type: ignore # noqa: E501
     wait_for_next_observations,
 )
 
 
 # spawn an agent of team_name, with position
-def spawn_agent(team_name, team_id, agent_id, num_players, port):
+def spawn_agent(
+    team_name: str, team_id: int, agent_id: int, num_players: int, port: int
+) -> basic_agent:
     """
     Used to run an agent in a seperate physical process.
     """
@@ -26,7 +31,7 @@ def spawn_agent(team_name, team_id, agent_id, num_players, port):
     return a
 
 
-def run_server_thread(game_setting, include_wait, port):
+def run_server_thread(game_setting: str, include_wait: bool, port: int) -> None:
     # ./usr/local/bin/rcssmonitor
     command = (
         "/usr/local/bin/rcssserver -server::coach_w_referee=on"
@@ -60,18 +65,18 @@ def run_server_thread(game_setting, include_wait, port):
     os.system(command)
 
 
-def start_trainer(port):
+def start_trainer(port: int) -> Trainer:
     trainer = Trainer()
     trainer.connect("localhost", port + 1)
     return trainer
 
 
-def run_monitor_thread(port):
+def run_monitor_thread(port: int) -> None:
     # ./usr/local/bin/rcssmonitor
     os.system("/usr/local/bin/rcssmonitor --server-port=" + str(port))
 
 
-def start_server(game_setting, include_wait, port):
+def start_server(game_setting: str, include_wait: bool, port: int) -> None:
     # Wait for server to startup completely
     # print("mode: ", mode)
     at = mp.Process(target=run_server_thread, args=(game_setting, include_wait, port))
@@ -80,7 +85,7 @@ def start_server(game_setting, include_wait, port):
     time.sleep(0.2)
 
 
-def start_monitor(port):
+def start_monitor(port: int) -> None:
     # Wait for monitor process to complete
     at = mp.Process(target=run_monitor_thread, args=(port,))
     at.daemon = True
@@ -88,7 +93,14 @@ def start_monitor(port):
     time.sleep(0.2)
 
 
-def connect_agents(team_name, team_id, num_per_team, num_players, start_id, port):
+def connect_agents(
+    team_name: str,
+    team_id: int,
+    num_per_team: int,
+    num_players: int,
+    start_id: int,
+    port: int,
+) -> List:
     # spawn all agents as seperate processes for maximum processing efficiency
     agents = []
     for agent_id in range(start_id, start_id + num_per_team):
@@ -110,14 +122,14 @@ def connect_agents(team_name, team_id, num_per_team, num_players, start_id, port
 class RoboCup2D:
     def __init__(
         self,
-        game_setting="reward_shaping",
-        include_wait=False,
-        team_names=["Team1", "Team2"],
-        players_per_team=11,
-        render_game=False,
-        game_length=6000,
-        beta=0.1,
-        port=6000,
+        game_setting: str = "reward_shaping",
+        include_wait: bool = False,
+        team_names: List = ["Team1", "Team2"],
+        players_per_team: List = [11, 11],
+        render_game: bool = False,
+        game_length: int = 6000,
+        beta: float = 0.1,
+        port: int = 6000,
     ):
 
         self.game_setting = game_setting
@@ -198,7 +210,7 @@ class RoboCup2D:
                     self.agents["player_" + str(agent.agent_id)] = agent
                 start_id += players_per_team[t_i]
 
-    def step(self, actions: Dict[str, str]):
+    def step(self, actions: Dict[str, Any]) -> Tuple[Any, Any, Any, Any]:
         # Do agent update
         # start_step = time.time()
         self.game_step += 1
@@ -299,7 +311,7 @@ class RoboCup2D:
 
         return self.__get_latest_obs(), rewards, self.__get_state(), done
 
-    def reset(self):
+    def reset(self) -> Tuple[Any, Any, Any]:
         self.game_step = 0
         if self.game_setting == "domain_randomisation":
             goal_diff = self.game_scores[0] - self.game_scores[1]
@@ -362,7 +374,7 @@ class RoboCup2D:
         wait_for_next_observations([self.trainer])
         return self.__get_latest_obs(), rewards, self.__get_state()
 
-    def __get_state(self):
+    def __get_state(self) -> Dict[str, Any]:
         # Return latest observations to agents
         state_dict = self.trainer.get_state_dict()
         # TODO: Return per agent states. The states should be mirrored. So a critic and
@@ -372,7 +384,7 @@ class RoboCup2D:
         state_dict["game_length"] = self.game_length
         return state_dict
 
-    def __get_latest_obs(self):
+    def __get_latest_obs(self) -> Dict[str, Any]:
         # Return latest observations to agents
         obs = {}
         for agent_key, agent in self.agents.items():
