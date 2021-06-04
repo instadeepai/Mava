@@ -1,15 +1,16 @@
-# type: ignore
-# import math
-
-# import random
-
-# from mava.utils.environments.RoboCup_env.robocup_utils import (
-#     game_object,
-#     message_parser,
-#     sp_exceptions,
-# )
-
-
+# Copyright 2021 [...placeholder...]. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 class WorldModel:
     """
     Holds and updates the model of the world as known from current and past
@@ -103,24 +104,6 @@ class WorldModel:
         # create a new server parameter object for holding all server params
         self.server_parameters = ServerParameters()
 
-    # def euclidean_distance(self, point1, point2):
-    #     """
-    #     Returns the Euclidean distance between two points on a plane.
-    #     """
-
-    #     if point1 is not None and point1[0] is not None and
-    # point1[1] is not None
-    #     and point2 is not None and point2[0] is not None and
-    # point2[1] is not None:
-    #         x1 = point1[0]
-    #         y1 = point1[1]
-    #         x2 = point2[0]
-    #         y2 = point2[1]
-
-    #         return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-    #     except:
-    #         return 200
-
     def process_new_info(self, ball, goals, players):
         """
         Update any internal variables based on the currently available
@@ -200,8 +183,6 @@ class WorldModel:
         print("is_kick_off_us!")
         ko_left = WorldModel.PlayModes.KICK_OFF_L
         ko_right = WorldModel.PlayModes.KICK_OFF_R
-
-        # print self.play_mode
 
         # return whether we're on the side that's kicking off
         return (
