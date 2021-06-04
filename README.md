@@ -65,7 +65,7 @@ Mava includes several system implementations. Below we list these together with 
 * 🟩 - Multi-Agent Deep Deterministic Policy Gradient (MADDPG).
 * 🟩 - Multi-Agent Distributed Distributional Deep Deterministic Policy Gradient (MAD4PG).
 * 🟨 - Multi-Agent Proximal Policy Optimisation (MAPPO).
-* 🟥 - Value Decomposition Networks (VDN).
+* 🟨 - Value Decomposition Networks (VDN).
 * 🟥 - Monotonic value function factorisation (QMIX).
 
 As we develop Mava further, we aim to have all systems well tested on a wide variety of environments.
