@@ -235,10 +235,11 @@ class QMIX(MADQN):
         # since we do not have a recurrent version.
         if self._communication_module_fn is not None:
             raise Exception(
-                "QMIX currently does not support recurrence and therefore cannot use a communication module."
+                "QMIX currently does not support recurrence and \
+                therefore cannot use a communication module."
             )
 
-        # extract agent networks
+        # Extract agent networks
         agent_networks = architecture.create_actor_variables()
 
         # Mixing module
@@ -249,7 +250,7 @@ class QMIX(MADQN):
             num_hypernet_layers=1,
         ).create_system()
 
-        # create logger
+        # Create logger
         trainer_logger_config = {}
         if self._logger_config and "trainer" in self._logger_config:
             trainer_logger_config = self._logger_config["trainer"]
