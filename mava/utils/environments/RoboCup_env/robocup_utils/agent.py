@@ -33,11 +33,6 @@ from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import (
     wait_for_next_observations,
 )
 
-# import copy
-# import os
-# os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-# import pygame
-
 # Define some colours
 green = (0, 255, 50)
 light_blue = (0, 255, 255)
@@ -135,16 +130,12 @@ class Agent:
         self.__message_tread.start()
         # wait until the socket receives a response from the server and gets its
         # assigned port.
-        # print("Agent init address: ", init_address)
         while self.__sock.address == init_address:
             time.sleep(0.0001)
 
-        # print("Agent new address: ", self.__sock.address)
-        # exit()
         # create our thinking thread.  this will perform the actions necessary
         # to play a game of robo-soccer.
         self.__thinking = True
-        # self.__think_thread.daemon = True
 
         # set connected state.  done last to prevent state inconsistency if
         # something goes wrong beforehand.
@@ -153,7 +144,6 @@ class Agent:
         self.last_action = None
 
         # Move to random starting position
-
         x = np.random.randint(-52, 53)
         y = np.random.randint(-34, 35)
 
@@ -166,45 +156,6 @@ class Agent:
             )
             self.__think_thread.daemon = True
             self.__think_thread.start()
-
-    # def disconnect(self):
-    #     """
-    #     Tell the loop threads to stop and signal the server that we're
-    #     disconnecting, then join the loop threads and destroy all our inner
-    #     methods.
-    #
-    #     Since the message loop thread can conceiveably block indefinitely while
-    #     waiting for the server to respond, we only allow it (and the think loop
-    #     for good measure) a short time to finish before simply giving up.
-    #
-    #     Once an agent has been disconnected, it is 'dead' and cannot be used
-    #     again.  All of its methods get replaced by a method that raises an
-    #     exception every time it is called.
-    #     """
-    #
-    #     # don't do anything if not connected
-    #     if not self.__connected:
-    #         return
-    #
-    #     # tell the loops to terminate
-    #     self.__parsing = False
-    #     self.__thinking = False
-    #
-    #     # tell the server that we're quitting
-    #     self.__sock.send("(bye)")
-    #
-    #     # tell our threads to join, but only wait breifly for them to do so.
-    #     # don't join them if they haven't been started (this can happen if
-    #     # disconnect is called very quickly after connect).
-    #     if self.__msg_thread.is_alive():
-    #         self.__msg_thread.join(0.01)
-    #
-    #     # if self.__think_thread.is_alive():
-    #     #     self.__think_thread.join(0.01)
-    #
-    #     # reset all standard variables in this object.  self.__connected gets
-    #     # reset here, along with all other non-user defined internal variables.
-    #     Agent.__init__(self)
 
     def __message_loop(self):
         """
@@ -220,9 +171,6 @@ class Agent:
             # world model as-is.  the world model parses it and stores it within
             # itself for perusal at our leisure.
             raw_msg = self.__sock.recv()
-
-            # if b'goal' in raw_msg:
-            #    print("Agent message: '" , raw_msg, "'")
 
             msg_type = self.msg_handler.handle_message(raw_msg)
             if msg_type is not None:

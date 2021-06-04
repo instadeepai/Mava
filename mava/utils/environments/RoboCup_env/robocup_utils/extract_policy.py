@@ -1,4 +1,17 @@
-# type: ignore
+# Copyright 2021 [...placeholder...]. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import pickle
 
@@ -8,7 +21,6 @@ from acme.tf import savers as tf2_savers
 def save_policy_and_obs(architecture, agent_type, checkpoint_subpath, pickle_save_loc):
     policy_networks = architecture.create_actor_variables()
     before_sum = policy_networks["policies"][agent_type].variables[1].numpy().sum()
-    # print("Weights before: ", before_sum)
     objects_to_save = {
         "policy": policy_networks["policies"][agent_type],
         "observation": policy_networks["observations"][agent_type],
@@ -27,8 +39,6 @@ def save_policy_and_obs(architecture, agent_type, checkpoint_subpath, pickle_sav
     assert before_sum != after_sum
 
     # Save policy variables
-    print(policy_networks["policies"][agent_type])
-    exit()
     policy = policy_networks["policies"][agent_type].set.variables
     policy_file = open(os.path.join(pickle_save_loc, "policy.obj"), "wb")
     pickle.dump(policy, policy_file)
