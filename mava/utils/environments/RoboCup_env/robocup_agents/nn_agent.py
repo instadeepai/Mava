@@ -1,4 +1,18 @@
-# type: ignore
+# python3
+# Copyright 2021 [...placeholder...]. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 from typing import Any, Dict, Mapping, MutableSequence, Sequence, Union
 
@@ -19,7 +33,6 @@ from mava.components.tf.networks.mad4pg import DiscreteValuedHead
 from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import SpecWrapper
 
 tfd = tfp.distributions
-# log = logging.getLogger(__name__)
 
 
 def set_gpu_affinity(gpus: Any) -> Any:
@@ -51,11 +64,6 @@ def set_gpu_affinity(gpus: Any) -> Any:
             tf.config.experimental.set_memory_growth(gpu, True)
         except RuntimeError as e:
             print(e)
-
-    # log.info(
-    #     f"Devices: {len(devices)} physical and "
-    #     f"{len(tf.config.list_logical_devices('GPU'))} logical devices"
-    # )
     return gpus
 
 
@@ -243,7 +251,6 @@ class NNBot(object):
         # Create the policy_networks
         policy_networks = architecture.create_actor_variables()
         before_sum = policy_networks["policies"][agent_type].variables[1].numpy().sum()
-        # print("Weights before: ", before_sum)
         objects_to_save = {
             "policy": policy_networks["policies"][agent_type],
             "observation": policy_networks["observations"][agent_type],
