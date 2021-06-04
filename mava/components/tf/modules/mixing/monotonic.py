@@ -17,7 +17,7 @@
 #   - [] Complete class for monotonic mixing
 
 """Mixing for multi-agent RL systems"""
-
+import copy
 from typing import Dict, Optional
 
 import sonnet as snt
@@ -59,26 +59,21 @@ class MonotonicMixing(BaseMixingModule):
 
         if agent_networks is None:
             agent_networks = self._architecture.create_actor_variables()
-        self._agent_networks = {}
-        self._agent_networks["values"] = agent_networks["values"]
-        self._agent_networks["target_values"] = agent_networks["target_values"]
+        self._agent_networks = agent_networks
 
     def _create_mixing_layer(self) -> snt.Module:
         """Modify and return system architecture given mixing structure."""
         state_specs = self._environment_spec.get_extra_specs()
         state_specs = state_specs["s_t"]
-        # TODO Currently hard coded to 3 but need to generalise
-        # Need to figure out how to get the size of one-hot representation
-        # of the global state that is returned by the environment.
-        # One hot input dimension of global state
-        # state_specs = tf.TensorSpec(shape=(1, 3))  # Check this shape
-        self._num_agents = len(self._agent_networks["values"])
-        q_value_dim = tf.TensorSpec(self._num_agents)
+
+        self._n_agents = len(self._agent_networks["values"])
+        q_value_dim = tf.TensorSpec(self._n_agents)
 
         # Implement method from base class
         self._mixed_network = MonotonicMixingNetwork(
             self._architecture,
             self._agent_networks,
+            self._n_agents,
             self._qmix_hidden_dim,
             num_hypernet_layers=self._num_hypernet_layers,
             hypernet_hidden_dim=self._hypernet_hidden_dim,
@@ -90,5 +85,7 @@ class MonotonicMixing(BaseMixingModule):
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         # Implement method from base class
         self._agent_networks["mixing"] = self._create_mixing_layer()
-        self._agent_networks["target_mixing"] = self._create_mixing_layer()
+        self._agent_networks["target_mixing"] = copy.deepcopy(
+            self._agent_networks["mixing"]
+        )
         return self._agent_networks

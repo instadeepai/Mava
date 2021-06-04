@@ -20,7 +20,7 @@ from typing import Any, Dict, Optional
 import dm_env
 from smac.env import StarCraft2Env
 
-from mava.wrappers import SMACEnvWrapper
+from mava.wrappers import SMACEnvWrapper  # type:ignore
 
 
 def load_smac_env(env_config: Dict[str, Any]) -> StarCraft2Env:
