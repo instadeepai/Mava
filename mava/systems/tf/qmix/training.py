@@ -15,7 +15,7 @@
 
 """Qmix trainer implementation."""
 
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Sequence, Union
 
 import numpy as np
 import sonnet as snt
@@ -49,7 +49,7 @@ class QMIXTrainer(MADQNTrainer):
         target_mixing_network: snt.Module,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: snt.Optimizer,
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,

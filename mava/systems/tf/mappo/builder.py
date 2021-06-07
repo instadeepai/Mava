@@ -15,7 +15,7 @@
 
 """MAPPO builder and config."""
 import dataclasses
-from typing import Dict, Iterator, List, Optional, Type
+from typing import Dict, Iterator, List, Optional, Type, Union
 
 import reverb
 import sonnet as snt
@@ -62,7 +62,7 @@ class MAPPOConfig:
     """
 
     environment_spec: specs.EnvironmentSpec
-    policy_optimizer: snt.Optimizer
+    policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
     sequence_length: int = 10
     sequence_period: int = 5

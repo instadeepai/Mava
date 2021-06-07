@@ -17,7 +17,7 @@
 import copy
 import os
 import time
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 import sonnet as snt
@@ -48,8 +48,8 @@ class MAPPOTrainer(mava.Trainer):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         shared_weights: bool,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
@@ -67,6 +67,7 @@ class MAPPOTrainer(mava.Trainer):
             policy_networks: ...
             critic_networks: ...
             policy_optimizer: policy optimizer,
+                This can be a single optimizer or an optimizer per agent key.
             critic_optimizer: critic optimizer,
             shared_weights: ...
             discount: discount to use for TD updates.
@@ -104,11 +105,16 @@ class MAPPOTrainer(mava.Trainer):
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Create optimizers for different agent types.
-        # TODO(Kale-ab): Allow this to be passed as a system param.
-        self._policy_optimizers: snt.Optimizer = {}
-        self._critic_optimizers: snt.Optimizer = {}
+        # If dict with optimizers passed in, use that.
+        if not isinstance(policy_optimizer, dict):
+            self._policy_optimizers: Dict[str, snt.Optimizer] = {}
+            for agent in self.unique_net_keys:
+                self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
+        else:
+            self._policy_optimizers = policy_optimizer
+
+        self._critic_optimizers: Dict[str, snt.Optimizer] = {}
         for agent in self.unique_net_keys:
-            self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
             self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
 
         # Expose the variables.
@@ -417,8 +423,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         shared_weights: bool,
         discount: float = 0.99,
         lambda_gae: float = 1.0,

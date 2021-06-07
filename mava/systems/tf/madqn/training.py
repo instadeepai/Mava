@@ -15,7 +15,7 @@
 
 import copy
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import sonnet as snt
@@ -49,7 +49,7 @@ class MADQNTrainer(mava.Trainer):
         target_q_networks: Dict[str, snt.Module],
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: snt.Optimizer,
+        optimizer: Union[Dict[str, snt.Optimizer], snt.Optimizer],
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
@@ -103,10 +103,13 @@ class MADQNTrainer(mava.Trainer):
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Create optimizers for different agent types.
-        # TODO(Kale-ab): Allow this to be passed as a system param.
-        self._optimizers: snt.Optimizer = {}
-        for agent in self.unique_net_keys:
-            self._optimizers[agent] = copy.deepcopy(optimizer)
+        # If dict with optimizers passed in, use that.
+        if not isinstance(optimizer, dict):
+            self._optimizers: Dict[str, snt.Optimizer] = {}
+            for agent in self.unique_net_keys:
+                self._optimizers[agent] = copy.deepcopy(optimizer)
+        else:
+            self._optimizers = optimizer
 
         # Expose the variables.
         q_networks_to_expose = {}
@@ -340,7 +343,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         target_q_networks: Dict[str, snt.Module],
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: snt.Optimizer,
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
@@ -435,7 +438,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         target_q_networks: Dict[str, snt.Module],
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: snt.Optimizer,
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
