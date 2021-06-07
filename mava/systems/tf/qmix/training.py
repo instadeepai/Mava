@@ -15,7 +15,7 @@
 
 """Qmix trainer implementation."""
 import time
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 import sonnet as snt
@@ -52,7 +52,7 @@ class QMIXTrainer(MADQNTrainer):
         target_mixing_network: snt.Module,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        optimizer: snt.Optimizer,
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
@@ -254,8 +254,7 @@ class QMIXTrainer(MADQNTrainer):
         ]
         gradients = self.tape.gradient(self.loss, variables)
         gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
-        # TODO We need to use correct optim for mixing
-        # self._optimizer.apply(gradients, variables)
+        self._optimizer.apply(gradients, variables)
 
         train_utils.safe_del(self, "tape")
 
