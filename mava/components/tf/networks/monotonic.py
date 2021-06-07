@@ -13,9 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn): Generalise Qmixing to allow for different activations,
-#  hypernetwork structures etc.
-
 # Code inspired by PyMARL framework implementation
 # https://github.com/oxwhirl/pymarl/blob/master/src/modules/mixers/qmix.py
 
@@ -23,7 +20,6 @@
 
 from typing import Dict
 
-# import launchpad as lp
 import sonnet as snt
 import tensorflow as tf
 
@@ -41,13 +37,13 @@ class MonotonicMixingNetwork(snt.Module):
         self,
         architecture: BaseArchitecture,
         agent_networks: Dict[str, snt.Module],
+        n_agents: int,
         qmix_hidden_dim: int = 64,
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 0,
     ) -> None:
         """Initializes the mixer.
         Args:
-            architecture: the BaseArchitecture used.
             state_shape: The state shape as defined by the environment.
             n_agents: The number of agents (i.e. Q-values) to mix.
             qmix_hidden_dim: Mixing layers hidden dimensions.
@@ -58,6 +54,7 @@ class MonotonicMixingNetwork(snt.Module):
         super(MonotonicMixingNetwork, self).__init__()
         self._architecture = architecture
         self._agent_networks = agent_networks
+        self._n_agents = n_agents
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
@@ -72,17 +69,17 @@ class MonotonicMixingNetwork(snt.Module):
 
     def __call__(
         self,
-        q_values: tf.Tensor,  # [batch_size, n_agents] = [B,2]
-        states: tf.Tensor,  # [batch_size, one_hot_state_dim = 3]
+        q_values: tf.Tensor,  # [batch_size, n_agents]
+        states: tf.Tensor,  # [batch_size, state_dim]
     ) -> tf.Tensor:
         """Monotonic mixing logic."""
 
-        # Expand dimensions to [B, 1, n_agents] = [B,1,2] for matmul
-        q_values = tf.expand_dims(q_values, axis=1)
+        # Create hypernetwork
         self._hyperparams = self._hypernetworks(states)
 
-        # For convenience
-        w1 = self._hyperparams["w1"]  # [B, 2, qmix_hidden_dim]
+        # Extract hypernetwork layers
+        # TODO: make more general -> this assumes two layer hypernetwork
+        w1 = self._hyperparams["w1"]  # [B, n_agents, qmix_hidden_dim]
         b1 = self._hyperparams["b1"]  # [B, 1, qmix_hidden_dim]
         w2 = self._hyperparams["w2"]  # [B, qmix_hidden_dim, 1]
         b2 = self._hyperparams["b2"]  # [B, 1, 1]

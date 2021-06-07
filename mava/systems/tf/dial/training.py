@@ -31,6 +31,9 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
 from mava.systems.tf.madqn.training import MADQNRecurrentCommTrainer
+from mava.utils import training_utils as train_utils
+
+train_utils.set_growing_gpu_memory()
 
 
 class DIALSwitchTrainer(MADQNRecurrentCommTrainer):

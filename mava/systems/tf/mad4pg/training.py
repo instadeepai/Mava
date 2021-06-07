@@ -37,6 +37,8 @@ from mava.systems.tf.maddpg.training import (
 )
 from mava.utils import training_utils as train_utils
 
+train_utils.set_growing_gpu_memory()
+
 
 class MAD4PGBaseTrainer(MADDPGBaseTrainer):
     """MAD4PG trainer.
