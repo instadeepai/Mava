@@ -105,7 +105,6 @@ class MADQNTrainer(mava.Trainer):
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Create optimizers for different agent types.
-        # If dict with optimizers passed in, use that.
         if not isinstance(optimizer, dict):
             self._optimizers: Dict[str, snt.Optimizer] = {}
             for agent in self.unique_net_keys:
