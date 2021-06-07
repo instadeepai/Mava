@@ -115,12 +115,6 @@ class TestMADDPG:
         """Tests that the system can run on the simple spread
         debugging environment without crashing."""
 
-        # set loggers info
-        # TODO Allow for no checkpointing and no loggers to be
-        # passed in.
-        mava_id = "tests/maddpg"
-        base_dir = "~/mava"
-
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -132,8 +126,6 @@ class TestMADDPG:
         network_factory = lp_utils.partial_kwargs(make_networks)
 
         # system
-        checkpoint_dir = f"{base_dir}/{mava_id}"
-
         system = maddpg.MADDPG(
             environment_factory=environment_factory,
             network_factory=network_factory,
@@ -144,7 +136,6 @@ class TestMADDPG:
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             checkpoint=False,
-            checkpoint_subpath=checkpoint_dir,
         )
         program = system.build()
 

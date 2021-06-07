@@ -440,12 +440,14 @@ class DIAL:
     def build(self, name: str = "madqn") -> Any:
         """Build the distributed system topology."""
         program = lp.Program(name=name)
+        counter = None
 
         with program.group("replay"):
             replay = program.add_node(lp.ReverbNode(self.replay))
 
-        with program.group("counter"):
-            counter = program.add_node(lp.CourierNode(self.counter))
+        if self._checkpoint:
+            with program.group("counter"):
+                counter = program.add_node(lp.CourierNode(self.counter))
 
         if self._max_executor_steps:
             with program.group("coordinator"):

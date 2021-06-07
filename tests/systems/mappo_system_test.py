@@ -126,12 +126,6 @@ class TestMAPPO:
         """Tests that the system can run on the simple spread
         debugging environment without crashing."""
 
-        # set loggers info
-        # TODO Allow for no checkpointing and no loggers to be
-        # passed in.
-        mava_id = "tests/mappo"
-        base_dir = "~/mava"
-
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -143,8 +137,6 @@ class TestMAPPO:
         network_factory = lp_utils.partial_kwargs(make_networks)
 
         # system
-        checkpoint_dir = f"{base_dir}/{mava_id}"
-
         system = mappo.MAPPO(
             environment_factory=environment_factory,
             network_factory=network_factory,
@@ -154,7 +146,6 @@ class TestMAPPO:
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
-            checkpoint_subpath=checkpoint_dir,
         )
         program = system.build()
 
