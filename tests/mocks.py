@@ -77,10 +77,18 @@ class MockedExecutor(ActorMock, core.Executor):
     ) -> None:
 
         for agent, observation_spec in self._spec.items():
-            _validate_spec(observation_spec.actions, action[agent])
-            _validate_spec(observation_spec.rewards, next_timestep.reward[agent])
-            _validate_spec(observation_spec.discounts, next_timestep.discount[agent])
-            if next_timestep.observation:
+            if agent in action.keys():
+                _validate_spec(observation_spec.actions, action[agent])
+
+            if agent in next_timestep.reward.keys():
+                _validate_spec(observation_spec.rewards, next_timestep.reward[agent])
+
+            if agent in next_timestep.discount.keys():
+                _validate_spec(
+                    observation_spec.discounts, next_timestep.discount[agent]
+                )
+
+            if next_timestep.observation and agent in next_timestep.observation.keys():
                 _validate_spec(
                     observation_spec.observations, next_timestep.observation[agent]
                 )

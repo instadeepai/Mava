@@ -21,6 +21,7 @@ from typing import Any, List, Optional, Union
 import dm_env
 import numpy as np
 import supersuit
+from supersuit import black_death_v1
 
 from mava.wrappers import (
     ParallelEnvWrapper,
@@ -63,7 +64,7 @@ def make_environment(
     env_type: str = "parallel",
     env_class: str = "mpe",
     env_name: str = "simple_spread_v2",
-    env_preprocess_wrappers: Optional[List] = None,
+    env_preprocess_wrappers: Optional[List] = [(black_death_v1, None)],
     random_seed: Optional[int] = None,
     **kwargs: Any,
 ) -> dm_env.Environment:
