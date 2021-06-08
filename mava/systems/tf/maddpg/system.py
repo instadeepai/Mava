@@ -226,13 +226,16 @@ class MADDPG:
         """The replay storage."""
         return self._builder.make_replay_tables(self._environment_spec)
 
-    def counter(self) -> Any:
-        return tf2_savers.CheckpointingRunner(
-            counting.Counter(),
-            time_delta_minutes=15,
-            directory=self._checkpoint_subpath,
-            subdirectory="counter",
-        )
+    def counter(self, checkpoint: bool) -> Any:
+        if checkpoint:
+            return tf2_savers.CheckpointingRunner(
+                counting.Counter(),
+                time_delta_minutes=15,
+                directory=self._checkpoint_subpath,
+                subdirectory="counter",
+            )
+        else:
+            return counting.Counter()
 
     def coordinator(self, counter: counting.Counter) -> Any:
         return lp_utils.StepsLimiter(counter, self._max_executor_steps)
@@ -422,14 +425,12 @@ class MADDPG:
     def build(self, name: str = "maddpg") -> Any:
         """Build the distributed system topology."""
         program = lp.Program(name=name)
-        counter = None
 
         with program.group("replay"):
             replay = program.add_node(lp.ReverbNode(self.replay))
 
-        if self._checkpoint:
-            with program.group("counter"):
-                counter = program.add_node(lp.CourierNode(self.counter))
+        with program.group("counter"):
+            counter = program.add_node(lp.CourierNode(self.counter, self._checkpoint))
 
         if self._max_executor_steps:
             with program.group("coordinator"):
