@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...] Ltd. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ to expose simple, efficient, and readable components, as well as examples that
 serve both as reference implementations of popular algorithms and as strong
 baselines, while still providing enough flexibility to do novel research.
 For more information see
-[github repository](https://github.com/[...placeholder...]ai/mava)."""
+[github repository](https://github.com/instadeepai/mava)."""
 
 # Get the version from metadata.
 version = _metadata.__version__  # type: ignore
@@ -86,7 +86,7 @@ setup(
     description="A Python library for Multi-Agent Reinforcement Learning.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author="[...placeholder...]",
+    author="InstaDeep Ltd",
     license="Apache License, Version 2.0",
     keywords="multi-agent reinforcement-learning python machine learning",
     packages=find_packages(),
