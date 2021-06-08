@@ -95,7 +95,7 @@ class StepsLimiter:
                     "StepsLimiter: Max steps of %d was reached, terminating",
                     self._max_steps,
                 )
-                self._stop_program()
+                lp.stop()
 
             # Don't spam the counter.
             time.sleep(10.0)

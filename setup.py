@@ -48,7 +48,7 @@ env_requirements = [
 ]
 
 launchpad_requirements = [
-    "dm-launchpad",
+    "dm-launchpad-nightly",
 ]
 
 testing_formatting_requirements = [
