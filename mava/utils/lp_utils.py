@@ -72,7 +72,6 @@ class StepsLimiter:
     ):
         self._counter = counter
         self._max_steps = max_steps
-        self._stop_program = lp.make_program_stopper(FLAGS.lp_launch_type)
         self._steps_key = steps_key
 
     def run(self) -> None:
