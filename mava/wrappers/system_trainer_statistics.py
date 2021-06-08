@@ -78,7 +78,8 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        train_utils.checkpoint_networks(self._system_checkpointer)
+        if self._system_checkpointer:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
         if self._logger:
             self._logger.write(fetches)
@@ -184,7 +185,8 @@ class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        train_utils.checkpoint_networks(self._system_checkpointer)
+        if self._system_checkpointer:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
         fetches["epsilon"] = self.get_epsilon()
         self._trainer._decrement_epsilon()  # type: ignore
@@ -333,7 +335,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        train_utils.checkpoint_networks(self._system_checkpointer)
+        if self._system_checkpointer:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
         if self._logger:
             self._logger.write(fetches)
