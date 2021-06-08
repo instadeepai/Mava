@@ -15,7 +15,7 @@
 
 """VDN trainer implementation."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import sonnet as snt
 import tensorflow as tf
@@ -48,7 +48,7 @@ class VDNTrainer(MADQNTrainer):
         target_mixing_network: snt.Module,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: snt.Optimizer,
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,

@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """Qmix trainer implementation."""
-
 import time
 from typing import Any, Dict, List, Optional, Sequence
 

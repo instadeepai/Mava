@@ -108,7 +108,9 @@ class MADQN:
         clipping: bool = True,
         max_gradient_norm: float = None,
         discount: float = 0.99,
-        optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
+            learning_rate=1e-4
+        ),
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         max_executor_steps: int = None,
@@ -437,12 +439,14 @@ class MADQN:
     def build(self, name: str = "madqn") -> Any:
         """Build the distributed system topology."""
         program = lp.Program(name=name)
+        counter = None
 
         with program.group("replay"):
             replay = program.add_node(lp.ReverbNode(self.replay))
 
-        with program.group("counter"):
-            counter = program.add_node(lp.CourierNode(self.counter))
+        if self._checkpoint:
+            with program.group("counter"):
+                counter = program.add_node(lp.CourierNode(self.counter))
 
         if self._max_executor_steps:
             with program.group("coordinator"):

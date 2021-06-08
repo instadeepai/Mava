@@ -14,5 +14,3 @@
 # limitations under the License.
 
 """Common tools for reverb replay used for specifically for MARL."""
-
-# TODO(Kale-ab): custom replay for MARL systems (we will implement them as we need them)

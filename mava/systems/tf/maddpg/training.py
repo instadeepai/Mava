@@ -19,7 +19,7 @@
 import copy
 import os
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import reverb
@@ -53,8 +53,8 @@ class MADDPGBaseTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -89,6 +89,7 @@ class MADDPGBaseTrainer(mava.Trainer):
             before the policy and the critic.
           target_observation_network: the target observation network.
           policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+            This can be a single optimizer or an optimizer per agent key.
           critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
@@ -146,11 +147,15 @@ class MADDPGBaseTrainer(mava.Trainer):
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Create optimizers for different agent types.
-        # TODO(Kale-ab): Allow this to be passed as a system param.
-        self._policy_optimizers: snt.Optimizer = {}
-        self._critic_optimizers: snt.Optimizer = {}
+        if not isinstance(policy_optimizer, dict):
+            self._policy_optimizers: Dict[str, snt.Optimizer] = {}
+            for agent in self.unique_net_keys:
+                self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
+        else:
+            self._policy_optimizers = policy_optimizer
+
+        self._critic_optimizers: Dict[str, snt.Optimizer] = {}
         for agent in self.unique_net_keys:
-            self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
             self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
 
         # Expose the variables.
@@ -470,7 +475,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -548,7 +553,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -669,7 +674,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         target_update_period: int,
         target_update_rate: float,
         dataset: tf.data.Dataset,
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
@@ -799,7 +804,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -914,8 +919,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -947,6 +952,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             before the policy and the critic.
           target_observation_network: the target observation network.
           policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+            This can be a single optimizer or an optimizer per agent key.
           critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
@@ -1005,11 +1011,15 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Create optimizers for different agent types.
-        # TODO(Kale-ab): Allow this to be passed as a system param.
-        self._policy_optimizers: snt.Optimizer = {}
-        self._critic_optimizers: snt.Optimizer = {}
+        if not isinstance(policy_optimizer, dict):
+            self._policy_optimizers: Dict[str, snt.Optimizer] = {}
+            for agent in self.unique_net_keys:
+                self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
+        else:
+            self._policy_optimizers = policy_optimizer
+
+        self._critic_optimizers: Dict[str, snt.Optimizer] = {}
         for agent in self.unique_net_keys:
-            self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
             self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
 
         # Expose the variables.
@@ -1419,7 +1429,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -1499,7 +1509,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -1617,7 +1627,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,

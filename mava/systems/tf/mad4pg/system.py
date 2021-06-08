@@ -65,7 +65,9 @@ class MAD4PG(MADDPG):
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
         samples_per_insert: float = 32.0,
-        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        policy_optimizer: Union[
+            snt.Optimizer, Dict[str, snt.Optimizer]
+        ] = snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
         n_step: int = 5,
         sequence_length: int = 20,
@@ -118,6 +120,9 @@ class MAD4PG(MADDPG):
             replay_table_name: string indicating what name to give the replay table.
             train_loop_fn: loop for training.
             eval_loop_fn: loop for evaluation.
+            policy_optimizer: the optimizer to be applied to the policy loss.
+                This can be a single optimizer or an optimizer per agent key.
+            critic_optimizer: the optimizer to be applied to the critic loss.
         """
         super().__init__(
             environment_factory=environment_factory,

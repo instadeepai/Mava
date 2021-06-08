@@ -29,12 +29,6 @@ from mava.utils.wrapper_utils import (
     convert_np_type,
     parameterized_restart,
 )
-from mava.wrappers.env_preprocess_wrappers import (
-    StandardizeObservationParallel,
-    StandardizeObservationSequential,
-    StandardizeRewardParallel,
-    StandardizeRewardSequential,
-)
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
 
@@ -48,8 +42,6 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         env_preprocess_wrappers: Optional[List] = [
             # (env_preprocessor, dict_with_preprocessor_params)
             (black_death_v1, None),
-            (StandardizeObservationSequential, None),
-            (StandardizeRewardSequential, None),
         ],
     ):
         self._environment = environment
@@ -139,7 +131,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
 
     def observation_spec(self) -> types.Observation:
         observation_specs = {}
-        for agent in self._environment.possible_agents:
+        for agent in self.possible_agents:
             observation_specs[agent] = types.OLT(
                 observation=_convert_to_spec(
                     self._environment.observation_spaces[agent]
@@ -151,7 +143,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
 
     def action_spec(self) -> Dict[str, specs.DiscreteArray]:
         action_specs = {}
-        for agent in self._environment.possible_agents:
+        for agent in self.possible_agents:
             action_specs[agent] = _convert_to_spec(
                 self._environment.action_spaces[agent]
             )
@@ -159,14 +151,14 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
 
     def reward_spec(self) -> Dict[str, specs.Array]:
         reward_specs = {}
-        for agent in self._environment.possible_agents:
+        for agent in self.possible_agents:
             reward_specs[agent] = specs.Array((), np.float32)
 
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
         discount_specs = {}
-        for agent in self._environment.possible_agents:
+        for agent in self.possible_agents:
             discount_specs[agent] = specs.BoundedArray(
                 (), np.float32, minimum=0, maximum=1.0
             )
@@ -194,7 +186,10 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
 
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment."""
-        return getattr(self._environment, name)
+        if hasattr(self.__class__, name):
+            return self.__getattribute__(name)
+        else:
+            return getattr(self._environment, name)
 
 
 class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
@@ -206,8 +201,6 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         env_preprocess_wrappers: Optional[List] = [
             # (env_preprocessor, dict_with_preprocessor_params)
             (black_death_v1, None),
-            (StandardizeObservationParallel, None),
-            (StandardizeRewardParallel, None),
         ],
     ):
         self._environment = environment
@@ -223,11 +216,12 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
         discount_spec = self.discount_spec()
+        observe = self._environment.reset()
+
         self._discounts = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
-            for agent in self._environment.possible_agents
+            for agent in self.possible_agents
         }
-        observe = self._environment.reset()
 
         if type(observe) == tuple:
             observe, env_extras = observe
@@ -313,7 +307,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
     def observation_spec(self) -> types.Observation:
         observation_specs = {}
-        for agent in self._environment.possible_agents:
+        for agent in self.possible_agents:
             observation_specs[agent] = types.OLT(
                 observation=_convert_to_spec(
                     self._environment.observation_spaces[agent]
@@ -326,20 +320,20 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
     def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
         action_specs = {}
         action_spaces = self._environment.action_spaces
-        for agent in self._environment.possible_agents:
+        for agent in self.possible_agents:
             action_specs[agent] = _convert_to_spec(action_spaces[agent])
         return action_specs
 
     def reward_spec(self) -> Dict[str, specs.Array]:
         reward_specs = {}
-        for agent in self._environment.possible_agents:
+        for agent in self.possible_agents:
             reward_specs[agent] = specs.Array((), np.float32)
 
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
         discount_specs = {}
-        for agent in self._environment.possible_agents:
+        for agent in self.possible_agents:
             discount_specs[agent] = specs.BoundedArray(
                 (), np.float32, minimum=0, maximum=1.0
             )
@@ -367,4 +361,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment."""
-        return getattr(self._environment, name)
+        if hasattr(self.__class__, name):
+            return self.__getattribute__(name)
+        else:
+            return getattr(self._environment, name)

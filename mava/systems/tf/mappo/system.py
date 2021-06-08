@@ -15,7 +15,7 @@
 
 """MAPPO system implementation."""
 import functools
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type, Union
 
 import acme
 import dm_env
@@ -60,7 +60,9 @@ class MAPPO:
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
         executor_variable_update_period: int = 100,
-        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=5e-4),
+        policy_optimizer: Union[
+            snt.Optimizer, Dict[str, snt.Optimizer]
+        ] = snt.optimizers.Adam(learning_rate=5e-4),
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-5),
         discount: float = 0.99,
         lambda_gae: float = 0.99,
@@ -362,12 +364,14 @@ class MAPPO:
     def build(self, name: str = "mappo") -> Any:
         """Build the distributed system topology."""
         program = lp.Program(name=name)
+        counter = None
 
         with program.group("replay"):
             replay = program.add_node(lp.ReverbNode(self.replay))
 
-        with program.group("counter"):
-            counter = program.add_node(lp.CourierNode(self.counter))
+        if self._checkpoint:
+            with program.group("counter"):
+                counter = program.add_node(lp.CourierNode(self.counter))
 
         if self._max_executor_steps:
             with program.group("coordinator"):

@@ -15,7 +15,7 @@
 
 """Defines the QMIX system class."""
 import functools
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type, Union
 
 import dm_env
 import reverb
@@ -104,7 +104,9 @@ class QMIX(MADQN):
         period: int = 20,
         max_gradient_norm: float = None,
         discount: float = 0.99,
-        optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
+            learning_rate=1e-4
+        ),
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         max_executor_steps: int = None,

@@ -66,7 +66,7 @@ class MADDPGConfig:
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
-    policy_optimizer: snt.Optimizer
+    policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
     shared_weights: bool = True
     discount: float = 0.99
