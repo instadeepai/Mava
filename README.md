@@ -171,15 +171,27 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     pip install --upgrade pip setuptools
     ```
 
-2.  To install the core libraries with dependencies from source (from root directory):
+2.  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset :
 
     ```bash
-    pip install -e ".[tf,envs,reverb,launchpad]"
+    pip install id-mava
+    pip install id-mava[reverb]
     ```
 
-    Note that the dependencies may be installed selectively by adding and removing their identifiers. Additional optional dependencies include `record_episode` for installing packages required to make video recordings of evaluation runs and `testing_formatting` for running tests and code formatting checks. Extra information on optional installs are given below.
+3. To install dependencies for tensorflow agents:
+    ```bash
+    pip install id-mava[tf]
+    ```
+4. For distributed agent support:
+    ```bash
+    pip install id-mava[launchpad]
+    ```
 
-3.  **NB**: Flatland and SMAC installations have to be done separately. Flatland can be installed using:
+5. To install example environments, such as [PettingZoo](https://github.com/PettingZoo-Team/PettingZoo):
+    ```bash
+    pip install id-mava[envs]
+    ```
+6.  **NB**: For Flatland and SMAC environments, installations have to be done separately. Flatland can be installed using:
 
     ```bash
     pip install .[flatland]
@@ -194,7 +206,7 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     pip install pysc2
     pip install git+https://github.com/oxwhirl/smac.git
     ```
-3.  For the 2D RoboCup environment, a local install has only been tested using the Ubuntu 18.04 operating system.
+7.  For the 2D RoboCup environment, a local install has only been tested using the Ubuntu 18.04 operating system.
     The installation can be performed by running the RoboCup bash script while inside the Mava
     python virtual environment.
     ```bash
