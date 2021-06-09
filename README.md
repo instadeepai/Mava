@@ -2,6 +2,8 @@
 
 # Mava: a research framework for distributed multi-agent reinforcement learning
 
+![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava)
+![PyPI version](https://badge.fury.io/py/id-mava.svg)
 ![pytest](https://github.com/arnupretorius/mava/workflows/format_and_test/badge.svg)
 
 # Table of Contents
@@ -176,6 +178,12 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     pip install id-mava
     pip install id-mava[reverb]
+    ```
+
+    Or for nightly builds:
+    ```bash
+    pip install id-mava-nightly
+    pip install id-mava-nightly[reverb]
     ```
 
 3. To install dependencies for tensorflow agents:
