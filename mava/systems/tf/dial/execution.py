@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,99 +13,88 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Kevin): implement DIAL executor (if required)
-# Helper resources
-#   - single agent generic actors in acme:
-#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/actors.py
-#   - single agent custom actor for Impala in acme:
-#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/impala/acting.py
-#   - multi-agent generic executors in mava: mava/systems/tf/executors.py
-
 """DIAL executor implementation."""
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import sonnet as snt
 import tensorflow as tf
-import tensorflow_probability as tfp
 from acme import types
-from acme.specs import EnvironmentSpec
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.systems.tf.executors import RecurrentExecutorWithComms
+from mava.systems.tf.madqn.execution import MADQNRecurrentCommExecutor
+from mava.systems.tf.madqn.training import MADQNTrainer
 
-tfd = tfp.distributions
 
-
-class DIALExecutor(RecurrentExecutorWithComms):
-    """DIAL implementation of a recurrent Executor."""
+class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
+    """DIAL executor.
+    An executor based on a recurrent communicating policy for each agent in the system
+    which takes non-batched observations and outputs non-batched actions.
+    It also allows adding experiences to replay and updating the weights
+    from the policy on the learner.
+    Note: this executor is specific to switch game env.
+    """
 
     def __init__(
         self,
-        policy_networks: Dict[str, snt.RNNCore],
+        q_networks: Dict[str, snt.Module],
+        action_selectors: Dict[str, snt.Module],
         communication_module: BaseCommunicationModule,
-        agent_specs: Dict[str, EnvironmentSpec],
         shared_weights: bool = True,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
-        is_eval: bool = False,
-        epsilon: float = 0.05,
+        trainer: MADQNTrainer = None,
+        fingerprint: bool = False,
+        evaluator: bool = False,
     ):
         """Initializes the executor.
-        TODO: Update docstring
         Args:
-          policy_networks: the (recurrent) policy to run for each agent in the system.
+          policy_network: the policy to run for each agent in the system.
           shared_weights: specify if weights are shared between agent networks.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
             of the policies to the executor copy (in case they are separate).
-          store_recurrent_state: Whether to pass the recurrent state to the adder.
         """
-        # Store these for later use.
-        self._agent_specs = agent_specs
-        self._is_eval = is_eval
-        self._epsilon = epsilon
 
-        super().__init__(
-            adder=adder,
-            variable_client=variable_client,
-            policy_networks=policy_networks,
-            store_recurrent_state=store_recurrent_state,
-            communication_module=communication_module,
-            shared_weights=shared_weights,
+        # Store these for later use.
+        self._adder = adder
+        self._variable_client = variable_client
+        self._q_networks = q_networks
+        self._policy_networks = q_networks
+        self._communication_module = communication_module
+        self._action_selectors = action_selectors
+        self._store_recurrent_state = store_recurrent_state
+        self._trainer = trainer
+        self._shared_weights = shared_weights
+
+        self._states: Dict[str, Any] = {}
+        self._messages: Dict[str, Any] = {}
+
+    def _policy(
+        self,
+        agent: str,
+        observation: types.NestedTensor,
+        state: types.NestedTensor,
+        message: types.NestedTensor,
+        legal_actions: types.NestedTensor,
+        epsilon: tf.Tensor,
+    ) -> types.NestedTensor:
+
+        (action, m_values), new_state = super()._policy(
+            agent,
+            observation,
+            state,
+            message,
+            legal_actions,
+            epsilon,
         )
 
-    def _sample_action(
-        self, action_policy: types.NestedTensor, agent: str
-    ) -> types.NestedTensor:
-        action = tf.argmax(action_policy, axis=1)
-        if tf.random.uniform([]) < self._epsilon and not self._is_eval:
-            action_spec = self._agent_specs[agent].actions
-            action = tf.random.uniform(
-                action_spec.shape, 0, action_spec.num_values, dtype=tf.dtypes.int64
-            )
-
-        # Hard coded perfect policy:
-        # if observation[1].item()==5 and observation[0].item()==1:
-        #   action = tf.constant([1], dtype=tf.dtypes.int64)
-        # else:
-        #   tf.constant([0], dtype=tf.dtypes.int64)
-
-        return action
-
-    def _process_message(
-        self, observation: types.NestedTensor, message_policy: types.NestedTensor
-    ) -> types.NestedTensor:
-        # Only one agent can message at each timestep
+        # Mask message if obs[0] == 1.
+        # Note: this is specific to switch env
         if observation[0] == 0:
-            message = tf.zeros_like(message_policy)
-        else:
-            message = (
-                message_policy.sample()
-                if isinstance(message_policy, tfd.Distribution)
-                else message_policy
-            )
-        return message
+            m_values = tf.zeros_like(m_values)
+
+        return (action, m_values), new_state

@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,5 +18,3 @@
 from mava.components.tf.modules.mixing.additive import AdditiveMixing
 from mava.components.tf.modules.mixing.base import BaseMixingModule
 from mava.components.tf.modules.mixing.monotonic import MonotonicMixing
-from mava.components.tf.modules.mixing.transformed import QTranAlt, QTranBase
-from mava.components.tf.modules.mixing.weighted import WeightedMixing

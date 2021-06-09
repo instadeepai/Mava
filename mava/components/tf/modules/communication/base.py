@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,9 +16,11 @@
 # TODO (Kevin): complete base class for communication
 
 import abc
-from typing import Dict
+from typing import Dict, Union
 
 import sonnet as snt
+
+from mava.components.tf.architectures import BaseArchitecture, BasePolicyArchitecture
 
 """Base communication interface for multi-agent RL systems"""
 
@@ -29,6 +31,24 @@ class BaseCommunicationModule:
     to create systems that can perform some form of communication between
     agents in a multi-agent RL system.
     """
+
+    @abc.abstractmethod
+    def __init__(
+        self,
+        architecture: Union[
+            BaseArchitecture,
+            BasePolicyArchitecture,
+        ],
+        shared: bool,
+        channel_size: int,
+        channel_noise: float,
+    ) -> None:
+        """Initializes the broadcaster communicator.
+        Args:
+            architecture: the BaseArchitecture used.
+            shared: if a shared communication channel is used.
+            channel_noise: stddev of normal noise in channel.
+        """
 
     @abc.abstractmethod
     def process_messages(

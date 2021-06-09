@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +15,19 @@
 
 """Implementations of a MADDPG agent."""
 
+from mava.systems.tf.maddpg.execution import (
+    MADDPGFeedForwardExecutor,
+    MADDPGRecurrentExecutor,
+)
 from mava.systems.tf.maddpg.system import MADDPG
 from mava.systems.tf.maddpg.training import (
-    BaseMADDPGTrainer,
-    CentralisedMADDPGTrainer,
-    DecentralisedMADDPGTrainer,
-    NetworkedMADDPGTrainer,
-    StateBasedMADDPGTrainer,
+    MADDPGBaseRecurrentTrainer,
+    MADDPGBaseTrainer,
+    MADDPGCentralisedRecurrentTrainer,
+    MADDPGCentralisedTrainer,
+    MADDPGDecentralisedRecurrentTrainer,
+    MADDPGDecentralisedTrainer,
+    MADDPGNetworkedTrainer,
+    MADDPGStateBasedRecurrentTrainer,
+    MADDPGStateBasedTrainer,
 )

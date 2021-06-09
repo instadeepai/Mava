@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -90,12 +90,6 @@ class TestMADQN:
         """Tests that the system can run on the simple spread
         debugging environment without crashing."""
 
-        # set loggers info
-        # TODO Allow for no checkpointing and no loggers to be
-        # passed in.
-        mava_id = "tests/madqn"
-        base_dir = "~/mava"
-
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -107,8 +101,6 @@ class TestMADQN:
         network_factory = lp_utils.partial_kwargs(make_networks)
 
         # system
-        checkpoint_dir = f"{base_dir}/{mava_id}"
-
         system = madqn.MADQN(
             environment_factory=environment_factory,
             network_factory=network_factory,
@@ -118,7 +110,6 @@ class TestMADQN:
             max_replay_size=1000,
             optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
-            checkpoint_subpath=checkpoint_dir,
         )
 
         program = system.build()

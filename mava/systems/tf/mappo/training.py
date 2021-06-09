@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,10 @@
 # limitations under the License.
 
 """MAPPO trainer implementation."""
+import copy
 import os
 import time
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 import sonnet as snt
@@ -29,6 +30,8 @@ from acme.utils import counting, loggers
 import mava
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
+
+train_utils.set_growing_gpu_memory()
 
 tfd = tfp.distributions
 
@@ -47,8 +50,8 @@ class MAPPOTrainer(mava.Trainer):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         shared_weights: bool,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
@@ -66,6 +69,7 @@ class MAPPOTrainer(mava.Trainer):
             policy_networks: ...
             critic_networks: ...
             policy_optimizer: policy optimizer,
+                This can be a single optimizer or an optimizer per agent key.
             critic_optimizer: critic optimizer,
             shared_weights: ...
             discount: discount to use for TD updates.
@@ -95,16 +99,24 @@ class MAPPOTrainer(mava.Trainer):
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
 
-        # Get optimizers
-        self._policy_optimizer = policy_optimizer
-        self._critic_optimizer = critic_optimizer
-
         # Dictionary with network keys for each agent.
         self.agent_net_keys = {agent: agent for agent in self._agents}
         if self._shared_weights:
             self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
+
+        # Create optimizers for different agent types.
+        if not isinstance(policy_optimizer, dict):
+            self._policy_optimizers: Dict[str, snt.Optimizer] = {}
+            for agent in self.unique_net_keys:
+                self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
+        else:
+            self._policy_optimizers = policy_optimizer
+
+        self._critic_optimizers: Dict[str, snt.Optimizer] = {}
+        for agent in self.unique_net_keys:
+            self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -156,8 +168,8 @@ class MAPPOTrainer(mava.Trainer):
                     "policy": self._policy_networks[agent_key],
                     "critic": self._critic_networks[agent_key],
                     "observation": self._observation_networks[agent_key],
-                    "policy_optimizer": self._policy_optimizer,
-                    "critic_optimizer": self._critic_optimizer,
+                    "policy_optimizer": self._policy_optimizers,
+                    "critic_optimizer": self._critic_optimizers,
                 }
 
                 subdir = os.path.join("trainer", agent_key)
@@ -255,9 +267,9 @@ class MAPPOTrainer(mava.Trainer):
                 discount = discount[:-1]
 
                 # Get agent network
-                network_key = agent.split("_")[0] if self._shared_weights else agent
-                policy_network = self._policy_networks[network_key]
-                critic_network = self._critic_networks[network_key]
+                agent_key = agent.split("_")[0] if self._shared_weights else agent
+                policy_network = self._policy_networks[agent_key]
+                critic_network = self._critic_networks[agent_key]
 
                 # Reshape inputs.
                 dims = actor_observation.shape[:2]
@@ -290,7 +302,7 @@ class MAPPOTrainer(mava.Trainer):
 
                 # Do not use the loss provided by td_lambda as they sum the losses over
                 # the sequence length rather than averaging them.
-                critic_loss = tf.reduce_mean(
+                critic_loss = self._baseline_cost * tf.reduce_mean(
                     tf.square(td_lambda_extra.temporal_differences), name="CriticLoss"
                 )
 
@@ -342,15 +354,15 @@ class MAPPOTrainer(mava.Trainer):
         tape = self.tape
 
         for agent in self._agents:
-            # Get network_key.
-            network_key = agent.split("_")[0] if self._shared_weights else agent
+            # Get agent_key.
+            agent_key = agent.split("_")[0] if self._shared_weights else agent
 
             # Get trainable variables.
             policy_variables = (
-                self._observation_networks[network_key].trainable_variables
-                + self._policy_networks[network_key].trainable_variables
+                self._observation_networks[agent_key].trainable_variables
+                + self._policy_networks[agent_key].trainable_variables
             )
-            critic_variables = self._critic_networks[network_key].trainable_variables
+            critic_variables = self._critic_networks[agent_key].trainable_variables
 
             # Get gradients.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
@@ -365,8 +377,8 @@ class MAPPOTrainer(mava.Trainer):
             )
 
             # Apply gradients.
-            self._critic_optimizer.apply(critic_grads, critic_variables)
-            self._policy_optimizer.apply(policy_grads, policy_variables)
+            self._critic_optimizers[agent_key].apply(critic_grads, critic_variables)
+            self._policy_optimizers[agent_key].apply(policy_grads, policy_variables)
 
         train_utils.safe_del(self, "tape")
 
@@ -412,8 +424,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         shared_weights: bool,
         discount: float = 0.99,
         lambda_gae: float = 1.0,

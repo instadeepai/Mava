@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -77,10 +77,18 @@ class MockedExecutor(ActorMock, core.Executor):
     ) -> None:
 
         for agent, observation_spec in self._spec.items():
-            _validate_spec(observation_spec.actions, action[agent])
-            _validate_spec(observation_spec.rewards, next_timestep.reward[agent])
-            _validate_spec(observation_spec.discounts, next_timestep.discount[agent])
-            if next_timestep.observation:
+            if agent in action.keys():
+                _validate_spec(observation_spec.actions, action[agent])
+
+            if agent in next_timestep.reward.keys():
+                _validate_spec(observation_spec.rewards, next_timestep.reward[agent])
+
+            if agent in next_timestep.discount.keys():
+                _validate_spec(
+                    observation_spec.discounts, next_timestep.discount[agent]
+                )
+
+            if next_timestep.observation and agent in next_timestep.observation.keys():
                 _validate_spec(
                     observation_spec.observations, next_timestep.observation[agent]
                 )

@@ -27,11 +27,17 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# mac
+__MACOSX
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+
+# mac
+__MACOSX
 
 # Installer logs
 pip-log.txt
@@ -147,3 +153,4 @@ mava/workspace.code-workspace
 .DS_Store
 mava_testing
 .devcontainer/devcontainer.json
+3rdparty

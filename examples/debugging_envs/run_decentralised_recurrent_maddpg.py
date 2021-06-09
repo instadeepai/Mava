@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,8 +28,9 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.systems.tf import executors, maddpg
-from mava.systems.tf.maddpg.training import DecentralisedRecurrentMADDPGTrainer
+from mava.systems.tf import maddpg
+from mava.systems.tf.maddpg.execution import MADDPGRecurrentExecutor
+from mava.systems.tf.maddpg.training import MADDPGDecentralisedRecurrentTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -160,8 +161,8 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=DecentralisedRecurrentMADDPGTrainer,
-        executor_fn=executors.RecurrentExecutor,
+        trainer_fn=MADDPGDecentralisedRecurrentTrainer,
+        executor_fn=MADDPGRecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
     ).build()
 

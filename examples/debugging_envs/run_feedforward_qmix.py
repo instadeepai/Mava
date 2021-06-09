@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -120,7 +120,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
-        num_agents=2,
+        num_agents=3,
         return_state_info=True,
     )
 
@@ -148,9 +148,10 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=2,
         exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.01,
-        epsilon_decay=1e-4,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        epsilon_min=0.05,
+        epsilon_decay=3e-4,
+        max_replay_size=1000000,
+        optimizer=snt.optimizers.RMSProp(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()
 

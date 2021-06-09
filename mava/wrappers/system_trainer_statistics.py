@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,7 +78,8 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        train_utils.checkpoint_networks(self._system_checkpointer)
+        if self._system_checkpointer:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
         if self._logger:
             self._logger.write(fetches)
@@ -184,7 +185,8 @@ class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        train_utils.checkpoint_networks(self._system_checkpointer)
+        if self._system_checkpointer:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
         fetches["epsilon"] = self.get_epsilon()
         self._trainer._decrement_epsilon()  # type: ignore
@@ -333,7 +335,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        train_utils.checkpoint_networks(self._system_checkpointer)
+        if self._system_checkpointer:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
         if self._logger:
             self._logger.write(fetches)
@@ -409,7 +412,7 @@ class NetworkStatistics(NetworkStatisticsBase):
                 policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
 
             # Apply gradients.
-            self._policy_optimizer.apply(policy_gradients, policy_variables)
+            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
 
             if log_current_timestep:
                 if self.log_weights:
@@ -509,8 +512,8 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             )[0]
 
             # Apply gradients.
-            self._policy_optimizer.apply(policy_gradients, policy_variables)
-            self._critic_optimizer.apply(critic_gradients, critic_variables)
+            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
+            self._critic_optimizers[agent_key].apply(critic_gradients, critic_variables)
 
             if log_current_timestep:
                 if self.log_weights:

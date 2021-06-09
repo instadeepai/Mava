@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -98,7 +98,7 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
 
         # Create one critic per agent. Each critic gets
         # absolute state information of the environment.
-        critic_state_shape = self._env_spec.get_extra_specs()["env_state"].shape
+        critic_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
         critic_obs_spec = tf.TensorSpec(
             shape=critic_state_shape,
             dtype=tf.dtypes.float32,

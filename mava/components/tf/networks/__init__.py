@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 
 from mava.components.tf.networks.additive import AdditiveMixingNetwork
-from mava.components.tf.networks.dial import DIALPolicy
+from mava.components.tf.networks.communication import CommunicationNetwork
 from mava.components.tf.networks.epsilon_greedy import epsilon_greedy_action_selector
 from mava.components.tf.networks.fingerprints import ObservationNetworkWithFingerprint
 from mava.components.tf.networks.monotonic import MonotonicMixingNetwork

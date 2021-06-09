@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -128,7 +128,7 @@ class MultiAgentSwitchGame(gym.Env):
     # get observation for a particular agent
     def _get_obs(self, a_i: int, agent_id: str) -> np.array:
         selected = 1.0 if a_i == self.selected_agent else 0.0
-        return np.array([selected, self.time], dtype=np.float32)
+        return np.array([selected, a_i], dtype=np.float32)
 
     # get dones for a particular agent
     # unused right now -- agents are allowed to go beyond the viewing screen

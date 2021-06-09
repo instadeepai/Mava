@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -280,7 +280,15 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             # Generate an action from the agent's policy and step the environment.
             actions = self._get_actions(timestep)
-            timestep = self._environment.step(actions)
+
+            if type(actions) == tuple:
+                # Return other action information
+                # e.g. the policy information.
+                env_actions, _ = actions
+            else:
+                env_actions = actions
+
+            timestep = self._environment.step(env_actions)
 
             if type(timestep) == tuple:
                 timestep, env_extras = timestep

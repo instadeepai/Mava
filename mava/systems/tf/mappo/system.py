@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 """MAPPO system implementation."""
 import functools
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type, Union
 
 import acme
 import dm_env
@@ -60,7 +60,9 @@ class MAPPO:
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
         executor_variable_update_period: int = 100,
-        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=5e-4),
+        policy_optimizer: Union[
+            snt.Optimizer, Dict[str, snt.Optimizer]
+        ] = snt.optimizers.Adam(learning_rate=5e-4),
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-5),
         discount: float = 0.99,
         lambda_gae: float = 0.99,
@@ -183,13 +185,16 @@ class MAPPO:
         """The replay storage."""
         return self._builder.make_replay_tables(self._environment_spec)
 
-    def counter(self) -> Any:
-        return tf2_savers.CheckpointingRunner(
-            counting.Counter(),
-            time_delta_minutes=15,
-            directory=self._checkpoint_subpath,
-            subdirectory="counter",
-        )
+    def counter(self, checkpoint: bool) -> Any:
+        if checkpoint:
+            return tf2_savers.CheckpointingRunner(
+                counting.Counter(),
+                time_delta_minutes=15,
+                directory=self._checkpoint_subpath,
+                subdirectory="counter",
+            )
+        else:
+            return counting.Counter()
 
     def coordinator(self, counter: counting.Counter) -> Any:
         return lp_utils.StepsLimiter(counter, self._max_executor_steps)  # type: ignore
@@ -367,7 +372,7 @@ class MAPPO:
             replay = program.add_node(lp.ReverbNode(self.replay))
 
         with program.group("counter"):
-            counter = program.add_node(lp.CourierNode(self.counter))
+            counter = program.add_node(lp.CourierNode(self.counter, self._checkpoint))
 
         if self._max_executor_steps:
             with program.group("coordinator"):

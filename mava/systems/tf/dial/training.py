@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,216 +13,76 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Kevin): implement DIAL trainer
-# Helper resources
-#   - single agent dqn learner in acme:
-#           https://github.com/deepmind/acme/blob/master/acme/agents/tf/dqn/learning.py
-#   - multi-agent ddpg trainer in mava: mava/systems/tf/maddpg/trainer.py
-#   - https://github.com/deepmind/acme/agents/tf/r2d2/learning.py
 
 """DIAL trainer implementation."""
-import os
-import time
-from typing import Any, Dict, List, Optional, Sequence
 
-import numpy as np
-import reverb
+from typing import Any, Dict, List, Union
+
 import sonnet as snt
 import tensorflow as tf
 import tree
+import trfl
 from acme.tf import utils as tf2_utils
+from acme.types import NestedArray
 from acme.utils import counting, loggers
 
-import mava
-
-# from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.systems.tf import savers as tf2_savers
+from mava.components.tf.modules.communication import BaseCommunicationModule
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationScheduler,
+)
+from mava.systems.tf.madqn.training import MADQNRecurrentCommTrainer
 from mava.utils import training_utils as train_utils
 
+train_utils.set_growing_gpu_memory()
 
-class DIALTrainer(mava.Trainer):
-    """DIAL trainer.
+
+class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
+    """Recurrent Comm DIAL Switch trainer.
     This is the trainer component of a DIAL system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
+    Note: this trainer is specific to switch game env.
     """
 
     def __init__(
         self,
         agents: List[str],
         agent_types: List[str],
-        networks: Dict[str, snt.Module],
-        discount: float,
-        huber_loss_parameter: float,
+        q_networks: Dict[str, snt.Module],
+        target_q_networks: Dict[str, snt.Module],
         target_update_period: int,
         dataset: tf.data.Dataset,
-        policy_optimizer: snt.Optimizer,
-        shared_weights: bool = True,
-        importance_sampling_exponent: float = None,
-        replay_client: Optional[reverb.Client] = None,
-        clipping: bool = True,
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        discount: float,
+        shared_weights: bool,
+        exploration_scheduler: LinearExplorationScheduler,
+        communication_module: BaseCommunicationModule,
+        max_gradient_norm: float = None,
+        fingerprint: bool = False,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        max_gradient_norm: Optional[float] = None,
     ):
-        """Initializes the learner.
-        Args:
-          policy_network: the online (optimized) policy.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the (policy) loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
-        """
-        self._agents = agents
-        self._agent_types = agent_types
-        self._shared_weights = shared_weights
-        self._communication_module = networks["communication_module"]["all_agents"]
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            q_networks=q_networks,
+            target_q_networks=target_q_networks,
+            target_update_period=target_update_period,
+            dataset=dataset,
+            optimizer=optimizer,
+            discount=discount,
+            shared_weights=shared_weights,
+            exploration_scheduler=exploration_scheduler,
+            max_gradient_norm=max_gradient_norm,
+            fingerprint=fingerprint,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+            communication_module=communication_module,
+        )
 
-        # Store online and target networks.
-        self._policy_networks = networks["policies"]
-        self._target_policy_networks = networks["target_policies"]
-
-        # self._observation_networks = observation_networks
-        self._observation_networks = {
-            k: tf2_utils.to_sonnet_module(v)
-            for k, v in networks["observations"].items()
-        }
-
-        # General learner book-keeping and loggers.
-        self._counter = counter or counting.Counter()
-        self._logger = logger or loggers.make_default_logger("trainer")
-
-        # Other learner parameters.
-        self._discount = discount
-        self._clipping = clipping
-
-        # Necessary to track when to update target networks.
-        self._num_steps = tf.Variable(0, dtype=tf.int32)
-        self._target_update_period = target_update_period
-
-        # Create an iterator to go through the dataset.
-        # TODO(b/155086959): Fix type stubs and remove.
-        self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
-
-        # Create optimizers if they aren't given.
-        self._policy_optimizer = policy_optimizer or snt.optimizers.Adam(1e-4)
-
-        # Dictionary with network keys for each agent.
-        self.agent_net_keys = {agent: agent for agent in self._agents}
-        if self._shared_weights:
-            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
-
-        self.unique_net_keys = self._agent_types if shared_weights else self._agents
-
-        policy_networks_to_expose = {}
-        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
-            "policy": {},
-        }
-        for agent_key in self.unique_net_keys:
-            policy_network_to_expose = snt.Sequential(
-                [
-                    self._observation_networks[agent_key],
-                    self._policy_networks[agent_key],
-                ]
-            )
-            policy_networks_to_expose[agent_key] = policy_network_to_expose
-            self._system_network_variables["policy"][
-                agent_key
-            ] = policy_network_to_expose.variables
-
-        self._system_checkpointer = {}
-        if checkpoint:
-            for agent_key in self.unique_net_keys:
-                objects_to_save = {
-                    "counter": self._counter,
-                    "policy": self._policy_networks[agent_key],
-                    "observation": self._observation_networks[agent_key],
-                    "target_policy": self._target_policy_networks[agent_key],
-                    "policy_optimizer": self._policy_optimizer,
-                    "num_steps": self._num_steps,
-                }
-
-                subdir = os.path.join("trainer", agent_key)
-                checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=15,
-                    directory=checkpoint_subpath,
-                    objects_to_save=objects_to_save,
-                    subdirectory=subdir,
-                )
-                self._system_checkpointer[agent_key] = checkpointer
-
-        self._timestamp: Optional[float] = None
-
-    @tf.function
-    def _update_target_networks(self) -> None:
-        for key in self.unique_net_keys:
-            # Update target network.
-            online_variables = (*self._policy_networks[key].variables,)
-            target_variables = (*self._target_policy_networks[key].variables,)
-
-            # Make online -> target network update ops.
-            if tf.math.mod(self._num_steps, self._target_update_period) == 0:
-                for src, dest in zip(online_variables, target_variables):
-                    dest.assign(src)
-            self._num_steps.assign_add(1)
-
-    @tf.function
-    def _policy_actions_messages(
-        self,
-        target_obs_trans: Dict[str, np.ndarray],
-        target_core_state: Dict[str, np.ndarray],
-        target_core_message: Dict[str, np.ndarray],
-    ) -> Any:
-        actions = {}
-        messages = {}
-
-        for agent in self._agents:
-            time.time()
-            agent_key = self.agent_net_keys[agent]
-            target_trans_obs = target_obs_trans[agent]
-            # TODO (dries): Why is there an extra tuple
-            #  wrapping that needs to be removed?
-            agent_core_state = target_core_state[agent][0]
-            agent_core_message = target_core_message[agent][0]
-
-            transposed_obs = tf2_utils.batch_to_sequence(target_trans_obs)
-
-            (output_actions, output_messages), _ = snt.static_unroll(
-                self._target_policy_networks[agent_key],
-                transposed_obs,
-                agent_core_state,
-                agent_core_message,
-            )
-            actions[agent] = tf2_utils.batch_to_sequence(output_actions)
-            messages[agent] = tf2_utils.batch_to_sequence(output_messages)
-        return actions, messages
-
-    def _step(self) -> Dict[str, Dict[str, Any]]:
-        # Update the target networks
-        self._update_target_networks()
-
-        inputs = next(self._iterator)
-
-        self._forward(inputs)
-
-        self._backward()
-
-        # Log losses per agent
-        return self.policy_losses
-
-    # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
@@ -231,207 +91,106 @@ class DIALTrainer(mava.Trainer):
 
         observations, actions, rewards, discounts, _, extra = data
 
-        core_states = extra["core_states"]
-
-        bs = actions[self._agents[0]].shape[1]
-
-        self.bs = bs
-
+        # core_states = extra["core_states"]
+        core_state = tree.map_structure(
+            lambda s: s[:, 0, :], inputs.data.extras["core_states"]
+        )
+        core_message = tree.map_structure(
+            lambda s: s[:, 0, :], inputs.data.extras["core_messages"]
+        )
         T = actions[self._agents[0]].shape[0]
 
+        # Use fact that end of episode always has the reward to
+        # find episode lengths. This is used to mask loss.
+        ep_end = tf.argmax(tf.math.abs(rewards[self._agents[0]]), axis=0)
+
         with tf.GradientTape(persistent=True) as tape:
-            policy_losses = {agent_id: tf.zeros(bs) for agent_id in self._agents}
-            # for each batch
-            # for b in range(bs):
-            # Unroll episode and store states, messages
-
-            messages = {
-                0: {
-                    agent_id: core_states[agent_id]["message"][0]
-                    for agent_id in self._agents
-                }
-            }  # index of time t
-
-            channel = {}
-
-            states = {
-                0: {
-                    agent_id: core_states[agent_id]["state"][0]
-                    for agent_id in self._agents
-                }
-            }  # index of time t
-
-            # For all time-steps
-            for t in range(0, T, 1):
-                channel[t] = self._communication_module.process_messages(messages[t])[
-                    self._agents[0]
-                ]
-
-                messages[t + 1] = {}
-                states[t + 1] = {}
-
-                # For each agent
-                for agent_id in self._agents:
-                    agent_type = self.agent_net_keys[agent_id]
-                    # Agent input at time t
-                    obs_in = observations[agent_id].observation[t]
-
-                    state_in = states[t][agent_id]
-                    message_in = channel[t]
-
-                    batched_observation = obs_in
-                    batched_state = state_in
-                    batched_message = message_in
-
-                    (q_t, m_t), s_t = self._policy_networks[agent_type](
-                        batched_observation, batched_state, batched_message
-                    )
-
-                    # TODO (dries): Why was this here? Is it still needed?
-                    # if obs_in[0] == 0:
-                    #     m_t = tf.zeros_like(m_t)
-
-                    messages[t + 1][agent_id] = m_t
-                    states[t + 1][agent_id] = s_t
-
-            channel[t + 1] = self._communication_module.process_messages(
-                messages[t + 1]
-            )[self._agents[0]]
-
-            # Backtrack episode
-            # For t=T to 1, -1 do
-            for t in range(T - 1, 0, -1):
-                # For each agent a do
-                for agent_id in self._agents:
-                    agent_type = self.agent_net_keys[agent_id]
-
-                    # All at timestep t
-                    agent_input = observations[agent_id].observation
-                    # (sequence,batch,1)
-                    next_message = channel[t]
-                    message = channel[t - 1]
-                    next_state = states[t][agent_id]
-                    state = states[t - 1][agent_id]
-
-                    action = actions[agent_id]
-
-                    reward = rewards[agent_id]
-
-                    discount = tf.cast(
-                        self._discount, dtype=discounts[agent_id][t, 0].dtype
-                    )
-
-                    terminal = t == T - 1
-
-                    # y_t_a = r_t
-                    y_action = reward[t - 1]
-                    y_message = reward[t - 1]
-
-                    # y_t_a = r_t + discount * max_u Q(t)
-                    if not terminal:
-                        batched_observation = agent_input[t]
-                        batched_state = next_state
-                        batched_message = next_message
-
-                        (q_t, m_t), s = self._target_policy_networks[agent_type](
-                            batched_observation, batched_state, batched_message
-                        )
-
-                        y_action += discount * tf.reduce_max(q_t)
-                        y_message += discount * tf.reduce_max(m_t)
-                        # y_message += discount * m_t
-
-                    # d_Q_t_a = y_t_a - Q(t-1)
-                    batched_observation = agent_input[t - 1]
-                    batched_state = state
-                    batched_message = message
-
-                    # TODO (dries): Why is the policy values calculated
-                    #  again? Was this not done in the first loop?
-                    (q_t1, m_t1), s = self._policy_networks[agent_type](
-                        batched_observation, batched_state, batched_message
-                    )
-
-                    td_action = y_action - tf.gather(q_t1, action[t - 1], batch_dims=1)
-
-                    # d_theta = d_theta + d_Q_t_a ^ 2
-                    policy_losses[agent_id] += td_action ** 2
-
-                    # Communication grads
-                    td_comm = y_message - tf.gather(
-                        m_t1, tf.argmax(next_message, axis=-1), batch_dims=1
-                    )
-                    policy_losses[agent_id] += td_comm ** 2
-
-            # Average over batches
-            for key in policy_losses.keys():
-                policy_losses[key] = {
-                    "policy_loss": tf.reduce_mean(policy_losses[key], axis=0)
-                }
-        self.policy_losses: Dict[str, Dict[str, tf.Tensor]] = policy_losses
-        self.tape = tape
-
-    def _backward(self) -> None:
-
-        # TODO (dries): I still need to figure out the
-        #  total_loss thing. Not per agent I see but per batch?
-
-        # Calculate the gradients and update the networks
-        policy_losses = self.policy_losses
-
-        tape = self.tape
-        for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
-
-            # Get trainable variables.
-            policy_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._policy_networks[agent_key].trainable_variables
-            )
-
-            # Compute gradients.
-            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
-            #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context." caused by losses.dpg, which calls
-            #  tape.gradient.
-            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
-
-            # Maybe clip gradients.
-            if self._clipping:
-                policy_gradients = tf.clip_by_global_norm(policy_gradients, 40.0)[0]
-
-            # Apply gradients.
-            self._policy_optimizer.apply(policy_gradients, policy_variables)
-        train_utils.safe_del(self, "tape")
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        # Compute elapsed time.
-        timestamp = time.time()
-        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
-        self._timestamp = timestamp
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        # Checkpoint the networks.
-        if len(self._system_checkpointer.keys()) > 0:
-            for agent_key in self.unique_net_keys:
-                checkpointer = self._system_checkpointer[agent_key]
-                checkpointer.save()
-
-        self._logger.write(fetches)
-
-    def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
-        variables: Dict[str, Dict[str, np.ndarray]] = {}
-        for network_type in names:
-            variables[network_type] = {
-                agent: tf2_utils.to_numpy(
-                    self._system_network_variables[network_type][agent]
-                )
-                for agent in self.unique_net_keys
+            q_network_losses: Dict[str, NestedArray] = {
+                agent: {"q_value_loss": tf.zeros(())} for agent in self._agents
             }
-        return variables
+
+            state = {agent: core_state[agent][0] for agent in self._agents}
+            target_state = {agent: core_state[agent][0] for agent in self._agents}
+
+            message = {agent: core_message[agent][0] for agent in self._agents}
+            target_message = {agent: core_message[agent][0] for agent in self._agents}
+
+            # _target_q_networks must be 1 step ahead
+            target_channel = self._communication_module.process_messages(target_message)
+            for agent in self._agents:
+                agent_key = self.agent_net_keys[agent]
+                (q_targ, m), s = self._target_q_networks[agent_key](
+                    observations[agent].observation[0],
+                    target_state[agent],
+                    target_channel[agent],
+                )
+                target_state[agent] = s
+                target_message[agent] = m
+
+            for t in range(1, T, 1):
+                channel = self._communication_module.process_messages(message)
+                target_channel = self._communication_module.process_messages(
+                    target_message
+                )
+
+                for agent in self._agents:
+                    agent_key = self.agent_net_keys[agent]
+
+                    # Cast the additional discount
+                    # to match the environment discount dtype.
+
+                    discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
+
+                    (q_targ, m), s = self._target_q_networks[agent_key](
+                        observations[agent].observation[t],
+                        target_state[agent],
+                        target_channel[agent],
+                    )
+
+                    target_state[agent] = s
+                    target_message[agent] = tf.math.multiply(
+                        m, observations[agent].observation[t][:, :1]
+                    )
+
+                    (q, m), s = self._q_networks[agent_key](
+                        observations[agent].observation[t - 1],
+                        state[agent],
+                        channel[agent],
+                    )
+
+                    state[agent] = s
+                    message[agent] = tf.math.multiply(
+                        m, observations[agent].observation[t - 1][:, :1]
+                    )
+
+                    # Mask target
+                    q_targ = tf.concat(
+                        [
+                            [q_targ[i]]
+                            if t <= ep_end[i]
+                            else [tf.zeros_like(q_targ[i])]
+                            for i in range(q_targ.shape[0])
+                        ],
+                        axis=0,
+                    )
+
+                    loss, _ = trfl.qlearning(
+                        q,
+                        actions[agent][t - 1],
+                        rewards[agent][t - 1],
+                        discount * discounts[agent][t],
+                        q_targ,
+                    )
+
+                    # Index loss (mask ended episodes)
+                    if not tf.reduce_any(t - 1 <= ep_end):
+                        continue
+
+                    loss = tf.reduce_mean(loss[t - 1 <= ep_end])
+                    # loss = tf.reduce_mean(loss)
+                    q_network_losses[agent]["q_value_loss"] += loss
+
+        # print(q_network_losses['agent_0'])
+        self._q_network_losses = q_network_losses
+        self.tape = tape
+        # {}.t

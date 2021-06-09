@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import functools
-from typing import Any, Callable, Dict, List, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 import acme
 import dm_env
@@ -34,6 +34,7 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.maddpg import builder, training
+from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
@@ -56,10 +57,10 @@ class MADDPG:
             DecentralisedQValueActorCritic
         ] = DecentralisedQValueActorCritic,
         trainer_fn: Union[
-            Type[training.BaseMADDPGTrainer],
-            Type[training.BaseRecurrentMADDPGTrainer],
-        ] = training.DecentralisedMADDPGTrainer,
-        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+            Type[training.MADDPGBaseTrainer],
+            Type[training.MADDPGBaseRecurrentTrainer],
+        ] = training.MADDPGDecentralisedTrainer,
+        executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -69,12 +70,14 @@ class MADDPG:
         prefetch_size: int = 4,
         target_averaging: bool = False,
         target_update_period: int = 100,
-        target_update_rate: float = 0.01,
+        target_update_rate: Optional[float] = None,
         executor_variable_update_period: int = 1000,
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
         samples_per_insert: float = 32.0,
-        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        policy_optimizer: Union[
+            snt.Optimizer, Dict[str, snt.Optimizer]
+        ] = snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
         n_step: int = 5,
         sequence_length: int = 20,
@@ -127,7 +130,9 @@ class MADDPG:
             replay_table_name: string indicating what name to give the replay table.
             train_loop_fn: loop for training.
             eval_loop_fn: loop for evaluation.
-
+            policy_optimizer: the optimizer to be applied to the policy loss.
+                This can be a single optimizer or an optimizer per agent key.
+            critic_optimizer: the optimizer to be applied to the critic loss.
         """
 
         if not environment_spec:
@@ -221,13 +226,16 @@ class MADDPG:
         """The replay storage."""
         return self._builder.make_replay_tables(self._environment_spec)
 
-    def counter(self) -> Any:
-        return tf2_savers.CheckpointingRunner(
-            counting.Counter(),
-            time_delta_minutes=15,
-            directory=self._checkpoint_subpath,
-            subdirectory="counter",
-        )
+    def counter(self, checkpoint: bool) -> Any:
+        if checkpoint:
+            return tf2_savers.CheckpointingRunner(
+                counting.Counter(),
+                time_delta_minutes=15,
+                directory=self._checkpoint_subpath,
+                subdirectory="counter",
+            )
+        else:
+            return counting.Counter()
 
     def coordinator(self, counter: counting.Counter) -> Any:
         return lp_utils.StepsLimiter(counter, self._max_executor_steps)
@@ -252,9 +260,14 @@ class MADDPG:
             "trainer", **trainer_logger_config
         )
 
+        # Create system architecture with target networks.
+        adder_env_spec = self._builder.convert_discrete_to_bounded(
+            self._environment_spec
+        )
+
         # architecture args
         architecture_config = {
-            "environment_spec": self._environment_spec,
+            "environment_spec": adder_env_spec,
             "observation_networks": networks["observations"],
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
@@ -263,7 +276,6 @@ class MADDPG:
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
 
-        # Create system architecture with target networks.
         system_networks = self._architecture(**architecture_config).create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
@@ -418,7 +430,7 @@ class MADDPG:
             replay = program.add_node(lp.ReverbNode(self.replay))
 
         with program.group("counter"):
-            counter = program.add_node(lp.CourierNode(self.counter))
+            counter = program.add_node(lp.CourierNode(self.counter, self._checkpoint))
 
         if self._max_executor_steps:
             with program.group("coordinator"):

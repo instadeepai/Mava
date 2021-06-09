@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,8 +30,9 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
 from mava.components.tf.networks.mad4pg import DiscreteValuedHead
-from mava.systems.tf import executors, mad4pg
-from mava.systems.tf.mad4pg.training import DecentralisedRecurrentMAD4PGTrainer
+from mava.systems.tf import mad4pg
+from mava.systems.tf.mad4pg.execution import MAD4PGRecurrentExecutor
+from mava.systems.tf.mad4pg.training import MAD4PGDecentralisedRecurrentTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -165,8 +166,8 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=DecentralisedRecurrentMAD4PGTrainer,
-        executor_fn=executors.RecurrentExecutor,
+        trainer_fn=MAD4PGDecentralisedRecurrentTrainer,
+        executor_fn=MAD4PGRecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
     ).build()
 

@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 
 """MAD4PG trainer implementation."""
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import sonnet as snt
 import tensorflow as tf
@@ -26,19 +26,21 @@ from acme.utils import counting, loggers
 
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf.maddpg.training import (
-    BaseMADDPGTrainer,
-    BaseRecurrentMADDPGTrainer,
-    CentralisedMADDPGTrainer,
-    CentralisedRecurrentMADDPGTrainer,
-    DecentralisedMADDPGTrainer,
-    DecentralisedRecurrentMADDPGTrainer,
-    StateBasedMADDPGTrainer,
-    StateBasedRecurrentMADDPGTrainer,
+    MADDPGBaseRecurrentTrainer,
+    MADDPGBaseTrainer,
+    MADDPGCentralisedRecurrentTrainer,
+    MADDPGCentralisedTrainer,
+    MADDPGDecentralisedRecurrentTrainer,
+    MADDPGDecentralisedTrainer,
+    MADDPGStateBasedRecurrentTrainer,
+    MADDPGStateBasedTrainer,
 )
 from mava.utils import training_utils as train_utils
 
+train_utils.set_growing_gpu_memory()
 
-class BaseMAD4PGTrainer(BaseMADDPGTrainer):
+
+class MAD4PGBaseTrainer(MADDPGBaseTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -52,7 +54,7 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -189,7 +191,7 @@ class BaseMAD4PGTrainer(BaseMADDPGTrainer):
         self.tape = tape
 
 
-class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
+class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -203,7 +205,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -267,7 +269,7 @@ class DecentralisedMAD4PGTrainer(BaseMAD4PGTrainer, DecentralisedMADDPGTrainer):
         )
 
 
-class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
+class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -281,7 +283,7 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -345,7 +347,7 @@ class CentralisedMAD4PGTrainer(BaseMAD4PGTrainer, CentralisedMADDPGTrainer):
         )
 
 
-class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
+class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -359,7 +361,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -423,7 +425,7 @@ class StateBasedMAD4PGTrainer(BaseMAD4PGTrainer, StateBasedMADDPGTrainer):
         )
 
 
-class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
+class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -437,7 +439,7 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -601,6 +603,15 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
 
                 dpg_actions = tf2_utils.batch_to_sequence(outputs)
 
+                # Note (dries): This is done to so that losses.dpg can verify
+                # using gradient.tape that there is a
+                # gradient relationship between dpg_q_values and dpg_actions_comb.
+                dpg_actions_comb, dim = train_utils.combine_dim(dpg_actions)
+
+                # Note (dries): This seemingly useless line is important!
+                # Don't remove it. See above note.
+                dpg_actions = train_utils.extract_dim(dpg_actions_comb, dim)
+
                 # Get dpg actions
                 dpg_actions_feed = self._get_dpg_feed(
                     target_actions, dpg_actions, agent
@@ -618,7 +629,7 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
 
                 policy_loss = losses.dpg(
                     dpg_q_values,
-                    act_comb,
+                    dpg_actions_comb,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
@@ -627,8 +638,8 @@ class BaseRecurrentMAD4PGTrainer(BaseRecurrentMADDPGTrainer):
         self.tape = tape
 
 
-class DecentralisedRecurrentMAD4PGTrainer(
-    BaseRecurrentMAD4PGTrainer, DecentralisedRecurrentMADDPGTrainer
+class MAD4PGDecentralisedRecurrentTrainer(
+    MAD4PGBaseRecurrentTrainer, MADDPGDecentralisedRecurrentTrainer
 ):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
@@ -643,7 +654,7 @@ class DecentralisedRecurrentMAD4PGTrainer(
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -709,8 +720,8 @@ class DecentralisedRecurrentMAD4PGTrainer(
         )
 
 
-class CentralisedRecurrentMAD4PGTrainer(
-    BaseRecurrentMAD4PGTrainer, CentralisedRecurrentMADDPGTrainer
+class MAD4PGCentralisedRecurrentTrainer(
+    MAD4PGBaseRecurrentTrainer, MADDPGCentralisedRecurrentTrainer
 ):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
@@ -725,7 +736,7 @@ class CentralisedRecurrentMAD4PGTrainer(
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -791,8 +802,8 @@ class CentralisedRecurrentMAD4PGTrainer(
         )
 
 
-class StateBasedRecurrentMAD4PGTrainer(
-    BaseRecurrentMAD4PGTrainer, StateBasedRecurrentMADDPGTrainer
+class MAD4PGStateBasedRecurrentTrainer(
+    MAD4PGBaseRecurrentTrainer, MADDPGStateBasedRecurrentTrainer
 ):
     """MAD4PG trainer.
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
@@ -807,7 +818,7 @@ class StateBasedRecurrentMAD4PGTrainer(
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,

@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,21 +14,28 @@
 # limitations under the License.
 
 """MADDPG system implementation."""
+import copy
 import dataclasses
 from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import reverb
 import sonnet as snt
 from acme import datasets
+from acme.specs import EnvironmentSpec
 from acme.tf import variable_utils
 from acme.utils import counting, loggers
+from dm_env import specs as dm_specs
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
+from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
+
+BoundedArray = dm_specs.BoundedArray
+DiscreteArray = dm_specs.DiscreteArray
 
 
 @dataclasses.dataclass
@@ -59,7 +66,7 @@ class MADDPGConfig:
             replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
-    policy_optimizer: snt.Optimizer
+    policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
     shared_weights: bool = True
     discount: float = 0.99
@@ -67,7 +74,7 @@ class MADDPGConfig:
     prefetch_size: int = 4
     target_averaging: bool = False
     target_update_period: int = 100
-    target_update_rate: float = 0.01
+    target_update_rate: Optional[float] = None
     executor_variable_update_period: int = 1000
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
@@ -98,10 +105,10 @@ class MADDPGBuilder(SystemBuilder):
         self,
         config: MADDPGConfig,
         trainer_fn: Union[
-            Type[training.BaseMADDPGTrainer],
-            Type[training.BaseRecurrentMADDPGTrainer],
-        ] = training.DecentralisedMADDPGTrainer,
-        executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
+            Type[training.MADDPGBaseTrainer],
+            Type[training.MADDPGBaseRecurrentTrainer],
+        ] = training.MADDPGDecentralisedTrainer,
+        executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):
         """Args:
@@ -118,20 +125,49 @@ class MADDPGBuilder(SystemBuilder):
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
 
+    def convert_discrete_to_bounded(
+        self, environment_spec: specs.MAEnvironmentSpec
+    ) -> specs.MAEnvironmentSpec:
+        env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
+        keys = env_adder_spec._keys
+        for key in keys:
+            agent_spec = env_adder_spec._specs[key]
+            if type(agent_spec.actions) == DiscreteArray:
+                num_actions = agent_spec.actions.num_values
+                minimum = [float("-inf")] * num_actions
+                maximum = [float("inf")] * num_actions
+                new_act_spec = BoundedArray(
+                    shape=(num_actions,),
+                    minimum=minimum,
+                    maximum=maximum,
+                    dtype="float32",
+                    name="actions",
+                )
+
+                env_adder_spec._specs[key] = EnvironmentSpec(
+                    observations=agent_spec.observations,
+                    actions=new_act_spec,
+                    rewards=agent_spec.rewards,
+                    discounts=agent_spec.discounts,
+                )
+        return env_adder_spec
+
     def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
         """Create tables to insert data into."""
 
+        env_adder_spec = self.convert_discrete_to_bounded(environment_spec)
+
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
-                environment_spec, self._extra_specs
+                env_adder_spec, self._extra_specs
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder_sig = reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec, self._extra_specs
+                env_adder_spec, self._extra_specs
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
@@ -252,6 +288,7 @@ class MADDPGBuilder(SystemBuilder):
         # Create the actor which defines how we take actions.
         return self._executor_fn(
             policy_networks=policy_networks,
+            agent_specs=self._config.environment_spec.get_agent_specs(),
             shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
@@ -287,7 +324,7 @@ class MADDPGBuilder(SystemBuilder):
         target_update_rate = self._config.target_update_rate
 
         # trainer args
-        trainer_config = {
+        trainer_config: Dict[str, Any] = {
             "agents": agents,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],

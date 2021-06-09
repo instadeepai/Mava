@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ similar to the `Actor` and `Learner` in Acme.
 
 import abc
 import itertools
-from typing import Dict, Generic, Optional, Sequence, TypeVar
+from typing import Dict, Generic, Optional, Sequence, Tuple, TypeVar, Union
 
 import acme
 import dm_env
@@ -55,7 +55,10 @@ class Executor(acme.Actor):
     @abc.abstractmethod
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
+    ) -> Union[
+        Dict[str, types.NestedArray],
+        Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
+    ]:
         """Samples from the policy and returns an action for each agent."""
 
     @abc.abstractmethod
