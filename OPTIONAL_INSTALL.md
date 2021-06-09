@@ -1,5 +1,5 @@
 ### Optional Installs
-1. **Optional**: To install ROM files for Atari-Py using AutoROM (https://github.com/PettingZoo-Team/AutoROM).
+1. **Optional**: To install ROM files for Atari-Py using [AutoROM](https://github.com/PettingZoo-Team/AutoROM).
    ```
    pip install autorom && AutoROM
    ```
