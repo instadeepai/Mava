@@ -148,6 +148,7 @@ class VDN(MADQN):
             train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn=eval_loop_fn,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
+            logger_config=logger_config,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
