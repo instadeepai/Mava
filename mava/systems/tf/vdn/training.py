@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,18 +15,21 @@
 
 """VDN trainer implementation."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 
 import sonnet as snt
 import tensorflow as tf
 from acme.utils import counting, loggers
 from trfl.indexing_ops import batched_index
 
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
 from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.utils import training_utils as train_utils
+
+train_utils.set_growing_gpu_memory()
 
 
 class VDNTrainer(MADQNTrainer):
@@ -45,12 +48,14 @@ class VDNTrainer(MADQNTrainer):
         target_mixing_network: snt.Module,
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: snt.Optimizer,
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
-        clipping: bool = True,
+        communication_module: Optional[BaseCommunicationModule] = None,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
+        fingerprint: bool = False,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -70,24 +75,33 @@ class VDNTrainer(MADQNTrainer):
             discount=discount,
             shared_weights=shared_weights,
             exploration_scheduler=exploration_scheduler,
-            clipping=clipping,
+            communication_module=communication_module,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
+            fingerprint=fingerprint,
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
         )
 
     @tf.function
-    def _step(self) -> Dict[str, Dict[str, Any]]:
+    def _step(
+        self,
+    ) -> Dict[str, Dict[str, Any]]:
+
         # Update the target networks
         self._update_target_networks()
 
+        # Get data from replay (dropping extras if any). Note there is no
+        # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
 
         self._forward(inputs)
+
         self._backward()
 
-        return {"system": {"q_value_loss": self.loss}}  # Return total system loss
+        # Log losses per agent
+        return {agent: {"q_value_loss": self.loss} for agent in self._agents}
 
     def _forward(self, inputs: Any) -> None:
         # Unpack input data as follows:
@@ -104,49 +118,51 @@ class VDNTrainer(MADQNTrainer):
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            q_tm1 = []  # Q vals
-            q_t = []  # Target Q vals
+            q_acts = []  # Q vals
+            q_targets = []  # Target Q vals
             for agent in self._agents:
                 agent_key = self.agent_net_keys[agent]
 
                 o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
                     o_tm1, o_t, a_tm1, agent
                 )
+                q_tm1 = self._q_networks[agent_key](o_tm1_feed)
+                q_t_value = self._target_q_networks[agent_key](o_t_feed)
+                q_t_selector = self._q_networks[agent_key](o_t_feed)
+                best_action = tf.argmax(q_t_selector, axis=1, output_type=tf.int32)
 
-                q_tm1_agent = self._q_networks[agent_key](o_tm1_feed)  # [B, n_actions]
-                q_act = batched_index(q_tm1_agent, a_tm1_feed, keepdims=True)  # [B, 1]
+                # TODO Make use of q_t_selector for fingerprinting. Speak to Claude.
+                q_act = batched_index(q_tm1, a_tm1_feed, keepdims=True)  # [B, 1]
+                q_target = batched_index(
+                    q_t_value, best_action, keepdims=True
+                )  # [B, 1]
 
-                q_t_agent = self._target_q_networks[agent_key](
-                    o_t_feed
-                )  # [B, n_actions]
-                q_target_max = tf.reduce_max(q_t_agent, axis=1, keepdims=True)  # [B, 1]
+                q_acts.append(q_act)
+                q_targets.append(q_target)
 
-                q_tm1.append(q_act)
-                q_t.append(q_target_max)
+            rewards = tf.concat(
+                [tf.reshape(val, (-1, 1)) for val in list(r_t.values())], axis=1
+            )
+            rewards = tf.reduce_mean(rewards, axis=1)  # [B]
 
-            num_agents = len(self._agents)
+            pcont = tf.concat(
+                [tf.reshape(val, (-1, 1)) for val in list(d_t.values())], axis=1
+            )
+            pcont = tf.reduce_mean(pcont, axis=1)
+            discount = tf.cast(self._discount, list(d_t.values())[0].dtype)
+            pcont = discount * pcont  # [B]
 
-            rewards = [tf.reshape(val, (-1, 1)) for val in list(r_t.values())]
-            rewards = tf.reshape(
-                tf.concat(rewards, axis=1), (-1, 1, num_agents)
-            )  # [B, 1, num_agents]
+            q_acts = tf.concat(q_acts, axis=1)  # [B, num_agents]
+            q_targets = tf.concat(q_targets, axis=1)  # [B, num_agents]
 
-            dones = [tf.reshape(val.terminal, (-1, 1)) for val in list(o_tm1.values())]
-            dones = tf.reshape(
-                tf.concat(dones, axis=1), (-1, 1, num_agents)
-            )  # [B, 1, num_agents]
+            q_tot_mixed = self._mixing_network(q_acts)  # [B, 1, 1]
+            q_tot_target_mixed = self._target_mixing_network(q_targets)  # [B, 1, 1]
 
-            q_tm1 = tf.concat(q_tm1, axis=1)  # [B, num_agents]
-            q_t = tf.concat(q_t, axis=1)  # [B, num_agents]
-
-            q_tot_mixed = self._mixing_network(q_tm1)  # [B, 1, 1]
-            q_tot_target_mixed = self._target_mixing_network(q_t)  # [B, 1, 1]
+            # q_tot_mixed = tf.reduce_sum(q_acts, axis=1)  # [B, 1, 1]
+            # q_tot_target_mixed = tf.reduce_sum(q_targets, axis=1)  # [B, 1, 1]
 
             # Calculate Q loss.
-            targets = (
-                rewards
-                + self._discount * (tf.constant(1.0) - dones) * q_tot_target_mixed
-            )
+            targets = rewards + pcont * q_tot_target_mixed
             targets = tf.stop_gradient(targets)
             td_error = targets - q_tot_mixed
 
@@ -161,15 +177,14 @@ class VDNTrainer(MADQNTrainer):
             # Get trainable variables.
             trainable_variables = self._q_networks[agent_key].trainable_variables
 
-        # Compute gradients.
-        gradients = self.tape.gradient(self.loss, trainable_variables)
+            # Compute gradients.
+            gradients = self.tape.gradient(self.loss, trainable_variables)
 
-        # Maybe clip gradients.
-        if self._clipping:
-            gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+            # Clip gradients.
+            gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
 
-        # Apply gradients.
-        self._optimizers[agent_key].apply(gradients, trainable_variables)
+            # Apply gradients.
+            self._optimizers[agent_key].apply(gradients, trainable_variables)
 
         # Delete the tape manually because of the persistent=True flag.
         train_utils.safe_del(self, "tape")

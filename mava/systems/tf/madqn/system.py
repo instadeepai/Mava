@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ class MADQN:
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Union[
-            Type[training.MADQNTrainer], Type[training.RecurrentMADQNTrainer]
+            Type[training.MADQNTrainer], Type[training.MADQNRecurrentTrainer]
         ] = training.MADQNTrainer,
         communication_module: Type[BaseCommunicationModule] = None,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
@@ -106,8 +106,11 @@ class MADQN:
         sequence_length: int = 20,
         period: int = 20,
         clipping: bool = True,
+        max_gradient_norm: float = None,
         discount: float = 0.99,
-        optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
+            learning_rate=1e-4
+        ),
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         max_executor_steps: int = None,
@@ -174,7 +177,7 @@ class MADQN:
                 n_step=n_step,
                 sequence_length=sequence_length,
                 period=period,
-                clipping=clipping,
+                max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
@@ -218,13 +221,16 @@ class MADQN:
         """The replay storage."""
         return self._builder.make_replay_tables(self._environment_spec)
 
-    def counter(self) -> Any:
-        return tf2_savers.CheckpointingRunner(
-            counting.Counter(),
-            time_delta_minutes=15,
-            directory=self._checkpoint_subpath,
-            subdirectory="counter",
-        )
+    def counter(self, checkpoint: bool) -> Any:
+        if checkpoint:
+            return tf2_savers.CheckpointingRunner(
+                counting.Counter(),
+                time_delta_minutes=15,
+                directory=self._checkpoint_subpath,
+                subdirectory="counter",
+            )
+        else:
+            return counting.Counter()
 
     def coordinator(self, counter: counting.Counter) -> Any:
         return lp_utils.StepsLimiter(counter, self._max_executor_steps)  # type: ignore
@@ -441,7 +447,7 @@ class MADQN:
             replay = program.add_node(lp.ReverbNode(self.replay))
 
         with program.group("counter"):
-            counter = program.add_node(lp.CourierNode(self.counter))
+            counter = program.add_node(lp.CourierNode(self.counter, self._checkpoint))
 
         if self._max_executor_steps:
             with program.group("coordinator"):

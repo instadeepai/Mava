@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,8 +20,12 @@ from mava.systems.tf.mad4pg.execution import (
 )
 from mava.systems.tf.mad4pg.system import MAD4PG
 from mava.systems.tf.mad4pg.training import (
-    BaseMAD4PGTrainer,
-    CentralisedMAD4PGTrainer,
-    DecentralisedMAD4PGTrainer,
-    StateBasedMAD4PGTrainer,
+    MAD4PGBaseRecurrentTrainer,
+    MAD4PGBaseTrainer,
+    MAD4PGCentralisedRecurrentTrainer,
+    MAD4PGCentralisedTrainer,
+    MAD4PGDecentralisedRecurrentTrainer,
+    MAD4PGDecentralisedTrainer,
+    MAD4PGStateBasedRecurrentTrainer,
+    MAD4PGStateBasedTrainer,
 )

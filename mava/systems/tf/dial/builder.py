@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import dataclasses
-from typing import Any, Dict, Iterator, List, Optional, Type
+from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import numpy as np
 import reverb
@@ -59,7 +59,7 @@ class DIALConfig:
     shared_weights: bool
     target_update_period: int
     executor_variable_update_period: int
-    clipping: bool
+    max_gradient_norm: Optional[float]
     min_replay_size: int
     max_replay_size: int
     samples_per_insert: Optional[float]
@@ -70,7 +70,7 @@ class DIALConfig:
     period: int
     discount: float
     checkpoint: bool
-    optimizer: snt.Optimizer
+    optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
 
@@ -89,8 +89,8 @@ class DIALBuilder:
         self,
         config: DIALConfig,
         trainer_fn: Type[
-            training.RecurrentCommMADQNTrainer
-        ] = training.RecurrentCommMADQNTrainer,
+            training.MADQNRecurrentCommTrainer
+        ] = training.MADQNRecurrentCommTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNRecurrentCommExecutor,
         extra_specs: Dict[str, Any] = {},
         exploration_scheduler_fn: Type[
@@ -222,7 +222,7 @@ class DIALBuilder:
         communication_module: BaseCommunicationModule,
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
-        trainer: Optional[training.RecurrentCommMADQNTrainer] = None,
+        trainer: Optional[training.MADQNRecurrentCommTrainer] = None,
         evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
@@ -314,7 +314,7 @@ class DIALBuilder:
             shared_weights=self._config.shared_weights,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
-            clipping=self._config.clipping,
+            max_gradient_norm=self._config.max_gradient_norm,
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             dataset=dataset,

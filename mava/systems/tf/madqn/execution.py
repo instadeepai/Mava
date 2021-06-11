@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -154,7 +154,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             if not self._evaluator:
                 epsilon = self._trainer.get_epsilon()
             else:
-                epsilon = 0.0
+                # Note (dries): For some reason 0 epsilon breaks on StarCraft.
+                epsilon = 1e-10
 
             epsilon = tf.convert_to_tensor(epsilon)
 

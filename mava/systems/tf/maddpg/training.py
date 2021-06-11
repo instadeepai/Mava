@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 import copy
 import os
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import reverb
@@ -37,8 +37,10 @@ from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
+train_utils.set_growing_gpu_memory()
 
-class BaseMADDPGTrainer(mava.Trainer):
+
+class MADDPGBaseTrainer(mava.Trainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -52,8 +54,8 @@ class BaseMADDPGTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -88,6 +90,7 @@ class BaseMADDPGTrainer(mava.Trainer):
             before the policy and the critic.
           target_observation_network: the target observation network.
           policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+            This can be a single optimizer or an optimizer per agent key.
           critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
@@ -145,11 +148,15 @@ class BaseMADDPGTrainer(mava.Trainer):
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Create optimizers for different agent types.
-        # TODO(Kale-ab): Allow this to be passed as a system param.
-        self._policy_optimizers: snt.Optimizer = {}
-        self._critic_optimizers: snt.Optimizer = {}
+        if not isinstance(policy_optimizer, dict):
+            self._policy_optimizers: Dict[str, snt.Optimizer] = {}
+            for agent in self.unique_net_keys:
+                self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
+        else:
+            self._policy_optimizers = policy_optimizer
+
+        self._critic_optimizers: Dict[str, snt.Optimizer] = {}
         for agent in self.unique_net_keys:
-            self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
             self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
 
         # Expose the variables.
@@ -378,6 +385,7 @@ class BaseMADDPGTrainer(mava.Trainer):
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
+
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
         self.tape = tape
 
@@ -454,7 +462,7 @@ class BaseMADDPGTrainer(mava.Trainer):
         return variables
 
 
-class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
+class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -468,7 +476,7 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -532,7 +540,7 @@ class DecentralisedMADDPGTrainer(BaseMADDPGTrainer):
         )
 
 
-class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
+class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -546,7 +554,7 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -579,7 +587,6 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
           target_observation_network: the target observation network.
           policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
           critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
           logger: logger object to be used by learner.
           checkpoint: boolean indicating whether to checkpoint the learner.
@@ -621,10 +628,11 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # Centralised based
-        o_tm1_feed = tf.stack([x for x in o_tm1_trans.values()], 1)
-        o_t_feed = tf.stack([x for x in o_t_trans.values()], 1)
-        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        a_t_feed = tf.stack([x for x in a_t.values()], 1)
+        o_tm1_feed = tf.stack([o_tm1_trans[agent] for agent in self._agents], 1)
+        o_t_feed = tf.stack([o_t_trans[agent] for agent in self._agents], 1)
+        a_tm1_feed = tf.stack([a_tm1[agent] for agent in self._agents], 1)
+        a_t_feed = tf.stack([a_t[agent] for agent in self._agents], 1)
+
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     def _get_dpg_feed(
@@ -636,13 +644,18 @@ class CentralisedMADDPGTrainer(BaseMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
+        tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
-        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
+
+        dpg_a_t_feed = tf.squeeze(
+            tf.stack([dpg_a_t_feed[agent] for agent in self._agents], 1)
+        )
+
         return dpg_a_t_feed
 
 
-class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
+class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -662,7 +675,7 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         target_update_period: int,
         target_update_rate: float,
         dataset: tf.data.Dataset,
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
@@ -740,6 +753,9 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         a_tm1_vals = []
         a_t_vals = []
 
+        # The agent has to be in the connections for training to work
+        assert agent in connections
+
         for connected_agent in connections:
             o_tm1_vals.append(o_tm1_trans[connected_agent])
             o_t_vals.append(o_t_trans[connected_agent])
@@ -749,6 +765,7 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         o_t_feed = tf.stack(o_t_vals, 1)
         a_tm1_feed = tf.stack(a_tm1_vals, 1)
         a_t_feed = tf.stack(a_t_vals, 1)
+
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     def _get_dpg_feed(
@@ -757,16 +774,24 @@ class NetworkedMADDPGTrainer(BaseMADDPGTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        # Centralised and StateBased DPG
-        # Note (dries): Copy has to be made because the input
-        # variables cannot be changed.
+        # Networked based
+        tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
-        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
+
+        connections = self._connection_spec[agent]
+
+        # The agent has to be in the connections for training to work
+        assert agent in connections
+
+        a_t_vals = []
+        for connected_agent in connections:
+            a_t_vals.append(dpg_a_t_feed[connected_agent])
+        dpg_a_t_feed = tf.squeeze(tf.stack(a_t_vals, 1))
         return dpg_a_t_feed
 
 
-class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
+class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -780,7 +805,7 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -854,10 +879,11 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         # State based
-        o_tm1_feed = e_tm1["env_state"]
-        o_t_feed = e_t["env_state"]
-        a_tm1_feed = tf.stack([x for x in a_tm1.values()], 1)
-        a_t_feed = tf.stack([x for x in a_t.values()], 1)
+        o_tm1_feed = e_tm1["s_t"]
+        o_t_feed = e_t["s_t"]
+        a_tm1_feed = tf.stack([a_tm1[agent] for agent in self._agents], 1)
+        a_t_feed = tf.stack([a_t[agent] for agent in self._agents], 1)
+
         return o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed
 
     def _get_dpg_feed(
@@ -869,14 +895,18 @@ class StateBasedMADDPGTrainer(BaseMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
+        tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
         dpg_a_t_feed[agent] = dpg_a_t
-        tree.map_structure(tf.stop_gradient, dpg_a_t_feed)
+
+        dpg_a_t_feed = tf.squeeze(
+            tf.stack([dpg_a_t_feed[agent] for agent in self._agents], 1)
+        )
 
         return dpg_a_t_feed
 
 
-class BaseRecurrentMADDPGTrainer(mava.Trainer):
+class MADDPGBaseRecurrentTrainer(mava.Trainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -890,8 +920,8 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -923,6 +953,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
             before the policy and the critic.
           target_observation_network: the target observation network.
           policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
+            This can be a single optimizer or an optimizer per agent key.
           critic_optimizer: the optimizer to be applied to the critic loss.
           clipping: whether to clip gradients by global norm.
           counter: counter object used to keep track of steps.
@@ -981,11 +1012,15 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Create optimizers for different agent types.
-        # TODO(Kale-ab): Allow this to be passed as a system param.
-        self._policy_optimizers: snt.Optimizer = {}
-        self._critic_optimizers: snt.Optimizer = {}
+        if not isinstance(policy_optimizer, dict):
+            self._policy_optimizers: Dict[str, snt.Optimizer] = {}
+            for agent in self.unique_net_keys:
+                self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
+        else:
+            self._policy_optimizers = policy_optimizer
+
+        self._critic_optimizers: Dict[str, snt.Optimizer] = {}
         for agent in self.unique_net_keys:
-            self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
             self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
 
         # Expose the variables.
@@ -1272,6 +1307,15 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
 
                 dpg_actions = tf2_utils.batch_to_sequence(outputs)
 
+                # Note (dries): This is done to so that losses.dpg
+                # can verify using gradient.tape that there is a
+                # gradient relationship between dpg_q_values and dpg_actions_comb.
+                dpg_actions_comb, dim = train_utils.combine_dim(dpg_actions)
+
+                # Note (dries): This seemingly useless line is important!
+                # Don't remove it. See above note.
+                dpg_actions = train_utils.extract_dim(dpg_actions_comb, dim)
+
                 # Get dpg actions
                 dpg_actions_feed = self._get_dpg_feed(
                     target_actions, dpg_actions, agent
@@ -1280,17 +1324,18 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
                 # Get dpg Q values.
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(dpg_actions_feed)
-                dpg_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+
+                dpg_q_values = tf.squeeze(
+                    self._critic_networks[agent_key](obs_comb, act_comb)
+                )
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
-                # dpg_q_values = tf.squeeze(dpg_q_values, axis=-1)  # [B]
-
                 dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
                 clip_norm = True if self._max_gradient_norm is not None else False
 
                 policy_loss = losses.dpg(
                     dpg_q_values,
-                    act_comb,
+                    dpg_actions_comb,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
@@ -1371,7 +1416,7 @@ class BaseRecurrentMADDPGTrainer(mava.Trainer):
         return variables
 
 
-class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
+class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -1385,7 +1430,7 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -1452,7 +1497,7 @@ class DecentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         )
 
 
-class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
+class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -1466,7 +1511,7 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -1542,11 +1587,16 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # Centralised based
-        obs_trans_feed = tf.stack([x for x in obs_trans.values()], -1)
-        target_obs_trans_feed = tf.stack([x for x in target_obs_trans.values()], -1)
-        action_feed = tf.stack([x for x in actions.values()], -1)
-        target_actions_feed = tf.stack([x for x in target_actions.values()], -1)
-        return obs_trans_feed, target_obs_trans_feed, action_feed, target_actions_feed
+        obs_trans_feed = tf.stack([obs_trans[agent] for agent in self._agents], -1)
+        target_obs_trans_feed = tf.stack(
+            [target_obs_trans[agent] for agent in self._agents], -1
+        )
+        actions_feed = tf.stack([actions[agent] for agent in self._agents], -1)
+        target_actions_feed = tf.stack(
+            [target_actions[agent] for agent in self._agents], -1
+        )
+
+        return obs_trans_feed, target_obs_trans_feed, actions_feed, target_actions_feed
 
     def _get_dpg_feed(
         self,
@@ -1557,16 +1607,16 @@ class CentralisedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
+        tree.map_structure(tf.stop_gradient, actions)
         dpg_actions_feed = copy.copy(actions)
         dpg_actions_feed[agent] = dpg_actions
         dpg_actions_feed = tf.squeeze(
-            tf.stack([x for x in dpg_actions_feed.values()], -1)
+            tf.stack([dpg_actions_feed[agent] for agent in self._agents], -1)
         )
-        tree.map_structure(tf.stop_gradient, dpg_actions_feed)
         return dpg_actions_feed
 
 
-class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
+class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -1580,7 +1630,7 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: snt.Optimizer,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
         discount: float,
         target_averaging: bool,
@@ -1655,11 +1705,14 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # State based
-        obs_trans_feed = extras["env_state"]
-        target_obs_trans_feed = extras["env_state"]
-        action_feed = tf.stack([x for x in actions.values()], -1)
-        target_actions_feed = tf.stack([x for x in target_actions.values()], -1)
-        return obs_trans_feed, target_obs_trans_feed, action_feed, target_actions_feed
+        obs_trans_feed = extras["s_t"]
+        target_obs_trans_feed = extras["s_t"]
+        actions_feed = tf.stack([actions[agent] for agent in self._agents], -1)
+        target_actions_feed = tf.stack(
+            [target_actions[agent] for agent in self._agents], -1
+        )
+
+        return obs_trans_feed, target_obs_trans_feed, actions_feed, target_actions_feed
 
     def _get_dpg_feed(
         self,
@@ -1670,12 +1723,12 @@ class StateBasedRecurrentMADDPGTrainer(BaseRecurrentMADDPGTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
+        tree.map_structure(tf.stop_gradient, actions)
         dpg_actions_feed = copy.copy(actions)
         dpg_actions_feed[agent] = dpg_actions
         dpg_actions_feed = tf.squeeze(
-            tf.stack([x for x in dpg_actions_feed.values()], -1)
+            tf.stack([dpg_actions_feed[agent] for agent in self._agents], -1)
         )
-        tree.map_structure(tf.stop_gradient, dpg_actions_feed)
         return dpg_actions_feed
 
 

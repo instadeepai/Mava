@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.systems.tf.madqn.execution import MADQNRecurrentExecutor
-from mava.systems.tf.madqn.training import RecurrentMADQNTrainer
+from mava.systems.tf.madqn.training import MADQNRecurrentTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import smac_utils
 from mava.utils.loggers import logger_utils
@@ -143,7 +143,7 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        trainer_fn=RecurrentMADQNTrainer,
+        trainer_fn=MADQNRecurrentTrainer,
         executor_fn=MADQNRecurrentExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,

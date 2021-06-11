@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 import copy
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import sonnet as snt
@@ -34,6 +34,8 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
+train_utils.set_growing_gpu_memory()
+
 
 class MADQNTrainer(mava.Trainer):
     """MADQN trainer.
@@ -49,11 +51,11 @@ class MADQNTrainer(mava.Trainer):
         target_q_networks: Dict[str, snt.Module],
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: snt.Optimizer,
+        optimizer: Union[Dict[str, snt.Optimizer], snt.Optimizer],
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         fingerprint: bool = False,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -77,7 +79,12 @@ class MADQNTrainer(mava.Trainer):
 
         # Other learner parameters.
         self._discount = discount
-        self._clipping = clipping
+        # Set up gradient clipping.
+        if max_gradient_norm is not None:
+            self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
+        else:  # A very large number. Infinity results in NaNs.
+            self._max_gradient_norm = tf.convert_to_tensor(1e10)
+
         self._fingerprint = fingerprint
 
         # Necessary to track when to update target networks.
@@ -98,10 +105,12 @@ class MADQNTrainer(mava.Trainer):
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
         # Create optimizers for different agent types.
-        # TODO(Kale-ab): Allow this to be passed as a system param.
-        self._optimizers: snt.Optimizer = {}
-        for agent in self.unique_net_keys:
-            self._optimizers[agent] = copy.deepcopy(optimizer)
+        if not isinstance(optimizer, dict):
+            self._optimizers: Dict[str, snt.Optimizer] = {}
+            for agent in self.unique_net_keys:
+                self._optimizers[agent] = copy.deepcopy(optimizer)
+        else:
+            self._optimizers = optimizer
 
         # Expose the variables.
         q_networks_to_expose = {}
@@ -301,9 +310,8 @@ class MADQNTrainer(mava.Trainer):
             # Compute gradients
             gradients = tape.gradient(q_network_losses[agent], q_network_variables)
 
-            # Maybe clip gradients.
-            if self._clipping:
-                gradients = tf.clip_by_global_norm(gradients, 40.0)[0]
+            # Clip gradients.
+            gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
 
             # Apply gradients.
             self._optimizers[agent_key].apply(gradients, q_network_variables)
@@ -322,7 +330,7 @@ class MADQNTrainer(mava.Trainer):
         return variables
 
 
-class RecurrentMADQNTrainer(MADQNTrainer):
+class MADQNRecurrentTrainer(MADQNTrainer):
     """Recurrent MADQN trainer.
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -336,11 +344,11 @@ class RecurrentMADQNTrainer(MADQNTrainer):
         target_q_networks: Dict[str, snt.Module],
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: snt.Optimizer,
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         fingerprint: bool = False,
@@ -359,7 +367,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
             discount=discount,
             shared_weights=shared_weights,
             exploration_scheduler=exploration_scheduler,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             fingerprint=fingerprint,
@@ -417,7 +425,7 @@ class RecurrentMADQNTrainer(MADQNTrainer):
         self.tape = tape
 
 
-class RecurrentCommMADQNTrainer(MADQNTrainer):
+class MADQNRecurrentCommTrainer(MADQNTrainer):
     """Recurrent MADQN trainer.
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -431,12 +439,12 @@ class RecurrentCommMADQNTrainer(MADQNTrainer):
         target_q_networks: Dict[str, snt.Module],
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: snt.Optimizer,
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: BaseCommunicationModule,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         fingerprint: bool = False,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -454,7 +462,7 @@ class RecurrentCommMADQNTrainer(MADQNTrainer):
             discount=discount,
             shared_weights=shared_weights,
             exploration_scheduler=exploration_scheduler,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,
             counter=counter,
             logger=logger,

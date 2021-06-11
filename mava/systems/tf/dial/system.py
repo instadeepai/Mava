@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 """Defines the DIAL system class."""
 import functools
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type, Union
 
 import acme
 import dm_env
@@ -87,8 +87,8 @@ class DIAL:
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[
-            training.RecurrentCommMADQNTrainer
-        ] = training.RecurrentCommMADQNTrainer,
+            training.MADQNRecurrentCommTrainer
+        ] = training.MADQNRecurrentCommTrainer,
         communication_module: Type[BaseCommunicationModule] = BroadcastedCommunication,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         exploration_scheduler_fn: Type[
@@ -109,9 +109,11 @@ class DIAL:
         n_step: int = 5,
         sequence_length: int = 6,
         period: int = 20,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         discount: float = 1,
-        optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
+            learning_rate=1e-4
+        ),
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         max_executor_steps: int = None,
@@ -178,7 +180,7 @@ class DIAL:
                 n_step=n_step,
                 sequence_length=sequence_length,
                 period=period,
-                clipping=clipping,
+                max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
@@ -294,7 +296,7 @@ class DIAL:
         replay: reverb.Client,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        trainer: Optional[training.RecurrentCommMADQNTrainer] = None,
+        trainer: Optional[training.MADQNRecurrentCommTrainer] = None,
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
 
@@ -369,7 +371,7 @@ class DIAL:
         self,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        trainer: training.RecurrentCommMADQNTrainer,
+        trainer: training.MADQNRecurrentCommTrainer,
     ) -> Any:
         """The evaluation process."""
 
@@ -440,12 +442,14 @@ class DIAL:
     def build(self, name: str = "madqn") -> Any:
         """Build the distributed system topology."""
         program = lp.Program(name=name)
+        counter = None
 
         with program.group("replay"):
             replay = program.add_node(lp.ReverbNode(self.replay))
 
-        with program.group("counter"):
-            counter = program.add_node(lp.CourierNode(self.counter))
+        if self._checkpoint:
+            with program.group("counter"):
+                counter = program.add_node(lp.CourierNode(self.counter))
 
         if self._max_executor_steps:
             with program.group("coordinator"):

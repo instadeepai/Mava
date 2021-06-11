@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MAD4PG on PZ environments."""
-
+"""Example running recurrent MADDPG on the debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
@@ -29,23 +28,24 @@ from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava import specs as mava_specs
-from mava.systems.tf import mad4pg
+from mava.components.tf.architectures import StateBasedQValueCritic
+from mava.systems.tf import maddpg
+from mava.systems.tf.maddpg.execution import MADDPGRecurrentExecutor
+from mava.systems.tf.maddpg.training import MADDPGStateBasedRecurrentTrainer
 from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
+from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
-
-flags.DEFINE_string(
-    "env_class",
-    "sisl",
-    "Pettingzoo environment class, e.g. atari (str).",
-)
-
 flags.DEFINE_string(
     "env_name",
-    "multiwalker_v7",
-    "Pettingzoo environment name, e.g. pong (str).",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "continuous",
+    "Environment action space type (str).",
 )
 flags.DEFINE_string(
     "mava_id",
@@ -65,9 +65,6 @@ def make_networks(
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
     sigma: float = 0.3,
-    vmin: float = -150.0,
-    vmax: float = 150.0,
-    num_atoms: int = 51,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
@@ -94,15 +91,17 @@ def make_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(specs[key].actions.shape, dtype=int)
 
-        # Create the shared observation network; here simply a state-less operation.
+        # Create the observation network.
         observation_network = tf2_utils.to_sonnet_module(tf2_utils.batch_concat)
 
         # Create the policy network.
-        policy_network = snt.Sequential(
+        policy_network = snt.DeepRNN(
             [
-                networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key], activate_final=True
-                ),
+                observation_network,
+                snt.Flatten(),
+                snt.nets.MLP(policy_networks_layer_sizes[key]),
+                snt.LSTM(25),
+                snt.nets.MLP([128]),
                 networks.NearZeroInitializedLinear(num_dimensions),
                 networks.TanhToSpec(specs[key].actions),
                 networks.ClippedGaussian(sigma),
@@ -118,31 +117,31 @@ def make_networks(
                 networks.LayerNormMLP(
                     critic_networks_layer_sizes[key], activate_final=False
                 ),
-                networks.DiscreteValuedHead(vmin, vmax, num_atoms),
+                snt.Linear(1),
             ]
         )
+
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network
 
     return {
+        "observations": observation_networks,
         "policies": policy_networks,
         "critics": critic_networks,
-        "observations": observation_networks,
     }
 
 
 def main(_: Any) -> None:
-
     # environment
     environment_factory = functools.partial(
-        pettingzoo_utils.make_environment,
+        debugging_utils.make_environment,
         env_name=FLAGS.env_name,
-        env_class=FLAGS.env_class,
-        remove_on_fall=False,
+        action_space=FLAGS.action_space,
+        num_agents=3,
+        return_state_info=True,
     )
 
-    # networks
     network_factory = lp_utils.partial_kwargs(make_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -159,15 +158,16 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
-    program = mad4pg.MAD4PG(
+    program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        architecture=StateBasedQValueCritic,
+        trainer_fn=MADDPGStateBasedRecurrentTrainer,
+        executor_fn=MADDPGRecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
+        shared_weights=False,
     ).build()
 
     # launch

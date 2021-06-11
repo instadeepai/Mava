@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...] Ltd. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,14 +26,13 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb>=0.2.0",
-    "tensorflow>=2.4.1",
+    "dm-reverb>=0.3.0",
     "jax",
     "jaxlib",
 ]
 
 tf_requirements = [
-    "tensorflow>=2.4.1",
+    "tensorflow>=2.5.0",
     "tensorflow_probability",
     "dm-sonnet",
     "trfl",
@@ -48,7 +47,7 @@ env_requirements = [
 ]
 
 launchpad_requirements = [
-    "dm-launchpad",
+    "dm-launchpad-nightly",
 ]
 
 testing_formatting_requirements = [
@@ -70,7 +69,7 @@ to expose simple, efficient, and readable components, as well as examples that
 serve both as reference implementations of popular algorithms and as strong
 baselines, while still providing enough flexibility to do novel research.
 For more information see
-[github repository](https://github.com/[...placeholder...]ai/mava)."""
+[github repository](https://github.com/instadeepai/mava)."""
 
 # Get the version from metadata.
 version = _metadata.__version__  # type: ignore
@@ -86,12 +85,12 @@ setup(
     description="A Python library for Multi-Agent Reinforcement Learning.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author="[...placeholder...]",
+    author="InstaDeep Ltd",
     license="Apache License, Version 2.0",
     keywords="multi-agent reinforcement-learning python machine learning",
     packages=find_packages(),
     install_requires=[
-        "dm-acme",
+        "dm-acme==0.2.0",
         "absl-py",
         "dm_env",
         "dm-tree",
@@ -119,6 +118,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
 )

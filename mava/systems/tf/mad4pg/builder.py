@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
-from typing import Any, Dict, Type
+from typing import Any, Dict, Type, Union
 
 from mava import core
 from mava.systems.tf import executors
@@ -35,9 +35,10 @@ class MAD4PGBuilder(MADDPGBuilder):
     def __init__(
         self,
         config: MADDPGConfig,
-        trainer_fn: Type[
-            training.BaseMAD4PGTrainer
-        ] = training.DecentralisedMAD4PGTrainer,
+        trainer_fn: Union[
+            Type[training.MAD4PGBaseTrainer],
+            Type[training.MAD4PGBaseRecurrentTrainer],
+        ] = training.MAD4PGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):

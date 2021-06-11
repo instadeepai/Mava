@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym.spaces import Box, Discrete
 from pettingzoo.utils.env import ParallelEnv
+
+# TODO should not be imported unless user wants the smac env.
 from smac.env import StarCraft2Env  # type:ignore
 
 from mava import types

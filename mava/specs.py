@@ -15,8 +15,9 @@ from acme.specs import EnvironmentSpec
 # the specs on the wrappers themselves
 class MAEnvironmentSpec:
     def __init__(self, environment: dm_env.Environment):
-        self._specs = self._make_ma_environment_spec(environment)
-        self._keys = list(self._specs.keys())
+        specs = self._make_ma_environment_spec(environment)
+        self._keys = list(sorted(specs.keys()))
+        self._specs = {key: specs[key] for key in self._keys}
 
     def _make_ma_environment_spec(
         self, environment: dm_env.Environment

@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -184,7 +184,7 @@ def main(_: Any) -> None:
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
-        trainer_fn=maddpg.NetworkedMADDPGTrainer,
+        trainer_fn=maddpg.MADDPGNetworkedTrainer,
         connection_spec=fully_connected_network_spec,
         shared_weights=False,
     ).build()

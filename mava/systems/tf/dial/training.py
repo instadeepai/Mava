@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 """DIAL trainer implementation."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import sonnet as snt
 import tensorflow as tf
@@ -30,10 +30,13 @@ from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
-from mava.systems.tf.madqn.training import RecurrentCommMADQNTrainer
+from mava.systems.tf.madqn.training import MADQNRecurrentCommTrainer
+from mava.utils import training_utils as train_utils
+
+train_utils.set_growing_gpu_memory()
 
 
-class DIALSwitchTrainer(RecurrentCommMADQNTrainer):
+class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
     """Recurrent Comm DIAL Switch trainer.
     This is the trainer component of a DIAL system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -48,12 +51,12 @@ class DIALSwitchTrainer(RecurrentCommMADQNTrainer):
         target_q_networks: Dict[str, snt.Module],
         target_update_period: int,
         dataset: tf.data.Dataset,
-        optimizer: snt.Optimizer,
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         shared_weights: bool,
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: BaseCommunicationModule,
-        clipping: bool = True,
+        max_gradient_norm: float = None,
         fingerprint: bool = False,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -71,7 +74,7 @@ class DIALSwitchTrainer(RecurrentCommMADQNTrainer):
             discount=discount,
             shared_weights=shared_weights,
             exploration_scheduler=exploration_scheduler,
-            clipping=clipping,
+            max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,
             counter=counter,
             logger=logger,
