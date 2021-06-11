@@ -302,7 +302,7 @@ class MADDPGRecurrentCommExecutor(executors.RecurrentCommExecutor):
         (policy, message_policy), new_state = self._policy_networks[agent_key](
             batched_observation,
             state,
-            # message,
+            message,
         )
 
         # TODO (dries): Make this support hybrid action spaces.
