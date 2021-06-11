@@ -32,7 +32,7 @@ from mava.components.tf.modules.communication import BroadcastedCommunication
 from mava.components.tf.networks import CommunicationNetwork
 from mava.systems.tf import maddpg
 from mava.systems.tf.maddpg.execution import MADDPGRecurrentCommExecutor
-from mava.systems.tf.maddpg.training import DecentralisedRecurrentCommMADDPGTrainer
+from mava.systems.tf.maddpg.training import MADDPGDecentralisedRecurrentCommTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
@@ -179,7 +179,7 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=2,
-        trainer_fn=DecentralisedRecurrentCommMADDPGTrainer,
+        trainer_fn=MADDPGDecentralisedRecurrentCommTrainer,
         executor_fn=MADDPGRecurrentCommExecutor,
         communication_function=BroadcastedCommunication,
         checkpoint_subpath=checkpoint_dir,

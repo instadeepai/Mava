@@ -1732,7 +1732,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         return dpg_actions_feed
 
 
-class DecentralisedRecurrentCommMADDPGTrainer(BaseRecurrentMADDPGTrainer):
+class MADDPGDecentralisedRecurrentCommTrainer(MADDPGDecentralisedRecurrentTrainer):
     """MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
@@ -1863,7 +1863,6 @@ class DecentralisedRecurrentCommMADDPGTrainer(BaseRecurrentMADDPGTrainer):
                 for agent in self._agents
             }
 
-        print(actions[self._agents[0]].shape)
         return actions
 
     # Forward pass that calculates loss.
