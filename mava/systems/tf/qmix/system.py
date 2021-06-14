@@ -250,6 +250,7 @@ class QMIX(MADQN):
             environment_spec=self._environment_spec,
             agent_networks=agent_networks,
             num_hypernet_layers=1,
+            n_agents=len(self._environment_spec.get_agent_ids()),
         ).create_system()
 
         # Create logger

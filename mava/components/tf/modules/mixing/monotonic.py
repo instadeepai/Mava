@@ -40,6 +40,7 @@ class MonotonicMixing(BaseMixingModule):
         self,
         architecture: BaseArchitecture,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        n_agents: int,
         agent_networks: Optional[Dict[str, snt.Module]] = None,
         qmix_hidden_dim: int = 64,
         num_hypernet_layers: int = 2,
@@ -56,6 +57,7 @@ class MonotonicMixing(BaseMixingModule):
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
+        self._n_agents = n_agents
 
         if agent_networks is None:
             agent_networks = self._architecture.create_actor_variables()
@@ -66,7 +68,6 @@ class MonotonicMixing(BaseMixingModule):
         state_specs = self._environment_spec.get_extra_specs()
         state_specs = state_specs["s_t"]
 
-        self._n_agents = len(self._agent_networks["values"])
         q_value_dim = tf.TensorSpec(self._n_agents)
 
         # Implement method from base class
