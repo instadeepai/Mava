@@ -154,6 +154,12 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     To install the environment, please run the provided bash script, which is a slightly modified version of the script found [here][pymarl].
     ```bash
     ./install_sc2.sh
+    ```
+    Or optionally install through docker (*each build downloads and installs StarCraftII ~3.8G* ):
+    ```bash
+    make build
+    make build_sc2
+    ```
 
 3. Install 2D RoboCup environment [Optional]:
     To install the environment, please run the robocup docker build command after running the Mava docker build command.
