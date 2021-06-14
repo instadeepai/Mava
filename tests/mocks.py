@@ -200,7 +200,6 @@ class SequentialEnvironment(MockedEnvironment, SequentialEnvWrapper):
         self._agents = agents
         self._possible_agents = agents
         self._specs = specs
-        self.agent_selection = self.agents[0]
         self.agent_step_counter = 0
 
     def agent_iter(self, n_agents: int) -> Iterator[str]:
@@ -209,6 +208,10 @@ class SequentialEnvironment(MockedEnvironment, SequentialEnvWrapper):
     @property
     def current_agent(self) -> Any:
         return self.agent_selection
+
+    @property
+    def agent_selection(self) -> str:
+        return self.possible_agents[self.agent_step_counter]
 
     def observation_spec(self) -> OLT:
 
