@@ -84,6 +84,9 @@ class MonotonicMixingNetwork(snt.Module):
         w2 = self._hyperparams["w2"]  # [B, qmix_hidden_dim, 1]
         b2 = self._hyperparams["b2"]  # [B, 1, 1]
 
+        # Expand dimensions to [B, 1, n_agents] = [B,1,2] for matmul
+        q_values = tf.expand_dims(q_values, axis=1)
+
         # ELU -> Exp. linear unit
         hidden = tf.nn.elu(tf.matmul(q_values, w1) + b1)  # [B, 1, qmix_hidden_dim]
 
