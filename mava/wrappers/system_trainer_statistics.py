@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Sequence
 import numpy as np
 import tensorflow as tf
 from acme.utils import loggers
-
+from acme.tf import utils as tf2_utils
 import mava
 from mava.utils import training_utils as train_utils
 from mava.utils.loggers import Logger
@@ -77,6 +77,13 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
+
+        # Update the variable source
+        train_var_sum = np.sum(self._trainer._system_network_variables["policies"]["agent"][1])
+        client_var_sum = np.sum(self._variable_client._variables[1])
+        print("Trainer: ", train_var_sum, "Client: ", client_var_sum)
+        #print()
+        self._variable_client.set_async(self._trainer._system_network_variables)
 
         if self._system_checkpointer:
             train_utils.checkpoint_networks(self._system_checkpointer)

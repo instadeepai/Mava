@@ -116,7 +116,17 @@ class FeedForwardExecutor(core.Executor):
 
     def update(self, wait: bool = False) -> None:
         if self._variable_client:
-            self._variable_client.update(wait)
+            import numpy as np
+            #print("self._variable_client._variables", self._variable_client._variables["policies"]["agent"][1])
+            var_sum = np.sum(self._variable_client._variables["policies"]["agent"][1])
+            #print("Executor client: ", var_sum, ". local: ", "None")
+            self._variable_client.get_async(wait)
+
+            # for agent in self._policy_networks.keys():
+            #     self._policy_networks[agent].variables = self._variable_client._variables["policies"][agent]
+
+             
+            
 
 
 class RecurrentExecutor(core.Executor):
