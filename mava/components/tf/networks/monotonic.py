@@ -63,6 +63,7 @@ class MonotonicMixingNetwork(snt.Module):
         self._hypernetworks = HyperNetwork(
             self._agent_networks,
             self._qmix_hidden_dim,
+            self._n_agents,
             self._num_hypernet_layers,
             self._hypernet_hidden_dim,
         )

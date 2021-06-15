@@ -136,6 +136,7 @@ dmypy.json
 
 # vscode
 .vscode
+.history
 
 # custom
 # Dockerfile
