@@ -16,7 +16,7 @@
 """Generic environment loop wrapper to track system statistics"""
 
 import time
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import dm_env
 import matplotlib.pyplot as plt
@@ -31,7 +31,7 @@ from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics
 
 
-class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
+class EnvironmentLoopStatisticsBase:
     """A parallel MARL environment loop.
     This takes `Environment` and `Executor` instances and coordinates their
     interaction. Executors are updated if `should_update=True`. This can be used as:
@@ -56,6 +56,8 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
         self._counter = environment_loop._counter
         self._logger = environment_loop._logger
         self._should_update = environment_loop._should_update
+        self._environment_loop = environment_loop
+        self._override_environment_loop_stats_methods()
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         raise NotImplementedError
@@ -67,6 +69,21 @@ class EnvironmentLoopStatisticsBase(ParallelEnvironmentLoop):
         start_time: float,
     ) -> None:
         raise NotImplementedError
+
+    @property
+    def environment_loop(self) -> ParallelEnvironmentLoop:
+        return self._environment_loop
+
+    def _override_environment_loop_stats_methods(self) -> None:
+        self._environment_loop._compute_episode_statistics = (  # type: ignore
+            self._compute_episode_statistics
+        )
+        self._environment_loop._compute_step_statistics = (  # type: ignore
+            self._compute_step_statistics
+        )
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._environment_loop, name)
 
 
 class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
