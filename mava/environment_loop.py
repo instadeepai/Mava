@@ -15,21 +15,18 @@
 
 """A simple multi-agent-system-environment training loop."""
 
-import operator
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import acme
 import dm_env
 import numpy as np
-import tree
 from acme.utils import counting, loggers
-from dm_env import specs
 
 import mava
+from mava.types import Action
 from mava.utils.wrapper_utils import (
     SeqTimestepDict,
-    broadcast_timestep_to_all_agents,
     convert_seq_timestep_and_actions_to_parallel,
     generate_zeros_from_spec,
 )
@@ -66,10 +63,120 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger(label)
         self._should_update = should_update
-        self._running_statistics = None
+        self._running_statistics: Dict[str, float] = {}
+        self.num_agents = self._environment.num_agents
+
+        # keeps track of previous actions and timesteps
+        self._prev_action: Dict[str, Action] = {
+            a: None for a in self._environment.possible_agents
+        }
+        self._prev_timestep: Dict[str, dm_env.TimeStep] = {
+            a: None for a in self._environment.possible_agents
+        }
+        self._agent_action_timestep: Dict[str, Tuple[Action, dm_env.TimeStep]] = {}
+        self._step_type: Dict[str, dm_env.StepType] = {
+            a: dm_env.StepType.FIRST for a in self._environment.possible_agents
+        }
+
+        # For evaluation, this keeps track of the total undiscounted reward
+        # for each agent accumulated during the episode.
+        self.rewards: Dict[str, float] = {}
+        self.episode_returns: Dict[str, float] = {}
+        for agent, spec in self._environment.reward_spec().items():
+            self.rewards.update({agent: generate_zeros_from_spec(spec)})
+            self.episode_returns.update({agent: generate_zeros_from_spec(spec)})
 
     def _get_action(self, agent_id: str, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_action(agent_id, timestep.observation)
+
+    def _to_mid_timestep(
+        self, timestep: dm_env.TimeStep, agent: str
+    ) -> dm_env.TimeStep:
+        return dm_env.TimeStep(
+            observation=timestep.observation,
+            reward=timestep.reward,
+            discount=timestep.discount,
+            step_type=self._step_type[agent],
+        )
+
+    def _to_last_timestep(self, timestep: dm_env.TimeStep) -> dm_env.TimeStep:
+        return dm_env.TimeStep(
+            observation=timestep.observation,
+            reward=timestep.reward,
+            discount=timestep.discount,
+            step_type=dm_env.StepType.LAST,
+        )
+
+    def _send_observation(self) -> None:
+        if len(self._agent_action_timestep) == self.num_agents:
+            timesteps: Dict[str, SeqTimestepDict] = {
+                k: {"timestep": v[1], "action": v[0]}
+                for k, v in self._agent_action_timestep.items()
+            }
+            (
+                parallel_actions,
+                parallel_timestep,
+            ) = convert_seq_timestep_and_actions_to_parallel(
+                timesteps, self._environment.possible_agents
+            )
+
+            if parallel_timestep.step_type.first():
+                assert all([val is None for val in parallel_actions.values()])
+                self._executor.observe_first(parallel_timestep)
+            else:
+                self._executor.observe(
+                    parallel_actions, next_timestep=parallel_timestep
+                )
+
+            self.rewards = parallel_timestep.reward
+            for agent, reward in self.rewards.items():
+                self.episode_returns[agent] = self.episode_returns[agent] + reward
+            self._agent_action_timestep = {}
+
+    def _perform_turn(self, timestep: dm_env.TimeStep) -> dm_env.TimeStep:
+        # current agent
+        agent = self._environment.current_agent
+
+        # save action, timestep pairs for current agent
+        timestep = self._to_mid_timestep(timestep, agent)
+        self._agent_action_timestep[agent] = (self._prev_action[agent], timestep)
+
+        self._prev_timestep[agent] = timestep
+
+        # obtain action given the timestep of current agent
+        action = self._get_action(agent, timestep)
+
+        # perform environment step; a new agent becomes the current agent and its
+        # timestep is returned
+        timestep = self._environment.step(action)
+
+        # save the action of the former agent
+        self._prev_action[agent] = action
+        self._step_type[agent] = dm_env.StepType.MID
+
+        # send observation to executor if (action, timestep) pairs are saved for all
+        # agents
+        # if true, executor observes the data
+        self._send_observation()
+
+        return timestep
+
+    def _collect_last_timesteps(self, timestep: dm_env.TimeStep) -> None:
+        assert timestep.step_type == dm_env.StepType.LAST
+
+        self._agent_action_timestep = {}
+        for i in range(self.num_agents):
+            agent = self._environment.current_agent
+            timestep = self._to_last_timestep(timestep)
+            self._agent_action_timestep[agent] = (self._prev_action[agent], timestep)
+
+            timestep = self._environment.step(
+                generate_zeros_from_spec(self._environment.action_spec()[agent])
+            )
+
+        assert len(self._agent_action_timestep) == self.num_agents
+
+        self._send_observation()
 
     def run_episode(self) -> loggers.LoggingData:
         """Run one episode.
@@ -83,54 +190,24 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         start_time = time.time()
         episode_steps = 0
 
-        timestep = self._environment.reset()
-        agent = self._environment.current_agent
-
-        # Broadcast timestep for all agents - to use parallel adder.
-        # TODO (Kale-ab) : Make more robust -this could cause issues
-        # if agents have different discounts, obs or legal actions.
-        parallel_timestep = broadcast_timestep_to_all_agents(
-            timestep, self._environment.possible_agents
-        )
-
-        # Make the first observation - parallel adder.
-        self._executor.observe_first(parallel_timestep)
-
-        n_agents = self._environment.num_agents
-        rewards = {
-            agent: generate_zeros_from_spec(spec)
-            for agent, spec in self._environment.reward_spec().items()
+        self._prev_action = {a: None for a in self._environment.possible_agents}
+        self._prev_timestep = {a: None for a in self._environment.possible_agents}
+        self._agent_action_timestep = {}
+        self._step_type = {
+            a: dm_env.StepType.FIRST for a in self._environment.possible_agents
         }
 
-        # For evaluation, this keeps track of the total undiscounted reward
-        # for each agent accumulated during the episode.
-        multiagent_reward_spec = specs.Array((n_agents,), np.float32)
-        episode_return = tree.map_structure(
-            generate_zeros_from_spec, multiagent_reward_spec
-        )
+        timestep = self._environment.reset()
 
         # Run an episode.
         while not timestep.last():
-            # Keep track of timesteps for all agents in the step.
-            timesteps: Dict[str, SeqTimestepDict] = {}
-            # Generate an action from the agent's policy and step the environment.
-            for agent in self._environment.agent_iter(n_agents):
-                action = self._get_action(agent, timestep)
-                timestep = self._environment.step(action)
-                rewards[agent] = timestep.reward
+            timestep = self._perform_turn(timestep)
 
-                timesteps[agent] = {"timestep": timestep, "action": action}
-
-            # Combine actions and timesteps to use parallel adder
-            (
-                parallel_actions,
-                parallel_timestep,
-            ) = convert_seq_timestep_and_actions_to_parallel(
-                timesteps, self._environment.possible_agents
-            )
-
-            # Call observe using parallel data.
-            self._executor.observe(parallel_actions, next_timestep=parallel_timestep)
+            # if Last timestep is encounterd, Env is frozen and observations for all
+            # agents are collected. (action, timestep) pairs must be obtained for all
+            # agents
+            if timestep.last():
+                self._collect_last_timesteps(timestep)
 
             # Update all actors
             if self._should_update:
@@ -139,28 +216,27 @@ class SequentialEnvironmentLoop(acme.core.Worker):
             # Book-keeping.
             episode_steps += 1
 
-            # Equivalent to: episode_return += timestep.reward
-            # We capture the return value because if timestep.reward is a JAX
-            # DeviceArray, episode_return will not be mutated in-place. (In all other
-            # cases, the returned episode_return will be the same object as the
-            # argument episode_return.)
-            episode_return = tree.map_structure(
-                operator.iadd, episode_return, np.array(list(rewards.values()))
-            )
+        self._compute_episode_statistics(
+            self.episode_returns,
+            episode_steps,
+            start_time,
+        )
+        if self._running_statistics:
+            return self._running_statistics
+        else:
+            # Record counts.
+            counts = self._counter.increment(episodes=1, steps=episode_steps)
 
-        # Record counts.
-        counts = self._counter.increment(episodes=1, steps=episode_steps)
+            # Collect the results and combine with counts.
+            steps_per_second = episode_steps / (time.time() - start_time)
+            result = {
+                "episode_length": episode_steps,
+                "mean_episode_return": np.mean(list(self.episode_returns.values())),
+                "steps_per_second": steps_per_second,
+            }
+            result.update(counts)
 
-        # Collect the results and combine with counts.
-        steps_per_second = episode_steps / (time.time() - start_time)
-        result = {
-            "episode_length": episode_steps,
-            "mean_episode_return": np.mean(episode_return),
-            "steps_per_second": steps_per_second,
-        }
-        result.update(counts)
-
-        return result
+            return result
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         pass
