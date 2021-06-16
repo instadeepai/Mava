@@ -82,7 +82,9 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
 
         return parameterized_restart(reward, self._discount, observation)
 
-    def step(self, action: Union[int, float]) -> dm_env.TimeStep:  # type: ignore[override]
+    def step(  # type: ignore[override]
+        self, action: Union[int, float]
+    ) -> dm_env.TimeStep:
         """Steps the environment."""
         if self._reset_next_step:
             return self.reset()
@@ -126,17 +128,21 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         self, agent: str, observe: Union[dict, np.ndarray], done: bool
     ) -> types.OLT:
 
+        legals: np.ndarray = None
+        observation: np.ndarray = None
+
         if isinstance(observe, dict) and "action_mask" in observe:
             legals = observe["action_mask"]
-            observe = observe["observation"]
+            observation = observe["observation"]
         else:
             legals = np.ones(
                 _convert_to_spec(self._environment.action_spaces[agent]).shape,
                 dtype=self._environment.action_spaces[agent].dtype,
             )
-        if observe.dtype == np.int8:
-            observe = np.dtype(np.float32).type(
-                observe
+            observation = observe
+        if observation.dtype == np.int8:
+            observation = np.dtype(np.float32).type(
+                observation
             )  # observation is not expected to be int8
         if legals.dtype == np.int8:
             legals = np.dtype(np.int64).type(legals)
