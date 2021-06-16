@@ -20,8 +20,9 @@ from typing import Any, Dict, List, Sequence
 
 import numpy as np
 import tensorflow as tf
-from acme.utils import loggers
 from acme.tf import utils as tf2_utils
+from acme.utils import loggers
+
 import mava
 from mava.utils import training_utils as train_utils
 from mava.utils.loggers import Logger
@@ -79,11 +80,40 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         fetches.update(counts)
 
         # Update the variable source
-        train_var_sum = np.sum(self._trainer._system_network_variables["policies"]["agent"][1])
-        client_var_sum = np.sum(self._variable_client._variables[1])
-        print("Trainer: ", train_var_sum, "Client: ", client_var_sum)
-        #print()
+        # train_var_sum = np.sum(self._trainer._system_network_variables["policies"]["agent"][1])
+        # before_client_set_sum = np.sum(self._variable_client._variables["policies"]["agent"][1])
+        # print()
+
+        # self._variable_client.get_async()
+        # while not self._variable_client._future.done():
+        #     print("Getting..")
+        #     time.sleep(0.0001)
+        # self._variable_client.get_async()
+        # print("Done.")
+
+        # self._variable_client.get_and_wait()
+
+        # import tensorflow as tf
+        # tf.print("Setting variables")
+
+        # TODO (dries): Change this to async method
         self._variable_client.set_async(self._trainer._system_network_variables)
+        # tf.print("Done setting.")
+
+        # time.sleep(1.0)
+
+        # client_var_after_set_sum = np.sum(self._variable_client._variables["policies"]["agent"][1])
+
+        # self._variable_client.get_and_wait()
+
+        # exit()
+        # self._variable_client._variables = self._trainer._system_network_variables
+
+        # after_client_get_sum = np.sum(self._variable_client._variables["policies"]["agent"][1])
+        # print("Trainer: ", train_var_sum, "Client before set: ", before_client_set_sum, "Client after set: ", client_var_after_set_sum, "Client after get: ", after_client_get_sum)
+
+        # print("Done.")
+        # exit()
 
         if self._system_checkpointer:
             train_utils.checkpoint_networks(self._system_checkpointer)

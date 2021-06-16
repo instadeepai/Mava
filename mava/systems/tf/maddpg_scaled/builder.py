@@ -17,25 +17,26 @@
 import copy
 import dataclasses
 from typing import Any, Dict, Iterator, List, Optional, Type, Union
-from acme.core import VariableSource
-from numpy.core.fromnumeric import var
 
 import reverb
 import sonnet as snt
 from acme import datasets
+from acme.core import VariableSource
 from acme.specs import EnvironmentSpec
-from acme.utils import counting, loggers
 from acme.tf import utils as tf2_utils
+from acme.utils import counting, loggers
 from dm_env import specs as dm_specs
-from mava.systems.tf import variable_utils
-from mava.systems.tf import savers as tf2_savers
-from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from numpy.core.fromnumeric import var
+
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
+from mava.systems.tf import savers as tf2_savers
+from mava.systems.tf import variable_utils
 from mava.systems.tf.maddpg_scaled import training
 from mava.systems.tf.maddpg_scaled.execution import MADDPGFeedForwardExecutor
+from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
 
 BoundedArray = dm_specs.BoundedArray
@@ -273,13 +274,15 @@ class MADDPGBuilder(SystemBuilder):
         # Set all the network variables inside the variable source
         networks_vars = {}
         for net_key in networks.keys():
-            networks_vars[net_key] = {agent: networks[net_key][agent].variables for agent in self._agent_types}
-        
-        
-        variable_source.set_variables(networks.keys(), tf2_utils.to_numpy(networks_vars))
+            networks_vars[net_key] = {
+                agent: networks[net_key][agent].variables for agent in self._agent_types
+            }
+
+        variable_source.set_variables(
+            networks.keys(), tf2_utils.to_numpy(networks_vars)
+        )
 
         return variable_source
-        
 
     def make_executor(
         self,
@@ -311,7 +314,7 @@ class MADDPGBuilder(SystemBuilder):
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policies": variables},
-                update_period=self._config.executor_variable_update_period,
+                get_period=self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -366,9 +369,10 @@ class MADDPGBuilder(SystemBuilder):
 
         variables = {}
         for net_key in networks.keys():
-            variables[net_key] = {agent: networks[net_key][agent].variables for agent in self._agent_types}
-        variables = tf2_utils.to_numpy(variables)
-        
+            variables[net_key] = {
+                agent: networks[net_key][agent].variables for agent in self._agent_types
+            }
+
         variable_client = variable_utils.VariableClient(
             client=variable_source,
             variables=variables,

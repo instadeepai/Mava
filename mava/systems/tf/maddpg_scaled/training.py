@@ -19,7 +19,7 @@
 import copy
 import os
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import reverb
@@ -34,7 +34,8 @@ from acme.utils import counting, loggers
 import mava
 from mava import core
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
-from mava.systems.tf import savers as tf2_savers, variable_sources
+from mava.systems.tf import savers as tf2_savers
+from mava.systems.tf import variable_sources
 from mava.utils import training_utils as train_utils
 
 train_utils.set_growing_gpu_memory()
@@ -164,7 +165,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         # Expose the variables.
         policy_networks_to_expose = {}
         self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
-            "critic": {},
+            "critics": {},
             "policies": {},
         }
         for agent_key in self.unique_net_keys:
@@ -175,7 +176,7 @@ class MADDPGBaseTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            self._system_network_variables["critic"][
+            self._system_network_variables["critics"][
                 agent_key
             ] = target_critic_networks[agent_key].variables
             self._system_network_variables["policies"][
@@ -237,7 +238,7 @@ class MADDPGBaseTrainer(mava.Trainer):
                     for src, dest in zip(online_variables, target_variables):
                         dest.assign(src)
             self._num_steps.assign_add(1)
-    
+
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
@@ -458,7 +459,10 @@ class MADDPGBaseTrainer(mava.Trainer):
 
         # Update variable source variables
         # TODO (dries): Do this call asynchronous
-        self._variable_source.set_variables(self._system_network_variables.keys(), tf2_utils.to_numpy(self._system_network_variables))
+        self._variable_source.set_variables(
+            self._system_network_variables.keys(),
+            tf2_utils.to_numpy(self._system_network_variables),
+        )
 
         # Checkpoint and attempt to write the logs.
         if self._checkpoint:
@@ -498,7 +502,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        
     ):
         """Initializes the learner.
         Args:
@@ -1046,7 +1049,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 ]
             )
             policy_networks_to_expose[agent_key] = policy_network_to_expose
-            self._system_network_variables["critic"][
+            self._system_network_variables["critics"][
                 agent_key
             ] = target_critic_networks[agent_key].variables
             self._system_network_variables["policies"][
@@ -1411,8 +1414,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
         if self._logger:
             self._logger.write(fetches)
-
-    
 
 
 class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
