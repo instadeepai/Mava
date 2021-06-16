@@ -148,7 +148,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
             legals = np.dtype(np.int64).type(legals)
 
         observation = types.OLT(
-            observation=observe,
+            observation=observation,
             legal_actions=legals,
             terminal=np.asarray([done], dtype=np.float32),
         )
