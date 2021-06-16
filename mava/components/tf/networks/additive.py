@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,4 +26,5 @@ class AdditiveMixingNetwork(snt.Module):
 
     def __call__(self, q_values: tf.Tensor) -> tf.Tensor:
         """Monotonic mixing logic."""
-        return tf.math.reduce_sum(q_values, keepdims=True)
+        # return tf.math.reduce_sum(q_values, axis=1)
+        return tf.math.reduce_sum(q_values, axis=1)

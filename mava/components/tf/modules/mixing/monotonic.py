@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 #   - [] Complete class for monotonic mixing
 
 """Mixing for multi-agent RL systems"""
-
+import copy
 from typing import Dict, Optional
 
 import sonnet as snt
@@ -40,6 +40,7 @@ class MonotonicMixing(BaseMixingModule):
         self,
         architecture: BaseArchitecture,
         environment_spec: mava_specs.MAEnvironmentSpec,
+        n_agents: int,
         agent_networks: Optional[Dict[str, snt.Module]] = None,
         qmix_hidden_dim: int = 64,
         num_hypernet_layers: int = 2,
@@ -56,29 +57,24 @@ class MonotonicMixing(BaseMixingModule):
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
+        self._n_agents = n_agents
 
         if agent_networks is None:
             agent_networks = self._architecture.create_actor_variables()
-        self._agent_networks = {}
-        self._agent_networks["values"] = agent_networks["values"]
-        self._agent_networks["target_values"] = agent_networks["target_values"]
+        self._agent_networks = agent_networks
 
     def _create_mixing_layer(self) -> snt.Module:
         """Modify and return system architecture given mixing structure."""
         state_specs = self._environment_spec.get_extra_specs()
         state_specs = state_specs["s_t"]
-        # TODO Currently hard coded to 3 but need to generalise
-        # Need to figure out how to get the size of one-hot representation
-        # of the global state that is returned by the environment.
-        # One hot input dimension of global state
-        # state_specs = tf.TensorSpec(shape=(1, 3))  # Check this shape
-        self._num_agents = len(self._agent_networks["values"])
-        q_value_dim = tf.TensorSpec(self._num_agents)
+
+        q_value_dim = tf.TensorSpec(self._n_agents)
 
         # Implement method from base class
         self._mixed_network = MonotonicMixingNetwork(
             self._architecture,
             self._agent_networks,
+            self._n_agents,
             self._qmix_hidden_dim,
             num_hypernet_layers=self._num_hypernet_layers,
             hypernet_hidden_dim=self._hypernet_hidden_dim,
@@ -90,5 +86,7 @@ class MonotonicMixing(BaseMixingModule):
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         # Implement method from base class
         self._agent_networks["mixing"] = self._create_mixing_layer()
-        self._agent_networks["target_mixing"] = self._create_mixing_layer()
+        self._agent_networks["target_mixing"] = copy.deepcopy(
+            self._agent_networks["mixing"]
+        )
         return self._agent_networks

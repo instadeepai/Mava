@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -196,6 +196,12 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         self._step_type = {
             a: dm_env.StepType.FIRST for a in self._environment.possible_agents
         }
+
+        self.rewards = {}
+        self.episode_returns = {}
+        for agent, spec in self._environment.reward_spec().items():
+            self.rewards.update({agent: generate_zeros_from_spec(spec)})
+            self.episode_returns.update({agent: generate_zeros_from_spec(spec)})
 
         timestep = self._environment.reset()
 

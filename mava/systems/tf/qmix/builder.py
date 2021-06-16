@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,8 @@ from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
+from mava.components.tf.modules.mixing import MonotonicMixing
+from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.qmix import execution, training
 from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
@@ -34,6 +36,7 @@ from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
 @dataclasses.dataclass
 class QMIXConfig(MADQNConfig):
+    # TODO Match documentation with MADQNConfig once cleaned.
     """Configuration options for the QMIX system.
     Args:
             environment_spec: description of the actions, observations, etc.
@@ -67,10 +70,12 @@ class QMIXBuilder(MADQNBuilder):
         config: QMIXConfig,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
+        mixer: Type[MonotonicMixing] = MonotonicMixing,
         extra_specs: Dict[str, Any] = {},
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
+        replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ) -> None:
         """Args:
         _config: Configuration options for the QMIX system.
@@ -82,7 +87,9 @@ class QMIXBuilder(MADQNBuilder):
             executor_fn=executor_fn,
             extra_specs=extra_specs,
             exploration_scheduler_fn=exploration_scheduler_fn,
+            replay_stabilisation_fn=replay_stabilisation_fn,
         )
+        self._mixer = mixer
 
     def make_trainer(
         self,
@@ -101,19 +108,24 @@ class QMIXBuilder(MADQNBuilder):
             executor steps, etc.) distributed throughout the system.
           logger: Logger object for logging metadata.
         """
-        q_networks = networks["values"]
-        target_q_networks = networks["target_values"]
-        mixing_network = networks["mixing"]
-        target_mixing_network = networks["target_mixing"]
-
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
+
+        q_networks = networks["values"]
+        target_q_networks = networks["target_values"]
+
+        mixing_network = networks["mixing"]
+        target_mixing_network = networks["target_mixing"]
 
         # Make epsilon scheduler
         exploration_scheduler = self._exploration_scheduler_fn(
             epsilon_min=self._config.epsilon_min,
             epsilon_decay=self._config.epsilon_decay,
         )
+
+        # Check if we should use fingerprints
+        fingerprint = True if self._replay_stabiliser_fn is not None else False
+
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(  # type:ignore
             agents=agents,
@@ -128,8 +140,10 @@ class QMIXBuilder(MADQNBuilder):
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
             exploration_scheduler=exploration_scheduler,
+            communication_module=communication_module,
             dataset=dataset,
             counter=counter,
+            fingerprint=fingerprint,
             logger=logger,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,

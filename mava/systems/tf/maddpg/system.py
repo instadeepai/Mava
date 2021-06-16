@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,7 +75,9 @@ class MADDPG:
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
         samples_per_insert: float = 32.0,
-        policy_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        policy_optimizer: Union[
+            snt.Optimizer, Dict[str, snt.Optimizer]
+        ] = snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
         n_step: int = 5,
         sequence_length: int = 20,
@@ -128,7 +130,9 @@ class MADDPG:
             replay_table_name: string indicating what name to give the replay table.
             train_loop_fn: loop for training.
             eval_loop_fn: loop for evaluation.
-
+            policy_optimizer: the optimizer to be applied to the policy loss.
+                This can be a single optimizer or an optimizer per agent key.
+            critic_optimizer: the optimizer to be applied to the critic loss.
         """
 
         if not environment_spec:
@@ -222,13 +226,16 @@ class MADDPG:
         """The replay storage."""
         return self._builder.make_replay_tables(self._environment_spec)
 
-    def counter(self) -> Any:
-        return tf2_savers.CheckpointingRunner(
-            counting.Counter(),
-            time_delta_minutes=15,
-            directory=self._checkpoint_subpath,
-            subdirectory="counter",
-        )
+    def counter(self, checkpoint: bool) -> Any:
+        if checkpoint:
+            return tf2_savers.CheckpointingRunner(
+                counting.Counter(),
+                time_delta_minutes=15,
+                directory=self._checkpoint_subpath,
+                subdirectory="counter",
+            )
+        else:
+            return counting.Counter()
 
     def coordinator(self, counter: counting.Counter) -> Any:
         return lp_utils.StepsLimiter(counter, self._max_executor_steps)
@@ -423,7 +430,7 @@ class MADDPG:
             replay = program.add_node(lp.ReverbNode(self.replay))
 
         with program.group("counter"):
-            counter = program.add_node(lp.CourierNode(self.counter))
+            counter = program.add_node(lp.CourierNode(self.counter, self._checkpoint))
 
         if self._max_executor_steps:
             with program.group("coordinator"):

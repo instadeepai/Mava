@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 """Defines the VDN system class."""
 import functools
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type, Union
 
 import dm_env
 import reverb
@@ -93,14 +93,16 @@ class VDN(MADQN):
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
-        max_replay_size: int = 1000,
+        max_replay_size: int = 1000000,
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
         max_gradient_norm: float = None,
         discount: float = 0.99,
-        optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
+            learning_rate=1e-4
+        ),
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         max_executor_steps: int = None,
@@ -119,6 +121,7 @@ class VDN(MADQN):
             environment_spec = mava_specs.MAEnvironmentSpec(
                 environment_factory(evaluation=False)  # type:ignore
             )
+        self._environment_spec = environment_spec
 
         # set default logger if no logger provided
         if not logger_factory:
@@ -145,6 +148,7 @@ class VDN(MADQN):
             train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn=eval_loop_fn,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
+            logger_config=logger_config,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):

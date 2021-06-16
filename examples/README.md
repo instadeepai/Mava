@@ -78,7 +78,7 @@ We also include a number of systems running on discrete action space environment
     an MA-DQN system running on the StarCraft 3m environment.
 -   [MA-DQN (recurrent)](smac/run_recurrent_madqn.py):
     an MA-DQN system running on the StarCraft 3m environment.
-    
+
 [debug]: ../mava/utils/debugging
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland

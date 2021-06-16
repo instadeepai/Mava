@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
+from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.vdn import execution, training
 from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
@@ -71,6 +72,7 @@ class VDNBuilder(MADQNBuilder):
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
+        replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ) -> None:
         """Args:
         _config: Configuration options for the QMIX system.
@@ -82,6 +84,7 @@ class VDNBuilder(MADQNBuilder):
             executor_fn=executor_fn,
             extra_specs=extra_specs,
             exploration_scheduler_fn=exploration_scheduler_fn,
+            replay_stabilisation_fn=replay_stabilisation_fn,
         )
 
     def make_trainer(
@@ -114,6 +117,10 @@ class VDNBuilder(MADQNBuilder):
             epsilon_min=self._config.epsilon_min,
             epsilon_decay=self._config.epsilon_decay,
         )
+
+        # Check if we should use fingerprints
+        fingerprint = True if self._replay_stabiliser_fn is not None else False
+
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(  # type:ignore
             agents=agents,
@@ -128,8 +135,10 @@ class VDNBuilder(MADQNBuilder):
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
             exploration_scheduler=exploration_scheduler,
+            communication_module=communication_module,
             dataset=dataset,
             counter=counter,
+            fingerprint=fingerprint,
             logger=logger,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,

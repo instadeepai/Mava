@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 """Defines the QMIX system class."""
 import functools
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type, Union
 
 import dm_env
 import reverb
@@ -27,8 +27,10 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
-from mava.components.tf.modules import mixing
+from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.mixing import MonotonicMixing
+from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.madqn.system import MADQN
@@ -80,10 +82,12 @@ class QMIX(MADQN):
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
-        mixer: Type[mixing.BaseMixingModule] = mixing.MonotonicMixing,
+        mixer: Type[MonotonicMixing] = MonotonicMixing,
+        communication_module: Type[BaseCommunicationModule] = None,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
+        replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
         epsilon_min: float = 0.05,
         epsilon_decay: float = 1e-4,
         num_executors: int = 1,
@@ -93,14 +97,16 @@ class QMIX(MADQN):
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
-        max_replay_size: int = 1000,
+        max_replay_size: int = 1000000,
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
         max_gradient_norm: float = None,
         discount: float = 0.99,
-        optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
+            learning_rate=1e-4
+        ),
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         max_executor_steps: int = None,
@@ -130,20 +136,40 @@ class QMIX(MADQN):
             )
 
         super(QMIX, self).__init__(
-            architecture=architecture,
             environment_factory=environment_factory,
             network_factory=network_factory,
             logger_factory=logger_factory,
-            environment_spec=environment_spec,
-            shared_weights=shared_weights,
+            architecture=architecture,
+            trainer_fn=trainer_fn,
+            communication_module=communication_module,
+            executor_fn=executor_fn,
+            exploration_scheduler_fn=exploration_scheduler_fn,
+            replay_stabilisation_fn=replay_stabilisation_fn,
+            epsilon_min=epsilon_min,
+            epsilon_decay=epsilon_decay,
             num_executors=num_executors,
             num_caches=num_caches,
+            environment_spec=environment_spec,
+            shared_weights=shared_weights,
+            batch_size=batch_size,
+            prefetch_size=prefetch_size,
+            min_replay_size=min_replay_size,
+            max_replay_size=max_replay_size,
+            samples_per_insert=samples_per_insert,
+            n_step=n_step,
+            sequence_length=sequence_length,
+            period=period,
+            discount=discount,
+            optimizer=optimizer,
+            target_update_period=target_update_period,
+            executor_variable_update_period=executor_variable_update_period,
             max_executor_steps=max_executor_steps,
-            checkpoint_subpath=checkpoint_subpath,
             checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+            logger_config=logger_config,
             train_loop_fn=train_loop_fn,
-            train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn=eval_loop_fn,
+            train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
         )
 
@@ -178,6 +204,8 @@ class QMIX(MADQN):
             executor_fn=executor_fn,
             extra_specs=extra_specs,
             exploration_scheduler_fn=exploration_scheduler_fn,
+            replay_stabilisation_fn=replay_stabilisation_fn,
+            mixer=mixer,
         )
 
     def trainer(
@@ -198,16 +226,34 @@ class QMIX(MADQN):
             shared_weights=self._shared_weights,
         )
 
+        # Fingerprint module
+        if self._builder._replay_stabiliser_fn is not None:
+            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
+                architecture
+            )
+
+        # Communication module
+        # NOTE: this is currently not expected to work with qmix
+        # since we do not have a recurrent version.
+        if self._communication_module_fn is not None:
+            raise Exception(
+                "QMIX currently does not support recurrence and \
+                therefore cannot use a communication module."
+            )
+
+        # Extract agent networks
         agent_networks = architecture.create_actor_variables()
 
-        # Augment network architecture by adding mixing layer network.
+        # Mixing module
         system_networks = self._mixer(
             architecture=architecture,
             environment_spec=self._environment_spec,
             agent_networks=agent_networks,
+            num_hypernet_layers=1,
+            n_agents=len(self._environment_spec.get_agent_ids()),
         ).create_system()
 
-        # create logger
+        # Create logger
         trainer_logger_config = {}
         if self._logger_config and "trainer" in self._logger_config:
             trainer_logger_config = self._logger_config["trainer"]
@@ -222,6 +268,7 @@ class QMIX(MADQN):
             networks=system_networks,
             dataset=dataset,
             counter=counter,
+            communication_module=None,
             logger=trainer_logger,
         )
 

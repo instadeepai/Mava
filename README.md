@@ -2,6 +2,8 @@
 
 # Mava: a research framework for distributed multi-agent reinforcement learning
 
+![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava)
+![PyPI version](https://badge.fury.io/py/id-mava.svg)
 ![pytest](https://github.com/arnupretorius/mava/workflows/format_and_test/badge.svg)
 
 # Table of Contents
@@ -26,7 +28,7 @@ baselines, while still providing enough flexibility to do novel research.
 ## Overview
 ### Systems and the Executor-Trainer paradigm
 
-At the core of the Mava framework is the concept of a `system`. A system refers to a full multi-agent reinforcement learning algorithm consisting of the following specific components: an `Executor`, a `Trainer` and a `Dataset`. 
+At the core of the Mava framework is the concept of a `system`. A system refers to a full multi-agent reinforcement learning algorithm consisting of the following specific components: an `Executor`, a `Trainer` and a `Dataset`.
 
 <p style="text-align:center;">
 <img src="docs/images/mava_system.png" width="45%">
@@ -44,7 +46,7 @@ Mava shares much of the design philosophy of Acme for the same reason: to allow 
 ## Supported environments
 
 A given multi-agent system interacts with its environment via an `EnvironmentLoop`. This loop takes as input a `system` instance and a multi-agent `environment`
-instance which implements the [DeepMind Environment API][dm_env]. Mava currently supports multi-agent environment loops and environment wrappers for the following environments and environment suites: 
+instance which implements the [DeepMind Environment API][dm_env]. Mava currently supports multi-agent environment loops and environment wrappers for the following environments and environment suites:
 
 <figure >
     <img align="right" src="docs/images/animation.gif" width="40%">
@@ -53,19 +55,19 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [PettingZoo][pettingzoo]
 * [SMAC][smac]
 * [Flatland][flatland]
-* [2D RoboCup][robocup] 
+* [2D RoboCup][robocup]
 
 The animation on the right shows MAD4PG solving the Multi-Walker environment from PettingZoo.
 
 ## System implementations
 
-Mava includes several system implementations. Below we list these together with an indication of the maturity of the system using the following keys: 🟩  -- Tested and working well, 🟨  -- Running and training on simple environments, but not extensively tested and 🟥  -- Implemented but untested and yet to show clear signs of stable training. 
+Mava includes several system implementations. Below we list these together with an indication of the maturity of the system using the following keys: 🟩  -- Tested and working well, 🟨  -- Running and training on simple environments, but not extensively tested and 🟥  -- Implemented but untested and yet to show clear signs of stable training.
 
 * 🟩 - Multi-Agent Deep Q-Networks (MADQN).
 * 🟩 - Multi-Agent Deep Deterministic Policy Gradient (MADDPG).
 * 🟩 - Multi-Agent Distributed Distributional Deep Deterministic Policy Gradient (MAD4PG).
 * 🟨 - Multi-Agent Proximal Policy Optimisation (MAPPO).
-* 🟥 - Value Decomposition Networks (VDN).
+* 🟨 - Value Decomposition Networks (VDN).
 * 🟥 - Monotonic value function factorisation (QMIX).
 
 As we develop Mava further, we aim to have all systems well tested on a wide variety of environments.
@@ -85,22 +87,22 @@ import launchpad
 
 # Distributed program
 program = madqn.MADQN(
-        environment_factory=helpers.environment_factory,
-        network_factory=helpers.network_factory,
-        architecture=DecentralisedPolicyActor,
-        num_executors=2,
-    ).build()
+    environment_factory=helpers.environment_factory,
+    network_factory=helpers.network_factory,
+    architecture=DecentralisedPolicyActor,
+    num_executors=2,
+).build()
 
 # Launch
 launchpad.launch(
-        program,
-        launchpad.LaunchType.LOCAL_MULTI_PROCESSING,
-    )
+    program,
+    launchpad.LaunchType.LOCAL_MULTI_PROCESSING,
+)
 ```
 
 The first two arguments to the program are environment and network factory functions.
-These helper functions are responsible for creating the networks for the system, initialising their parameters on the different compute nodes and providing a copy of the environment for each executor. The next argument `num_executors` sets the number of executor processes to be run. 
-After building the program we feed it to Launchpad's `launch` function and specify the launch type to perform local multi-processing, i.e. running the distributed program on a single machine. Scaling up or down is simply a matter of adjusting the number of executor processes. 
+These helper functions are responsible for creating the networks for the system, initialising their parameters on the different compute nodes and providing a copy of the environment for each executor. The next argument `num_executors` sets the number of executor processes to be run.
+After building the program we feed it to Launchpad's `launch` function and specify the launch type to perform local multi-processing, i.e. running the distributed program on a single machine. Scaling up or down is simply a matter of adjusting the number of executor processes.
 
 For a deeper dive, take a look at the detailed working code
 examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
@@ -114,7 +116,7 @@ from mava.components.tf.modules import communication
 
 ...
 
-# Wrap architecture in communication module                
+# Wrap architecture in communication module
 communication.BroadcastedCommunication(
     architecture=architecture,
     shared=True,
@@ -152,7 +154,19 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     To install the environment, please run the provided bash script, which is a slightly modified version of the script found [here][pymarl].
     ```bash
     ./install_sc2.sh
+    ```
+    Or optionally install through docker (*each build downloads and installs StarCraftII ~3.8G* ):
+    ```bash
+    make build
+    make build_sc2
+    ```
 
+3. Install 2D RoboCup environment [Optional]:
+    To install the environment, please run the robocup docker build command after running the Mava docker build command.
+    ```bash
+    make build
+    make build_robocup
+    ```
 ### Python virtual environment
 
 1.  If not using docker, we strongly recommend using a
@@ -165,30 +179,52 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     pip install --upgrade pip setuptools
     ```
 
-2.  To install the core libraries with dependencies from source (from root directory): 
+2.  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset :
 
     ```bash
-    pip install -e ".[tf,envs,reverb,launchpad]"
+    pip install id-mava
+    pip install id-mava[reverb]
     ```
 
-    Note that the dependencies may be installed selectively by adding and removing their identifiers. Additional optional dependencies include `record_episode` for installing packages required to make video recordings of evaluation runs and `testing_formatting` for running tests and code formatting checks. Extra information on optional installs are given below.
+    Or for nightly builds:
+    ```bash
+    pip install id-mava-nightly
+    pip install id-mava-nightly[reverb]
+    ```
 
-3.  **NB**: Flatland and SMAC installations have to be done separately. Flatland can be installed using:
-   
+3. To install dependencies for tensorflow agents:
+    ```bash
+    pip install id-mava[tf]
+    ```
+4. For distributed agent support:
+    ```bash
+    pip install id-mava[launchpad]
+    ```
+
+5. To install example environments, such as [PettingZoo](https://github.com/PettingZoo-Team/PettingZoo):
+    ```bash
+    pip install id-mava[envs]
+    ```
+6.  **NB**: For Flatland and SMAC environments, installations have to be done separately. Flatland can be installed using:
+
     ```bash
     pip install .[flatland]
     ```
-   
+
     For StarCraft II installation, this must be installed separately according to your operating system.
     To install the StarCraft II ML environment and associated packages, please follow the instructions on [PySC2](https://github.com/deepmind/pysc2) to install the StarCraft II game files.
     Please ensure you have the required game maps (for both PySC2 and SMAC) extracted in the StarCraft II maps directory.
     Once this is done you can install the packages for the single agent case (PySC2) and the multi-agent case (SMAC).
-   
+
     ```bash
     pip install pysc2
     pip install git+https://github.com/oxwhirl/smac.git
     ```
-
+7.  For the 2D RoboCup environment, a local install has only been tested using the Ubuntu 18.04 operating system.
+    The installation can be performed by running the RoboCup bash script while inside the Mava
+    python virtual environment.
+    ```bash
+    ./install_robocup.sh
 We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functionality such as the use of Atari environments, environment wrappers, gpu support and agent episode recording.
 
 ## Debugging
@@ -196,9 +232,9 @@ We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functi
 <figure>
     <img align="right" src="docs/images/simple_spread.png" width="25%">
 </figure>
-                                                                  
+
 To test and debug new system implementations, we use a simplified version of the spread environment from the [MPE][mpe] suite.
-Debugging in MARL can be very difficult and time consuming, therefore it is important to use a small environment for debugging that is simple and fast but at the same time still able to clearly show whether a system is able to learn. An illustration of the debugging environment is shown on the right. Agents start at random locations and are assigned specific landmarks which they attempt to reach in as few steps as possible. Rewards are given to each agent independently as a function of their distance to the landmark. The reward is normalised to be between 0 and 1, where 1 is given when the agent is directly on top of the landmark. The further an agent is away from its landmark the more the reward value converges to 0. Collisions between agents result in a reward of -1 received by the colliding agents. To test both discrete and continuous control systems we feature two versions of the environment. In the discrete version the action space for each agent consists of the following five actions: `left`, `right`, `up`, `down`, `stand-still`. In the continuous case, the action space consists of real values bounded between -1 and 1 for the `acceleration` of the agent in the `x` and `y` direction. Several examples of running systems on the debugging environment can be found [here][debug]. Below we show the results from some of our systems trained on the debugging environment. 
+Debugging in MARL can be very difficult and time consuming, therefore it is important to use a small environment for debugging that is simple and fast but at the same time still able to clearly show whether a system is able to learn. An illustration of the debugging environment is shown on the right. Agents start at random locations and are assigned specific landmarks which they attempt to reach in as few steps as possible. Rewards are given to each agent independently as a function of their distance to the landmark. The reward is normalised to be between 0 and 1, where 1 is given when the agent is directly on top of the landmark. The further an agent is away from its landmark the more the reward value converges to 0. Collisions between agents result in a reward of -1 received by the colliding agents. To test both discrete and continuous control systems we feature two versions of the environment. In the discrete version the action space for each agent consists of the following five actions: `left`, `right`, `up`, `down`, `stand-still`. In the continuous case, the action space consists of real values bounded between -1 and 1 for the `acceleration` of the agent in the `x` and `y` direction. Several examples of running systems on the debugging environment can be found [here][debug]. Below we show the results from some of our systems trained on the debugging environment.
 
 <p style="text-align:center;">
 <img src="docs/images/discrete.png" width="45%">
@@ -209,8 +245,8 @@ Debugging in MARL can be very difficult and time consuming, therefore it is impo
 
 We have big ambitions for Mava! 🚀 But there is still much work that needs to be done. We have a clear roadmap for expanding our system implementations and associated modules, improving testing and robustness and providing support for across-machine training. Furthermore, in the near future, we also plan to implement the following features (feel free to vote for any one of them by clicking on the name!).
 
-[![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel/vote) <br /> 
-[![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training/vote) <br /> 
+[![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel/vote) <br />
+[![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training/vote) <br />
 [![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures/vote)
 
 In the slightly more longer term, the Mava team plans to release benchmarking results for several different systems and environments and contribute a MARL specific behavioural environment suite specifically engineered to study aspects of MARL such as cooperation and coordination.
