@@ -16,11 +16,6 @@ from mava.components.tf.modules.communication import BaseCommunicationModule
 
 tfd = tfp.distributions
 
-import time
-
-# Delete me
-import numpy as np
-
 
 class FeedForwardExecutor(core.Executor):
     """A feed-forward executor.
@@ -120,28 +115,8 @@ class FeedForwardExecutor(core.Executor):
         return actions
 
     def update(self, wait: bool = False) -> None:
-        # TODO (dries): Add counter here or in vairalbe_utils to pull every n times
         if self._variable_client:
-            # if self._variable_client._call_counter==0:
-
             self._variable_client.get_async()
-            for agent in self._policy_networks.keys():
-                for i in range(len(self._policy_networks[agent].variables)):
-                    self._policy_networks[agent].variables[i].assign(
-                        self._variable_client._variables["policies"][agent][i]
-                    )
-            # if self._variable_client._future is not None:
-
-            #     # print("Actually getting :) ")
-            #     while not self._variable_client._future.done():
-            #         # print("Getting..")
-            #         time.sleep(0.001)
-            #     self._variable_client.get_async()
-            #     # print("Done.")
-
-            #     var_sum = np.sum(self._variable_client._variables["policies"]["agent"][1])
-            #     print("Executor client: ", var_sum, ". local: ", "None")
-            # self._variable_client.get_async(wait)
 
 
 class RecurrentExecutor(core.Executor):
