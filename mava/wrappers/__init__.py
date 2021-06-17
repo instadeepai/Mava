@@ -26,8 +26,12 @@ from mava.wrappers.pettingzoo import (
 )
 from mava.wrappers.robocup import RoboCupWrapper
 
-# TODO only import smac if the user needs it.
-from mava.wrappers.smac import SMACEnvWrapper
+try:
+    from smac.env import StarCraft2Env  # type:ignore
+
+    from mava.wrappers.smac import SMACEnvWrapper
+except ModuleNotFoundError:
+    pass
 from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
     DetailedTrainerStatisticsWithEpsilon,

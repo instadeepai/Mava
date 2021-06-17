@@ -27,8 +27,11 @@ from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym.spaces import Box, Discrete
 from pettingzoo.utils.env import ParallelEnv
 
-# TODO should not be imported unless user wants the smac env.
-from smac.env import StarCraft2Env  # type:ignore
+try:
+    from smac.env import StarCraft2Env  # type:ignore
+except ModuleNotFoundError:
+    pass
+
 
 from mava import types
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
