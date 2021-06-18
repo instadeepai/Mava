@@ -139,6 +139,8 @@ class VDNBuilder(MADQNBuilder):
             dataset=dataset,
             counter=counter,
             fingerprint=fingerprint,
+            lr_decay_period=self._config.lr_decay_period,
+            lr_decay_rate=self._config.lr_decay_rate,
             logger=logger,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,

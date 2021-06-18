@@ -71,6 +71,8 @@ class MADQNConfig:
     period: int
     discount: float
     checkpoint: bool
+    lr_decay_rate: Optional[float]
+    lr_decay_period: Optional[int]
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
@@ -311,6 +313,8 @@ class MADQNBuilder:
             dataset=dataset,
             counter=counter,
             fingerprint=fingerprint,
+            lr_decay_period=self._config.lr_decay_period,
+            lr_decay_rate=self._config.lr_decay_rate,
             logger=logger,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,

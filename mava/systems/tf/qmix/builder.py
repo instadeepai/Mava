@@ -141,6 +141,8 @@ class QMIXBuilder(MADQNBuilder):
             max_gradient_norm=self._config.max_gradient_norm,
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
+            lr_decay_period=self._config.lr_decay_period,
+            lr_decay_rate=self._config.lr_decay_rate,
             dataset=dataset,
             counter=counter,
             fingerprint=fingerprint,

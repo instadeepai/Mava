@@ -151,6 +151,8 @@ def main(_: Any) -> None:
         epsilon_min=0.05,
         epsilon_decay=3e-4,
         max_replay_size=1000000,
+        lr_decay_rate=0.1,
+        lr_decay_period=1000,
         optimizer=snt.optimizers.RMSProp(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()

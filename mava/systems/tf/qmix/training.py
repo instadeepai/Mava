@@ -58,6 +58,8 @@ class QMIXTrainer(MADQNTrainer):
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: Optional[BaseCommunicationModule] = None,
         max_gradient_norm: float = None,
+        lr_decay_period: Optional[int] = None,
+        lr_decay_rate: Optional[float] = None,
         counter: counting.Counter = None,
         fingerprint: bool = False,
         logger: loggers.Logger = None,
@@ -84,6 +86,8 @@ class QMIXTrainer(MADQNTrainer):
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             fingerprint=fingerprint,
+            lr_decay_period=lr_decay_period,
+            lr_decay_rate=lr_decay_rate,
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
@@ -146,6 +150,9 @@ class QMIXTrainer(MADQNTrainer):
         epsilon = self.get_epsilon()
         fetches["epsilon"] = epsilon
         self._decrement_epsilon()
+
+        # Decay lr
+        self._decay_lr()
 
         if self._logger:
             self._logger.write(fetches)

@@ -62,6 +62,8 @@ class MADQNTrainer(mava.Trainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
+        lr_decay_rate: Optional[float] = None,
+        lr_decay_period: Optional[int] = None,
     ):
 
         self._agents = agents
@@ -112,6 +114,10 @@ class MADQNTrainer(mava.Trainer):
         else:
             self._optimizers = optimizer
 
+        # Optional LR decay
+        self._lr_decay_rate = lr_decay_rate
+        self._lr_decay_period = lr_decay_period
+
         # Expose the variables.
         q_networks_to_expose = {}
         self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
@@ -160,6 +166,14 @@ class MADQNTrainer(mava.Trainer):
 
     def _decrement_epsilon(self) -> None:
         self._exploration_scheduler.decrement_epsilon()
+
+    def _decay_lr(self) -> None:
+        if self._lr_decay_period is None or self._lr_decay_rate is None:
+            return
+
+        if tf.math.mod(self._num_steps + 1, self._lr_decay_period) == 0:
+            for optimizer in self._optimizers.values():
+                optimizer.learning_rate *= self._lr_decay_period
 
     def _update_target_networks(self) -> None:
         for key in self.unique_net_keys:
@@ -213,6 +227,9 @@ class MADQNTrainer(mava.Trainer):
         epsilon = self.get_epsilon()
         fetches["epsilon"] = epsilon
         self._decrement_epsilon()
+
+        # Decay lr
+        self._decay_lr()
 
         if self._logger:
             self._logger.write(fetches)
