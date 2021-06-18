@@ -30,8 +30,8 @@ from tests.conftest import EnvSpec, EnvType, Helpers
 @pytest.mark.parametrize(
     "env_spec",
     [
-        EnvSpec("pettingzoo.atari.pong_v1", EnvType.Parallel),
-        EnvSpec("pettingzoo.atari.pong_v1", EnvType.Sequential),
+        EnvSpec("pettingzoo.atari.pong_v2", EnvType.Parallel),
+        EnvSpec("pettingzoo.atari.pong_v2", EnvType.Sequential),
     ],
 )
 class TestEnvPreprocessWrapper:

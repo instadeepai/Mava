@@ -104,7 +104,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         )
 
     def env_done(self) -> bool:
-        return self._environment.env_done
+        return not self.agents
 
     def agent_iter(self, max_iter: int = 2 ** 63) -> Iterator:
         return self._environment.agent_iter(max_iter)
@@ -277,7 +277,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         )
 
     def env_done(self) -> bool:
-        return self._environment.env_done
+        return not self.agents
 
     # Convert PettingZoo observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
