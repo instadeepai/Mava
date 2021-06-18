@@ -35,7 +35,8 @@ import mava
 from mava import core
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf import savers as tf2_savers
-from mava.systems.tf import variable_sources
+
+# from mava.systems.tf import variable_sources
 from mava.utils import training_utils as train_utils
 
 train_utils.set_growing_gpu_memory()
