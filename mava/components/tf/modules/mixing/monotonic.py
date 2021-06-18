@@ -18,14 +18,13 @@
 
 """Mixing for multi-agent RL systems"""
 import copy
-from typing import Dict, Optional
+from typing import Dict
 
 import sonnet as snt
 import tensorflow as tf
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
-from mava.components.tf.architectures import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
 from mava.components.tf.networks.monotonic import MonotonicMixingNetwork
 
@@ -38,10 +37,9 @@ class MonotonicMixing(BaseMixingModule):
 
     def __init__(
         self,
-        architecture: BaseArchitecture,
         environment_spec: mava_specs.MAEnvironmentSpec,
         n_agents: int,
-        agent_networks: Optional[Dict[str, snt.Module]] = None,
+        agent_networks: Dict[str, snt.Module],
         qmix_hidden_dim: int = 64,
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 0,  # Defaults to qmix_hidden_dim
@@ -52,15 +50,11 @@ class MonotonicMixing(BaseMixingModule):
         """
         super(MonotonicMixing, self).__init__()
 
-        self._architecture = architecture
         self._environment_spec = environment_spec
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
         self._n_agents = n_agents
-
-        if agent_networks is None:
-            agent_networks = self._architecture.create_actor_variables()
         self._agent_networks = agent_networks
 
     def _create_mixing_layer(self) -> snt.Module:
@@ -72,7 +66,6 @@ class MonotonicMixing(BaseMixingModule):
 
         # Implement method from base class
         self._mixed_network = MonotonicMixingNetwork(
-            self._architecture,
             self._agent_networks,
             self._n_agents,
             self._qmix_hidden_dim,

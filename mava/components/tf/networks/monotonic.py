@@ -23,7 +23,6 @@ from typing import Dict
 import sonnet as snt
 import tensorflow as tf
 
-from mava.components.tf.architectures.base import BaseArchitecture
 from mava.components.tf.networks.hypernetwork import HyperNetwork
 
 
@@ -35,7 +34,6 @@ class MonotonicMixingNetwork(snt.Module):
 
     def __init__(
         self,
-        architecture: BaseArchitecture,
         agent_networks: Dict[str, snt.Module],
         n_agents: int,
         qmix_hidden_dim: int = 64,
@@ -52,7 +50,6 @@ class MonotonicMixingNetwork(snt.Module):
                 layer. Relevant for num_hypernet_layers > 1.
         """
         super(MonotonicMixingNetwork, self).__init__()
-        self._architecture = architecture
         self._agent_networks = agent_networks
         self._n_agents = n_agents
         self._qmix_hidden_dim = qmix_hidden_dim

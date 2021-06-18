@@ -117,9 +117,15 @@ class QMIX(MADQN):
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        qmix_hidden_dim: int = 32,
+        num_hypernet_layers: int = 2,
+        hypernet_hidden_dim: int = 64,
     ):
 
         self._mixer = mixer
+        self._qmix_hidden_dim = qmix_hidden_dim
+        self._num_hypernet_layers = num_hypernet_layers
+        self._hypernet_hidden_dim = hypernet_hidden_dim
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
@@ -246,11 +252,12 @@ class QMIX(MADQN):
 
         # Mixing module
         system_networks = self._mixer(
-            architecture=architecture,
             environment_spec=self._environment_spec,
             agent_networks=agent_networks,
-            num_hypernet_layers=1,
             n_agents=len(self._environment_spec.get_agent_ids()),
+            num_hypernet_layers=self._num_hypernet_layers,
+            qmix_hidden_dim=self._qmix_hidden_dim,
+            hypernet_hidden_dim=self._hypernet_hidden_dim,
         ).create_system()
 
         # Create logger

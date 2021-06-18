@@ -248,11 +248,9 @@ class QMIXTrainer(MADQNTrainer):
             self._optimizers[agent_key].apply(gradients, variables)
 
         # Update mixing network
-        variables = [
-            *self._mixing_network.trainable_variables,
-            # *self._mixing_network._hypernetworks.trainable_variables,
-        ]
+        variables = self.get_mixing_trainable_weights()
         gradients = self.tape.gradient(self.loss, variables)
+
         gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
         self._optimizer.apply(gradients, variables)
 
@@ -273,3 +271,10 @@ class QMIXTrainer(MADQNTrainer):
                     for key in self.unique_net_keys
                 }
         return variables
+
+    def get_mixing_trainable_weights(self) -> List:
+        mixing_vars = []
+        for var in self._mixing_network.trainable_variables:
+            if "mixing" in var.name:
+                mixing_vars.append(var)
+        return mixing_vars
