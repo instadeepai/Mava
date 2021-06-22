@@ -273,7 +273,7 @@ If you use Mava in your work, please cite the accompanying
 [technical report][Paper]:
 
 ```bibtex
-@article{anon2021mava,
+@article{pretorius2021mava,
     title={Mava: A Research Framework for Distributed Multi-Agent Reinforcement Learning},
     author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Kevin Eloff 
     and Claude Formanek and St John Grimbly and Siphelele Danisa and Lawrance Francis
