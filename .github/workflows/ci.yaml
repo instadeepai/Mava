@@ -33,7 +33,7 @@ jobs:
           pip install .[flatland]
           # openspiel
           sudo apt-get update
-          sudo apt-get install clang
+          sudo apt-get install clang -y
           pip install .[open_spiel]
           pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
           # For atari envs
