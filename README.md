@@ -17,14 +17,14 @@
 8. [Contributing](#contributing)
 9. [Troubleshooting and FAQ](#troubleshooting-and-faqs)
 
-<!-- **[Overview](#overview)** | **[Installation](#installation)** | **[Systems]** | **[Examples]** | -->
+Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability.
 
-<!-- ![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava) -->
-<!-- ![PyPI version](https://badge.fury.io/py/id-mava.svg) -->
+> 👷‍♀️ **NOTICE**: Our release of Mava is foremost to benefit the wider community and make it easier for researchers to work on MARL.
+> However, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide in future releases.
+> From incorporating the latest research and innovations to making the framework more stable, robust and well tested. 
+> Furthermore, we are committed and will do our best to keep everything working and have the experience of using Mava be as pleasant as possible.
+> As with all large codebases, it is inevitable that there are bugs that we are not aware of and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
 
-
-Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava builds off of [Acme][Acme] and in a similar way strives to expose simple, efficient, and readable components, as well as examples that serve both as reference implementations of popular algorithms and as strong
-baselines, while still providing enough flexibility to do novel research.
 ## Overview
 ### Systems and the Executor-Trainer paradigm
 
@@ -69,6 +69,15 @@ Mava includes several system implementations. Below we list these together with 
 * 🟨 - Multi-Agent Proximal Policy Optimisation (MAPPO).
 * 🟨 - Value Decomposition Networks (VDN).
 * 🟥 - Monotonic value function factorisation (QMIX).
+
+| **Name**         | **Recurrent**      | **Continuous**          | **Discrete**  | **Multi Processing**   |
+| ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | 
+| MADQN   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | 
+| MADDPG  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark:        | 
+| MAD4PG   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:             | 
+| MAPPO   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:              | 
+| VDN   | :x: | :x: | :heavy_check_mark: | :heavy_check_mark:  | 
+| QMIX   | :x: | :x: | :heavy_check_mark:                | :heavy_check_mark:                 | 
 
 As we develop Mava further, we aim to have all systems well tested on a wide variety of environments.
 
@@ -266,7 +275,10 @@ If you use Mava in your work, please cite the accompanying
 ```bibtex
 @article{anon2021mava,
     title={Mava: A Research Framework for Distributed Multi-Agent Reinforcement Learning},
-    author={Anonymous authors},
+    author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Kevin Eloff 
+    and Claude Formanek and St John Grimbly and Siphelele Danisa and Lawrance Francis
+    and Jonathan Shock and Herman Kamper and Willie Brink and Herman Engelbrecht 
+    and Alexandre Laterre and Karim Beguir},
     year={2021},
     journal={arXiv preprint},
     url={},
