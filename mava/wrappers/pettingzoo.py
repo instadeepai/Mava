@@ -246,6 +246,10 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     def current_agent(self) -> Any:
         return self._environment.agent_selection
 
+    @property
+    def num_agents(self) -> int:
+        return self._environment.num_agents
+
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment."""
         if hasattr(self.__class__, name):
