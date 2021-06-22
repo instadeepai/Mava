@@ -38,6 +38,9 @@ build:
 build_robocup:
 	docker build --tag $(IMAGE) -f ./Dockerfile.robocup .
 
+build_sc2:
+	docker build --tag $(IMAGE) -f ./Dockerfile.sc2 .
+
 push:
 	docker login
 	-docker push $(IMAGE)
