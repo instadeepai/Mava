@@ -19,6 +19,8 @@ import dm_env
 import numpy as np
 import pyspiel  # type: ignore
 from acme import specs
+from gym.spaces import Discrete
+from gym.spaces.box import Box
 from open_spiel.python import rl_environment  # type: ignore
 
 from mava import types
@@ -36,6 +38,15 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
             f"player_{i}" for i in range(self._environment.num_players)
         ]
         self._agents = self._possible_agents[:]
+        self.num_actions = self._environment.action_spec()["num_actions"]
+        self.info_state = self._environment.observation_spec()["info_state"]
+        self.action_spaces = {
+            agent: Discrete(self.num_actions) for agent in self.possible_agents
+        }
+        self.observation_spaces = {
+            agent: Box(0, 1, self.info_state, dtype=np.float64)
+            for agent in self.possible_agents
+        }
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
@@ -51,7 +62,7 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         done = self.dones[agent]
 
         observe = self._to_observation(opnspl_tmstep)
-        observation = self._convert_observation(observe, done)
+        observation = self._convert_observation(agent, observe, done)
 
         self._discount = convert_np_type(self.discount_spec()[agent].dtype, 1)
 
@@ -70,7 +81,10 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         self,
         timestep: rl_environment.TimeStep,
     ) -> Dict[str, np.ndarray]:
-        obs = timestep.observations["info_state"][self.current_player_id]
+
+        obs = np.array(
+            timestep.observations["info_state"][self.current_player_id], np.float32
+        )
 
         action_mask = np.zeros((self._environment.action_spec()["num_actions"],))
         action_mask[timestep.observations["legal_actions"][self.current_player_id]] = 1
@@ -86,6 +100,10 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         """Steps the environment."""
         if self._reset_next_step:
             return self.reset()
+
+        # only action lists are accepted
+        if not isinstance(action_list, (list, tuple)):
+            action_list = [action_list]
 
         agent = self.current_agent
 
@@ -137,14 +155,14 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
                 self.reward_spec()[agent].dtype,
                 0,
             )
-            observation = self._convert_observation(observe, True)
+            observation = self._convert_observation(agent, observe, True)
         else:
             #  observation for next agent
             reward = convert_np_type(
                 self.reward_spec()[agent].dtype,
                 opnspl_timestep.rewards[self.current_player_id],
             )
-            observation = self._convert_observation(observe, self.dones[agent])
+            observation = self._convert_observation(agent, observe, self.dones[agent])
 
         return dm_env.TimeStep(
             observation=observation,
@@ -162,11 +180,14 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
     # Convert OpenSpiel observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
     def _convert_observation(  # type: ignore[override]
-        self, observe: Union[dict, np.ndarray], done: bool
+        self, agent: str, observe: Union[dict, np.ndarray], done: bool
     ) -> types.OLT:
-
-        legals = np.array(observe["action_mask"], np.float32)
-        observation = np.array(observe["observation"], np.float32)
+        if isinstance(observe, dict):
+            legals = np.array(observe["action_mask"], np.float32)
+            observation = np.array(observe["observation"])
+        else:
+            legals = np.ones(self.num_actions, np.float32)
+            observation = np.array(observe)
 
         observation = types.OLT(
             observation=observation,
