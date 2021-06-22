@@ -23,7 +23,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from acme.utils import counting, loggers, paths
 from acme.wrappers.video import _make_animation
-from array2gif import write_gif
+
+try:
+    from array2gif import write_gif
+except ModuleNotFoundError:
+    pass
 
 import mava
 from mava.environment_loop import ParallelEnvironmentLoop
