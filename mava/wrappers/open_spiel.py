@@ -13,96 +13,200 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterator, List, Tuple, Union
 
 import dm_env
 import numpy as np
+import pyspiel  # type: ignore
 from acme import specs
-from acme.wrappers.open_spiel_wrapper import OpenSpielWrapper, rl_environment
+from open_spiel.python import rl_environment  # type: ignore
 
 from mava import types
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import SequentialEnvWrapper
 
 
-class SequentialOpenSpielWrapper(SequentialEnvWrapper):
+class OpenSpielSequentialWrapper(SequentialEnvWrapper):
     def __init__(
         self,
         environment: rl_environment.Environment,
     ):
-        acme_open_spiel_wrapper = OpenSpielWrapper(environment)
-        self._environment = acme_open_spiel_wrapper
+        self._environment = environment
         self._possible_agents = [
-            f"agent_{i}" for i in range(self._environment.num_players)
+            f"player_{i}" for i in range(self._environment.num_players)
         ]
         self._agents = self._possible_agents[:]
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
-        tm_step = self._environment.reset()
-        observations = tm_step.observations
-        rewards = {
-            agent: convert_np_type(self.reward_spec()[agent].dtype, 0)
-            for agent in self.possible_agents
-        }
-        self._discounts = {
-            agent: convert_np_type(self.discount_spec()[agent].dtype, 1)
-            for agent in self.possible_agents
-        }
-        return parameterized_restart(rewards, self._discounts, observations)
+        self._reset_next_step = False
+        self.dones = {agent: False for agent in self.possible_agents}
+        self._agents = self._possible_agents[:]
 
-    def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
-        """Steps the environment."""
+        self._prev_timestep: rl_environment.TimeStep = None
+        self._current_player_id = 0
+
+        opnspl_tmstep = self._environment.reset()
         agent = self.current_agent
-        action = actions[agent]
-        tm_step = self._environment.step(action)
-        observations = {
-            f"agent_{k}": observe for k, observe in enumerate(tm_step.observations)
+        done = self.dones[agent]
+
+        observe = self._to_observation(opnspl_tmstep)
+        observation = self._convert_observation(observe, done)
+
+        self._discount = convert_np_type(self.discount_spec()[agent].dtype, 1)
+
+        reward = convert_np_type(
+            self.reward_spec()[agent].dtype,
+            (
+                opnspl_tmstep.rewards[self.current_player_id]
+                if opnspl_tmstep.rewards
+                else 0
+            ),
+        )
+
+        return parameterized_restart(reward, self._discount, observation)
+
+    def _to_observation(
+        self,
+        timestep: rl_environment.TimeStep,
+    ) -> Dict[str, np.ndarray]:
+        obs = timestep.observations["info_state"][self.current_player_id]
+
+        action_mask = np.zeros((self._environment.action_spec()["num_actions"],))
+        action_mask[timestep.observations["legal_actions"][self.current_player_id]] = 1
+
+        observation = {
+            "observation": obs,
+            "action_mask": action_mask,
         }
-        rewards = {f"agent_{k}": rew for k, rew in enumerate(tm_step.rewards)}
-        discounts = {
-            f"agent_{k}": discount for k, discount in enumerate(tm_step.discounts)
-        }
-        step_type = tm_step.step_type
+
+        return observation
+
+    def step(self, action_list: Tuple[np.ndarray]) -> dm_env.TimeStep:
+        """Steps the environment."""
+        if self._reset_next_step:
+            return self.reset()
+
+        agent = self.current_agent
+
+        # done agents should be removed and active agents should take steps
+        if self.dones[agent]:
+            self.agents.remove(agent)
+            del self.dones[agent]
+
+            # move to next agent, which should also be done
+            self._current_player_id = (self._current_player_id + 1) % self.num_agents
+            agent = self.current_agent
+
+            opnspl_timestep = self._prev_timestep
+
+            step_type = dm_env.StepType.LAST
+
+        else:
+            opnspl_timestep = self._environment.step(action_list)
+
+            # after a step, a next agent becomes the current
+            agent = self.current_agent
+
+            if (
+                self._environment.get_state.current_player()
+                == pyspiel.PlayerId.TERMINAL
+            ):
+                # all agents get done at a terminal step in turn-based games
+                # current agent/player is updated using _current_player_id
+                self.dones = {agnt: True for agnt in self._possible_agents}
+                self._current_player_id = (
+                    self._current_player_id + 1
+                ) % self.num_agents
+
+                agent = self.current_agent
+            else:
+                self.dones[agent] = False
+
+            step_type = (
+                dm_env.StepType.LAST if self.dones[agent] else dm_env.StepType.MID
+            )
+            self._prev_timestep = opnspl_timestep
+
+        observe = self._to_observation(opnspl_timestep)
+
+        # Reset if all agents are done
+        if self.env_done():
+            self._reset_next_step = True
+            reward = convert_np_type(
+                self.reward_spec()[agent].dtype,
+                0,
+            )
+            observation = self._convert_observation(observe, True)
+        else:
+            #  observation for next agent
+            reward = convert_np_type(
+                self.reward_spec()[agent].dtype,
+                opnspl_timestep.rewards[self.current_player_id],
+            )
+            observation = self._convert_observation(observe, self.dones[agent])
 
         return dm_env.TimeStep(
-            observation=observations,
-            reward=rewards,
-            discount=discounts,
+            observation=observation,
+            reward=reward,
+            discount=self._discount,
             step_type=step_type,
         )
 
+    def env_done(self) -> bool:
+        return not self.agents
+
+    def agent_iter(self, max_iter: int = 2 ** 63) -> Iterator:
+        return AgentIterator(self, max_iter)
+
+    # Convert OpenSpiel observation so it's dm_env compatible. Also, the list
+    # of legal actions must be converted to a legal actions mask.
+    def _convert_observation(  # type: ignore[override]
+        self, observe: Union[dict, np.ndarray], done: bool
+    ) -> types.OLT:
+
+        legals = np.array(observe["action_mask"], np.float32)
+        observation = np.array(observe["observation"], np.float32)
+
+        observation = types.OLT(
+            observation=observation,
+            legal_actions=legals,
+            terminal=np.asarray([done], dtype=np.float32),
+        )
+
+        return observation
+
     def observation_spec(self) -> types.Observation:
-        olt = self.acme_open_spiel_wrapper.observations_spec
         observation_specs = {}
         for agent in self.possible_agents:
+            spec = self._environment.observation_spec()
             observation_specs[agent] = types.OLT(
-                observation=olt.observation,
-                legal_actions=olt.legat_actions,
-                terminal=olt.terminal,
+                observation=specs.Array(spec["info_state"], np.float32),
+                legal_actions=specs.Array(spec["legal_actions"], np.float32),
+                terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
 
     def action_spec(self) -> Dict[str, specs.DiscreteArray]:
         action_specs = {}
-        action_spc = self.acme_open_spiel_wrapper.action_spec()
         for agent in self.possible_agents:
-            action_specs[agent] = action_spc
+            spec = self._environment.action_spec()
+            action_specs[agent] = specs.DiscreteArray(spec["num_actions"], np.int64)
         return action_specs
 
     def reward_spec(self) -> Dict[str, specs.Array]:
         reward_specs = {}
-        reward_spc = self.acme_open_spiel_wrapper.reward_spec()
         for agent in self.possible_agents:
-            reward_specs[agent] = reward_spc
+            reward_specs[agent] = specs.Array((), np.float32)
 
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
         discount_specs = {}
-        discount_spc = self.acme_open_spiel_wrapper.discount_spec()
-        for agent in self._environment.possible_agents:
-            discount_specs[agent] = discount_spc
+        for agent in self.possible_agents:
+            discount_specs[agent] = specs.BoundedArray(
+                (), np.float32, minimum=0, maximum=1.0
+            )
         return discount_specs
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
@@ -122,9 +226,43 @@ class SequentialOpenSpielWrapper(SequentialEnvWrapper):
         return self._environment
 
     @property
-    def current_agent(self) -> Any:
-        return f"agent_{self._environment.get_state.current_player()}"
+    def current_agent(self) -> str:
+
+        agent = self.possible_agents[self.current_player_id]
+
+        return agent
+
+    @property
+    def current_player_id(self) -> int:
+        if self._environment.get_state.current_player() == pyspiel.PlayerId.TERMINAL:
+            return self._current_player_id
+        else:
+            p_id = self._environment.get_state.current_player()
+            self._current_player_id = p_id
+            return p_id
+
+    @property
+    def num_agents(self) -> int:
+        return len(self.possible_agents)
 
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment."""
-        return getattr(self._environment, name)
+        if hasattr(self.__class__, name):
+            return self.__getattribute__(name)
+        else:
+            return getattr(self._environment, name)
+
+
+class AgentIterator:
+    def __init__(self, env: OpenSpielSequentialWrapper, max_iter: int) -> None:
+        self.env = env
+        self.countdown = max_iter
+
+    def __iter__(self) -> Any:
+        return self
+
+    def __next__(self) -> str:
+        if not self.env.agents or self.countdown <= 0:
+            raise StopIteration
+        self.countdown -= 1
+        return self.env.current_agent
