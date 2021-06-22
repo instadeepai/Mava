@@ -50,7 +50,7 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "./logs", "Base dir to store experiments.")
 flags.DEFINE_string(
     "random_player",
-    "player_1",
+    None,
     "The player that should take only random actions in the game",
 )
 
