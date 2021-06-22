@@ -163,8 +163,10 @@ class SequentialEnvironmentLoop(acme.core.Worker):
 
     def _collect_last_timesteps(self, timestep: dm_env.TimeStep) -> None:
         assert timestep.step_type == dm_env.StepType.LAST
+        cache_tsp = [timestep]
 
         self._agent_action_timestep = {}
+
         for i in range(self.num_agents):
             agent = self._environment.current_agent
             timestep = self._to_last_timestep(timestep)
@@ -173,8 +175,14 @@ class SequentialEnvironmentLoop(acme.core.Worker):
             timestep = self._environment.step(
                 generate_zeros_from_spec(self._environment.action_spec()[agent])
             )
+            cache_tsp += [timestep]
 
         assert len(self._agent_action_timestep) == self.num_agents
+        assert all(
+            [float(v[1].reward) != 0 for _, v in self._agent_action_timestep.items()]
+        ) or all(
+            [float(v[1].reward == 0) for _, v in self._agent_action_timestep.items()]
+        )
 
         self._send_observation()
 
