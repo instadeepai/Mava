@@ -20,10 +20,10 @@
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability.
 
 > 👷‍♀️ **NOTICE**: Our release of Mava is foremost to benefit the wider community and make it easier for researchers to work on MARL.
-> However, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide in future releases.
+> However, we consider this release an **Alpha version of Mava**. But of course, as with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
 > From incorporating the latest research and innovations to making the framework more stable, robust and well tested. 
 > Furthermore, we are committed and will do our best to keep everything working and have the experience of using Mava be as pleasant as possible.
-> As with all large codebases, it is inevitable that there are bugs that we are not aware of and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
+> With all large codebases, it is inevitable that there are bugs and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
 
 ## Overview
 ### Systems and the Executor-Trainer paradigm
@@ -56,6 +56,7 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [SMAC][smac]
 * [Flatland][flatland]
 * [2D RoboCup][robocup]
+* [OpenSpiel][openspiel]
 
 The animation on the right shows MAD4PG solving the Multi-Walker environment from PettingZoo.
 
@@ -70,14 +71,14 @@ Mava includes several system implementations. Below we list these together with 
 * 🟨 - Value Decomposition Networks (VDN).
 * 🟥 - Monotonic value function factorisation (QMIX).
 
-| **Name**         | **Recurrent**      | **Continuous**          | **Discrete**  | **Multi Processing**   |
-| ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | 
-| MADQN   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | 
-| MADDPG  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark:        | 
-| MAD4PG   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:             | 
-| MAPPO   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:              | 
-| VDN   | :x: | :x: | :heavy_check_mark: | :heavy_check_mark:  | 
-| QMIX   | :x: | :x: | :heavy_check_mark:                | :heavy_check_mark:                 | 
+| **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training** | **Communication**  | **Multi Processing**   |
+| ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------ | ------------------- | 
+| MADQN   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| MADDPG  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark:        | :heavy_check_mark: | :heavy_check_mark: |
+| MAD4PG   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:             | :x: | :heavy_check_mark: |
+| MAPPO   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:              | :x: | :heavy_check_mark: |
+| VDN   | :x: | :x: | :heavy_check_mark: | :heavy_check_mark:  | :x: | :heavy_check_mark: |
+| QMIX   | :x: | :x: | :heavy_check_mark:                | :heavy_check_mark:                 | :x: | :heavy_check_mark: |
 
 As we develop Mava further, we aim to have all systems well tested on a wide variety of environments.
 
@@ -217,7 +218,7 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
 6.  **NB**: For Flatland and SMAC environments, installations have to be done separately. Flatland can be installed using:
 
     ```bash
-    pip install .[flatland]
+    pip install id-mava[flatland]
     ```
 
     For StarCraft II installation, this must be installed separately according to your operating system.
