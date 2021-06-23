@@ -265,7 +265,7 @@ We will put the most popular (recurring or often discussed) requests up for a vo
 [![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training/vote) <br />
 [![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures/vote)
 
-In the slightly more longer term, the Mava team plans to release benchmarking results for several different systems and environments and contribute a MARL specific behavioural environment suite specifically engineered to study aspects of MARL such as cooperation and coordination.
+In the slightly more longer term, the Mava team plans to release benchmarking results for several different systems and environments and contribute a MARL specific behavioural environment suite (similar to the [bsuite][bsuite] for single-agent RL) specifically engineered to study aspects of MARL such as cooperation and coordination.
 
 ## Contributing
 
@@ -308,3 +308,4 @@ If you use Mava in your work, please cite the accompanying
 [launchpad]: https://github.com/deepmind/launchpad
 [roadmap]: https://github.com/instadeepai/Mava/issues/246
 [wishlist]: https://github.com/instadeepai/Mava/issues/247
+[bsuite]: https://github.com/deepmind/bsuite
