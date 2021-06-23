@@ -20,10 +20,10 @@
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability.
 
 > 👷‍♀️ **NOTICE**: Our release of Mava is foremost to benefit the wider community and make it easier for researchers to work on MARL.
-> However, we consider this release an **Alpha version of Mava**. But of course, as with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
+> However, we consider this release an **Alpha version of Mava**. As with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
 > From incorporating the latest research and innovations to making the framework more stable, robust and well tested. 
 > Furthermore, we are committed and will do our best to keep everything working and have the experience of using Mava be as pleasant as possible.
-> With all large codebases, it is inevitable that there are bugs and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
+> With all large codebases, it is inevitable that there might be bugs and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
 
 ## Overview
 ### Systems and the Executor-Trainer paradigm
