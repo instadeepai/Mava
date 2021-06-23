@@ -23,7 +23,6 @@ def recurrent_n_step_critic_loss(
         check_rank([q_values, target_q_values, rewards, discounts], [2, 2, 2, 2])
 
     # Construct arguments to compute bootstrap target.
-    # TODO (dries): Is the discount calculation correct?
     if type(q_values) != DiscreteValuedDistribution:
         q_tm1 = q_values[:, 0:-bootstrap_n]
         q_t = target_q_values[:, bootstrap_n:]
