@@ -20,10 +20,10 @@
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability.
 
 > 👷‍♀️ **NOTICE**: Our release of Mava is foremost to benefit the wider community and make it easier for researchers to work on MARL.
-> However, we consider this release an **Alpha version of Mava**. As with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
+> However, we consider this release a **Beta version of Mava**. As with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
 > From incorporating the latest research and innovations to making the framework more stable, robust and well tested. 
 > Furthermore, we are committed and will do our best to keep everything working and have the experience of using Mava be as pleasant as possible.
-> With all large codebases, it is inevitable that there might be bugs and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
+> It is inevitable that there might be bugs we are not aware of and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
 
 ## Overview
 ### Systems and the Executor-Trainer paradigm
@@ -253,7 +253,12 @@ Debugging in MARL can be very difficult and time consuming, therefore it is impo
 
 ## Roadmap
 
-We have big ambitions for Mava! 🚀 But there is still much work that needs to be done. We have a clear roadmap for expanding our system implementations and associated modules, improving testing and robustness and providing support for across-machine training. Furthermore, in the near future, we also plan to implement the following features (feel free to vote for any one of them by clicking on the name!).
+We have big ambitions for Mava!  🚀  But there is still much work that needs to be done. We have a clear roadmap and wish list for expanding our system implementations and associated modules, improving testing and robustness and providing support for across-machine training. Please visit them using the links below and feel free to add your own suggestions!
+
+* [ROADMAP][roadmap]
+* [WISHLIST][wishlist]
+
+We will put the most popular (recurring or often discussed) requests up for a vote, as below (you can vote for any one of them by clicking on the name!). This will help us prioritise our time towards developing what is likely to be of highest value. 
 
 [![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel/vote) <br />
 [![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training/vote) <br />
@@ -300,3 +305,5 @@ If you use Mava in your work, please cite the accompanying
 [pymarl]: https://github.com/oxwhirl/pymarl
 [mpe]: https://github.com/openai/multiagent-particle-envs
 [launchpad]: https://github.com/deepmind/launchpad
+[roadmap]: https://github.com/instadeepai/Mava/issues/246
+[wishlist]: https://github.com/instadeepai/Mava/issues/247
