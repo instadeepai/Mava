@@ -23,7 +23,7 @@ Mava is a library for building multi-agent reinforcement learning (MARL) systems
 > However, we consider this release a **Beta version of Mava**. As with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
 > From incorporating the latest research and innovations to making the framework more stable, robust and well tested. 
 > Furthermore, we are committed and will do our best to keep everything working and have the experience of using Mava be as pleasant as possible.
-> Breaking changes may occur as well as significant design changes if we feel it could greatly improve the useability of the framework but these will be clearly communicated.
+> During Beta development breaking changes may occur as well as significant design changes (if we feel it could greatly improve the useability of the framework) but these will be clearly communicated before being incorporated into the codebase.
 > It is also inevitable that there might be bugs we are not aware of and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
 
 ## Overview
