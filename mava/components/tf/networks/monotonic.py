@@ -36,6 +36,7 @@ class MonotonicMixingNetwork(snt.Module):
         self,
         agent_networks: Dict[str, snt.Module],
         n_agents: int,
+        name: str = "mixing",
         qmix_hidden_dim: int = 64,
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 0,
@@ -49,7 +50,7 @@ class MonotonicMixingNetwork(snt.Module):
             hypernet_hidden_dim: The number of nodes in the hypernetwork hidden
                 layer. Relevant for num_hypernet_layers > 1.
         """
-        super(MonotonicMixingNetwork, self).__init__()
+        super(MonotonicMixingNetwork, self).__init__(name=name)
         self._agent_networks = agent_networks
         self._n_agents = n_agents
         self._qmix_hidden_dim = qmix_hidden_dim

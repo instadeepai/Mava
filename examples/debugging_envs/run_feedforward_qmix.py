@@ -153,6 +153,7 @@ def main(_: Any) -> None:
         max_replay_size=1000000,
         optimizer=snt.optimizers.RMSProp(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        num_hypernet_layers=1,
     ).build()
 
     # launch

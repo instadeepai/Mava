@@ -17,7 +17,6 @@
 #   - [] Complete class for monotonic mixing
 
 """Mixing for multi-agent RL systems"""
-import copy
 from typing import Dict
 
 import sonnet as snt
@@ -40,9 +39,9 @@ class MonotonicMixing(BaseMixingModule):
         environment_spec: mava_specs.MAEnvironmentSpec,
         n_agents: int,
         agent_networks: Dict[str, snt.Module],
-        qmix_hidden_dim: int = 64,
+        qmix_hidden_dim: int = 32,
         num_hypernet_layers: int = 2,
-        hypernet_hidden_dim: int = 0,  # Defaults to qmix_hidden_dim
+        hypernet_hidden_dim: int = 64,  # Defaults to qmix_hidden_dim
     ) -> None:
         """Initializes the mixer.
         Args:
@@ -57,7 +56,7 @@ class MonotonicMixing(BaseMixingModule):
         self._n_agents = n_agents
         self._agent_networks = agent_networks
 
-    def _create_mixing_layer(self) -> snt.Module:
+    def _create_mixing_layer(self, name: str = "mixing") -> snt.Module:
         """Modify and return system architecture given mixing structure."""
         state_specs = self._environment_spec.get_extra_specs()
         state_specs = state_specs["s_t"]
@@ -66,11 +65,12 @@ class MonotonicMixing(BaseMixingModule):
 
         # Implement method from base class
         self._mixed_network = MonotonicMixingNetwork(
-            self._agent_networks,
-            self._n_agents,
-            self._qmix_hidden_dim,
+            agent_networks=self._agent_networks,
+            n_agents=self._n_agents,
+            qmix_hidden_dim=self._qmix_hidden_dim,
             num_hypernet_layers=self._num_hypernet_layers,
             hypernet_hidden_dim=self._hypernet_hidden_dim,
+            name=name,
         )
 
         tf2_utils.create_variables(self._mixed_network, [q_value_dim, state_specs])
@@ -78,8 +78,9 @@ class MonotonicMixing(BaseMixingModule):
 
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         # Implement method from base class
-        self._agent_networks["mixing"] = self._create_mixing_layer()
-        self._agent_networks["target_mixing"] = copy.deepcopy(
-            self._agent_networks["mixing"]
+        self._agent_networks["mixing"] = self._create_mixing_layer(name="mixing")
+        self._agent_networks["target_mixing"] = self._create_mixing_layer(
+            name="target_mixing"
         )
+
         return self._agent_networks

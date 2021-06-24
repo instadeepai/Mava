@@ -20,9 +20,9 @@ import tensorflow as tf
 class AdditiveMixingNetwork(snt.Module):
     """Multi-agent monotonic mixing architecture."""
 
-    def __init__(self) -> None:
+    def __init__(self, name: str = "mixing") -> None:
         """Initializes the mixer."""
-        super(AdditiveMixingNetwork, self).__init__()
+        super(AdditiveMixingNetwork, self).__init__(name=name)
 
     def __call__(self, q_values: tf.Tensor) -> tf.Tensor:
         """Monotonic mixing logic."""
