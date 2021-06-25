@@ -137,14 +137,6 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             fingerprint,
         )
 
-        action = self._policy(
-            agent,
-            observation.observation,
-            observation.legal_actions,
-            epsilon,
-            fingerprint,
-        )
-
         action = tf2_utils.to_numpy_squeeze(action)
 
         return action
