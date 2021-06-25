@@ -33,7 +33,7 @@ reverb_requirements = [
 
 tf_requirements = [
     "tensorflow>=2.5.0",
-    "tensorflow_probability",
+    "tensorflow_probability==0.12.2",
     "dm-sonnet",
     "trfl",
 ]
