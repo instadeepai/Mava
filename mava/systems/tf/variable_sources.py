@@ -23,6 +23,8 @@ class VariableSource:
                 subdirectory=subdir,
             )
 
+        print("Checkpointer created :)")
+        exit()
             # for agent_key in self.unique_net_keys:
             #     objects_to_save = {
             #         "counter": self._counter,

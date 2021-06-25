@@ -28,6 +28,7 @@ from acme.utils import counting, loggers
 from dm_env import specs as dm_specs
 from numpy.core.fromnumeric import var
 
+import tensorflow as tf
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
@@ -73,6 +74,8 @@ class MADDPGConfig:
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
+    num_executors: int
+    num_trainers: int
     shared_weights: bool = True
     discount: float = 0.99
     batch_size: int = 256
@@ -111,7 +114,7 @@ class MADDPGBuilder(SystemBuilder):
         config: MADDPGConfig,
         trainer_fn: Union[
             Type[training.MADDPGBaseTrainer],
-            Type[training.MADDPGBaseRecurrentTrainer],
+            # Type[training.MADDPGBaseRecurrentTrainer],
         ] = training.MADDPGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
@@ -258,7 +261,24 @@ class MADDPGBuilder(SystemBuilder):
         networks: Dict[str, Dict[str, snt.Module]],
     ) -> core.Executor:
         # Create the variable source
-        variable_source = MavaVariableSource()
+        variables = {}
+
+        # Network variables
+        agent_keys = self._agent_types if self._config.shared_weights else self._agents
+        for net_key in networks.keys():
+            for agent in agent_keys:
+                variables[f"{net_key}_{agent}"] = networks[net_key][agent].variables
+
+        # Executor specific variables
+        for i in range(self._config.num_executors):
+            variables[f"executor_{i}_counter"] = counting.Counter()
+
+        # Trainer specific variables
+        for i in range(self._config.num_trainers):
+            variables[f"trainer_{i}_counter"] = counting.Counter()
+            variables[f"trainer_{i}_num_steps"] = tf.Variable(0, dtype=tf.int32)
+
+        variable_source = MavaVariableSource(variables, self._config.checkpoint, self._config.checkpoint_subpath)
 
         # if self._config.checkpoint:
         #     counter = tf2_savers.CheckpointingRunner(
@@ -271,22 +291,23 @@ class MADDPGBuilder(SystemBuilder):
         #     counter = counting.Counter()
 
         # Set all the network variables inside the variable source
-        networks_vars = {}
+        # networks_vars = {}
 
-        agent_keys = self._agent_types if self._config.shared_weights else self._agents
-        for net_key in networks.keys():
-            networks_vars[net_key] = {
-                agent: networks[net_key][agent].variables for agent in agent_keys
-            }
+        # agent_keys = self._agent_types if self._config.shared_weights else self._agents
+        # for net_key in networks.keys():
+        #     networks_vars[net_key] = {
+        #         agent: networks[net_key][agent].variables for agent in agent_keys
+        #     }
 
-        variable_source.set_variables(
-            networks.keys(), tf2_utils.to_numpy(networks_vars)
-        )
+        # variable_source.set_variables(
+        #     variables.keys(), tf2_utils.to_numpy(variables)
+        # )
 
         return variable_source
 
     def make_executor(
         self,
+        executor_id: str,
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
@@ -307,14 +328,24 @@ class MADDPGBuilder(SystemBuilder):
             agent_keys = self._agent_types if shared_weights else self._agents
 
             # Create policy variables
-            variables = {}
+            variables = {"policies": {}}
+            get_keys = []
+            
+            # TODO: Should variables be per agent? polcies_net_0
             for agent in agent_keys:
-                variables[agent] = policy_networks[agent].variables
+                var_key = f"policies_{agent}"
+                variables[var_key] = policy_networks[agent].variables
+                get_keys.append(var_key)
+            
+            set_keys = [f"{executor_id}_counter"]
+            variables[f"{executor_id}_counter"] = counting.Counter()
 
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
-                variables={"policies": variables},
+                variables=variables,
+                get_keys=get_keys,
+                set_keys=set_keys,
                 get_period=self._config.executor_variable_update_period,
             )
 
@@ -343,7 +374,6 @@ class MADDPGBuilder(SystemBuilder):
         dataset: Iterator[reverb.ReplaySample],
         variable_source: core.VariableSource,
         train_agents: Dict[str, Any],
-        num_steps: int,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
@@ -369,23 +399,29 @@ class MADDPGBuilder(SystemBuilder):
         target_update_rate = self._config.target_update_rate
 
         # Create variable client
-        set_variables = {}
-        get_variables = {}
+        variables = {}
+        set_keys = []
+        get_keys = []
         agent_keys = self._agent_types if self._config.shared_weights else self._agents
         for net_key in networks.keys():
             for agent in agent_keys:
+                variables[f"{net_key}_{agent}"] = networks[net_key][agent].variables
                 if agent in train_agents:
-                    set_variables[net_key][agent] = networks[net_key][agent].variables
+                    set_keys.append(f"{net_key}_{agent}")
                 else:
-                    get_variables[net_key][agent] = networks[net_key][agent].variables
+                    get_keys.append(f"{net_key}_{agent}")
 
-        set_variables[f"{trainer_id}_num_steps"] = num_steps
-        set_variables[f"{trainer_id}_counter"] = counter
+        num_steps = tf.Variable(0, dtype=tf.int32)
+        variables[f"{trainer_id}_num_steps"] = num_steps
+        set_keys.append(f"{trainer_id}_num_steps")
+        variables[f"{trainer_id}_counter"] = counter
+        set_keys.append(f"{trainer_id}_counter")
 
         variable_client = variable_utils.VariableClient(
             client=variable_source,
-            set_variables=set_variables,
-            get_variables=get_variables,
+            variables=variables,
+            get_keys=get_keys,
+            set_keys=set_keys,
         )
 
         # Get all the initial variables

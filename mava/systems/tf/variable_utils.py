@@ -113,17 +113,17 @@ class VariableClient:
 
     def get_and_wait(self) -> None:
         """Immediately update and block until we get the result."""
-        self._copy(client.get_variables(self._get_keys))  # type: ignore
+        self._copy(self._client.get_variables(self._get_keys))  # type: ignore
         return
 
     def set_and_wait(self) -> None:
         """Immediately update and block until we get the result."""
-        client.set_variables(self._set_keys)  # type: ignore
+        self._client.set_variables(self._set_keys)  # type: ignore
         return
 
     def get_all_and_wait(self) -> None:
         """Immediately update and block until we get the result."""
-        self._copy(client.get_variables(self._keys))  # type: ignore
+        self._copy(self._client.get_variables(self._get_keys))  # type: ignore
         return
 
     def _copy(self, new_variables: Dict[str, Any]) -> None:

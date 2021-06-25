@@ -41,7 +41,7 @@ from mava.systems.tf.maddpg_scaled import builder, training
 from mava.systems.tf.maddpg_scaled.execution import MADDPGFeedForwardExecutor
 from mava.utils.loggers import MavaLogger, logger_utils
 
-# from mava.wrappers import DetailedPerAgentStatistics
+from mava.wrappers import DetailedPerAgentStatistics
 
 
 class MADDPG(maddpg_system):
@@ -62,7 +62,7 @@ class MADDPG(maddpg_system):
         ] = DecentralisedQValueActorCritic,
         trainer_fn: Union[
             Type[training.MADDPGBaseTrainer],
-            Type[training.MADDPGBaseRecurrentTrainer],
+            # Type[training.MADDPGBaseRecurrentTrainer],
         ] = training.MADDPGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
@@ -187,6 +187,8 @@ class MADDPG(maddpg_system):
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
                 shared_weights=shared_weights,
+                num_trainers=num_trainers,
+                num_executors=num_executors,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -213,15 +215,108 @@ class MADDPG(maddpg_system):
         )
 
     def variable_server(self):
-        # TODO(dries): Move checkpoint loading from trainer to variable server.
-
         # Create the system
         _, system_networks = self.create_system()
-        variables = system_networks
-        for i in self._num_trainers:
-            variables[f"trainer_{i}_counter"] = counting.Counter()
-            variables[f"trainer_{i}_num_steps"] = tf.Variable(0, dtype=tf.int32)
-        return self._builder.make_variable_server()
+        # variables = system_networks
+        # for i in range(self._num_trainers):
+        #     variables[f"trainer_{i}_counter"] = counting.Counter()
+        #     variables[f"trainer_{i}_num_steps"] = tf.Variable(0, dtype=tf.int32)
+        return self._builder.make_variable_server(system_networks)
+
+    def executor(
+        self,
+        executor_id: str,
+        replay: reverb.Client,
+        variable_source: acme.VariableSource,
+        # counter: counting.Counter,
+    ) -> mava.ParallelEnvironmentLoop:
+        """The executor process."""
+
+        # Create the system
+        system, _ = self.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
+
+        # Create the executor.
+        executor = self._builder.make_executor(
+            executor_id=executor_id,
+            policy_networks=behaviour_policy_networks,
+            adder=self._builder.make_adder(replay),
+            variable_source=variable_source,
+        )
+
+        # TODO (Arnu): figure out why factory function are giving type errors
+        # Create the environment.
+        environment = self._environment_factory(evaluation=False)  # type: ignore
+
+        # Create logger and counter; actors will not spam bigtable.
+        # counter = counting.Counter(counter, "executor")
+
+        # Create executor logger
+        executor_logger_config = {}
+        if self._logger_config and "executor" in self._logger_config:
+            executor_logger_config = self._logger_config["executor"]
+        exec_logger = self._logger_factory(  # type: ignore
+            f"executor_{executor_id}", **executor_logger_config
+        )
+
+        # Create the loop to connect environment and executor.
+        train_loop = self._train_loop_fn(
+            environment,
+            executor,
+            logger=exec_logger,
+            **self._train_loop_fn_kwargs,
+        )
+
+        train_loop = DetailedPerAgentStatistics(train_loop)
+
+        return train_loop
+
+    def evaluator(
+        self,
+        variable_source: acme.VariableSource,
+        # counter: counting.Counter,
+        logger: loggers.Logger = None,
+    ) -> Any:
+        """The evaluation process."""
+
+        # Create the system
+        system, _ = self.create_system()
+
+        # behaviour policy networks (obs net + policy head)
+        behaviour_policy_networks = system.create_behaviour_policy()
+
+        # Create the agent.
+        executor = self._builder.make_executor(
+            executor_id="evaluator",
+            policy_networks=behaviour_policy_networks,
+            variable_source=variable_source,
+        )
+
+        # Make the environment.
+        environment = self._environment_factory(evaluation=True)  # type: ignore
+
+        # Create logger and counter.
+        # counter = counting.Counter(counter, "evaluator")
+        evaluator_logger_config = {}
+        if self._logger_config and "evaluator" in self._logger_config:
+            evaluator_logger_config = self._logger_config["evaluator"]
+        eval_logger = self._logger_factory(  # type: ignore
+            "evaluator", **evaluator_logger_config
+        )
+
+        # Create the run loop and return it.
+        # Create the loop to connect environment and executor.
+        eval_loop = self._eval_loop_fn(
+            environment,
+            executor,
+            logger=eval_logger,
+            **self._eval_loop_fn_kwargs,
+        )
+
+        eval_loop = DetailedPerAgentStatistics(eval_loop)
+        return eval_loop
 
     def trainer(
         self,
@@ -248,6 +343,7 @@ class MADDPG(maddpg_system):
         # counter = counting.Counter(counter, "trainer")
 
         return self._builder.make_trainer(
+            trainer_id=trainer_id,
             networks=system_networks,
             train_agents=self._train_agents[f"trainer_{trainer_id}"],
             dataset=dataset,
