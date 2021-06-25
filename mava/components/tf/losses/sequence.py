@@ -17,13 +17,12 @@ def recurrent_n_step_critic_loss(
     loss_fn: Union[Type[trfl.td_learning], Type[losses.categorical]],
 ) -> tf.Tensor:
 
-    assert bootstrap_n < len(rewards[0])
+    seq_len = len(rewards[0])
+    assert bootstrap_n < seq_len
     if type(q_values) != DiscreteValuedDistribution:
         check_rank([q_values, target_q_values, rewards, discounts], [2, 2, 2, 2])
 
     # Construct arguments to compute bootstrap target.
-    # TODO (dries): Is the discount calculation correct?
-
     if type(q_values) != DiscreteValuedDistribution:
         q_tm1 = q_values[:, 0:-bootstrap_n]
         q_t = target_q_values[:, bootstrap_n:]
@@ -36,11 +35,10 @@ def recurrent_n_step_critic_loss(
 
         q_t = target_q_values
         q_t.cut_dimension(axis=1, start=bootstrap_n)
-
-    n_step_rewards = rewards[:, :bootstrap_n]
-    n_step_discount = discounts[:, :bootstrap_n]
+    n_step_rewards = rewards[:, :-bootstrap_n]
+    n_step_discount = discounts[:, :-bootstrap_n]
     for i in range(1, bootstrap_n + 1):
-        n_step_rewards += rewards[:, i : i + bootstrap_n]
+        n_step_rewards += rewards[:, i : i + seq_len - bootstrap_n]
 
     n_step_rewards, _ = combine_dim(n_step_rewards)
     n_step_discount, _ = combine_dim(n_step_discount)
