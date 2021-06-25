@@ -255,3 +255,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             self._adder.add(policy, next_timestep, next_extras)  # type: ignore
         else:
             self._adder.add(policy, next_timestep, numpy_states)  # type: ignore
+
+    def update(self, wait: bool = False) -> None:
+        if self._variable_client:
+            self._variable_client.get_async()

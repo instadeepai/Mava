@@ -116,7 +116,7 @@ class FeedForwardExecutor(core.Executor):
 
     def update(self, wait: bool = False) -> None:
         if self._variable_client:
-            self._variable_client.get_async()
+            self._variable_client.update(wait)
 
 
 class RecurrentExecutor(core.Executor):

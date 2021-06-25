@@ -466,7 +466,7 @@ class MADDPGBuilder(SystemBuilder):
         # TODO(Kale-ab/Arnu): need to fix wrapper type issues
         trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
 
-        trainer = DetailedTrainerStatistics(  # type: ignore
+        trainer = ScaledDetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]
         )
 

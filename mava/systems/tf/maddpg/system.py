@@ -267,7 +267,6 @@ class MADDPG:
     def trainer(
         self,
         replay: reverb.Client,
-        variable_source: core.VariableSource,
         counter: counting.Counter,
     ) -> mava.core.Trainer:
         """The Trainer part of the system."""
@@ -292,7 +291,6 @@ class MADDPG:
             counter=counter,
             logger=trainer_logger,
             connection_spec=self._connection_spec,
-            variable_source=variable_source,
         )
 
     def executor(

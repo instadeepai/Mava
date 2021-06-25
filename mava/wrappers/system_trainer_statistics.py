@@ -78,6 +78,105 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
+        if self._system_checkpointer:
+            train_utils.checkpoint_networks(self._system_checkpointer)
+
+        if self._logger:
+            self._logger.write(fetches)
+
+
+class DetailedTrainerStatistics(TrainerStatisticsBase):
+    """A trainer class that logs episode stats."""
+
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+        metrics: List[str] = ["policy_loss"],
+        summary_stats: List = ["mean", "max", "min", "var", "std"],
+    ) -> None:
+        super().__init__(trainer)
+
+        self._metrics = metrics
+        self._summary_stats = summary_stats
+
+    def _create_loggers(self, keys: List[str]) -> None:
+
+        # get system logger data
+        trainer_label = self._logger._label
+        base_dir = self._logger._directory
+        (
+            to_terminal,
+            to_csv,
+            to_tensorboard,
+            time_delta,
+            print_fn,
+            time_stamp,
+        ) = self._logger._logger_info
+
+        self._network_running_statistics: Dict[str, Dict[str, float]] = {}
+        self._networks_stats: Dict[str, Dict[str, RunningStatistics]] = {
+            key: {} for key in keys
+        }
+        self._network_loggers: Dict[str, loggers.Logger] = {}
+
+        # statistics dictionary
+        for key in keys:
+            network_label = trainer_label + "_" + key
+            self._network_loggers[key] = Logger(
+                label=network_label,
+                directory=base_dir,
+                to_terminal=to_terminal,
+                to_csv=to_csv,
+                to_tensorboard=to_tensorboard,
+                time_delta=0,
+                print_fn=print_fn,
+                time_stamp=time_stamp,
+            )
+            for metric in self._metrics:
+                self._networks_stats[key][metric] = RunningStatistics(f"{key}_{metric}")
+
+    def _compute_statistics(self, data: Dict[str, Dict[str, float]]) -> None:
+        for network, datum in data.items():
+            for key, val in datum.items():
+                network_running_statistics: Dict[str, float] = {}
+                network_running_statistics[f"{network}_raw_{key}"] = val
+                self._networks_stats[network][key].push(val)
+                for stat in self._summary_stats:
+                    network_running_statistics[
+                        f"{network}_{stat}_{key}"
+                    ] = self._networks_stats[network][key].__getattribute__(stat)()
+
+                self._network_loggers[network].write(network_running_statistics)
+
+
+class ScaledTrainerStatisticsBase(TrainerWrapperBase):
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+    ) -> None:
+        super().__init__(trainer)
+        self._require_loggers = True
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        if self._require_loggers:
+            self._create_loggers(list(fetches.keys()))
+            self._require_loggers = False
+
+        # compute statistics
+        self._compute_statistics(fetches)
+
+        # Compute elapsed time.
+        timestamp = time.time()
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp: float = timestamp
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
         # Update the variable source and the trainer
         self._variable_client.set_async()
         self._variable_client.get_async()
@@ -89,7 +188,7 @@ class TrainerStatisticsBase(TrainerWrapperBase):
             self._logger.write(fetches)
 
 
-class DetailedTrainerStatistics(TrainerStatisticsBase):
+class ScaledDetailedTrainerStatistics(ScaledTrainerStatisticsBase):
     """A trainer class that logs episode stats."""
 
     def __init__(
