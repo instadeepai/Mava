@@ -12,6 +12,8 @@ class VariableSource:
         # Init the variable dictionary
         self.variables: Dict[str, Any] = variables
 
+        print("Variables: ", self.variables.keys())
+
         # Create checkpointer
         self._system_checkpointer = {}
         if checkpoint:
@@ -69,6 +71,7 @@ class VariableSource:
             names = [names]  # type: ignore
 
         for var_key in names:
+            assert var_key in self.variables
             self.variables[var_key] = vars[var_key]
         return
 

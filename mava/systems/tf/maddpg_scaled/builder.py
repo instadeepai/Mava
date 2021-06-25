@@ -262,12 +262,11 @@ class MADDPGBuilder(SystemBuilder):
     ) -> core.Executor:
         # Create the variable source
         variables = {}
-
         # Network variables
         agent_keys = self._agent_types if self._config.shared_weights else self._agents
         for net_key in networks.keys():
             for agent in agent_keys:
-                variables[f"{net_key}_{agent}"] = networks[net_key][agent].variables
+                variables[f"{agent}_{net_key}"] = networks[net_key][agent].variables
 
         # Executor specific variables
         for i in range(self._config.num_executors):
@@ -330,12 +329,12 @@ class MADDPGBuilder(SystemBuilder):
             agent_keys = self._agent_types if shared_weights else self._agents
 
             # Create policy variables
-            variables = {"policies": {}}
+            variables = {}
             get_keys = []
 
             # TODO: Should variables be per agent? polcies_net_0
             for agent in agent_keys:
-                var_key = f"policies_{agent}"
+                var_key = f"{agent}_policies"
                 variables[var_key] = policy_networks[agent].variables
                 get_keys.append(var_key)
 
@@ -407,11 +406,11 @@ class MADDPGBuilder(SystemBuilder):
         agent_keys = self._agent_types if self._config.shared_weights else self._agents
         for net_key in networks.keys():
             for agent in agent_keys:
-                variables[f"{net_key}_{agent}"] = networks[net_key][agent].variables
+                variables[f"{agent}_{net_key}"] = networks[net_key][agent].variables
                 if agent in train_agents:
-                    set_keys.append(f"{net_key}_{agent}")
+                    set_keys.append(f"{agent}_{net_key}")
                 else:
-                    get_keys.append(f"{net_key}_{agent}")
+                    get_keys.append(f"{agent}_{net_key}")
 
         num_steps = tf.Variable(0, dtype=tf.int32)
         variables[f"{trainer_id}_num_steps"] = num_steps

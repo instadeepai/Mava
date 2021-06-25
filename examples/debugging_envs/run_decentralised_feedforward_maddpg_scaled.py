@@ -178,6 +178,7 @@ def main(_: Any) -> None:
         logger_config=logger_config,
         num_executors=2,
         num_trainers=3,
+        shared_weights=False,
         train_agents={
             "trainer_0": ["agent_0"],
             "trainer_1": ["agent_1"],
