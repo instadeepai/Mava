@@ -257,7 +257,6 @@ class MADDPGBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
     ) -> core.Executor:
-        print("Starting inside variable_server")
         # Create the variable source
         variable_source = MavaVariableSource()
 
@@ -273,9 +272,12 @@ class MADDPGBuilder(SystemBuilder):
 
         # Set all the network variables inside the variable source
         networks_vars = {}
+
+        
+        agent_keys = self._agent_types if self._config.shared_weights else self._agents
         for net_key in networks.keys():
             networks_vars[net_key] = {
-                agent: networks[net_key][agent].variables for agent in self._agent_types
+                agent: networks[net_key][agent].variables for agent in agent_keys
             }
 
         variable_source.set_variables(
@@ -337,10 +339,12 @@ class MADDPGBuilder(SystemBuilder):
 
     def make_trainer(
         self,
+        trainer_id: str,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         variable_source: core.VariableSource,
-        replay_client: Optional[reverb.Client] = None,
+        train_agents: Dict[str, Any],
+        num_steps: int,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
@@ -366,22 +370,32 @@ class MADDPGBuilder(SystemBuilder):
         target_update_rate = self._config.target_update_rate
 
         # Create variable client
-
-        variables = {}
+        set_variables = {}
+        get_variables = {}
+        agent_keys = self._agent_types if self._config.shared_weights else self._agents
         for net_key in networks.keys():
-            variables[net_key] = {
-                agent: networks[net_key][agent].variables for agent in self._agent_types
-            }
+            for agent in agent_keys:
+                if agent in train_agents:
+                    set_variables[net_key][agent] = networks[net_key][agent].variables
+                else:
+                    get_variables[net_key][agent] = networks[net_key][agent].variables
+
+        set_variables[f"{trainer_id}_num_steps"] = num_steps
+        set_variables[f"{trainer_id}_counter"] = counter
 
         variable_client = variable_utils.VariableClient(
             client=variable_source,
-            variables=variables,
+            set_variables=set_variables,
+            get_variables=get_variables,
         )
-        variable_client.get_and_wait()
+
+        # Get all the initial variables
+        variable_client.get_all_and_wait()
 
         # trainer args
         trainer_config: Dict[str, Any] = {
             "agents": agents,
+            "train_agents": train_agents,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
@@ -400,6 +414,7 @@ class MADDPGBuilder(SystemBuilder):
             "variable_client": variable_client,
             "dataset": dataset,
             "counter": counter,
+            "num_steps": num_steps,
             "logger": logger,
             "checkpoint": self._config.checkpoint,
             "checkpoint_subpath": self._config.checkpoint_subpath,

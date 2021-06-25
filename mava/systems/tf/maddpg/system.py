@@ -226,38 +226,10 @@ class MADDPG:
         """The replay storage."""
         return self._builder.make_replay_tables(self._environment_spec)
 
-    def counter(self, checkpoint: bool) -> Any:
-        if checkpoint:
-            return tf2_savers.CheckpointingRunner(
-                counting.Counter(),
-                time_delta_minutes=15,
-                directory=self._checkpoint_subpath,
-                subdirectory="counter",
-            )
-        else:
-            return counting.Counter()
-
-    def coordinator(self, counter: counting.Counter) -> Any:
-        return lp_utils.StepsLimiter(counter, self._max_executor_steps)
-
-    def trainer(
-        self,
-        replay: reverb.Client,
-        counter: counting.Counter,
-    ) -> mava.core.Trainer:
-        """The Trainer part of the system."""
-
+    def create_system(self):
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec, shared_weights=self._shared_weights
-        )
-
-        # create logger
-        trainer_logger_config = {}
-        if self._logger_config and "trainer" in self._logger_config:
-            trainer_logger_config = self._logger_config["trainer"]
-        trainer_logger = self._logger_factory(  # type: ignore
-            "trainer", **trainer_logger_config
         )
 
         # Create system architecture with target networks.
@@ -275,8 +247,41 @@ class MADDPG:
         }
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
+        system = self._architecture(**architecture_config)
+        return system, system.create_system()
 
-        system_networks = self._architecture(**architecture_config).create_system()
+    def counter(self, checkpoint: bool) -> Any:
+        if checkpoint:
+            return tf2_savers.CheckpointingRunner(
+                counting.Counter(),
+                time_delta_minutes=15,
+                directory=self._checkpoint_subpath,
+                subdirectory="counter",
+            )
+        else:
+            return counting.Counter()
+
+    def coordinator(self, counter: counting.Counter) -> Any:
+        return lp_utils.StepsLimiter(counter, self._max_executor_steps)
+
+    def trainer(
+        self,
+        replay: reverb.Client,
+        variable_source: core.VariableSource,
+        counter: counting.Counter,
+    ) -> mava.core.Trainer:
+        """The Trainer part of the system."""
+
+        # create logger
+        trainer_logger_config = {}
+        if self._logger_config and "trainer" in self._logger_config:
+            trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory(  # type: ignore
+            "trainer", **trainer_logger_config
+        )
+
+        # Create the system
+        _, system_networks = self.create_system()
 
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
@@ -287,6 +292,7 @@ class MADDPG:
             counter=counter,
             logger=trainer_logger,
             connection_spec=self._connection_spec,
+            variable_source=variable_source,
         )
 
     def executor(
@@ -298,27 +304,8 @@ class MADDPG:
     ) -> mava.ParallelEnvironmentLoop:
         """The executor process."""
 
-        # Create the behavior policy.
-        networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
-        )
-
-        # architecture args
-        architecture_config = {
-            "environment_spec": self._environment_spec,
-            "observation_networks": networks["observations"],
-            "policy_networks": networks["policies"],
-            "critic_networks": networks["critics"],
-            "shared_weights": self._shared_weights,
-        }
-        if self._connection_spec:
-            architecture_config["network_spec"] = self._connection_spec
-
-        # Create system architecture with target networks.
-        system = self._architecture(**architecture_config)
-
-        # create variables
-        _ = system.create_system()
+        # Create the system
+        system, _ = self.create_system()
 
         # behaviour policy networks (obs net + policy head)
         behaviour_policy_networks = system.create_behaviour_policy()
@@ -366,27 +353,8 @@ class MADDPG:
     ) -> Any:
         """The evaluation process."""
 
-        # Create the behavior policy.
-        networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
-        )
-
-        # architecture args
-        architecture_config = {
-            "environment_spec": self._environment_spec,
-            "observation_networks": networks["observations"],
-            "policy_networks": networks["policies"],
-            "critic_networks": networks["critics"],
-            "shared_weights": self._shared_weights,
-        }
-        if self._connection_spec:
-            architecture_config["network_spec"] = self._connection_spec
-
-        # Create system architecture with target networks.
-        system = self._architecture(**architecture_config)
-
-        # create variables
-        _ = system.create_system()
+        # Create the system
+        system, _ = self.create_system()
 
         # behaviour policy networks (obs net + policy head)
         behaviour_policy_networks = system.create_behaviour_policy()
@@ -421,6 +389,7 @@ class MADDPG:
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)
         return eval_loop
+
 
     def build(self, name: str = "maddpg") -> Any:
         """Build the distributed system topology."""

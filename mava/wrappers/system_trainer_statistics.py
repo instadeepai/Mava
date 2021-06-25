@@ -78,11 +78,12 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        # Update the variable source
+        # Update the variable source and the trainer
         self._variable_client.set_async()
+        self._variable_client.get_async()
 
-        if self._system_checkpointer:
-            train_utils.checkpoint_networks(self._system_checkpointer)
+        # if self._system_checkpointer:
+        #     train_utils.checkpoint_networks(self._system_checkpointer)
 
         if self._logger:
             self._logger.write(fetches)

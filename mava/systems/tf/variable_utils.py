@@ -16,7 +16,7 @@
 """Variable handling utilities for TensorFlow 2. Adapted from Deepmind's Acme library"""
 
 from concurrent import futures
-from typing import Any, Dict, Mapping, Optional, Sequence
+from typing import Any, Dict, Mapping, Optional, Sequence, List
 
 import tensorflow as tf
 from acme.tf import utils as tf2_utils
@@ -31,20 +31,24 @@ class VariableClient:
         self,
         client: VariableSource,
         variables: Mapping[str, Sequence[tf.Variable]],
+        get_keys: List[str] = None,
+        set_keys: List[str] = None,
         get_period: int = 1,
         set_period: int = 1,
     ):
-        self._keys = list(variables.keys())
+        self._all_keys = list(variables.keys())
+        self._get_keys = get_keys if get_keys is not None else self._all_keys
+        self._set_keys = set_keys if set_keys is not None else self._all_keys
         self._variables = variables
         self._get_call_counter = 0
         self._set_call_counter = 0
         self._get_update_period = get_period
         self._set_update_period = set_period
         self._client = client
-        self._request = lambda: client.get_variables(self._keys)
+        self._request = lambda: client.get_variables(self._get_keys)
 
         self._adjust = lambda: client.set_variables(
-            self._keys, tf2_utils.to_numpy(self._variables)
+            self._set_keys, tf2_utils.to_numpy({self._variables[key] for key in self._set_keys})
         )
         # Create a single background thread to fetch variables without necessarily
         # blocking the actor.
@@ -108,12 +112,17 @@ class VariableClient:
 
     def get_and_wait(self) -> None:
         """Immediately update and block until we get the result."""
-        self._copy(self._request())  # type: ignore
+        self._copy(client.get_variables(self._get_keys))  # type: ignore
         return
 
     def set_and_wait(self) -> None:
         """Immediately update and block until we get the result."""
-        self._adjust()  # type: ignore
+        client.set_variables(self._set_keys)  # type: ignore
+        return
+
+    def get_all_and_wait(self) -> None:
+        """Immediately update and block until we get the result."""
+        self._copy(client.get_variables(self._keys))  # type: ignore
         return
 
     def _copy(self, new_variables: Dict[str, Any]) -> None:
