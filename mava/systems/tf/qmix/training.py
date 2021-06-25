@@ -234,15 +234,14 @@ class QMIXTrainer(MADQNTrainer):
     def _backward(self) -> None:
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-
             # Update agent networks
-            variables = [*self._q_networks[agent_key].trainable_variables]
+            variables = self._q_networks[agent_key].trainable_variables
             gradients = self.tape.gradient(self.loss, variables)
             gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
             self._optimizers[agent_key].apply(gradients, variables)
 
         # Update mixing network
-        variables = self.get_mixing_trainable_vars()
+        variables = self.get_mixing_trainable_vars("mixing")
         gradients = self.tape.gradient(self.loss, variables)
 
         gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
@@ -266,14 +265,17 @@ class QMIXTrainer(MADQNTrainer):
                 }
         return variables
 
-    def get_mixing_trainable_vars(self) -> List:
-        mixing_vars = []
+    def get_mixing_trainable_vars(self, network: str = "mixing") -> List:
+        mixing_trainable_vars = []
         for var in self._mixing_network.trainable_variables:
-            if "mixing" in var.name:
-                mixing_vars.append(var)
-        return mixing_vars
+            if var.name.startswith(network):
+                mixing_trainable_vars.append(var)
+        return mixing_trainable_vars
 
-    def get_mixing_vars(self, network: str = "mixing") -> List:
+    def get_mixing_vars(
+        self,
+        network: str = "mixing",
+    ) -> List:
         mixing_vars = []
         for var in self._mixing_network.variables:
             if var.name.startswith(network):
