@@ -1,5 +1,5 @@
 # python3
-# Copyright 2021 [...placeholder...]. All rights reserved.
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,21 +15,18 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import dm_env
 import launchpad as lp
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from absl import app, flags
 from acme import types
 from acme.tf import networks
-from acme.utils import counting, loggers
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 from open_spiel.python import rl_environment  # type: ignore
 
-import mava
 from mava import specs as mava_specs
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.networks import epsilon_greedy_action_selector
@@ -52,11 +49,6 @@ flags.DEFINE_string(
     "Experiment identifier that can be used to continue experiments.",
 )
 flags.DEFINE_string("base_dir", "./logs", "Base dir to store experiments.")
-flags.DEFINE_string(
-    "random_player",
-    None,
-    "The player that should take only random actions in the game",
-)
 
 
 def make_networks(
@@ -122,41 +114,6 @@ def make_environment(
     return environment
 
 
-class Loop(OpenSpielSequentialEnvironmentLoop):
-    def __init__(
-        self,
-        env: dm_env.Environment,
-        executor: mava.core.Executor,
-        counter: counting.Counter = None,
-        logger: loggers.Logger = None,
-        should_update: bool = True,
-        label: str = "seq_env_loop",
-        random_player: str = FLAGS.random_player,
-    ):
-        super().__init__(
-            env,
-            executor,
-            counter=counter,
-            logger=logger,
-            should_update=should_update,
-            label=label,
-        )
-        assert random_player in [None, "player_0", "player_1"]
-        self._random_player = random_player
-
-    def _get_action(self, agent_id: str, timestep: dm_env.TimeStep) -> List[np.ndarray]:
-        action = [self._executor.select_action(agent_id, timestep.observation)]
-        if self._random_player and agent_id == self._random_player:
-            legal_actions = timestep.observation.legal_actions
-            possible_actions = np.where(legal_actions)[0]
-            if len(possible_actions):
-                action = [np.random.choice(np.where(legal_actions)[0])]
-            else:
-                action = [0]
-
-        return action
-
-
 def main(_: Any) -> None:
 
     # environment
@@ -190,8 +147,8 @@ def main(_: Any) -> None:
         epsilon_decay=1e-4,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        train_loop_fn=Loop,
-        eval_loop_fn=Loop,
+        train_loop_fn=OpenSpielSequentialEnvironmentLoop,
+        eval_loop_fn=OpenSpielSequentialEnvironmentLoop,
     ).build()
 
     # launch
