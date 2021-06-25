@@ -89,22 +89,14 @@ class SequentialEnvironmentLoop(acme.core.Worker):
     def _get_action(self, agent_id: str, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_action(agent_id, timestep.observation)
 
-    def _to_mid_timestep(
-        self, timestep: dm_env.TimeStep, agent: str
+    def _set_step_type(
+        self, timestep: dm_env.TimeStep, step_type: dm_env.StepType
     ) -> dm_env.TimeStep:
         return dm_env.TimeStep(
             observation=timestep.observation,
             reward=timestep.reward,
             discount=timestep.discount,
-            step_type=self._step_type[agent],
-        )
-
-    def _to_last_timestep(self, timestep: dm_env.TimeStep) -> dm_env.TimeStep:
-        return dm_env.TimeStep(
-            observation=timestep.observation,
-            reward=timestep.reward,
-            discount=timestep.discount,
-            step_type=dm_env.StepType.LAST,
+            step_type=step_type,
         )
 
     def _send_observation(self) -> None:
@@ -124,6 +116,8 @@ class SequentialEnvironmentLoop(acme.core.Worker):
                 assert all([val is None for val in parallel_actions.values()])
                 self._executor.observe_first(parallel_timestep)
             else:
+                rewards = [r for r in parallel_timestep.reward.values()]
+                assert sum(rewards) == 0, "Reward must be zero-sum"
                 self._executor.observe(
                     parallel_actions, next_timestep=parallel_timestep
                 )
@@ -138,7 +132,7 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         agent = self._environment.current_agent
 
         # save action, timestep pairs for current agent
-        timestep = self._to_mid_timestep(timestep, agent)
+        timestep = self._set_step_type(timestep, self._step_type[agent])
         self._agent_action_timestep[agent] = (self._prev_action[agent], timestep)
 
         self._prev_timestep[agent] = timestep
@@ -167,9 +161,9 @@ class SequentialEnvironmentLoop(acme.core.Worker):
 
         self._agent_action_timestep = {}
 
-        for i in range(self.num_agents):
+        for _ in range(self.num_agents):
             agent = self._environment.current_agent
-            timestep = self._to_last_timestep(timestep)
+            timestep = self._set_step_type(timestep, dm_env.StepType.LAST)
             self._agent_action_timestep[agent] = (self._prev_action[agent], timestep)
 
             timestep = self._environment.step(
@@ -178,11 +172,6 @@ class SequentialEnvironmentLoop(acme.core.Worker):
             cache_tsp += [timestep]
 
         assert len(self._agent_action_timestep) == self.num_agents
-        assert all(
-            [float(v[1].reward) != 0 for _, v in self._agent_action_timestep.items()]
-        ) or all(
-            [float(v[1].reward == 0) for _, v in self._agent_action_timestep.items()]
-        )
 
         self._send_observation()
 
