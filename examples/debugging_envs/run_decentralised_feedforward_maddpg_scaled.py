@@ -178,7 +178,11 @@ def main(_: Any) -> None:
         logger_config=logger_config,
         num_executors=2,
         num_trainers=3,
-        train_agents={"trainer_0": ["agent_0"], "trainer_1": ["agent_1"], "trainer_2": ["agent_2"]},
+        train_agents={
+            "trainer_0": ["agent_0"],
+            "trainer_1": ["agent_1"],
+            "trainer_2": ["agent_2"],
+        },
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,

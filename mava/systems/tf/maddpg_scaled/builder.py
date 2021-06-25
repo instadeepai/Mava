@@ -273,7 +273,6 @@ class MADDPGBuilder(SystemBuilder):
         # Set all the network variables inside the variable source
         networks_vars = {}
 
-        
         agent_keys = self._agent_types if self._config.shared_weights else self._agents
         for net_key in networks.keys():
             networks_vars[net_key] = {

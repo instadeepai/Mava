@@ -16,7 +16,7 @@
 """Variable handling utilities for TensorFlow 2. Adapted from Deepmind's Acme library"""
 
 from concurrent import futures
-from typing import Any, Dict, Mapping, Optional, Sequence, List
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import tensorflow as tf
 from acme.tf import utils as tf2_utils
@@ -48,7 +48,8 @@ class VariableClient:
         self._request = lambda: client.get_variables(self._get_keys)
 
         self._adjust = lambda: client.set_variables(
-            self._set_keys, tf2_utils.to_numpy({self._variables[key] for key in self._set_keys})
+            self._set_keys,
+            tf2_utils.to_numpy({self._variables[key] for key in self._set_keys}),
         )
         # Create a single background thread to fetch variables without necessarily
         # blocking the actor.

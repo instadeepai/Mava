@@ -32,9 +32,11 @@ from acme.utils import counting, loggers
 
 import mava
 from mava import core
-from mava.systems.tf.maddpg.training import MADDPGBaseTrainer as feedforward_trainer
-from mava.systems.tf.maddpg.training import MADDPGBaseRecurrentTrainer as recurrent_trainer
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
+from mava.systems.tf.maddpg.training import (
+    MADDPGBaseRecurrentTrainer as recurrent_trainer,
+)
+from mava.systems.tf.maddpg.training import MADDPGBaseTrainer as feedforward_trainer
 
 # from mava.systems.tf import variable_sources
 from mava.utils import training_utils as train_utils
@@ -188,7 +190,7 @@ class MADDPGBaseTrainer(feedforward_trainer):
             self._system_network_variables["policies"][
                 agent_key
             ] = policy_network_to_expose.variables
-        
+
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.

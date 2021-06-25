@@ -1,7 +1,9 @@
-from typing import Any, Dict, Sequence, Union
-import time
-import numpy as np
 import os
+import time
+from typing import Any, Dict, Sequence, Union
+
+import numpy as np
+
 from mava.systems.tf import savers as tf2_savers
 
 
@@ -20,7 +22,6 @@ class VariableSource:
                 objects_to_save=self.variables,
                 subdirectory=subdir,
             )
-
 
             # for agent_key in self.unique_net_keys:
             #     objects_to_save = {
@@ -72,6 +73,6 @@ class VariableSource:
     def run(self):
         # Checkpoints every 15 minutes
         while True:
-            time.sleep(15*60)
+            time.sleep(15 * 60)
             if self.checkpointer:
                 self._system_checkpointer.save()

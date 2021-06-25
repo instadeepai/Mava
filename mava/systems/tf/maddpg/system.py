@@ -390,7 +390,6 @@ class MADDPG:
         eval_loop = DetailedPerAgentStatistics(eval_loop)
         return eval_loop
 
-
     def build(self, name: str = "maddpg") -> Any:
         """Build the distributed system topology."""
         program = lp.Program(name=name)

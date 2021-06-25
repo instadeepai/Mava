@@ -22,22 +22,25 @@ import dm_env
 import launchpad as lp
 import reverb
 import sonnet as snt
-from acme import specs as acme_specs
+
 # from acme.tf import utils as tf2_utils
 import tensorflow as tf
+from acme import specs as acme_specs
 from acme.utils import counting, loggers
 
 import mava
-from mava import core
+
 # from mava.systems.tf import savers as tf2_savers
+from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
-from mava.systems.tf.maddpg_scaled import builder, training
 from mava.systems.tf.maddpg.system import MADDPG as maddpg_system
+from mava.systems.tf.maddpg_scaled import builder, training
 from mava.systems.tf.maddpg_scaled.execution import MADDPGFeedForwardExecutor
 from mava.utils.loggers import MavaLogger, logger_utils
+
 # from mava.wrappers import DetailedPerAgentStatistics
 
 
@@ -208,7 +211,7 @@ class MADDPG(maddpg_system):
             executor_fn=executor_fn,
             extra_specs=extra_specs,
         )
-    
+
     def variable_server(self):
         # TODO(dries): Move checkpoint loading from trainer to variable server.
 
@@ -267,8 +270,10 @@ class MADDPG(maddpg_system):
         with program.group("trainer"):
             # Add executors which pull round-robin from our variable sources.
             for trainer_id in range(self._num_trainers):
-                program.add_node(lp.CourierNode(self.trainer, trainer_id, replay, variable_server))
-        
+                program.add_node(
+                    lp.CourierNode(self.trainer, trainer_id, replay, variable_server)
+                )
+
         with program.group("evaluator"):
             program.add_node(lp.CourierNode(self.evaluator, variable_server))
 
