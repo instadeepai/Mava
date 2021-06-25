@@ -39,6 +39,7 @@ def make_default_networks(
     ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
+    sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
@@ -83,15 +84,22 @@ def make_default_networks(
         # An optional network to process observations
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
         # Create the policy network.
-        policy_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key], activate_final=True
-                ),
-                networks.NearZeroInitializedLinear(num_dimensions),
-                networks.TanhToSpec(agent_act_spec),
+        policy_network = [
+            networks.LayerNormMLP(
+                policy_networks_layer_sizes[key], activate_final=True
+            ),
+            networks.NearZeroInitializedLinear(num_dimensions),
+            networks.TanhToSpec(agent_act_spec),
+        ]
+
+        # Add Gaussian noise for simple exploration.
+        if sigma and sigma > 0.0:
+            policy_network += [
+                networks.ClippedGaussian(sigma),
+                networks.ClipToSpec(agent_act_spec),
             ]
-        )
+
+        policy_network = snt.Sequential(policy_network)
 
         # Create the critic network.
         critic_network = snt.Sequential(
