@@ -116,8 +116,6 @@ class SequentialEnvironmentLoop(acme.core.Worker):
                 assert all([val is None for val in parallel_actions.values()])
                 self._executor.observe_first(parallel_timestep)
             else:
-                rewards = [r for r in parallel_timestep.reward.values()]
-                assert sum(rewards) == 0, "Reward must be zero-sum"
                 self._executor.observe(
                     parallel_actions, next_timestep=parallel_timestep
                 )
