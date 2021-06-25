@@ -228,7 +228,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self,
         environment: dm_env.Environment,
         executor: mava.core.Executor,
-        counter: counting.Counter = None, # TODO (dries): Depreciated. Remove this line
+        counter: counting.Counter = None,  # TODO (dries): Depreciated. Remove this line
         logger: loggers.Logger = None,
         should_update: bool = True,
         label: str = "parallel_environment_loop",
@@ -241,7 +241,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             # Depreciated: For older algorithms without a centralised variable source.
             self._counter = counter
         else:
-            # Use 
+            # Use
             self.counter = self.executor._counter
 
         # self._counter = counter or counting.Counter()

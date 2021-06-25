@@ -25,28 +25,28 @@ class VariableSource:
 
         print("Checkpointer created :)")
         exit()
-            # for agent_key in self.unique_net_keys:
-            #     objects_to_save = {
-            #         "counter": self._counter,
-            #         "policies": self._policy_networks[agent_key],
-            #         "critics": self._critic_networks[agent_key],
-            #         "observations": self._observation_networks[agent_key],
-            #         "target_policies": self._target_policy_networks[agent_key],
-            #         "target_critics": self._target_critic_networks[agent_key],
-            #         "target_observations": self._target_observation_networks[agent_key],
-            #         "policy_optimizer": self._policy_optimizers,
-            #         "critic_optimizer": self._critic_optimizers,
-            #         "num_steps": self._num_steps,
-            #     }
+        # for agent_key in self.unique_net_keys:
+        #     objects_to_save = {
+        #         "counter": self._counter,
+        #         "policies": self._policy_networks[agent_key],
+        #         "critics": self._critic_networks[agent_key],
+        #         "observations": self._observation_networks[agent_key],
+        #         "target_policies": self._target_policy_networks[agent_key],
+        #         "target_critics": self._target_critic_networks[agent_key],
+        #         "target_observations": self._target_observation_networks[agent_key],
+        #         "policy_optimizer": self._policy_optimizers,
+        #         "critic_optimizer": self._critic_optimizers,
+        #         "num_steps": self._num_steps,
+        #     }
 
-            #     subdir = os.path.join("variable_source", agent_key)
-            #     checkpointer = tf2_savers.Checkpointer(
-            #         time_delta_minutes=15,
-            #         directory=checkpoint_subpath,
-            #         objects_to_save=objects_to_save,
-            #         subdirectory=subdir,
-            #     )
-            #     self._system_checkpointer[agent_key] = checkpointer
+        #     subdir = os.path.join("variable_source", agent_key)
+        #     checkpointer = tf2_savers.Checkpointer(
+        #         time_delta_minutes=15,
+        #         directory=checkpoint_subpath,
+        #         objects_to_save=objects_to_save,
+        #         subdirectory=subdir,
+        #     )
+        #     self._system_checkpointer[agent_key] = checkpointer
 
     def get_variables(
         self, names: Union[str, Sequence[str]]

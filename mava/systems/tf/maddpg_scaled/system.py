@@ -40,7 +40,6 @@ from mava.systems.tf.maddpg.system import MADDPG as maddpg_system
 from mava.systems.tf.maddpg_scaled import builder, training
 from mava.systems.tf.maddpg_scaled.execution import MADDPGFeedForwardExecutor
 from mava.utils.loggers import MavaLogger, logger_utils
-
 from mava.wrappers import DetailedPerAgentStatistics
 
 

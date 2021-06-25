@@ -20,6 +20,7 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import reverb
 import sonnet as snt
+import tensorflow as tf
 from acme import datasets
 from acme.core import VariableSource
 from acme.specs import EnvironmentSpec
@@ -28,7 +29,6 @@ from acme.utils import counting, loggers
 from dm_env import specs as dm_specs
 from numpy.core.fromnumeric import var
 
-import tensorflow as tf
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.builders import SystemBuilder
@@ -278,7 +278,9 @@ class MADDPGBuilder(SystemBuilder):
             variables[f"trainer_{i}_counter"] = counting.Counter()
             variables[f"trainer_{i}_num_steps"] = tf.Variable(0, dtype=tf.int32)
 
-        variable_source = MavaVariableSource(variables, self._config.checkpoint, self._config.checkpoint_subpath)
+        variable_source = MavaVariableSource(
+            variables, self._config.checkpoint, self._config.checkpoint_subpath
+        )
 
         # if self._config.checkpoint:
         #     counter = tf2_savers.CheckpointingRunner(
@@ -330,13 +332,13 @@ class MADDPGBuilder(SystemBuilder):
             # Create policy variables
             variables = {"policies": {}}
             get_keys = []
-            
+
             # TODO: Should variables be per agent? polcies_net_0
             for agent in agent_keys:
                 var_key = f"policies_{agent}"
                 variables[var_key] = policy_networks[agent].variables
                 get_keys.append(var_key)
-            
+
             set_keys = [f"{executor_id}_counter"]
             variables[f"{executor_id}_counter"] = counting.Counter()
 

@@ -15,19 +15,14 @@
 
 """Implementations of a MADDPG agent."""
 
-from mava.systems.tf.maddpg_scaled.execution import (
+from mava.systems.tf.maddpg_scaled.execution import (  # MADDPGRecurrentExecutor,
     MADDPGFeedForwardExecutor,
-    # MADDPGRecurrentExecutor,
 )
 from mava.systems.tf.maddpg_scaled.system import MADDPG
-from mava.systems.tf.maddpg_scaled.training import (
-    # MADDPGBaseRecurrentTrainer,
+from mava.systems.tf.maddpg_scaled.training import (  # MADDPGBaseRecurrentTrainer,; MADDPGCentralisedRecurrentTrainer,; MADDPGDecentralisedRecurrentTrainer,; MADDPGStateBasedRecurrentTrainer,
     MADDPGBaseTrainer,
-    # MADDPGCentralisedRecurrentTrainer,
     MADDPGCentralisedTrainer,
-    # MADDPGDecentralisedRecurrentTrainer,
     MADDPGDecentralisedTrainer,
     MADDPGNetworkedTrainer,
-    # MADDPGStateBasedRecurrentTrainer,
     MADDPGStateBasedTrainer,
 )
