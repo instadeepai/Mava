@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-"""DIAL trainer implementation."""
+"""DIAL system trainer implementation."""
 
 from typing import Any, Dict, List, Union
 
@@ -63,6 +63,28 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
+        """[summary]
+
+        Args:
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            q_networks (Dict[str, snt.Module]): [description]
+            target_q_networks (Dict[str, snt.Module]): [description]
+            target_update_period (int): [description]
+            dataset (tf.data.Dataset): [description]
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            discount (float): [description]
+            shared_weights (bool): [description]
+            exploration_scheduler (LinearExplorationScheduler): [description]
+            communication_module (BaseCommunicationModule): [description]
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            fingerprint (bool, optional): [description]. Defaults to False.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+        """
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -91,7 +113,6 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
 
         observations, actions, rewards, discounts, _, extra = data
 
-        # core_states = extra["core_states"]
         core_state = tree.map_structure(
             lambda s: s[:, 0, :], inputs.data.extras["core_states"]
         )
@@ -190,7 +211,5 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
                     # loss = tf.reduce_mean(loss)
                     q_network_losses[agent]["q_value_loss"] += loss
 
-        # print(q_network_losses['agent_0'])
         self._q_network_losses = q_network_losses
         self.tape = tape
-        # {}.t
