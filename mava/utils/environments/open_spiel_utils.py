@@ -13,33 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
+
+from open_spiel.python import rl_environment  # type: ignore
 
 
-class EnvSource(str, Enum):
-    PettingZoo = "pettingzoo"
-    RLLibMultiEnv = "rllibmultienv"
-    Flatland = "flatland"
-    OpenSpiel = "openspiel"
+def load_open_spiel_env(game_name: str) -> rl_environment.Environment:
+    """Loads an open spiel environment given a game name Also, the possible agents in the
+    environment are set"""
 
+    env = rl_environment.Environment(game_name)
+    env.agents = [f"player_{i}" for i in range(env.num_players)]
+    env.possible_agents = env.agents[:]
 
-class MockedEnvironments(str, Enum):
-    Mocked_Dicrete = "discrete_mock"
-    Mocked_Continous = "continous_mock"
-
-
-class EnvType(Enum):
-    Sequential = 1
-    Parallel = 2
-
-
-class EnvSpec:
-    def __init__(
-        self,
-        env_name: str,
-        env_type: EnvType,
-        env_source: EnvSource = EnvSource.PettingZoo,
-    ):
-        self.env_name = env_name
-        self.env_type = env_type
-        self.env_source = env_source
+    return env
