@@ -135,14 +135,14 @@ class VariableClient:
         """Copies the new variables to the old ones."""
 
         # new_variables = tree.flatten(new_variables)
-        if len(self._variables) != len(new_variables):
-            raise ValueError(
-                "Length mismatch between old ",
-                self._variables.keys(),
-                " variables and new",
-                new_variables.keys(),
-                ".",
-            )
+        # if len(self._variables) != len(new_variables):
+        #     raise ValueError(
+        #         "Length mismatch between old ",
+        #         self._variables.keys(),
+        #         " variables and new",
+        #         new_variables.keys(),
+        #         ".",
+        #     )
 
         # for new, old in zip(new_variables, self._variables):
         #     self._variables[i] = new_variables[i]
@@ -156,7 +156,7 @@ class VariableClient:
                         self._variables[key][agent_key][i].assign(
                             new_variables[key][agent_key][i]
                         )
-            elif var_type == np.int32:
+            elif var_type == np.int32 or var_type == np.float32:
                 # TODO (dries): Is this count value getting tracked?
                 self._variables[key] = new_variables[key]
 

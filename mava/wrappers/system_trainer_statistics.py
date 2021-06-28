@@ -185,7 +185,7 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
         # Update the variable source and the trainer
         # TODO (dries): Can this be simplified? Do a async get?
         self._variable_client.set_async()
-        self._variable_client.get()
+        self._variable_client.get_and_wait()
 
         fetches.update(self._counts)
 
@@ -596,7 +596,7 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
         tape = self.tape
         log_current_timestep = self._log_step()
 
-        for agent in self._agents:
+        for agent in self._train_agents:
             agent_key = self.agent_net_keys[agent]
 
             # Get trainable variables.

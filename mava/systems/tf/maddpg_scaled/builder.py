@@ -258,7 +258,7 @@ class MADDPGBuilder(SystemBuilder):
 
     def create_counter_variables(self, variables):
         variables["trainer_steps"] = tf.Variable(0, dtype=tf.int32)
-        variables["trainer_walltime"] = tf.Variable(0, dtype=tf.int32)
+        variables["trainer_walltime"] = tf.Variable(0, dtype=tf.float32)
         variables["evaluator_steps"] = tf.Variable(0, dtype=tf.int32)
         variables["evaluator_episodes"] = tf.Variable(0, dtype=tf.int32)
         variables["executor_episodes"] = tf.Variable(0, dtype=tf.int32)

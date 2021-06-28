@@ -18,7 +18,7 @@ class VariableSource:
             for key in self.variables.keys():
                 var = self.variables[key]
                 # Don't store empty tuple (e.g. empty observation_network) variables
-                if not (type(var)==tuple and len(var) == 0):
+                if not (type(var) == tuple and len(var) == 0):
                     save_variables[key] = variables[key]
 
             # Create checkpointer
@@ -76,17 +76,20 @@ class VariableSource:
 
         for var_key in names:
             assert var_key in self.variables
-            self.variables[var_key] = vars[var_key]
+            self.variables[var_key].assign(vars[var_key])
         return
 
-    def add_to_variables(self, names: Sequence[str], vars: Dict[str, np.ndarray]) -> None:
+    def add_to_variables(
+        self, names: Sequence[str], vars: Dict[str, np.ndarray]
+    ) -> None:
         if type(names) == str:
             vars = {names: vars}  # type: ignore
             names = [names]  # type: ignore
 
         for var_key in names:
             assert var_key in self.variables
-            self.variables[var_key] += vars[var_key]
+            # Note: Can also use self.variables[var_key] = self.variables[var_key] + vars[var_key]
+            self.variables[var_key].assign_add(vars[var_key])
         return
 
     def run(self):
