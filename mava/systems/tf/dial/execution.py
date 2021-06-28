@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""DIAL executor implementation."""
+"""DIAL system executor implementation."""
+
 from typing import Any, Dict, Optional
 
 import sonnet as snt
@@ -49,14 +50,19 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         fingerprint: bool = False,
         evaluator: bool = False,
     ):
-        """Initializes the executor.
+        """[summary]
+
         Args:
-          policy_network: the policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            q_networks (Dict[str, snt.Module]): [description]
+            action_selectors (Dict[str, snt.Module]): [description]
+            communication_module (BaseCommunicationModule): [description]
+            shared_weights (bool, optional): [description]. Defaults to True.
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional): [description]. Defaults to None.
+            store_recurrent_state (bool, optional): [description]. Defaults to True.
+            trainer (MADQNTrainer, optional): [description]. Defaults to None.
+            fingerprint (bool, optional): [description]. Defaults to False.
+            evaluator (bool, optional): [description]. Defaults to False.
         """
 
         # Store these for later use.
@@ -82,6 +88,19 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
     ) -> types.NestedTensor:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedTensor): [description]
+            state (types.NestedTensor): [description]
+            message (types.NestedTensor): [description]
+            legal_actions (types.NestedTensor): [description]
+            epsilon (tf.Tensor): [description]
+
+        Returns:
+            types.NestedTensor: [description]
+        """
 
         (action, m_values), new_state = super()._policy(
             agent,

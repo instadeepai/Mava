@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""DIAL system builder implementation."""
+
 import dataclasses
 from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
@@ -36,22 +38,30 @@ from mava.systems.tf.madqn import execution, training
 
 @dataclasses.dataclass
 class DIALConfig:
-    """Configuration options for the MADDPG system.
+    """Configuration options for the DIAL system.
     Args:
-            environment_spec: description of the actions, observations, etc.
-            discount: discount to use for TD updates.
-            batch_size: batch size for updates.
-            prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-              the target networks.
-            min_replay_size: minimum replay size before updating.
-            max_replay_size: maximum replay size.
-            samples_per_insert: number of samples to take from replay for every insert
-              that is made.
-            n_step: number of steps to squash into a single transition.
-            sigma: standard deviation of zero-mean, Gaussian exploration noise.
-            clipping: whether to clip gradients by global norm.
-            replay_table_name: string indicating what name to give the replay table."""
+        environment_spec: description of the actions, observations, etc.
+        epsilon_min: float
+        epsilon_decay: float
+        shared_weights: bool
+        target_update_period: number of learner steps to perform before updating
+            the target networks.
+        executor_variable_update_period: int
+        max_gradient_norm: Optional[float]
+        min_replay_size: minimum replay size before updating.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        prefetch_size: size to prefetch from replay.
+        batch_size: batch size for updates.
+        n_step: number of steps to squash into a single transition.
+        sequence_length: int
+        period: int
+        discount: discount to use for TD updates.
+        checkpoint: bool
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
+        replay_table_name: string indicating what name to give the replay table.
+        checkpoint_subpath: str = "~/mava/."""
 
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
@@ -76,7 +86,7 @@ class DIALConfig:
 
 
 class DIALBuilder:
-    """Builder for MADQN which constructs individual components of the system."""
+    """Builder for DIAL which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an RL system.
       Implementations of this interface contain a complete specification of a
@@ -98,9 +108,16 @@ class DIALBuilder:
         ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ):
-        """Args:
-        _config: Configuration options for the MADQN system.
-        _trainer_fn: Trainer module to use."""
+        """[summary]
+
+        Args:
+            config (DIALConfig): [description]
+            trainer_fn (Type[ training.MADQNRecurrentCommTrainer ], optional): [description]. Defaults to training.MADQNRecurrentCommTrainer.
+            executor_fn (Type[core.Executor], optional): [description]. Defaults to execution.MADQNRecurrentCommExecutor.
+            extra_specs (Dict[str, Any], optional): [description]. Defaults to {}.
+            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional): [description]. Defaults to LinearExplorationScheduler.
+            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]], optional): [description]. Defaults to None.
+        """
         self._config = config
         self._extra_specs = extra_specs
 
@@ -115,7 +132,17 @@ class DIALBuilder:
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
-        """Create tables to insert data into."""
+        """[summary]
+
+        Args:
+            environment_spec (specs.MAEnvironmentSpec): [description]
+
+        Raises:
+            NotImplementedError: [description]
+
+        Returns:
+            List[reverb.Table]: [description]
+        """
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
@@ -129,9 +156,6 @@ class DIALBuilder:
             adder_sig = reverb_adders.ParallelSequenceAdder.signature(
                 environment_spec, self._extra_specs
             )
-            # adder_sig = reverb_adders.ParallelEpisodeAdder.signature(
-            #     environment_spec, self._extra_specs
-            # )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
 
@@ -164,9 +188,17 @@ class DIALBuilder:
     def make_dataset_iterator(
         self, replay_client: reverb.Client
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the system.
+        """[summary]
+
         Args:
-            replay_client: Reverb Client which points to the replay server."""
+            replay_client (reverb.Client): [description]
+
+        Returns:
+            [type]: [description]
+
+        Yields:
+            Iterator[reverb.ReplaySample]: [description]
+        """
 
         sequence_length = (
             self._config.sequence_length
@@ -186,9 +218,17 @@ class DIALBuilder:
     def make_adder(
         self, replay_client: reverb.Client
     ) -> Optional[adders.ParallelAdder]:
-        """Create an adder which records data generated by the executor/environment.
+        """[summary]
+
         Args:
-          replay_client: Reverb Client which points to the replay server."""
+            replay_client (reverb.Client): [description]
+
+        Raises:
+            NotImplementedError: [description]
+
+        Returns:
+            Optional[adders.ParallelAdder]: [description]
+        """
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
@@ -205,11 +245,6 @@ class DIALBuilder:
                 sequence_length=self._config.sequence_length,
                 period=self._config.period,
             )
-            # adder = reverb_adders.ParallelEpisodeAdder(
-            #     priority_fns=None,
-            #     client=replay_client,
-            #     max_sequence_length=self._config.sequence_length,
-            # )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
 
@@ -225,15 +260,19 @@ class DIALBuilder:
         trainer: Optional[training.MADQNRecurrentCommTrainer] = None,
         evaluator: bool = False,
     ) -> core.Executor:
-        """Create an executor instance.
+        """[summary]
+
         Args:
-            q_networks: A struct of instance of all
-                the different system q networks,
-                this should be a callable which takes as input observations
-                and returns actions.
-            adder: How data is recorded (e.g. added to replay).
-            variable_source: collection of (nested) numpy arrays. Contains
-                source variables as defined in mava.core.
+            q_networks (Dict[str, snt.Module]): [description]
+            action_selectors (Dict[str, Any]): [description]
+            communication_module (BaseCommunicationModule): [description]
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults to None.
+            variable_source (Optional[core.VariableSource], optional): [description]. Defaults to None.
+            trainer (Optional[training.MADQNRecurrentCommTrainer], optional): [description]. Defaults to None.
+            evaluator (bool, optional): [description]. Defaults to False.
+
+        Returns:
+            core.Executor: [description]
         """
 
         shared_weights = self._config.shared_weights
@@ -279,15 +318,17 @@ class DIALBuilder:
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
     ) -> core.Trainer:
-        """Creates an instance of the trainer.
+        """[summary]
+
         Args:
-          networks: struct describing the networks needed by the trainer; this can
-            be specific to the trainer in question.
-          dataset: iterator over samples from replay.
-          counter: a Counter which allows for recording of counts (trainer steps,
-            executor steps, etc.) distributed throughout the system.
-          logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the trainer checkpoints itself.
+            networks (Dict[str, Dict[str, snt.Module]]): [description]
+            dataset (Iterator[reverb.ReplaySample]): [description]
+            communication_module (BaseCommunicationModule): [description]
+            counter (Optional[counting.Counter], optional): [description]. Defaults to None.
+            logger (Optional[types.NestedLogger], optional): [description]. Defaults to None.
+
+        Returns:
+            core.Trainer: [description]
         """
         q_networks = networks["values"]
         target_q_networks = networks["target_values"]

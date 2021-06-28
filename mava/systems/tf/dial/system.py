@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Defines the DIAL system class."""
+"""DIAL system implementation."""
+
 import functools
 from typing import Any, Callable, Dict, Optional, Type, Union
 
@@ -47,38 +48,7 @@ from mava.wrappers import DetailedPerAgentStatistics
 
 
 class DIAL:
-    """DIAL system.
-    This implements a single-process QMIX system.
-    Args:
-        environment_factory: Callable to instantiate an environment on a compute node.
-        network_factory: Callable to instantiate system networks on a compute node.
-        logger_factory: Callable to instantiate a system logger on a compute node.
-        architecture: system architecture, e.g. decentralised or centralised.
-        trainer_fn: training type associated with executor and architecture,
-            e.g. centralised training.
-        executor_fn: executor type for example feedforward or recurrent.
-        num_executors: number of executor processes to run in parallel.
-        num_caches: number of trainer node caches.
-        environment_spec: description of the actions, observations, etc.
-        q_networks: the online Q network (the one being optimized)
-        epsilon: probability of taking a random action; ignored if a policy
-            network is given.
-        trainer_fn: the class used for training the agent and mixing networks.
-        shared_weights: boolean determining whether shared weights is used.
-        target_update_period: number of learner steps to perform before updating
-            the target networks.
-        clipping: whether to clip gradients by global norm.
-        replay_table_name: string indicating what name to give the replay table.
-        max_replay_size: maximum replay size.
-        samples_per_insert: number of samples to take from replay for every insert
-            that is made.
-        prefetch_size: size to prefetch from replay.
-        batch_size: batch size for updates.
-        n_step: number of steps to squash into a single transition.
-        discount: discount to use for TD updates.
-        counter: counter object used to keep track of steps.
-        checkpoint: boolean indicating whether to checkpoint the learner.
-    """
+    """DIAL system. (say some more here...)"""
 
     def __init__(
         self,
@@ -125,6 +95,46 @@ class DIAL:
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
     ):
+        """[summary]
+
+        Args:
+            environment_factory (Callable[[bool], dm_env.Environment]): [description]
+            network_factory (Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]]): [description]
+            logger_factory (Callable[[str], MavaLogger], optional): [description]. Defaults to None.
+            architecture (Type[DecentralisedValueActor], optional): [description]. Defaults to DecentralisedValueActor.
+            trainer_fn (Type[ training.MADQNRecurrentCommTrainer ], optional): [description]. Defaults to training.MADQNRecurrentCommTrainer.
+            communication_module (Type[BaseCommunicationModule], optional): [description]. Defaults to BroadcastedCommunication.
+            executor_fn (Type[core.Executor], optional): [description]. Defaults to execution.MADQNFeedForwardExecutor.
+            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional): [description]. Defaults to LinearExplorationScheduler.
+            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]], optional): [description]. Defaults to None.
+            epsilon_min (float, optional): [description]. Defaults to 0.05.
+            epsilon_decay (float, optional): [description]. Defaults to 1e-3.
+            num_executors (int, optional): [description]. Defaults to 1.
+            num_caches (int, optional): [description]. Defaults to 0.
+            environment_spec (mava_specs.MAEnvironmentSpec, optional): [description]. Defaults to None.
+            shared_weights (bool, optional): [description]. Defaults to True.
+            batch_size (int, optional): [description]. Defaults to 256.
+            prefetch_size (int, optional): [description]. Defaults to 4.
+            min_replay_size (int, optional): [description]. Defaults to 1000.
+            max_replay_size (int, optional): [description]. Defaults to 1000000.
+            samples_per_insert (Optional[float], optional): [description]. Defaults to 4.0.
+            n_step (int, optional): [description]. Defaults to 5.
+            sequence_length (int, optional): [description]. Defaults to 6.
+            period (int, optional): [description]. Defaults to 20.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            discount (float, optional): [description]. Defaults to 1.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]], optional): [description]. Defaults to snt.optimizers.Adam( learning_rate=1e-4 ).
+            target_update_period (int, optional): [description]. Defaults to 100.
+            executor_variable_update_period (int, optional): [description]. Defaults to 1000.
+            max_executor_steps (int, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to False.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+            logger_config (Dict, optional): [description]. Defaults to {}.
+            train_loop_fn (Callable, optional): [description]. Defaults to ParallelEnvironmentLoop.
+            eval_loop_fn (Callable, optional): [description]. Defaults to ParallelEnvironmentLoop.
+            train_loop_fn_kwargs (Dict, optional): [description]. Defaults to {}.
+            eval_loop_fn_kwargs (Dict, optional): [description]. Defaults to {}.
+        """
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
@@ -193,6 +203,11 @@ class DIAL:
         )
 
     def _get_extra_specs(self) -> Any:
+        """[summary]
+
+        Returns:
+            Any: [description]
+        """
         agents = self._environment_spec.get_agent_ids()
         core_state_specs = {}
         core_message_specs = {}
@@ -221,10 +236,19 @@ class DIAL:
         return extras
 
     def replay(self) -> Any:
-        """The replay storage."""
+        """[summary]
+
+        Returns:
+            Any: [description]
+        """
         return self._builder.make_replay_tables(self._environment_spec)
 
     def counter(self) -> Any:
+        """[summary]
+
+        Returns:
+            Any: [description]
+        """
         return tf2_savers.CheckpointingRunner(
             counting.Counter(),
             time_delta_minutes=15,
@@ -233,6 +257,14 @@ class DIAL:
         )
 
     def coordinator(self, counter: counting.Counter) -> Any:
+        """[summary]
+
+        Args:
+            counter (counting.Counter): [description]
+
+        Returns:
+            Any: [description]
+        """
         return lp_utils.StepsLimiter(counter, self._max_executor_steps)  # type: ignore
 
     def trainer(
@@ -240,7 +272,15 @@ class DIAL:
         replay: reverb.Client,
         counter: counting.Counter,
     ) -> mava.core.Trainer:
-        """The Trainer part of the system."""
+        """[summary]
+
+        Args:
+            replay (reverb.Client): [description]
+            counter (counting.Counter): [description]
+
+        Returns:
+            mava.core.Trainer: [description]
+        """
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
@@ -298,7 +338,18 @@ class DIAL:
         counter: counting.Counter,
         trainer: Optional[training.MADQNRecurrentCommTrainer] = None,
     ) -> mava.ParallelEnvironmentLoop:
-        """The executor process."""
+        """[summary]
+
+        Args:
+            executor_id (str): [description]
+            replay (reverb.Client): [description]
+            variable_source (acme.VariableSource): [description]
+            counter (counting.Counter): [description]
+            trainer (Optional[training.MADQNRecurrentCommTrainer], optional): [description]. Defaults to None.
+
+        Returns:
+            mava.ParallelEnvironmentLoop: [description]
+        """
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -339,7 +390,6 @@ class DIAL:
             trainer=trainer,
         )
 
-        # TODO (Arnu): figure out why factory function are giving type errors
         # Create the environment.
         environment = self._environment_factory(evaluation=False)  # type: ignore
 
@@ -373,7 +423,16 @@ class DIAL:
         counter: counting.Counter,
         trainer: training.MADQNRecurrentCommTrainer,
     ) -> Any:
-        """The evaluation process."""
+        """[summary]
+
+        Args:
+            variable_source (acme.VariableSource): [description]
+            counter (counting.Counter): [description]
+            trainer (training.MADQNRecurrentCommTrainer): [description]
+
+        Returns:
+            Any: [description]
+        """
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -440,7 +499,14 @@ class DIAL:
         return eval_loop
 
     def build(self, name: str = "madqn") -> Any:
-        """Build the distributed system topology."""
+        """[summary]
+
+        Args:
+            name (str, optional): [description]. Defaults to "madqn".
+
+        Returns:
+            Any: [description]
+        """
         program = lp.Program(name=name)
         counter = None
 
