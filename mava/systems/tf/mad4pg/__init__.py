@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Implementations of a MAD4PG agent."""
 from mava.systems.tf.mad4pg.execution import (
     MAD4PGFeedForwardExecutor,
     MAD4PGRecurrentExecutor,

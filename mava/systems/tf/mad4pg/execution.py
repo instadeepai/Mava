@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""MAD4PG system executor implementation."""
+
 from typing import Dict, Optional
 
 import sonnet as snt
@@ -42,6 +44,16 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         shared_weights: bool = True,
     ):
+        """[summary]
+
+        Args:
+            policy_networks (Dict[str, snt.Module]): [description]
+            agent_specs (Dict[str, EnvironmentSpec]): [description]
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional): [description]. Defaults to None.
+            shared_weights (bool, optional): [description]. Defaults to True.
+        """
+
         super().__init__(
             policy_networks=policy_networks,
             agent_specs=agent_specs,
@@ -67,6 +79,16 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         shared_weights: bool = True,
     ):
+        """[summary]
+
+        Args:
+            policy_networks (Dict[str, snt.Module]): [description]
+            agent_specs (Dict[str, EnvironmentSpec]): [description]
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional): [description]. Defaults to None.
+            shared_weights (bool, optional): [description]. Defaults to True.
+        """
+
         super().__init__(
             policy_networks=policy_networks,
             agent_specs=agent_specs,

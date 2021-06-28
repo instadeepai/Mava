@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MAD4PG system implementation."""
+"""MAD4PG system builder implementation."""
+
 from typing import Any, Dict, Type, Union
 
 from mava import core
@@ -42,9 +43,14 @@ class MAD4PGBuilder(MADDPGBuilder):
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):
-        """Args:
-        config: Configuration options for the MAD4PG system.
-        trainer_fn: Trainer module to use."""
+        """[summary]
+
+        Args:
+            config (MADDPGConfig): [description]
+            trainer_fn (Union[ Type[training.MAD4PGBaseTrainer], Type[training.MAD4PGBaseRecurrentTrainer], ], optional): [description]. Defaults to training.MAD4PGDecentralisedTrainer.
+            executor_fn (Type[core.Executor], optional): [description]. Defaults to executors.FeedForwardExecutor.
+            extra_specs (Dict[str, Any], optional): [description]. Defaults to {}.
+        """
 
         super().__init__(
             config=config,
