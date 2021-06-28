@@ -24,6 +24,7 @@ import tensorflow as tf
 from acme.tf import utils as tf2_utils
 
 from mava import specs as mava_specs
+from mava.components.tf.architectures.base import BaseArchitecture
 from mava.components.tf.modules.mixing import BaseMixingModule
 from mava.components.tf.networks.monotonic import MonotonicMixingNetwork
 
@@ -38,7 +39,7 @@ class MonotonicMixing(BaseMixingModule):
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
         n_agents: int,
-        agent_networks: Dict[str, snt.Module],
+        architecture: BaseArchitecture,
         qmix_hidden_dim: int = 32,
         num_hypernet_layers: int = 2,
         hypernet_hidden_dim: int = 64,  # Defaults to qmix_hidden_dim
@@ -54,7 +55,8 @@ class MonotonicMixing(BaseMixingModule):
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
         self._n_agents = n_agents
-        self._agent_networks = agent_networks
+        self._architecture = architecture
+        self._agent_networks = self._architecture.create_actor_variables()
 
     def _create_mixing_layer(self, name: str = "mixing") -> snt.Module:
         """Modify and return system architecture given mixing structure."""

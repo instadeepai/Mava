@@ -118,8 +118,8 @@ class QMIX(MADQN):
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         qmix_hidden_dim: int = 32,
-        num_hypernet_layers: int = 2,
-        hypernet_hidden_dim: int = 64,
+        num_hypernet_layers: int = 1,
+        hypernet_hidden_dim: int = 32,
     ):
 
         self._mixer = mixer
@@ -247,13 +247,10 @@ class QMIX(MADQN):
                 therefore cannot use a communication module."
             )
 
-        # Extract agent networks
-        agent_networks = architecture.create_actor_variables()
-
         # Mixing module
         system_networks = self._mixer(
             environment_spec=self._environment_spec,
-            agent_networks=agent_networks,
+            architecture=architecture,
             n_agents=len(self._environment_spec.get_agent_ids()),
             num_hypernet_layers=self._num_hypernet_layers,
             qmix_hidden_dim=self._qmix_hidden_dim,
