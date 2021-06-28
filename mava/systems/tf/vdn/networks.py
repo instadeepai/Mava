@@ -18,7 +18,6 @@ import sonnet as snt
 import tensorflow as tf
 from acme import types
 from acme.tf import networks
-from acme.tf.networks.atari import DQNAtariNetwork
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import epsilon_greedy_action_selector
@@ -26,22 +25,12 @@ from mava.components.tf.networks import epsilon_greedy_action_selector
 valid_dqn_network_types = ["mlp", "atari"]
 
 
-# Default networks for madqn
-# TODO Use fingerprints variable
+# Default networks for vdn
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        512,
-        256,
-    ),
+    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64, 64),
     shared_weights: bool = True,
-    network_type: str = "mlp",
-    fingerprints: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
-
-    assert (
-        network_type.lower() in valid_dqn_network_types
-    ), f"Invalid network_type, valid options are {valid_dqn_network_types}"
     """Creates networks used by the agents."""
 
     specs = environment_spec.get_agent_specs()
@@ -71,17 +60,14 @@ def make_default_networks(
         num_dimensions = specs[key].actions.num_values
 
         # Create the policy network.
-        if network_type.lower() == "mlp":
-            q_network = snt.Sequential(
-                [
-                    networks.LayerNormMLP(
-                        q_networks_layer_sizes[key], activate_final=False
-                    ),
-                    networks.NearZeroInitializedLinear(num_dimensions),
-                ]
-            )
-        elif network_type.lower() == "atari":
-            q_network = DQNAtariNetwork(num_dimensions)
+        q_network = snt.Sequential(
+            [
+                networks.LayerNormMLP(
+                    q_networks_layer_sizes[key], activate_final=False
+                ),
+                networks.NearZeroInitializedLinear(num_dimensions),
+            ]
+        )
 
         # epsilon greedy action selector
         action_selector = action_selector_fn
