@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""MADQN system trainer implementation."""
+
 import copy
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -63,6 +65,28 @@ class MADQNTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
     ):
+        """[summary]
+
+        Args:
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            q_networks (Dict[str, snt.Module]): [description]
+            target_q_networks (Dict[str, snt.Module]): [description]
+            target_update_period (int): [description]
+            dataset (tf.data.Dataset): [description]
+            optimizer (Union[Dict[str, snt.Optimizer], snt.Optimizer]): [description]
+            discount (float): [description]
+            shared_weights (bool): [description]
+            exploration_scheduler (LinearExplorationScheduler): [description]
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            fingerprint (bool, optional): [description]. Defaults to False.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+            communication_module (Optional[BaseCommunicationModule], optional):
+                [description]. Defaults to None.
+        """
 
         self._agents = agents
         self._agent_types = agent_types
@@ -153,15 +177,31 @@ class MADQNTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def get_epsilon(self) -> float:
+        """[summary]
+
+        Returns:
+            float: [description]
+        """
+
         return self._exploration_scheduler.get_epsilon()
 
     def get_trainer_steps(self) -> float:
+        """[summary]
+
+        Returns:
+            float: [description]
+        """
+
         return self._num_steps.numpy()
 
     def _decrement_epsilon(self) -> None:
+        """[summary]"""
+
         self._exploration_scheduler.decrement_epsilon()
 
     def _update_target_networks(self) -> None:
+        """[summary]"""
+
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (*self._q_networks[key].variables,)
@@ -181,6 +221,17 @@ class MADQNTrainer(mava.Trainer):
         a_tm1: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        """[summary]
+
+        Args:
+            o_tm1_trans (Dict[str, np.ndarray]): [description]
+            o_t_trans (Dict[str, np.ndarray]): [description]
+            a_tm1 (Dict[str, np.ndarray]): [description]
+            agent (str): [description]
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+        """
 
         # Decentralised
         o_tm1_feed = o_tm1_trans[agent].observation
@@ -190,6 +241,8 @@ class MADQNTrainer(mava.Trainer):
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
     def step(self) -> None:
+        """[summary]"""
+
         # Run the learning step.
         fetches = self._step()
 
@@ -221,6 +274,11 @@ class MADQNTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
+        """[summary]
+
+        Returns:
+            Dict[str, Dict[str, Any]]: [description]
+        """
 
         # Update the target networks
         self._update_target_networks()
@@ -237,6 +295,12 @@ class MADQNTrainer(mava.Trainer):
         return self._q_network_losses
 
     def _forward(self, inputs: Any) -> None:
+        """[summary]
+
+        Args:
+            inputs (Any): [description]
+        """
+
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -299,6 +363,8 @@ class MADQNTrainer(mava.Trainer):
         self.tape = tape
 
     def _backward(self) -> None:
+        """[summary]"""
+
         q_network_losses = self._q_network_losses
         tape = self.tape
         for agent in self._agents:
@@ -319,6 +385,15 @@ class MADQNTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+        """[summary]
+
+        Args:
+            names (Sequence[str]): [description]
+
+        Returns:
+            Dict[str, Dict[str, np.ndarray]]: [description]
+        """
+
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
             variables[network_type] = {
@@ -356,6 +431,29 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
     ):
+        """[summary]
+
+        Args:
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            q_networks (Dict[str, snt.Module]): [description]
+            target_q_networks (Dict[str, snt.Module]): [description]
+            target_update_period (int): [description]
+            dataset (tf.data.Dataset): [description]
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            discount (float): [description]
+            shared_weights (bool): [description]
+            exploration_scheduler (LinearExplorationScheduler): [description]
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            fingerprint (bool, optional): [description]. Defaults to False.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+            communication_module (Optional[BaseCommunicationModule], optional):
+                [description]. Defaults to None.
+        """
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -376,6 +474,12 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         )
 
     def _forward(self, inputs: Any) -> None:
+        """[summary]
+
+        Args:
+            inputs (Any): [description]
+        """
+
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
         )
@@ -451,6 +555,28 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
+        """[summary]
+
+        Args:
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            q_networks (Dict[str, snt.Module]): [description]
+            target_q_networks (Dict[str, snt.Module]): [description]
+            target_update_period (int): [description]
+            dataset (tf.data.Dataset): [description]
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            discount (float): [description]
+            shared_weights (bool): [description]
+            exploration_scheduler (LinearExplorationScheduler): [description]
+            communication_module (BaseCommunicationModule): [description]
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            fingerprint (bool, optional): [description]. Defaults to False.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+        """
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -473,6 +599,12 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         self._communication_module = communication_module
 
     def _forward(self, inputs: Any) -> None:
+        """[summary]
+
+        Args:
+            inputs (Any): [description]
+        """
+
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
         )

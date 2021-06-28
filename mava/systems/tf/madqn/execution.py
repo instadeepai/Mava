@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-"""Executor implementations for MADQN."""
+"""MADQN system executor implementation."""
 
 from typing import Any, Dict, Optional
 
@@ -59,14 +59,21 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         fingerprint: bool = False,
         evaluator: bool = False,
     ):
-        """Initializes the executor.
+        """[summary]
+
         Args:
-          policy_network: the policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            q_networks (Dict[str, snt.Module]): [description]
+            action_selectors (Dict[str, snt.Module]): [description]
+            trainer (MADQNTrainer): [description]
+            shared_weights (bool, optional): [description]. Defaults to True.
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
+                to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                [description]. Defaults to None.
+            communication_module (Optional[BaseCommunicationModule], optional):
+                [description]. Defaults to None.
+            fingerprint (bool, optional): [description]. Defaults to False.
+            evaluator (bool, optional): [description]. Defaults to False.
         """
 
         # Store these for later use.
@@ -88,6 +95,19 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         epsilon: tf.Tensor,
         fingerprint: Optional[tf.Tensor] = None,
     ) -> types.NestedTensor:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedTensor): [description]
+            legal_actions (types.NestedTensor): [description]
+            epsilon (tf.Tensor): [description]
+            fingerprint (Optional[tf.Tensor], optional): [description].
+                Defaults to None.
+
+        Returns:
+            types.NestedTensor: [description]
+        """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
@@ -113,6 +133,18 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedArray): [description]
+
+        Raises:
+            NotImplementedError: [description]
+
+        Returns:
+            types.NestedArray: [description]
+        """
         raise NotImplementedError
 
     def observe_first(
@@ -120,6 +152,13 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
+        """[summary]
+
+        Args:
+            timestep (dm_env.TimeStep): [description]
+            extras (Dict[str, types.NestedArray], optional): [description].
+                Defaults to {}.
+        """
 
         if self._fingerprint and self._trainer is not None:
             epsilon = self._trainer.get_epsilon()
@@ -136,6 +175,15 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
+        """[summary]
+
+        Args:
+            actions (Dict[str, types.NestedArray]): [description]
+            next_timestep (dm_env.TimeStep): [description]
+            next_extras (Dict[str, types.NestedArray], optional): [description].
+                Defaults to {}.
+        """
+
         if self._fingerprint and self._trainer is not None:
             trainer_step = self._trainer.get_trainer_steps()
             epsilon = self._trainer.get_epsilon()
@@ -148,6 +196,15 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
     def select_actions(
         self, observations: Dict[str, OLT]
     ) -> Dict[str, types.NestedArray]:
+        """[summary]
+
+        Args:
+            observations (Dict[str, OLT]): [description]
+
+        Returns:
+            Dict[str, types.NestedArray]: [description]
+        """
+
         actions = {}
         for agent, observation in observations.items():
             # Pass the observation through the policy network.
@@ -181,6 +238,12 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         return actions
 
     def update(self, wait: bool = False) -> None:
+        """[summary]
+
+        Args:
+            wait (bool, optional): [description]. Defaults to False.
+        """
+
         if self._variable_client:
             self._variable_client.update(wait)
 
@@ -206,14 +269,22 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         evaluator: bool = False,
         fingerprint: bool = False,
     ):
-        """Initializes the executor.
+        """[summary]
+
         Args:
-          policy_network: the policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            q_networks (Dict[str, snt.Module]): [description]
+            action_selectors (Dict[str, snt.Module]): [description]
+            shared_weights (bool, optional): [description]. Defaults to True.
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
+                to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                [description]. Defaults to None.
+            store_recurrent_state (bool, optional): [description]. Defaults to True.
+            trainer (MADQNTrainer, optional): [description]. Defaults to None.
+            communication_module (Optional[BaseCommunicationModule], optional):
+                [description]. Defaults to None.
+            evaluator (bool, optional): [description]. Defaults to False.
+            fingerprint (bool, optional): [description]. Defaults to False.
         """
 
         # Store these for later use.
@@ -237,6 +308,18 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
     ) -> types.NestedTensor:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedTensor): [description]
+            state (types.NestedTensor): [description]
+            legal_actions (types.NestedTensor): [description]
+            epsilon (tf.Tensor): [description]
+
+        Returns:
+            types.NestedTensor: [description]
+        """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
@@ -258,11 +341,33 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedArray): [description]
+
+        Raises:
+            NotImplementedError: [description]
+
+        Returns:
+            types.NestedArray: [description]
+        """
+
         raise NotImplementedError
 
     def select_actions(
         self, observations: Dict[str, OLT]
     ) -> Dict[str, types.NestedArray]:
+        """[summary]
+
+        Args:
+            observations (Dict[str, OLT]): [description]
+
+        Returns:
+            Dict[str, types.NestedArray]: [description]
+        """
+
         actions = {}
 
         for agent, observation in observations.items():
@@ -312,14 +417,21 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         fingerprint: bool = False,
         evaluator: bool = False,
     ):
-        """Initializes the executor.
+        """[summary]
+
         Args:
-          policy_network: the policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            q_networks (Dict[str, snt.Module]): [description]
+            action_selectors (Dict[str, snt.Module]): [description]
+            communication_module (BaseCommunicationModule): [description]
+            shared_weights (bool, optional): [description]. Defaults to True.
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
+                to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                [description]. Defaults to None.
+            store_recurrent_state (bool, optional): [description]. Defaults to True.
+            trainer (MADQNTrainer, optional): [description]. Defaults to None.
+            fingerprint (bool, optional): [description]. Defaults to False.
+            evaluator (bool, optional): [description]. Defaults to False.
         """
 
         # Store these for later use.
@@ -346,6 +458,19 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
     ) -> types.NestedTensor:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedTensor): [description]
+            state (types.NestedTensor): [description]
+            message (types.NestedTensor): [description]
+            legal_actions (types.NestedTensor): [description]
+            epsilon (tf.Tensor): [description]
+
+        Returns:
+            types.NestedTensor: [description]
+        """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
@@ -369,11 +494,33 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedArray): [description]
+
+        Raises:
+            NotImplementedError: [description]
+
+        Returns:
+            types.NestedArray: [description]
+        """
+
         raise NotImplementedError
 
     def select_actions(
         self, observations: Dict[str, OLT]
     ) -> Dict[str, types.NestedArray]:
+        """[summary]
+
+        Args:
+            observations (Dict[str, OLT]): [description]
+
+        Returns:
+            Dict[str, types.NestedArray]: [description]
+        """
+
         actions = {}
 
         message_inputs = self._communication_module.process_messages(self._messages)
