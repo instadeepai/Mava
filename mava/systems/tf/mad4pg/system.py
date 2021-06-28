@@ -88,27 +88,39 @@ class MAD4PG(MADDPG):
 
         Args:
             environment_factory (Callable[[bool], dm_env.Environment]): [description]
-            network_factory (Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]]): [description]
-            logger_factory (Callable[[str], MavaLogger], optional): [description]. Defaults to None.
-            architecture (Type[ DecentralisedQValueActorCritic ], optional): [description]. Defaults to DecentralisedQValueActorCritic.
-            trainer_fn (Union[ Type[training.MAD4PGBaseTrainer], Type[training.MAD4PGBaseRecurrentTrainer], ], optional): [description]. Defaults to training.MAD4PGDecentralisedTrainer.
-            executor_fn (Type[core.Executor], optional): [description]. Defaults to MADDPGFeedForwardExecutor.
+            network_factory (Callable[[acme_specs.BoundedArray],
+                Dict[str, snt.Module]]): [description]
+            logger_factory (Callable[[str], MavaLogger], optional): [description].
+                Defaults to None.
+            architecture (Type[ DecentralisedQValueActorCritic ], optional):
+                [description]. Defaults to DecentralisedQValueActorCritic.
+            trainer_fn (Union[ Type[training.MAD4PGBaseTrainer],
+                Type[training.MAD4PGBaseRecurrentTrainer], ], optional): [description].
+                Defaults to training.MAD4PGDecentralisedTrainer.
+            executor_fn (Type[core.Executor], optional): [description]. Defaults to
+                MADDPGFeedForwardExecutor.
             num_executors (int, optional): [description]. Defaults to 1.
             num_caches (int, optional): [description]. Defaults to 0.
-            environment_spec (mava_specs.MAEnvironmentSpec, optional): [description]. Defaults to None.
+            environment_spec (mava_specs.MAEnvironmentSpec, optional): [description].
+                Defaults to None.
             shared_weights (bool, optional): [description]. Defaults to True.
             discount (float, optional): [description]. Defaults to 0.99.
             batch_size (int, optional): [description]. Defaults to 256.
             prefetch_size (int, optional): [description]. Defaults to 4.
             target_averaging (bool, optional): [description]. Defaults to False.
             target_update_period (int, optional): [description]. Defaults to 100.
-            target_update_rate (Optional[float], optional): [description]. Defaults to None.
-            executor_variable_update_period (int, optional): [description]. Defaults to 1000.
+            target_update_rate (Optional[float], optional): [description]. Defaults to
+                None.
+            executor_variable_update_period (int, optional): [description]. Defaults to
+                1000.
             min_replay_size (int, optional): [description]. Defaults to 1000.
             max_replay_size (int, optional): [description]. Defaults to 1000000.
             samples_per_insert (float, optional): [description]. Defaults to 32.0.
-            policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ], optional): [description]. Defaults to snt.optimizers.Adam(learning_rate=1e-4).
-            critic_optimizer (snt.Optimizer, optional): [description]. Defaults to snt.optimizers.Adam(learning_rate=1e-4).
+            policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
+                optional): [description]. Defaults to
+                snt.optimizers.Adam(learning_rate=1e-4).
+            critic_optimizer (snt.Optimizer, optional): [description]. Defaults to
+                snt.optimizers.Adam(learning_rate=1e-4).
             n_step (int, optional): [description]. Defaults to 5.
             sequence_length (int, optional): [description]. Defaults to 20.
             period (int, optional): [description]. Defaults to 20.
@@ -118,8 +130,10 @@ class MAD4PG(MADDPG):
             checkpoint (bool, optional): [description]. Defaults to True.
             checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
             logger_config (Dict, optional): [description]. Defaults to {}.
-            train_loop_fn (Callable, optional): [description]. Defaults to ParallelEnvironmentLoop.
-            eval_loop_fn (Callable, optional): [description]. Defaults to ParallelEnvironmentLoop.
+            train_loop_fn (Callable, optional): [description]. Defaults to
+                ParallelEnvironmentLoop.
+            eval_loop_fn (Callable, optional): [description]. Defaults to
+                ParallelEnvironmentLoop.
             train_loop_fn_kwargs (Dict, optional): [description]. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): [description]. Defaults to {}.
         """

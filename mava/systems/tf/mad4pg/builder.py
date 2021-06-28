@@ -47,8 +47,11 @@ class MAD4PGBuilder(MADDPGBuilder):
 
         Args:
             config (MADDPGConfig): [description]
-            trainer_fn (Union[ Type[training.MAD4PGBaseTrainer], Type[training.MAD4PGBaseRecurrentTrainer], ], optional): [description]. Defaults to training.MAD4PGDecentralisedTrainer.
-            executor_fn (Type[core.Executor], optional): [description]. Defaults to executors.FeedForwardExecutor.
+            trainer_fn (Union[ Type[training.MAD4PGBaseTrainer],
+                Type[training.MAD4PGBaseRecurrentTrainer], ], optional):
+                [description]. Defaults to training.MAD4PGDecentralisedTrainer.
+            executor_fn (Type[core.Executor], optional): [description]. Defaults to
+                executors.FeedForwardExecutor.
             extra_specs (Dict[str, Any], optional): [description]. Defaults to {}.
         """
 

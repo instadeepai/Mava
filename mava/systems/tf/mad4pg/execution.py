@@ -49,8 +49,10 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         Args:
             policy_networks (Dict[str, snt.Module]): [description]
             agent_specs (Dict[str, EnvironmentSpec]): [description]
-            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional): [description]. Defaults to None.
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
+                to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                [description]. Defaults to None.
             shared_weights (bool, optional): [description]. Defaults to True.
         """
 
@@ -84,8 +86,10 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         Args:
             policy_networks (Dict[str, snt.Module]): [description]
             agent_specs (Dict[str, EnvironmentSpec]): [description]
-            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional): [description]. Defaults to None.
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
+                to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                [description]. Defaults to None.
             shared_weights (bool, optional): [description]. Defaults to True.
         """
 

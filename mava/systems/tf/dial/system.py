@@ -99,39 +99,53 @@ class DIAL:
 
         Args:
             environment_factory (Callable[[bool], dm_env.Environment]): [description]
-            network_factory (Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]]): [description]
-            logger_factory (Callable[[str], MavaLogger], optional): [description]. Defaults to None.
-            architecture (Type[DecentralisedValueActor], optional): [description]. Defaults to DecentralisedValueActor.
-            trainer_fn (Type[ training.MADQNRecurrentCommTrainer ], optional): [description]. Defaults to training.MADQNRecurrentCommTrainer.
-            communication_module (Type[BaseCommunicationModule], optional): [description]. Defaults to BroadcastedCommunication.
-            executor_fn (Type[core.Executor], optional): [description]. Defaults to execution.MADQNFeedForwardExecutor.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional): [description]. Defaults to LinearExplorationScheduler.
-            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]], optional): [description]. Defaults to None.
+            network_factory (Callable[[acme_specs.BoundedArray],
+                Dict[str, snt.Module]]): [description]
+            logger_factory (Callable[[str], MavaLogger], optional): [description].
+                Defaults to None.
+            architecture (Type[DecentralisedValueActor], optional): [description].
+                Defaults to DecentralisedValueActor.
+            trainer_fn (Type[ training.MADQNRecurrentCommTrainer ], optional):
+                [description]. Defaults to training.MADQNRecurrentCommTrainer.
+            communication_module (Type[BaseCommunicationModule], optional):
+                [description]. Defaults to BroadcastedCommunication.
+            executor_fn (Type[core.Executor], optional): [description]. Defaults to
+                execution.MADQNFeedForwardExecutor.
+            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
+                [description]. Defaults to LinearExplorationScheduler.
+            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
+                optional): [description]. Defaults to None.
             epsilon_min (float, optional): [description]. Defaults to 0.05.
             epsilon_decay (float, optional): [description]. Defaults to 1e-3.
             num_executors (int, optional): [description]. Defaults to 1.
             num_caches (int, optional): [description]. Defaults to 0.
-            environment_spec (mava_specs.MAEnvironmentSpec, optional): [description]. Defaults to None.
+            environment_spec (mava_specs.MAEnvironmentSpec, optional): [description].
+                Defaults to None.
             shared_weights (bool, optional): [description]. Defaults to True.
             batch_size (int, optional): [description]. Defaults to 256.
             prefetch_size (int, optional): [description]. Defaults to 4.
             min_replay_size (int, optional): [description]. Defaults to 1000.
             max_replay_size (int, optional): [description]. Defaults to 1000000.
-            samples_per_insert (Optional[float], optional): [description]. Defaults to 4.0.
+            samples_per_insert (Optional[float], optional): [description]. Defaults
+                to 4.0.
             n_step (int, optional): [description]. Defaults to 5.
             sequence_length (int, optional): [description]. Defaults to 6.
             period (int, optional): [description]. Defaults to 20.
             max_gradient_norm (float, optional): [description]. Defaults to None.
             discount (float, optional): [description]. Defaults to 1.
-            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]], optional): [description]. Defaults to snt.optimizers.Adam( learning_rate=1e-4 ).
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]], optional):
+                [description]. Defaults to snt.optimizers.Adam( learning_rate=1e-4 ).
             target_update_period (int, optional): [description]. Defaults to 100.
-            executor_variable_update_period (int, optional): [description]. Defaults to 1000.
+            executor_variable_update_period (int, optional): [description]. Defaults
+                to 1000.
             max_executor_steps (int, optional): [description]. Defaults to None.
             checkpoint (bool, optional): [description]. Defaults to False.
             checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
             logger_config (Dict, optional): [description]. Defaults to {}.
-            train_loop_fn (Callable, optional): [description]. Defaults to ParallelEnvironmentLoop.
-            eval_loop_fn (Callable, optional): [description]. Defaults to ParallelEnvironmentLoop.
+            train_loop_fn (Callable, optional): [description]. Defaults to
+                ParallelEnvironmentLoop.
+            eval_loop_fn (Callable, optional): [description]. Defaults to
+                ParallelEnvironmentLoop.
             train_loop_fn_kwargs (Dict, optional): [description]. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): [description]. Defaults to {}.
         """
@@ -345,7 +359,8 @@ class DIAL:
             replay (reverb.Client): [description]
             variable_source (acme.VariableSource): [description]
             counter (counting.Counter): [description]
-            trainer (Optional[training.MADQNRecurrentCommTrainer], optional): [description]. Defaults to None.
+            trainer (Optional[training.MADQNRecurrentCommTrainer], optional):
+                [description]. Defaults to None.
 
         Returns:
             mava.ParallelEnvironmentLoop: [description]

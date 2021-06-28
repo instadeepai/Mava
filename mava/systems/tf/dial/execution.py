@@ -57,8 +57,10 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
             action_selectors (Dict[str, snt.Module]): [description]
             communication_module (BaseCommunicationModule): [description]
             shared_weights (bool, optional): [description]. Defaults to True.
-            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional): [description]. Defaults to None.
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
+                to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                [description]. Defaults to None.
             store_recurrent_state (bool, optional): [description]. Defaults to True.
             trainer (MADQNTrainer, optional): [description]. Defaults to None.
             fingerprint (bool, optional): [description]. Defaults to False.

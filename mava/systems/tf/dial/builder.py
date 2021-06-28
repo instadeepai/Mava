@@ -112,11 +112,15 @@ class DIALBuilder:
 
         Args:
             config (DIALConfig): [description]
-            trainer_fn (Type[ training.MADQNRecurrentCommTrainer ], optional): [description]. Defaults to training.MADQNRecurrentCommTrainer.
-            executor_fn (Type[core.Executor], optional): [description]. Defaults to execution.MADQNRecurrentCommExecutor.
+            trainer_fn (Type[ training.MADQNRecurrentCommTrainer ], optional):
+                [description]. Defaults to training.MADQNRecurrentCommTrainer.
+            executor_fn (Type[core.Executor], optional): [description]. Defaults to
+                execution.MADQNRecurrentCommExecutor.
             extra_specs (Dict[str, Any], optional): [description]. Defaults to {}.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional): [description]. Defaults to LinearExplorationScheduler.
-            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]], optional): [description]. Defaults to None.
+            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
+                [description]. Defaults to LinearExplorationScheduler.
+            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
+                optional): [description]. Defaults to None.
         """
         self._config = config
         self._extra_specs = extra_specs
@@ -266,9 +270,12 @@ class DIALBuilder:
             q_networks (Dict[str, snt.Module]): [description]
             action_selectors (Dict[str, Any]): [description]
             communication_module (BaseCommunicationModule): [description]
-            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults to None.
-            variable_source (Optional[core.VariableSource], optional): [description]. Defaults to None.
-            trainer (Optional[training.MADQNRecurrentCommTrainer], optional): [description]. Defaults to None.
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
+                to None.
+            variable_source (Optional[core.VariableSource], optional): [description].
+                Defaults to None.
+            trainer (Optional[training.MADQNRecurrentCommTrainer], optional):
+                [description]. Defaults to None.
             evaluator (bool, optional): [description]. Defaults to False.
 
         Returns:
@@ -324,8 +331,10 @@ class DIALBuilder:
             networks (Dict[str, Dict[str, snt.Module]]): [description]
             dataset (Iterator[reverb.ReplaySample]): [description]
             communication_module (BaseCommunicationModule): [description]
-            counter (Optional[counting.Counter], optional): [description]. Defaults to None.
-            logger (Optional[types.NestedLogger], optional): [description]. Defaults to None.
+            counter (Optional[counting.Counter], optional): [description]. Defaults to
+                None.
+            logger (Optional[types.NestedLogger], optional): [description]. Defaults to
+                None.
 
         Returns:
             core.Trainer: [description]

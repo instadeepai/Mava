@@ -80,7 +80,8 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+              [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -239,7 +240,8 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+              [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -320,7 +322,8 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+              [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -401,7 +404,8 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+              [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -483,7 +487,8 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+              [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -702,7 +707,8 @@ class MAD4PGDecentralisedRecurrentTrainer(
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+              [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -788,7 +794,8 @@ class MAD4PGCentralisedRecurrentTrainer(
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -874,7 +881,8 @@ class MAD4PGStateBasedRecurrentTrainer(
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
