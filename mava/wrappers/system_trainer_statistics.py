@@ -149,6 +149,7 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
 
                 self._network_loggers[network].write(network_running_statistics)
 
+
 class ScaledTrainerStatisticsBase(TrainerWrapperBase):
     def __init__(
         self,
@@ -175,7 +176,10 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
 
         # Update our counts and record it.
         # TODO (dries): Can this be simplified? Only one set and one get?
-        self._variable_client.add_and_wait(self, ["trainer_steps", "trainer_walltime"], {"trainer_steps": 1, "trainer_walltime": elapsed_time})
+        self._variable_client.add_and_wait(
+            ["trainer_steps", "trainer_walltime"],
+            {"trainer_steps": 1, "trainer_walltime": elapsed_time},
+        )
         # counts = self._counter.increment(steps=1, walltime=elapsed_time)
 
         # Update the variable source and the trainer

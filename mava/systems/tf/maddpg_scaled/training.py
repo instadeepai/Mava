@@ -55,8 +55,7 @@ class MADDPGBaseTrainer(feedforward_trainer):
         agents: List[str],
         agent_types: List[str],
         train_agents: List[str],
-        counts: Dict[str, Any],
-        trainer_id: str,
+        # trainer_id: str,
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -71,12 +70,13 @@ class MADDPGBaseTrainer(feedforward_trainer):
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         variable_client: core.VariableSource,
+        counts: Dict[str, Any],
         num_steps: int,
         shared_weights: bool = False,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
+        # checkpoint: bool = True,
         # checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
@@ -110,9 +110,9 @@ class MADDPGBaseTrainer(feedforward_trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._shared_weights = shared_weights
-        self._checkpoint = checkpoint
+        # self._checkpoint = checkpoint
         self._variable_client = variable_client
-        self._trainer_id = trainer_id
+        # self._trainer_id = trainer_id
 
         # Setup counter
         self._counts = counts
@@ -487,12 +487,14 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         variable_client: core.VariableSource,
+        counts: Dict[str, Any],
+        num_steps: int,
         shared_weights: bool = False,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
+        # checkpoint: bool = True,
+        # checkpoint_subpath: str = "~/mava/",
     ):
         """Initializes the learner.
         Args:
@@ -538,9 +540,11 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
+            # checkpoint=checkpoint,
+            # checkpoint_subpath=checkpoint_subpath,
             variable_client=variable_client,
+            counts=counts,
+            num_steps=num_steps,
         )
 
 

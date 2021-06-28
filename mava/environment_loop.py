@@ -236,15 +236,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         # Internalize agent and environment.
         self._environment = environment
         self._executor = executor
+        self._counter = counter
 
-        if counter:
-            # Depreciated: For older algorithms without a centralised variable source.
-            self._counter = counter
-        else:
-            # Use
-            self.counter = self.executor._counter
-
-        # self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger(label)
         self._should_update = should_update
         self._running_statistics: Dict[str, float] = {}
@@ -337,7 +330,15 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             return self._running_statistics
         else:
             # Record counts.
-            counts = self._counter.increment(episodes=1, steps=episode_steps)
+            if not self._counter:
+                self._executor._variable_client.add_and_wait(
+                    self,
+                    ["executor_episodes", "executor_steps"],
+                    {"executor_episodes": 1, "executor_steps": episode_steps},
+                )
+                counts = self._executor._counts
+            else:
+                counts = self._counter.increment(episodes=1, steps=episode_steps)
 
             # Collect the results and combine with counts.
             steps_per_second = episode_steps / (time.time() - start_time)

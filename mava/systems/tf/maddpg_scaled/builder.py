@@ -38,7 +38,7 @@ from mava.systems.tf import variable_utils
 from mava.systems.tf.maddpg_scaled import training
 from mava.systems.tf.maddpg_scaled.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
-from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
+from mava.wrappers import ScaledDetailedTrainerStatistics, NetworkStatisticsActorCritic
 
 BoundedArray = dm_specs.BoundedArray
 DiscreteArray = dm_specs.DiscreteArray
@@ -277,7 +277,9 @@ class MADDPGBuilder(SystemBuilder):
         for net_key in networks.keys():
             for agent in agent_keys:
                 # Ensure obs and target networks are sonnet modules
-                variables[f"{agent}_{net_key}"] = tf2_utils.to_sonnet_module(networks[net_key][agent]).variables
+                variables[f"{agent}_{net_key}"] = tf2_utils.to_sonnet_module(
+                    networks[net_key][agent]
+                ).variables
 
         # Executor specific variables
         # for i in range(self._config.num_executors):
@@ -349,10 +351,18 @@ class MADDPGBuilder(SystemBuilder):
                 variables[var_key] = policy_networks[agent].variables
                 get_keys.append(var_key)
 
-            count_names = ["trainer_steps", "trainer_walltime", "evaluator_steps", "evaluator_episodes", "executor_episodes", "executor_steps"]
-            get_keys.extend(count_names)
-
             variables = self.create_counter_variables(variables)
+
+            count_names = [
+                "trainer_steps",
+                "trainer_walltime",
+                "evaluator_steps",
+                "evaluator_episodes",
+                "executor_episodes",
+                "executor_steps",
+            ]
+            get_keys.extend(count_names)
+            counts = {name: variables[name] for name in count_names}
 
             # set_keys = [f"{executor_id}_counter"]
             # variables[f"{executor_id}_counter"] = counting.Counter()
@@ -377,6 +387,7 @@ class MADDPGBuilder(SystemBuilder):
         # Create the actor which defines how we take actions.
         return self._executor_fn(
             policy_networks=policy_networks,
+            counts=counts,
             agent_specs=self._config.environment_spec.get_agent_specs(),
             shared_weights=shared_weights,
             variable_client=variable_client,
@@ -390,7 +401,7 @@ class MADDPGBuilder(SystemBuilder):
         dataset: Iterator[reverb.ReplaySample],
         variable_source: core.VariableSource,
         train_agents: Dict[str, Any],
-        counter: Optional[counting.Counter] = None,
+        # counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
@@ -432,7 +443,14 @@ class MADDPGBuilder(SystemBuilder):
         variables = self.create_counter_variables(variables)
         num_steps = variables["trainer_steps"]
 
-        count_names = ["trainer_steps", "trainer_walltime", "evaluator_steps", "evaluator_episodes", "executor_episodes", "executor_steps"]
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
         get_keys.extend(count_names)
         counts = {name: variables[name] for name in count_names}
 
@@ -470,8 +488,8 @@ class MADDPGBuilder(SystemBuilder):
             "counts": counts,
             "num_steps": num_steps,
             "logger": logger,
-            "checkpoint": self._config.checkpoint,
-            "checkpoint_subpath": self._config.checkpoint_subpath,
+            # "checkpoint": self._config.checkpoint,
+            # "checkpoint_subpath": self._config.checkpoint_subpath,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
