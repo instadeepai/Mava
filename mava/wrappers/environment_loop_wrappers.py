@@ -122,7 +122,6 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
 class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
     def __init__(self, environment_loop: ParallelEnvironmentLoop):
         super().__init__(environment_loop)
-
         # get loop logger data
         loop_label = self._logger._label
         base_dir = self._logger._directory

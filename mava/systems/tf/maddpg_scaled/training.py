@@ -55,7 +55,8 @@ class MADDPGBaseTrainer(feedforward_trainer):
         agents: List[str],
         agent_types: List[str],
         train_agents: List[str],
-        # trainer_id: str,
+        counts: Dict[str, Any],
+        trainer_id: str,
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -111,6 +112,10 @@ class MADDPGBaseTrainer(feedforward_trainer):
         self._shared_weights = shared_weights
         self._checkpoint = checkpoint
         self._variable_client = variable_client
+        self._trainer_id = trainer_id
+
+        # Setup counter
+        self._counts = counts
 
         # Store online and target networks.
         self._train_agents = train_agents

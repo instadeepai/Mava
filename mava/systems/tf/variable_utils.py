@@ -19,9 +19,10 @@ from concurrent import futures
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import tensorflow as tf
+from tensorflow.python.ops.resource_variable_ops import ResourceVariable
 from acme.tf import utils as tf2_utils
-
 from mava.systems.tf.variable_sources import VariableSource
+import numpy as np
 
 
 class VariableClient:
@@ -46,6 +47,7 @@ class VariableClient:
         self._set_update_period = set_period
         self._client = client
         self._request = lambda: client.get_variables(self._get_keys)
+        self._request_all = lambda: client.get_variables(self._all_keys)
 
         self._adjust = lambda: client.set_variables(
             self._set_keys,
@@ -111,19 +113,22 @@ class VariableClient:
             self._set_call_counter = 0
         return
 
+    def add_and_wait(self, names, vars) -> None:
+        self._client.add_to_variables(names, vars)
+
     def get_and_wait(self) -> None:
         """Immediately update and block until we get the result."""
-        self._copy(self._client.get_variables(self._get_keys))  # type: ignore
-        return
-
-    def set_and_wait(self) -> None:
-        """Immediately update and block until we get the result."""
-        self._client.set_variables(self._set_keys)  # type: ignore
+        self._copy(self._request())  # type: ignore
         return
 
     def get_all_and_wait(self) -> None:
         """Immediately update and block until we get the result."""
-        self._copy(self._client.get_variables(self._get_keys))  # type: ignore
+        self._copy(self._request_all())  # type: ignore
+        return
+
+    def set_and_wait(self) -> None:
+        """Immediately update and block until we get the result."""
+        self._adjust()  # type: ignore
         return
 
     def _copy(self, new_variables: Dict[str, Any]) -> None:
@@ -144,14 +149,21 @@ class VariableClient:
         #   old.assign(new)
 
         for key in new_variables.keys():
-            if type(new_variables[key]) == dict:
+            var_type = type(new_variables[key])
+            if var_type == dict:
                 for agent_key in new_variables[key].keys():
                     for i in range(len(self._variables[key][agent_key])):
                         self._variables[key][agent_key][i].assign(
                             new_variables[key][agent_key][i]
                         )
-            else:
+            elif var_type == np.int32:
+                # TODO (dries): Is this count value getting tracked?
+                self._variables[key] = new_variables[key]
+
+            elif var_type == tuple:
                 for i in range(len(self._variables[key])):
                     self._variables[key][i].assign(new_variables[key][i])
+            else:
+                NotImplemented(f"Variable type of {var_type} not implemented.")
 
         return

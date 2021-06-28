@@ -256,27 +256,38 @@ class MADDPGBuilder(SystemBuilder):
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
         return adder
 
+    def create_counter_variables(self, variables):
+        variables["trainer_steps"] = tf.Variable(0, dtype=tf.int32)
+        variables["trainer_walltime"] = tf.Variable(0, dtype=tf.int32)
+        variables["evaluator_steps"] = tf.Variable(0, dtype=tf.int32)
+        variables["evaluator_episodes"] = tf.Variable(0, dtype=tf.int32)
+        variables["executor_episodes"] = tf.Variable(0, dtype=tf.int32)
+        variables["executor_steps"] = tf.Variable(0, dtype=tf.int32)
+        return variables
+
     def make_variable_server(
         self,
         networks: Dict[str, Dict[str, snt.Module]],
     ) -> core.Executor:
-        # Create the variable source
+
+        # Create variables
         variables = {}
         # Network variables
         agent_keys = self._agent_types if self._config.shared_weights else self._agents
         for net_key in networks.keys():
             for agent in agent_keys:
-                variables[f"{agent}_{net_key}"] = networks[net_key][agent].variables
+                # Ensure obs and target networks are sonnet modules
+                variables[f"{agent}_{net_key}"] = tf2_utils.to_sonnet_module(networks[net_key][agent]).variables
 
         # Executor specific variables
-        for i in range(self._config.num_executors):
-            variables[f"executor_{i}_counter"] = counting.Counter()
+        # for i in range(self._config.num_executors):
+        # variables[f"executor_{i}_counter"] = counting.Counter()
 
         # Trainer specific variables
-        for i in range(self._config.num_trainers):
-            variables[f"trainer_{i}_counter"] = counting.Counter()
-            variables[f"trainer_{i}_num_steps"] = tf.Variable(0, dtype=tf.int32)
+        # for i in range(self._config.num_trainers):
+        variables = self.create_counter_variables(variables)
 
+        # Create variable source
         variable_source = MavaVariableSource(
             variables, self._config.checkpoint, self._config.checkpoint_subpath
         )
@@ -338,15 +349,19 @@ class MADDPGBuilder(SystemBuilder):
                 variables[var_key] = policy_networks[agent].variables
                 get_keys.append(var_key)
 
-            set_keys = [f"{executor_id}_counter"]
-            variables[f"{executor_id}_counter"] = counting.Counter()
+            count_names = ["trainer_steps", "trainer_walltime", "evaluator_steps", "evaluator_episodes", "executor_episodes", "executor_steps"]
+            get_keys.extend(count_names)
+
+            variables = self.create_counter_variables(variables)
+
+            # set_keys = [f"{executor_id}_counter"]
+            # variables[f"{executor_id}_counter"] = counting.Counter()
 
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables=variables,
                 get_keys=get_keys,
-                set_keys=set_keys,
                 get_period=self._config.executor_variable_update_period,
             )
 
@@ -412,11 +427,14 @@ class MADDPGBuilder(SystemBuilder):
                 else:
                     get_keys.append(f"{agent}_{net_key}")
 
-        num_steps = tf.Variable(0, dtype=tf.int32)
-        variables[f"{trainer_id}_num_steps"] = num_steps
-        set_keys.append(f"{trainer_id}_num_steps")
-        variables[f"{trainer_id}_counter"] = counter
-        set_keys.append(f"{trainer_id}_counter")
+        # num_steps = tf.Variable(0, dtype=tf.int32)
+
+        variables = self.create_counter_variables(variables)
+        num_steps = variables["trainer_steps"]
+
+        count_names = ["trainer_steps", "trainer_walltime", "evaluator_steps", "evaluator_episodes", "executor_episodes", "executor_steps"]
+        get_keys.extend(count_names)
+        counts = {name: variables[name] for name in count_names}
 
         variable_client = variable_utils.VariableClient(
             client=variable_source,
@@ -449,7 +467,7 @@ class MADDPGBuilder(SystemBuilder):
             "target_update_rate": target_update_rate,
             "variable_client": variable_client,
             "dataset": dataset,
-            "counter": counter,
+            "counts": counts,
             "num_steps": num_steps,
             "logger": logger,
             "checkpoint": self._config.checkpoint,
