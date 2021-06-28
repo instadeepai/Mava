@@ -25,10 +25,10 @@ from acme.testing.fakes import Environment as MockedEnvironment
 from acme.testing.fakes import _generate_from_spec, _validate_spec
 
 from mava import core
-from mava.systems.system import System
 from mava.types import OLT, Observation
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
+from tests.system import System
 
 """Mock Objects for Tests"""
 

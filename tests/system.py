@@ -22,8 +22,6 @@ from acme import types
 
 import mava
 
-# Internal imports.
-
 
 def _calculate_num_learner_steps(
     num_observations: int,
@@ -122,6 +120,3 @@ class System(mava.core.Executor, mava.core.VariableSource):
         self, names: Sequence[str]
     ) -> Dict[str, Dict[str, types.NestedArray]]:
         return self._trainer.get_variables(names)
-
-
-# Internal class.
