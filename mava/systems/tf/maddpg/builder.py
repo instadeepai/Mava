@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG system implementation."""
+"""MADDPG system builder implementation."""
+
 import copy
 import dataclasses
 from typing import Any, Dict, Iterator, List, Optional, Type, Union
@@ -42,28 +43,30 @@ DiscreteArray = dm_specs.DiscreteArray
 class MADDPGConfig:
     """Configuration options for the MADDPG system.
     Args:
-            environment_spec: description of the actions, observations, etc.
-            policy_networks: the online (optimized) policies for each agent in
-                the system.
-            critic_networks: the online critic for each agent in the system.
-            observation_networks: dictionary of optional networks to transform
-                the observations before they are fed into any network.
-            discount: discount to use for TD updates.
-            batch_size: batch size for updates.
-            prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-              the target networks.
-            min_replay_size: minimum replay size before updating.
-            max_replay_size: maximum replay size.
-            samples_per_insert: number of samples to take from replay for every insert
-              that is made.
-            n_step: number of steps to squash into a single transition.
-            sigma: standard deviation of zero-mean, Gaussian exploration noise.
-            clipping: whether to clip gradients by global norm.
-            logger: logger object to be used by trainers.
-            counter: counter object used to keep track of steps.
-            checkpoint: boolean indicating whether to checkpoint the trainers.
-            replay_table_name: string indicating what name to give the replay table."""
+        environment_spec: specs.MAEnvironmentSpec
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
+        critic_optimizer: snt.Optimizer
+        shared_weights: bool = True
+        discount: float = 0.99
+        batch_size: int = 256
+        prefetch_size: int = 4
+        target_averaging: bool = False
+        target_update_period: int = 100
+        target_update_rate: Optional[float] = None
+        executor_variable_update_period: int = 1000
+        min_replay_size: int = 1000
+        max_replay_size: int = 1000000
+        samples_per_insert: float = 32.0
+        n_step: int = 5
+        sequence_length: int = 20
+        period: int = 20
+        max_gradient_norm: Optional[float] = None
+        sigma: float = 0.3
+        logger: loggers.Logger = None
+        counter: counting.Counter = None
+        checkpoint: bool = True
+        checkpoint_subpath: str = "~/mava/"
+        replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE."""
 
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
@@ -111,15 +114,21 @@ class MADDPGBuilder(SystemBuilder):
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):
-        """Args:
-        config: Configuration options for the MADDPG system.
-        trainer_fn: Trainer module to use."""
+        """[summary]
+
+        Args:
+            config (MADDPGConfig): [description]
+            trainer_fn (Union[ Type[training.MADDPGBaseTrainer],
+                Type[training.MADDPGBaseRecurrentTrainer], ], optional): [description].
+                Defaults to training.MADDPGDecentralisedTrainer.
+            executor_fn (Type[core.Executor], optional): [description]. Defaults to
+                MADDPGFeedForwardExecutor.
+            extra_specs (Dict[str, Any], optional): [description]. Defaults to {}.
+        """
 
         self._config = config
         self._extra_specs = extra_specs
 
-        """ _agents: a list of the agent specs (ids).
-            _agent_types: a list of the types of agents to be used."""
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
@@ -128,6 +137,15 @@ class MADDPGBuilder(SystemBuilder):
     def convert_discrete_to_bounded(
         self, environment_spec: specs.MAEnvironmentSpec
     ) -> specs.MAEnvironmentSpec:
+        """[summary]
+
+        Args:
+            environment_spec (specs.MAEnvironmentSpec): [description]
+
+        Returns:
+            specs.MAEnvironmentSpec: [description]
+        """
+
         env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
         keys = env_adder_spec._keys
         for key in keys:
@@ -156,7 +174,17 @@ class MADDPGBuilder(SystemBuilder):
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
-        """Create tables to insert data into."""
+        """[summary]
+
+        Args:
+            environment_spec (specs.MAEnvironmentSpec): [description]
+
+        Raises:
+            NotImplementedError: [description]
+
+        Returns:
+            List[reverb.Table]: [description]
+        """
 
         env_adder_spec = self.convert_discrete_to_bounded(environment_spec)
 
@@ -202,6 +230,17 @@ class MADDPGBuilder(SystemBuilder):
         self,
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
+        """[summary]
+
+        Args:
+            replay_client (reverb.Client): [description]
+
+        Returns:
+            [type]: [description]
+
+        Yields:
+            Iterator[reverb.ReplaySample]: [description]
+        """
 
         sequence_length = (
             self._config.sequence_length
@@ -209,7 +248,6 @@ class MADDPGBuilder(SystemBuilder):
             else None
         )
 
-        """Create a dataset iterator to use for learning/updating the system."""
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
@@ -223,13 +261,19 @@ class MADDPGBuilder(SystemBuilder):
         self,
         replay_client: reverb.Client,
     ) -> Optional[adders.ParallelAdder]:
-        """Create an adder which records data generated by the executor/environment.
+        """[summary]
+
         Args:
-          replay_client: Reverb Client which points to the replay server.
+            replay_client (reverb.Client): [description]
+
+        Raises:
+            NotImplementedError: [description]
+
+        Returns:
+            Optional[adders.ParallelAdder]: [description]
         """
 
         # Select adder
-
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=None,
@@ -254,13 +298,17 @@ class MADDPGBuilder(SystemBuilder):
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
-        """Create an executor instance.
+        """[summary]
+
         Args:
-          policy_networks: A struct of instance of all the different policy networks;
-           this should be a callable
-            which takes as input observations and returns actions.
-          adder: How data is recorded (e.g. added to replay).
-          variable_source: A source providing the necessary executor parameters.
+            policy_networks (Dict[str, snt.Module]): [description]
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
+                to None.
+            variable_source (Optional[core.VariableSource], optional): [description].
+                Defaults to None.
+
+        Returns:
+            core.Executor: [description]
         """
 
         shared_weights = self._config.shared_weights
@@ -303,17 +351,24 @@ class MADDPGBuilder(SystemBuilder):
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
-        """Creates an instance of the trainer.
+        """[summary]
+
         Args:
-          networks: struct describing the networks needed by the trainer; this can
-            be specific to the trainer in question.
-          dataset: iterator over samples from replay.
-          replay_client: client which allows communication with replay, e.g. in
-            order to update priorities.
-          counter: a Counter which allows for recording of counts (trainer steps,
-            executor steps, etc.) distributed throughout the system.
-          logger: Logger object for logging metadata.
+            networks (Dict[str, Dict[str, snt.Module]]): [description]
+            dataset (Iterator[reverb.ReplaySample]): [description]
+            replay_client (Optional[reverb.Client], optional): [description]. Defaults
+                to None.
+            counter (Optional[counting.Counter], optional): [description]. Defaults
+                to None.
+            logger (Optional[types.NestedLogger], optional): [description]. Defaults
+                to None.
+            connection_spec (Dict[str, List[str]], optional): [description]. Defaults
+                to None.
+
+        Returns:
+            core.Trainer: [description]
         """
+
         agents = self._agents
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights

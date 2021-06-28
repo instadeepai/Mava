@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """MADDPG system implementation."""
+
 import functools
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
@@ -94,45 +95,60 @@ class MADDPG:
         eval_loop_fn_kwargs: Dict = {},
         connection_spec: Callable[[Dict[str, List[str]]], Dict[str, List[str]]] = None,
     ):
-        """Initialize the system.
+        """[summary]
+
         Args:
-            environment_factory: Callable to instantiate an environment
-                on a compute node.
-            network_factory: Callable to instantiate system networks on a compute node.
-            logger_factory: Callable to instantiate a system logger on a compute node.
-            architecture: system architecture, e.g. decentralised or centralised.
-            trainer_fn: training type associated with executor and architecture,
-                e.g. centralised training.
-            executor_fn: executor type for example feedforward or recurrent.
-            num_executors: number of executor processes to run in parallel.
-            num_caches: number of trainer node caches.
-            environment_spec: description of the actions, observations, etc.
-            shared_weights: set whether agents should share network weights.
-            discount: discount to use for TD updates.
-            batch_size: batch size for updates.
-            prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-              the target networks.
-            min_replay_size: minimum replay size before updating.
-            max_replay_size: maximum replay size.
-            samples_per_insert: number of samples to take from replay for every insert
-              that is made.
-            n_step: number of steps to squash into a single transition.
-            sequence_length: Length of the sequences to use in recurrent
-            training (if using recurrence).
-            period: Overlapping period of sequences used in recurrent
-            training (if using recurrence).
-            sigma: standard deviation of zero-mean, Gaussian exploration noise.
-            clipping: whether to clip gradients by global norm.
-            counter: counter object used to keep track of steps.
-            checkpoint: boolean indicating whether to checkpoint the trainers.
-            checkpoint_subpath: directory for checkpoints.
-            replay_table_name: string indicating what name to give the replay table.
-            train_loop_fn: loop for training.
-            eval_loop_fn: loop for evaluation.
-            policy_optimizer: the optimizer to be applied to the policy loss.
-                This can be a single optimizer or an optimizer per agent key.
-            critic_optimizer: the optimizer to be applied to the critic loss.
+            environment_factory (Callable[[bool], dm_env.Environment]): [description]
+            network_factory (Callable[[acme_specs.BoundedArray], Dict[str,
+                snt.Module]]): [description]
+            logger_factory (Callable[[str], MavaLogger], optional): [description].
+                Defaults to None.
+            architecture (Type[ DecentralisedQValueActorCritic ], optional):
+                [description]. Defaults to DecentralisedQValueActorCritic.
+            trainer_fn (Union[ Type[training.MADDPGBaseTrainer],
+                Type[training.MADDPGBaseRecurrentTrainer], ], optional): [description].
+                    Defaults to training.MADDPGDecentralisedTrainer.
+            executor_fn (Type[core.Executor], optional): [description]. Defaults to
+                MADDPGFeedForwardExecutor.
+            num_executors (int, optional): [description]. Defaults to 1.
+            num_caches (int, optional): [description]. Defaults to 0.
+            environment_spec (mava_specs.MAEnvironmentSpec, optional): [description].
+                Defaults to None.
+            shared_weights (bool, optional): [description]. Defaults to True.
+            discount (float, optional): [description]. Defaults to 0.99.
+            batch_size (int, optional): [description]. Defaults to 256.
+            prefetch_size (int, optional): [description]. Defaults to 4.
+            target_averaging (bool, optional): [description]. Defaults to False.
+            target_update_period (int, optional): [description]. Defaults to 100.
+            target_update_rate (Optional[float], optional): [description]. Defaults to
+                None.
+            executor_variable_update_period (int, optional): [description]. Defaults to
+                1000.
+            min_replay_size (int, optional): [description]. Defaults to 1000.
+            max_replay_size (int, optional): [description]. Defaults to 1000000.
+            samples_per_insert (float, optional): [description]. Defaults to 32.0.
+            policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
+                optional): [description]. Defaults to
+                snt.optimizers.Adam(learning_rate=1e-4).
+            critic_optimizer (snt.Optimizer, optional): [description]. Defaults to
+                snt.optimizers.Adam(learning_rate=1e-4).
+            n_step (int, optional): [description]. Defaults to 5.
+            sequence_length (int, optional): [description]. Defaults to 20.
+            period (int, optional): [description]. Defaults to 20.
+            sigma (float, optional): [description]. Defaults to 0.3.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            max_executor_steps (int, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+            logger_config (Dict, optional): [description]. Defaults to {}.
+            train_loop_fn (Callable, optional): [description]. Defaults to
+                ParallelEnvironmentLoop.
+            eval_loop_fn (Callable, optional): [description]. Defaults to
+                ParallelEnvironmentLoop.
+            train_loop_fn_kwargs (Dict, optional): [description]. Defaults to {}.
+            eval_loop_fn_kwargs (Dict, optional): [description]. Defaults to {}.
+            connection_spec (Callable[[Dict[str, List[str]]], Dict[str, List[str]]],
+                optional): [description]. Defaults to None.
         """
 
         if not environment_spec:
@@ -208,6 +224,12 @@ class MADDPG:
         )
 
     def _get_extra_specs(self) -> Any:
+        """[summary]
+
+        Returns:
+            Any: [description]
+        """
+
         agents = self._environment_spec.get_agent_ids()
         core_state_specs = {}
         networks = self._network_factory(  # type: ignore
@@ -223,10 +245,24 @@ class MADDPG:
         return {"core_states": core_state_specs}
 
     def replay(self) -> Any:
-        """The replay storage."""
+        """[summary]
+
+        Returns:
+            Any: [description]
+        """
+
         return self._builder.make_replay_tables(self._environment_spec)
 
     def counter(self, checkpoint: bool) -> Any:
+        """[summary]
+
+        Args:
+            checkpoint (bool): [description]
+
+        Returns:
+            Any: [description]
+        """
+
         if checkpoint:
             return tf2_savers.CheckpointingRunner(
                 counting.Counter(),
@@ -238,6 +274,15 @@ class MADDPG:
             return counting.Counter()
 
     def coordinator(self, counter: counting.Counter) -> Any:
+        """[summary]
+
+        Args:
+            counter (counting.Counter): [description]
+
+        Returns:
+            Any: [description]
+        """
+
         return lp_utils.StepsLimiter(counter, self._max_executor_steps)
 
     def trainer(
@@ -245,7 +290,15 @@ class MADDPG:
         replay: reverb.Client,
         counter: counting.Counter,
     ) -> mava.core.Trainer:
-        """The Trainer part of the system."""
+        """[summary]
+
+        Args:
+            replay (reverb.Client): [description]
+            counter (counting.Counter): [description]
+
+        Returns:
+            mava.core.Trainer: [description]
+        """
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
@@ -296,7 +349,17 @@ class MADDPG:
         variable_source: acme.VariableSource,
         counter: counting.Counter,
     ) -> mava.ParallelEnvironmentLoop:
-        """The executor process."""
+        """[summary]
+
+        Args:
+            executor_id (str): [description]
+            replay (reverb.Client): [description]
+            variable_source (acme.VariableSource): [description]
+            counter (counting.Counter): [description]
+
+        Returns:
+            mava.ParallelEnvironmentLoop: [description]
+        """
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -364,7 +427,16 @@ class MADDPG:
         counter: counting.Counter,
         logger: loggers.Logger = None,
     ) -> Any:
-        """The evaluation process."""
+        """[summary]
+
+        Args:
+            variable_source (acme.VariableSource): [description]
+            counter (counting.Counter): [description]
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+
+        Returns:
+            Any: [description]
+        """
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -423,7 +495,15 @@ class MADDPG:
         return eval_loop
 
     def build(self, name: str = "maddpg") -> Any:
-        """Build the distributed system topology."""
+        """[summary]
+
+        Args:
+            name (str, optional): [description]. Defaults to "maddpg".
+
+        Returns:
+            Any: [description]
+        """
+
         program = lp.Program(name=name)
 
         with program.group("replay"):

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""MADDPG system executor implementation."""
+
 from typing import Dict, List, Optional, Tuple, Union
 
 import dm_env
@@ -53,15 +55,16 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         shared_weights: bool = True,
     ):
+        """[summary]
 
-        """Initializes the executor.
         Args:
-          networks: the (recurrent) policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            policy_networks (Dict[str, snt.Module]): [description]
+            agent_specs (Dict[str, EnvironmentSpec]): [description]
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
+                to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                [description]. Defaults to None.
+            shared_weights (bool, optional): [description]. Defaults to True.
         """
 
         # Store these for later use.
@@ -77,6 +80,18 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
     def _policy(
         self, agent: str, observation: types.NestedTensor
     ) -> types.NestedTensor:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedTensor): [description]
+
+        Raises:
+            NotImplementedError: [description]
+
+        Returns:
+            types.NestedTensor: [description]
+        """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
@@ -101,6 +116,15 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> Tuple[types.NestedArray, types.NestedArray]:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedArray): [description]
+
+        Returns:
+            Tuple[types.NestedArray, types.NestedArray]: [description]
+        """
 
         # Step the recurrent policy/value network forward
         # given the current observation and state.
@@ -114,6 +138,15 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+        """[summary]
+
+        Args:
+            observations (Dict[str, types.NestedArray]): [description]
+
+        Returns:
+            Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+                [description]
+        """
 
         actions = {}
         policies = {}
@@ -129,6 +162,15 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
+        """[summary]
+
+        Args:
+            actions (Union[ Dict[str, types.NestedArray], List[Dict[str,
+                types.NestedArray]] ]): [description]
+            next_timestep (dm_env.TimeStep): [description]
+            next_extras (Dict[str, types.NestedArray], optional): [description].
+                Defaults to {}.
+        """
         if self._adder:
             _, policy = actions
             # TODO (dries): Sort out this mypy issue.
@@ -145,15 +187,17 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         shared_weights: bool = True,
         store_recurrent_state: bool = True,
     ):
+        """[summary]
 
-        """Initializes the executor.
         Args:
-          networks: the (recurrent) policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            policy_networks (Dict[str, snt.Module]): [description]
+            agent_specs (Dict[str, EnvironmentSpec]): [description]
+            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
+                to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                [description]. Defaults to None.
+            shared_weights (bool, optional): [description]. Defaults to True.
+            store_recurrent_state (bool, optional): [description]. Defaults to True.
         """
 
         # Store these for later use.
@@ -174,6 +218,20 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         observation: types.NestedTensor,
         state: types.NestedTensor,
     ) -> Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedTensor): [description]
+            state (types.NestedTensor): [description]
+
+        Raises:
+            NotImplementedError: [description]
+
+        Returns:
+            Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
+                [description]
+        """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
@@ -198,6 +256,15 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
+        """[summary]
+
+        Args:
+            agent (str): [description]
+            observation (types.NestedArray): [description]
+
+        Returns:
+            types.NestedArray: [description]
+        """
 
         # TODO Mask actions here using observation.legal_actions
         # Initialize the RNN state if necessary.
@@ -222,6 +289,15 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+        """[summary]
+
+        Args:
+            observations (Dict[str, types.NestedArray]): [description]
+
+        Returns:
+            Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+                [description]
+        """
 
         actions = {}
         policies = {}
@@ -235,6 +311,15 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         next_timestep: dm_env.TimeStep,
         next_extras: Optional[Dict[str, types.NestedArray]] = {},
     ) -> None:
+        """[summary]
+
+        Args:
+            actions (Dict[str, types.NestedArray]): [description]
+            next_timestep (dm_env.TimeStep): [description]
+            next_extras (Optional[Dict[str, types.NestedArray]], optional):
+                [description]. Defaults to {}.
+        """
+
         if not self._adder:
             return
         _, policy = actions

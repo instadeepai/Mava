@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-"""MADDPG trainer implementation."""
+"""MADDPG system trainer implementation."""
 
 import copy
 import os
@@ -69,32 +69,30 @@ class MADDPGBaseTrainer(mava.Trainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """Initializes the learner.
+        """[summary]
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_averaging: If true the target values are updated gradually otherwise
-          they are updated completely after target_update_period steps.
-          target_update_period: if target_averaging is false this represents the number
-          of learner steps to perform before updating the target networks.
-          target_update_rate: if target_averaging is true this value is used specify
-          how fast to update the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-            This can be a single optimizer or an optimizer per agent key.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            policy_networks (Dict[str, snt.Module]): [description]
+            critic_networks (Dict[str, snt.Module]): [description]
+            target_policy_networks (Dict[str, snt.Module]): [description]
+            target_critic_networks (Dict[str, snt.Module]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            discount (float): [description]
+            target_averaging (bool): [description]
+            target_update_period (int): [description]
+            target_update_rate (float): [description]
+            dataset (tf.data.Dataset): [description]
+            observation_networks (Dict[str, snt.Module]): [description]
+            target_observation_networks (Dict[str, snt.Module]): [description]
+            shared_weights (bool, optional): [description]. Defaults to False.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
         """
 
         self._agents = agents
@@ -210,6 +208,8 @@ class MADDPGBaseTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def _update_target_networks(self) -> None:
+        """[summary]"""
+
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (
@@ -238,6 +238,16 @@ class MADDPGBaseTrainer(mava.Trainer):
     def _transform_observations(
         self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+        """[summary]
+
+        Args:
+            obs (Dict[str, np.ndarray]): [description]
+            next_obs (Dict[str, np.ndarray]): [description]
+
+        Returns:
+            Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]: [description]
+        """
+
         o_tm1 = {}
         o_t = {}
         for agent in self._agents:
@@ -263,6 +273,20 @@ class MADDPGBaseTrainer(mava.Trainer):
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        """[summary]
+
+        Args:
+            o_tm1_trans (Dict[str, np.ndarray]): [description]
+            o_t_trans (Dict[str, np.ndarray]): [description]
+            a_tm1 (Dict[str, np.ndarray]): [description]
+            a_t (Dict[str, np.ndarray]): [description]
+            e_tm1 (Dict[str, np.ndarray]): [description]
+            e_t (Dict[str, np.array]): [description]
+            agent (str): [description]
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+        """
 
         # Decentralised critic
         o_tm1_feed = o_tm1_trans[agent]
@@ -277,11 +301,29 @@ class MADDPGBaseTrainer(mava.Trainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
+        """[summary]
+
+        Args:
+            a_t (Dict[str, np.ndarray]): [description]
+            dpg_a_t (np.ndarray): [description]
+            agent (str): [description]
+
+        Returns:
+            tf.Tensor: [description]
+        """
         # Decentralised DPG
         dpg_a_t_feed = dpg_a_t
         return dpg_a_t_feed
 
     def _target_policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
+        """[summary]
+
+        Args:
+            next_obs (Dict[str, np.ndarray]): [description]
+
+        Returns:
+            Any: [description]
+        """
         actions = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -293,6 +335,11 @@ class MADDPGBaseTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
+        """[summary]
+
+        Returns:
+            Dict[str, Dict[str, Any]]: [description]
+        """
         # Update the target networks
         self._update_target_networks()
 
@@ -310,6 +357,12 @@ class MADDPGBaseTrainer(mava.Trainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
+        """[summary]
+
+        Args:
+            inputs (Any): [description]
+        """
+
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -390,6 +443,8 @@ class MADDPGBaseTrainer(mava.Trainer):
 
     # Backward pass that calculates gradients and updates network.
     def _backward(self) -> None:
+        """[summary]"""
+
         # Calculate the gradients and update the networks
         policy_losses = self.policy_losses
         critic_losses = self.critic_losses
@@ -430,6 +485,8 @@ class MADDPGBaseTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
+        """[summary]"""
+
         # Run the learning step.
         fetches = self._step()
 
@@ -491,27 +548,30 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """Initializes the learner.
+        """[summary]
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizers to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizers to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            policy_networks (Dict[str, snt.Module]): [description]
+            critic_networks (Dict[str, snt.Module]): [description]
+            target_policy_networks (Dict[str, snt.Module]): [description]
+            target_critic_networks (Dict[str, snt.Module]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            critic_optimizer (snt.Optimizer): [description]
+            discount (float): [description]
+            target_averaging (bool): [description]
+            target_update_period (int): [description]
+            target_update_rate (float): [description]
+            dataset (tf.data.Dataset): [description]
+            observation_networks (Dict[str, snt.Module]): [description]
+            target_observation_networks (Dict[str, snt.Module]): [description]
+            shared_weights (bool, optional): [description]. Defaults to False.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
         """
 
         super().__init__(
@@ -569,26 +629,30 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """Initializes the learner.
+        """[summary]
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            policy_networks (Dict[str, snt.Module]): [description]
+            critic_networks (Dict[str, snt.Module]): [description]
+            target_policy_networks (Dict[str, snt.Module]): [description]
+            target_critic_networks (Dict[str, snt.Module]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            critic_optimizer (snt.Optimizer): [description]
+            discount (float): [description]
+            target_averaging (bool): [description]
+            target_update_period (int): [description]
+            target_update_rate (float): [description]
+            dataset (tf.data.Dataset): [description]
+            observation_networks (Dict[str, snt.Module]): [description]
+            target_observation_networks (Dict[str, snt.Module]): [description]
+            shared_weights (bool, optional): [description]. Defaults to False.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
         """
 
         super().__init__(
@@ -625,6 +689,20 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        """[summary]
+
+        Args:
+            o_tm1_trans (Dict[str, np.ndarray]): [description]
+            o_t_trans (Dict[str, np.ndarray]): [description]
+            a_tm1 (Dict[str, np.ndarray]): [description]
+            a_t (Dict[str, np.ndarray]): [description]
+            e_tm1 (Dict[str, np.ndarray]): [description]
+            e_t (Dict[str, np.array]): [description]
+            agent (str): [description]
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+        """
 
         # Centralised based
         o_tm1_feed = tf.stack([o_tm1_trans[agent] for agent in self._agents], 1)
@@ -640,6 +718,17 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
+        """[summary]
+
+        Args:
+            a_t (Dict[str, np.ndarray]): [description]
+            dpg_a_t (np.ndarray): [description]
+            agent (str): [description]
+
+        Returns:
+            tf.Tensor: [description]
+        """
+
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
@@ -685,27 +774,31 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """Initializes the learner.
+        """[summary]
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            connection_spec (Dict[str, List[str]]): [description]
+            policy_networks (Dict[str, snt.Module]): [description]
+            critic_networks (Dict[str, snt.Module]): [description]
+            target_policy_networks (Dict[str, snt.Module]): [description]
+            target_critic_networks (Dict[str, snt.Module]): [description]
+            discount (float): [description]
+            target_averaging (bool): [description]
+            target_update_period (int): [description]
+            target_update_rate (float): [description]
+            dataset (tf.data.Dataset): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            critic_optimizer (snt.Optimizer): [description]
+            observation_networks (Dict[str, snt.Module]): [description]
+            target_observation_networks (Dict[str, snt.Module]): [description]
+            shared_weights (bool, optional): [description]. Defaults to False.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
         """
 
         super().__init__(
@@ -744,6 +837,20 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        """[summary]
+
+        Args:
+            o_tm1_trans (Dict[str, np.ndarray]): [description]
+            o_t_trans (Dict[str, np.ndarray]): [description]
+            a_tm1 (Dict[str, np.ndarray]): [description]
+            a_t (Dict[str, np.ndarray]): [description]
+            e_tm1 (Dict[str, np.ndarray]): [description]
+            e_t (Dict[str, np.array]): [description]
+            agent (str): [description]
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+        """
 
         # Networked based
         connections = self._connection_spec[agent]
@@ -773,6 +880,17 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
+        """[summary]
+
+        Args:
+            a_t (Dict[str, np.ndarray]): [description]
+            dpg_a_t (np.ndarray): [description]
+            agent (str): [description]
+
+        Returns:
+            tf.Tensor: [description]
+        """
+
         # Networked based
         tree.map_structure(tf.stop_gradient, a_t)
         dpg_a_t_feed = copy.copy(a_t)
@@ -820,27 +938,30 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """Initializes the learner.
+        """[summary]
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            policy_networks (Dict[str, snt.Module]): [description]
+            critic_networks (Dict[str, snt.Module]): [description]
+            target_policy_networks (Dict[str, snt.Module]): [description]
+            target_critic_networks (Dict[str, snt.Module]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            critic_optimizer (snt.Optimizer): [description]
+            discount (float): [description]
+            target_averaging (bool): [description]
+            target_update_period (int): [description]
+            target_update_rate (float): [description]
+            dataset (tf.data.Dataset): [description]
+            observation_networks (Dict[str, snt.Module]): [description]
+            target_observation_networks (Dict[str, snt.Module]): [description]
+            shared_weights (bool, optional): [description]. Defaults to False.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
         """
 
         super().__init__(
@@ -877,6 +998,21 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        """[summary]
+
+        Args:
+            o_tm1_trans (Dict[str, np.ndarray]): [description]
+            o_t_trans (Dict[str, np.ndarray]): [description]
+            a_tm1 (Dict[str, np.ndarray]): [description]
+            a_t (Dict[str, np.ndarray]): [description]
+            e_tm1 (Dict[str, np.ndarray]): [description]
+            e_t (Dict[str, np.array]): [description]
+            agent (str): [description]
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+        """
+
         # State based
         o_tm1_feed = e_tm1["s_t"]
         o_t_feed = e_t["s_t"]
@@ -891,6 +1027,17 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
+        """[summary]
+
+        Args:
+            a_t (Dict[str, np.ndarray]): [description]
+            dpg_a_t (np.ndarray): [description]
+            agent (str): [description]
+
+        Returns:
+            tf.Tensor: [description]
+        """
+
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
@@ -936,28 +1083,31 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """Initializes the learner.
+        """[summary]
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-            This can be a single optimizer or an optimizer per agent key.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            policy_networks (Dict[str, snt.Module]): [description]
+            critic_networks (Dict[str, snt.Module]): [description]
+            target_policy_networks (Dict[str, snt.Module]): [description]
+            target_critic_networks (Dict[str, snt.Module]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            discount (float): [description]
+            target_averaging (bool): [description]
+            target_update_period (int): [description]
+            target_update_rate (float): [description]
+            dataset (tf.data.Dataset): [description]
+            observation_networks (Dict[str, snt.Module]): [description]
+            target_observation_networks (Dict[str, snt.Module]): [description]
+            shared_weights (bool, optional): [description]. Defaults to False.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+            bootstrap_n (int, optional): [description]. Defaults to 10.
         """
 
         self._agents = agents
@@ -1074,6 +1224,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def _update_target_networks(self) -> None:
+        """[summary]"""
 
         for key in self.unique_net_keys:
             # Update target network.
@@ -1103,6 +1254,15 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     def _transform_observations(
         self, observations: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+        """[summary]
+
+        Args:
+            observations (Dict[str, np.ndarray]): [description]
+
+        Returns:
+            Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]: [description]
+        """
+
         # Note (dries): We are assuming that only the policy network
         # is recurrent and not the observation network.
         obs_trans = {}
@@ -1141,6 +1301,19 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         extras: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        """[summary]
+
+        Args:
+            obs_trans (Dict[str, np.ndarray]): [description]
+            target_obs_trans (Dict[str, np.ndarray]): [description]
+            actions (Dict[str, np.ndarray]): [description]
+            target_actions (Dict[str, np.ndarray]): [description]
+            extras (Dict[str, np.ndarray]): [description]
+            agent (str): [description]
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+        """
 
         # Decentralised critic
         obs_trans_feed = obs_trans[agent]
@@ -1155,6 +1328,17 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
+        """[summary]
+
+        Args:
+            target_actions (Dict[str, np.ndarray]): [description]
+            dpg_actions (np.ndarray): [description]
+            agent (str): [description]
+
+        Returns:
+            tf.Tensor: [description]
+        """
+
         # Decentralised DPG
         dpg_actions_feed = dpg_actions
         return dpg_actions_feed
@@ -1164,6 +1348,16 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         target_obs_trans: Dict[str, np.ndarray],
         target_core_state: Dict[str, np.ndarray],
     ) -> Any:
+        """[summary]
+
+        Args:
+            target_obs_trans (Dict[str, np.ndarray]): [description]
+            target_core_state (Dict[str, np.ndarray]): [description]
+
+        Returns:
+            Any: [description]
+        """
+
         actions = {}
 
         for agent in self._agents:
@@ -1188,6 +1382,12 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
+        """[summary]
+
+        Returns:
+            Dict[str, Dict[str, Any]]: [description]
+        """
+
         # Update the target networks
         self._update_target_networks()
 
@@ -1206,6 +1406,12 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
+        """[summary]
+
+        Args:
+            inputs (Any): [description]
+        """
+
         data = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
@@ -1344,6 +1550,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
     # Backward pass that calculates gradients and updates network.
     def _backward(self) -> None:
+        """[summary]"""
+
         # Calculate the gradients and update the networks
         policy_losses = self.policy_losses
         critic_losses = self.critic_losses
@@ -1384,6 +1592,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
+        """[summary]"""
+
         # Run the learning step.
         fetches = self._step()
 
@@ -1404,6 +1614,15 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+        """[summary]
+
+        Args:
+            names (Sequence[str]): [description]
+
+        Returns:
+            Dict[str, Dict[str, np.ndarray]]: [description]
+        """
+
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
             variables[network_type] = {
@@ -1446,27 +1665,31 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """Initializes the learner.
+        """[summary]
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            policy_networks (Dict[str, snt.Module]): [description]
+            critic_networks (Dict[str, snt.Module]): [description]
+            target_policy_networks (Dict[str, snt.Module]): [description]
+            target_critic_networks (Dict[str, snt.Module]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            critic_optimizer (snt.Optimizer): [description]
+            discount (float): [description]
+            target_averaging (bool): [description]
+            target_update_period (int): [description]
+            target_update_rate (float): [description]
+            dataset (tf.data.Dataset): [description]
+            observation_networks (Dict[str, snt.Module]): [description]
+            target_observation_networks (Dict[str, snt.Module]): [description]
+            shared_weights (bool, optional): [description]. Defaults to False.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+            bootstrap_n (int, optional): [description]. Defaults to 10.
         """
 
         super().__init__(
@@ -1526,28 +1749,33 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """Initializes the learner.
+        """[summary]
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            policy_networks (Dict[str, snt.Module]): [description]
+            critic_networks (Dict[str, snt.Module]): [description]
+            target_policy_networks (Dict[str, snt.Module]): [description]
+            target_critic_networks (Dict[str, snt.Module]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            critic_optimizer (snt.Optimizer): [description]
+            discount (float): [description]
+            target_averaging (bool): [description]
+            target_update_period (int): [description]
+            target_update_rate (float): [description]
+            dataset (tf.data.Dataset): [description]
+            observation_networks (Dict[str, snt.Module]): [description]
+            target_observation_networks (Dict[str, snt.Module]): [description]
+            shared_weights (bool, optional): [description]. Defaults to False.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+            bootstrap_n (int, optional): [description]. Defaults to 10.
         """
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -1582,6 +1810,19 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         extras: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        """[summary]
+
+        Args:
+            obs_trans (Dict[str, np.ndarray]): [description]
+            target_obs_trans (Dict[str, np.ndarray]): [description]
+            actions (Dict[str, np.ndarray]): [description]
+            target_actions (Dict[str, np.ndarray]): [description]
+            extras (Dict[str, np.ndarray]): [description]
+            agent (str): [description]
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+        """
 
         # Centralised based
         obs_trans_feed = tf.stack([obs_trans[agent] for agent in self._agents], -1)
@@ -1601,6 +1842,17 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
+        """[summary]
+
+        Args:
+            actions (Dict[str, np.ndarray]): [description]
+            dpg_actions (np.ndarray): [description]
+            agent (str): [description]
+
+        Returns:
+            tf.Tensor: [description]
+        """
+
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
@@ -1644,28 +1896,33 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """Initializes the learner.
+        """[summary]
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): [description]
+            agent_types (List[str]): [description]
+            policy_networks (Dict[str, snt.Module]): [description]
+            critic_networks (Dict[str, snt.Module]): [description]
+            target_policy_networks (Dict[str, snt.Module]): [description]
+            target_critic_networks (Dict[str, snt.Module]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            critic_optimizer (snt.Optimizer): [description]
+            discount (float): [description]
+            target_averaging (bool): [description]
+            target_update_period (int): [description]
+            target_update_rate (float): [description]
+            dataset (tf.data.Dataset): [description]
+            observation_networks (Dict[str, snt.Module]): [description]
+            target_observation_networks (Dict[str, snt.Module]): [description]
+            shared_weights (bool, optional): [description]. Defaults to False.
+            max_gradient_norm (float, optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to True.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+            bootstrap_n (int, optional): [description]. Defaults to 10.
         """
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -1700,6 +1957,19 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         extras: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        """[summary]
+
+        Args:
+            obs_trans (Dict[str, np.ndarray]): [description]
+            target_obs_trans (Dict[str, np.ndarray]): [description]
+            actions (Dict[str, np.ndarray]): [description]
+            target_actions (Dict[str, np.ndarray]): [description]
+            extras (Dict[str, np.ndarray]): [description]
+            agent (str): [description]
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+        """
 
         # State based
         obs_trans_feed = extras["s_t"]
@@ -1717,6 +1987,17 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
+        """[summary]
+
+        Args:
+            actions (Dict[str, np.ndarray]): [description]
+            dpg_actions (np.ndarray): [description]
+            agent (str): [description]
+
+        Returns:
+            tf.Tensor: [description]
+        """
+
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
