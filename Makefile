@@ -17,7 +17,7 @@ DOCKER_RUN_TENSORBOARD=docker run $(RUN_FLAGS_TENSORBOARD) $(IMAGE)
 
 # Set example to run when using `make run`
 # Default example
-EXAMPLE=examples/debugging_envs/run_decentralised_feedforward_maddpg_continous.py
+EXAMPLE=examples/debugging_envs/run_decentralised_feedforward_maddpg.py
 
 # make file commands
 run:
