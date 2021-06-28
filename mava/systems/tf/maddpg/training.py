@@ -78,8 +78,10 @@ class MADDPGBaseTrainer(mava.Trainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
-            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             discount (float): [description]
             target_averaging (bool): [description]
             target_update_period (int): [description]
@@ -557,7 +559,8 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -638,7 +641,8 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -789,7 +793,8 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
             target_update_period (int): [description]
             target_update_rate (float): [description]
             dataset (tf.data.Dataset): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             critic_optimizer (snt.Optimizer): [description]
             observation_networks (Dict[str, snt.Module]): [description]
             target_observation_networks (Dict[str, snt.Module]): [description]
@@ -947,7 +952,8 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -1092,8 +1098,10 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
-            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             discount (float): [description]
             target_averaging (bool): [description]
             target_update_period (int): [description]
@@ -1674,7 +1682,8 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -1758,7 +1767,8 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
@@ -1905,7 +1915,8 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             critic_networks (Dict[str, snt.Module]): [description]
             target_policy_networks (Dict[str, snt.Module]): [description]
             target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                [description]
             critic_optimizer (snt.Optimizer): [description]
             discount (float): [description]
             target_averaging (bool): [description]
