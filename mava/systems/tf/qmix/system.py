@@ -251,7 +251,6 @@ class QMIX(MADQN):
         system_networks = self._mixer(
             environment_spec=self._environment_spec,
             architecture=architecture,
-            n_agents=len(self._environment_spec.get_agent_ids()),
             num_hypernet_layers=self._num_hypernet_layers,
             qmix_hidden_dim=self._qmix_hidden_dim,
             hypernet_hidden_dim=self._hypernet_hidden_dim,
