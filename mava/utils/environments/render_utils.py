@@ -62,7 +62,7 @@ class Renderer:
         self.display = pygame.Surface(window_size_px)
 
         if mode == "human":
-            self.display = pygame.display.set_mode(window_size_px, 0, 32)
+            self.display = pygame.display.set_mode(window_size_px, 0, 32)  # type: ignore  # noqa: E501
             pygame.display.init()
 
             pygame.display.set_caption("Starcraft Viewer")
