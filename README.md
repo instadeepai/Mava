@@ -17,14 +17,15 @@
 8. [Contributing](#contributing)
 9. [Troubleshooting and FAQ](#troubleshooting-and-faqs)
 
-<!-- **[Overview](#overview)** | **[Installation](#installation)** | **[Systems]** | **[Examples]** | -->
+Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability.
 
-<!-- ![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava) -->
-<!-- ![PyPI version](https://badge.fury.io/py/id-mava.svg) -->
+> 👷‍♀️ **NOTICE**: Our release of Mava is foremost to benefit the wider community and make it easier for researchers to work on MARL.
+> However, we consider this release a **Beta version of Mava**. As with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
+> From incorporating the latest research and innovations to making the framework more stable, robust and well tested.
+> Furthermore, we are committed and will do our best to keep everything working and have the experience of using Mava be as pleasant as possible.
+> During Beta development breaking changes may occur as well as significant design changes (if we feel it could greatly improve the useability of the framework) but these will be clearly communicated before being incorporated into the codebase.
+> It is also inevitable that there might be bugs we are not aware of and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
 
-
-Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava builds off of [Acme][Acme] and in a similar way strives to expose simple, efficient, and readable components, as well as examples that serve both as reference implementations of popular algorithms and as strong
-baselines, while still providing enough flexibility to do novel research.
 ## Overview
 ### Systems and the Executor-Trainer paradigm
 
@@ -56,6 +57,7 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [SMAC][smac]
 * [Flatland][flatland]
 * [2D RoboCup][robocup]
+* [OpenSpiel][openspiel]
 
 The animation on the right shows MAD4PG solving the Multi-Walker environment from PettingZoo.
 
@@ -69,6 +71,15 @@ Mava includes several system implementations. Below we list these together with 
 * 🟨 - Multi-Agent Proximal Policy Optimisation (MAPPO).
 * 🟨 - Value Decomposition Networks (VDN).
 * 🟥 - Monotonic value function factorisation (QMIX).
+
+| **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training** | **Communication**  | **Multi Processing**   |
+| ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------ | ------------------- |
+| MADQN   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| MADDPG  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark:        | :heavy_check_mark: | :heavy_check_mark: |
+| MAD4PG   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:             | :x: | :heavy_check_mark: |
+| MAPPO   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:              | :x: | :heavy_check_mark: |
+| VDN   | :x: | :x: | :heavy_check_mark: | :heavy_check_mark:  | :x: | :heavy_check_mark: |
+| QMIX   | :x: | :x: | :heavy_check_mark:                | :heavy_check_mark:                 | :x: | :heavy_check_mark: |
 
 As we develop Mava further, we aim to have all systems well tested on a wide variety of environments.
 
@@ -205,12 +216,15 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     pip install id-mava[envs]
     ```
-6.  **NB**: For Flatland and SMAC environments, installations have to be done separately. Flatland can be installed using:
+6.  **NB**: For Flatland, OpenSpiel and SMAC environments, installations have to be done separately. Flatland can be installed using:
 
     ```bash
-    pip install .[flatland]
+    pip install id-mava[flatland]
     ```
-
+    and for OpenSpiel, after ensuring that the right cmake and clang versions are installed as specified [here](https://github.com/deepmind/open_spiel/blob/master/docs/install.md):
+    ```bash
+    pip install id-mava[open_spiel]
+    ```
     For StarCraft II installation, this must be installed separately according to your operating system.
     To install the StarCraft II ML environment and associated packages, please follow the instructions on [PySC2](https://github.com/deepmind/pysc2) to install the StarCraft II game files.
     Please ensure you have the required game maps (for both PySC2 and SMAC) extracted in the StarCraft II maps directory.
@@ -243,13 +257,12 @@ Debugging in MARL can be very difficult and time consuming, therefore it is impo
 
 ## Roadmap
 
-We have big ambitions for Mava! 🚀 But there is still much work that needs to be done. We have a clear roadmap for expanding our system implementations and associated modules, improving testing and robustness and providing support for across-machine training. Furthermore, in the near future, we also plan to implement the following features (feel free to vote for any one of them by clicking on the name!).
+We have big ambitions for Mava!  🚀  But there is still much work that needs to be done. We have a clear roadmap and wish list for expanding our system implementations and associated modules, improving testing and robustness and providing support for across-machine training. Please visit them using the links below and feel free to add your own suggestions!
 
-[![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Sequential%20environment%20support%20including%20OpenSpiel/vote) <br />
-[![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Population%20based%20training/vote) <br />
-[![](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures)](https://api.gh-polls.com/poll/01F75ZJZXE8C5JM7MQWEX9PRXQ/Dynamic%20networked%20architectures/vote)
+* [ROADMAP][roadmap]
+* [WISHLIST][wishlist]
 
-In the slightly more longer term, the Mava team plans to release benchmarking results for several different systems and environments and contribute a MARL specific behavioural environment suite specifically engineered to study aspects of MARL such as cooperation and coordination.
+In the slightly more longer term, the Mava team plans to release benchmarking results for several different systems and environments and contribute a MARL specific behavioural environment suite (similar to the [bsuite][bsuite] for single-agent RL) specifically engineered to study aspects of MARL such as cooperation and coordination.
 
 ## Contributing
 
@@ -264,9 +277,12 @@ If you use Mava in your work, please cite the accompanying
 [technical report][Paper]:
 
 ```bibtex
-@article{anon2021mava,
+@article{pretorius2021mava,
     title={Mava: A Research Framework for Distributed Multi-Agent Reinforcement Learning},
-    author={Anonymous authors},
+    author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Kevin Eloff
+    and Claude Formanek and St John Grimbly and Siphelele Danisa and Lawrance Francis
+    and Jonathan Shock and Herman Kamper and Willie Brink and Herman Engelbrecht
+    and Alexandre Laterre and Karim Beguir},
     year={2021},
     journal={arXiv preprint},
     url={},
@@ -287,3 +303,6 @@ If you use Mava in your work, please cite the accompanying
 [pymarl]: https://github.com/oxwhirl/pymarl
 [mpe]: https://github.com/openai/multiagent-particle-envs
 [launchpad]: https://github.com/deepmind/launchpad
+[roadmap]: https://github.com/instadeepai/Mava/issues/246
+[wishlist]: https://github.com/instadeepai/Mava/issues/247
+[bsuite]: https://github.com/deepmind/bsuite

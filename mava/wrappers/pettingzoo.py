@@ -14,9 +14,11 @@
 # limitations under the License.
 
 """Wraps a PettingZoo MARL environment to be used as a dm_env environment."""
+import copy
 from typing import Any, Dict, Iterator, List, Optional, Union
 
 import dm_env
+import gym
 import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
@@ -32,7 +34,6 @@ from mava.utils.wrapper_utils import (
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
 
-# TODO(Kale-ab): Check usage agents vs possible agents
 class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
 
@@ -51,56 +52,66 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
             self._environment = apply_env_wrapper_preprocessers(
                 self._environment, env_preprocess_wrappers
             )
+        self.correct_agent_name()
+        self.last_turn_agent = None
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
         self._reset_next_step = False
         self._environment.reset()
-        self._step_type = dm_env.StepType.FIRST
+        self._step_types = {
+            agent: dm_env.StepType.FIRST for agent in self.possible_agents
+        }
+        self._first_step_performed = {agent: False for agent in self.possible_agents}
 
         observe, _, done, _ = self._environment.last()
         agent = self.current_agent
         observation = self._convert_observation(agent, observe, done)
 
-        self._discount = convert_np_type(
-            self.discount_spec()[agent].dtype, 1
-        )  # Not used in pettingzoo
+        self._discount = convert_np_type(self.discount_spec()[agent].dtype, 1)
+
         reward = convert_np_type(self.reward_spec()[agent].dtype, 0)
+
         return parameterized_restart(reward, self._discount, observation)
 
-    def step(self, action: Union[int, float]) -> dm_env.TimeStep:
+    def step(  # type: ignore[override]
+        self, action: Union[int, float]
+    ) -> dm_env.TimeStep:
         """Steps the environment."""
         if self._reset_next_step:
             return self.reset()
 
-        observe, reward, done, info = self._environment.last()
+        _, _, done, _ = self._environment.last()
 
         # If current agent is done
         if done:
             self._environment.step(None)
-            self._step_type = dm_env.StepType.LAST
         else:
             self._environment.step(action)
-            self._step_type = dm_env.StepType.MID
-
-            # Update these vars so dm_env.TimeStep returned has
-            # the last information.
-            observe, reward, done, info = self._environment.last()
 
         agent = self.current_agent
-        # Convert rewards to match spec
-        reward = convert_np_type(self.reward_spec()[agent].dtype, reward)
-        observation = self._convert_observation(agent, observe, done)
-
         # Reset if all agents are done
         if self.env_done():
             self._reset_next_step = True
+            reward = convert_np_type(self.reward_spec()[agent].dtype, 0)
+            observation = self._convert_observation(
+                agent, self._environment.observe(agent), done
+            )
+        else:
+            #  observation for next agent
+            observe, reward, done, info = self._environment.last()
+
+            # Convert rewards to match spec
+            reward = convert_np_type(self.reward_spec()[agent].dtype, reward)
+            observation = self._convert_observation(agent, observe, done)
+
+        step_type = dm_env.StepType.LAST if done else dm_env.StepType.MID
 
         return dm_env.TimeStep(
             observation=observation,
             reward=reward,
             discount=self._discount,
-            step_type=self._step_type,
+            step_type=step_type,
         )
 
     def env_done(self) -> bool:
@@ -111,32 +122,83 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
 
     # Convert PettingZoo observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
-    def _convert_observation(
+    def _convert_observation(  # type: ignore[override]
         self, agent: str, observe: Union[dict, np.ndarray], done: bool
     ) -> types.OLT:
+
+        legals: np.ndarray = None
+        observation: np.ndarray = None
+
         if isinstance(observe, dict) and "action_mask" in observe:
             legals = observe["action_mask"]
-            observe = observe["observation"]
+            observation = observe["observation"]
         else:
             legals = np.ones(
                 _convert_to_spec(self._environment.action_spaces[agent]).shape,
                 dtype=self._environment.action_spaces[agent].dtype,
             )
+            observation = observe
+        if observation.dtype == np.int8:
+            observation = np.dtype(np.float32).type(
+                observation
+            )  # observation is not expected to be int8
+        if legals.dtype == np.int8:
+            legals = np.dtype(np.int64).type(legals)
+
         observation = types.OLT(
-            observation=observe,
+            observation=observation,
             legal_actions=legals,
             terminal=np.asarray([done], dtype=np.float32),
         )
         return observation
 
+    def correct_agent_name(self) -> None:
+        self._environment.reset()
+        if "tictactoe" in self._environment.metadata["name"]:
+            corrected_names = ["player_0", "player_1"]
+            self._environment.unwrapped.possible_agents = corrected_names
+            self._environment.unwrapped.agents = corrected_names
+            self._environment.possible_agents = corrected_names
+            self._environment.agents = corrected_names
+            previous_names = list(self.observation_spaces.keys())
+
+            for corrected_name, prev_name in zip(corrected_names, previous_names):
+                self.observation_spaces[corrected_name] = self.observation_spaces[
+                    prev_name
+                ]
+                self.action_spaces[corrected_name] = self.action_spaces[prev_name]
+                self.rewards[corrected_name] = self.rewards[prev_name]
+                self.dones[corrected_name] = self.dones[prev_name]
+                self.infos[corrected_name] = self.infos[prev_name]
+
+                del self.observation_spaces[prev_name]
+                del self.action_spaces[prev_name]
+                del self.rewards[prev_name]
+                del self.dones[prev_name]
+                del self.infos[prev_name]
+
     def observation_spec(self) -> types.Observation:
         observation_specs = {}
-        for agent in self.possible_agents:
+        for agent in self._environment.possible_agents:
+            if isinstance(self._environment.observation_spaces[agent], gym.spaces.Dict):
+                obs_space = copy.deepcopy(
+                    self._environment.observation_spaces[agent]["observation"]
+                )
+                legal_actions_space = copy.deepcopy(
+                    self._environment.observation_spaces[agent]["action_mask"]
+                )
+            else:
+                obs_space = copy.deepcopy(self._environment.observation_spaces[agent])
+                legal_actions_space = copy.deepcopy(
+                    self._environment.action_spaces[agent]
+                )
+            if obs_space.dtype == np.int8:
+                obs_space.dtype = np.dtype(np.float32)
+            if legal_actions_space.dtype == np.int8:
+                legal_actions_space.dtype = np.dtype(np.int64)
             observation_specs[agent] = types.OLT(
-                observation=_convert_to_spec(
-                    self._environment.observation_spaces[agent]
-                ),
-                legal_actions=_convert_to_spec(self._environment.action_spaces[agent]),
+                observation=_convert_to_spec(obs_space),
+                legal_actions=_convert_to_spec(legal_actions_space),
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
@@ -183,6 +245,10 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     @property
     def current_agent(self) -> Any:
         return self._environment.agent_selection
+
+    @property
+    def num_agents(self) -> int:
+        return self._environment.num_agents
 
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment."""
@@ -297,6 +363,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
                     _convert_to_spec(self._environment.action_spaces[agent]).shape,
                     dtype=self._environment.action_spaces[agent].dtype,
                 )
+
             observations[agent] = types.OLT(
                 observation=observation,
                 legal_actions=legals,

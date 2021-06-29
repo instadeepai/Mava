@@ -113,7 +113,33 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
-        raise NotImplementedError
+
+        if not self._evaluator:
+            epsilon = self._trainer.get_epsilon()
+        else:
+            epsilon = 1e-10
+
+        epsilon = tf.convert_to_tensor(epsilon)
+
+        if self._fingerprint:
+            trainer_step = self._trainer.get_trainer_steps()
+            fingerprint = tf.concat([epsilon, trainer_step], axis=0)
+            fingerprint = tf.expand_dims(fingerprint, axis=0)
+            fingerprint = tf.cast(fingerprint, "float32")
+        else:
+            fingerprint = None
+
+        action = self._policy(
+            agent,
+            observation.observation,
+            observation.legal_actions,
+            epsilon,
+            fingerprint,
+        )
+
+        action = tf2_utils.to_numpy_squeeze(action)
+
+        return action
 
     def observe_first(
         self,

@@ -33,7 +33,7 @@ reverb_requirements = [
 
 tf_requirements = [
     "tensorflow>=2.5.0",
-    "tensorflow_probability",
+    "tensorflow_probability==0.12.2",
     "dm-sonnet",
     "trfl",
 ]
@@ -62,6 +62,7 @@ testing_formatting_requirements = [
 record_episode_requirements = ["array2gif"]
 
 flatland_requirements = ["flatland-rl"]
+open_spiel_requirements = ["open_spiel"]
 
 long_description = """Mava is a library for building multi-agent reinforcement
 learning (MARL) systems. Mava builds off of Acme and in a similar way strives
@@ -104,6 +105,7 @@ setup(
         "tf": tf_requirements,
         "envs": env_requirements,
         "flatland": flatland_requirements,
+        "open_spiel": open_spiel_requirements,
         "reverb": reverb_requirements,
         "launchpad": launchpad_requirements,
         "testing_formatting": testing_formatting_requirements,
