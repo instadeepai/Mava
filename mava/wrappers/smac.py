@@ -18,7 +18,7 @@
 
 """Wraps a StarCraft II MARL environment (SMAC) as a dm_env environment."""
 
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import dm_env
 import numpy as np
@@ -26,6 +26,8 @@ from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym.spaces import Box, Discrete
 from pettingzoo.utils.env import ParallelEnv
+
+from mava.utils.environments.render_utils import Renderer
 
 try:
     from smac.env import StarCraft2Env  # type:ignore
@@ -68,6 +70,9 @@ class SMACEnvWrapper(ParallelEnvWrapper):
             self._environment.get_total_actions()
         )
         self.action_spaces = {agent: self.action_space for agent in self._agents}
+
+        self.reward: dict = {}
+        self.renderer: Optional[Renderer] = None
 
     def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
         """Resets the env and returns observations from ready agents.
@@ -182,6 +187,8 @@ class SMACEnvWrapper(ParallelEnvWrapper):
             step_type=self._step_type,
         )
 
+        self.reward = rewards
+
         return timestep, {"s_t": state}
 
     def env_done(self) -> bool:
@@ -247,6 +254,8 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def seed(self, random_seed: int) -> None:
         self._environment._seed = random_seed
+        # Reset after setting seed
+        self.full_restart()
 
     @property
     def agents(self) -> List:
@@ -264,3 +273,23 @@ class SMACEnvWrapper(ParallelEnvWrapper):
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment."""
         return getattr(self._environment, name)
+
+    def render(self, mode: str = "human") -> Any:
+        if self.renderer is None:
+            self.renderer = Renderer(self, mode)
+        assert mode == self.renderer.mode, "mode must be consistent across render calls"
+        return self.renderer.render(mode)
+
+    def close(self) -> None:
+        """Close StarCraft II."""
+        if self.renderer is not None:
+            self.renderer.close()
+            self.renderer = None
+        self._environment.close()
+
+    def full_restart(self) -> None:
+        """Full restart. Closes the SC2 process and launches a new one."""
+        if self._sc2_proc:
+            self._sc2_proc.close()
+        self._launch()
+        self.force_restarts += 1
