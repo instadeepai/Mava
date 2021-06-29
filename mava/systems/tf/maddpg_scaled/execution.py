@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dm_env
 import sonnet as snt
@@ -138,4 +138,5 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
     def update(self, wait: bool = False) -> None:
         if self._variable_client:
-            self._variable_client.get_async()
+            # TODO (dries): Maybe changes this to a async get?
+            self._variable_client.get_and_wait()

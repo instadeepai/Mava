@@ -19,10 +19,7 @@ from mava.systems.tf.maddpg_scaled.execution import (  # MADDPGRecurrentExecutor
     MADDPGFeedForwardExecutor,
 )
 from mava.systems.tf.maddpg_scaled.system import MADDPG
-from mava.systems.tf.maddpg_scaled.training import (  # MADDPGBaseRecurrentTrainer,; MADDPGCentralisedRecurrentTrainer,; MADDPGDecentralisedRecurrentTrainer,; MADDPGStateBasedRecurrentTrainer,
+from mava.systems.tf.maddpg_scaled.training import (
     MADDPGBaseTrainer,
-    MADDPGCentralisedTrainer,
     MADDPGDecentralisedTrainer,
-    MADDPGNetworkedTrainer,
-    MADDPGStateBasedTrainer,
 )

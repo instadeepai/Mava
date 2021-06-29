@@ -22,23 +22,18 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme import datasets
-from acme.core import VariableSource
 from acme.specs import EnvironmentSpec
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 from dm_env import specs as dm_specs
-from numpy.core.fromnumeric import var
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.systems.builders import SystemBuilder
-from mava.systems.tf import executors
-from mava.systems.tf import savers as tf2_savers
-from mava.systems.tf import variable_utils
+from mava.systems.tf import executors, variable_utils
 from mava.systems.tf.maddpg_scaled import training
 from mava.systems.tf.maddpg_scaled.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
-from mava.wrappers import ScaledDetailedTrainerStatistics, NetworkStatisticsActorCritic
+from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerStatistics
 
 BoundedArray = dm_specs.BoundedArray
 DiscreteArray = dm_specs.DiscreteArray
@@ -99,7 +94,7 @@ class MADDPGConfig:
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
-class MADDPGBuilder(SystemBuilder):
+class MADDPGBuilder:
     """Builder for MADDPG which constructs individual components of the system."""
 
     """Defines an interface for defining the components of an RL system.
@@ -237,7 +232,6 @@ class MADDPGBuilder(SystemBuilder):
         """
 
         # Select adder
-
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=None,
@@ -256,7 +250,9 @@ class MADDPGBuilder(SystemBuilder):
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
         return adder
 
-    def create_counter_variables(self, variables):
+    def create_counter_variables(
+        self, variables: Dict[str, tf.Variable]
+    ) -> Dict[str, tf.Variable]:
         variables["trainer_steps"] = tf.Variable(0, dtype=tf.int32)
         variables["trainer_walltime"] = tf.Variable(0, dtype=tf.float32)
         variables["evaluator_steps"] = tf.Variable(0, dtype=tf.int32)
@@ -268,7 +264,7 @@ class MADDPGBuilder(SystemBuilder):
     def make_variable_server(
         self,
         networks: Dict[str, Dict[str, snt.Module]],
-    ) -> core.Executor:
+    ) -> MavaVariableSource:
 
         # Create variables
         variables = {}
@@ -281,50 +277,20 @@ class MADDPGBuilder(SystemBuilder):
                     networks[net_key][agent]
                 ).variables
 
-        # Executor specific variables
-        # for i in range(self._config.num_executors):
-        # variables[f"executor_{i}_counter"] = counting.Counter()
-
-        # Trainer specific variables
-        # for i in range(self._config.num_trainers):
         variables = self.create_counter_variables(variables)
 
         # Create variable source
         variable_source = MavaVariableSource(
             variables, self._config.checkpoint, self._config.checkpoint_subpath
         )
-
-        # if self._config.checkpoint:
-        #     counter = tf2_savers.CheckpointingRunner(
-        #         counting.Counter(),
-        #         time_delta_minutes=15,
-        #         directory=self._config.checkpoint_subpath,
-        #         subdirectory="counter",
-        #     )
-        # else:
-        #     counter = counting.Counter()
-
-        # Set all the network variables inside the variable source
-        # networks_vars = {}
-
-        # agent_keys = self._agent_types if self._config.shared_weights else self._agents
-        # for net_key in networks.keys():
-        #     networks_vars[net_key] = {
-        #         agent: networks[net_key][agent].variables for agent in agent_keys
-        #     }
-
-        # variable_source.set_variables(
-        #     variables.keys(), tf2_utils.to_numpy(variables)
-        # )
-
         return variable_source
 
     def make_executor(
         self,
-        executor_id: str,
+        # executor_id: str,
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
-        variable_source: Optional[core.VariableSource] = None,
+        variable_source: Optional[MavaVariableSource] = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -339,16 +305,15 @@ class MADDPGBuilder(SystemBuilder):
 
         variable_client = None
         if variable_source:
-            agent_keys = self._agent_types if shared_weights else self._agents
+            agent_net_keys = self._agent_types if shared_weights else self._agents
 
             # Create policy variables
             variables = {}
             get_keys = []
 
-            # TODO: Should variables be per agent? polcies_net_0
-            for agent in agent_keys:
-                var_key = f"{agent}_policies"
-                variables[var_key] = policy_networks[agent].variables
+            for agent_net_key in agent_net_keys:
+                var_key = f"{agent_net_key}_policies"
+                variables[var_key] = policy_networks[agent_net_key].variables
                 get_keys.append(var_key)
 
             variables = self.create_counter_variables(variables)
@@ -364,9 +329,6 @@ class MADDPGBuilder(SystemBuilder):
             get_keys.extend(count_names)
             counts = {name: variables[name] for name in count_names}
 
-            # set_keys = [f"{executor_id}_counter"]
-            # variables[f"{executor_id}_counter"] = counting.Counter()
-
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
@@ -378,11 +340,6 @@ class MADDPGBuilder(SystemBuilder):
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
             variable_client.get_and_wait()
-            # print("Updated and waited.")
-            # print("Get variables: ", variable_source.get_variables(["policies"]).keys())
-            # variable_source.set_variables("policies", [])
-            # print("Variables set.")
-            # exit()
 
         # Create the actor which defines how we take actions.
         return self._executor_fn(
@@ -396,12 +353,11 @@ class MADDPGBuilder(SystemBuilder):
 
     def make_trainer(
         self,
-        trainer_id: str,
+        # trainer_id: str,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        variable_source: core.VariableSource,
-        train_agents: Dict[str, Any],
-        # counter: Optional[counting.Counter] = None,
+        variable_source: MavaVariableSource,
+        trainer_net_config: List[Any],
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
@@ -429,16 +385,18 @@ class MADDPGBuilder(SystemBuilder):
         variables = {}
         set_keys = []
         get_keys = []
-        agent_keys = self._agent_types if self._config.shared_weights else self._agents
-        for net_key in networks.keys():
-            for agent in agent_keys:
-                variables[f"{agent}_{net_key}"] = networks[net_key][agent].variables
-                if agent in train_agents:
-                    set_keys.append(f"{agent}_{net_key}")
+        agent_net_keys = (
+            self._agent_types if self._config.shared_weights else self._agents
+        )
+        for net_type_key in networks.keys():
+            for agent_net_key in agent_net_keys:
+                variables[f"{agent_net_key}_{net_type_key}"] = networks[net_type_key][
+                    agent_net_key
+                ].variables
+                if agent_net_key in trainer_net_config:
+                    set_keys.append(f"{agent_net_key}_{net_type_key}")
                 else:
-                    get_keys.append(f"{agent}_{net_key}")
-
-        # num_steps = tf.Variable(0, dtype=tf.int32)
+                    get_keys.append(f"{agent_net_key}_{net_type_key}")
 
         variables = self.create_counter_variables(variables)
         num_steps = variables["trainer_steps"]
@@ -467,7 +425,7 @@ class MADDPGBuilder(SystemBuilder):
         # trainer args
         trainer_config: Dict[str, Any] = {
             "agents": agents,
-            "train_agents": train_agents,
+            "trainer_net_config": trainer_net_config,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
@@ -488,8 +446,6 @@ class MADDPGBuilder(SystemBuilder):
             "counts": counts,
             "num_steps": num_steps,
             "logger": logger,
-            # "checkpoint": self._config.checkpoint,
-            # "checkpoint_subpath": self._config.checkpoint_subpath,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec

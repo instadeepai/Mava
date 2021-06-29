@@ -179,7 +179,7 @@ def main(_: Any) -> None:
         num_executors=2,
         num_trainers=3,
         shared_weights=False,
-        train_agents={
+        trainer_net_config={
             "trainer_0": ["agent_0"],
             "trainer_1": ["agent_1"],
             "trainer_2": ["agent_2"],

@@ -15,7 +15,7 @@
 
 """MADDPG system implementation."""
 import functools
-from typing import Any, Callable, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import acme
 import dm_env
@@ -226,7 +226,9 @@ class MADDPG:
         """The replay storage."""
         return self._builder.make_replay_tables(self._environment_spec)
 
-    def create_system(self):
+    def create_system(
+        self,
+    ) -> Tuple[DecentralisedQValueActorCritic, Dict[str, Dict[str, snt.Module]]]:
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec, shared_weights=self._shared_weights

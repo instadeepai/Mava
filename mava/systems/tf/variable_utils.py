@@ -16,13 +16,13 @@
 """Variable handling utilities for TensorFlow 2. Adapted from Deepmind's Acme library"""
 
 from concurrent import futures
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
-import tensorflow as tf
-from tensorflow.python.ops.resource_variable_ops import ResourceVariable
-from acme.tf import utils as tf2_utils
-from mava.systems.tf.variable_sources import VariableSource
 import numpy as np
+import tensorflow as tf
+from acme.tf import utils as tf2_utils
+
+from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 
 
 class VariableClient:
@@ -30,8 +30,8 @@ class VariableClient:
 
     def __init__(
         self,
-        client: VariableSource,
-        variables: Mapping[str, Sequence[tf.Variable]],
+        client: MavaVariableSource,
+        variables: Dict[str, tf.Variable],
         get_keys: List[str] = None,
         set_keys: List[str] = None,
         get_period: int = 1,
@@ -40,7 +40,7 @@ class VariableClient:
         self._all_keys = list(variables.keys())
         self._get_keys = get_keys if get_keys is not None else self._all_keys
         self._set_keys = set_keys if set_keys is not None else self._all_keys
-        self._variables = variables
+        self._variables: Dict[str, tf.Variable] = variables
         self._get_call_counter = 0
         self._set_call_counter = 0
         self._get_update_period = get_period
@@ -51,7 +51,7 @@ class VariableClient:
 
         self._adjust = lambda: client.set_variables(
             self._set_keys,
-            tf2_utils.to_numpy({self._variables[key] for key in self._set_keys}),
+            tf2_utils.to_numpy({key: self._variables[key] for key in self._set_keys}),
         )
         # Create a single background thread to fetch variables without necessarily
         # blocking the actor.
@@ -113,7 +113,7 @@ class VariableClient:
             self._set_call_counter = 0
         return
 
-    def add_and_wait(self, names, vars) -> None:
+    def add_and_wait(self, names: List[str], vars: Dict[str, Any]) -> None:
         self._client.add_to_variables(names, vars)
 
     def get_and_wait(self) -> None:
@@ -133,21 +133,6 @@ class VariableClient:
 
     def _copy(self, new_variables: Dict[str, Any]) -> None:
         """Copies the new variables to the old ones."""
-
-        # new_variables = tree.flatten(new_variables)
-        # if len(self._variables) != len(new_variables):
-        #     raise ValueError(
-        #         "Length mismatch between old ",
-        #         self._variables.keys(),
-        #         " variables and new",
-        #         new_variables.keys(),
-        #         ".",
-        #     )
-
-        # for new, old in zip(new_variables, self._variables):
-        #     self._variables[i] = new_variables[i]
-        #   old.assign(new)
-
         for key in new_variables.keys():
             var_type = type(new_variables[key])
             if var_type == dict:
@@ -158,12 +143,12 @@ class VariableClient:
                         )
             elif var_type == np.int32 or var_type == np.float32:
                 # TODO (dries): Is this count value getting tracked?
-                self._variables[key] = new_variables[key]
+                self._variables[key].assign(new_variables[key])
 
             elif var_type == tuple:
                 for i in range(len(self._variables[key])):
                     self._variables[key][i].assign(new_variables[key][i])
             else:
-                NotImplemented(f"Variable type of {var_type} not implemented.")
+                NotImplementedError(f"Variable type of {var_type} not implemented.")
 
         return

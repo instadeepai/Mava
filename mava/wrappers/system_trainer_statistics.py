@@ -180,17 +180,13 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
             ["trainer_steps", "trainer_walltime"],
             {"trainer_steps": 1, "trainer_walltime": elapsed_time},
         )
-        # counts = self._counter.increment(steps=1, walltime=elapsed_time)
 
         # Update the variable source and the trainer
-        # TODO (dries): Can this be simplified? Do a async get?
-        self._variable_client.set_async()
+        # TODO (dries): Can this be simplified? Do an async set and get?
+        self._variable_client.set_and_wait()
         self._variable_client.get_and_wait()
 
         fetches.update(self._counts)
-
-        # if self._system_checkpointer:
-        #     train_utils.checkpoint_networks(self._system_checkpointer)
 
         if self._logger:
             self._logger.write(fetches)
@@ -341,12 +337,20 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         ), "Nothing is selected to be logged."
 
     def _log_step(self) -> bool:
-        return bool(
-            self._counter
-            and self._counter._counts
-            and self._counter._counts.get("steps")
-            and self._counter._counts.get("steps") % self.log_interval == 0
-        )
+        if hasattr(self, "_counter"):
+            return bool(
+                self._counter
+                and self._counter._counts
+                and self._counter._counts.get("steps")
+                and self._counter._counts.get("steps") % self.log_interval == 0
+            )
+        else:
+            return bool(
+                self._counts
+                and self._counts
+                and self._counts.get("steps")
+                and self._counts.get("steps") % self.log_interval == 0
+            )
 
     def _create_loggers(self, keys: List[str]) -> None:
         trainer_label = self._logger._label
@@ -596,7 +600,13 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
         tape = self.tape
         log_current_timestep = self._log_step()
 
-        for agent in self._train_agents:
+        # Check if self._trainer_agent_list exists. Otherwise use self._agents
+        agents = (
+            self._trainer_agent_list
+            if hasattr(self, "_trainer_agent_list")
+            else self._agents
+        )
+        for agent in agents:
             agent_key = self.agent_net_keys[agent]
 
             # Get trainable variables.
