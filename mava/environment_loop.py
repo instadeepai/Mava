@@ -409,7 +409,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             # Record counts.
             if not self._counter:
                 self._executor._variable_client.add_and_wait(
-                    self,
                     ["executor_episodes", "executor_steps"],
                     {"executor_episodes": 1, "executor_steps": episode_steps},
                 )
