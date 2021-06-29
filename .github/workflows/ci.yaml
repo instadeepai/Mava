@@ -31,9 +31,12 @@ jobs:
           pip install --upgrade pip setuptools
           pip install .
           pip install .[flatland]
+          # openspiel
+          sudo apt-get update
+          sudo apt-get install clang -y
+          pip install .[open_spiel]
           pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
           # For atari envs
-          sudo apt-get update
           sudo apt-get install unrar
           pip install autorom
           AutoROM -v
