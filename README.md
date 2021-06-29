@@ -214,12 +214,15 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     pip install id-mava[envs]
     ```
-6.  **NB**: For Flatland and SMAC environments, installations have to be done separately. Flatland can be installed using:
+6.  **NB**: For Flatland, OpenSpiel and SMAC environments, installations have to be done separately. Flatland can be installed using:
 
     ```bash
     pip install id-mava[flatland]
     ```
-
+    and for OpenSpiel, after ensuring that the right cmake and clang versions are installed as specified [here](https://github.com/deepmind/open_spiel/blob/master/docs/install.md):
+    ```bash
+    pip install id-mava[open_spiel]
+    ```
     For StarCraft II installation, this must be installed separately according to your operating system.
     To install the StarCraft II ML environment and associated packages, please follow the instructions on [PySC2](https://github.com/deepmind/pysc2) to install the StarCraft II game files.
     Please ensure you have the required game maps (for both PySC2 and SMAC) extracted in the StarCraft II maps directory.
