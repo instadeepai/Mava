@@ -12,70 +12,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, Mapping, Optional, Sequence, Union
+from typing import Dict, Mapping, Sequence, Union
 
-import sonnet as snt
-import tensorflow as tf
 from acme import types
-from acme.tf import networks
 
 from mava import specs as mava_specs
-from mava.components.tf.networks import epsilon_greedy_action_selector
-
-valid_dqn_network_types = ["mlp", "atari"]
+from mava.systems.tf.madqn.networks import (
+    make_default_networks as make_default_networks_madqn,
+)
+from mava.utils.enums import ArchitectureType, Network
 
 
 # Default networks for vdn
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (64, 64),
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (128, 128),
     shared_weights: bool = True,
+    archecture_type: ArchitectureType = ArchitectureType.feedforward,
+    network_type: Network = Network.mlp,
+    fingerprints: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
 
-    specs = environment_spec.get_agent_specs()
-
-    # Create agent_type specs
-    if shared_weights:
-        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-        specs = type_specs
-
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
-
-    def action_selector_fn(
-        q_values: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: Optional[tf.Variable] = None,
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
-
-    q_networks = {}
-    action_selectors = {}
-    for key in specs.keys():
-
-        # Get total number of action dimensions from action spec.
-        num_dimensions = specs[key].actions.num_values
-
-        # Create the policy network.
-        q_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(
-                    q_networks_layer_sizes[key], activate_final=False
-                ),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
-        )
-
-        # epsilon greedy action selector
-        action_selector = action_selector_fn
-
-        q_networks[key] = q_network
-        action_selectors[key] = action_selector
-
-    return {
-        "q_networks": q_networks,
-        "action_selectors": action_selectors,
-    }
+    return make_default_networks_madqn(
+        environment_spec=environment_spec,
+        policy_networks_layer_sizes=policy_networks_layer_sizes,
+        shared_weights=shared_weights,
+        archecture_type=archecture_type,
+        network_type=network_type,
+        fingerprints=fingerprints,
+    )

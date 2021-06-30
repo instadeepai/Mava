@@ -22,27 +22,26 @@ from acme.tf.networks.atari import DQNAtariNetwork
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import epsilon_greedy_action_selector
-
-valid_dqn_network_types = ["mlp", "atari"]
+from mava.utils.enums import ArchitectureType, Network
 
 
 # Default networks for madqn
 # TODO Use fingerprints variable
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        512,
-        256,
-    ),
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
-    network_type: str = "mlp",
+    archecture_type: ArchitectureType = ArchitectureType.feedforward,
+    network_type: Network = Network.mlp,
     fingerprints: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
 
-    assert (
-        network_type.lower() in valid_dqn_network_types
-    ), f"Invalid network_type, valid options are {valid_dqn_network_types}"
-    """Creates networks used by the agents."""
+    # Set Policy function and layer size
+    if archecture_type == ArchitectureType.feedforward:
+        policy_network_func = snt.Sequential
+    elif archecture_type == ArchitectureType.recurrent:
+        policy_networks_layer_sizes = (128, 128)
+        policy_network_func = snt.DeepRNN
 
     specs = environment_spec.get_agent_specs()
 
@@ -51,8 +50,10 @@ def make_default_networks(
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
 
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
+    if isinstance(policy_networks_layer_sizes, Sequence):
+        policy_networks_layer_sizes = {
+            key: policy_networks_layer_sizes for key in specs.keys()
+        }
 
     def action_selector_fn(
         q_values: types.NestedTensor,
@@ -63,7 +64,7 @@ def make_default_networks(
             action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
         )
 
-    q_networks = {}
+    policy_networks = {}
     action_selectors = {}
     for key in specs.keys():
 
@@ -71,25 +72,32 @@ def make_default_networks(
         num_dimensions = specs[key].actions.num_values
 
         # Create the policy network.
-        if network_type.lower() == "mlp":
-            q_network = snt.Sequential(
-                [
+        if network_type == Network.atari_dqn_network:
+            policy_network = DQNAtariNetwork(num_dimensions)
+        else:
+            if archecture_type == ArchitectureType.feedforward:
+                policy_network = [
                     networks.LayerNormMLP(
-                        q_networks_layer_sizes[key], activate_final=False
+                        list(policy_networks_layer_sizes[key]) + [num_dimensions],
+                        activate_final=False,
                     ),
-                    networks.NearZeroInitializedLinear(num_dimensions),
                 ]
-            )
-        elif network_type.lower() == "atari":
-            q_network = DQNAtariNetwork(num_dimensions)
+            elif archecture_type == ArchitectureType.recurrent:
+                policy_network = [
+                    networks.LayerNormMLP(
+                        policy_networks_layer_sizes[key][:-1], activate_final=True
+                    ),
+                    snt.LSTM(policy_networks_layer_sizes[key][-1]),
+                    snt.Linear(num_dimensions),
+                ]
+
+            policy_network = policy_network_func(policy_network)
 
         # epsilon greedy action selector
-        action_selector = action_selector_fn
-
-        q_networks[key] = q_network
-        action_selectors[key] = action_selector
+        policy_networks[key] = policy_network
+        action_selectors[key] = action_selector_fn
 
     return {
-        "q_networks": q_networks,
+        "q_networks": policy_networks,
         "action_selectors": action_selectors,
     }

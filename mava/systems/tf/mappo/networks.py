@@ -33,11 +33,7 @@ DiscreteArray = specs.DiscreteArray
 # Default networks for mappo
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        256,
-        256,
-        256,
-    ),
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
 ) -> Dict[str, snt.Module]:
@@ -97,8 +93,6 @@ def make_default_networks(
 
         critic_network = snt.Sequential(
             [
-                # The multiplexer concatenates the observations/actions.
-                networks.CriticMultiplexer(),
                 networks.LayerNormMLP(
                     list(critic_networks_layer_sizes[key]) + [1], activate_final=False
                 ),

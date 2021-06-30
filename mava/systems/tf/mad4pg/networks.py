@@ -24,6 +24,7 @@ from dm_env import specs
 
 from mava import specs as mava_specs
 from mava.components.tf.networks.mad4pg import DiscreteValuedHead
+from mava.utils.enums import ArchitectureType
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
@@ -33,19 +34,24 @@ DiscreteArray = specs.DiscreteArray
 # Default networks for mad4pg
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        256,
-        256,
-        256,
-    ),
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
     sigma: float = 0.3,
+    archecture_type: ArchitectureType = ArchitectureType.feedforward,
     vmin: float = -150.0,
     vmax: float = 150.0,
     num_atoms: int = 51,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
+
+    # Set Policy function and layer size
+    if archecture_type == ArchitectureType.feedforward:
+        policy_network_func = snt.Sequential
+    elif archecture_type == ArchitectureType.recurrent:
+        policy_networks_layer_sizes = (128, 128)
+        policy_network_func = snt.DeepRNN
+
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
@@ -89,10 +95,21 @@ def make_default_networks(
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
-        policy_network = [
-            networks.LayerNormMLP(
-                policy_networks_layer_sizes[key], activate_final=True
-            ),
+        if archecture_type == ArchitectureType.feedforward:
+            policy_network = [
+                networks.LayerNormMLP(
+                    policy_networks_layer_sizes[key], activate_final=True
+                ),
+            ]
+        elif archecture_type == ArchitectureType.recurrent:
+            policy_network = [
+                networks.LayerNormMLP(
+                    policy_networks_layer_sizes[key][:-1], activate_final=True
+                ),
+                snt.LSTM(policy_networks_layer_sizes[key][-1]),
+            ]
+
+        policy_network += [
             networks.NearZeroInitializedLinear(num_dimensions),
             networks.TanhToSpec(agent_act_spec),
         ]
@@ -104,7 +121,7 @@ def make_default_networks(
                 networks.ClipToSpec(agent_act_spec),
             ]
 
-        policy_network = snt.Sequential(policy_network)
+        policy_network = policy_network_func(policy_network)
 
         # Create the critic network.
         critic_network = snt.Sequential(
