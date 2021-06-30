@@ -63,10 +63,12 @@ class EnvironmentLoopStatisticsBase:
         return self._running_statistics
 
     def _override_environment_loop_stats_methods(self) -> None:
-        self._environment_loop._compute_episode_statistics = (
+        self._environment_loop._compute_episode_statistics = (  # type: ignore
             self._compute_episode_statistics
         )
-        self._environment_loop._compute_step_statistics = self._compute_step_statistics
+        self._environment_loop._compute_step_statistics = (  # type: ignore
+            self._compute_step_statistics
+        )
         self._environment_loop._get_running_stats = (  # type: ignore
             self._get_running_stats
         )
