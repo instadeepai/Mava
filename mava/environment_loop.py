@@ -426,7 +426,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 "steps_per_second": steps_per_second,
             }
 
-            if not hasattr(self, "counts"):
+            if hasattr(self, "counts"):
                 result.update(counts)
 
             return result
