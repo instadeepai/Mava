@@ -30,38 +30,23 @@ except ModuleNotFoundError:
     pass
 
 import mava
-from mava.environment_loop import ParallelEnvironmentLoop
+from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
 from mava.utils.loggers import Logger
 from mava.utils.wrapper_utils import RunningStatistics
 
 
 class EnvironmentLoopStatisticsBase:
-    """A parallel MARL environment loop.
-    This takes `Environment` and `Executor` instances and coordinates their
-    interaction. Executors are updated if `should_update=True`. This can be used as:
-        loop = EnvironmentLoop(environment, executor)
-        loop.run(num_episodes)
-    A `Counter` instance can optionally be given in order to maintain counts
-    between different Mava components. If not given a local Counter will be
-    created to maintain counts between calls to the `run` method.
-    A `Logger` instance can also be passed in order to control the output of the
-    loop. If not given a platform-specific default logger will be used as defined
-    by utils.loggers.make_default_logger from acme. A string `label` can be passed
-    to easily change the label associated with the default logger; this is ignored
-    if a `Logger` instance is given.
+    """
+    A base stats class that acts as a MARL environment loop wrapper.
     """
 
     def __init__(
         self,
-        environment_loop: ParallelEnvironmentLoop,
+        environment_loop: Union[ParallelEnvironmentLoop, SequentialEnvironmentLoop],
     ) -> None:
-        self._environment = environment_loop._environment
-        self._executor = environment_loop._executor
-        self._counter = environment_loop._counter
-        self._logger = environment_loop._logger
-        self._should_update = environment_loop._should_update
         self._environment_loop = environment_loop
         self._override_environment_loop_stats_methods()
+        self._running_statistics: Dict[str, float] = {}
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         raise NotImplementedError
@@ -74,9 +59,8 @@ class EnvironmentLoopStatisticsBase:
     ) -> None:
         raise NotImplementedError
 
-    @property
-    def environment_loop(self) -> ParallelEnvironmentLoop:
-        return self._environment_loop
+    def _get_running_stats(self) -> Dict:
+        return self._running_statistics
 
     def _override_environment_loop_stats_methods(self) -> None:
         self._environment_loop._compute_episode_statistics = (  # type: ignore
@@ -85,15 +69,23 @@ class EnvironmentLoopStatisticsBase:
         self._environment_loop._compute_step_statistics = (  # type: ignore
             self._compute_step_statistics
         )
+        self._environment_loop._get_running_stats = (  # type: ignore
+            self._get_running_stats
+        )
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._environment_loop, name)
 
 
 class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
+    """
+    A stats class that acts as a MARL environment loop wrapper
+    and overwrites _compute_episode_statistics.
+    """
+
     def __init__(
         self,
-        environment_loop: ParallelEnvironmentLoop,
+        environment_loop: Union[ParallelEnvironmentLoop, SequentialEnvironmentLoop],
         summary_stats: List = ["mean", "max", "min", "var", "std", "raw"],
     ):
         super().__init__(environment_loop)
@@ -144,7 +136,15 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
 
 
 class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
-    def __init__(self, environment_loop: ParallelEnvironmentLoop):
+    """
+    A stats class that acts as a MARL environment loop wrapper
+    and overwrites _compute_episode_statistics and _compute_step_statistics.
+    """
+
+    def __init__(
+        self,
+        environment_loop: Union[ParallelEnvironmentLoop, SequentialEnvironmentLoop],
+    ):
         super().__init__(environment_loop)
         # get loop logger data
         loop_label = self._logger._label
