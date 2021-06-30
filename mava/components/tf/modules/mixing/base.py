@@ -44,7 +44,7 @@ class BaseMixingModule:
         """Initialise the mixer."""
 
     @abc.abstractmethod
-    def _create_mixing_layer(self) -> snt.Module:
+    def _create_mixing_layer(self, name: str) -> snt.Module:
         """Abstract function for adding an arbitrary mixing layer to a
         given architecture."""
 
