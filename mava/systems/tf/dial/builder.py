@@ -58,8 +58,8 @@ class DIALConfig:
         prefetch_size: size to prefetch from replay.
         batch_size: batch size for updates.
         n_step: number of steps to include prior to boostrapping.
-        sequence_length:
-        period: int
+        sequence_length: recurrent sequence rollout length.
+        period: consecutive starting points for overlapping rollouts across a sequence.
         discount: discount to use for TD updates.
         checkpoint: boolean to indicate whether to checkpoint models.
         optimizer: type of optimizer to use for updating the parameters of models.
