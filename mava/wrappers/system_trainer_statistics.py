@@ -76,7 +76,6 @@ class TrainerStatisticsBase(TrainerWrapperBase):
 
         # Update our counts and record it.
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
-
         fetches.update(counts)
 
         if self._system_checkpointer:
@@ -337,19 +336,19 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         ), "Nothing is selected to be logged."
 
     def _log_step(self) -> bool:
-        if hasattr(self, "_counter"):
-            return bool(
-                self._counter
-                and self._counter._counts
-                and self._counter._counts.get("steps")
-                and self._counter._counts.get("steps") % self.log_interval == 0
-            )
-        else:
+        if hasattr(self, "_counts"):
             return bool(
                 self._counts
                 and self._counts
                 and self._counts.get("steps")
                 and self._counts.get("steps") % self.log_interval == 0
+            )
+        else:
+            return bool(
+                self._counter
+                and self._counter._counts
+                and self._counter._counts.get("steps")
+                and self._counter._counts.get("steps") % self.log_interval == 0
             )
 
     def _create_loggers(self, keys: List[str]) -> None:
@@ -450,8 +449,8 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        # if self._system_checkpointer:
-        #     train_utils.checkpoint_networks(self._system_checkpointer)
+        if self._system_checkpointer:
+            train_utils.checkpoint_networks(self._system_checkpointer)
 
         if self._logger:
             self._logger.write(fetches)
