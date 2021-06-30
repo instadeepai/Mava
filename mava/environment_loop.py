@@ -89,6 +89,9 @@ class SequentialEnvironmentLoop(acme.core.Worker):
     def _get_action(self, agent_id: str, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_action(agent_id, timestep.observation)
 
+    def _get_running_stats(self) -> Dict:
+        return self._running_statistics
+
     def _set_step_type(
         self, timestep: dm_env.TimeStep, step_type: dm_env.StepType
     ) -> dm_env.TimeStep:
@@ -222,8 +225,8 @@ class SequentialEnvironmentLoop(acme.core.Worker):
             episode_steps,
             start_time,
         )
-        if self._running_statistics:
-            return self._running_statistics
+        if self._get_running_stats():
+            return self._get_running_stats()
         else:
             # Record counts.
             counts = self._counter.increment(episodes=1, steps=episode_steps)
@@ -238,17 +241,6 @@ class SequentialEnvironmentLoop(acme.core.Worker):
             result.update(counts)
 
             return result
-
-    def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
-        pass
-
-    def _compute_episode_statistics(
-        self,
-        episode_returns: Dict[str, float],
-        episode_steps: int,
-        start_time: float,
-    ) -> None:
-        pass
 
     def run(
         self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
@@ -320,6 +312,9 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_actions(timestep.observation)
+
+    def _get_running_stats(self) -> Dict:
+        return self._running_statistics
 
     def run_episode(self) -> loggers.LoggingData:
         """Run one episode.
@@ -402,8 +397,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             episode_steps,
             start_time,
         )
-        if self._running_statistics:
-            return self._running_statistics
+        if self._get_running_stats():
+            return self._get_running_stats()
         else:
             # Record counts.
             counts = self._counter.increment(episodes=1, steps=episode_steps)
@@ -418,17 +413,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             result.update(counts)
 
             return result
-
-    def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
-        pass
-
-    def _compute_episode_statistics(
-        self,
-        episode_returns: Dict[str, float],
-        episode_steps: int,
-        start_time: float,
-    ) -> None:
-        pass
 
     def run(
         self, num_episodes: Optional[int] = None, num_steps: Optional[int] = None
