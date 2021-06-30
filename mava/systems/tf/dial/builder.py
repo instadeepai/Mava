@@ -40,7 +40,8 @@ from mava.systems.tf.madqn import execution, training
 class DIALConfig:
     """Configuration options for the DIAL system.
     Args:
-        environment_spec: description of the actions, observations, etc.
+        environment_spec: description of the action and observation spaces etc. for
+            each agent in the system.
         epsilon_min: final minimum value for epsilon at the end of a decay schedule.
         epsilon_decay: the rate at which epislon decays.
         shared_weights: boolean indicating whether agents should share weights.
@@ -139,7 +140,7 @@ class DIALBuilder:
         """Create tables to insert data into.
 
         Args:
-            environment_spec (specs.MAEnvironmentSpec): description of the action,
+            environment_spec (specs.MAEnvironmentSpec): description of the action and
                 observation spaces etc. for each agent in the system.
 
         Raises:

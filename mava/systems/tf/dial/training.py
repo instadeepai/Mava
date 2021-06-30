@@ -63,26 +63,34 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
+        """initialise DIAL trainer for switch game
 
         Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            q_networks (Dict[str, snt.Module]): [description]
-            target_q_networks (Dict[str, snt.Module]): [description]
-            target_update_period (int): [description]
-            dataset (tf.data.Dataset): [description]
-            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
-            discount (float): [description]
-            shared_weights (bool): [description]
-            exploration_scheduler (LinearExplorationScheduler): [description]
-            communication_module (BaseCommunicationModule): [description]
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            fingerprint (bool, optional): [description]. Defaults to False.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            q_networks (Dict[str, snt.Module]): q-value networks.
+            target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            target_update_period (int): number of steps before updating target networks.
+            dataset (tf.data.Dataset): training dataset.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
+                optimizer for updating the parameters of the networks.
+            discount (float): discount factor for TD updates.
+            shared_weights (bool): wether agents are sharing weights or not.
+            exploration_scheduler (LinearExplorationScheduler): function specifying a
+                decaying scheduler for epsilon exploration.
+            communication_module (BaseCommunicationModule): module for communication
+                between agents.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            fingerprint (bool, optional): whether to apply replay stabilisation using
+                policy fingerprints. Defaults to False.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
         """
 
         super().__init__(

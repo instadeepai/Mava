@@ -50,21 +50,28 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         fingerprint: bool = False,
         evaluator: bool = False,
     ):
-        """[summary]
+        """Initialise the system executor
 
         Args:
-            q_networks (Dict[str, snt.Module]): [description]
-            action_selectors (Dict[str, snt.Module]): [description]
-            communication_module (BaseCommunicationModule): [description]
-            shared_weights (bool, optional): [description]. Defaults to True.
-            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
-                to None.
+            q_networks (Dict[str, snt.Module]): q-value networks for each agent in the
+                system.
+            action_selectors (Dict[str, Any]): policy action selector method, e.g.
+                epsilon greedy.
+            communication_module (BaseCommunicationModule): module for enabling
+                communication protocols between agents.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
+            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+                to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
-                [description]. Defaults to None.
-            store_recurrent_state (bool, optional): [description]. Defaults to True.
-            trainer (MADQNTrainer, optional): [description]. Defaults to None.
-            fingerprint (bool, optional): [description]. Defaults to False.
-            evaluator (bool, optional): [description]. Defaults to False.
+                client to copy weights from the trainer. Defaults to None.
+            store_recurrent_state (bool, optional): boolean to store the recurrent
+                network hidden state. Defaults to True.
+            trainer (MADQNTrainer, optional): system trainer. Defaults to None.
+            fingerprint (bool, optional): fingerprint stabilisation function to
+                stabilise experience replay. Defaults to False.
+            evaluator (bool, optional): whether the executor will be used for
+                evaluation. Defaults to False.
         """
 
         # Store these for later use.
@@ -90,15 +97,17 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
     ) -> types.NestedTensor:
-        """[summary]
+        """Agent specific policy function
 
         Args:
-            agent (str): [description]
-            observation (types.NestedTensor): [description]
-            state (types.NestedTensor): [description]
-            message (types.NestedTensor): [description]
-            legal_actions (types.NestedTensor): [description]
-            epsilon (tf.Tensor): [description]
+            agent (str): agent id
+            observation (types.NestedTensor): observation tensor received from the
+                environment.
+            state (types.NestedTensor): Full state of the environment.
+            message (types.NestedTensor): received agent messsage.
+            legal_actions (types.NestedTensor): actions allowed to be taken at the
+                current observation.
+            epsilon (tf.Tensor): value for epsilon greedy action selection.
 
         Returns:
             types.NestedTensor: [description]
