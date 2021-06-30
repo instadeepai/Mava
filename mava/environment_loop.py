@@ -407,13 +407,16 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             return self._running_statistics
         else:
             # Record counts.
-            if not hasattr(self, "_counter") and hasattr(
-                self._executor, "_variable_client"
-            ):
-                self._executor._variable_client.add_and_wait(
-                    ["executor_episodes", "executor_steps"],
-                    {"executor_episodes": 1, "executor_steps": episode_steps},
-                )
+            if not hasattr(self, "_counter"):
+                if hasattr(self._executor, "_variable_client"):
+                    self._executor._variable_client.add_and_wait(
+                        ["executor_episodes", "executor_steps"],
+                        {"executor_episodes": 1, "executor_steps": episode_steps},
+                    )
+                else:
+                    self._executor._counts["executor_episodes"] += 1
+                    self._executor._counts["executor_steps"] += episode_steps
+
                 counts = self._executor._counts
             elif self._counter:
                 counts = self._counter.increment(episodes=1, steps=episode_steps)
@@ -426,9 +429,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 "steps_per_second": steps_per_second,
             }
 
-            if hasattr(self, "counts"):
-                result.update(counts)
-
+            result.update(counts)
             return result
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
