@@ -108,14 +108,9 @@ class QMIXTrainer(MADQNTrainer):
                     dest.assign(src)
 
             # NOTE These shouldn't really be in the agent for loop.
-            online_variables = [
-                *self._mixing_network.variables,
-                # *self._mixing_network._hypernetworks.variables,
-            ]
-            target_variables = [
-                *self._target_mixing_network.variables,
-                # *self._target_mixing_network._hypernetworks.variables,
-            ]
+            online_variables = self.get_mixing_vars("mixing")
+            target_variables = self.get_mixing_vars("target_mixing")
+
             # Make online -> target network update ops.
             for src, dest in zip(online_variables, target_variables):
                 dest.assign(src)
@@ -230,7 +225,6 @@ class QMIXTrainer(MADQNTrainer):
 
             # Calculate Q loss.
             targets = rewards + pcont * q_tot_target_mixed
-            targets = tf.stop_gradient(targets)
             td_error = targets - q_tot_mixed
 
             # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
@@ -240,19 +234,16 @@ class QMIXTrainer(MADQNTrainer):
     def _backward(self) -> None:
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-
             # Update agent networks
-            variables = [*self._q_networks[agent_key].trainable_variables]
+            variables = self._q_networks[agent_key].trainable_variables
             gradients = self.tape.gradient(self.loss, variables)
             gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
             self._optimizers[agent_key].apply(gradients, variables)
 
         # Update mixing network
-        variables = [
-            *self._mixing_network.trainable_variables,
-            # *self._mixing_network._hypernetworks.trainable_variables,
-        ]
+        variables = self.get_mixing_trainable_vars("mixing")
         gradients = self.tape.gradient(self.loss, variables)
+
         gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
         self._optimizer.apply(gradients, variables)
 
@@ -273,3 +264,20 @@ class QMIXTrainer(MADQNTrainer):
                     for key in self.unique_net_keys
                 }
         return variables
+
+    def get_mixing_trainable_vars(self, network: str = "mixing") -> List:
+        mixing_trainable_vars = []
+        for var in self._mixing_network.trainable_variables:
+            if var.name.startswith(network):
+                mixing_trainable_vars.append(var)
+        return mixing_trainable_vars
+
+    def get_mixing_vars(
+        self,
+        network: str = "mixing",
+    ) -> List:
+        mixing_vars = []
+        for var in self._mixing_network.variables:
+            if var.name.startswith(network):
+                mixing_vars.append(var)
+        return mixing_vars
