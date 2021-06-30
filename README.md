@@ -64,9 +64,9 @@ The animation on the right shows MAD4PG solving the Multi-Walker environment fro
 Mava includes several system implementations. Below we list these together with an indication of the maturity of the system using the following keys: 🟩  -- Tested and working well, 🟨  -- Running and training on simple environments, but not extensively tested and 🟥  -- Implemented but untested and yet to show clear signs of stable training.
 
 * 🟩 - Multi-Agent Deep Q-Networks (MADQN).
-* 🟩 - Differentiable Inter-Agent Learning (DIAL).
 * 🟩 - Multi-Agent Deep Deterministic Policy Gradient (MADDPG).
 * 🟩 - Multi-Agent Distributed Distributional Deep Deterministic Policy Gradient (MAD4PG).
+* 🟨 - Differentiable Inter-Agent Learning (DIAL).
 * 🟨 - Multi-Agent Proximal Policy Optimisation (MAPPO).
 * 🟨 - Value Decomposition Networks (VDN).
 * 🟥 - Monotonic value function factorisation (QMIX).
