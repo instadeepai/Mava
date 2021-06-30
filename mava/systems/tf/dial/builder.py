@@ -348,7 +348,8 @@ class DIALBuilder:
                 metadata.. Defaults to None.
 
         Returns:
-            core.Trainer: [description]
+            core.Trainer: system trainer, that uses the collected data from the
+                executors to update the parameters of the agent networks in the system.
         """
         q_networks = networks["values"]
         target_q_networks = networks["target_values"]
