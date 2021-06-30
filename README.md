@@ -64,6 +64,7 @@ The animation on the right shows MAD4PG solving the Multi-Walker environment fro
 Mava includes several system implementations. Below we list these together with an indication of the maturity of the system using the following keys: 🟩  -- Tested and working well, 🟨  -- Running and training on simple environments, but not extensively tested and 🟥  -- Implemented but untested and yet to show clear signs of stable training.
 
 * 🟩 - Multi-Agent Deep Q-Networks (MADQN).
+* 🟩 - Differentiable Inter-Agent Learning (DIAL).
 * 🟩 - Multi-Agent Deep Deterministic Policy Gradient (MADDPG).
 * 🟩 - Multi-Agent Distributed Distributional Deep Deterministic Policy Gradient (MAD4PG).
 * 🟨 - Multi-Agent Proximal Policy Optimisation (MAPPO).
@@ -73,6 +74,7 @@ Mava includes several system implementations. Below we list these together with 
 | **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training** | **Communication**  | **Multi Processing**   |
 | ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------ | ------------------- |
 | MADQN   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| DIAL   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | MADDPG  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark:        | :heavy_check_mark: | :heavy_check_mark: |
 | MAD4PG   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:             | :x: | :heavy_check_mark: |
 | MAPPO   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:              | :x: | :heavy_check_mark: |
@@ -278,7 +280,7 @@ If you use Mava in your work, please cite the accompanying
 @article{pretorius2021mava,
     title={Mava: A Research Framework for Distributed Multi-Agent Reinforcement Learning},
     author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Kevin Eloff
-    and Claude Formanek and St John Grimbly and Siphelele Danisa and Lawrance Francis
+    and Claude Formanek and St John Grimbly and Siphelele Danisa and Lawrence Francis
     and Jonathan Shock and Herman Kamper and Willie Brink and Herman Engelbrecht
     and Alexandre Laterre and Karim Beguir},
     year={2021},
