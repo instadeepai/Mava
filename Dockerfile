@@ -30,7 +30,7 @@ RUN export LANG=en_US.UTF-8
 
 # Mava dependencies
 COPY . /home/app/mava
-RUN apt-get install build-essential
+RUN apt-get update && apt-get install make
 RUN python -m pip uninstall -y enum34
 RUN python -m pip install --upgrade pip setuptools
 RUN python -m pip install .
