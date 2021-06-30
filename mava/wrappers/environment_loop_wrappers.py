@@ -237,7 +237,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
         self._running_statistics.update({"episode_length": episode_steps})
 
-        if not hasattr(self, "counts"):
+        if hasattr(self, "counts"):
             self._running_statistics.update(counts)
 
 
