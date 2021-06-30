@@ -48,6 +48,7 @@ This is meant to flexibily test various environments wrappers.
         EnvSpec("pettingzoo.sisl.multiwalker_v7", EnvType.Parallel),
         EnvSpec("pettingzoo.sisl.multiwalker_v7", EnvType.Sequential),
         EnvSpec("flatland", EnvType.Parallel, EnvSource.Flatland),
+        EnvSpec("tic_tac_toe", EnvType.Sequential, EnvSource.OpenSpiel),
     ],
 )
 class TestEnvWrapper:
@@ -109,6 +110,16 @@ class TestEnvWrapper:
         assert (
             dm_env_timestep.step_type == dm_env.StepType.FIRST
         ), "Failed to have correct StepType."
+        if (
+            env_spec.env_name == "tic_tac_toe"
+            and env_spec.env_source == EnvSource.OpenSpiel
+            and env_spec.env_type == EnvType.Sequential
+        ):
+            pytest.skip(
+                "This test is only applicable to parralel wrappers and only works "
+                "for the provided PZ sequential envs because they have 3 agents, and"
+                "an OLT has length of 3 (a bug, i'd say)"
+            )
         assert (
             len(dm_env_timestep.observation) == num_agents
         ), "Failed to generate observation for all agents."
@@ -146,6 +157,7 @@ class TestEnvWrapper:
                         test_agents_observations[agent],
                         dm_env_timestep[agent].observation,
                     )
+
                     assert (
                         bool(dm_env_timestep[agent].terminal) is False
                     ), "Failed to set terminal."
@@ -265,9 +277,17 @@ class TestEnvWrapper:
 
         # Sequential env_types
         elif env_spec.env_type == EnvType.Sequential:
+            curr_dm_timestep = initial_dm_env_timestep
             for agent in agents:
-                test_agent_actions = wrapped_env.action_spaces[agent].sample()
+                if env_spec.env_source == EnvSource.OpenSpiel:
+                    test_agent_actions = np.random.choice(
+                        np.where(curr_dm_timestep.observation.legal_actions)[0]
+                    )
+                else:
+                    test_agent_actions = wrapped_env.action_spaces[agent].sample()
+
                 curr_dm_timestep = wrapped_env.step(test_agent_actions)
+
                 assert not np.array_equal(
                     initial_dm_env_timestep.observation.observation,
                     curr_dm_timestep.observation.observation,
@@ -320,6 +340,9 @@ class TestEnvWrapper:
         self, env_spec: EnvSpec, helpers: Helpers, monkeypatch: MonkeyPatch
     ) -> None:
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+
+        if env_spec.env_source == EnvSource.OpenSpiel:
+            pytest.skip("Open Spiel does not use the .last() method")
 
         # Seed environment since we are sampling actions.
         # We need to seed env and action space.

@@ -49,12 +49,9 @@ def make_environment(
     """
     del evaluation
 
-    env = StarCraft2Env(map_name=map_name, **kwargs)
+    env = StarCraft2Env(map_name=map_name, seed=random_seed, **kwargs)
 
     # wrap starcraft 2 environment
     environment = SMACEnvWrapper(env)
-
-    if random_seed and hasattr(environment, "seed"):
-        environment.seed(random_seed)
 
     return environment
