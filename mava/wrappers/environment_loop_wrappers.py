@@ -205,7 +205,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         mean_episode_return = np.mean(np.array(list(episode_returns.values())))
 
         # Record counts.
-        if not hasattr(self, "_counter"):
+        if hasattr(self._executor, "_counts"):
             if hasattr(self._executor, "_variable_client"):
                 self._executor._variable_client.add_and_wait(
                     ["executor_episodes", "executor_steps"],
@@ -216,7 +216,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                 self._executor._counts["executor_steps"] += episode_steps
 
             counts = self._executor._counts
-        elif self._counter:
+        else:
             counts = self._counter.increment(episodes=1, steps=episode_steps)
 
         self._episode_length_stats.push(episode_steps)

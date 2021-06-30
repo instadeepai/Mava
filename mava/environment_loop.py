@@ -316,7 +316,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         # Internalize agent and environment.
         self._environment = environment
         self._executor = executor
-        self._counter = counter
+        self._counter = counter or counting.Counter()
 
         self._logger = logger or loggers.make_default_logger(label)
         self._should_update = should_update
@@ -424,7 +424,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             return self._get_running_stats()
         else:
             # Record counts.
-            if not hasattr(self, "_counter"):
+            if hasattr(self._executor, "_counts"):
                 if hasattr(self._executor, "_variable_client"):
                     self._executor._variable_client.add_and_wait(
                         ["executor_episodes", "executor_steps"],
@@ -435,7 +435,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     self._executor._counts["executor_steps"] += episode_steps
 
                 counts = self._executor._counts
-            elif self._counter:
+            else:
                 counts = self._counter.increment(episodes=1, steps=episode_steps)
 
             # Collect the results and combine with counts.

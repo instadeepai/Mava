@@ -303,32 +303,32 @@ class MADDPGBuilder:
 
         shared_weights = self._config.shared_weights
 
+        agent_net_keys = self._agent_types if shared_weights else self._agents
+
+        # Create policy variables
+        variables = {}
+        get_keys = []
+
+        for agent_net_key in agent_net_keys:
+            var_key = f"{agent_net_key}_policies"
+            variables[var_key] = policy_networks[agent_net_key].variables
+            get_keys.append(var_key)
+
+        variables = self.create_counter_variables(variables)
+
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        get_keys.extend(count_names)
+        counts = {name: variables[name] for name in count_names}
+
         variable_client = None
         if variable_source:
-            agent_net_keys = self._agent_types if shared_weights else self._agents
-
-            # Create policy variables
-            variables = {}
-            get_keys = []
-
-            for agent_net_key in agent_net_keys:
-                var_key = f"{agent_net_key}_policies"
-                variables[var_key] = policy_networks[agent_net_key].variables
-                get_keys.append(var_key)
-
-            variables = self.create_counter_variables(variables)
-
-            count_names = [
-                "trainer_steps",
-                "trainer_walltime",
-                "evaluator_steps",
-                "evaluator_episodes",
-                "executor_episodes",
-                "executor_steps",
-            ]
-            get_keys.extend(count_names)
-            counts = {name: variables[name] for name in count_names}
-
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
