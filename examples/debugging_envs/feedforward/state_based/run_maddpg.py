@@ -55,6 +55,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        return_state_info=True,
     )
 
     # Networks.
