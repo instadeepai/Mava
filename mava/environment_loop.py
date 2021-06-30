@@ -407,13 +407,15 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             return self._running_statistics
         else:
             # Record counts.
-            if not self._counter:
+            if not hasattr(self, "_counter") and hasattr(
+                self._executor, "_variable_client"
+            ):
                 self._executor._variable_client.add_and_wait(
                     ["executor_episodes", "executor_steps"],
                     {"executor_episodes": 1, "executor_steps": episode_steps},
                 )
                 counts = self._executor._counts
-            else:
+            elif self._counter:
                 counts = self._counter.increment(episodes=1, steps=episode_steps)
 
             # Collect the results and combine with counts.
