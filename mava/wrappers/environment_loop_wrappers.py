@@ -236,7 +236,9 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
             self._agent_loggers[agent].write(agent_running_statistics)
 
         self._running_statistics.update({"episode_length": episode_steps})
-        self._running_statistics.update(counts)
+
+        if not hasattr(self, "counts"):
+            self._running_statistics.update(counts)
 
 
 class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
