@@ -146,6 +146,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         environment_loop: Union[ParallelEnvironmentLoop, SequentialEnvironmentLoop],
     ):
         super().__init__(environment_loop)
+
         # get loop logger data
         loop_label = self._logger._label
         base_dir = self._logger._directory
@@ -239,7 +240,6 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
             self._agent_loggers[agent].write(agent_running_statistics)
 
         self._running_statistics.update({"episode_length": episode_steps})
-
         self._running_statistics.update(counts)
 
 
@@ -316,10 +316,10 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
 
     def _append_frame(self) -> None:
         """Appends a frame to the sequence of frames."""
-        if self._counter:
-            counts = self._counter.get_counts()
-        else:
+        if hasattr(self._executor, "_counts"):
             counts = self._executor._counts
+        else:
+            counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
         if counter and (counter % self._record_every == 0):
             self._frames.append(self._retrieve_render())
@@ -331,10 +331,10 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         return timestep
 
     def _write_frames(self) -> None:
-        if self._counter:
-            counts = self._counter.get_counts()
-        else:
+        if hasattr(self._executor, "_counts"):
             counts = self._executor._counts
+        else:
+            counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
         path = f"{self._path}/{self._filename}_{counter}_eval_episode"
         try:

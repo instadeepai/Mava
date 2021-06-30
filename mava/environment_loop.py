@@ -444,8 +444,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 "mean_episode_return": np.mean(list(episode_returns.values())),
                 "steps_per_second": steps_per_second,
             }
-
             result.update(counts)
+
             return result
 
     def run(
