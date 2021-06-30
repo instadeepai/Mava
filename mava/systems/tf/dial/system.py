@@ -298,7 +298,7 @@ class DIAL:
         """Coordination helper for a distributed program
 
         Args:
-            counter (counting.Counter): step counter object
+            counter (counting.Counter): step counter object.
 
         Returns:
             Any: step limiter object.
