@@ -32,9 +32,9 @@ ENV DISPLAY=:0
 # Install Mava and dependencies
 COPY . /home/app/mava
 RUN python -m pip install --upgrade pip
-RUN python -m pip install id-mava[flatland]
+RUN python -m pip install .[flatland]
 RUN python -m pip install .[open_spiel] --no-cache
-RUN python -m pip install id-mava[tf,envs,reverb,launchpad,testing_formatting,record_episode]
+RUN python -m pip install .[tf,envs,reverb,launchpad,testing_formatting,record_episode]
 
 # Install starcraft 2 environment
 RUN apt-get -y install git
