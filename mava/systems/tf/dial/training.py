@@ -72,7 +72,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             dataset=dataset,
             optimizer=optimizer,
             discount=discount,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,
@@ -118,7 +118,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             # _target_q_networks must be 1 step ahead
             target_channel = self._communication_module.process_messages(target_message)
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_config[agent]
                 (q_targ, m), s = self._target_q_networks[agent_key](
                     observations[agent].observation[0],
                     target_state[agent],
@@ -134,7 +134,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
                 )
 
                 for agent in self._agents:
-                    agent_key = self.agent_net_keys[agent]
+                    agent_key = self._agent_net_config[agent]
 
                     # Cast the additional discount
                     # to match the environment discount dtype.

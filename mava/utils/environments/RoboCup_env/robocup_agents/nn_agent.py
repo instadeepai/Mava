@@ -71,22 +71,20 @@ def set_gpu_affinity(gpus: Any) -> Any:
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
+    agent_net_config: Dict[str, str],
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         256,
         256,
         256,
     ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
-    shared_weights: bool = True,
     sigma: float = 0.3,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
-    if shared_weights:
-        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-        specs = type_specs
+    specs = {agent_net_config[key]: specs[key] for key in specs.keys()}
 
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
@@ -146,13 +144,13 @@ def make_networks(
 
 def make_recurrent_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
+    agent_net_config: Dict[str, str],
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         256,
         256,
         256,
     ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
-    shared_weights: bool = True,
     sigma: float = 0.3,
     vmin: float = -150.0,
     vmax: float = 150.0,
@@ -247,7 +245,7 @@ class NNBot(object):
             policy_networks=system_networks["policies"],
             critic_networks=system_networks["critics"],
             observation_networks=system_networks["observations"],
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )
 
         # Create the policy_networks

@@ -38,13 +38,13 @@ class CentralisedPolicyActor(DecentralisedPolicyActor):
         environment_spec: mava_specs.MAEnvironmentSpec,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )
 
     def _get_actor_specs(
@@ -81,14 +81,14 @@ class CentralisedValueCritic(DecentralisedValueActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )
 
     def _get_critic_specs(
@@ -123,14 +123,14 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )
 
     def _get_critic_specs(
@@ -189,7 +189,7 @@ class CentralisedQValueActorCritic(  # type: ignore
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
     ):
 
         CentralisedQValueCritic.__init__(
@@ -198,5 +198,5 @@ class CentralisedQValueActorCritic(  # type: ignore
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )

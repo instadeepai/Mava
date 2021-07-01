@@ -100,9 +100,11 @@ class MAPPOTrainer(mava.Trainer):
         self._critic_networks = critic_networks
 
         # Dictionary with network keys for each agent.
-        self.agent_net_keys = {agent: agent for agent in self._agents}
+        self._agent_net_config = {agent: agent for agent in self._agents}
         if self._shared_weights:
-            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
+            self._agent_net_config = {
+                agent: agent.split("_")[0] for agent in self._agents
+            }
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
@@ -202,7 +204,7 @@ class MAPPOTrainer(mava.Trainer):
     ) -> Dict[str, np.ndarray]:
         observation_trans = {}
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_config[agent]
             observation_trans[agent] = self._observation_networks[agent_key](
                 observation[agent].observation
             )
@@ -267,7 +269,7 @@ class MAPPOTrainer(mava.Trainer):
                 discount = discount[:-1]
 
                 # Get agent network
-                agent_key = agent.split("_")[0] if self._shared_weights else agent
+                agent_key = self._agent_net_config[agent]
                 policy_network = self._policy_networks[agent_key]
                 critic_network = self._critic_networks[agent_key]
 
@@ -355,7 +357,7 @@ class MAPPOTrainer(mava.Trainer):
 
         for agent in self._agents:
             # Get agent_key.
-            agent_key = agent.split("_")[0] if self._shared_weights else agent
+            agent_key = self._agent_net_config[agent]
 
             # Get trainable variables.
             policy_variables = (
@@ -446,7 +448,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             critic_networks=critic_networks,
             observation_networks=observation_networks,
             dataset=dataset,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             discount=discount,

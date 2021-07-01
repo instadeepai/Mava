@@ -101,6 +101,7 @@ class DIAL:
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
+        agent_net_config: Dict[str, str] = {},
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
@@ -146,6 +147,7 @@ class DIAL:
         self._network_factory = network_factory
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
+        self._agent_net_config = agent_net_config
         self._shared_weights = shared_weights
         self._num_exectors = num_executors
         self._num_caches = num_caches
@@ -168,7 +170,7 @@ class DIAL:
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
-                shared_weights=shared_weights,
+                agent_net_config=agent_net_config,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,

@@ -98,9 +98,11 @@ class MADQNTrainer(mava.Trainer):
         self._exploration_scheduler = exploration_scheduler
 
         # Dictionary with network keys for each agent.
-        self.agent_net_keys = {agent: agent for agent in self._agents}
+        self._agent_net_config = {agent: agent for agent in self._agents}
         if self._shared_weights:
-            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
+            self._agent_net_config = {
+                agent: agent.split("_")[0] for agent in self._agents
+            }
 
         self.unique_net_keys = self._agent_types if shared_weights else self._agents
 
@@ -251,7 +253,7 @@ class MADQNTrainer(mava.Trainer):
             q_network_losses: Dict[str, NestedArray] = {}
 
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_config[agent]
 
                 # Cast the additional discount to match the environment discount dtype.
                 discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
@@ -302,7 +304,7 @@ class MADQNTrainer(mava.Trainer):
         q_network_losses = self._q_network_losses
         tape = self.tape
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_config[agent]
 
             # Get trainable variables
             q_network_variables = self._q_networks[agent_key].trainable_variables
@@ -365,7 +367,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             dataset=dataset,
             optimizer=optimizer,
             discount=discount,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
@@ -392,7 +394,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             q_network_losses: Dict[str, NestedArray] = {}
 
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_config[agent]
                 # Cast the additional discount to match the environment discount dtype.
                 discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
 
@@ -460,7 +462,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             dataset=dataset,
             optimizer=optimizer,
             discount=discount,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,
@@ -504,7 +506,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             # _target_q_networks must be 1 step ahead
             target_channel = self._communication_module.process_messages(target_message)
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_config[agent]
                 (q_targ, m), s = self._target_q_networks[agent_key](
                     observations[agent].observation[0],
                     target_state[agent],
@@ -520,7 +522,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
                 )
 
                 for agent in self._agents:
-                    agent_key = self.agent_net_keys[agent]
+                    agent_key = self._agent_net_config[agent]
 
                     # Cast the additional discount
                     # to match the environment discount dtype.

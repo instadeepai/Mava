@@ -41,7 +41,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         communication_module: BaseCommunicationModule,
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,

@@ -52,7 +52,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         trainer: MADQNTrainer,
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
@@ -62,7 +62,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         """Initializes the executor.
         Args:
           policy_network: the policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
+          agent_net_config: specifies what network each agent uses.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
@@ -94,7 +94,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         batched_legals = tf2_utils.add_batch_dim(legal_actions)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_config[agent]
 
         # Compute the policy, conditioned on the observation and
         # possibly the fingerprint.
@@ -223,7 +223,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         self,
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
@@ -235,7 +235,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         """Initializes the executor.
         Args:
           policy_network: the policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
+          agent_net_config: specifies what network each agent uses.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
@@ -269,7 +269,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         batched_legals = tf2_utils.add_batch_dim(legal_actions)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_config[agent]
 
         # Compute the policy, conditioned on the observation.
         q_values, new_state = self._q_networks[agent_key](batched_observation, state)
@@ -330,7 +330,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         communication_module: BaseCommunicationModule,
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
@@ -341,7 +341,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         """Initializes the executor.
         Args:
           policy_network: the policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
+          agent_net_config: specifies what network each agent uses.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
@@ -378,7 +378,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         batched_legals = tf2_utils.add_batch_dim(legal_actions)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_config[agent]
 
         # Compute the policy, conditioned on the observation.
         (q_values, m_values), new_state = self._q_networks[agent_key](

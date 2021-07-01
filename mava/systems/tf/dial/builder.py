@@ -262,7 +262,7 @@ class DIALBuilder:
         return self._executor_fn(
             q_networks=q_networks,
             action_selectors=action_selectors,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             variable_client=variable_client,
             adder=adder,
             trainer=trainer,

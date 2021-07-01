@@ -68,7 +68,7 @@ class MADDPGConfig:
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
-    shared_weights: bool = True
+    agent_net_config: Dict[str, str]
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -263,15 +263,13 @@ class MADDPGBuilder(SystemBuilder):
           variable_source: A source providing the necessary executor parameters.
         """
 
-        shared_weights = self._config.shared_weights
+        agent_net_config = self._config.agent_net_config
 
         variable_client = None
         if variable_source:
-            agent_keys = self._agent_types if shared_weights else self._agents
-
             # Create policy variables
             variables = {}
-            for agent in agent_keys:
+            for agent in set(agent_net_config.values()):
                 variables[agent] = policy_networks[agent].variables
 
             # Get new policy variables
@@ -289,7 +287,7 @@ class MADDPGBuilder(SystemBuilder):
         return self._executor_fn(
             policy_networks=policy_networks,
             agent_specs=self._config.environment_spec.get_agent_specs(),
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             variable_client=variable_client,
             adder=adder,
         )
@@ -316,7 +314,7 @@ class MADDPGBuilder(SystemBuilder):
         """
         agents = self._agents
         agent_types = self._agent_types
-        shared_weights = self._config.shared_weights
+        agent_net_config = self._config.agent_net_config
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         target_update_period = self._config.target_update_period
@@ -333,7 +331,7 @@ class MADDPGBuilder(SystemBuilder):
             "target_policy_networks": networks["target_policies"],
             "target_critic_networks": networks["target_critics"],
             "target_observation_networks": networks["target_observations"],
-            "shared_weights": shared_weights,
+            "agent_net_config": agent_net_config,
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
             "max_gradient_norm": max_gradient_norm,

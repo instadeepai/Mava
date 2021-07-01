@@ -42,15 +42,15 @@ class MAPPOFeedForwardExecutor(core.Executor):
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
     ):
 
         """Initializes the executor.
         Args:
           networks: the (recurrent) policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
+          agent_net_config: specifies what network each agent uses.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy

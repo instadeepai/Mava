@@ -38,16 +38,16 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
     ):
         super().__init__(
             policy_networks=policy_networks,
             agent_specs=agent_specs,
             adder=adder,
             variable_client=variable_client,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )
 
 
@@ -63,14 +63,14 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
     ):
         super().__init__(
             policy_networks=policy_networks,
             agent_specs=agent_specs,
             adder=adder,
             variable_client=variable_client,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )

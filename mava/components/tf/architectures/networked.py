@@ -38,13 +38,13 @@ class NetworkedPolicyActor(DecentralisedPolicyActor):
         network_spec: Dict[str, List[str]],
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        agent_net_config: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )
 
         self._network_spec = network_spec
@@ -85,14 +85,14 @@ class NetworkedQValueCritic(DecentralisedQValueActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )
 
         self._network_spec = network_spec
