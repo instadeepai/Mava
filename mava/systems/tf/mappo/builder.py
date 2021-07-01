@@ -28,7 +28,6 @@ from acme.utils import counting
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.systems.builders import SystemBuilder
 from mava.systems.tf.mappo import execution, training
 from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
 

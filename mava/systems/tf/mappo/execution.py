@@ -21,7 +21,6 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
 from acme import types
-
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
