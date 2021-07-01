@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MAPPO trainer implementation."""
+"""MAPPO system trainer implementation."""
+
 import copy
 import os
 import time
@@ -64,28 +65,30 @@ class MAPPOTrainer(mava.Trainer):
         checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """Initializes the learner.
+        """[summary]
+
         Args:
-            policy_networks: ...
-            critic_networks: ...
-            policy_optimizer: policy optimizer,
-                This can be a single optimizer or an optimizer per agent key.
-            critic_optimizer: critic optimizer,
-            shared_weights: ...
-            discount: discount to use for TD updates.
-            dataset: dataset to learn from, whether fixed or from a replay buffer
-                (see `acme.datasets.reverb.make_dataset` documentation).
-            lambda_gae: ...
-            clipping_espilon: ...
-            entropy_cost: ...
-            baseline_cost: ...
-            max_abs_reward: ...
-            max_gradient_norm: ...
-            clipping: whether to clip gradients by global norm.
-            counter: counter object used to keep track of steps.
-            logger: logger object to be used by learner.
-            checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[Any]): [description]
+            agent_types (List[str]): [description]
+            observation_networks (Dict[str, snt.Module]): [description]
+            policy_networks (Dict[str, snt.Module]): [description]
+            critic_networks (Dict[str, snt.Module]): [description]
+            dataset (tf.data.Dataset): [description]
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
+            shared_weights (bool): [description]
+            discount (float, optional): [description]. Defaults to 0.99.
+            lambda_gae (float, optional): [description]. Defaults to 1.0.
+            entropy_cost (float, optional): [description]. Defaults to 0.0.
+            baseline_cost (float, optional): [description]. Defaults to 1.0.
+            clipping_epsilon (float, optional): [description]. Defaults to 0.2.
+            max_gradient_norm (Optional[float], optional): [description]. Defaults to None.
+            counter (counting.Counter, optional): [description]. Defaults to None.
+            logger (loggers.Logger, optional): [description]. Defaults to None.
+            checkpoint (bool, optional): [description]. Defaults to False.
+            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
         """
+
         # Store agents.
         self._agents = agents
         self._agent_types = agent_types

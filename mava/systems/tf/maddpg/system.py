@@ -134,10 +134,10 @@ class MADDPG:
             samples_per_insert (Optional[float], optional): number of samples to take
                 from replay for every insert that is made. Defaults to 32.0.
             policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
-                optional): optimizer(s) for updating policy networks Defaults to
+                optional): optimizer(s) for updating policy networks. Defaults to
                 snt.optimizers.Adam(learning_rate=1e-4).
             critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
-                networks Defaults to snt.optimizers.Adam(learning_rate=1e-4).
+                networks. Defaults to snt.optimizers.Adam(learning_rate=1e-4).
             n_step (int, optional): number of steps to include prior to boostrapping.
                 Defaults to 5.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
