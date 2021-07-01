@@ -29,7 +29,7 @@ from acme.utils import loggers
 import mava
 from mava import core
 from mava import specs as mava_specs
-from mava.components.tf.architectures import DecentralisedQValueActorCritic
+from mava.components.tf.architectures import DecentralisedQValueActorCriticScaled
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg_scaled import builder, training
@@ -53,8 +53,8 @@ class MADDPG:
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[
-            DecentralisedQValueActorCritic
-        ] = DecentralisedQValueActorCritic,
+            DecentralisedQValueActorCriticScaled
+        ] = DecentralisedQValueActorCriticScaled,
         trainer_fn: Union[
             Type[training.MADDPGBaseTrainer],
             # Type[training.MADDPGBaseRecurrentTrainer],
@@ -63,8 +63,9 @@ class MADDPG:
         num_executors: int = 1,
         num_trainers: int = 1,
         trainer_net_config: Dict[str, List] = {},
-        environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
+        agent_net_config: Dict[str, List] = {},
+        environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -148,13 +149,20 @@ class MADDPG:
                 to_terminal=True,
                 time_delta=10,
             )
+        
+        # Setup agent networks
+        self._agent_net_config = agent_net_config
+        if not agent_net_config:
+            agents = self._environment_spec.get_agent_ids()
+            agent_types = self._config.environment_spec.get_agent_types()
+            agent_net_keys = agent_types if shared_weights else agents
+            self._agent_net_config = {agent: agent_net_keys[agent] for agent in agents}
 
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
-        self._shared_weights = shared_weights
         self._num_exectors = num_executors
         self._num_trainers = num_trainers
         self._trainer_net_config = trainer_net_config
@@ -181,7 +189,7 @@ class MADDPG:
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
-                shared_weights=shared_weights,
+                agent_net_config=self._agent_net_config,
                 num_trainers=num_trainers,
                 num_executors=num_executors,
                 discount=discount,
@@ -213,13 +221,15 @@ class MADDPG:
         agents = self._environment_spec.get_agent_ids()
         core_state_specs = {}
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config
         )
         for agent in agents:
-            agent_type = agent.split("_")[0]
+            # agent_type = agent.split("_")[0]
+            agent_net_key = self._agent_net_config[agent]
             core_state_specs[agent] = (
                 tf2_utils.squeeze_batch_dim(
-                    networks["policies"][agent_type].initial_state(1)
+                    networks["policies"][agent_net_key].initial_state(1)
                 ),
             )
         return {"core_states": core_state_specs}
@@ -230,10 +240,11 @@ class MADDPG:
 
     def create_system(
         self,
-    ) -> Tuple[DecentralisedQValueActorCritic, Dict[str, Dict[str, snt.Module]]]:
+    ) -> Tuple[DecentralisedQValueActorCriticScaled, Dict[str, Dict[str, snt.Module]]]:
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture with target networks.
@@ -247,7 +258,8 @@ class MADDPG:
             "observation_networks": networks["observations"],
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
-            "shared_weights": self._shared_weights,
+            "agent_net_config": self._agent_net_config,
+            # "shared_weights": self._shared_weights,
         }
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec

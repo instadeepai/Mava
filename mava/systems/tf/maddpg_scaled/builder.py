@@ -71,7 +71,7 @@ class MADDPGConfig:
     critic_optimizer: snt.Optimizer
     num_executors: int
     num_trainers: int
-    shared_weights: bool = True
+    agent_net_config: Dict[str, List]
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -124,7 +124,7 @@ class MADDPGBuilder:
         """ _agents: a list of the agent specs (ids).
             _agent_types: a list of the types of agents to be used."""
         self._agents = self._config.environment_spec.get_agent_ids()
-        self._agent_types = self._config.environment_spec.get_agent_types()
+        # self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
 
@@ -269,12 +269,13 @@ class MADDPGBuilder:
         # Create variables
         variables = {}
         # Network variables
-        agent_keys = self._agent_types if self._config.shared_weights else self._agents
+        # agent_keys = self._agent_types if self._config.shared_weights else self._agents
+        
         for net_key in networks.keys():
-            for agent in agent_keys:
+            for agent_net_key in set(self._config.agent_net_config):
                 # Ensure obs and target networks are sonnet modules
-                variables[f"{agent}_{net_key}"] = tf2_utils.to_sonnet_module(
-                    networks[net_key][agent]
+                variables[f"{agent_net_key}_{net_key}"] = tf2_utils.to_sonnet_module(
+                    networks[net_key][agent_net_key]
                 ).variables
 
         variables = self.create_counter_variables(variables)
@@ -301,15 +302,15 @@ class MADDPGBuilder:
           variable_source: A source providing the necessary executor parameters.
         """
 
-        shared_weights = self._config.shared_weights
+        # shared_weights = self._config.shared_weights
 
-        agent_net_keys = self._agent_types if shared_weights else self._agents
+        # agent_net_keys = self._agent_types if shared_weights else self._agents
 
         # Create policy variables
         variables = {}
         get_keys = []
 
-        for agent_net_key in agent_net_keys:
+        for agent_net_key in self._config.agent_net_keys:
             var_key = f"{agent_net_key}_policies"
             variables[var_key] = policy_networks[agent_net_key].variables
             get_keys.append(var_key)
@@ -346,7 +347,8 @@ class MADDPGBuilder:
             policy_networks=policy_networks,
             counts=counts,
             agent_specs=self._config.environment_spec.get_agent_specs(),
-            shared_weights=shared_weights,
+            agent_net_config=self._config.agent_net_config,
+            # shared_weights=shared_weights,
             variable_client=variable_client,
             adder=adder,
         )
@@ -374,7 +376,7 @@ class MADDPGBuilder:
         """
         agents = self._agents
         agent_types = self._agent_types
-        shared_weights = self._config.shared_weights
+        # shared_weights = self._config.shared_weights
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         target_update_period = self._config.target_update_period
@@ -385,11 +387,11 @@ class MADDPGBuilder:
         variables = {}
         set_keys = []
         get_keys = []
-        agent_net_keys = (
-            self._agent_types if self._config.shared_weights else self._agents
-        )
+        # agent_net_keys = (
+        #     self._agent_types if self._config.shared_weights else self._agents
+        # )
         for net_type_key in networks.keys():
-            for agent_net_key in agent_net_keys:
+            for agent_net_key in self._agent_net_keys:
                 variables[f"{agent_net_key}_{net_type_key}"] = networks[net_type_key][
                     agent_net_key
                 ].variables
@@ -433,7 +435,8 @@ class MADDPGBuilder:
             "target_policy_networks": networks["target_policies"],
             "target_critic_networks": networks["target_critics"],
             "target_observation_networks": networks["target_observations"],
-            "shared_weights": shared_weights,
+            "agent_net_config": self._config.agent_net_config,
+            # "shared_weights": shared_weights,
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
             "max_gradient_norm": max_gradient_norm,
