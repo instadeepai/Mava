@@ -53,7 +53,7 @@ class MADQNTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         optimizer: Union[Dict[str, snt.Optimizer], snt.Optimizer],
         discount: float,
-        shared_weights: bool,
+        agent_net_config: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
         max_gradient_norm: float = None,
         fingerprint: bool = False,
@@ -66,7 +66,7 @@ class MADQNTrainer(mava.Trainer):
 
         self._agents = agents
         self._agent_types = agent_types
-        self._shared_weights = shared_weights
+        self._agent_net_config = agent_net_config
         self._checkpoint = checkpoint
 
         # Store online and target q-networks.
@@ -98,13 +98,7 @@ class MADQNTrainer(mava.Trainer):
         self._exploration_scheduler = exploration_scheduler
 
         # Dictionary with network keys for each agent.
-        self._agent_net_config = {agent: agent for agent in self._agents}
-        if self._shared_weights:
-            self._agent_net_config = {
-                agent: agent.split("_")[0] for agent in self._agents
-            }
-
-        self.unique_net_keys = self._agent_types if shared_weights else self._agents
+        self.unique_net_keys = set(self._agent_net_config.values())
 
         # Create optimizers for different agent types.
         if not isinstance(optimizer, dict):

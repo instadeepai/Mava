@@ -146,8 +146,14 @@ class MAPPO:
         self._network_factory = network_factory
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
-        self._shared_weights = shared_weights
+        # Setup agent networks
         self._agent_net_config = agent_net_config
+        if not agent_net_config:
+            agents = environment_spec.get_agent_ids()
+            self._agent_net_config = {
+                agent: agent.split("_")[0] if shared_weights else agents
+                for a_i, agent in enumerate(agents)
+            }
         self._num_exectors = num_executors
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
@@ -210,7 +216,8 @@ class MAPPO:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture with target networks.
@@ -219,7 +226,7 @@ class MAPPO:
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
+            agent_net_config=self._agent_net_config,
         ).create_system()
 
         # create logger
@@ -252,7 +259,8 @@ class MAPPO:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture with target networks.
@@ -261,7 +269,7 @@ class MAPPO:
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
+            agent_net_config=self._agent_net_config,
         )
 
         # create variables
@@ -316,7 +324,8 @@ class MAPPO:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture with target networks.
@@ -325,7 +334,7 @@ class MAPPO:
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
+            agent_net_config=self._agent_net_config,
         )
 
         # create variables

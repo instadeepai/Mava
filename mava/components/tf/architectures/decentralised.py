@@ -48,9 +48,6 @@ class DecentralisedValueActor(BaseArchitecture):
 
         self._value_networks = value_networks
         self._agent_net_config = agent_net_config
-        self._actor_agent_keys = (
-            self._agent_types if self._shared_weights else self._agents
-        )
         self._n_agents = len(self._agents)
 
         self._create_target_networks()
@@ -61,12 +58,10 @@ class DecentralisedValueActor(BaseArchitecture):
 
     def _get_actor_specs(self) -> Dict[str, OLT]:
         actor_obs_specs = {}
-        for agent_key in self._actor_agent_keys:
-            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
-
+        for agent_key in self._agents:
             # Get observation spec for policy.
             actor_obs_specs[agent_key] = self._agent_specs[
-                agent_spec_key
+                agent_key
             ].observations.observation
         return actor_obs_specs
 
@@ -81,10 +76,8 @@ class DecentralisedValueActor(BaseArchitecture):
         actor_obs_specs = self._get_actor_specs()
 
         # create policy variables for each agent
-        for agent_key in self._actor_agent_keys:
-
+        for agent_key in self._agents:
             obs_spec = actor_obs_specs[agent_key]
-
             # Create variables for value and policy networks.
             tf2_utils.create_variables(self._value_networks[agent_key], [obs_spec])
 
@@ -124,9 +117,6 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
         self._observation_networks = observation_networks
         self._policy_networks = policy_networks
         self._agent_net_config = agent_net_config
-        self._actor_agent_keys = (
-            self._agent_types if self._shared_weights else self._agents
-        )
         self._n_agents = len(self._agents)
         self._embed_specs: Dict[str, Any] = {}
 
@@ -139,12 +129,10 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
     def _get_actor_specs(self) -> Dict[str, acme_specs.Array]:
         actor_obs_specs = {}
-        for agent_key in self._actor_agent_keys:
-            agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
-
+        for agent_key in self._agents:
             # Get observation spec for policy.
             actor_obs_specs[agent_key] = self._agent_specs[
-                agent_spec_key
+                agent_key
             ].observations.observation
         return actor_obs_specs
 
@@ -161,23 +149,24 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
         actor_obs_specs = self._get_actor_specs()
 
         # create policy variables for each agent
-        for agent_key in self._actor_agent_keys:
+        for agent_key in self._agents:
+            agent_net_key = self._agent_net_config[agent_key]
 
             obs_spec = actor_obs_specs[agent_key]
             emb_spec = tf2_utils.create_variables(
-                self._observation_networks[agent_key], [obs_spec]
+                self._observation_networks[agent_net_key], [obs_spec]
             )
             self._embed_specs[agent_key] = emb_spec
 
             # Create variables.
-            tf2_utils.create_variables(self._policy_networks[agent_key], [emb_spec])
+            tf2_utils.create_variables(self._policy_networks[agent_net_key], [emb_spec])
 
             # create target network variables
             tf2_utils.create_variables(
-                self._target_policy_networks[agent_key], [emb_spec]
+                self._target_policy_networks[agent_net_key], [emb_spec]
             )
             tf2_utils.create_variables(
-                self._target_observation_networks[agent_key], [obs_spec]
+                self._target_observation_networks[agent_net_key], [obs_spec]
             )
 
         actor_networks["policies"] = self._policy_networks
@@ -189,7 +178,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
     def create_behaviour_policy(self) -> Dict[str, snt.Module]:
         behaviour_policy_networks: Dict[str, snt.Module] = {}
-        for agent_key in self._actor_agent_keys:
+        for agent_key in set(self._agent_net_config.values()):
             snt_module = type(self._policy_networks[agent_key])
             behaviour_policy_networks[agent_key] = snt_module(
                 [
@@ -219,7 +208,6 @@ class DecentralisedValueActorCritic(BaseActorCritic):
     ):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()  # All agend ids
-        # self._agent_types = self._env_spec.get_agent_types()      # Get agent types
         self._agent_specs = (
             self._env_spec.get_agent_specs()
         )  # Each agent's environment interaction specification
@@ -228,11 +216,6 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
         self._agent_net_config = agent_net_config
-        # self._actor_agent_keys = (
-        #     self._agent_types if self._shared_weights else self._agents
-        # )
-        # self._actor_agent_keys = unique(self._agent_net_config.keys())
-        # self._critic_agent_keys = self._actor_agent_keys
         self._n_agents = len(self._agents)
         self._embed_specs: Dict[str, Any] = {}
 
@@ -249,8 +232,6 @@ class DecentralisedValueActorCritic(BaseActorCritic):
     def _get_actor_specs(self) -> Dict[str, acme_specs.Array]:
         actor_obs_specs = {}
         for agent_key in self._agents:
-            # agent_spec_key = f"{agent_key}_0" if self._shared_weights else agent_key
-
             # Get observation spec for policy.
             actor_obs_specs[agent_key] = self._agent_specs[
                 agent_key
@@ -368,9 +349,6 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
     ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
         critic_act_specs = {}
         for agent_key in self._agents:
-            # agent_net_key = self._agent_net_config[agent_key]
-            # f"{agent_key}_0" if self._shared_weights else agent_key
-
             # Get observation and action spec for critic.
             critic_act_specs[agent_key] = self._agent_specs[agent_key].actions
         return self._embed_specs, critic_act_specs

@@ -144,8 +144,14 @@ class MADQN:
         self._network_factory = network_factory
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
+        # Setup agent networks
         self._agent_net_config = agent_net_config
-        self._shared_weights = shared_weights
+        if not agent_net_config:
+            agents = environment_spec.get_agent_ids()
+            self._agent_net_config = {
+                agent: agent.split("_")[0] if shared_weights else agents
+                for a_i, agent in enumerate(agents)
+            }
         self._num_exectors = num_executors
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
@@ -246,14 +252,15 @@ class MADQN:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture with target networks.
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_config=self._agent_net_config,
         )
 
         if self._builder._replay_stabiliser_fn is not None:
@@ -304,14 +311,15 @@ class MADQN:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture with target networks.
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_config=self._agent_net_config,
         )
 
         if self._builder._replay_stabiliser_fn is not None:
@@ -379,14 +387,15 @@ class MADQN:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture with target networks.
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_config=self._agent_net_config,
         )
 
         if self._builder._replay_stabiliser_fn is not None:

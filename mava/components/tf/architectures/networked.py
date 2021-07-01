@@ -49,9 +49,12 @@ class NetworkedPolicyActor(DecentralisedPolicyActor):
 
         self._network_spec = network_spec
 
-        if self._shared_weights:
+        if len(set(self._agent_net_config.values())) < len(
+            self._agent_net_config.values()
+        ):
             raise Exception(
-                "Networked architectures currently do not support weight sharing."
+                "Networked architectures currently do not support"
+                " different agents with the same network weights."
             )
 
     def _get_actor_spec(self, agent_key: str) -> Dict[str, acme_specs.Array]:
@@ -97,9 +100,12 @@ class NetworkedQValueCritic(DecentralisedQValueActorCritic):
 
         self._network_spec = network_spec
 
-        if self._shared_weights:
+        if len(set(self._agent_net_config.values())) < len(
+            self._agent_net_config.values()
+        ):
             raise Exception(
-                "Networked architectures currently do not support weight sharing."
+                "Networked architectures currently do not support"
+                " different agents with the same network weights."
             )
 
     def _get_critic_specs(

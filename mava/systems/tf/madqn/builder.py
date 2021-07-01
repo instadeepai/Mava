@@ -57,7 +57,7 @@ class MADQNConfig:
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
     epsilon_decay: float
-    shared_weights: bool
+    agent_net_config: Dict[str, str]
     max_gradient_norm: Optional[float]
     target_update_period: int
     executor_variable_update_period: int
