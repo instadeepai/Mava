@@ -36,6 +36,7 @@ from mava.systems.tf.madqn.system import MADQN
 from mava.systems.tf.vdn import builder, execution, training
 from mava.utils.loggers import MavaLogger, logger_utils
 
+
 # TODO Implement recurrent VDN
 class VDN(MADQN):
     """VDN system."""
