@@ -103,10 +103,12 @@ class MADQN:
             architecture (Type[DecentralisedValueActor], optional): system architecture,
                 e.g. decentralised or centralised. Defaults to DecentralisedValueActor.
             trainer_fn (Union[ Type[training.MADQNTrainer],
-                Type[training.MADQNRecurrentTrainer] ], optional): training type associated with executor and architecture, e.g.
-                centralised training. Defaults to training.MADQNTrainer.
+                Type[training.MADQNRecurrentTrainer] ], optional): training type
+                associated with executor and architecture, e.g. centralised training.
+                Defaults to training.MADQNTrainer.
             communication_module (Type[BaseCommunicationModule], optional):
-                module for enabling communication protocols between agents. Defaults to None.
+                module for enabling communication protocols between agents. Defaults to
+                None.
             executor_fn (Type[core.Executor], optional): executor type, e.g.
                 feedforward or recurrent. Defaults to
                 execution.MADQNFeedForwardExecutor.
