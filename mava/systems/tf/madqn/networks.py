@@ -22,6 +22,7 @@ from acme.tf.networks.atari import DQNAtariNetwork
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import epsilon_greedy_action_selector
+from mava.components.tf.networks.communication import CommunicationNetwork
 from mava.utils.enums import ArchitectureType, Network
 
 
@@ -34,6 +35,7 @@ def make_default_networks(
     archecture_type: ArchitectureType = ArchitectureType.feedforward,
     network_type: Network = Network.mlp,
     fingerprints: bool = False,
+    message_size: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
 
     # Set Policy function and layer size
@@ -74,6 +76,32 @@ def make_default_networks(
         # Create the policy network.
         if network_type == Network.atari_dqn_network:
             q_network = DQNAtariNetwork(num_dimensions)
+        elif network_type == Network.coms_network:
+            assert message_size is not None, "Message size not set."
+            q_network = CommunicationNetwork(
+                networks.LayerNormMLP(
+                    (128,),
+                    activate_final=True,
+                ),
+                networks.LayerNormMLP(
+                    (128,),
+                    activate_final=True,
+                ),
+                snt.LSTM(128),
+                snt.Sequential(
+                    [
+                        networks.LayerNormMLP((128,), activate_final=True),
+                        networks.NearZeroInitializedLinear(num_dimensions),
+                        networks.TanhToSpec(specs[key].actions),
+                    ]
+                ),
+                snt.Sequential(
+                    [
+                        networks.LayerNormMLP((128, message_size), activate_final=True),
+                    ]
+                ),
+                message_size=message_size,
+            )
         else:
             if archecture_type == ArchitectureType.feedforward:
                 q_network = [

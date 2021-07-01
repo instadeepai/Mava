@@ -25,3 +25,4 @@ class ArchitectureType(Enum):
 class Network(Enum):
     mlp = 1
     atari_dqn_network = 2
+    coms_network = 3
