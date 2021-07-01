@@ -243,7 +243,7 @@ class DIALBuilder:
             # Create policy variables
             variables = {
                 net_key: q_networks[net_key].variables
-                for net_key in set(self._agent_net_keys.values())
+                for net_key in set(agent_net_config.values())
             }
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
@@ -312,7 +312,7 @@ class DIALBuilder:
             discount=self._config.discount,
             q_networks=q_networks,
             target_q_networks=target_q_networks,
-            shared_weights=self._config.shared_weights,
+            agent_net_config=self._config.agent_net_config,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,

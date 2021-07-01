@@ -151,8 +151,8 @@ class MAPPO:
         if not agent_net_config:
             agents = environment_spec.get_agent_ids()
             self._agent_net_config = {
-                agent: agent.split("_")[0] if shared_weights else agents
-                for a_i, agent in enumerate(agents)
+                agent: agent.split("_")[0] if shared_weights else agent
+                for agent in agents
             }
         self._num_exectors = num_executors
         self._num_caches = num_caches

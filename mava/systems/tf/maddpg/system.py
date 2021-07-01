@@ -65,7 +65,7 @@ class MADDPG:
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
-        agent_net_config: Dict[str, List] = {},
+        agent_net_config: Dict[str, str] = {},
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -155,8 +155,8 @@ class MADDPG:
         if not agent_net_config:
             agents = environment_spec.get_agent_ids()
             self._agent_net_config = {
-                agent: agent.split("_")[0] if shared_weights else agents
-                for a_i, agent in enumerate(agents)
+                agent: agent.split("_")[0] if shared_weights else agent
+                for agent in agents
             }
 
         self._architecture = architecture

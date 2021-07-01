@@ -224,14 +224,15 @@ class QMIX(MADQN):
         """The Trainer part of the system. Train with mixing networks."""
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_config=self._agent_net_config,
         )
 
         # Fingerprint module
