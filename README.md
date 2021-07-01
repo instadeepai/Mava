@@ -75,9 +75,9 @@ Mava includes several system implementations. Below we list these together with 
 | ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------ | ------------------- |
 | MADQN   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | DIAL   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| MADDPG  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark:        | :heavy_check_mark: | :heavy_check_mark: |
+| MADDPG  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark:        | :x: | :heavy_check_mark: |
 | MAD4PG   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:             | :x: | :heavy_check_mark: |
-| MAPPO   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:              | :x: | :heavy_check_mark: |
+| MAPPO   | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:              | :x: | :heavy_check_mark: |
 | VDN   | :x: | :x: | :heavy_check_mark: | :heavy_check_mark:  | :x: | :heavy_check_mark: |
 | QMIX   | :x: | :x: | :heavy_check_mark:                | :heavy_check_mark:                 | :x: | :heavy_check_mark: |
 
