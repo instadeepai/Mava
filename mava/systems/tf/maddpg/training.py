@@ -69,32 +69,42 @@ class MADDPGBaseTrainer(mava.Trainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
+        """Initialise MADDPG trainer
 
         Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks (Dict[str, snt.Module]): target policy networks.
+            target_critic_networks (Dict[str, snt.Module]): target critic networks.
             policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
+                optimizer(s) for updating policy networks.
             critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+                optimizer for updating critic networks.
+            discount (float): discount factor for TD updates.
+            target_averaging (bool): whether to use polyak averaging for target network
+                updates.
+            target_update_period (int): number of steps before target networks are
+                updated.
+            target_update_rate (float): update rate when using averaging.
+            dataset (tf.data.Dataset): training dataset.
+            observation_networks (Dict[str, snt.Module]): network for feature
+                extraction from raw observation.
+            target_observation_networks (Dict[str, snt.Module]): target observation
+                network.
+            shared_weights (bool): wether agents are sharing weights or not.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
         """
 
         self._agents = agents
@@ -210,7 +220,8 @@ class MADDPGBaseTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def _update_target_networks(self) -> None:
-        """[summary]"""
+        """Sync the target parameters with the latest online
+        parameters for all networks"""
 
         for key in self.unique_net_keys:
             # Update target network.
@@ -240,14 +251,15 @@ class MADDPGBaseTrainer(mava.Trainer):
     def _transform_observations(
         self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        """[summary]
+        """apply the observation networks to the raw observations from the dataset
 
         Args:
-            obs (Dict[str, np.ndarray]): [description]
-            next_obs (Dict[str, np.ndarray]): [description]
+            obs (Dict[str, np.ndarray]): raw agent observations
+            next_obs (Dict[str, np.ndarray]): raw next observations
 
         Returns:
-            Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]: [description]
+            Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]: transformed
+                observations (features)
         """
 
         o_tm1 = {}
@@ -275,19 +287,21 @@ class MADDPGBaseTrainer(mava.Trainer):
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        """[summary]
+        """get data to feed to the agent critic network(s)
 
         Args:
-            o_tm1_trans (Dict[str, np.ndarray]): [description]
-            o_t_trans (Dict[str, np.ndarray]): [description]
-            a_tm1 (Dict[str, np.ndarray]): [description]
-            a_t (Dict[str, np.ndarray]): [description]
-            e_tm1 (Dict[str, np.ndarray]): [description]
-            e_t (Dict[str, np.array]): [description]
-            agent (str): [description]
+            o_tm1_trans (Dict[str, np.ndarray]): transformed (e.g. using observation
+                network) observation at timestep t-1
+            o_t_trans (Dict[str, np.ndarray]): transformed observation at timestep t
+            a_tm1 (Dict[str, np.ndarray]): action at timestep t-1
+            a_t (Dict[str, np.ndarray]): action at timestep t
+            e_tm1 (Dict[str, np.ndarray]): extras at timestep t-1
+            e_t (Dict[str, np.array]): extras at timestep t
+            agent (str): agent id
 
         Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: agent critic network
+                feeds
         """
 
         # Decentralised critic
@@ -303,29 +317,30 @@ class MADDPGBaseTrainer(mava.Trainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        """[summary]
+        """get data to feed to the agent networks
 
         Args:
-            a_t (Dict[str, np.ndarray]): [description]
-            dpg_a_t (np.ndarray): [description]
-            agent (str): [description]
+            a_t (Dict[str, np.ndarray]): action at timestep t
+            dpg_a_t (np.ndarray): predicted action at timestep t
+            agent (str): agent id
 
         Returns:
-            tf.Tensor: [description]
+            tf.Tensor: agent policy network feed
         """
         # Decentralised DPG
         dpg_a_t_feed = dpg_a_t
         return dpg_a_t_feed
 
     def _target_policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
-        """[summary]
+        """select actions using target policy networks
 
         Args:
-            next_obs (Dict[str, np.ndarray]): [description]
+            next_obs (Dict[str, np.ndarray]): next agent observations.
 
         Returns:
-            Any: [description]
+            Any: agent target actions
         """
+
         actions = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -337,11 +352,12 @@ class MADDPGBaseTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-        """[summary]
+        """Trainer forward and backward passes.
 
         Returns:
-            Dict[str, Dict[str, Any]]: [description]
+            Dict[str, Dict[str, Any]]: losses
         """
+
         # Update the target networks
         self._update_target_networks()
 
@@ -359,10 +375,10 @@ class MADDPGBaseTrainer(mava.Trainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
-        """[summary]
+        """Trainer forward pass
 
         Args:
-            inputs (Any): [description]
+            inputs (Any): input data from the data table (transitions)
         """
 
         # Unpack input data as follows:
@@ -445,7 +461,7 @@ class MADDPGBaseTrainer(mava.Trainer):
 
     # Backward pass that calculates gradients and updates network.
     def _backward(self) -> None:
-        """[summary]"""
+        """Trainer backward pass updating network parameters"""
 
         # Calculate the gradients and update the networks
         policy_losses = self.policy_losses
@@ -487,7 +503,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
-        """[summary]"""
+        """trainer step to update the parameters of the agents in the system"""
 
         # Run the learning step.
         fetches = self._step()
@@ -509,6 +525,15 @@ class MADDPGBaseTrainer(mava.Trainer):
             self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+        """get network variables
+
+        Args:
+            names (Sequence[str]): network names
+
+        Returns:
+            Dict[str, Dict[str, np.ndarray]]: network variables
+        """
+
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
             variables[network_type] = {
@@ -521,7 +546,7 @@ class MADDPGBaseTrainer(mava.Trainer):
 
 
 class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
-    """MADDPG trainer.
+    """MADDPG trainer for a decentralised architecture.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -550,32 +575,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-        """
 
         super().__init__(
             agents=agents,
@@ -603,7 +602,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
 
 
 class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
-    """MADDPG trainer.
+    """MADDPG trainer for a centralised architecture.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -632,32 +631,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-        """
 
         super().__init__(
             agents=agents,
@@ -693,20 +666,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        """[summary]
-
-        Args:
-            o_tm1_trans (Dict[str, np.ndarray]): [description]
-            o_t_trans (Dict[str, np.ndarray]): [description]
-            a_tm1 (Dict[str, np.ndarray]): [description]
-            a_t (Dict[str, np.ndarray]): [description]
-            e_tm1 (Dict[str, np.ndarray]): [description]
-            e_t (Dict[str, np.array]): [description]
-            agent (str): [description]
-
-        Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
-        """
 
         # Centralised based
         o_tm1_feed = tf.stack([o_tm1_trans[agent] for agent in self._agents], 1)
@@ -722,16 +681,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        """[summary]
-
-        Args:
-            a_t (Dict[str, np.ndarray]): [description]
-            dpg_a_t (np.ndarray): [description]
-            agent (str): [description]
-
-        Returns:
-            tf.Tensor: [description]
-        """
 
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
@@ -748,7 +697,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
 
 
 class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
-    """MADDPG trainer.
+    """MADDPG trainer for a networked architecture.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -778,33 +727,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            connection_spec (Dict[str, List[str]]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            critic_optimizer (snt.Optimizer): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-        """
 
         super().__init__(
             agents=agents,
@@ -842,20 +764,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        """[summary]
-
-        Args:
-            o_tm1_trans (Dict[str, np.ndarray]): [description]
-            o_t_trans (Dict[str, np.ndarray]): [description]
-            a_tm1 (Dict[str, np.ndarray]): [description]
-            a_t (Dict[str, np.ndarray]): [description]
-            e_tm1 (Dict[str, np.ndarray]): [description]
-            e_t (Dict[str, np.array]): [description]
-            agent (str): [description]
-
-        Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
-        """
 
         # Networked based
         connections = self._connection_spec[agent]
@@ -885,16 +793,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        """[summary]
-
-        Args:
-            a_t (Dict[str, np.ndarray]): [description]
-            dpg_a_t (np.ndarray): [description]
-            agent (str): [description]
-
-        Returns:
-            tf.Tensor: [description]
-        """
 
         # Networked based
         tree.map_structure(tf.stop_gradient, a_t)
@@ -914,7 +812,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
 
 
 class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
-    """MADDPG trainer.
+    """MADDPG trainer for a state-based architecture.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -943,32 +841,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-        """
 
         super().__init__(
             agents=agents,
@@ -1004,20 +876,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         e_t: Dict[str, np.array],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        """[summary]
-
-        Args:
-            o_tm1_trans (Dict[str, np.ndarray]): [description]
-            o_t_trans (Dict[str, np.ndarray]): [description]
-            a_tm1 (Dict[str, np.ndarray]): [description]
-            a_t (Dict[str, np.ndarray]): [description]
-            e_tm1 (Dict[str, np.ndarray]): [description]
-            e_t (Dict[str, np.array]): [description]
-            agent (str): [description]
-
-        Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
-        """
 
         # State based
         o_tm1_feed = e_tm1["s_t"]
@@ -1033,16 +891,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        """[summary]
-
-        Args:
-            a_t (Dict[str, np.ndarray]): [description]
-            dpg_a_t (np.ndarray): [description]
-            agent (str): [description]
-
-        Returns:
-            tf.Tensor: [description]
-        """
 
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
@@ -1059,7 +907,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
 
 
 class MADDPGBaseRecurrentTrainer(mava.Trainer):
-    """MADDPG trainer.
+    """Recurrent MADDPG trainer.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -1089,33 +937,42 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """[summary]
+        """Initialise Recurrent MADDPG trainer
 
         Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks (Dict[str, snt.Module]): target policy networks.
+            target_critic_networks (Dict[str, snt.Module]): target critic networks.
             policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
+                optimizer(s) for updating policy networks.
             critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            bootstrap_n (int, optional): [description]. Defaults to 10.
+                optimizer for updating critic networks.
+            discount (float): discount factor for TD updates.
+            target_averaging (bool): whether to use polyak averaging for target network
+                updates.
+            target_update_period (int): number of steps before target networks are
+                updated.
+            target_update_rate (float): update rate when using averaging.
+            dataset (tf.data.Dataset): training dataset.
+            observation_networks (Dict[str, snt.Module]): network for feature
+                extraction from raw observation.
+            target_observation_networks (Dict[str, snt.Module]): target observation
+                network.
+            shared_weights (bool): wether agents are sharing weights or not.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
         """
 
         self._agents = agents
@@ -1232,7 +1089,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def _update_target_networks(self) -> None:
-        """[summary]"""
+        """Sync the target parameters with the latest online
+        parameters for all networks"""
 
         for key in self.unique_net_keys:
             # Update target network.
@@ -1262,13 +1120,15 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     def _transform_observations(
         self, observations: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        """[summary]
+        """apply the observation networks to the raw observations from the dataset
 
         Args:
-            observations (Dict[str, np.ndarray]): [description]
+            obs (Dict[str, np.ndarray]): raw agent observations
+            next_obs (Dict[str, np.ndarray]): raw next observations
 
         Returns:
-            Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]: [description]
+            Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]: transformed
+                observations (features)
         """
 
         # Note (dries): We are assuming that only the policy network
@@ -1309,18 +1169,21 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         extras: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        """[summary]
+        """get data to feed to the agent critic network(s)
 
         Args:
-            obs_trans (Dict[str, np.ndarray]): [description]
-            target_obs_trans (Dict[str, np.ndarray]): [description]
-            actions (Dict[str, np.ndarray]): [description]
-            target_actions (Dict[str, np.ndarray]): [description]
-            extras (Dict[str, np.ndarray]): [description]
-            agent (str): [description]
+            o_tm1_trans (Dict[str, np.ndarray]): transformed (e.g. using observation
+                network) observation at timestep t-1
+            o_t_trans (Dict[str, np.ndarray]): transformed observation at timestep t
+            a_tm1 (Dict[str, np.ndarray]): action at timestep t-1
+            a_t (Dict[str, np.ndarray]): action at timestep t
+            e_tm1 (Dict[str, np.ndarray]): extras at timestep t-1
+            e_t (Dict[str, np.array]): extras at timestep t
+            agent (str): agent id
 
         Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: agent critic network
+                feeds
         """
 
         # Decentralised critic
@@ -1336,15 +1199,15 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        """[summary]
+        """get data to feed to the agent networks
 
         Args:
-            target_actions (Dict[str, np.ndarray]): [description]
-            dpg_actions (np.ndarray): [description]
-            agent (str): [description]
+            a_t (Dict[str, np.ndarray]): action at timestep t
+            dpg_a_t (np.ndarray): predicted action at timestep t
+            agent (str): agent id
 
         Returns:
-            tf.Tensor: [description]
+            tf.Tensor: agent policy network feed
         """
 
         # Decentralised DPG
@@ -1356,14 +1219,15 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         target_obs_trans: Dict[str, np.ndarray],
         target_core_state: Dict[str, np.ndarray],
     ) -> Any:
-        """[summary]
+        """select actions using target policy networks
 
         Args:
-            target_obs_trans (Dict[str, np.ndarray]): [description]
-            target_core_state (Dict[str, np.ndarray]): [description]
+            target_obs_trans (Dict[str, np.ndarray]): agent transformed target
+                observations.
+            target_core_state (Dict[str, np.ndarray]): target recurrent network state
 
         Returns:
-            Any: [description]
+            Any: agent target actions
         """
 
         actions = {}
@@ -1390,10 +1254,10 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-        """[summary]
+        """Trainer forward and backward passes.
 
         Returns:
-            Dict[str, Dict[str, Any]]: [description]
+            Dict[str, Dict[str, Any]]: losses
         """
 
         # Update the target networks
@@ -1414,10 +1278,10 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
-        """[summary]
+        """Trainer forward pass
 
         Args:
-            inputs (Any): [description]
+            inputs (Any): input data from the data table (transitions)
         """
 
         data = inputs.data
@@ -1558,7 +1422,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
     # Backward pass that calculates gradients and updates network.
     def _backward(self) -> None:
-        """[summary]"""
+        """Trainer backward pass updating network parameters"""
 
         # Calculate the gradients and update the networks
         policy_losses = self.policy_losses
@@ -1600,7 +1464,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
-        """[summary]"""
+        """trainer step to update the parameters of the agents in the system"""
 
         # Run the learning step.
         fetches = self._step()
@@ -1622,13 +1486,13 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
-        """[summary]
+        """get network variables
 
         Args:
-            names (Sequence[str]): [description]
+            names (Sequence[str]): network names
 
         Returns:
-            Dict[str, Dict[str, np.ndarray]]: [description]
+            Dict[str, Dict[str, np.ndarray]]: network variables
         """
 
         variables: Dict[str, Dict[str, np.ndarray]] = {}
@@ -1643,7 +1507,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
 
 class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
-    """MADDPG trainer.
+    """Recurrent MADDPG trainer for a decentralised architecture.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -1673,33 +1537,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            bootstrap_n (int, optional): [description]. Defaults to 10.
-        """
 
         super().__init__(
             agents=agents,
@@ -1728,7 +1565,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
 
 class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
-    """MADDPG trainer.
+    """Recurrent MADDPG trainer for a centralised architecture.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -1758,33 +1595,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            bootstrap_n (int, optional): [description]. Defaults to 10.
-        """
 
         super().__init__(
             agents=agents,
@@ -1820,19 +1630,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         extras: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        """[summary]
-
-        Args:
-            obs_trans (Dict[str, np.ndarray]): [description]
-            target_obs_trans (Dict[str, np.ndarray]): [description]
-            actions (Dict[str, np.ndarray]): [description]
-            target_actions (Dict[str, np.ndarray]): [description]
-            extras (Dict[str, np.ndarray]): [description]
-            agent (str): [description]
-
-        Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
-        """
 
         # Centralised based
         obs_trans_feed = tf.stack([obs_trans[agent] for agent in self._agents], -1)
@@ -1852,16 +1649,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        """[summary]
-
-        Args:
-            actions (Dict[str, np.ndarray]): [description]
-            dpg_actions (np.ndarray): [description]
-            agent (str): [description]
-
-        Returns:
-            tf.Tensor: [description]
-        """
 
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
@@ -1876,7 +1663,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
 
 class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
-    """MADDPG trainer.
+    """Recurrent MADDPG trainer for a state-based architecture.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -1906,33 +1693,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            bootstrap_n (int, optional): [description]. Defaults to 10.
-        """
 
         super().__init__(
             agents=agents,
@@ -1968,19 +1728,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         extras: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        """[summary]
-
-        Args:
-            obs_trans (Dict[str, np.ndarray]): [description]
-            target_obs_trans (Dict[str, np.ndarray]): [description]
-            actions (Dict[str, np.ndarray]): [description]
-            target_actions (Dict[str, np.ndarray]): [description]
-            extras (Dict[str, np.ndarray]): [description]
-            agent (str): [description]
-
-        Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: [description]
-        """
 
         # State based
         obs_trans_feed = extras["s_t"]
@@ -1998,16 +1745,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        """[summary]
-
-        Args:
-            actions (Dict[str, np.ndarray]): [description]
-            dpg_actions (np.ndarray): [description]
-            agent (str): [description]
-
-        Returns:
-            tf.Tensor: [description]
-        """
 
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
