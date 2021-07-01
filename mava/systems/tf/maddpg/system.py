@@ -162,7 +162,7 @@ class MADDPG:
             train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
-            the evaluation loop. Defaults to {}.
+                the evaluation loop. Defaults to {}.
             connection_spec (Callable[[Dict[str, List[str]]], Dict[str, List[str]]],
                 optional): network topology specification for networked system
                 architectures. Defaults to None.
