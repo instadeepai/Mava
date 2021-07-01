@@ -12,36 +12,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, Mapping, Optional, Sequence, Union
+from typing import Mapping, Optional
 
 import sonnet as snt
 import tensorflow as tf
 from acme import types
 from acme.tf import networks
-from acme.tf.networks.atari import DQNAtariNetwork
 
 from mava import specs as mava_specs
 from mava.components.tf.networks import epsilon_greedy_action_selector
-from mava.utils.enums import ArchitectureType, Network
+from mava.components.tf.networks.communication import CommunicationNetwork
+from mava.utils.enums import ArchitectureType
 
 
-# Default networks for madqn
-# TODO Use fingerprints variable
+# Default networks for Dial
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
+    message_size: int = 1,
     shared_weights: bool = True,
-    archecture_type: ArchitectureType = ArchitectureType.feedforward,
-    network_type: Network = Network.mlp,
-    fingerprints: bool = False,
+    archecture_type: ArchitectureType = ArchitectureType.recurrent,
 ) -> Mapping[str, types.TensorTransformation]:
+    """Creates networks used by the agents."""
 
-    # Set Policy function and layer size
-    if archecture_type == ArchitectureType.feedforward:
-        q_network_func = snt.Sequential
-    elif archecture_type == ArchitectureType.recurrent:
-        policy_networks_layer_sizes = (128, 128)
-        q_network_func = snt.DeepRNN
+    assert (
+        archecture_type == ArchitectureType.recurrent
+    ), "Dial currently supports recurrent architectures."
 
     specs = environment_spec.get_agent_specs()
 
@@ -49,11 +44,6 @@ def make_default_networks(
     if shared_weights:
         type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
         specs = type_specs
-
-    if isinstance(policy_networks_layer_sizes, Sequence):
-        policy_networks_layer_sizes = {
-            key: policy_networks_layer_sizes for key in specs.keys()
-        }
 
     def action_selector_fn(
         q_values: types.NestedTensor,
@@ -71,31 +61,36 @@ def make_default_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
 
-        # Create the policy network.
-        if network_type == Network.atari_dqn_network:
-            q_network = DQNAtariNetwork(num_dimensions)
-        else:
-            if archecture_type == ArchitectureType.feedforward:
-                q_network = [
-                    networks.LayerNormMLP(
-                        list(policy_networks_layer_sizes[key]) + [num_dimensions],
-                        activate_final=False,
-                    ),
+        q_network = CommunicationNetwork(
+            networks.LayerNormMLP(
+                (128,),
+                activate_final=True,
+            ),
+            networks.LayerNormMLP(
+                (128,),
+                activate_final=True,
+            ),
+            snt.GRU(128),
+            snt.Sequential(
+                [
+                    networks.LayerNormMLP((128,), activate_final=True),
+                    networks.NearZeroInitializedLinear(num_dimensions),
+                    networks.TanhToSpec(specs[key].actions),
                 ]
-            elif archecture_type == ArchitectureType.recurrent:
-                q_network = [
-                    networks.LayerNormMLP(
-                        policy_networks_layer_sizes[key][:-1], activate_final=True
-                    ),
-                    snt.LSTM(policy_networks_layer_sizes[key][-1]),
-                    snt.Linear(num_dimensions),
+            ),
+            snt.Sequential(
+                [
+                    networks.LayerNormMLP((128, message_size), activate_final=True),
                 ]
-
-            q_network = q_network_func(q_network)
+            ),
+            message_size=message_size,
+        )
 
         # epsilon greedy action selector
+        action_selector = action_selector_fn
+
         q_networks[key] = q_network
-        action_selectors[key] = action_selector_fn
+        action_selectors[key] = action_selector
 
     return {
         "q_networks": q_networks,
