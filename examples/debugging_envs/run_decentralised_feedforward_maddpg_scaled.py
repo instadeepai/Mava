@@ -69,7 +69,7 @@ def make_networks(
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
-    specs = {key: specs[key] for key in agent_net_config.keys()}
+    specs = {agent_net_config[key]: specs[key] for key in specs.keys()}
 
     # if shared_weights:
     #     specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
