@@ -15,21 +15,16 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any
 
 import dm_env
 import launchpad as lp
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
-from acme import types
-from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 from open_spiel.python import rl_environment  # type: ignore
 
-from mava import specs as mava_specs
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.environment_loops.open_spiel_environment_loop import (
     OpenSpielSequentialEnvironmentLoop,
 )
@@ -48,62 +43,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "./logs", "Base dir to store experiments.")
-
-
-def make_networks(
-    environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (16,),
-    shared_weights: bool = False,
-) -> Mapping[str, types.TensorTransformation]:
-    """Creates networks used by the agents."""
-
-    specs = environment_spec.get_agent_specs()
-    # Create agent_type specs
-    if shared_weights:
-        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-        specs = type_specs
-
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
-
-    def action_selector_fn(
-        q_values: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: Optional[tf.Variable] = None,
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
-
-    q_networks = {}
-    action_selectors = {}
-    for key in specs.keys():
-
-        # Get total number of action dimensions from action spec.
-        num_dimensions = specs[key].actions.num_values
-
-        # Create the policy network.
-        q_network = snt.Sequential(
-            [
-                snt.Flatten(),
-                networks.LayerNormMLP(
-                    q_networks_layer_sizes[key], activate_final=False
-                ),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
-        )
-
-        # epsilon greedy action selector
-        action_selector = action_selector_fn
-
-        q_networks[key] = q_network
-        action_selectors[key] = action_selector
-
-    return {
-        "q_networks": q_networks,
-        "action_selectors": action_selectors,
-    }
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def make_environment(
@@ -119,13 +59,13 @@ def main(_: Any) -> None:
     # environment
     environment_factory = make_environment
 
-    # networks
-    network_factory = lp_utils.partial_kwargs(make_networks)
+    # Networks.
+    network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-    # loggers
+    # Log every [log_every] seconds.
     log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
@@ -151,7 +91,7 @@ def main(_: Any) -> None:
         eval_loop_fn=OpenSpielSequentialEnvironmentLoop,
     ).build()
 
-    # launch
+    # Ensure only trainer runs on gpu, while other processes run on cpu.
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
@@ -160,6 +100,7 @@ def main(_: Any) -> None:
         "executor": PythonProcess(env=env_vars),
     }
 
+    # Launch.
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
