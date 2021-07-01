@@ -65,6 +65,7 @@ class MADDPG:
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
+        agent_net_config: Dict[str, List] = {},
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -149,6 +150,14 @@ class MADDPG:
                 time_delta=10,
             )
 
+        # Setup agent networks
+        self._agent_net_config = agent_net_config
+        if not agent_net_config:
+            agents = self._environment_spec.get_agent_ids()
+            agent_types = self._config.environment_spec.get_agent_types()
+            agent_net_keys = agent_types if shared_weights else agents
+            self._agent_net_config = {agent: agent_net_keys[agent] for agent in agents}
+
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
@@ -181,7 +190,7 @@ class MADDPG:
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
-                shared_weights=shared_weights,
+                agent_net_config=self._agent_net_config,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
