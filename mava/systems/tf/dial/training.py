@@ -63,7 +63,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """initialise DIAL trainer for switch game
+        """Initialise DIAL trainer for switch game
 
         Args:
             agents (List[str]): agent ids, e.g. "agent_0".

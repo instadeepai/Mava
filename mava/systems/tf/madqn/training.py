@@ -65,27 +65,34 @@ class MADQNTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
     ):
-        """[summary]
+        """Initialise MADQN trainer
 
         Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            q_networks (Dict[str, snt.Module]): [description]
-            target_q_networks (Dict[str, snt.Module]): [description]
-            target_update_period (int): [description]
-            dataset (tf.data.Dataset): [description]
-            optimizer (Union[Dict[str, snt.Optimizer], snt.Optimizer]): [description]
-            discount (float): [description]
-            shared_weights (bool): [description]
-            exploration_scheduler (LinearExplorationScheduler): [description]
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            fingerprint (bool, optional): [description]. Defaults to False.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            communication_module (Optional[BaseCommunicationModule], optional):
-                [description]. Defaults to None.
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            q_networks (Dict[str, snt.Module]): q-value networks.
+            target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            target_update_period (int): number of steps before updating target networks.
+            dataset (tf.data.Dataset): training dataset.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
+                optimizer for updating the parameters of the networks.
+            discount (float): discount factor for TD updates.
+            shared_weights (bool): wether agents are sharing weights or not.
+            exploration_scheduler (LinearExplorationScheduler): function specifying a
+                decaying scheduler for epsilon exploration.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            fingerprint (bool, optional): whether to apply replay stabilisation using
+                policy fingerprints. Defaults to False.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+            communication_module (BaseCommunicationModule): module for communication
+                between agents. Defaults to None.
         """
 
         self._agents = agents
@@ -177,30 +184,31 @@ class MADQNTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def get_epsilon(self) -> float:
-        """[summary]
+        """get the current value for the exploration parameter epsilon
 
         Returns:
-            float: [description]
+            float: epsilon parameter value
         """
 
         return self._exploration_scheduler.get_epsilon()
 
     def get_trainer_steps(self) -> float:
-        """[summary]
+        """get trainer step count
 
         Returns:
-            float: [description]
+            float: number of trainer steps
         """
 
         return self._num_steps.numpy()
 
     def _decrement_epsilon(self) -> None:
-        """[summary]"""
+        """Decay epsilon exploration value"""
 
         self._exploration_scheduler.decrement_epsilon()
 
     def _update_target_networks(self) -> None:
-        """[summary]"""
+        """Sync the target network parameters with the latest online network
+        parameters"""
 
         for key in self.unique_net_keys:
             # Update target network.
@@ -221,16 +229,18 @@ class MADQNTrainer(mava.Trainer):
         a_tm1: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-        """[summary]
+        """get data to feed to the agent networks
 
         Args:
-            o_tm1_trans (Dict[str, np.ndarray]): [description]
-            o_t_trans (Dict[str, np.ndarray]): [description]
-            a_tm1 (Dict[str, np.ndarray]): [description]
-            agent (str): [description]
+            o_tm1_trans (Dict[str, np.ndarray]): transformed (e.g. using observation
+                network) observation at timestep t-1
+            o_t_trans (Dict[str, np.ndarray]): transformed observation at timestep t
+            a_tm1 (Dict[str, np.ndarray]): action at timestep t-1
+            agent (str): agent id
 
         Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor]: [description]
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor]: agent network feeds, observations
+                at t-1, t and action at time t.
         """
 
         # Decentralised
@@ -241,7 +251,7 @@ class MADQNTrainer(mava.Trainer):
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
     def step(self) -> None:
-        """[summary]"""
+        """trainer step to update the parameters of the agents in the system"""
 
         # Run the learning step.
         fetches = self._step()
@@ -271,14 +281,8 @@ class MADQNTrainer(mava.Trainer):
             self._logger.write(fetches)
 
     @tf.function
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-        """[summary]
-
-        Returns:
-            Dict[str, Dict[str, Any]]: [description]
-        """
+    def _step(self) -> None:
+        """Trainer forward and backward passes."""
 
         # Update the target networks
         self._update_target_networks()
@@ -295,10 +299,10 @@ class MADQNTrainer(mava.Trainer):
         return self._q_network_losses
 
     def _forward(self, inputs: Any) -> None:
-        """[summary]
+        """Trainer forward pass
 
         Args:
-            inputs (Any): [description]
+            inputs (Any): input data from the data table (transitions)
         """
 
         # Unpack input data as follows:
@@ -363,7 +367,7 @@ class MADQNTrainer(mava.Trainer):
         self.tape = tape
 
     def _backward(self) -> None:
-        """[summary]"""
+        """Trainer backward pass updating network parameters"""
 
         q_network_losses = self._q_network_losses
         tape = self.tape
@@ -385,13 +389,13 @@ class MADQNTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
-        """[summary]
+        """get network variables
 
         Args:
-            names (Sequence[str]): [description]
+            names (Sequence[str]): network names
 
         Returns:
-            Dict[str, Dict[str, np.ndarray]]: [description]
+            Dict[str, Dict[str, np.ndarray]]: network variables
         """
 
         variables: Dict[str, Dict[str, np.ndarray]] = {}
@@ -431,27 +435,34 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
     ):
-        """[summary]
+        """Initialise recurrent MADQN trainer
 
         Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            q_networks (Dict[str, snt.Module]): [description]
-            target_q_networks (Dict[str, snt.Module]): [description]
-            target_update_period (int): [description]
-            dataset (tf.data.Dataset): [description]
-            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
-            discount (float): [description]
-            shared_weights (bool): [description]
-            exploration_scheduler (LinearExplorationScheduler): [description]
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            fingerprint (bool, optional): [description]. Defaults to False.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            communication_module (Optional[BaseCommunicationModule], optional):
-                [description]. Defaults to None.
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            q_networks (Dict[str, snt.Module]): q-value networks.
+            target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            target_update_period (int): number of steps before updating target networks.
+            dataset (tf.data.Dataset): training dataset.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
+                optimizer for updating the parameters of the networks.
+            discount (float): discount factor for TD updates.
+            shared_weights (bool): wether agents are sharing weights or not.
+            exploration_scheduler (LinearExplorationScheduler): function specifying a
+                decaying scheduler for epsilon exploration.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            fingerprint (bool, optional): whether to apply replay stabilisation using
+                policy fingerprints. Defaults to False.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+            communication_module (BaseCommunicationModule): module for communication
+                between agents. Defaults to None.
         """
 
         super().__init__(
@@ -474,10 +485,10 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         )
 
     def _forward(self, inputs: Any) -> None:
-        """[summary]
+        """Trainer forward pass
 
         Args:
-            inputs (Any): [description]
+            inputs (Any): input data from the data table (transitions)
         """
 
         data = tree.map_structure(
@@ -530,7 +541,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
 
 
 class MADQNRecurrentCommTrainer(MADQNTrainer):
-    """Recurrent MADQN trainer.
+    """Recurrent MADQN trainer with communication.
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -555,26 +566,34 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
+        """Initialise recurrent MADQN trainer with communication
 
         Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            q_networks (Dict[str, snt.Module]): [description]
-            target_q_networks (Dict[str, snt.Module]): [description]
-            target_update_period (int): [description]
-            dataset (tf.data.Dataset): [description]
-            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): [description]
-            discount (float): [description]
-            shared_weights (bool): [description]
-            exploration_scheduler (LinearExplorationScheduler): [description]
-            communication_module (BaseCommunicationModule): [description]
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            fingerprint (bool, optional): [description]. Defaults to False.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            q_networks (Dict[str, snt.Module]): q-value networks.
+            target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            target_update_period (int): number of steps before updating target networks.
+            dataset (tf.data.Dataset): training dataset.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
+                optimizer for updating the parameters of the networks.
+            discount (float): discount factor for TD updates.
+            shared_weights (bool): wether agents are sharing weights or not.
+            exploration_scheduler (LinearExplorationScheduler): function specifying a
+                decaying scheduler for epsilon exploration.
+            communication_module (BaseCommunicationModule): module for communication
+                between agents.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            fingerprint (bool, optional): whether to apply replay stabilisation using
+                policy fingerprints. Defaults to False.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
         """
 
         super().__init__(
@@ -599,10 +618,10 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         self._communication_module = communication_module
 
     def _forward(self, inputs: Any) -> None:
-        """[summary]
+        """Trainer forward pass
 
         Args:
-            inputs (Any): [description]
+            inputs (Any): input data from the data table (transitions)
         """
 
         data = tree.map_structure(
