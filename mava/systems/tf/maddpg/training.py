@@ -546,10 +546,7 @@ class MADDPGBaseTrainer(mava.Trainer):
 
 
 class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
-    """MADDPG trainer for a decentralised architecture.
-    This is the trainer component of a MADDPG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """MADDPG trainer for a decentralised architecture."""
 
     def __init__(
         self,
@@ -602,10 +599,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
 
 
 class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
-    """MADDPG trainer for a centralised architecture.
-    This is the trainer component of a MADDPG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """MADDPG trainer for a centralised architecture."""
 
     def __init__(
         self,
@@ -697,10 +691,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
 
 
 class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
-    """MADDPG trainer for a networked architecture.
-    This is the trainer component of a MADDPG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """MADDPG trainer for a networked architecture."""
 
     def __init__(
         self,
@@ -812,10 +803,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
 
 
 class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
-    """MADDPG trainer for a state-based architecture.
-    This is the trainer component of a MADDPG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """MADDPG trainer for a state-based architecture."""
 
     def __init__(
         self,

@@ -183,6 +183,10 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
 
 class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
+    """A recurrent executor for MADDPG.
+    An executor based on a recurrent policy for each agent in the system.
+    """
+
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],

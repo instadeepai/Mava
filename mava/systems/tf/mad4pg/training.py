@@ -71,31 +71,42 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
+        """Initialise MAD4PG trainer
 
         Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks (Dict[str, snt.Module]): target policy networks.
+            target_critic_networks (Dict[str, snt.Module]): target critic networks.
             policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-              [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+                optimizer(s) for updating policy networks.
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                optimizer for updating critic networks.
+            discount (float): discount factor for TD updates.
+            target_averaging (bool): whether to use polyak averaging for target network
+                updates.
+            target_update_period (int): number of steps before target networks are
+                updated.
+            target_update_rate (float): update rate when using averaging.
+            dataset (tf.data.Dataset): training dataset.
+            observation_networks (Dict[str, snt.Module]): network for feature
+                extraction from raw observation.
+            target_observation_networks (Dict[str, snt.Module]): target observation
+                network.
+            shared_weights (bool): wether agents are sharing weights or not.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
         """
 
         super().__init__(
@@ -124,11 +135,12 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
-        """[summary]
+        """Trainer forward pass
 
         Args:
-            inputs (Any): [description]
+            inputs (Any): input data from the data table (transitions)
         """
+
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -202,10 +214,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
 
 
 class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """MAD4PG trainer for a decentralised architecture."""
 
     def __init__(
         self,
@@ -231,32 +240,6 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-              [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-        """
 
         super().__init__(
             agents=agents,
@@ -284,10 +267,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
 
 
 class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """MAD4PG trainer for a centralised architecture."""
 
     def __init__(
         self,
@@ -313,32 +293,6 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-              [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-        """
 
         super().__init__(
             agents=agents,
@@ -366,10 +320,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
 
 
 class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """MAD4PG trainer for a state-based architecture."""
 
     def __init__(
         self,
@@ -395,32 +346,6 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-              [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-        """
 
         super().__init__(
             agents=agents,
@@ -448,8 +373,8 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
 
 
 class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
+    """Recurrent MAD4PG trainer.
+    This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
 
@@ -478,32 +403,42 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """[summary]
+        """Initialise Recurrent MAD4PG trainer
 
         Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks (Dict[str, snt.Module]): target policy networks.
+            target_critic_networks (Dict[str, snt.Module]): target critic networks.
             policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-              [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            bootstrap_n (int, optional): [description]. Defaults to 10.
+                optimizer(s) for updating policy networks.
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                optimizer for updating critic networks.
+            discount (float): discount factor for TD updates.
+            target_averaging (bool): whether to use polyak averaging for target network
+                updates.
+            target_update_period (int): number of steps before target networks are
+                updated.
+            target_update_rate (float): update rate when using averaging.
+            dataset (tf.data.Dataset): training dataset.
+            observation_networks (Dict[str, snt.Module]): network for feature
+                extraction from raw observation.
+            target_observation_networks (Dict[str, snt.Module]): target observation
+                network.
+            shared_weights (bool): wether agents are sharing weights or not.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
         """
 
         super().__init__(
@@ -533,6 +468,12 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
+        """Trainer forward pass
+
+        Args:
+            inputs (Any): input data from the data table (transitions)
+        """
+
         # TODO: Update this forward function to work like MA-D4PG
         data = inputs.data
 
@@ -668,10 +609,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 class MAD4PGDecentralisedRecurrentTrainer(
     MAD4PGBaseRecurrentTrainer, MADDPGDecentralisedRecurrentTrainer
 ):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """Recurrent MAD4PG trainer for a decentralised architecture."""
 
     def __init__(
         self,
@@ -698,33 +636,6 @@ class MAD4PGDecentralisedRecurrentTrainer(
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-              [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            bootstrap_n (int, optional): [description]. Defaults to 10.
-        """
 
         super().__init__(
             agents=agents,
@@ -755,10 +666,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
 class MAD4PGCentralisedRecurrentTrainer(
     MAD4PGBaseRecurrentTrainer, MADDPGCentralisedRecurrentTrainer
 ):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """Recurrent MAD4PG trainer for a centralised architecture."""
 
     def __init__(
         self,
@@ -785,33 +693,6 @@ class MAD4PGCentralisedRecurrentTrainer(
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            bootstrap_n (int, optional): [description]. Defaults to 10.
-        """
 
         super().__init__(
             agents=agents,
@@ -842,10 +723,7 @@ class MAD4PGCentralisedRecurrentTrainer(
 class MAD4PGStateBasedRecurrentTrainer(
     MAD4PGBaseRecurrentTrainer, MADDPGStateBasedRecurrentTrainer
 ):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """Recurrent MAD4PG trainer for a state-based architecture."""
 
     def __init__(
         self,
@@ -872,33 +750,6 @@ class MAD4PGStateBasedRecurrentTrainer(
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """[summary]
-
-        Args:
-            agents (List[str]): [description]
-            agent_types (List[str]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            target_policy_networks (Dict[str, snt.Module]): [description]
-            target_critic_networks (Dict[str, snt.Module]): [description]
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            critic_optimizer (snt.Optimizer): [description]
-            discount (float): [description]
-            target_averaging (bool): [description]
-            target_update_period (int): [description]
-            target_update_rate (float): [description]
-            dataset (tf.data.Dataset): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            target_observation_networks (Dict[str, snt.Module]): [description]
-            shared_weights (bool, optional): [description]. Defaults to False.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            bootstrap_n (int, optional): [description]. Defaults to 10.
-        """
 
         super().__init__(
             agents=agents,

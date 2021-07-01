@@ -164,7 +164,8 @@ class MADDPG:
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
             the evaluation loop. Defaults to {}.
             connection_spec (Callable[[Dict[str, List[str]]], Dict[str, List[str]]],
-                optional): [description]. Defaults to None.
+                optional): network topology specification for networked system
+                architectures. Defaults to None.
         """
 
         if not environment_spec:
