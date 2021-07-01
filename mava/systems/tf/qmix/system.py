@@ -166,10 +166,13 @@ class QMIX(MADQN):
             train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
-            the evaluation loop. Defaults to {}.
-            qmix_hidden_dim (int, optional): [description]. Defaults to 32.
-            num_hypernet_layers (int, optional): [description]. Defaults to 1.
-            hypernet_hidden_dim (int, optional): [description]. Defaults to 32.
+                the evaluation loop. Defaults to {}.
+            qmix_hidden_dim (int, optional): mixing network hidden dimension. Defaults
+                to 32.
+            num_hypernet_layers (int, optional): number of layers for hypernetwork.
+                Defaults to 1.
+            hypernet_hidden_dim (int, optional): hypernetwork hidden dimension. Defaults
+                to 32.
         """
 
         self._mixer = mixer

@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Defines the VDN system class."""
+"""VDN system implementation."""
+
 import functools
 from typing import Any, Callable, Dict, Optional, Type, Union
 
@@ -35,42 +36,9 @@ from mava.systems.tf.madqn.system import MADQN
 from mava.systems.tf.vdn import builder, execution, training
 from mava.utils.loggers import MavaLogger, logger_utils
 
-
-# TODO Correct documentation
-# TODO Implement recurrent option from MADQN
+# TODO Implement recurrent VDN
 class VDN(MADQN):
-    """VDN system.
-    This implements a single-process VDN system.
-    Args:
-        environment_factory: Callable to instantiate an environment on a compute node.
-        network_factory: Callable to instantiate system networks on a compute node.
-        logger_factory: Callable to instantiate a system logger on a compute node.
-        architecture: system architecture, e.g. decentralised or centralised.
-        trainer_fn: training type associated with executor and architecture,
-            e.g. centralised training.
-        executor_fn: executor type for example feedforward or recurrent.
-        num_executors: number of executor processes to run in parallel.
-        num_caches: number of trainer node caches.
-        environment_spec: description of the actions, observations, etc.
-        q_networks: the online Q network (the one being optimized)
-        epsilon: probability of taking a random action; ignored if a policy
-            network is given.
-        trainer_fn: the class used for training the agent and mixing networks.
-        shared_weights: boolean determining whether shared weights is used.
-        target_update_period: number of learner steps to perform before updating
-            the target networks.
-        clipping: whether to clip gradients by global norm.
-        replay_table_name: string indicating what name to give the replay table.
-        max_replay_size: maximum replay size.
-        samples_per_insert: number of samples to take from replay for every insert
-            that is made.
-        prefetch_size: size to prefetch from replay.
-        batch_size: batch size for updates.
-        n_step: number of steps to squash into a single transition.
-        discount: discount to use for TD updates.
-        counter: counter object used to keep track of steps.
-        checkpoint: boolean indicating whether to checkpoint the learner.
-    """
+    """VDN system."""
 
     def __init__(
         self,
@@ -114,6 +82,78 @@ class VDN(MADQN):
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
     ):
+        """Initialise the system
+
+        Args:
+            environment_factory (Callable[[bool], dm_env.Environment]): function to
+                instantiate an environment.
+            network_factory (Callable[[acme_specs.BoundedArray],
+                Dict[str, snt.Module]]): function to instantiate system networks.
+            logger_factory (Callable[[str], MavaLogger], optional): function to
+                instantiate a system logger. Defaults to None.
+            architecture (Type[DecentralisedValueActor], optional): system architecture,
+                e.g. decentralised or centralised. Defaults to DecentralisedValueActor.
+            trainer_fn (Type[training.VDNTrainer], optional): training type associated
+                with executor and architecture, e.g. centralised training. Defaults
+                to training.VDNTrainer.
+            executor_fn (Type[core.Executor], optional): executor type, e.g.
+                feedforward or recurrent. Defaults to execution.VDNFeedForwardExecutor.
+            mixer (Type[mixing.BaseMixingModule], optional): mixer module type, e.g.
+                additive or monotonic mixing. Defaults to mixing.AdditiveMixing.
+            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
+                function specifying a decaying scheduler for epsilon exploration.
+                Defaults to LinearExplorationScheduler.
+            epsilon_min (float, optional): final minimum epsilon value at the end of a
+                decaying schedule. Defaults to 0.05.
+            epsilon_decay (float, optional): epsilon decay rate. Defaults to 1e-4.
+            num_executors (int, optional): number of executor processes to run in
+                parallel. Defaults to 1.
+            num_caches (int, optional): number of trainer node caches. Defaults to 0.
+            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
+                the action, observation spaces etc. for each agent in the system.
+                Defaults to None.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
+            batch_size (int, optional): sample batch size for updates. Defaults to 256.
+            prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
+            min_replay_size (int, optional): minimum replay size before updating.
+                Defaults to 1000.
+            max_replay_size (int, optional): maximum replay size. Defaults to 1000000.
+            samples_per_insert (Optional[float], optional): number of samples to take
+                from replay for every insert that is made. Defaults to 32.0.
+            n_step (int, optional): number of steps to include prior to boostrapping.
+                Defaults to 5.
+            sequence_length (int, optional): recurrent sequence rollout length. Defaults
+                to 20.
+            period (int, optional): [description]. Defaults to 20.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            discount (float, optional): discount factor to use for TD updates. Defaults
+                to 0.99.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]], optional):
+                type of optimizer to use to update network parameters. Defaults to
+                snt.optimizers.Adam( learning_rate=1e-4 ).
+            target_update_period (int, optional): number of steps before target
+                networks are updated. Defaults to 100.
+            executor_variable_update_period (int, optional): number of steps before
+                updating executor variables from the variable source. Defaults to 1000.
+            max_executor_steps (int, optional): maximum number of steps and executor
+                can in an episode. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint models. Defaults to
+                False.
+            checkpoint_subpath (str, optional): subdirectory specifying where to store
+                checkpoints. Defaults to "~/mava/".
+            logger_config (Dict, optional): additional configuration settings for the
+                logger factory. Defaults to {}.
+            train_loop_fn (Callable, optional): function to instantiate a train loop.
+                Defaults to ParallelEnvironmentLoop.
+            eval_loop_fn (Callable, optional): function to instantiate an evaluation
+                loop. Defaults to ParallelEnvironmentLoop.
+            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
+                to the training loop. Defaults to {}.
+            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
+                the evaluation loop. Defaults to {}.
+        """
 
         self._mixer = mixer
 
@@ -189,7 +229,16 @@ class VDN(MADQN):
         replay: reverb.Client,
         counter: counting.Counter,
     ) -> mava.core.Trainer:
-        """The Trainer part of the system. Train with mixing networks."""
+        """System trainer
+
+        Args:
+            replay (reverb.Client): replay data table to pull data from.
+            counter (counting.Counter): step counter object.
+
+        Returns:
+            mava.core.Trainer: system trainer.
+        """
+
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec
@@ -225,5 +274,12 @@ class VDN(MADQN):
         )
 
     def build(self, name: str = "vdn") -> Any:
-        """Build the distributed system topology."""
+        """Build the distributed system as a graph program.
+
+        Args:
+            name (str, optional): system name. Defaults to "vdn".
+
+        Returns:
+            Any: graph program for distributed system training.
+        """
         return super().build(name=name)
