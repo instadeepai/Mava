@@ -16,24 +16,19 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Dict
 
 import launchpad as lp
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
-from acme import types
-from acme.tf import networks
 from flatland.envs.observations import TreeObsForRailEnv
 from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
-from mava import specs as mava_specs
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
-from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments.flatland_utils import flatland_env_factory
@@ -46,7 +41,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 # flatland environment config
@@ -68,70 +63,20 @@ flatland_env_config: Dict = {
 }
 
 
-def make_networks(
-    environment_spec: mava_specs.MAEnvironmentSpec,
-    epsilon: tf.Variable = tf.Variable(0.05, trainable=False),
-    shared_weights: bool = True,
-    q_networks_layer_sizes: Tuple = (256, 256),
-) -> Mapping[str, types.TensorTransformation]:
-    """Creates networks used by the agents."""
-
-    specs = environment_spec.get_agent_specs()
-
-    # Create agent_type specs
-    if shared_weights:
-        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-        specs = type_specs
-
-    def action_selector_fn(
-        q_values: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: Optional[tf.Variable] = None,
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
-
-    q_networks = {}
-    action_selectors = {}
-    for key in specs.keys():
-
-        # Get total number of action dimensions from action spec.
-        num_dimensions = specs[key].actions.num_values
-
-        # Create the q-value network.
-        q_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(q_networks_layer_sizes, activate_final=True),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
-        )
-
-        # epsilon greedy action selector
-        action_selector = action_selector_fn
-
-        q_networks[key] = q_network
-        action_selectors[key] = action_selector
-
-    return {
-        "q_networks": q_networks,
-        "action_selectors": action_selectors,
-    }
-
-
 def main(_: Any) -> None:
 
+    # Environment.
     environment_factory = functools.partial(
         flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
     )
 
-    # networks
-    network_factory = lp_utils.partial_kwargs(make_networks)
+    # Networks.
+    network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-    # loggers
+    # Log every [log_every] seconds.
     log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
@@ -155,7 +100,7 @@ def main(_: Any) -> None:
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
-    # launch
+    # Ensure only trainer runs on gpu, while other processes run on cpu.
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
@@ -163,6 +108,8 @@ def main(_: Any) -> None:
         "evaluator": PythonProcess(env=env_vars),
         "executor": PythonProcess(env=env_vars),
     }
+
+    # Launch.
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
