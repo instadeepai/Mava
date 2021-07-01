@@ -429,6 +429,96 @@ class NetworkStatistics(NetworkStatisticsBase):
         train_utils.safe_del(self, "tape")
 
 
+class NetworkStatisticsMixing(NetworkStatisticsBase):
+    """
+    A class for logging network statistics.
+    This class assumes the trainer has the following:
+        _forward: Forward pass. Stores a policy loss and tf.GradientTape.
+        _backward: Updates network using policy loss and tf.GradientTape.
+    """
+
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+        # Log only l2 norm by default.
+        gradient_norms: List = [2],
+        weight_norms: List = [2],
+        log_interval: int = 100,
+        log_weights: bool = True,
+        log_gradients: bool = True,
+    ) -> None:
+        super().__init__(
+            trainer,
+            gradient_norms,
+            weight_norms,
+            log_interval,
+            log_weights,
+            log_gradients,
+        )
+
+    def _step(
+        self,
+    ) -> Dict[str, Dict[str, Any]]:
+
+        # Update the target networks
+        # Trying not to assume off policy.
+        if hasattr(self, "_update_target_networks"):
+            self._update_target_networks()
+
+        # Get data from replay (dropping extras if any). Note there is no
+        # extra data here because we do not insert any into Reverb.
+        inputs = next(self._iterator)
+
+        self._forward(inputs)
+
+        self._backward()
+
+        # Log losses per agent
+        return {agent: {"q_value_loss": self.loss} for agent in self._agents}
+
+    def _backward(self) -> None:
+        log_current_timestep = self._log_step()
+        for agent in self._agents:
+            agent_key = self.agent_net_keys[agent]
+
+            # Update agent networks
+            variables = [*self._q_networks[agent_key].trainable_variables]
+            gradients = self.tape.gradient(self.loss, variables)
+            gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
+            self._optimizers[agent_key].apply(gradients, variables)
+
+            if log_current_timestep:
+                if self.log_weights:
+                    self._log_weights(label="Policy", agent=agent, weights=variables)
+                if self.log_gradients:
+                    self._log_gradients(
+                        label="Policy",
+                        agent=agent,
+                        variables_names=[vars.name for vars in variables],
+                        gradients=gradients,
+                    )
+
+        # Update mixing network
+        variables = self.get_mixing_trainable_vars()
+        gradients = self.tape.gradient(self.loss, variables)
+
+        gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
+        self._optimizer.apply(gradients, variables)
+
+        if log_current_timestep:
+            if self.log_weights:
+                self._log_weights(label="Mixing", agent=agent, weights=variables)
+            if self.log_gradients:
+                self._log_gradients(
+                    label="Mixing",
+                    agent=agent,
+                    variables_names=[vars.name for vars in variables],
+                    gradients=gradients,
+                )
+
+        train_utils.safe_del(self, "tape")
+
+
 class NetworkStatisticsActorCritic(NetworkStatisticsBase):
     """
     A class for logging network statistics.

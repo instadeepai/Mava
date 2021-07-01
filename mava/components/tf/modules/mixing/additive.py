@@ -32,9 +32,9 @@ class AdditiveMixing(BaseMixingModule):
         self._architecture = architecture
         self._agent_networks = self._architecture.create_actor_variables()
 
-    def _create_mixing_layer(self) -> snt.Module:
+    def _create_mixing_layer(self, name: str = "mixing") -> snt.Module:
         # Instantiate additive mixing network
-        self._mixed_network = AdditiveMixingNetwork()
+        self._mixed_network = AdditiveMixingNetwork(name)
         return self._mixed_network
 
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
