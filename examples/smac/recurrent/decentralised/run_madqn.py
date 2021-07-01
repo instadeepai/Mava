@@ -17,23 +17,17 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any
 
 import launchpad as lp
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
-from acme import types
-from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
-from mava import specs as mava_specs
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
-from mava.systems.tf.madqn.execution import MADQNRecurrentExecutor
-from mava.systems.tf.madqn.training import MADQNRecurrentTrainer
 from mava.utils import lp_utils
+from mava.utils.enums import ArchitectureType
 from mava.utils.environments import smac_utils
 from mava.utils.loggers import logger_utils
 
@@ -49,68 +43,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
-
-
-def make_networks(
-    environment_spec: mava_specs.MAEnvironmentSpec,
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        512,
-        512,
-        256,
-    ),
-    shared_weights: bool = True,
-) -> Mapping[str, types.TensorTransformation]:
-    """Creates networks used by the agents."""
-
-    specs = environment_spec.get_agent_specs()
-
-    # Create agent_type specs
-    if shared_weights:
-        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-        specs = type_specs
-
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
-
-    def action_selector_fn(
-        q_values: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: Optional[tf.Variable] = None,
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
-
-    q_networks = {}
-    action_selectors = {}
-    for key in specs.keys():
-
-        # Get total number of action dimensions from action spec.
-        num_dimensions = specs[key].actions.num_values
-
-        # Create the policy network.
-        q_network = snt.DeepRNN(
-            [
-                networks.LayerNormMLP(
-                    q_networks_layer_sizes[key], activate_final=False
-                ),
-                snt.LSTM(25),
-                snt.nets.MLP([128]),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
-        )
-
-        # epsilon greedy action selector
-        action_selector = action_selector_fn
-
-        q_networks[key] = q_network
-        action_selectors[key] = action_selector
-
-    return {
-        "q_networks": q_networks,
-        "action_selectors": action_selectors,
-    }
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -120,13 +53,17 @@ def main(_: Any) -> None:
         smac_utils.make_environment, map_name=FLAGS.map_name
     )
 
-    # networks
-    network_factory = lp_utils.partial_kwargs(make_networks)
+    # Networks.
+    network_factory = lp_utils.partial_kwargs(
+        madqn.make_default_networks,
+        policy_networks_layer_sizes=[128, 128],
+        archecture_type=ArchitectureType.recurrent,
+    )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
-    # loggers
+    # Log every [log_every] seconds.
     log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
@@ -142,16 +79,18 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=1,
-        trainer_fn=MADQNRecurrentTrainer,
-        executor_fn=MADQNRecurrentExecutor,
+        num_executors=2,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
-        epsilon_decay=5e-4,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        epsilon_decay=1e-5,
+        optimizer=snt.optimizers.RMSProp(learning_rate=1e-5),
         checkpoint_subpath=checkpoint_dir,
-        n_step=1,
         batch_size=32,
+        executor_variable_update_period=100,
+        target_update_period=200,
+        max_gradient_norm=10,
+        trainer_fn=madqn.training.MADQNRecurrentTrainer,
+        executor_fn=madqn.execution.MADQNRecurrentExecutor,
     ).build()
 
     # launch
