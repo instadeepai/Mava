@@ -95,7 +95,7 @@ class DIAL:
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
     ):
-        """DIAL system
+        """Initialise the system
 
         Args:
             environment_factory (Callable[[bool], dm_env.Environment]): function to
@@ -550,6 +550,7 @@ class DIAL:
         Returns:
             Any: graph program for distributed system training.
         """
+
         program = lp.Program(name=name)
         counter = None
 

@@ -30,10 +30,7 @@ from mava.systems.tf.madqn.training import MADQNTrainer
 
 class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
     """DIAL executor.
-    An executor based on a recurrent communicating policy for each agent in the system
-    which takes non-batched observations and outputs non-batched actions.
-    It also allows adding experiences to replay and updating the weights
-    from the policy on the learner.
+    An executor based on a recurrent communicating policy for each agent in the system.
     Note: this executor is specific to switch game env.
     """
 
@@ -68,7 +65,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
             store_recurrent_state (bool, optional): boolean to store the recurrent
                 network hidden state. Defaults to True.
             trainer (MADQNTrainer, optional): system trainer. Defaults to None.
-            fingerprint (bool, optional): fingerprint stabilisation function to
+            fingerprint (bool, optional): whether to use fingerprint stabilisation to
                 stabilise experience replay. Defaults to False.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
@@ -110,7 +107,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
             epsilon (tf.Tensor): value for epsilon greedy action selection.
 
         Returns:
-            types.NestedTensor: [description]
+            types.NestedTensor: action, message and new recurrent hidden state
         """
 
         (action, m_values), new_state = super()._policy(
