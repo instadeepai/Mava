@@ -40,11 +40,8 @@ tfd = tfp.distributions
 
 
 class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
-    """A feed-forward executor for discrete actions in MADDPG.
-    An executor based on a feed-forward policy for each agent in the system
-    which takes non-batched observations and outputs non-batched actions.
-    It also allows adding experiences to replay and updating the weights
-    from the policy on the learner.
+    """A feed-forward executor for discrete actions.
+    An executor based on a feed-forward policy for each agent in the system.
     """
 
     def __init__(
@@ -55,16 +52,19 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         shared_weights: bool = True,
     ):
-        """[summary]
+        """Initialise the system executor
 
         Args:
-            policy_networks (Dict[str, snt.Module]): [description]
-            agent_specs (Dict[str, EnvironmentSpec]): [description]
-            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
-                to None.
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            agent_specs (Dict[str, EnvironmentSpec]): agent observation and action
+                space specifications.
+            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+                to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
-                [description]. Defaults to None.
-            shared_weights (bool, optional): [description]. Defaults to True.
+                client to copy weights from the trainer. Defaults to None.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
         """
 
         # Store these for later use.
@@ -80,17 +80,18 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
     def _policy(
         self, agent: str, observation: types.NestedTensor
     ) -> types.NestedTensor:
-        """[summary]
+        """Agent specific policy function
 
         Args:
-            agent (str): [description]
-            observation (types.NestedTensor): [description]
+            agent (str): agent id
+            observation (types.NestedTensor): observation tensor received from the
+                environment.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: unknown action space
 
         Returns:
-            types.NestedTensor: [description]
+            types.NestedTensor: agent action
         """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
@@ -116,14 +117,15 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> Tuple[types.NestedArray, types.NestedArray]:
-        """[summary]
+        """select an action for a single agent in the system
 
         Args:
-            agent (str): [description]
-            observation (types.NestedArray): [description]
+            agent (str): agent id.
+            observation (types.NestedArray): observation tensor received from the
+                environment.
 
         Returns:
-            Tuple[types.NestedArray, types.NestedArray]: [description]
+            Tuple[types.NestedArray, types.NestedArray]: agent action and policy.
         """
 
         # Step the recurrent policy/value network forward
@@ -138,14 +140,15 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
-        """[summary]
+        """select the actions for all agents in the system
 
         Args:
-            observations (Dict[str, types.NestedArray]): [description]
+            observations (Dict[str, types.NestedArray]): agent observations from the
+                environment.
 
         Returns:
             Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
-                [description]
+                actions and policies for all agents in the system.
         """
 
         actions = {}
@@ -162,15 +165,17 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """[summary]
+        """record observed timestep from the environment
 
         Args:
             actions (Union[ Dict[str, types.NestedArray], List[Dict[str,
-                types.NestedArray]] ]): [description]
-            next_timestep (dm_env.TimeStep): [description]
-            next_extras (Dict[str, types.NestedArray], optional): [description].
-                Defaults to {}.
+                types.NestedArray]] ]): system agents' actions.
+            next_timestep (dm_env.TimeStep): data emitted by an environment during
+                interaction.
+            next_extras (Dict[str, types.NestedArray], optional): possible extra
+                information to record during the transition. Defaults to {}.
         """
+
         if self._adder:
             _, policy = actions
             # TODO (dries): Sort out this mypy issue.
@@ -187,17 +192,21 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         shared_weights: bool = True,
         store_recurrent_state: bool = True,
     ):
-        """[summary]
+        """Initialise the system executor
 
         Args:
-            policy_networks (Dict[str, snt.Module]): [description]
-            agent_specs (Dict[str, EnvironmentSpec]): [description]
-            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
-                to None.
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            agent_specs (Dict[str, EnvironmentSpec]): agent observation and action
+                space specifications.
+            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+                to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
-                [description]. Defaults to None.
-            shared_weights (bool, optional): [description]. Defaults to True.
-            store_recurrent_state (bool, optional): [description]. Defaults to True.
+                client to copy weights from the trainer. Defaults to None.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
+            store_recurrent_state (bool, optional): boolean to store the recurrent
+                network hidden state. Defaults to True.
         """
 
         # Store these for later use.
@@ -218,19 +227,20 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         observation: types.NestedTensor,
         state: types.NestedTensor,
     ) -> Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
-        """[summary]
+        """Agent specific policy function
 
         Args:
-            agent (str): [description]
-            observation (types.NestedTensor): [description]
-            state (types.NestedTensor): [description]
+            agent (str): agent id
+            observation (types.NestedTensor): observation tensor received from the
+                environment.
+            state (types.NestedTensor): recurrent network state.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: unknown action space
 
         Returns:
             Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
-                [description]
+                action, policy and new recurrent hidden state
         """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
@@ -256,14 +266,15 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
-        """[summary]
+        """select an action for a single agent in the system
 
         Args:
-            agent (str): [description]
-            observation (types.NestedArray): [description]
+            agent (str): agent id
+            observation (types.NestedArray): observation tensor received from the
+                environment.
 
         Returns:
-            types.NestedArray: [description]
+            types.NestedArray: action and policy.
         """
 
         # TODO Mask actions here using observation.legal_actions
@@ -289,14 +300,15 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
-        """[summary]
+        """select the actions for all agents in the system
 
         Args:
-            observations (Dict[str, types.NestedArray]): [description]
+            observations (Dict[str, types.NestedArray]): agent observations from the
+                environment.
 
         Returns:
             Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
-                [description]
+                actions and policies for all agents in the system.
         """
 
         actions = {}
@@ -311,13 +323,14 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         next_timestep: dm_env.TimeStep,
         next_extras: Optional[Dict[str, types.NestedArray]] = {},
     ) -> None:
-        """[summary]
+        """record observed timestep from the environment
 
         Args:
-            actions (Dict[str, types.NestedArray]): [description]
-            next_timestep (dm_env.TimeStep): [description]
-            next_extras (Optional[Dict[str, types.NestedArray]], optional):
-                [description]. Defaults to {}.
+            actions (Dict[str, types.NestedArray]): system agents' actions.
+            next_timestep (dm_env.TimeStep): data emitted by an environment during
+                interaction.
+            next_extras (Dict[str, types.NestedArray], optional): possible extra
+                information to record during the transition. Defaults to {}.
         """
 
         if not self._adder:

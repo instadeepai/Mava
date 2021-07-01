@@ -24,12 +24,11 @@ import sonnet as snt
 from acme import datasets
 from acme.specs import EnvironmentSpec
 from acme.tf import variable_utils
-from acme.utils import counting, loggers
+from acme.utils import counting
 from dm_env import specs as dm_specs
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.systems.builders import SystemBuilder
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
 from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
@@ -43,30 +42,32 @@ DiscreteArray = dm_specs.DiscreteArray
 class MADDPGConfig:
     """Configuration options for the MADDPG system.
     Args:
-        environment_spec: specs.MAEnvironmentSpec
-        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
-        critic_optimizer: snt.Optimizer
-        shared_weights: bool = True
-        discount: float = 0.99
-        batch_size: int = 256
-        prefetch_size: int = 4
-        target_averaging: bool = False
-        target_update_period: int = 100
-        target_update_rate: Optional[float] = None
-        executor_variable_update_period: int = 1000
-        min_replay_size: int = 1000
-        max_replay_size: int = 1000000
-        samples_per_insert: float = 32.0
-        n_step: int = 5
-        sequence_length: int = 20
-        period: int = 20
-        max_gradient_norm: Optional[float] = None
-        sigma: float = 0.3
-        logger: loggers.Logger = None
-        counter: counting.Counter = None
-        checkpoint: bool = True
-        checkpoint_subpath: str = "~/mava/"
-        replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE."""
+        environment_spec: description of the action and observation spaces etc. for
+            each agent in the system.
+        policy_optimizer: optimizer(s) for updating policy networks.
+        critic_optimizer: optimizer for updating critic networks.
+        shared_weights: boolean indicating whether agents should share weights.
+        discount: discount to use for TD updates.
+        batch_size: batch size for updates.
+        prefetch_size: size to prefetch from replay.
+        target_averaging: whether to use polyak averaging for target network updates.
+        target_update_period: number of steps before target networks are updated.
+        target_update_rate: update rate when using averaging.
+        executor_variable_update_period: the rate at which executors sync their
+            paramters with the trainer.
+        min_replay_size: minimum replay size before updating.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        n_step: number of steps to include prior to boostrapping.
+        sequence_length: recurrent sequence rollout length.
+        period: consecutive starting points for overlapping rollouts across a sequence.
+        max_gradient_norm: value to specify the maximum clipping value for the gradient
+            norm during optimization.
+        sigma: Gaussian sigma parameter.
+        checkpoint: boolean to indicate whether to checkpoint models.
+        checkpoint_subpath: subdirectory specifying where to store checkpoints.
+        replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
@@ -87,22 +88,13 @@ class MADDPGConfig:
     period: int = 20
     max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
-    logger: loggers.Logger = None
-    counter: counting.Counter = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
-class MADDPGBuilder(SystemBuilder):
+class MADDPGBuilder:
     """Builder for MADDPG which constructs individual components of the system."""
-
-    """Defines an interface for defining the components of an RL system.
-      Implementations of this interface contain a complete specification of a
-      concrete RL system. An instance of this class can be used to build an
-      RL system which interacts with the environment either locally or in a
-      distributed setup.
-      """
 
     def __init__(
         self,
@@ -114,16 +106,20 @@ class MADDPGBuilder(SystemBuilder):
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):
-        """[summary]
+        """Initialise the system.
 
         Args:
-            config (MADDPGConfig): [description]
+            config (MADDPGConfig): system configuration specifying hyperparameters and
+                additional information for constructing the system.
             trainer_fn (Union[ Type[training.MADDPGBaseTrainer],
-                Type[training.MADDPGBaseRecurrentTrainer], ], optional): [description].
-                Defaults to training.MADDPGDecentralisedTrainer.
-            executor_fn (Type[core.Executor], optional): [description]. Defaults to
-                MADDPGFeedForwardExecutor.
-            extra_specs (Dict[str, Any], optional): [description]. Defaults to {}.
+                Type[training.MADDPGBaseRecurrentTrainer], ], optional): Trainer
+                function, of a correpsonding type to work with the selected system
+                architecture. Defaults to training.MADDPGDecentralisedTrainer.
+            executor_fn (Type[core.Executor], optional): Executor function, of a
+                corresponding type to work with the selected system architecture.
+                Defaults to MADDPGFeedForwardExecutor.
+            extra_specs (Dict[str, Any], optional): defines the specifications of extra
+                information used by the system. Defaults to {}.
         """
 
         self._config = config
@@ -137,13 +133,14 @@ class MADDPGBuilder(SystemBuilder):
     def convert_discrete_to_bounded(
         self, environment_spec: specs.MAEnvironmentSpec
     ) -> specs.MAEnvironmentSpec:
-        """[summary]
+        """convert discrete action space to bounded continuous action space
 
         Args:
-            environment_spec (specs.MAEnvironmentSpec): [description]
+            environment_spec (specs.MAEnvironmentSpec): description of
+                the action, observation spaces etc. for each agent in the system.
 
         Returns:
-            specs.MAEnvironmentSpec: [description]
+            specs.MAEnvironmentSpec: updated environment spec.
         """
 
         env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
@@ -174,16 +171,17 @@ class MADDPGBuilder(SystemBuilder):
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
-        """[summary]
+        """Create tables to insert data into.
 
         Args:
-            environment_spec (specs.MAEnvironmentSpec): [description]
+            environment_spec (specs.MAEnvironmentSpec): description of the action and
+                observation spaces etc. for each agent in the system.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: unknown executor type.
 
         Returns:
-            List[reverb.Table]: [description]
+            List[reverb.Table]: a list of data tables for inserting data.
         """
 
         env_adder_spec = self.convert_discrete_to_bounded(environment_spec)
@@ -230,16 +228,17 @@ class MADDPGBuilder(SystemBuilder):
         self,
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
-        """[summary]
+        """Create a dataset iterator to use for training/updating the system.
 
         Args:
-            replay_client (reverb.Client): [description]
+            replay_client (reverb.Client): Reverb Client which points to the
+                replay server.
 
         Returns:
-            [type]: [description]
+            [type]: dataset iterator.
 
         Yields:
-            Iterator[reverb.ReplaySample]: [description]
+            Iterator[reverb.ReplaySample]: data samples from the dataset.
         """
 
         sequence_length = (
@@ -261,16 +260,17 @@ class MADDPGBuilder(SystemBuilder):
         self,
         replay_client: reverb.Client,
     ) -> Optional[adders.ParallelAdder]:
-        """[summary]
+        """Create an adder which records data generated by the executor/environment.
 
         Args:
-            replay_client (reverb.Client): [description]
+            replay_client (reverb.Client): Reverb Client which points to the
+                replay server.
 
         Raises:
-            NotImplementedError: [description]
+            NotImplementedError: unknown executor type.
 
         Returns:
-            Optional[adders.ParallelAdder]: [description]
+            Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
         """
 
         # Select adder
@@ -298,17 +298,19 @@ class MADDPGBuilder(SystemBuilder):
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
-        """[summary]
+        """Create an executor instance.
 
         Args:
-            policy_networks (Dict[str, snt.Module]): [description]
-            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
-                to None.
-            variable_source (Optional[core.VariableSource], optional): [description].
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            adder (Optional[adders.ParallelAdder], optional): adder to send data to
+                a replay buffer. Defaults to None.
+            variable_source (Optional[core.VariableSource], optional): variables server.
                 Defaults to None.
 
         Returns:
-            core.Executor: [description]
+            core.Executor: system executor, a collection of agents making up the part
+                of the system generating data by interacting the environment.
         """
 
         shared_weights = self._config.shared_weights
@@ -346,27 +348,26 @@ class MADDPGBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
-        """[summary]
+        """Create a trainer instance.
 
         Args:
-            networks (Dict[str, Dict[str, snt.Module]]): [description]
-            dataset (Iterator[reverb.ReplaySample]): [description]
-            replay_client (Optional[reverb.Client], optional): [description]. Defaults
-                to None.
-            counter (Optional[counting.Counter], optional): [description]. Defaults
-                to None.
-            logger (Optional[types.NestedLogger], optional): [description]. Defaults
-                to None.
-            connection_spec (Dict[str, List[str]], optional): [description]. Defaults
-                to None.
+            networks (Dict[str, Dict[str, snt.Module]]): system networks.
+            dataset (Iterator[reverb.ReplaySample]): dataset iterator to feed data to
+                the trainer networks.
+            counter (Optional[counting.Counter], optional): a Counter which allows for
+                recording of counts, e.g. trainer steps. Defaults to None.
+            logger (Optional[types.NestedLogger], optional): Logger object for logging
+                metadata.. Defaults to None.
+            connection_spec (Dict[str, List[str]], optional): connection topology used
+                for networked system architectures. Defaults to None.
 
         Returns:
-            core.Trainer: [description]
+            core.Trainer: system trainer, that uses the collected data from the
+                executors to update the parameters of the agent networks in the system.
         """
 
         agents = self._agents

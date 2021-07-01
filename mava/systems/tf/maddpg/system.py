@@ -42,12 +42,7 @@ from mava.wrappers import DetailedPerAgentStatistics
 
 
 class MADDPG:
-    """MADDPG system.
-    This implements a single-process DDPG system. This is an actor-critic based
-    system that generates data via a behavior policy, inserts N-step transitions into
-    a replay buffer, and periodically updates the policies of each agent
-    (and as a result the behavior) by sampling uniformly from this buffer.
-    """
+    """MADDPG system."""
 
     def __init__(
         self,
@@ -95,58 +90,79 @@ class MADDPG:
         eval_loop_fn_kwargs: Dict = {},
         connection_spec: Callable[[Dict[str, List[str]]], Dict[str, List[str]]] = None,
     ):
-        """[summary]
+        """Initialise the system
 
         Args:
-            environment_factory (Callable[[bool], dm_env.Environment]): [description]
-            network_factory (Callable[[acme_specs.BoundedArray], Dict[str,
-                snt.Module]]): [description]
-            logger_factory (Callable[[str], MavaLogger], optional): [description].
-                Defaults to None.
+            environment_factory (Callable[[bool], dm_env.Environment]): function to
+                instantiate an environment.
+            network_factory (Callable[[acme_specs.BoundedArray],
+                Dict[str, snt.Module]]): function to instantiate system networks.
+            logger_factory (Callable[[str], MavaLogger], optional): function to
+                instantiate a system logger. Defaults to None.
             architecture (Type[ DecentralisedQValueActorCritic ], optional):
-                [description]. Defaults to DecentralisedQValueActorCritic.
+                system architecture, e.g. decentralised or centralised. Defaults to
+                DecentralisedQValueActorCritic.
             trainer_fn (Union[ Type[training.MADDPGBaseTrainer],
-                Type[training.MADDPGBaseRecurrentTrainer], ], optional): [description].
-                    Defaults to training.MADDPGDecentralisedTrainer.
-            executor_fn (Type[core.Executor], optional): [description]. Defaults to
-                MADDPGFeedForwardExecutor.
-            num_executors (int, optional): [description]. Defaults to 1.
-            num_caches (int, optional): [description]. Defaults to 0.
-            environment_spec (mava_specs.MAEnvironmentSpec, optional): [description].
+                Type[training.MADDPGBaseRecurrentTrainer], ], optional): training type
+                associated with executor and architecture, e.g. centralised training.
+                Defaults to training.MADDPGDecentralisedTrainer.
+            executor_fn (Type[core.Executor], optional): executor type, e.g.
+                feedforward or recurrent. Defaults to MADDPGFeedForwardExecutor.
+            num_executors (int, optional): number of executor processes to run in
+                parallel. Defaults to 1.
+            num_caches (int, optional): number of trainer node caches. Defaults to 0.
+            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
+                the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
-            shared_weights (bool, optional): [description]. Defaults to True.
-            discount (float, optional): [description]. Defaults to 0.99.
-            batch_size (int, optional): [description]. Defaults to 256.
-            prefetch_size (int, optional): [description]. Defaults to 4.
-            target_averaging (bool, optional): [description]. Defaults to False.
-            target_update_period (int, optional): [description]. Defaults to 100.
-            target_update_rate (Optional[float], optional): [description]. Defaults to
-                None.
-            executor_variable_update_period (int, optional): [description]. Defaults to
-                1000.
-            min_replay_size (int, optional): [description]. Defaults to 1000.
-            max_replay_size (int, optional): [description]. Defaults to 1000000.
-            samples_per_insert (float, optional): [description]. Defaults to 32.0.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
+            discount (float, optional): discount factor to use for TD updates. Defaults
+                to 0.99.
+            batch_size (int, optional): sample batch size for updates. Defaults to 256.
+            prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
+            target_averaging (bool, optional): whether to use polyak averaging for
+                target network updates. Defaults to False.
+            target_update_period (int, optional): number of steps before target
+                networks are updated. Defaults to 100.
+            target_update_rate (Optional[float], optional): update rate when using
+                averaging. Defaults toNone.
+            executor_variable_update_period (int, optional): number of steps before
+                updating executor variables from the variable source. Defaults to 1000.
+            min_replay_size (int, optional): minimum replay size before updating.
+                Defaults to 1000.
+            max_replay_size (int, optional): maximum replay size. Defaults to 1000000.
+            samples_per_insert (Optional[float], optional): number of samples to take
+                from replay for every insert that is made. Defaults to 32.0.
             policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
-                optional): [description]. Defaults to
+                optional): optimizer(s) for updating policy networks Defaults to
                 snt.optimizers.Adam(learning_rate=1e-4).
-            critic_optimizer (snt.Optimizer, optional): [description]. Defaults to
-                snt.optimizers.Adam(learning_rate=1e-4).
-            n_step (int, optional): [description]. Defaults to 5.
-            sequence_length (int, optional): [description]. Defaults to 20.
-            period (int, optional): [description]. Defaults to 20.
-            sigma (float, optional): [description]. Defaults to 0.3.
-            max_gradient_norm (float, optional): [description]. Defaults to None.
-            max_executor_steps (int, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to True.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
-            logger_config (Dict, optional): [description]. Defaults to {}.
-            train_loop_fn (Callable, optional): [description]. Defaults to
-                ParallelEnvironmentLoop.
-            eval_loop_fn (Callable, optional): [description]. Defaults to
-                ParallelEnvironmentLoop.
-            train_loop_fn_kwargs (Dict, optional): [description]. Defaults to {}.
-            eval_loop_fn_kwargs (Dict, optional): [description]. Defaults to {}.
+            critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
+                networks Defaults to snt.optimizers.Adam(learning_rate=1e-4).
+            n_step (int, optional): number of steps to include prior to boostrapping.
+                Defaults to 5.
+            sequence_length (int, optional): recurrent sequence rollout length. Defaults
+                to 20.
+            period (int, optional): [consecutive starting points for overlapping
+                rollouts across a sequence. Defaults to 20.
+            sigma (float, optional): Gaussian sigma parameter. Defaults to 0.3.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            max_executor_steps (int, optional): maximum number of steps and executor
+                can in an episode. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint models. Defaults to
+                False.
+            checkpoint_subpath (str, optional): subdirectory specifying where to store
+                checkpoints. Defaults to "~/mava/".
+            logger_config (Dict, optional): additional configuration settings for the
+                logger factory. Defaults to {}.
+            train_loop_fn (Callable, optional): function to instantiate a train loop.
+                Defaults to ParallelEnvironmentLoop.
+            eval_loop_fn (Callable, optional): function to instantiate an evaluation
+                loop. Defaults to ParallelEnvironmentLoop.
+            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
+                to the training loop. Defaults to {}.
+            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
+            the evaluation loop. Defaults to {}.
             connection_spec (Callable[[Dict[str, List[str]]], Dict[str, List[str]]],
                 optional): [description]. Defaults to None.
         """
@@ -224,10 +240,10 @@ class MADDPG:
         )
 
     def _get_extra_specs(self) -> Any:
-        """[summary]
+        """helper to establish specs for extra information
 
         Returns:
-            Any: [description]
+            Dict[str, Any]: dictionary containing extra specs
         """
 
         agents = self._environment_spec.get_agent_ids()
@@ -245,22 +261,22 @@ class MADDPG:
         return {"core_states": core_state_specs}
 
     def replay(self) -> Any:
-        """[summary]
+        """Replay data storage.
 
         Returns:
-            Any: [description]
+            Any: replay data table built according the environment specification.
         """
 
         return self._builder.make_replay_tables(self._environment_spec)
 
     def counter(self, checkpoint: bool) -> Any:
-        """[summary]
+        """Step counter
 
         Args:
-            checkpoint (bool): [description]
+            checkpoint (bool): whether to checkpoint the counter.
 
         Returns:
-            Any: [description]
+            Any: step counter object.
         """
 
         if checkpoint:
@@ -274,13 +290,13 @@ class MADDPG:
             return counting.Counter()
 
     def coordinator(self, counter: counting.Counter) -> Any:
-        """[summary]
+        """Coordination helper for a distributed program
 
         Args:
-            counter (counting.Counter): [description]
+            counter (counting.Counter): step counter object.
 
         Returns:
-            Any: [description]
+            Any: step limiter object.
         """
 
         return lp_utils.StepsLimiter(counter, self._max_executor_steps)
@@ -290,14 +306,14 @@ class MADDPG:
         replay: reverb.Client,
         counter: counting.Counter,
     ) -> mava.core.Trainer:
-        """[summary]
+        """System trainer
 
         Args:
-            replay (reverb.Client): [description]
-            counter (counting.Counter): [description]
+            replay (reverb.Client): replay data table to pull data from.
+            counter (counting.Counter): step counter object.
 
         Returns:
-            mava.core.Trainer: [description]
+            mava.core.Trainer: system trainer.
         """
 
         # Create the networks to optimize (online)
@@ -349,16 +365,17 @@ class MADDPG:
         variable_source: acme.VariableSource,
         counter: counting.Counter,
     ) -> mava.ParallelEnvironmentLoop:
-        """[summary]
+        """System executor
 
         Args:
-            executor_id (str): [description]
-            replay (reverb.Client): [description]
-            variable_source (acme.VariableSource): [description]
-            counter (counting.Counter): [description]
+            executor_id (str): id to identify the executor process for logging purposes.
+            replay (reverb.Client): replay data table to push data to.
+            variable_source (acme.VariableSource): variable server for updating
+                network variables.
+            counter (counting.Counter): step counter object.
 
         Returns:
-            mava.ParallelEnvironmentLoop: [description]
+            mava.ParallelEnvironmentLoop: environment-executor loop instance.
         """
 
         # Create the behavior policy.
@@ -427,15 +444,17 @@ class MADDPG:
         counter: counting.Counter,
         logger: loggers.Logger = None,
     ) -> Any:
-        """[summary]
+        """System evaluator (an executor process not connected to a dataset)
 
         Args:
-            variable_source (acme.VariableSource): [description]
-            counter (counting.Counter): [description]
-            logger (loggers.Logger, optional): [description]. Defaults to None.
+            variable_source (acme.VariableSource): variable server for updating
+                network variables.
+            counter (counting.Counter): step counter object.
+            logger (loggers.Logger, optional): logger object. Defaults to None.
 
         Returns:
-            Any: [description]
+            Any: environment-executor evaluation loop instance for evaluating the
+                performance of a system.
         """
 
         # Create the behavior policy.
@@ -495,13 +514,13 @@ class MADDPG:
         return eval_loop
 
     def build(self, name: str = "maddpg") -> Any:
-        """[summary]
+        """Build the distributed system as a graph program.
 
         Args:
-            name (str, optional): [description]. Defaults to "maddpg".
+            name (str, optional): system name. Defaults to "maddpg".
 
         Returns:
-            Any: [description]
+            Any: graph program for distributed system training.
         """
 
         program = lp.Program(name=name)

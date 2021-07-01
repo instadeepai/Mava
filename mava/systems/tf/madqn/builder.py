@@ -275,8 +275,6 @@ class MADQNBuilder:
                 system.
             action_selectors (Dict[str, Any]): policy action selector method, e.g.
                 epsilon greedy.
-            adder (Optional[adders.ParallelAdder], optional): [description]. Defaults
-                to None.
             adder (Optional[adders.ParallelAdder], optional): adder to send data to
                 a replay buffer. Defaults to None.
             variable_source (Optional[core.VariableSource], optional): variables server.

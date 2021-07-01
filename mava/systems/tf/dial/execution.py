@@ -100,7 +100,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
             agent (str): agent id
             observation (types.NestedTensor): observation tensor received from the
                 environment.
-            state (types.NestedTensor): Full state of the environment.
+            state (types.NestedTensor): Recurrent network state.
             message (types.NestedTensor): received agent messsage.
             legal_actions (types.NestedTensor): actions allowed to be taken at the
                 current observation.

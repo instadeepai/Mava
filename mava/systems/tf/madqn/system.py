@@ -140,7 +140,8 @@ class MADQN:
                 Defaults to 5.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 20.
-            period (int, optional): [description]. Defaults to 20.
+            period (int, optional): consecutive starting points for overlapping
+                rollouts across a sequence. Defaults to 20.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             discount (float, optional): discount factor to use for TD updates. Defaults
