@@ -160,9 +160,7 @@ def make_recurrent_networks(
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
-    if shared_weights:
-        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-        specs = type_specs
+    specs = {agent_net_config[key]: specs[key] for key in specs.keys()}
 
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
@@ -220,67 +218,3 @@ def make_recurrent_networks(
         "policies": policy_networks,
         "critics": critic_networks,
     }
-
-
-class NNBot(object):
-    def __init__(
-        self, agent_type, num_players, checkpoint_subpath: str = "Checkpoints"
-    ):
-        # Convert action and observation specs.
-        spec_wrapper = SpecWrapper(num_players)
-
-        # setup the resources
-        set_gpu_affinity(0)
-
-        environment_spec = mava_specs.MAEnvironmentSpec(spec_wrapper)
-
-        # Create networks
-        shared_weights = True
-        system_networks = make_networks(
-            environment_spec=environment_spec, shared_weights=shared_weights
-        )
-
-        architecture = StateBasedQValueCritic(
-            environment_spec=environment_spec,
-            policy_networks=system_networks["policies"],
-            critic_networks=system_networks["critics"],
-            observation_networks=system_networks["observations"],
-            agent_net_config=agent_net_config,
-        )
-
-        # Create the policy_networks
-        policy_networks = architecture.create_actor_variables()
-        before_sum = policy_networks["policies"][agent_type].variables[1].numpy().sum()
-        objects_to_save = {
-            "policy": policy_networks["policies"][agent_type],
-            "observation": policy_networks["observations"][agent_type],
-        }
-
-        checkpointer_dir = os.path.join(checkpoint_subpath, agent_type)
-        tf2_savers.Checkpointer(
-            time_delta_minutes=1,
-            add_uid=False,
-            directory=checkpointer_dir,
-            objects_to_save=objects_to_save,
-            enable_checkpointing=True,
-        )
-        after_sum = policy_networks["policies"][agent_type].variables[1].numpy().sum()
-
-        assert before_sum != after_sum
-
-        self.policy = policy_networks["policies"][agent_type]
-        self.num_players = num_players
-
-    def reset_brain(self):
-        pass
-
-    def get_action(self, observation):
-        # Add a dummy batch dimension and as a side effect convert numpy to TF.
-        batched_observation = tf2_utils.add_batch_dim(observation)
-
-        # Compute the policy, conditioned on the observation.
-        policy = self.policy(batched_observation)
-
-        # Sample from the policy if it is stochastic.
-        action = policy.sample() if isinstance(policy, tfd.Distribution) else policy
-        return action.numpy()[0]

@@ -75,7 +75,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         self._q_networks = q_networks
         self._action_selectors = action_selectors
         self._trainer = trainer
-        self._shared_weights = shared_weights
+        self._agent_net_config = agent_net_config
         self._fingerprint = fingerprint
         self._evaluator = evaluator
 
@@ -250,7 +250,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         self._action_selectors = action_selectors
         self._store_recurrent_state = store_recurrent_state
         self._trainer = trainer
-        self._shared_weights = shared_weights
+        self._agent_net_config = agent_net_config
 
         self._states: Dict[str, Any] = {}
 
@@ -357,7 +357,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         self._action_selectors = action_selectors
         self._store_recurrent_state = store_recurrent_state
         self._trainer = trainer
-        self._shared_weights = shared_weights
+        self._agent_net_config = agent_net_config
 
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}

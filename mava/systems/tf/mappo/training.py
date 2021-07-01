@@ -428,7 +428,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         dataset: tf.data.Dataset,
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        shared_weights: bool,
+        agent_net_config: Dict[str, str],
         discount: float = 0.99,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.0,

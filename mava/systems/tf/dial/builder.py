@@ -236,14 +236,15 @@ class DIALBuilder:
                 source variables as defined in mava.core.
         """
 
-        shared_weights = self._config.shared_weights
+        agent_net_config = self._config.agent_net_config
 
         variable_client = None
         if variable_source:
-            agent_keys = self._agent_types if shared_weights else self._agents
-
             # Create policy variables
-            variables = {agent: q_networks[agent].variables for agent in agent_keys}
+            variables = {
+                net_key: q_networks[net_key].variables
+                for net_key in set(self._agent_net_keys.values())
+            }
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,

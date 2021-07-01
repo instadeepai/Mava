@@ -15,7 +15,7 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional
 
 import launchpad as lp
 import sonnet as snt

@@ -223,7 +223,6 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         self._agent_specs = (
             self._env_spec.get_agent_specs()
         )  # Each agent's environment interaction specification
-        # self._agent_type_specs = self._env_spec.get_agent_type_specs() # Get agent type specs
 
         self._observation_networks = observation_networks
         self._policy_networks = policy_networks
@@ -268,7 +267,9 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         actor_obs_specs = self._get_actor_specs()
 
         # create policy variables for each agent
-        # TODO (dries): This can be futher simplified by only initialising each network once. Not per agent.
+        # TODO (dries): This can be futher simplified by only initialising
+        # each network once. Not per agent. Some care should be taken
+        # with emb_spec though.
         for agent_key in self._agents:
             obs_spec = actor_obs_specs[agent_key]
             agent_net_key = self._agent_net_config[agent_key]

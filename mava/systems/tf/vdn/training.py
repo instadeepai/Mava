@@ -50,7 +50,7 @@ class VDNTrainer(MADQNTrainer):
         dataset: tf.data.Dataset,
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
-        shared_weights: bool,
+        agent_net_config: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: Optional[BaseCommunicationModule] = None,
         max_gradient_norm: float = None,

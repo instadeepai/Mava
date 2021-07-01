@@ -61,7 +61,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self._adder = adder
         self._variable_client = variable_client
         self._policy_networks = policy_networks
-        self._shared_weights = shared_weights
+        self._agent_net_config = agent_net_config
         self._prev_log_probs: Dict[str, Any] = {}
 
     @tf.function
@@ -71,7 +71,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         observation: types.NestedTensor,
     ) -> Tuple[types.NestedTensor, types.NestedTensor]:
         # Index network either on agent type or on agent id.
-        network_key = agent.split("_")[0] if self._shared_weights else agent
+        network_key = self._agent_net_config[agent]
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         observation = tf2_utils.add_batch_dim(observation.observation)
