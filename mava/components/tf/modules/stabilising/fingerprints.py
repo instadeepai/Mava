@@ -49,7 +49,7 @@ class FingerPrintStabalisation(BaseStabilisationModule):
 
         # create policy variables for each agent
         for agent_key in self._architecture._agents:
-            agent_net_key = self._agent_net_config[agent_key]
+            agent_net_key = self._architecture._agent_net_config[agent_key]
             obs_spec = actor_obs_specs[agent_key]
 
             # Create variables for value and policy networks.

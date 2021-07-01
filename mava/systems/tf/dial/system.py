@@ -252,7 +252,9 @@ class DIAL:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, agent_net_config=self._agent_net_config)
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
+        )
 
         # Create system architecture with target networks.
         architecture = self._architecture(
@@ -309,7 +311,8 @@ class DIAL:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, agent_net_config=self._agent_net_config
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture with target networks.
@@ -384,7 +387,8 @@ class DIAL:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, agent_net_config=self._agent_net_config
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture with target networks.
