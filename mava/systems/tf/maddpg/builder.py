@@ -78,7 +78,7 @@ class MADDPGConfig:
     executor_variable_update_period: int = 1000
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
-    samples_per_insert: float = 32.0
+    samples_per_insert: Optional[float] = 32.0
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20

@@ -1,4 +1,17 @@
-# type: ignore
+# python3
+# Copyright 2021 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Run recurrent MA-D4PG on RoboCup."""
 import functools
 from datetime import datetime
@@ -14,9 +27,6 @@ from mava.systems.tf.mad4pg.execution import MAD4PGRecurrentExecutor
 from mava.systems.tf.mad4pg.training import MAD4PGStateBasedRecurrentTrainer
 from mava.utils import lp_utils
 from mava.utils.environments import robocup_utils
-from mava.utils.environments.RoboCup_env.robocup_agents.nn_agent import (
-    make_recurrent_networks as make_networks,
-)
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -31,18 +41,16 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    # Environment
-    # Create an environment, grab the spec, and use it to create networks.
-
-    # Neural Networks
-    # Create the networks
+    # Environment.
     environment_factory = lp_utils.partial_kwargs(robocup_utils.make_environment)
-    network_factory = lp_utils.partial_kwargs(make_networks)
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_dir = f"{FLAGS.base_dir}/robocup"
+    # Networks.
+    network_factory = lp_utils.partial_kwargs(mad4pg.make_default_networks)
 
-    # loggers
+    # Checkpointer appends "Checkpoints" to checkpoint_dir.
+    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+
+    # Log every [log_every] seconds.
     log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
