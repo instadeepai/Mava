@@ -469,7 +469,3 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             step_count += result["episode_length"]
             # Log the given results.
             self._logger.write(result)
-
-
-# Internal class 1.
-# Internal class 2.

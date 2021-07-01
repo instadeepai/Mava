@@ -23,8 +23,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from acme import types
 from acme.specs import EnvironmentSpec
-
-# Internal imports.
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 from dm_env import specs

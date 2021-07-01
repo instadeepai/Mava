@@ -361,7 +361,7 @@ class MADDPGBuilder:
             counter (Optional[counting.Counter], optional): a Counter which allows for
                 recording of counts, e.g. trainer steps. Defaults to None.
             logger (Optional[types.NestedLogger], optional): Logger object for logging
-                metadata.. Defaults to None.
+                metadata. Defaults to None.
             connection_spec (Dict[str, List[str]], optional): connection topology used
                 for networked system architectures. Defaults to None.
 
