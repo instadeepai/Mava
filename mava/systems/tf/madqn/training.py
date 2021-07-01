@@ -281,7 +281,7 @@ class MADQNTrainer(mava.Trainer):
             self._logger.write(fetches)
 
     @tf.function
-    def _step(self) -> None:
+    def _step(self) -> Dict[str, Dict[str, Any]]:
         """Trainer forward and backward passes."""
 
         # Update the target networks
