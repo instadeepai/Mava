@@ -1,5 +1,5 @@
 # QMIX (Q-value function factorisation)
 
 <p style="text-align:center;">
-<img src="../../../../docs/images/qmix.png" width="40%">
+<img src="../../../../docs/images/qmix.png" width="80%">
 </p>
