@@ -65,31 +65,41 @@ class MAPPOTrainer(mava.Trainer):
         checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """[summary]
+        """Initialise MAPPO trainer
 
         Args:
-            agents (List[Any]): [description]
-            agent_types (List[str]): [description]
-            observation_networks (Dict[str, snt.Module]): [description]
-            policy_networks (Dict[str, snt.Module]): [description]
-            critic_networks (Dict[str, snt.Module]): [description]
-            dataset (tf.data.Dataset): [description]
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+                each agent in the system.
+            dataset (tf.data.Dataset): training dataset.
             policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
+                optimizer(s) for updating policy networks.
             critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                [description]
-            shared_weights (bool): [description]
-            discount (float, optional): [description]. Defaults to 0.99.
-            lambda_gae (float, optional): [description]. Defaults to 1.0.
-            entropy_cost (float, optional): [description]. Defaults to 0.0.
-            baseline_cost (float, optional): [description]. Defaults to 1.0.
-            clipping_epsilon (float, optional): [description]. Defaults to 0.2.
-            max_gradient_norm (Optional[float], optional): [description]. Defaults
-                to None.
-            counter (counting.Counter, optional): [description]. Defaults to None.
-            logger (loggers.Logger, optional): [description]. Defaults to None.
-            checkpoint (bool, optional): [description]. Defaults to False.
-            checkpoint_subpath (str, optional): [description]. Defaults to "~/mava/".
+                optimizer for updating critic networks.
+            shared_weights (bool): wether agents are sharing weights or not.
+            discount (float, optional): discount factor for TD updates. Defaults
+                to 0.99.
+            lambda_gae (float, optional): scalar determining the mix of bootstrapping
+                vs further accumulation of multi-step returns at each timestep.
+                Defaults to 1.0.
+            entropy_cost (float, optional): contribution of entropy regularization to
+                the total loss. Defaults to 0.0.
+            baseline_cost (float, optional): contribution of the value loss to the
+                total loss. Defaults to 1.0.
+            clipping_epsilon (float, optional): Hyper-parameter for clipping in the
+                policy objective. Defaults to 0.2.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
         """
 
         # Store agents.
@@ -197,6 +207,16 @@ class MAPPOTrainer(mava.Trainer):
         observations_trans: Dict[str, np.ndarray],
         agent: str,
     ) -> tf.Tensor:
+        """[summary]
+
+        Args:
+            observations_trans (Dict[str, np.ndarray]): transformed (e.g. using
+                observation network) raw agent observation.
+            agent (str): agent id.
+
+        Returns:
+            tf.Tensor: agent critic network feed
+        """
 
         # Decentralised based
         observation_feed = observations_trans[agent]
@@ -206,6 +226,16 @@ class MAPPOTrainer(mava.Trainer):
     def _transform_observations(
         self, observation: Dict[str, np.ndarray]
     ) -> Dict[str, np.ndarray]:
+        """apply the observation networks to the raw observations from the dataset
+
+        Args:
+            observation (Dict[str, np.ndarray]): raw agent observations
+
+        Returns:
+            Dict[str, np.ndarray]: transformed
+                observations (features)
+        """
+
         observation_trans = {}
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
@@ -218,6 +248,11 @@ class MAPPOTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
+        """Trainer forward and backward passes.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: losses
+        """
 
         # Get data from replay.
         inputs = next(self._iterator)
@@ -233,6 +268,12 @@ class MAPPOTrainer(mava.Trainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
+        """Trainer forward pass
+
+        Args:
+            inputs (Any): input data from the data table (transitions)
+        """
+
         # Convert to sequence data
         data = tf2_utils.batch_to_sequence(inputs.data)
 
@@ -354,6 +395,8 @@ class MAPPOTrainer(mava.Trainer):
 
     # Backward pass that calculates gradients and updates network.
     def _backward(self) -> None:
+        """Trainer backward pass updating network parameters"""
+
         # Calculate the gradients and update the networks
         policy_losses = self.policy_losses
         critic_losses = self.critic_losses
@@ -389,6 +432,7 @@ class MAPPOTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
+        """trainer step to update the parameters of the agents in the system"""
 
         # Run the learning step.
         fetches = self._step()
@@ -410,6 +454,15 @@ class MAPPOTrainer(mava.Trainer):
             self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+        """get network variables
+
+        Args:
+            names (Sequence[str]): network names
+
+        Returns:
+            Dict[str, Dict[str, np.ndarray]]: network variables
+        """
+
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
             variables[network_type] = {
@@ -422,6 +475,8 @@ class MAPPOTrainer(mava.Trainer):
 
 
 class CentralisedMAPPOTrainer(MAPPOTrainer):
+    """MAPPO trainer for a centralised architecture."""
+
     def __init__(
         self,
         agents: List[Any],
