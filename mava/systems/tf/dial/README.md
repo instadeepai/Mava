@@ -4,7 +4,7 @@ A common component of MARL systems is agent communication. Mava supports general
 
 <p style="text-align:center;">
 <img src="../../../../docs/images/dial.png" width="40%">
-<img src="../../../../docs/images/switchgame.png" width="60%">
+<img src="../../../../docs/images/switchgame.png" width="50%">
 </p>
 
 [Foerster et al., 2016]: https://arxiv.org/abs/1605.06676

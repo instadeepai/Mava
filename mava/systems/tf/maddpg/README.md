@@ -6,4 +6,8 @@ This system is an extension of the Deep Deterministic Policy Gradient (DDPG) alg
 <img src="../../../../docs/images/maddpg.png" width="40%">
 </p>
 
+<<<<<<< HEAD
 [Lowe et al. (2017)]: https://arxiv.org/pdf/1706.02275
+=======
+[Lowe et al. (2017)]: https://arxiv.org/pdf/1706.02275
+>>>>>>> f6a2a805d73b2efef6fb834bd9b82eedc1cc4c6b
