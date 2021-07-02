@@ -14,5 +14,6 @@
 # limitations under the License.
 
 from mava.systems.tf.mappo.execution import MAPPOFeedForwardExecutor
+from mava.systems.tf.mappo.networks import make_default_networks
 from mava.systems.tf.mappo.system import MAPPO
 from mava.systems.tf.mappo.training import CentralisedMAPPOTrainer, MAPPOTrainer

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-"""DIAL trainer implementation."""
+"""DIAL system trainer implementation."""
 
 from typing import Any, Dict, List, Union
 
@@ -63,6 +63,36 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
+        """Initialise DIAL trainer for switch game
+
+        Args:
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            q_networks (Dict[str, snt.Module]): q-value networks.
+            target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            target_update_period (int): number of steps before updating target networks.
+            dataset (tf.data.Dataset): training dataset.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
+                optimizer for updating the parameters of the networks.
+            discount (float): discount factor for TD updates.
+            shared_weights (bool): wether agents are sharing weights or not.
+            exploration_scheduler (LinearExplorationScheduler): function specifying a
+                decaying scheduler for epsilon exploration.
+            communication_module (BaseCommunicationModule): module for communication
+                between agents.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            fingerprint (bool, optional): whether to apply replay stabilisation using
+                policy fingerprints. Defaults to False.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+        """
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -91,7 +121,6 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
 
         observations, actions, rewards, discounts, _, extra = data
 
-        # core_states = extra["core_states"]
         core_state = tree.map_structure(
             lambda s: s[:, 0, :], inputs.data.extras["core_states"]
         )
@@ -190,7 +219,5 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
                     # loss = tf.reduce_mean(loss)
                     q_network_losses[agent]["q_value_loss"] += loss
 
-        # print(q_network_losses['agent_0'])
         self._q_network_losses = q_network_losses
         self.tape = tape
-        # {}.t
