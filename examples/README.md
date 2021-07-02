@@ -95,7 +95,7 @@ We also include a number of systems running on discrete action space environment
     -   **MA-DQN**:
         an MA-DQN system on SMAC environment.
         - [(Feedforward, decentralised)](smac/feedforward/decentralised/run_madqn.py)
-        - [(Recurrent, decentralised)](smac/recurrent/decentralised/run_madqn.py)
+        - [(Recurrent, decentralised)](smac/recurrent/decentralised/run_madqn.py) - ***Example using custom agent networks.***
 
     -   **QMIX**:
         a QMIX system on SMAC environment.
@@ -109,9 +109,6 @@ We also include a number of systems running on discrete action space environment
     -   **MA-DQN**:
         an MA-DQN system on OpenSpiel environment.
         - [(Feedforward, decentralised)](openspiel/tic_tac_toe/feedforward/decentralised/run_madqn.py)
-
-
-
 
 
 [debug]: ../mava/utils/debugging

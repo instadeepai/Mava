@@ -17,17 +17,21 @@
 
 import functools
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 import launchpad as lp
 import sonnet as snt
+import tensorflow as tf
 from absl import app, flags
+from acme import types
+from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
+from mava import specs as mava_specs
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.enums import ArchitectureType
 from mava.utils.environments import smac_utils
 from mava.utils.loggers import logger_utils
 
@@ -46,6 +50,61 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
+def custom_recurrent_network(
+    environment_spec: mava_specs.MAEnvironmentSpec,
+    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = [128, 128],
+    shared_weights: bool = True,
+) -> Mapping[str, types.TensorTransformation]:
+    """Creates networks used by the agents."""
+
+    specs = environment_spec.get_agent_specs()
+
+    # Create agent_type specs
+    if shared_weights:
+        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
+        specs = type_specs
+
+    if isinstance(q_networks_layer_sizes, Sequence):
+        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
+
+    def action_selector_fn(
+        q_values: types.NestedTensor,
+        legal_actions: types.NestedTensor,
+        epsilon: Optional[tf.Variable] = None,
+    ) -> types.NestedTensor:
+        return epsilon_greedy_action_selector(
+            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
+        )
+
+    q_networks = {}
+    action_selectors = {}
+    for key in specs.keys():
+
+        # Get total number of action dimensions from action spec.
+        num_dimensions = specs[key].actions.num_values
+
+        # Create the policy network.
+        q_network = snt.DeepRNN(
+            [
+                snt.Linear(q_networks_layer_sizes[key][:-1]),
+                tf.nn.relu,
+                snt.GRU(q_networks_layer_sizes[key][-1]),
+                networks.NearZeroInitializedLinear(num_dimensions),
+            ]
+        )
+
+        # epsilon greedy action selector
+        action_selector = action_selector_fn
+
+        q_networks[key] = q_network
+        action_selectors[key] = action_selector
+
+    return {
+        "q_networks": q_networks,
+        "action_selectors": action_selectors,
+    }
+
+
 def main(_: Any) -> None:
 
     # environment
@@ -55,9 +114,8 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks,
+        custom_recurrent_network,
         policy_networks_layer_sizes=[128, 128],
-        archecture_type=ArchitectureType.recurrent,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
