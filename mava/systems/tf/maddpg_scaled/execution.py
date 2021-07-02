@@ -49,16 +49,16 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
     ):
 
         """Initializes the executor.
         Args:
           networks: the (recurrent) policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
+          agent_net_config: ...
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
@@ -70,7 +70,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self._counts = counts
         super().__init__(
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             adder=adder,
             variable_client=variable_client,
         )
@@ -84,7 +84,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         batched_observation = tf2_utils.add_batch_dim(observation)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_config[agent]
 
         # Compute the policy, conditioned on the observation.
         policy = self._policy_networks[agent_key](batched_observation)

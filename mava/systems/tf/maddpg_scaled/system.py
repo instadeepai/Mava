@@ -29,7 +29,7 @@ from acme.utils import loggers
 import mava
 from mava import core
 from mava import specs as mava_specs
-from mava.components.tf.architectures import DecentralisedQValueActorCriticScaled
+from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg_scaled import builder, training
@@ -53,8 +53,8 @@ class MADDPG:
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[
-            DecentralisedQValueActorCriticScaled
-        ] = DecentralisedQValueActorCriticScaled,
+            DecentralisedQValueActorCritic
+        ] = DecentralisedQValueActorCritic,
         trainer_fn: Union[
             Type[training.MADDPGBaseTrainer],
             # Type[training.MADDPGBaseRecurrentTrainer],
@@ -241,7 +241,7 @@ class MADDPG:
 
     def create_system(
         self,
-    ) -> Tuple[DecentralisedQValueActorCriticScaled, Dict[str, Dict[str, snt.Module]]]:
+    ) -> Tuple[DecentralisedQValueActorCritic, Dict[str, Dict[str, snt.Module]]]:
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
