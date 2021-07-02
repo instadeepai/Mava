@@ -2,8 +2,6 @@
 
 # Expose specs and types modules.
 from acme import types as acme_types
-
-# Internal core import.
 from acme.core import Saveable, VariableSource, Worker
 
 from mava import specs, types, utils
@@ -18,6 +16,4 @@ from mava.core import Executor, Trainer
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
 from mava.specs import MAEnvironmentSpec
 
-# Internal environment_loop import.
-
-# Mava loves you more. ;)
+# Mava loves you too! ;)
