@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-"""Executor implementations for MADQN."""
+"""MADQN system executor implementation."""
 
 from typing import Any, Dict, Optional
 
@@ -23,8 +23,6 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme import types
-
-# Internal imports.
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
@@ -41,10 +39,7 @@ from mava.types import OLT
 
 class MADQNFeedForwardExecutor(FeedForwardExecutor):
     """A feed-forward executor.
-    An executor based on a feed-forward policy for each agent in the system
-    which takes non-batched observations and outputs non-batched actions.
-    It also allows adding experiences to replay and updating the weights
-    from the policy on the learner.
+    An executor based on a feed-forward policy for each agent in the system.
     """
 
     def __init__(
@@ -59,14 +54,25 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         fingerprint: bool = False,
         evaluator: bool = False,
     ):
-        """Initializes the executor.
+        """Initialise the system executor
+
         Args:
-          policy_network: the policy to run for each agent in the system.
-          agent_net_config: specifies what network each agent uses.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            q_networks (Dict[str, snt.Module]): q-value networks for each agent in the
+                system.
+            action_selectors (Dict[str, Any]): policy action selector method, e.g.
+                epsilon greedy.
+            trainer (MADQNTrainer, optional): system trainer.
+            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+                to a replay buffer. Defaults to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                client to copy weights from the trainer. Defaults to None.
+            communication_module (BaseCommunicationModule): module for enabling
+                communication protocols between agents. Defaults to None.
+            fingerprint (bool, optional): whether to use fingerprint stabilisation to
+                stabilise experience replay. Defaults to False.
+            evaluator (bool, optional): whether the executor will be used for
+                evaluation. Defaults to False.
         """
 
         # Store these for later use.
@@ -88,6 +94,21 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         epsilon: tf.Tensor,
         fingerprint: Optional[tf.Tensor] = None,
     ) -> types.NestedTensor:
+        """Agent specific policy function
+
+        Args:
+            agent (str): agent id
+            observation (types.NestedTensor): observation tensor received from the
+                environment.
+            legal_actions (types.NestedTensor): actions allowed to be taken at the
+                current observation.
+            epsilon (tf.Tensor): value for epsilon greedy action selection.
+            fingerprint (Optional[tf.Tensor], optional): policy fingerprints. Defaults
+                to None.
+
+        Returns:
+            types.NestedTensor: agent action
+        """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
@@ -113,6 +134,16 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
+        """select an action for a single agent in the system
+
+        Args:
+            agent (str): agent id
+            observation (types.NestedArray): observation tensor received from the
+                environment.
+
+        Returns:
+            types.NestedArray: agent action
+        """
 
         if not self._evaluator:
             epsilon = self._trainer.get_epsilon()
@@ -146,6 +177,14 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
+        """record first observed timestep from the environment
+
+        Args:
+            timestep (dm_env.TimeStep): data emitted by an environment at first step of
+                interaction.
+            extras (Dict[str, types.NestedArray], optional): possible extra information
+                to record during the first step. Defaults to {}.
+        """
 
         if self._fingerprint and self._trainer is not None:
             epsilon = self._trainer.get_epsilon()
@@ -162,6 +201,16 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
+        """record observed timestep from the environment
+
+        Args:
+            actions (Dict[str, types.NestedArray]): system agents' actions.
+            next_timestep (dm_env.TimeStep): data emitted by an environment during
+                interaction.
+            next_extras (Dict[str, types.NestedArray], optional): possible extra
+                information to record during the transition. Defaults to {}.
+        """
+
         if self._fingerprint and self._trainer is not None:
             trainer_step = self._trainer.get_trainer_steps()
             epsilon = self._trainer.get_epsilon()
@@ -174,6 +223,16 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
     def select_actions(
         self, observations: Dict[str, OLT]
     ) -> Dict[str, types.NestedArray]:
+        """select the actions for all agents in the system
+
+        Args:
+            observations (Dict[str, OLT]): transition object containing observations,
+                legal actions and terminals.
+
+        Returns:
+            Dict[str, types.NestedArray]: actions for all agents in the system.
+        """
+
         actions = {}
         for agent, observation in observations.items():
             # Pass the observation through the policy network.
@@ -207,16 +266,20 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         return actions
 
     def update(self, wait: bool = False) -> None:
+        """update executor variables
+
+        Args:
+            wait (bool, optional): whether to stall the executor's request for new
+                variables. Defaults to False.
+        """
+
         if self._variable_client:
             self._variable_client.update(wait)
 
 
 class MADQNRecurrentExecutor(RecurrentExecutor):
-    """A feed-forward executor.
-    An executor based on a feed-forward policy for each agent in the system
-    which takes non-batched observations and outputs non-batched actions.
-    It also allows adding experiences to replay and updating the weights
-    from the policy on the learner.
+    """A recurrent executor.
+    An executor based on a recurrent policy for each agent in the system
     """
 
     def __init__(
@@ -229,17 +292,30 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         store_recurrent_state: bool = True,
         trainer: MADQNTrainer = None,
         communication_module: Optional[BaseCommunicationModule] = None,
-        evaluator: bool = False,
         fingerprint: bool = False,
+        evaluator: bool = False,
     ):
-        """Initializes the executor.
+        """Initialise the system executor
+
         Args:
-          policy_network: the policy to run for each agent in the system.
-          agent_net_config: specifies what network each agent uses.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            q_networks (Dict[str, snt.Module]): q-value networks for each agent in the
+                system.
+            action_selectors (Dict[str, Any]): policy action selector method, e.g.
+                epsilon greedy.
+            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+                to a replay buffer. Defaults to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                client to copy weights from the trainer. Defaults to None.
+            store_recurrent_state (bool, optional): boolean to store the recurrent
+                network hidden state. Defaults to True.
+            trainer (MADQNTrainer, optional): system trainer. Defaults to None.
+            communication_module (BaseCommunicationModule): module for enabling
+                communication protocols between agents. Defaults to None.
+            fingerprint (bool, optional): whether to use fingerprint stabilisation to
+                stabilise experience replay. Defaults to False.
+            evaluator (bool, optional): whether the executor will be used for
+                evaluation. Defaults to False.
         """
 
         # Store these for later use.
@@ -263,6 +339,21 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
     ) -> types.NestedTensor:
+        """Agent specific policy function
+
+        Args:
+            agent (str): agent id
+            observation (types.NestedTensor): observation tensor received from the
+                environment.
+            state (types.NestedTensor): recurrent network state.
+            message (types.NestedTensor): received agent messsage.
+            legal_actions (types.NestedTensor): actions allowed to be taken at the
+                current observation.
+            epsilon (tf.Tensor): value for epsilon greedy action selection.
+
+        Returns:
+            types.NestedTensor: action and new recurrent hidden state
+        """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
@@ -284,11 +375,32 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
+        """select an action for a single agent in the system
+
+        Args:
+            agent (str): agent id
+            observation (types.NestedArray): observation tensor received from the
+                environment.
+
+        Raises:
+            NotImplementedError: has not been implemented for this training type.
+        """
+
         raise NotImplementedError
 
     def select_actions(
         self, observations: Dict[str, OLT]
     ) -> Dict[str, types.NestedArray]:
+        """select the actions for all agents in the system
+
+        Args:
+            observations (Dict[str, OLT]): transition object containing observations,
+                legal actions and terminals.
+
+        Returns:
+            Dict[str, types.NestedArray]: actions for all agents in the system.
+        """
+
         actions = {}
 
         for agent, observation in observations.items():
@@ -318,11 +430,9 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
 
 
 class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
-    """A feed-forward executor.
-    An executor based on a feed-forward policy for each agent in the system
-    which takes non-batched observations and outputs non-batched actions.
-    It also allows adding experiences to replay and updating the weights
-    from the policy on the learner.
+    """A recurrent executor with communication.
+    An executor based on a recurrent policy for each agent in the system using learned
+    communication.
     """
 
     def __init__(
@@ -338,14 +448,27 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         fingerprint: bool = False,
         evaluator: bool = False,
     ):
-        """Initializes the executor.
+        """Initialise the system executor
+
         Args:
-          policy_network: the policy to run for each agent in the system.
-          agent_net_config: specifies what network each agent uses.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            q_networks (Dict[str, snt.Module]): q-value networks for each agent in the
+                system.
+            action_selectors (Dict[str, Any]): policy action selector method, e.g.
+                epsilon greedy.
+            communication_module (BaseCommunicationModule): module for enabling
+                communication protocols between agents.
+            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+                to a replay buffer. Defaults to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                client to copy weights from the trainer. Defaults to None.
+            store_recurrent_state (bool, optional): boolean to store the recurrent
+                network hidden state. Defaults to True.
+            trainer (MADQNTrainer, optional): system trainer. Defaults to None.
+            fingerprint (bool, optional): whether to use fingerprint stabilisation to
+                stabilise experience replay. Defaults to False.
+            evaluator (bool, optional): whether the executor will be used for
+                evaluation. Defaults to False.
         """
 
         # Store these for later use.
@@ -372,6 +495,21 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
     ) -> types.NestedTensor:
+        """Agent specific policy function
+
+        Args:
+            agent (str): agent id
+            observation (types.NestedTensor): observation tensor received from the
+                environment.
+            state (types.NestedTensor): Recurrent network state.
+            message (types.NestedTensor): received agent messsage.
+            legal_actions (types.NestedTensor): actions allowed to be taken at the
+                current observation.
+            epsilon (tf.Tensor): value for epsilon greedy action selection.
+
+        Returns:
+            types.NestedTensor: action and new recurrent hidden state
+        """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
@@ -395,11 +533,32 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
+        """select an action for a single agent in the system
+
+        Args:
+            agent (str): agent id
+            observation (types.NestedArray): observation tensor received from the
+                environment.
+
+        Raises:
+            NotImplementedError: has not been implemented for this training type.
+        """
+
         raise NotImplementedError
 
     def select_actions(
         self, observations: Dict[str, OLT]
     ) -> Dict[str, types.NestedArray]:
+        """select the actions for all agents in the system
+
+        Args:
+            observations (Dict[str, OLT]): transition object containing observations,
+                legal actions and terminals.
+
+        Returns:
+            Dict[str, types.NestedArray]: actions for all agents in the system.
+        """
+
         actions = {}
 
         message_inputs = self._communication_module.process_messages(self._messages)

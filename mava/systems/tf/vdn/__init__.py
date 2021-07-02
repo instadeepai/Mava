@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Implementations of a VDN agent."""
-
 from mava.systems.tf.vdn.execution import VDNFeedForwardExecutor
+from mava.systems.tf.vdn.networks import make_default_networks
 from mava.systems.tf.vdn.system import VDN
 from mava.systems.tf.vdn.training import VDNTrainer
