@@ -77,13 +77,14 @@ class DecentralisedValueActor(BaseArchitecture):
 
         # create policy variables for each agent
         for agent_key in self._agents:
+            agent_net_key = self._agent_net_config[agent_key]
             obs_spec = actor_obs_specs[agent_key]
             # Create variables for value and policy networks.
-            tf2_utils.create_variables(self._value_networks[agent_key], [obs_spec])
+            tf2_utils.create_variables(self._value_networks[agent_net_key], [obs_spec])
 
             # create target value network variables
             tf2_utils.create_variables(
-                self._target_value_networks[agent_key], [obs_spec]
+                self._target_value_networks[agent_net_key], [obs_spec]
             )
 
         actor_networks["values"] = self._value_networks

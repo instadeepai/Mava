@@ -191,7 +191,7 @@ class QMIX(MADQN):
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
-                agent_net_config=agent_net_config,
+                agent_net_config=self._agent_net_config,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,

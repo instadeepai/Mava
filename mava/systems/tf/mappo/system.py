@@ -168,7 +168,7 @@ class MAPPO:
         self._builder = builder.MAPPOBuilder(
             config=builder.MAPPOConfig(
                 environment_spec=environment_spec,
-                agent_net_config=agent_net_config,
+                agent_net_config=self._agent_net_config,
                 executor_variable_update_period=executor_variable_update_period,
                 discount=discount,
                 lambda_gae=lambda_gae,

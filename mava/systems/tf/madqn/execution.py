@@ -94,17 +94,17 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         batched_legals = tf2_utils.add_batch_dim(legal_actions)
 
         # index network either on agent type or on agent id
-        agent_key = self._agent_net_config[agent]
+        agent_net_key = self._agent_net_config[agent]
 
         # Compute the policy, conditioned on the observation and
         # possibly the fingerprint.
         if fingerprint is not None:
-            q_values = self._q_networks[agent_key](batched_observation, fingerprint)
+            q_values = self._q_networks[agent_net_key](batched_observation, fingerprint)
         else:
-            q_values = self._q_networks[agent_key](batched_observation)
+            q_values = self._q_networks[agent_net_key](batched_observation)
 
         # select legal action
-        action = self._action_selectors[agent_key](
+        action = self._action_selectors[agent_net_key](
             q_values, batched_legals, epsilon=epsilon
         )
 
