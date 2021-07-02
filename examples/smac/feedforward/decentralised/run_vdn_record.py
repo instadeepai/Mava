@@ -13,7 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running QMIX on SMAC environments."""
+"""
+Example running VDN on multi-agent Starcraft 2 (SMAC) environment,
+while recording agents.
+"""
+
 import functools
 from datetime import datetime
 from typing import Any
@@ -24,10 +28,11 @@ from absl import app, flags
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.systems.tf import qmix
+from mava.systems.tf import vdn
 from mava.utils import lp_utils
 from mava.utils.environments import smac_utils
 from mava.utils.loggers import logger_utils
+from mava.wrappers.environment_loop_wrappers import MonitorParallelEnvironmentLoop
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -45,15 +50,18 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    # Environment.
+
+    # environment
     environment_factory = functools.partial(
         smac_utils.make_environment, map_name=FLAGS.map_name
     )
 
     # Networks.
-    network_factory = lp_utils.partial_kwargs(qmix.make_default_networks)
+    network_factory = lp_utils.partial_kwargs(
+        vdn.make_default_networks, policy_networks_layer_sizes=[64, 64]
+    )
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir.
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
@@ -68,7 +76,7 @@ def main(_: Any) -> None:
     )
 
     # distributed program
-    program = qmix.QMIX(
+    program = vdn.VDN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
@@ -76,16 +84,14 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
         epsilon_decay=1e-5,
-        max_replay_size=1000000,
-        optimizer=snt.optimizers.RMSProp(learning_rate=1e-5),
+        optimizer=snt.optimizers.SGD(learning_rate=1e-2),
         checkpoint_subpath=checkpoint_dir,
         batch_size=512,
-        qmix_hidden_dim=32,
-        num_hypernet_layers=1,
-        hypernet_hidden_dim=32,
         executor_variable_update_period=100,
         target_update_period=200,
         max_gradient_norm=10.0,
+        eval_loop_fn=MonitorParallelEnvironmentLoop,
+        eval_loop_fn_kwargs={"path": checkpoint_dir, "record_every": 100},
     ).build()
 
     # launch
