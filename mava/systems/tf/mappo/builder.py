@@ -29,7 +29,7 @@ from acme.utils import counting
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.systems.tf.mappo import execution, training
-from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
+from mava.wrappers import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -305,8 +305,6 @@ class MAPPOBuilder:
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
-
-        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
 
         trainer = DetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]

@@ -32,7 +32,7 @@ from mava.adders import reverb as reverb_adders
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import training
 from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
-from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
+from mava.wrappers import DetailedTrainerStatistics
 
 BoundedArray = dm_specs.BoundedArray
 DiscreteArray = dm_specs.DiscreteArray
@@ -408,11 +408,6 @@ class MADDPGBuilder:
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(**trainer_config)
-
-        # NB If using both NetworkStatistics and TrainerStatistics, order is important.
-        # NetworkStatistics needs to appear before TrainerStatistics.
-        # TODO(Kale-ab/Arnu): need to fix wrapper type issues
-        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
 
         trainer = DetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]
