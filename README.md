@@ -120,7 +120,13 @@ examples found in our [examples] subdirectory which show how to instantiate a fe
 
 ### Components
 
-Mava provides several components to support the design of MARL systems such as different system `architectures` and `modules`. You can change the architecture to support a different form of information sharing between agents, or add a module to enhance system capabilities. For example, you can update the above system code in MADQN to use a communication module by wrapping the architecture fed to the system as shown below.
+Mava provides several components to support the design of MARL systems such as different system `architectures` and `modules`. You can change the architecture to support a different form of information sharing between agents, or add a module to enhance system capabilities. Some examples of common architectures are given below.
+
+<figure >
+    <img align="center" src="docs/images/architectures.png">
+</figure>
+
+In terms of components, you can for example update the above system code in MADQN to use a communication module by wrapping the architecture fed to the system as shown below.
 
 ```python
 from mava.components.tf.modules import communication
@@ -136,7 +142,7 @@ communication.BroadcastedCommunication(
 )
 ```
 
-All modules in Mava work in this way.
+All modules in Mava aim to work in this way.
 
 ## Installation
 
