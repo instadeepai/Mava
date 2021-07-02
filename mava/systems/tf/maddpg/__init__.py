@@ -19,6 +19,7 @@ from mava.systems.tf.maddpg.execution import (
     MADDPGFeedForwardExecutor,
     MADDPGRecurrentExecutor,
 )
+from mava.systems.tf.maddpg.networks import make_default_networks
 from mava.systems.tf.maddpg.system import MADDPG
 from mava.systems.tf.maddpg.training import (
     MADDPGBaseRecurrentTrainer,

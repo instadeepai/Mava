@@ -75,7 +75,7 @@ class MADDPG:
         executor_variable_update_period: int = 1000,
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
-        samples_per_insert: float = 32.0,
+        samples_per_insert: Optional[float] = 32.0,
         policy_optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=1e-4),
