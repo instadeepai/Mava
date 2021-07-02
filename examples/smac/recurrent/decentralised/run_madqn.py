@@ -86,9 +86,9 @@ def custom_recurrent_network(
         # Create the policy network.
         q_network = snt.DeepRNN(
             [
-                snt.Linear(q_networks_layer_sizes[key][:-1]),
+                snt.Linear(q_networks_layer_sizes[key][0]),
                 tf.nn.relu,
-                snt.GRU(q_networks_layer_sizes[key][-1]),
+                snt.GRU(q_networks_layer_sizes[key][1]),
                 networks.NearZeroInitializedLinear(num_dimensions),
             ]
         )
@@ -115,7 +115,7 @@ def main(_: Any) -> None:
     # Networks.
     network_factory = lp_utils.partial_kwargs(
         custom_recurrent_network,
-        policy_networks_layer_sizes=[128, 128],
+        q_networks_layer_sizes=[128, 128],
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -137,7 +137,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=2,
+        num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
         epsilon_decay=1e-5,
@@ -146,7 +146,7 @@ def main(_: Any) -> None:
         batch_size=32,
         executor_variable_update_period=100,
         target_update_period=200,
-        max_gradient_norm=10,
+        max_gradient_norm=10.0,
         trainer_fn=madqn.training.MADQNRecurrentTrainer,
         executor_fn=madqn.execution.MADQNRecurrentExecutor,
     ).build()
