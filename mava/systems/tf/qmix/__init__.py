@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Implementations of a QMIX agent."""
-
 from mava.systems.tf.qmix.execution import QMIXFeedForwardExecutor
 from mava.systems.tf.qmix.networks import make_default_networks
 from mava.systems.tf.qmix.system import QMIX

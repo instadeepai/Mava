@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""DIAL executor implementation."""
+"""DIAL system executor implementation."""
+
 from typing import Any, Dict, Optional
 
 import sonnet as snt
@@ -29,10 +30,7 @@ from mava.systems.tf.madqn.training import MADQNTrainer
 
 class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
     """DIAL executor.
-    An executor based on a recurrent communicating policy for each agent in the system
-    which takes non-batched observations and outputs non-batched actions.
-    It also allows adding experiences to replay and updating the weights
-    from the policy on the learner.
+    An executor based on a recurrent communicating policy for each agent in the system.
     Note: this executor is specific to switch game env.
     """
 
@@ -49,14 +47,28 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         fingerprint: bool = False,
         evaluator: bool = False,
     ):
-        """Initializes the executor.
+        """Initialise the system executor
+
         Args:
-          policy_network: the policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            q_networks (Dict[str, snt.Module]): q-value networks for each agent in the
+                system.
+            action_selectors (Dict[str, Any]): policy action selector method, e.g.
+                epsilon greedy.
+            communication_module (BaseCommunicationModule): module for enabling
+                communication protocols between agents.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
+            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+                to a replay buffer. Defaults to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                client to copy weights from the trainer. Defaults to None.
+            store_recurrent_state (bool, optional): boolean to store the recurrent
+                network hidden state. Defaults to True.
+            trainer (MADQNTrainer, optional): system trainer. Defaults to None.
+            fingerprint (bool, optional): whether to use fingerprint stabilisation to
+                stabilise experience replay. Defaults to False.
+            evaluator (bool, optional): whether the executor will be used for
+                evaluation. Defaults to False.
         """
 
         # Store these for later use.
@@ -82,6 +94,21 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
     ) -> types.NestedTensor:
+        """Agent specific policy function
+
+        Args:
+            agent (str): agent id
+            observation (types.NestedTensor): observation tensor received from the
+                environment.
+            state (types.NestedTensor): Recurrent network state.
+            message (types.NestedTensor): received agent messsage.
+            legal_actions (types.NestedTensor): actions allowed to be taken at the
+                current observation.
+            epsilon (tf.Tensor): value for epsilon greedy action selection.
+
+        Returns:
+            types.NestedTensor: action, message and new recurrent hidden state
+        """
 
         (action, m_values), new_state = super()._policy(
             agent,

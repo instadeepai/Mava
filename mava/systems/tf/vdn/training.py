@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""VDN trainer implementation."""
+"""VDN system trainer implementation."""
 
 from typing import Any, Dict, List, Optional, Union
 
@@ -60,6 +60,38 @@ class VDNTrainer(MADQNTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ) -> None:
+        """Initialise VDN trainer
+
+        Args:
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            q_networks (Dict[str, snt.Module]): q-value networks.
+            target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            mixing_network (snt.Module): mixing networks learning factorised q-value
+                weights.
+            target_mixing_network (snt.Module): target mixing networks.
+            target_update_period (int): number of steps before updating target networks.
+            dataset (tf.data.Dataset): training dataset.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
+                optimizer for updating the parameters of the networks.
+            discount (float): discount factor for TD updates.
+            shared_weights (bool): wether agents are sharing weights or not.
+            exploration_scheduler (LinearExplorationScheduler): function specifying a
+                decaying scheduler for epsilon exploration.
+            communication_module (BaseCommunicationModule): module for communication
+                between agents. Defaults to None.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            fingerprint (bool, optional): whether to apply replay stabilisation using
+                policy fingerprints. Defaults to False.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+        """
 
         self._mixing_network = mixing_network
         self._target_mixing_network = target_mixing_network
@@ -88,6 +120,7 @@ class VDNTrainer(MADQNTrainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
+        """Trainer forward and backward passes."""
 
         # Update the target networks
         self._update_target_networks()
@@ -104,6 +137,12 @@ class VDNTrainer(MADQNTrainer):
         return {agent: {"q_value_loss": self.loss} for agent in self._agents}
 
     def _forward(self, inputs: Any) -> None:
+        """Trainer forward pass
+
+        Args:
+            inputs (Any): input data from the data table (transitions)
+        """
+
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -171,6 +210,8 @@ class VDNTrainer(MADQNTrainer):
             self.tape = tape
 
     def _backward(self) -> None:
+        """Trainer backward pass updating network parameters"""
+
         # Calculate the gradients and update the networks
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]

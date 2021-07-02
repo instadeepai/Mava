@@ -14,7 +14,8 @@
 # limitations under the License.
 
 
-"""MAD4PG trainer implementation."""
+"""MAD4PG system trainer implementation."""
+
 from typing import Any, Dict, List, Union
 
 import sonnet as snt
@@ -70,27 +71,42 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """Initializes the learner.
+        """Initialise MAD4PG trainer
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks (Dict[str, snt.Module]): target policy networks.
+            target_critic_networks (Dict[str, snt.Module]): target critic networks.
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                optimizer(s) for updating policy networks.
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                optimizer for updating critic networks.
+            discount (float): discount factor for TD updates.
+            target_averaging (bool): whether to use polyak averaging for target network
+                updates.
+            target_update_period (int): number of steps before target networks are
+                updated.
+            target_update_rate (float): update rate when using averaging.
+            dataset (tf.data.Dataset): training dataset.
+            observation_networks (Dict[str, snt.Module]): network for feature
+                extraction from raw observation.
+            target_observation_networks (Dict[str, snt.Module]): target observation
+                network.
+            shared_weights (bool): wether agents are sharing weights or not.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
         """
 
         super().__init__(
@@ -119,6 +135,12 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
+        """Trainer forward pass
+
+        Args:
+            inputs (Any): input data from the data table (transitions)
+        """
+
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -192,10 +214,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
 
 
 class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """MAD4PG trainer for a decentralised architecture."""
 
     def __init__(
         self,
@@ -221,28 +240,6 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """Initializes the learner.
-        Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
-        """
 
         super().__init__(
             agents=agents,
@@ -270,10 +267,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
 
 
 class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """MAD4PG trainer for a centralised architecture."""
 
     def __init__(
         self,
@@ -299,28 +293,6 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """Initializes the learner.
-        Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
-        """
 
         super().__init__(
             agents=agents,
@@ -348,10 +320,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
 
 
 class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """MAD4PG trainer for a state-based architecture."""
 
     def __init__(
         self,
@@ -377,28 +346,6 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
-        """Initializes the learner.
-        Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
-        """
 
         super().__init__(
             agents=agents,
@@ -426,8 +373,8 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
 
 
 class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
+    """Recurrent MAD4PG trainer.
+    This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
 
@@ -456,27 +403,42 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """Initializes the learner.
+        """Initialise Recurrent MAD4PG trainer
+
         Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks (Dict[str, snt.Module]): target policy networks.
+            target_critic_networks (Dict[str, snt.Module]): target critic networks.
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                optimizer(s) for updating policy networks.
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                optimizer for updating critic networks.
+            discount (float): discount factor for TD updates.
+            target_averaging (bool): whether to use polyak averaging for target network
+                updates.
+            target_update_period (int): number of steps before target networks are
+                updated.
+            target_update_rate (float): update rate when using averaging.
+            dataset (tf.data.Dataset): training dataset.
+            observation_networks (Dict[str, snt.Module]): network for feature
+                extraction from raw observation.
+            target_observation_networks (Dict[str, snt.Module]): target observation
+                network.
+            shared_weights (bool): wether agents are sharing weights or not.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
         """
 
         super().__init__(
@@ -506,6 +468,12 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: Any) -> None:
+        """Trainer forward pass
+
+        Args:
+            inputs (Any): input data from the data table (transitions)
+        """
+
         # TODO: Update this forward function to work like MA-D4PG
         data = inputs.data
 
@@ -641,10 +609,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 class MAD4PGDecentralisedRecurrentTrainer(
     MAD4PGBaseRecurrentTrainer, MADDPGDecentralisedRecurrentTrainer
 ):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """Recurrent MAD4PG trainer for a decentralised architecture."""
 
     def __init__(
         self,
@@ -671,28 +636,6 @@ class MAD4PGDecentralisedRecurrentTrainer(
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """Initializes the learner.
-        Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
-        """
 
         super().__init__(
             agents=agents,
@@ -723,10 +666,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
 class MAD4PGCentralisedRecurrentTrainer(
     MAD4PGBaseRecurrentTrainer, MADDPGCentralisedRecurrentTrainer
 ):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """Recurrent MAD4PG trainer for a centralised architecture."""
 
     def __init__(
         self,
@@ -753,28 +693,6 @@ class MAD4PGCentralisedRecurrentTrainer(
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """Initializes the learner.
-        Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
-        """
 
         super().__init__(
             agents=agents,
@@ -805,10 +723,7 @@ class MAD4PGCentralisedRecurrentTrainer(
 class MAD4PGStateBasedRecurrentTrainer(
     MAD4PGBaseRecurrentTrainer, MADDPGStateBasedRecurrentTrainer
 ):
-    """MAD4PG trainer.
-    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+    """Recurrent MAD4PG trainer for a state-based architecture."""
 
     def __init__(
         self,
@@ -835,28 +750,6 @@ class MAD4PGStateBasedRecurrentTrainer(
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """Initializes the learner.
-        Args:
-          policy_network: the online (optimized) policy.
-          critic_network: the online critic.
-          target_policy_network: the target policy (which lags behind the online
-            policy).
-          target_critic_network: the target critic.
-          discount: discount to use for TD updates.
-          target_update_period: number of learner steps to perform before updating
-            the target networks.
-          dataset: dataset to learn from, whether fixed or from a replay buffer
-            (see `acme.datasets.reverb.make_dataset` documentation).
-          observation_network: an optional online network to process observations
-            before the policy and the critic.
-          target_observation_network: the target observation network.
-          policy_optimizer: the optimizer to be applied to the DPG (policy) loss.
-          critic_optimizer: the optimizer to be applied to the critic loss.
-          clipping: whether to clip gradients by global norm.
-          counter: counter object used to keep track of steps.
-          logger: logger object to be used by learner.
-          checkpoint: boolean indicating whether to checkpoint the learner.
-        """
 
         super().__init__(
             agents=agents,

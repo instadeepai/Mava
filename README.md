@@ -31,18 +31,16 @@ Mava is a library for building multi-agent reinforcement learning (MARL) systems
 
 At the core of the Mava framework is the concept of a `system`. A system refers to a full multi-agent reinforcement learning algorithm consisting of the following specific components: an `Executor`, a `Trainer` and a `Dataset`.
 
-<p style="text-align:center;">
-<img src="docs/images/mava_system.png" width="45%">
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-<img src="docs/images/mava_distributed_training.png" width="45%">
-</p>
-
 The `Executor` is the part of the system that interacts with the environment, takes actions for each agent and observes the next state as a collection of observations, one for each agent in the system. Essentially, executors are the multi-agent version of the Actor class in Acme and are themselves constructed through feeding to the executor a dictionary of policy networks. The `Trainer` is responsible for sampling data from the Dataset originally collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner class in Acme. The `Dataset` stores all of the information collected by the executors in the form of a collection of dictionaries for the actions, observations and rewards with keys corresponding to the individual agent ids. The basic system design is shown on the left in the above figure.
 Several examples of system implementations can be viewed [here][Systems].
 
+<p align="center">
+  <img align="center" src="docs/images/animation_quick.gif" width="80%">
+</p>
+
 ### Distributed system training
 
-Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to scale systems in a simple way, using the same underlying multi-agent RL system code. Mava uses [Launchpad](launchpad) for creating distributed programs. In Mava, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of all the actor networks used within each executor. This approach to distributed system training is illustrated on the right in the figure above.
+Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to scale systems in a simple way, using the same underlying multi-agent RL system code. Mava uses [Launchpad](launchpad) for creating distributed programs. In Mava, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of all the actor networks used within each executor. This approach to distributed system training is illustrated on the right in the figure above. ✋ **NOTE: In the near future, Mava aims to support additional training setups, e.g. distributed training using multiple trainers to support Bayesian optimisation or population based training (PBT).**
 
 ## Supported environments
 
@@ -68,6 +66,7 @@ Mava includes several system implementations. Below we list these together with 
 * 🟩 - Multi-Agent Deep Q-Networks (MADQN).
 * 🟩 - Multi-Agent Deep Deterministic Policy Gradient (MADDPG).
 * 🟩 - Multi-Agent Distributed Distributional Deep Deterministic Policy Gradient (MAD4PG).
+* 🟨 - Differentiable Inter-Agent Learning (DIAL).
 * 🟨 - Multi-Agent Proximal Policy Optimisation (MAPPO).
 * 🟨 - Value Decomposition Networks (VDN).
 * 🟥 - Monotonic value function factorisation (QMIX).
@@ -75,9 +74,10 @@ Mava includes several system implementations. Below we list these together with 
 | **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training** | **Communication**  | **Multi Processing**   |
 | ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------ | ------------------- |
 | MADQN   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| MADDPG  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark:        | :heavy_check_mark: | :heavy_check_mark: |
+| DIAL   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| MADDPG  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark:        | :x: | :heavy_check_mark: |
 | MAD4PG   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:             | :x: | :heavy_check_mark: |
-| MAPPO   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:              | :x: | :heavy_check_mark: |
+| MAPPO   | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:              | :x: | :heavy_check_mark: |
 | VDN   | :x: | :x: | :heavy_check_mark: | :heavy_check_mark:  | :x: | :heavy_check_mark: |
 | QMIX   | :x: | :x: | :heavy_check_mark:                | :heavy_check_mark:                 | :x: | :heavy_check_mark: |
 
@@ -120,7 +120,13 @@ examples found in our [examples] subdirectory which show how to instantiate a fe
 
 ### Components
 
-Mava provides several components to support the design of MARL systems such as different system `architectures` and `modules`. You can change the architecture to support a different form of information sharing between agents, or add a module to enhance system capabilities. For example, you can update the above system code in MADQN to use a communication module by wrapping the architecture fed to the system as shown below.
+Mava provides several components to support the design of MARL systems such as different system `architectures` and `modules`. You can change the architecture to support a different form of information sharing between agents, or add a module to enhance system capabilities. Some examples of common architectures are given below.
+
+<figure >
+    <img align="center" src="docs/images/architectures.png">
+</figure>
+
+In terms of components, you can for example update the above system code in MADQN to use a communication module by wrapping the architecture fed to the system as shown below.
 
 ```python
 from mava.components.tf.modules import communication
@@ -136,7 +142,7 @@ communication.BroadcastedCommunication(
 )
 ```
 
-All modules in Mava work in this way.
+All modules in Mava aim to work in this way.
 
 ## Installation
 
@@ -280,7 +286,7 @@ If you use Mava in your work, please cite the accompanying
 @article{pretorius2021mava,
     title={Mava: A Research Framework for Distributed Multi-Agent Reinforcement Learning},
     author={Arnu Pretorius and Kale-ab Tessera and Andries P. Smit and Kevin Eloff
-    and Claude Formanek and St John Grimbly and Siphelele Danisa and Lawrance Francis
+    and Claude Formanek and St John Grimbly and Siphelele Danisa and Lawrence Francis
     and Jonathan Shock and Herman Kamper and Willie Brink and Herman Engelbrecht
     and Alexandre Laterre and Karim Beguir},
     year={2021},

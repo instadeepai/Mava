@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""MADQN system builder implementation."""
+
 import dataclasses
 from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
@@ -37,30 +39,41 @@ from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
 @dataclasses.dataclass
 class MADQNConfig:
-    """Configuration options for the MADDPG system.
+    """Configuration options for the MADQN system.
     Args:
-            environment_spec: description of the actions, observations, etc.
-            discount: discount to use for TD updates.
-            batch_size: batch size for updates.
-            prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-              the target networks.
-            min_replay_size: minimum replay size before updating.
-            max_replay_size: maximum replay size.
-            samples_per_insert: number of samples to take from replay for every insert
-              that is made.
-            n_step: number of steps to squash into a single transition.
-            sigma: standard deviation of zero-mean, Gaussian exploration noise.
-            clipping: whether to clip gradients by global norm.
-            replay_table_name: string indicating what name to give the replay table."""
+        environment_spec: description of the action and observation spaces etc. for
+            each agent in the system.
+        epsilon_min: final minimum value for epsilon at the end of a decay schedule.
+        epsilon_decay: the rate at which epislon decays.
+        shared_weights: boolean indicating whether agents should share weights.
+        target_update_period: number of learner steps to perform before updating
+            the target networks.
+        executor_variable_update_period: the rate at which executors sync their
+            paramters with the trainer.
+        max_gradient_norm: value to specify the maximum clipping value for the gradient
+            norm during optimization.
+        min_replay_size: minimum replay size before updating.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        prefetch_size: size to prefetch from replay.
+        batch_size: batch size for updates.
+        n_step: number of steps to include prior to boostrapping.
+        sequence_length: recurrent sequence rollout length.
+        period: consecutive starting points for overlapping rollouts across a sequence.
+        discount: discount to use for TD updates.
+        checkpoint: boolean to indicate whether to checkpoint models.
+        optimizer: type of optimizer to use for updating the parameters of models.
+        replay_table_name: string indicating what name to give the replay table.
+        checkpoint_subpath: subdirectory specifying where to store checkpoints."""
 
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
     epsilon_decay: float
     shared_weights: bool
-    max_gradient_norm: Optional[float]
     target_update_period: int
     executor_variable_update_period: int
+    max_gradient_norm: Optional[float]
     min_replay_size: int
     max_replay_size: int
     samples_per_insert: Optional[float]
@@ -79,13 +92,6 @@ class MADQNConfig:
 class MADQNBuilder:
     """Builder for MADQN which constructs individual components of the system."""
 
-    """Defines an interface for defining the components of an RL system.
-      Implementations of this interface contain a complete specification of a
-      concrete RL system. An instance of this class can be used to build an
-      RL system which interacts with the environment either locally or in a
-      distributed setup.
-      """
-
     def __init__(
         self,
         config: MADQNConfig,
@@ -97,9 +103,26 @@ class MADQNBuilder:
         ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ):
-        """Args:
-        _config: Configuration options for the MADQN system.
-        _trainer_fn: Trainer module to use."""
+        """Initialise the system.
+
+        Args:
+            config (MADQNConfig): system configuration specifying hyperparameters and
+                additional information for constructing the system.
+            trainer_fn (Type[training.MADQNTrainer], optional): Trainer function, of a
+                correpsonding type to work with the selected system architecture.
+                Defaults to training.MADQNTrainer.
+            executor_fn (Type[core.Executor], optional): Executor function, of a
+                corresponding type to work with the selected system architecture.
+                Defaults to execution.MADQNFeedForwardExecutor.
+            extra_specs (Dict[str, Any], optional): defines the specifications of extra
+                information used by the system. Defaults to {}.
+            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
+                epsilon decay scheduler. Defaults to LinearExplorationScheduler.
+            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
+                optional): optional function to stabilise experience replay. Defaults
+                to None.
+        """
+
         self._config = config
         self._extra_specs = extra_specs
 
@@ -114,7 +137,18 @@ class MADQNBuilder:
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
-        """Create tables to insert data into."""
+        """Create tables to insert data into.
+
+        Args:
+            environment_spec (specs.MAEnvironmentSpec): description of the action and
+                observation spaces etc. for each agent in the system.
+
+        Raises:
+            NotImplementedError: unknown executor type.
+
+        Returns:
+            List[reverb.Table]: a list of data tables for inserting data.
+        """
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
@@ -160,9 +194,18 @@ class MADQNBuilder:
     def make_dataset_iterator(
         self, replay_client: reverb.Client
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the system.
+        """Create a dataset iterator to use for training/updating the system.
+
         Args:
-            replay_client: Reverb Client which points to the replay server."""
+            replay_client (reverb.Client): Reverb Client which points to the
+                replay server.
+
+        Returns:
+            [type]: dataset iterator.
+
+        Yields:
+            Iterator[reverb.ReplaySample]: data samples from the dataset.
+        """
 
         sequence_length = (
             self._config.sequence_length
@@ -183,8 +226,17 @@ class MADQNBuilder:
         self, replay_client: reverb.Client
     ) -> Optional[adders.ParallelAdder]:
         """Create an adder which records data generated by the executor/environment.
+
         Args:
-          replay_client: Reverb Client which points to the replay server."""
+            replay_client (reverb.Client): Reverb Client which points to the
+                replay server.
+
+        Raises:
+            NotImplementedError: unknown executor type.
+
+        Returns:
+            Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
+        """
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
@@ -217,14 +269,26 @@ class MADQNBuilder:
         evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
+
         Args:
-            q_networks: A struct of instance of all
-                the different system q networks,
-                this should be a callable which takes as input observations
-                and returns actions.
-            adder: How data is recorded (e.g. added to replay).
-            variable_source: collection of (nested) numpy arrays. Contains
-                source variables as defined in mava.core.
+            q_networks (Dict[str, snt.Module]): q-value networks for each agent in the
+                system.
+            action_selectors (Dict[str, Any]): policy action selector method, e.g.
+                epsilon greedy.
+            adder (Optional[adders.ParallelAdder], optional): adder to send data to
+                a replay buffer. Defaults to None.
+            variable_source (Optional[core.VariableSource], optional): variables server.
+                Defaults to None.
+            trainer (Optional[training.MADQNRecurrentCommTrainer], optional):
+                system trainer. Defaults to None.
+            communication_module (BaseCommunicationModule): module for enabling
+                communication protocols between agents. Defaults to None.
+            evaluator (bool, optional): boolean indicator if the executor is used for
+                for evaluation only. Defaults to False.
+
+        Returns:
+            core.Executor: system executor, a collection of agents making up the part
+                of the system generating data by interacting the environment.
         """
 
         shared_weights = self._config.shared_weights
@@ -270,16 +334,24 @@ class MADQNBuilder:
         logger: Optional[types.NestedLogger] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
     ) -> core.Trainer:
-        """Creates an instance of the trainer.
+        """Create a trainer instance.
+
         Args:
-          networks: struct describing the networks needed by the trainer; this can
-            be specific to the trainer in question.
-          dataset: iterator over samples from replay.
-          counter: a Counter which allows for recording of counts (trainer steps,
-            executor steps, etc.) distributed throughout the system.
-          logger: Logger object for logging metadata.
-          checkpoint: bool controlling whether the trainer checkpoints itself.
+            networks (Dict[str, Dict[str, snt.Module]]): system networks.
+            dataset (Iterator[reverb.ReplaySample]): dataset iterator to feed data to
+                the trainer networks.
+            counter (Optional[counting.Counter], optional): a Counter which allows for
+                recording of counts, e.g. trainer steps. Defaults to None.
+            logger (Optional[types.NestedLogger], optional): Logger object for logging
+                metadata.. Defaults to None.
+            communication_module (BaseCommunicationModule): module to enable
+                agent communication. Defaults to None.
+
+        Returns:
+            core.Trainer: system trainer, that uses the collected data from the
+                executors to update the parameters of the agent networks in the system.
         """
+
         q_networks = networks["values"]
         target_q_networks = networks["target_values"]
 
