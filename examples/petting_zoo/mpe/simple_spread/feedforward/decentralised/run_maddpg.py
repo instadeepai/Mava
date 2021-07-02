@@ -39,7 +39,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_string(
     "env_name",
-    "simple_speaker_listener_v3",
+    "simple_spread_v2",
     "Pettingzoo environment name, e.g. pong (str).",
 )
 flags.DEFINE_string(
@@ -89,7 +89,7 @@ def main(_: Any) -> None:
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-2),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-2),
         checkpoint_subpath=checkpoint_dir,
-        max_gradient_norm=1.0,
+        max_gradient_norm=40.0,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
