@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""MAD4PG system executor implementation."""
+
 from typing import Dict, Optional
 
 import sonnet as snt
@@ -28,10 +30,7 @@ from mava.systems.tf.maddpg.execution import (
 
 class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
     """A feed-forward executor for MAD4PG.
-    An executor based on a feed-forward policy for each agent in the system
-    which takes non-batched observations and outputs non-batched actions.
-    It also allows adding experiences to replay and updating the weights
-    from the policy on the learner.
+    An executor based on a feed-forward policy for each agent in the system.
     """
 
     def __init__(
@@ -42,6 +41,21 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
+        """Initialise the system executor
+
+        Args:
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            agent_specs (Dict[str, EnvironmentSpec]): agent observation and action
+                space specifications.
+            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+                to a replay buffer. Defaults to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                client to copy weights from the trainer. Defaults to None.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
+        """
+
         super().__init__(
             policy_networks=policy_networks,
             agent_specs=agent_specs,
@@ -53,10 +67,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
 
 class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
     """A recurrent executor for MAD4PG.
-    An executor based on a recurrent policy for each agent in the system
-    which takes non-batched observations and outputs non-batched actions.
-    It also allows adding experiences to replay and updating the weights
-    from the policy on the learner.
+    An executor based on a recurrent policy for each agent in the system.
     """
 
     def __init__(
@@ -67,6 +78,21 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
+        """Initialise the system executor
+
+        Args:
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            agent_specs (Dict[str, EnvironmentSpec]): agent observation and action
+                space specifications.
+            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+                to a replay buffer. Defaults to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                client to copy weights from the trainer. Defaults to None.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
+        """
+
         super().__init__(
             policy_networks=policy_networks,
             agent_specs=agent_specs,

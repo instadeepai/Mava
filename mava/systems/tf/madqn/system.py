@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Defines the MADQN system class."""
+"""MADQN system implementation."""
+
 import functools
 from typing import Any, Callable, Dict, Optional, Type, Union
 
@@ -43,38 +44,7 @@ from mava.wrappers import DetailedPerAgentStatistics
 
 
 class MADQN:
-    """MADQN system.
-    This implements a single-process QMIX system.
-    Args:
-        environment_factory: Callable to instantiate an environment on a compute node.
-        network_factory: Callable to instantiate system networks on a compute node.
-        logger_factory: Callable to instantiate a system logger on a compute node.
-        architecture: system architecture, e.g. decentralised or centralised.
-        trainer_fn: training type associated with executor and architecture,
-            e.g. centralised training.
-        executor_fn: executor type for example feedforward or recurrent.
-        num_executors: number of executor processes to run in parallel.
-        num_caches: number of trainer node caches.
-        environment_spec: description of the actions, observations, etc.
-        q_networks: the online Q network (the one being optimized)
-        epsilon: probability of taking a random action; ignored if a policy
-            network is given.
-        trainer_fn: the class used for training the agent and mixing networks.
-        shared_weights: boolean determining whether shared weights is used.
-        target_update_period: number of learner steps to perform before updating
-            the target networks.
-        clipping: whether to clip gradients by global norm.
-        replay_table_name: string indicating what name to give the replay table.
-        max_replay_size: maximum replay size.
-        samples_per_insert: number of samples to take from replay for every insert
-            that is made.
-        prefetch_size: size to prefetch from replay.
-        batch_size: batch size for updates.
-        n_step: number of steps to squash into a single transition.
-        discount: discount to use for TD updates.
-        counter: counter object used to keep track of steps.
-        checkpoint: boolean indicating whether to checkpoint the learner.
-    """
+    """MADQN system."""
 
     def __init__(
         self,
@@ -106,7 +76,6 @@ class MADQN:
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
-        clipping: bool = True,
         max_gradient_norm: float = None,
         discount: float = 0.99,
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
@@ -123,6 +92,85 @@ class MADQN:
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
     ):
+        """Initialise the system
+
+        Args:
+            environment_factory (Callable[[bool], dm_env.Environment]): function to
+                instantiate an environment.
+            network_factory (Callable[[acme_specs.BoundedArray],
+                Dict[str, snt.Module]]): function to instantiate system networks.
+            logger_factory (Callable[[str], MavaLogger], optional): function to
+                instantiate a system logger. Defaults to None.
+            architecture (Type[DecentralisedValueActor], optional): system architecture,
+                e.g. decentralised or centralised. Defaults to DecentralisedValueActor.
+            trainer_fn (Union[ Type[training.MADQNTrainer],
+                Type[training.MADQNRecurrentTrainer] ], optional): training type
+                associated with executor and architecture, e.g. centralised training.
+                Defaults to training.MADQNTrainer.
+            communication_module (Type[BaseCommunicationModule], optional):
+                module for enabling communication protocols between agents. Defaults to
+                None.
+            executor_fn (Type[core.Executor], optional): executor type, e.g.
+                feedforward or recurrent. Defaults to
+                execution.MADQNFeedForwardExecutor.
+            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
+                function specifying a decaying scheduler for epsilon exploration.
+                Defaults to LinearExplorationScheduler.
+            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
+                optional): replay buffer stabilisaiton function, e.g. fingerprints.
+                Defaults to None.
+            epsilon_min (float, optional): final minimum epsilon value at the end of a
+                decaying schedule. Defaults to 0.05.
+            epsilon_decay (float, optional): epsilon decay rate. Defaults to 1e-4.
+            num_executors (int, optional): number of executor processes to run in
+                parallel. Defaults to 1.
+            num_caches (int, optional): number of trainer node caches. Defaults to 0.
+            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
+                the action, observation spaces etc. for each agent in the system.
+                Defaults to None.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
+            batch_size (int, optional): sample batch size for updates. Defaults to 256.
+            prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
+            min_replay_size (int, optional): minimum replay size before updating.
+                Defaults to 1000.
+            max_replay_size (int, optional): maximum replay size. Defaults to 1000000.
+            samples_per_insert (Optional[float], optional): number of samples to take
+                from replay for every insert that is made. Defaults to 32.0.
+            n_step (int, optional): number of steps to include prior to boostrapping.
+                Defaults to 5.
+            sequence_length (int, optional): recurrent sequence rollout length. Defaults
+                to 20.
+            period (int, optional): consecutive starting points for overlapping
+                rollouts across a sequence. Defaults to 20.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            discount (float, optional): discount factor to use for TD updates. Defaults
+                to 0.99.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]], optional):
+                type of optimizer to use to update network parameters. Defaults to
+                snt.optimizers.Adam( learning_rate=1e-4 ).
+            target_update_period (int, optional): number of steps before target
+                networks are updated. Defaults to 100.
+            executor_variable_update_period (int, optional): number of steps before
+                updating executor variables from the variable source. Defaults to 1000.
+            max_executor_steps (int, optional): maximum number of steps and executor
+                can in an episode. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint models. Defaults to
+                False.
+            checkpoint_subpath (str, optional): subdirectory specifying where to store
+                checkpoints. Defaults to "~/mava/".
+            logger_config (Dict, optional): additional configuration settings for the
+                logger factory. Defaults to {}.
+            train_loop_fn (Callable, optional): function to instantiate a train loop.
+                Defaults to ParallelEnvironmentLoop.
+            eval_loop_fn (Callable, optional): function to instantiate an evaluation
+                loop. Defaults to ParallelEnvironmentLoop.
+            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
+                to the training loop. Defaults to {}.
+            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
+            the evaluation loop. Defaults to {}.
+        """
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
@@ -198,6 +246,12 @@ class MADQN:
         )
 
     def _get_extra_specs(self) -> Any:
+        """helper to establish specs for extra information
+
+        Returns:
+            Dict[str, Any]: dictionary containing extra specs
+        """
+
         agents = self._environment_spec.get_agent_ids()
         core_state_specs = {}
         core_message_specs = {}
@@ -226,10 +280,24 @@ class MADQN:
         return extras
 
     def replay(self) -> Any:
-        """The replay storage."""
+        """Replay data storage.
+
+        Returns:
+            Any: replay data table built according the environment specification.
+        """
+
         return self._builder.make_replay_tables(self._environment_spec)
 
     def counter(self, checkpoint: bool) -> Any:
+        """Step counter
+
+        Args:
+            checkpoint (bool): whether to checkpoint the counter.
+
+        Returns:
+            Any: checkpointing object logging steps in a counter subdirectory.
+        """
+
         if checkpoint:
             return tf2_savers.CheckpointingRunner(
                 counting.Counter(),
@@ -241,6 +309,15 @@ class MADQN:
             return counting.Counter()
 
     def coordinator(self, counter: counting.Counter) -> Any:
+        """Coordination helper for a distributed program
+
+        Args:
+            counter (counting.Counter): step counter object.
+
+        Returns:
+            Any: step limiter object.
+        """
+
         return lp_utils.StepsLimiter(counter, self._max_executor_steps)  # type: ignore
 
     def trainer(
@@ -248,7 +325,15 @@ class MADQN:
         replay: reverb.Client,
         counter: counting.Counter,
     ) -> mava.core.Trainer:
-        """The Trainer part of the system."""
+        """System trainer
+
+        Args:
+            replay (reverb.Client): replay data table to pull data from.
+            counter (counting.Counter): step counter object.
+
+        Returns:
+            mava.core.Trainer: system trainer.
+        """
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
@@ -307,7 +392,20 @@ class MADQN:
         counter: counting.Counter,
         trainer: Optional[training.MADQNTrainer] = None,
     ) -> mava.ParallelEnvironmentLoop:
-        """The executor process."""
+        """System executor
+
+        Args:
+            executor_id (str): id to identify the executor process for logging purposes.
+            replay (reverb.Client): replay data table to push data to.
+            variable_source (acme.VariableSource): variable server for updating
+                network variables.
+            counter (counting.Counter): step counter object.
+            trainer (Optional[training.MADQNRecurrentCommTrainer], optional):
+                system trainer. Defaults to None.
+
+        Returns:
+            mava.ParallelEnvironmentLoop: environment-executor loop instance.
+        """
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -383,7 +481,19 @@ class MADQN:
         counter: counting.Counter,
         trainer: training.MADQNTrainer,
     ) -> Any:
-        """The evaluation process."""
+        """System evaluator (an executor process not connected to a dataset)
+
+        Args:
+            variable_source (acme.VariableSource): variable server for updating
+                network variables.
+            counter (counting.Counter): step counter object.
+            trainer (Optional[training.MADQNRecurrentCommTrainer], optional):
+                system trainer. Defaults to None.
+
+        Returns:
+            Any: environment-executor evaluation loop instance for evaluating the
+                performance of a system.
+        """
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -451,7 +561,15 @@ class MADQN:
         return eval_loop
 
     def build(self, name: str = "madqn") -> Any:
-        """Build the distributed system topology."""
+        """Build the distributed system as a graph program.
+
+        Args:
+            name (str, optional): system name. Defaults to "madqn".
+
+        Returns:
+            Any: graph program for distributed system training.
+        """
+
         program = lp.Program(name=name)
 
         with program.group("replay"):

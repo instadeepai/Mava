@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """MAPPO system implementation."""
+
 import functools
 from typing import Any, Callable, Dict, Optional, Type, Union
 
@@ -38,12 +39,7 @@ from mava.wrappers import DetailedPerAgentStatistics
 
 
 class MAPPO:
-
-    """MAPPO system.
-    This implements a single-process MAPPO system. This is an actor-critic based
-    system that generates data via a behavior policy, inserts N-step transitions into
-    a replay buffer, and periodically updates the policies of each agent.
-    """
+    """MAPPO system."""
 
     def __init__(
         self,
@@ -84,48 +80,75 @@ class MAPPO:
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
     ):
+        """Initialise the system
 
-        """Initialize the system.
         Args:
-            environment_factory: Callable to instantiate an environment
-                on a compute node.
-            network_factory: Callable to instantiate system networks
-                on a compute node.
-            logger_factory: Callable to instantiate a system logger
-                on a compute node.
-            architecture: system architecture, e.g. decentralised or centralised.
-            trainer_fn: training type associated with executor and architecture,
-                e.g. centralised training.
-            executor_fn: executor type for example feedforward or recurrent.
-            num_executors: number of executor processes to run in parallel.
-            num_caches: number of trainer node caches.
-            environment_spec: description of the actions, observations, etc.
-            shared_weights: set whether agents should share network weights.
-            sequence_length: length of the sequences in the queue.
-            sequence_period: amount of overlap between sequences added to the queue.
-            entropy_cost: contribution of entropy regularization to the total loss.
-            baseline_cost: contribution of the value loss to the total loss.
-            lambda_gae: scalar determining the mix of bootstrapping
+            environment_factory (Callable[[bool], dm_env.Environment]): function to
+                instantiate an environment.
+            network_factory (Callable[[acme_specs.BoundedArray],
+                Dict[str, snt.Module]]): function to instantiate system networks.
+            logger_factory (Callable[[str], MavaLogger], optional): function to
+                instantiate a system logger. Defaults to None.
+            architecture (Type[ DecentralisedValueActorCritic ], optional): system
+                architecture, e.g. decentralised or centralised. Defaults to
+                DecentralisedValueActorCritic.
+            trainer_fn (Type[training.MAPPOTrainer], optional): training type
+                associated with executor and architecture, e.g. centralised training.
+                Defaults to training.MAPPOTrainer.
+            executor_fn (Type[core.Executor], optional): executor type, e.g. feedforward
+                or recurrent. Defaults to execution.MAPPOFeedForwardExecutor.
+            num_executors (int, optional): number of executor processes to run in
+                parallel. Defaults to 1.
+            num_caches (int, optional): number of trainer node caches. Defaults to 0.
+            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
+                the action, observation spaces etc. for each agent in the system.
+                Defaults to None.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
+            executor_variable_update_period (int, optional): number of steps before
+                updating executor variables from the variable source. Defaults to 100.
+            policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
+                optional): optimizer(s) for updating policy networks.
+                Defaults to snt.optimizers.Adam(learning_rate=5e-4).
+            critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
+                networks. Defaults to snt.optimizers.Adam(learning_rate=1e-5).
+            discount (float, optional): discount factor to use for TD updates. Defaults
+                to 0.99.
+            lambda_gae (float, optional): scalar determining the mix of bootstrapping
                 vs further accumulation of multi-step returns at each timestep.
-                See `High-Dimensional Continuous Control Using Generalized
-                Advantage Estimation` for more information.
-            clipping_epsilon: Hyper-parameter for clipping in the policy
-                objective. Roughly: how far can the new policy go from
-                the old policy while still profiting? The new policy can
-                still go farther than the clip_ratio says, but it doesn’t
-                help on the objective anymore.
-            max_abs_reward: max reward. If not None, the reward on which the agent
-                is trained will be clipped between -max_abs_reward and max_abs_reward.
-            batch_size: batch size for updates.
-            max_queue_size: maximum queue size.
-            discount: discount to use for TD updates.
-            max_gradient_norm: used for gradient clipping.
-            checkpoint: boolean indicating whether to checkpoint the trainers.
-            counter: count the number of steps and episodes.
-            checkpoint_subpath: directory for checkpoints.
-            train_loop_fn: loop for training.
-            eval_loop_fn: loop for evaluation.
-            replay_table_name: string indicating what name to give the replay table."""
+                Defaults to 0.99.
+            clipping_epsilon (float, optional): Hyper-parameter for clipping in the
+                policy objective. Defaults to 0.2.
+            entropy_cost (float, optional): contribution of entropy regularization to
+                the total loss. Defaults to 0.01.
+            baseline_cost (float, optional): contribution of the value loss to the
+                total loss. Defaults to 0.5.
+            max_gradient_norm: value to specify the maximum clipping value for the
+            gradient norm during optimization.
+            max_queue_size (int, optional): maximum number of items in the queue.
+                Defaults to 100000.
+            batch_size (int, optional): sample batch size for updates. Defaults to 256.
+            sequence_length (int, optional): recurrent sequence rollout length. Defaults
+                to 10.
+            sequence_period (int, optional): consecutive starting points for
+                overlapping rollouts across a sequence. Defaults to 5.
+            max_executor_steps (int, optional): maximum number of steps and executor
+                can in an episode. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint models. Defaults to
+                False.
+            checkpoint_subpath (str, optional): subdirectory specifying where to store
+                checkpoints. Defaults to "~/mava/".
+            logger_config (Dict, optional): additional configuration settings for the
+                logger factory. Defaults to {}.
+            train_loop_fn (Callable, optional): function to instantiate a train loop.
+                Defaults to ParallelEnvironmentLoop.
+            eval_loop_fn (Callable, optional): function to instantiate an evaluation
+                loop. Defaults to ParallelEnvironmentLoop.
+            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
+                to the training loop. Defaults to {}.
+            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
+                the evaluation loop. Defaults to {}.
+        """
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
@@ -190,10 +213,24 @@ class MAPPO:
         )
 
     def replay(self) -> Any:
-        """The replay storage."""
+        """Replay data storage.
+
+        Returns:
+            Any: replay data table built according the environment specification.
+        """
+
         return self._builder.make_replay_tables(self._environment_spec)
 
     def counter(self, checkpoint: bool) -> Any:
+        """Step counter
+
+        Args:
+            checkpoint (bool): whether to checkpoint the counter.
+
+        Returns:
+            Any: step counter object.
+        """
+
         if checkpoint:
             return tf2_savers.CheckpointingRunner(
                 counting.Counter(),
@@ -205,6 +242,15 @@ class MAPPO:
             return counting.Counter()
 
     def coordinator(self, counter: counting.Counter) -> Any:
+        """Coordination helper for a distributed program
+
+        Args:
+            counter (counting.Counter): step counter object.
+
+        Returns:
+            Any: step limiter object.
+        """
+
         return lp_utils.StepsLimiter(counter, self._max_executor_steps)  # type: ignore
 
     def trainer(
@@ -212,7 +258,15 @@ class MAPPO:
         replay: reverb.Client,
         counter: counting.Counter,
     ) -> mava.core.Trainer:
-        """The Trainer part of the system."""
+        """System trainer
+
+        Args:
+            replay (reverb.Client): replay data table to pull data from.
+            counter (counting.Counter): step counter object.
+
+        Returns:
+            mava.core.Trainer: system trainer.
+        """
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
@@ -255,7 +309,18 @@ class MAPPO:
         variable_source: acme.VariableSource,
         counter: counting.Counter,
     ) -> mava.ParallelEnvironmentLoop:
-        """The executor process."""
+        """System executor
+
+        Args:
+            executor_id (str): id to identify the executor process for logging purposes.
+            replay (reverb.Client): replay data table to push data to.
+            variable_source (acme.VariableSource): variable server for updating
+                network variables.
+            counter (counting.Counter): step counter object.
+
+        Returns:
+            mava.ParallelEnvironmentLoop: environment-executor loop instance.
+        """
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -320,7 +385,18 @@ class MAPPO:
         counter: counting.Counter,
         logger: loggers.Logger = None,
     ) -> Any:
-        """The evaluation process."""
+        """System evaluator (an executor process not connected to a dataset)
+
+        Args:
+            variable_source (acme.VariableSource): variable server for updating
+                network variables.
+            counter (counting.Counter): step counter object.
+            logger (loggers.Logger, optional): logger object. Defaults to None.
+
+        Returns:
+            Any: environment-executor evaluation loop instance for evaluating the
+                performance of a system.
+        """
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
@@ -376,7 +452,14 @@ class MAPPO:
         return eval_loop
 
     def build(self, name: str = "mappo") -> Any:
-        """Build the distributed system topology."""
+        """Build the distributed system as a graph program.
+
+        Args:
+            name (str, optional): system name. Defaults to "mappo".
+
+        Returns:
+            Any: graph program for distributed system training.
+        """
         program = lp.Program(name=name)
 
         with program.group("replay"):
