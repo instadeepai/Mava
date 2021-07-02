@@ -64,7 +64,7 @@ class MADDPG:
         num_trainers: int = 1,
         trainer_net_config: Dict[str, List] = {},
         shared_weights: bool = True,
-        agent_net_config: Dict[str, List] = {},
+        agent_net_config: Dict[str, str] = {},
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -149,14 +149,15 @@ class MADDPG:
                 to_terminal=True,
                 time_delta=10,
             )
-        
+
         # Setup agent networks
         self._agent_net_config = agent_net_config
         if not agent_net_config:
-            agents = self._environment_spec.get_agent_ids()
-            agent_types = self._config.environment_spec.get_agent_types()
-            agent_net_keys = agent_types if shared_weights else agents
-            self._agent_net_config = {agent: agent_net_keys[agent] for agent in agents}
+            agents = environment_spec.get_agent_ids()
+            self._agent_net_config = {
+                agent: agent.split("_")[0] if shared_weights else agent
+                for agent in agents
+            }
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -222,7 +223,7 @@ class MADDPG:
         core_state_specs = {}
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
-            agent_net_config=self._agent_net_config
+            agent_net_config=self._agent_net_config,
         )
         for agent in agents:
             # agent_type = agent.split("_")[0]
