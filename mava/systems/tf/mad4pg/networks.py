@@ -31,7 +31,7 @@ BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
 
 
-# Default networks for mad4pg
+#
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
@@ -43,8 +43,32 @@ def make_default_networks(
     vmax: float = 150.0,
     num_atoms: int = 51,
 ) -> Mapping[str, types.TensorTransformation]:
-    """Creates networks used by the agents."""
+    """Default networks for mad4pg.
 
+    Args:
+        environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
+            observation spaces etc. for each agent in the system.
+        policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
+            size of policy networks. Defaults to (256, 256, 256).
+        critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
+            size of critic networks. Defaults to (512, 512, 256).
+        shared_weights (bool, optional): whether agents should share weights or not.
+            Defaults to True.
+        sigma (float, optional): hyperparameters used to add Gaussian noise
+            for simple exploration. Defaults to 0.3.
+        archecture_type (ArchitectureType, optional): archecture used
+            for agent networks. Can be feedforward or recurrent.
+            Defaults to ArchitectureType.feedforward.
+        vmin (float, optional): hyperparameters for the distributional critic in mad4pg.
+            Defaults to -150.0.
+        vmax (float, optional): hyperparameters for the distributional critic in mad4pg.
+            Defaults to 150.0.
+        num_atoms (int, optional):  hyperparameters for the distributional critic in
+            mad4pg. Defaults to 51.
+
+    Returns:
+        Mapping[str, types.TensorTransformation]: returned agent networks.
+    """
     # Set Policy function and layer size
     if archecture_type == ArchitectureType.feedforward:
         policy_network_func = snt.Sequential

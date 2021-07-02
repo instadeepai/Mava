@@ -30,15 +30,31 @@ BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
 
 
-# Default networks for mappo
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     shared_weights: bool = True,
 ) -> Dict[str, snt.Module]:
+    """Default networks for mappo.
 
-    """Creates networks used by the agents."""
+    Args:
+        environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
+            observation spaces etc. for each agent in the system.
+        policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
+            size of policy networks. Defaults to (256, 256, 256).
+        critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
+            size of critic networks. Defaults to (512, 512, 256).
+        shared_weights (bool, optional): whether agents should share weights or not.
+            Defaults to True.
+
+    Raises:
+        ValueError: Unknown action_spec type, if actions aren't DiscreteArray
+            or BoundedArray.
+
+    Returns:
+        Dict[str, snt.Module]: returned agent networks.
+    """
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
