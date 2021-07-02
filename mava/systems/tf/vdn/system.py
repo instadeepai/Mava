@@ -89,7 +89,8 @@ class VDN(MADQN):
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
-        shared_weights: bool = False,
+        shared_weights: bool = True,
+        agent_net_config: Dict[str, str] = {},
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
@@ -139,6 +140,7 @@ class VDN(MADQN):
             logger_factory=logger_factory,
             environment_spec=environment_spec,
             shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             num_executors=num_executors,
             num_caches=num_caches,
             max_executor_steps=max_executor_steps,
@@ -161,7 +163,7 @@ class VDN(MADQN):
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
-                shared_weights=shared_weights,
+                agent_net_config=agent_net_config,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -199,7 +201,7 @@ class VDN(MADQN):
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_config=self._agent_net_config,
         )
         # Augment network architecture by adding mixing layer network.
         system_networks = self._mixer(

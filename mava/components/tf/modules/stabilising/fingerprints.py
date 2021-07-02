@@ -48,19 +48,19 @@ class FingerPrintStabalisation(BaseStabilisationModule):
         actor_obs_specs = self._architecture._get_actor_specs()
 
         # create policy variables for each agent
-        for agent_key in self._architecture._actor_agent_keys:
-
+        for agent_key in self._architecture._agents:
+            agent_net_key = self._architecture._agent_net_config[agent_key]
             obs_spec = actor_obs_specs[agent_key]
 
             # Create variables for value and policy networks.
             tf2_utils.create_variables(
-                self._architecture._value_networks[agent_key],
+                self._architecture._value_networks[agent_net_key],
                 [obs_spec, self._fingerprint_spec],
             )
 
             # create target value network variables
             tf2_utils.create_variables(
-                self._architecture._target_value_networks[agent_key],
+                self._architecture._target_value_networks[agent_net_key],
                 [obs_spec, self._fingerprint_spec],
             )
 

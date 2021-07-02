@@ -42,15 +42,15 @@ class MAPPOFeedForwardExecutor(core.Executor):
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
     ):
 
         """Initializes the executor.
         Args:
           networks: the (recurrent) policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
+          agent_net_config: specifies what network each agent uses.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
@@ -61,7 +61,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self._adder = adder
         self._variable_client = variable_client
         self._policy_networks = policy_networks
-        self._shared_weights = shared_weights
+        self._agent_net_config = agent_net_config
         self._prev_log_probs: Dict[str, Any] = {}
 
     @tf.function
@@ -71,7 +71,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         observation: types.NestedTensor,
     ) -> Tuple[types.NestedTensor, types.NestedTensor]:
         # Index network either on agent type or on agent id.
-        network_key = agent.split("_")[0] if self._shared_weights else agent
+        network_key = self._agent_net_config[agent]
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         observation = tf2_utils.add_batch_dim(observation.observation)

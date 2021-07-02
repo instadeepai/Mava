@@ -38,13 +38,13 @@ class StateBasedPolicyActor(DecentralisedPolicyActor):
         environment_spec: mava_specs.MAEnvironmentSpec,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )
 
     def _get_actor_specs(
@@ -62,10 +62,10 @@ class StateBasedPolicyActor(DecentralisedPolicyActor):
             )
 
         actor_obs_specs = {}
-        for agent_key in self._actor_agent_keys:
-            agent_type = agent_key.split("_")[0]
+        for agent_key in self._agents:
+            agent_net_key = self._agent_net_config[agent_key]
             # Get observation spec for actor.
-            actor_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+            actor_obs_specs[agent_key] = obs_specs_per_type[agent_net_key]
         return actor_obs_specs
 
 
@@ -79,14 +79,14 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )
 
     def _get_critic_specs(
@@ -115,11 +115,11 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
 
         critic_obs_specs = {}
         critic_act_specs = {}
-        for agent_key in self._critic_agent_keys:
-            agent_type = agent_key.split("_")[0]
+        for agent_key in self._agents:
+            agent_net_key = self._agent_net_config[agent_key]
             # Get observation and action spec for critic.
             critic_obs_specs[agent_key] = critic_obs_spec
-            critic_act_specs[agent_key] = action_specs_per_type[agent_type]
+            critic_act_specs[agent_key] = action_specs_per_type[agent_net_key]
         return critic_obs_specs, critic_act_specs
 
 
@@ -135,7 +135,7 @@ class StateBasedQValueActorCritic(  # type: ignore
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
     ):
 
         StateBasedQValueCritic.__init__(
@@ -144,5 +144,5 @@ class StateBasedQValueActorCritic(  # type: ignore
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
         )

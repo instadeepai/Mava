@@ -62,20 +62,18 @@ flags.DEFINE_string("base_dir", "./logs/", "Base dir to store experiments.")
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
+    agent_net_config: Dict[str, str],
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         512,
         256,
     ),
-    shared_weights: bool = False,
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
 
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
-    if shared_weights:
-        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-        specs = type_specs
+    specs = {agent_net_config[key]: specs[key] for key in specs.keys()}
 
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}

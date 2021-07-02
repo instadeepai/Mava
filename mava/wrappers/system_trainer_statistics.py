@@ -510,7 +510,7 @@ class NetworkStatistics(NetworkStatisticsBase):
 
         # Calculate the gradients and update the networks
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_config[agent]
 
             # Get trainable variables.
             policy_variables = (
@@ -593,7 +593,7 @@ class NetworkStatisticsMixing(NetworkStatisticsBase):
     def _backward(self) -> None:
         log_current_timestep = self._log_step()
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_config[agent]
 
             # Update agent networks
             variables = [*self._q_networks[agent_key].trainable_variables]
@@ -696,7 +696,7 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             else self._agents
         )
         for agent in agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_config[agent]
 
             # Get trainable variables.
             policy_variables = (

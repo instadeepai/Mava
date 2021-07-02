@@ -56,7 +56,7 @@ class DIALConfig:
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
     epsilon_decay: float
-    shared_weights: bool
+    agent_net_config: Dict[str, str]
     target_update_period: int
     executor_variable_update_period: int
     max_gradient_norm: Optional[float]
@@ -236,14 +236,15 @@ class DIALBuilder:
                 source variables as defined in mava.core.
         """
 
-        shared_weights = self._config.shared_weights
+        agent_net_config = self._config.agent_net_config
 
         variable_client = None
         if variable_source:
-            agent_keys = self._agent_types if shared_weights else self._agents
-
             # Create policy variables
-            variables = {agent: q_networks[agent].variables for agent in agent_keys}
+            variables = {
+                net_key: q_networks[net_key].variables
+                for net_key in set(agent_net_config.values())
+            }
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
@@ -262,7 +263,7 @@ class DIALBuilder:
         return self._executor_fn(
             q_networks=q_networks,
             action_selectors=action_selectors,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             variable_client=variable_client,
             adder=adder,
             trainer=trainer,
@@ -311,7 +312,7 @@ class DIALBuilder:
             discount=self._config.discount,
             q_networks=q_networks,
             target_q_networks=target_q_networks,
-            shared_weights=self._config.shared_weights,
+            agent_net_config=self._config.agent_net_config,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,

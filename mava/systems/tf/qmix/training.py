@@ -54,7 +54,7 @@ class QMIXTrainer(MADQNTrainer):
         dataset: tf.data.Dataset,
         optimizer: snt.Optimizer,
         discount: float,
-        shared_weights: bool,
+        agent_net_config: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: Optional[BaseCommunicationModule] = None,
         max_gradient_norm: float = None,
@@ -78,7 +78,7 @@ class QMIXTrainer(MADQNTrainer):
             dataset=dataset,
             optimizer=optimizer,
             discount=discount,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             max_gradient_norm=max_gradient_norm,
@@ -184,7 +184,7 @@ class QMIXTrainer(MADQNTrainer):
             q_acts = []  # Q vals
             q_targets = []  # Target Q vals
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_config[agent]
 
                 o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
                     o_tm1, o_t, a_tm1, agent
@@ -233,7 +233,7 @@ class QMIXTrainer(MADQNTrainer):
 
     def _backward(self) -> None:
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_config[agent]
             # Update agent networks
             variables = self._q_networks[agent_key].trainable_variables
             gradients = self.tape.gradient(self.loss, variables)

@@ -39,7 +39,7 @@ class VDNFeedForwardExecutor(MADQNFeedForwardExecutor):
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         trainer: MADQNTrainer,
-        shared_weights: bool = True,
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
@@ -49,7 +49,7 @@ class VDNFeedForwardExecutor(MADQNFeedForwardExecutor):
         """Initializes the executor.
         Args:
           policy_network: the policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
+          agent_net_config: specifies what network each agent uses.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
@@ -58,7 +58,7 @@ class VDNFeedForwardExecutor(MADQNFeedForwardExecutor):
         super(VDNFeedForwardExecutor, self).__init__(
             q_networks=q_networks,
             action_selectors=action_selectors,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             adder=adder,
             variable_client=variable_client,
             communication_module=communication_module,

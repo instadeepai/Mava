@@ -93,7 +93,8 @@ class QMIX(MADQN):
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
-        shared_weights: bool = False,
+        shared_weights: bool = True,
+        agent_net_config: Dict[str, str] = {},
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
@@ -156,6 +157,7 @@ class QMIX(MADQN):
             num_executors=num_executors,
             num_caches=num_caches,
             environment_spec=environment_spec,
+            agent_net_config=agent_net_config,
             shared_weights=shared_weights,
             batch_size=batch_size,
             prefetch_size=prefetch_size,
@@ -189,7 +191,7 @@ class QMIX(MADQN):
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
-                shared_weights=shared_weights,
+                agent_net_config=self._agent_net_config,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -222,14 +224,15 @@ class QMIX(MADQN):
         """The Trainer part of the system. Train with mixing networks."""
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
 
         # Create system architecture
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_config=self._agent_net_config,
         )
 
         # Fingerprint module

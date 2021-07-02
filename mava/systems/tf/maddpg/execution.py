@@ -49,15 +49,15 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
     ):
 
         """Initializes the executor.
         Args:
           networks: the (recurrent) policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
+          agent_net_config: specifies what network each agent uses.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
@@ -68,7 +68,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self._agent_specs = agent_specs
         super().__init__(
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             adder=adder,
             variable_client=variable_client,
         )
@@ -82,7 +82,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         batched_observation = tf2_utils.add_batch_dim(observation)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_config[agent]
 
         # Compute the policy, conditioned on the observation.
         policy = self._policy_networks[agent_key](batched_observation)
@@ -140,16 +140,16 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
+        agent_net_config: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
         store_recurrent_state: bool = True,
     ):
 
         """Initializes the executor.
         Args:
           networks: the (recurrent) policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
+          agent_net_config: specifies what network each agent uses.
           adder: the adder object to which allows to add experiences to a
             dataset/replay buffer.
           variable_client: object which allows to copy weights from the trainer copy
@@ -161,7 +161,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
 
         super().__init__(
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_config=agent_net_config,
             adder=adder,
             variable_client=variable_client,
             store_recurrent_state=store_recurrent_state,
@@ -179,7 +179,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         batched_observation = tf2_utils.add_batch_dim(observation)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_config[agent]
 
         # Compute the policy, conditioned on the observation.
         policy, new_state = self._policy_networks[agent_key](batched_observation, state)
@@ -203,7 +203,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         # Initialize the RNN state if necessary.
         if self._states[agent] is None:
             # index network either on agent type or on agent id
-            agent_key = agent.split("_")[0] if self._shared_weights else agent
+            agent_key = self._agent_net_config[agent]
             self._states[agent] = self._policy_networks[agent_key].initia_state(1)
 
         # Step the recurrent policy forward given the current observation and state.
