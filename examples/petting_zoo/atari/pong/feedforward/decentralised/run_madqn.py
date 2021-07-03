@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Example running MADQN on debug Atari Pong."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -32,7 +33,7 @@ from mava.utils.loggers import logger_utils
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_class",
-    "butterfly",
+    "atari",
     "Pettingzoo environment class, e.g. atari (str).",
 )
 flags.DEFINE_string(
@@ -56,12 +57,11 @@ def main(_: Any) -> None:
         pettingzoo_utils.make_environment,
         env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        # env_preprocess_wrappers=[(pettingzoo_utils.atari_preprocessing, None)],
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks, network_type=Network.atari_dqn_network
+        madqn.make_default_networks, network_type=Network.mlp
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -83,7 +83,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=2,
+        num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
         epsilon_decay=1e-4,

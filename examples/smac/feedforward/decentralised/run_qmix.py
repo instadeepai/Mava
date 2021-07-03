@@ -72,7 +72,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=2,
+        num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
         epsilon_decay=1e-5,
@@ -85,7 +85,7 @@ def main(_: Any) -> None:
         hypernet_hidden_dim=32,
         executor_variable_update_period=100,
         target_update_period=200,
-        max_gradient_norm=10,
+        max_gradient_norm=10.0,
     ).build()
 
     # launch
