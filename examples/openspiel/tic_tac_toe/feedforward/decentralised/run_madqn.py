@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Example running MADQN on OpenSpiel's tic_tac_toe."""
 import functools
 from datetime import datetime
 from typing import Any

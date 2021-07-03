@@ -26,6 +26,7 @@ from mava.systems.tf import mad4pg
 from mava.systems.tf.mad4pg.execution import MAD4PGRecurrentExecutor
 from mava.systems.tf.mad4pg.training import MAD4PGStateBasedRecurrentTrainer
 from mava.utils import lp_utils
+from mava.utils.enums import ArchitectureType
 from mava.utils.environments import robocup_utils
 from mava.utils.loggers import logger_utils
 
@@ -45,7 +46,9 @@ def main(_: Any) -> None:
     environment_factory = lp_utils.partial_kwargs(robocup_utils.make_environment)
 
     # Networks.
-    network_factory = lp_utils.partial_kwargs(mad4pg.make_default_networks)
+    network_factory = lp_utils.partial_kwargs(
+        mad4pg.make_default_networks, archecture_type=ArchitectureType.recurrent
+    )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"

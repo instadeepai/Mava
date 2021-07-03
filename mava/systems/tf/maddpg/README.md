@@ -7,4 +7,3 @@ This system is an extension of the Deep Deterministic Policy Gradient (DDPG) alg
 </p>
 
 [Lowe et al. (2017)]: https://arxiv.org/pdf/1706.02275
-

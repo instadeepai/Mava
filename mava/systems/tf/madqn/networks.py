@@ -26,7 +26,7 @@ from mava.components.tf.networks.communication import CommunicationNetwork
 from mava.utils.enums import ArchitectureType, Network
 
 
-# Default networks for madqn
+#
 # TODO Use fingerprints variable
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
@@ -37,6 +37,29 @@ def make_default_networks(
     fingerprints: bool = False,
     message_size: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
+    """Default networks for madqn.
+
+    Args:
+        environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
+            observation spaces etc. for each agent in the system.
+        policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
+            size of policy networks. Defaults to (512, 512, 256).
+        shared_weights (bool, optional): whether agents should share weights or not.
+            Defaults to True.
+        archecture_type (ArchitectureType, optional): archecture used
+            for agent networks. Can be feedforward or recurrent.
+            Defaults to ArchitectureType.feedforward.
+        network_type (Network, optional): Agent network type.
+            Can be mlp, atari_dqn_network or coms_network.
+            Defaults to Network.mlp.
+        fingerprints (bool, optional): whether to apply replay stabilisation using
+            policy fingerprints. Defaults to False.
+        message_size (Optional[int], optional): size of message passed,
+            if using a coms network. Defaults to None.
+
+    Returns:
+        Mapping[str, types.TensorTransformation]: returned agent networks.
+    """
 
     # Set Policy function and layer size
     if archecture_type == ArchitectureType.feedforward:

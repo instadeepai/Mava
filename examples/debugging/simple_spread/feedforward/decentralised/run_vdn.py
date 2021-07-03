@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running QMIX on debug MPE environments."""
+"""Example running VDN on debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -80,7 +80,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=2,
+        num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
         epsilon_decay=3e-4,

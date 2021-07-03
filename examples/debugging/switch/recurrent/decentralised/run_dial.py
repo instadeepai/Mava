@@ -87,7 +87,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=2,
+        num_executors=1,
         trainer_fn=dial.DIALSwitchTrainer,
         executor_fn=dial.DIALSwitchExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler,
