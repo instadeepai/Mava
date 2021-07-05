@@ -14,5 +14,6 @@
 # limitations under the License.
 
 from mava.systems.tf.qmix.execution import QMIXFeedForwardExecutor
+from mava.systems.tf.qmix.networks import make_default_networks
 from mava.systems.tf.qmix.system import QMIX
 from mava.systems.tf.qmix.training import QMIXTrainer

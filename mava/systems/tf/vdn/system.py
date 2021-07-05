@@ -58,7 +58,7 @@ class VDN(MADQN):
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
-        shared_weights: bool = False,
+        shared_weights: bool = True,
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,

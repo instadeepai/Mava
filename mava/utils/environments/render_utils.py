@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 
 try:
+    os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
     import pygame
     from pysc2.lib import colors, features, point, transform
     from pysc2.lib.renderer_human import _Surface

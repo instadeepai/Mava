@@ -159,7 +159,7 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     make run EXAMPLE=dir/to/example/example.py
     ```
-    For example, `make run EXAMPLE=examples/petting_zoo/run_decentralised_feedforward_maddpg_continuous.py`. Alternatively, run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
+    For example, `make run EXAMPLE=examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py`. Alternatively, run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
 
     To run an example with tensorboard viewing enabled, you can run
     ```bash

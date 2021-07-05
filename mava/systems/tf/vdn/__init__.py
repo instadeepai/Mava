@@ -14,5 +14,6 @@
 # limitations under the License.
 
 from mava.systems.tf.vdn.execution import VDNFeedForwardExecutor
+from mava.systems.tf.vdn.networks import make_default_networks
 from mava.systems.tf.vdn.system import VDN
 from mava.systems.tf.vdn.training import VDNTrainer

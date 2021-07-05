@@ -1,84 +1,142 @@
 # Examples
-This directory includes working examples of Mava systems.
+We include a non-exhaustive number of examples, showing common use-cases for Mava. We also have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System.
 
 ## Environments
 
-In Mava we use a variety of different environments which include the
-[PettingZoo][pettingzoo] and [Flatland][flatland] environment set as well as a few custom [environments][debug] inside Mava.
+In Mava, we support a variety of different environments, which include
+PettingZoo ([Repo](pz_repo), [Paper](pz_paper)), SMAC ([Repo](smac_repo), [Paper](smac_paper)), [2D RoboCup][robocup], [Flatland][flatland], OpenSpiel ([Repo](openspiel_repo), [Paper](openspiel_paper)) environments, as well as a few custom [environments][debug] inside Mava.
+
+With our integration with PettingZoo, we support popular Multi-Agent environments such as SISL ([Repo](sisl_repo), [Paper](sisl_paper)), MPE ([Repo](mpe_repo), [Paper](mpe_paper)) and [Multi-Agent Atari](https://www.pettingzoo.ml/atari) environments.
 
 ## Continuous control
 We include a number of systems running on continuous control tasks.
 
--   [MA-DDPG (centralised, feedforward)](debugging_envs/run_centralised_feedforward_maddpg.py):
-    an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
--   [PPO (centralised, feedforward)](debugging_envs/run_centralised_feedforward_mappo.py):
-    a PPO system on the continuous action space simple_spread MPE debugging environment.
--   [MA-D4PG (decentralised, feedforward)](debugging_envs/run_decentralised_feedforward_mad4pg.py):
-    an MA-D4PG system on the continuous action space simple_spread MPE debugging environment.
--   [MA-DDPG (decentralised, feedforward)](debugging_envs/run_decentralised_feedforward_maddpg.py):
-    an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
--   [PPO (decentralised, feedforward)](debugging_envs/run_decentralised_feedforward_mappo.py):
-    a PPO system on the continuous action space simple_spread MPE debugging environment.
--   [MA-D4PG (decentralised, recurrent)](debugging_envs/run_decentralised_recurrent_mad4pg.py):
-    an MA-D4PG system on the continuous action space simple_spread MPE debugging environment.
--   [MA-DDPG (decentralised, recurrent)](debugging_envs/run_decentralised_recurrent_maddpg.py):
-    an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
--   [MA-DDPG (decentralised, feedforward)](debugging_envs/run_feedforward_maddpg_record_video.py):
-    an MA-DDPG system (with video wrapping) on the continuous action space simple_spread MPE debugging environment.
--   [MA-DDPG (networked, feedforward)](debugging_envs/run_networked_feedforward_maddpg.py):
-    an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
--   [MA-DDPG (state-based, feedforward)](debugging_envs/run_state_based_feedforward_maddpg.py):
-    an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
--   [MA-DDPG (state-based, recurrent)](debugging_envs/run_state_based_recurrent_maddpg.py):
-    an MA-DDPG system on the continuous action space simple_spread MPE debugging environment.
--   [PPO (centralised, feedforward)](petting_zoo/run_centralised_feedforward_mappo.py):
-    a PPO system using a centralised critic on the continuous action space multiwalker_v7 PettingZoo environment.
--   [MA-D4PG (decentralised, feedforward)](petting_zoo/run_decentralised_feedforward_mad4pg.py):
-    an MA-D4PG system on the continuous action space multiwalker_v7 PettingZoo environment.
--   [MA-DDPG (decentralised, feedforward)](petting_zoo/run_decentralised_feedforward_maddpg.py):
-    an MA-DDPG system on the continuous action space multiwalker_v7 PettingZoo environment.
--   [MA-DDPG (decentralised, recurrent)](petting_zoo/run_decentralised_recurrent_maddpg.py):
-    an MA-DDPG system on the continuous action space multiwalker_v7 PettingZoo environment.
--   [MA-DDPG (decentralised, feedforward)](petting_zoo/run_feedforward_maddpg_record_video.py):
-    an MA-DDPG system (with video wrapping) on the continuous action space multiwalker_v7 PettingZoo environment.
--   [MA-DDPG (networked, feedforward)](petting_zoo/run_networked_feedforward_maddpg_sparse.py):
-    an MA-DDPG system oon the continuous action space multiwalker_v7 PettingZoo environm
-[petting_zoo]: https://github.com/PettingZoo-Team/PettingZoo
+### Debugging Environment - Simple Spread
+-   **MADDPG**:
+    a MADDPG system running on the continuous action space simple_spread MPE environment.
+    - *Feedforward*:
+        -  [decentralised](debugging/simple_spread/feedforward/decentralised/run_maddpg.py), [decentralised record agents](debugging/simple_spread/feedforward/decentralised/run_maddpg_record.py) (***Example recording agents acting in the environment***), [decentralised scaling](debugging/simple_spread/feedforward/decentralised/run_maddpg_scaling.py) (***Example scaling to 4 executors***), [decentralised custom loggers](debugging/simple_spread/feedforward/decentralised/run_maddpg_custom_logging.py) (***Example using custom logging***),
+[centralised](debugging/simple_spread/feedforward/centralised/run_maddpg.py), [networked](debugging/simple_spread/feedforward/networked/run_maddpg.py) (***Example using a fully-connected, networked architecture***), [networked with custom architecture](debugging/simple_spread/feedforward/networked/run_maddpg_custom_network.py) (***Example using a custom, sparse, networked architecture***) and [state_based](debugging/simple_spread/feedforward/state_based/run_maddpg.py) .
+    - *Recurrent*
+        - [decentralised](debugging/simple_spread/recurrent/decentralised/run_maddpg.py) and [state_based](debugging/simple_spread/recurrent/state_based/run_maddpg.py).
 
+-   **MAD4PG**:
+    a MAD4PG system running on the continuous action space simple_spread MPE environment.
+    - *Feedforward*
+        - [decentralised](debugging/simple_spread/feedforward/decentralised/run_mad4pg.py), [centralised](debugging/simple_spread/feedforward/centralised/run_mad4pg.py)
+    and [state_based](debugging/simple_spread/feedforward/state_based/run_mad4pg.py).
+    - *Recurrent*
+        - [decentralised](debugging/simple_spread/recurrent/decentralised/run_mad4pg.py).
+
+### PettingZoo - Multiwalker
+  -   **MADDPG**:
+      a MADDPG system running on the Multiwalker environment.
+      - *Feedforward*
+        - [decentralised](petting_zoo/sisl/multiwalker/feedforward/decentralised/run_maddpg.py) and [centralised](petting_zoo/sisl/multiwalker/feedforward/centralised/run_maddpg.py).
+      - *Recurrent*
+        - [decentralised](petting_zoo/sisl/multiwalker/recurrent/decentralised/run_maddpg.py).
+
+  -   **MAD4PG**:
+      a MAD4PG system running on the Multiwalker environment.
+      - *Feedforward*
+        - [decentralised](petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py) and [decentralised record agents](petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py) (***Example recording agents acting in the environment***).
+
+### 2D RoboCup
+-   **MAD4PG**:
+    a MAD4PG system running on the RoboCup environment.
+    - *Recurrent*
+      - [state_based](robocup/recurrent/state_based/run_mad4pg.py).
 ## Discrete control
 
 We also include a number of systems running on discrete action space environments.
--   [MA-D4PG (decentralised, feedforward)](debugging_envs/run_decentralised_feedforward_discrete_mad4pg.py):
-    an MA-D4PG system on the discrete action space simple_spread MPE debugging environment.
--   [MA-DDPG (decentralised, feedforward)](debugging_envs/run_decentralised_feedforward_discrete_maddpg.py):
-    an MA-DDPG system on the discrete action space simple_spread MPE debugging environment.
--   [MA-DQN (feedforward)](debugging_envs/run_feedforward_madqn.py):
-    an MA-DQN system running on the discrete action space simple_spread MPE debugging environment.
--   [MA-DQN (feedforward)](debugging_envs/run_feedforward_madqn.py):
-    an MA-DQN system (with fingerprints) running on the discrete action space simple_spread MPE debugging environment.
--   [QMIX](debugging_envs/run_feedforward_qmix.py):
-    a QMIX system on the two step custom environment.
--   [VDN](debugging_envs/run_feedforward_vdn.py):
-    a VDN system on the two step custom environment.
--   [DIAL](debugging_envs/run_recurrent_dial.py):
-    a DIAL system on the custom SwitchGame environment.
--   [DIAL](debugging_envs/run_recurrent_dial_spread.py):
-    a DIAL system on the discrete action space simple_spread MPE debugging environment.
--   [MA-DQN (recurrent)](debugging_envs/run_recurrent_madqn.py):
-    an MA-DQN system running on the discrete action space simple_spread MPE debugging environment.
--   [MA-DQN (feedforward)](petting_zoo/run_feedforward_madqn.py):
-    an MA-DQN system running on the continuous action space multiwalker_v7 PettingZoo environment.
--   [MA-DQN (feedforward)](petting_zoo/run_feedforward_madqn.py):
-    an MA-DQN system (with fingerprints) running on the continuous action space multiwalker_v7 PettingZoo environment.
--   [QMIX](petting_zoo/run_feedforward_qmix.py):
-    a QMIX system on the two step custom environment.
--   [VDN](petting_zoo/run_feedforward_vdn.py):
-    a VDN system on the two step custom environment.
--   [MA-DQN (feedforward)](smac/run_feedforward_madqn.py):
-    an MA-DQN system running on the StarCraft 3m environment.
--   [MA-DQN (recurrent)](smac/run_recurrent_madqn.py):
-    an MA-DQN system running on the StarCraft 3m environment.
+
+### Debugging Environment - Simple Spread
+  -   **MAPPO**:
+      a MAPPO system running on the discrete action space simple_spread MPE environment.
+      - *Feedforward*
+        - [decentralised](debugging/simple_spread/feedforward/decentralised/run_mappo.py) and [centralised](debugging/simple_spread/feedforward/centralised/run_mappo.py).
+
+  -   **MADQN**:
+      a MADQN system running on the discrete action space simple_spread MPE environment.
+      - *Feedforward*
+        - [decentralised](debugging/simple_spread/feedforward/decentralised/run_madqn.py).
+      - *Recurrent*
+        - [decentralised](debugging/simple_spread/recurrent/decentralised/run_madqn.py) and [decentralised with coms](debugging/simple_spread/recurrent/decentralised/run_madqn_with_coms.py) (***Example using a system with communication***).
+
+  -   **QMIX**:
+      a QMIX system running on the discrete action space simple_spread MPE environment.
+      - *Feedforward*
+        - [decentralised](debugging/simple_spread/feedforward/decentralised/run_qmix.py).
+
+  -   **VDN**:
+      a VDN system running on the discrete action space simple_spread MPE environment.
+      - *Feedforward*
+        - [decentralised](debugging/simple_spread/feedforward/decentralised/run_vdn.py).
+
+  -   **DIAL**:
+      a DIAL system running on the discrete action space simple_spread MPE environment.
+      - *Recurrent*
+        - [decentralised](debugging/simple_spread/recurrent/decentralised/run_dial.py).
+
+### Debugging Environment - Switch
+-    **DIAL**:
+    a DIAL system running on the discrete custom SwitchGame environment.
+     - *Recurrent*
+        - [decentralised](debugging/switch/recurrent/decentralised/run_dial.py).
+
+### PettingZoo - Multi-Agent Atari
+-   **MADQN**:
+   a MADQN system running on the two-player competitive Atari Pong environment.
+    - *Feedforward*
+      - [decentralised](petting_zoo/atari/pong/feedforward/decentralised/run_madqn.py).
+
+### PettingZoo - Multi-Agent Particle Environment
+  -   **MADDPG**:
+      a MADDPG system running on the Simple Speaker Listener environment.
+      - *Feedforward*
+        - [ decentralised](petting_zoo/mpe/simple_speaker_listener/feedforward/decentralised/run_maddpg.py).
+
+  -   **MADDPG**:
+      a MADDPG system running on the Simple Spread environment.
+      - *Feedforward*
+        - [decentralised](petting_zoo/mpe/simple_spread/feedforward/decentralised/run_maddpg.py).
+
+### SMAC - StarCraft Multi-Agent Challenge
+-   **MADQN**:
+    a MADQN system running on the SMAC environment.
+    - *Feedforward*
+      - [decentralised](smac/feedforward/decentralised/run_madqn.py).
+    - *Recurrent*
+      - [decentralised with custom agent networks](smac/recurrent/decentralised/run_madqn.py) (***Example using custom agent networks***).
+
+-   **QMIX**:
+    a QMIX system running on the SMAC environment.
+    - *Feedforward*
+      - [decentralised](smac/feedforward/decentralised/run_qmix.py).
+
+-   **VDN**:
+    a VDN system running on the SMAC environment.
+    - *Feedforward*
+      - [decentralised](smac/feedforward/decentralised/run_vdn.py) and [decentralised record agents](smac/feedforward/decentralised/run_vdn_record.py).
+
+### OpenSpiel - Tic Tac Toe
+  -   **MADQN**:
+      a MADQN system running on the OpenSpiel environment.
+      - *Feedforward*
+        - [decentralised](openspiel/tic_tac_toe/feedforward/decentralised/run_madqn.py).
+
 
 [debug]: ../mava/utils/debugging
-[pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
+[pz_repo]: https://github.com/PettingZoo-Team/PettingZoo
+[pz_paper]: https://arxiv.org/abs/2009.14471
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
+[smac_repo]: https://github.com/oxwhirl/smac
+[smac_paper]: https://arxiv.org/abs/1902.04043
+[openspiel_repo]: https://github.com/deepmind/open_spiel
+[openspiel_paper]: https://github.com/deepmind/open_spiel
+[sisl_repo]: https://github.com/sisl/MADRL
+[sisl_paper]: http://ala2017.it.nuigalway.ie/papers/ALA2017_Gupta.pdf
+[mpe_repo]: https://github.com/openai/multiagent-particle-envs
+[mpe_paper]: https://arxiv.org/abs/1706.02275
+[robocup]: https://github.com/rcsoccersim
+[quickstart]: ./quickstart.ipynb
