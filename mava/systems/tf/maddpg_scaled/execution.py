@@ -50,6 +50,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_config: Dict[str, str],
+        do_pbt: bool=False,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -67,6 +68,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
         # Store these for later use.
         self._agent_specs = agent_specs
+        self._do_pbt= do_pbt
         self._counts = counts
         super().__init__(
             policy_networks=policy_networks,
@@ -84,10 +86,10 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         batched_observation = tf2_utils.add_batch_dim(observation)
 
         # index network either on agent type or on agent id
-        agent_key = self._agent_net_config[agent]
+        agent_net_key = self._agent_net_config[agent]
 
         # Compute the policy, conditioned on the observation.
-        policy = self._policy_networks[agent_key](batched_observation)
+        policy = self._policy_networks[agent_net_key](batched_observation)
 
         # TODO (dries): Make this support hybrid action spaces.
         if type(self._agent_specs[agent].actions) == BoundedArray:
@@ -122,6 +124,29 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         for agent, observation in observations.items():
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
+
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
+        """record first observed timestep from the environment
+
+        Args:
+            timestep (dm_env.TimeStep): data emitted by an environment at first step of
+                interaction.
+            extras (Dict[str, types.NestedArray], optional): possible extra information
+                to record during the first step. Defaults to {}.
+        """
+
+        if self._adder:
+            if self._do_pbt:
+                """Select new networks randomly for each agent."""
+                net_keys = self._policy_networks.keys()
+                for agent in self._agent_net_config.keys():
+                    self._agent_net_config[agent] = 
+
+            self._adder.add_first(timestep, extras)
 
     def observe(
         self,

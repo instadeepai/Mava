@@ -35,7 +35,6 @@ class FeedForwardExecutor(core.Executor):
     """A generic feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system.
     """
-
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],
