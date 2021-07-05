@@ -259,7 +259,8 @@ class DIAL:
         core_message_specs = {}
 
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
         for agent in agents:
             agent_type = agent.split("_")[0]

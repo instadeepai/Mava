@@ -13,8 +13,8 @@ setting:
 
 System                                                                | Paper                    | Code
 -------------------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Deep Deterministic Policy Gradient (MA-DDPG)             | [Lowe et al., 2017]   | [![TF](../../docs/images/tf-small.png)][MADDPG_TF2]
-Multi-Agent Distributed Distributional DDPG (MA-D4PG)    | [Barth-Maron et al., 2018] | [![TF](../../docs/images/tf-small.png)][MAD4PG_TF2]
+Multi-Agent Deep Deterministic Policy Gradient (MADDPG)             | [Lowe et al., 2017]   | [![TF](../../docs/images/tf-small.png)][MADDPG_TF2]
+Multi-Agent Distributed Distributional DDPG (MAD4PG)    | [Barth-Maron et al., 2018] | [![TF](../../docs/images/tf-small.png)][MAD4PG_TF2]
 
 ### Discrete control
 We also include a number of systems built with discrete action-spaces in mind listed below:
@@ -30,7 +30,7 @@ We also have a system that works with either discrete or continuous action-space
 
 System                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Proximal Policy Optimization (MA-PPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![TF](../../docs/images/tf-small.png)][MAPPO_TF2]
+Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![TF](../../docs/images/tf-small.png)][MAPPO_TF2]
 
 <!-- TF agents -->
 
