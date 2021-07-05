@@ -474,7 +474,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             inputs (Any): input data from the data table (transitions)
         """
 
-        # TODO: Update this forward function to work like MA-D4PG
+        # TODO: Update this forward function to work like MAD4PG
         data = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
