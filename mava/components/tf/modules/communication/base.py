@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Kevin): complete base class for communication
-
 import abc
 from typing import Dict, Union
 
@@ -59,4 +57,3 @@ class BaseCommunicationModule:
     @abc.abstractmethod
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         """Create system architecture with communication."""
-        # create_system on base architecture
