@@ -13,9 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn):
-#   - [] complete base class for mixing
-
 import abc
 from typing import Dict, Optional
 
