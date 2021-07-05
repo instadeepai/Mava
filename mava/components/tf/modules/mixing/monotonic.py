@@ -13,9 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn):
-#   - [] Complete class for monotonic mixing
-
 """Mixing for multi-agent RL systems"""
 from typing import Dict, Union
 

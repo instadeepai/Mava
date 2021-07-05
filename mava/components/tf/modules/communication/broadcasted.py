@@ -48,7 +48,6 @@ class BroadcastedCommunication(BaseCommunicationModule):
         self,
     ) -> Dict[str, Dict[str, snt.Module]]:
         """Create system architecture with communication by modifying architecture."""
-        # networks = self.create_communication_variables()
 
         return self._architecture.create_system()
 
