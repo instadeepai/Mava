@@ -9,14 +9,15 @@
 
 # Table of Contents
 1. [Overview](#overview)
-2. [Supported Environments](#supported-environments)
-3. [System implementations](#system-implementations)
-4. [Examples](#examples)
-5. [Installation](#installation)
-6. [Debugging](#debugging)
-7. [Roadmap](#roadmap)
-8. [Contributing](#contributing)
-9. [Troubleshooting and FAQ](#troubleshooting-and-faqs)
+2. [Getting Started](#getting-started)
+3. [Supported Environments](#supported-environments)
+4. [System implementations](#system-implementations)
+5. [Mava Usage](#mava-usage)
+6. [Installation](#installation)
+7. [Debugging](#debugging)
+8. [Roadmap](#roadmap)
+9. [Contributing](#contributing)
+10. [Troubleshooting and FAQ](#troubleshooting-and-faqs)
 
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability.
 
@@ -42,6 +43,9 @@ Several examples of system implementations can be viewed [here][Systems].
 ### Distributed system training
 
 Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to scale systems in a simple way, using the same underlying multi-agent RL system code. Mava uses [Launchpad](launchpad) for creating distributed programs. In Mava, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of all the actor networks used within each executor. This approach to distributed system training is illustrated on the right in the figure above. ✋ **NOTE: In the near future, Mava aims to support additional training setups, e.g. distributed training using multiple trainers to support Bayesian optimisation or population based training (PBT).**
+
+## Getting Started
+We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System. For more information on how to use Mava, please visit [Mava Usage](#mava-usage).
 
 ## Supported environments
 
@@ -84,7 +88,7 @@ Mava includes several system implementations. Below we list these together with 
 
 As we develop Mava further, we aim to have all systems well tested on a wide variety of environments.
 
-## Examples
+## Mava Usage
 
 To get a sense of how Mava systems are used we provide the following simplified example of launching a distributed MADQN system.
 
@@ -117,7 +121,7 @@ These helper functions are responsible for creating the networks for the system,
 After building the program we feed it to Launchpad's `launch` function and specify the launch type to perform local multi-processing, i.e. running the distributed program on a single machine. Scaling up or down is simply a matter of adjusting the number of executor processes.
 
 For a deeper dive, take a look at the detailed working code
-examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments. We also have a [Quickstart notebook][quickstart].
+examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
 
 ### Components
 
