@@ -14,5 +14,6 @@
 # limitations under the License.
 
 from mava.systems.tf.dial.execution import DIALSwitchExecutor
+from mava.systems.tf.dial.networks import make_default_networks
 from mava.systems.tf.dial.system import DIAL
 from mava.systems.tf.dial.training import DIALSwitchTrainer
