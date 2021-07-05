@@ -16,6 +16,7 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dm_env
+from numpy.random import randint
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -141,11 +142,12 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
         if self._adder:
             if self._do_pbt:
-                """Select new networks randomly for each agent."""
+                """In population based trianing select new networks randomly for each agent.
+                Also ddd the network key used by each agent."""
                 net_keys = self._policy_networks.keys()
                 for agent in self._agent_net_config.keys():
-                    self._agent_net_config[agent] = 
-
+                    self._agent_net_config[agent] = net_keys[randint(len(net_keys))]
+                extras["networks": self._agent_net_config]
             self._adder.add_first(timestep, extras)
 
     def observe(
@@ -158,6 +160,11 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
     ) -> None:
         if self._adder:
             _, policy = actions
+
+            if self._do_pbt:
+                """Add the network key used by each agent."""
+                next_extras["networks": self._agent_net_config]
+
             # TODO (dries): Sort out this mypy issue.
             self._adder.add(policy, next_timestep, next_extras)  # type: ignore
 

@@ -43,28 +43,7 @@ DiscreteArray = dm_specs.DiscreteArray
 class MADDPGConfig:
     """Configuration options for the MADDPG system.
     Args:
-            environment_spec: description of the actions, observations, etc.
-            policy_networks: the online (optimized) policies for each agent in
-                the system.
-            critic_networks: the online critic for each agent in the system.
-            observation_networks: dictionary of optional networks to transform
-                the observations before they are fed into any network.
-            discount: discount to use for TD updates.
-            batch_size: batch size for updates.
-            prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-              the target networks.
-            min_replay_size: minimum replay size before updating.
-            max_replay_size: maximum replay size.
-            samples_per_insert: number of samples to take from replay for every insert
-              that is made.
-            n_step: number of steps to squash into a single transition.
-            sigma: standard deviation of zero-mean, Gaussian exploration noise.
-            clipping: whether to clip gradients by global norm.
-            logger: logger object to be used by trainers.
-            counter: counter object used to keep track of steps.
-            checkpoint: boolean indicating whether to checkpoint the trainers.
-            replay_table_name: string indicating what name to give the replay table."""
+            Add the arguments..."""
 
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
@@ -85,6 +64,7 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
+    do_pbt = False,
     max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
     logger: loggers.Logger = None
@@ -341,7 +321,7 @@ class MADDPGBuilder:
             counts=counts,
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_config=self._config.agent_net_config,
-            # shared_weights=shared_weights,
+            do_pbt=self.config.do_pbt,
             variable_client=variable_client,
             adder=adder,
         )

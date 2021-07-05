@@ -83,6 +83,8 @@ class MADDPG:
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
+        do_pbt=False,
+        num_agents_in_population=10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
         # max_executor_steps: int = None,
@@ -159,6 +161,11 @@ class MADDPG:
                 for agent in agents
             }
 
+        self._network_factory_config = self._agent_net_config
+        if do_pbt:
+            # Note: Assuming all agents have the same specs for now.
+            self._network_factory_config = {f"agent_{i}": "agent_0" for i in range(num_agents_in_population)}
+
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
@@ -207,6 +214,7 @@ class MADDPG:
                 sequence_length=sequence_length,
                 period=period,
                 sigma=sigma,
+                do_pbt=do_pbt,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
@@ -223,7 +231,7 @@ class MADDPG:
         core_state_specs = {}
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
-            agent_net_config=self._agent_net_config,
+            agent_net_config=self._network_factory_config,
         )
         for agent in agents:
             # agent_type = agent.split("_")[0]
@@ -245,7 +253,7 @@ class MADDPG:
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
-            agent_net_config=self._agent_net_config,
+            agent_net_config=self._network_factory_config,
         )
 
         # Create system architecture with target networks.

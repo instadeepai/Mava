@@ -107,11 +107,8 @@ def main(_: Any) -> None:
             "trainer_3": ["agent_6", "agent_9"],
             "trainer_4": ["agent_7", "agent_8"],
         },
-        agent_net_config={
-            "agent_0": "agent_0",
-            "agent_1": "agent_1",
-            "agent_2": "agent_2",
-        },
+        do_pbt=True,
+        num_agents_in_population=10,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
