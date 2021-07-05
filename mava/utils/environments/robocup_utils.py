@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Pettingzoo environment factory."""
+"""Robocup environment factory."""
 
 import dm_env
 import numpy as np
