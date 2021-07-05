@@ -36,7 +36,7 @@ The `Executor` is the part of the system that interacts with the environment, ta
 Several examples of system implementations can be viewed [here][Systems].
 
 <p align="center">
-  <img align="center" src="docs/images/animation_quick.gif" width="80%">
+  <img align="center" src="docs/images/animation_quick.gif" width="70%">
 </p>
 
 ### Distributed system training
