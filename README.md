@@ -116,7 +116,7 @@ These helper functions are responsible for creating the networks for the system,
 After building the program we feed it to Launchpad's `launch` function and specify the launch type to perform local multi-processing, i.e. running the distributed program on a single machine. Scaling up or down is simply a matter of adjusting the number of executor processes.
 
 For a deeper dive, take a look at the detailed working code
-examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments.
+examples found in our [examples] subdirectory which show how to instantiate a few MARL systems and environments. We also have a [Quickstart notebook][quickstart].
 
 ### Components
 
@@ -312,3 +312,4 @@ If you use Mava in your work, please cite the accompanying
 [roadmap]: https://github.com/instadeepai/Mava/issues/246
 [wishlist]: https://github.com/instadeepai/Mava/issues/247
 [bsuite]: https://github.com/deepmind/bsuite
+[quickstart]: examples/quickstart.ipynb
