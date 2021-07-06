@@ -4,9 +4,9 @@ We include a non-exhaustive number of examples, showing common use-cases for Mav
 ## Environments
 
 In Mava, we support a variety of different environments, which include
-PettingZoo ([Repo](pz_repo), [Paper](pz_paper)), SMAC ([Repo](smac_repo), [Paper](smac_paper)), [2D RoboCup][robocup], [Flatland][flatland], OpenSpiel ([Repo](openspiel_repo), [Paper](openspiel_paper)) environments, as well as a few custom [environments][debug] inside Mava.
+PettingZoo ([Repo][pz_repo], [Paper][pz_paper]), SMAC ([Repo][smac_repo], [Paper][smac_paper]), [2D RoboCup][robocup], [Flatland][flatland], OpenSpiel ([Repo][openspiel_repo], [Paper][openspiel_paper]) environments, as well as a few custom [environments][debug] inside Mava.
 
-With our integration with PettingZoo, we support popular Multi-Agent environments such as SISL ([Repo](sisl_repo), [Paper](sisl_paper)), MPE ([Repo](mpe_repo), [Paper](mpe_paper)) and [Multi-Agent Atari](https://www.pettingzoo.ml/atari) environments.
+With our integration with PettingZoo, we support popular Multi-Agent environments such as SISL ([Repo][sisl_repo], [Paper][sisl_paper]), MPE ([Repo][mpe_repo], [Paper][mpe_paper]) and [Multi-Agent Atari](https://www.pettingzoo.ml/atari) environments.
 
 ## Continuous control
 We include a number of systems running on continuous control tasks.
