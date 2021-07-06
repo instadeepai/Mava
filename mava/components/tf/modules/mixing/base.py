@@ -13,9 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (StJohn):
-#   - [] complete base class for mixing
-
 import abc
 from typing import Dict, Optional
 
@@ -44,7 +41,7 @@ class BaseMixingModule:
         """Initialise the mixer."""
 
     @abc.abstractmethod
-    def _create_mixing_layer(self) -> snt.Module:
+    def _create_mixing_layer(self, name: str) -> snt.Module:
         """Abstract function for adding an arbitrary mixing layer to a
         given architecture."""
 

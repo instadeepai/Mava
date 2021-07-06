@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MAD4PG system implementation."""
+"""MAD4PG system builder implementation."""
+
 from typing import Any, Dict, Type, Union
 
 from mava import core
@@ -25,13 +26,6 @@ from mava.systems.tf.maddpg.builder import MADDPGBuilder, MADDPGConfig
 class MAD4PGBuilder(MADDPGBuilder):
     """Builder for MAD4PG which constructs individual components of the system."""
 
-    """Defines an interface for defining the components of an RL system.
-      Implementations of this interface contain a complete specification of a
-      concrete RL system. An instance of this class can be used to build an
-      RL system which interacts with the environment either locally or in a
-      distributed setup.
-      """
-
     def __init__(
         self,
         config: MADDPGConfig,
@@ -42,9 +36,21 @@ class MAD4PGBuilder(MADDPGBuilder):
         executor_fn: Type[core.Executor] = executors.FeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):
-        """Args:
-        config: Configuration options for the MAD4PG system.
-        trainer_fn: Trainer module to use."""
+        """Initialise the system.
+
+        Args:
+            config (MADDPGConfig): system configuration specifying hyperparameters and
+                additional information for constructing the system.
+            trainer_fn (Union[ Type[training.MAD4PGBaseTrainer],
+                Type[training.MAD4PGBaseRecurrentTrainer], ], optional): Trainer
+                function, of a correpsonding type to work with the selected system
+                architecture. Defaults to training.MAD4PGDecentralisedTrainer.
+            executor_fn (Type[core.Executor], optional): Executor function, of a
+                corresponding type to work with the selected system architecture.
+                Defaults to executors.FeedForwardExecutor.
+            extra_specs (Dict[str, Any], optional): defines the specifications of extra
+                information used by the system. Defaults to {}.
+        """
 
         super().__init__(
             config=config,

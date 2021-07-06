@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MAPPO builder and config."""
+"""MAPPO system builder implementation."""
+
 import dataclasses
 from typing import Dict, Iterator, List, Optional, Type, Union
 
@@ -27,37 +28,40 @@ from acme.utils import counting
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.systems.builders import SystemBuilder
 from mava.systems.tf.mappo import execution, training
-from mava.wrappers import DetailedTrainerStatistics, NetworkStatisticsActorCritic
+from mava.wrappers import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass
 class MAPPOConfig:
     """Configuration options for the MAPPO system
     Args:
-        environment_spec: environment specs.
-        sequence_length: length of the sequences in the queue.
-        sequence_period: amount of overlap between sequences added to the queue.
-        discount: discount factor (Always between 0 and 1).
-        lambda_gae: scalar determining the mix of bootstrapping
-            vs further accumulation of multi-step returns at each timestep.
-            See `High-Dimensional Continuous Control Using Generalized
-            Advantage Estimation` for more information.
-        clipping_epsilon: Hyper-parameter for clipping in the policy
-            objective. Roughly: how far can the new policy go from
-            the old policy while still profiting? The new policy can
-            still go farther than the clip_ratio says, but it doesn’t
-            help on the objective anymore.
+        environment_spec: description of the action and observation spaces etc. for
+            each agent in the system.
+        policy_optimizer: optimizer(s) for updating policy networks.
+        critic_optimizer: optimizer for updating critic networks.
+        sequence_length: recurrent sequence rollout length.
+        sequence_period: consecutive starting points for overlapping rollouts across a
+            sequence.
+        shared_weights: boolean indicating whether agents should share weights.
+        discount: discount to use for TD updates.
+        lambda_gae: scalar determining the mix of bootstrapping vs further accumulation
+            of multi-step returns at each timestep. See `High-Dimensional Continuous
+            Control Using Generalized Advantage Estimation` for more information.
         max_queue_size: maximum number of items in the queue.
-        batch_size: size of the mini-batches.
-        critic_optimizer: optimizer for the critic.
-        policy_optimizer: optimizer for the policy.
+        executor_variable_update_period: the rate at which executors sync their
+            paramters with the trainer.
+        batch_size: batch size for updates.
         entropy_cost: contribution of entropy regularization to the total loss.
         baseline_cost: contribution of the value loss to the total loss.
-        max_abs_reward: max reward. If not None, the reward on which the agent
-            is trained will be clipped between -max_abs_reward and max_abs_reward.
-        max_gradient_norm: gradient normalization.
+        clipping_epsilon: Hyper-parameter for clipping in the policy objective. Roughly:
+            how far can the new policy go from the old policy while still profiting?
+            The new policy can still go farther than the clip_ratio says, but it doesn’t
+            help on the objective anymore.
+        max_gradient_norm: value to specify the maximum clipping value for the gradient
+            norm during optimization.
+        checkpoint: boolean to indicate whether to checkpoint models.
+        checkpoint_subpath: subdirectory specifying where to store checkpoints.
         replay_table_name: string indicating what name to give the replay table.
     """
 
@@ -81,16 +85,8 @@ class MAPPOConfig:
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
-class MAPPOBuilder(SystemBuilder):
-
+class MAPPOBuilder:
     """Builder for MAPPO which constructs individual components of the system."""
-
-    """Defines an interface for defining the components of a MARL system.
-      Implementations of this interface contain a complete specification of a
-      concrete MARL system. An instance of this class can be used to build a
-      MARL system which interacts with the environment either locally or in a
-      distributed setup.
-      """
 
     def __init__(
         self,
@@ -98,10 +94,17 @@ class MAPPOBuilder(SystemBuilder):
         trainer_fn: Type[training.MAPPOTrainer] = training.MAPPOTrainer,
         executor_fn: Type[core.Executor] = execution.MAPPOFeedForwardExecutor,
     ):
-        """Args:
-        config: Configuration options for the MAPPO system.
-        policy_networks: ...
-        trainer_fn: ...
+        """Initialise the system.
+
+        Args:
+            config (MAPPOConfig): system configuration specifying hyperparameters and
+                additional information for constructing the system.
+            trainer_fn (Type[training.MAPPOTrainer], optional): Trainer
+                function, of a correpsonding type to work with the selected system
+                architecture. Defaults to training.MAPPOTrainer.
+            executor_fn (Type[core.Executor], optional): Executor function, of a
+                corresponding type to work with the selected system architecture.
+                Defaults to execution.MAPPOFeedForwardExecutor.
         """
 
         self._config = config
@@ -114,7 +117,16 @@ class MAPPOBuilder(SystemBuilder):
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
-        """Create tables to insert data into."""
+        """Create tables to insert data into.
+
+        Args:
+            environment_spec (specs.MAEnvironmentSpec): description of the action and
+                observation spaces etc. for each agent in the system.
+
+        Returns:
+            List[reverb.Table]: a list of data tables for inserting data.
+        """
+
         agent_specs = environment_spec.get_agent_specs()
         extras_spec: Dict[str, Dict[str, acme_types.NestedArray]] = {"log_probs": {}}
 
@@ -139,10 +151,19 @@ class MAPPOBuilder(SystemBuilder):
         self,
         replay_client: reverb.Client,
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for learning/updating the system.
+        """Create a dataset iterator to use for training/updating the system.
+
         Args:
-          replay_client: ...
+            replay_client (reverb.Client): Reverb Client which points to the
+                replay server.
+
+        Returns:
+            [type]: dataset iterator.
+
+        Yields:
+            Iterator[reverb.ReplaySample]: data samples from the dataset.
         """
+
         # Create tensorflow dataset to interface with reverb
         dataset = reverb.ReplayDataset.from_table_signature(
             server_address=replay_client.server_address,
@@ -162,9 +183,18 @@ class MAPPOBuilder(SystemBuilder):
         replay_client: reverb.Client,
     ) -> Optional[adders.ParallelAdder]:
         """Create an adder which records data generated by the executor/environment.
+
         Args:
-          replay_client: a Reverb client which points to the replay server.
+            replay_client (reverb.Client): Reverb Client which points to the
+                replay server.
+
+        Raises:
+            NotImplementedError: unknown executor type.
+
+        Returns:
+            Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
         """
+
         return reverb_adders.ParallelSequenceAdder(
             client=replay_client,
             period=self._config.sequence_period,
@@ -180,10 +210,18 @@ class MAPPOBuilder(SystemBuilder):
     ) -> core.Executor:
 
         """Create an executor instance.
+
         Args:
-            policy_networks: a struct of instance of all the different networks.
-            adder: how data is recorded (e.g. added to replay).
-            variable_source: a source providing the necessary executor parameters.
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            adder (Optional[adders.ParallelAdder], optional): adder to send data to
+                a replay buffer. Defaults to None.
+            variable_source (Optional[core.VariableSource], optional): variables server.
+                Defaults to None.
+
+        Returns:
+            core.Executor: system executor, a collection of agents making up the part
+                of the system generating data by interacting the environment.
         """
 
         variable_client = None
@@ -218,22 +256,25 @@ class MAPPOBuilder(SystemBuilder):
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        replay_client: Optional[reverb.Client] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
     ) -> core.Trainer:
-        """Creates an instance of the trainer.
+        """Create a trainer instance.
+
         Args:
-            networks: a struct describing the networks needed by the trainer; this can
-                be specific to the trainer in question.
-            dataset: iterator over samples from replay.
-            replay_client: client which allows communication with replay, e.g. in
-                order to update priorities.
-            counter: a Counter which allows for recording of counts (trainer steps,
-                executor steps, etc.) distributed throughout the system.
-            logger: Logger object for logging metadata.
-            checkpoint: bool controlling whether the trainer checkpoints itself.
+            networks (Dict[str, Dict[str, snt.Module]]): system networks.
+            dataset (Iterator[reverb.ReplaySample]): dataset iterator to feed data to
+                the trainer networks.
+            counter (Optional[counting.Counter], optional): a Counter which allows for
+                recording of counts, e.g. trainer steps. Defaults to None.
+            logger (Optional[types.NestedLogger], optional): Logger object for logging
+                metadata. Defaults to None.
+
+        Returns:
+            core.Trainer: system trainer, that uses the collected data from the
+                executors to update the parameters of the agent networks in the system.
         """
+
         agents = self._agents
         agent_types = self._agent_types
         shared_weights = self._config.shared_weights
@@ -264,8 +305,6 @@ class MAPPOBuilder(SystemBuilder):
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
-
-        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
 
         trainer = DetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]

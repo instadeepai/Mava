@@ -19,4 +19,3 @@ from mava.components.tf.modules.communication.base import BaseCommunicationModul
 from mava.components.tf.modules.communication.broadcasted import (
     BroadcastedCommunication,
 )
-from mava.components.tf.modules.communication.targeted import TargetedCommunication

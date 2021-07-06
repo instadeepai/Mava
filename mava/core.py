@@ -75,9 +75,6 @@ class Executor(acme.Actor):
         """
 
 
-# Internal class.
-
-
 class VariableSource(abc.ABC):
     """Abstract source of variables.
     Objects which implement this interface provide a source of variables, returned

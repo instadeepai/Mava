@@ -31,8 +31,10 @@ from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
 from mava.types import Observation, Reward
 from mava.utils.environments.flatland_utils import load_flatland_env
+from mava.utils.environments.open_spiel_utils import load_open_spiel_env
 from mava.utils.wrapper_utils import convert_np_type
 from mava.wrappers.flatland import FlatlandEnvWrapper
+from mava.wrappers.open_spiel import OpenSpielSequentialWrapper
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
@@ -89,6 +91,8 @@ class Helpers:
                 env = mod.env()  # type:ignore
         elif env_spec.env_source == EnvSource.Flatland:
             env = load_flatland_env(flatland_env_config)
+        elif env_spec.env_source == EnvSource.OpenSpiel:
+            env = load_open_spiel_env(env_spec.env_name)
         else:
             raise Exception("Env_spec is not valid.")
         env.reset()  # type:ignore
@@ -107,6 +111,8 @@ class Helpers:
                 wrapper = PettingZooAECEnvWrapper
         elif env_spec.env_source == EnvSource.Flatland:
             wrapper = FlatlandEnvWrapper
+        elif env_spec.env_source == EnvSource.OpenSpiel:
+            wrapper = OpenSpielSequentialWrapper
         else:
             raise Exception("Env_spec is not valid.")
         return wrapper

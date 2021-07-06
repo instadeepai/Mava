@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""MAPPO system executor implementation."""
+
 from typing import Any, Dict, Optional, Tuple
 
 import dm_env
@@ -21,8 +23,6 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
 from acme import types
-
-# Internal imports.
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
@@ -32,11 +32,8 @@ tfd = tfp.distributions
 
 
 class MAPPOFeedForwardExecutor(core.Executor):
-    """A recurrent Executor for MAPPO.
-    An executor based on a recurrent policy for each agent in the system which
-    takes non-batched observations and outputs non-batched actions, and keeps
-    track of the recurrent state inside. It also allows adding experiences to
-    replay and updating the weights from the policy on the learner.
+    """A feed-forward executor.
+    An executor based on a feed-forward policy for each agent in the system.
     """
 
     def __init__(
@@ -46,15 +43,17 @@ class MAPPOFeedForwardExecutor(core.Executor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         shared_weights: bool = True,
     ):
+        """Initialise the system executor
 
-        """Initializes the executor.
         Args:
-          networks: the (recurrent) policy to run for each agent in the system.
-          shared_weights: specify if weights are shared between agent networks.
-          adder: the adder object to which allows to add experiences to a
-            dataset/replay buffer.
-          variable_client: object which allows to copy weights from the trainer copy
-            of the policies to the executor copy (in case they are separate).
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+                to a replay buffer. Defaults to None.
+            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+                client to copy weights from the trainer. Defaults to None.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
         """
 
         # Store these for later use.
@@ -70,6 +69,17 @@ class MAPPOFeedForwardExecutor(core.Executor):
         agent: str,
         observation: types.NestedTensor,
     ) -> Tuple[types.NestedTensor, types.NestedTensor]:
+        """Agent specific policy function
+
+        Args:
+            agent (str): agent id
+            observation (types.NestedTensor): observation tensor received from the
+                environment.
+
+        Returns:
+            Tuple[types.NestedTensor, types.NestedTensor]: log probabilities and action
+        """
+
         # Index network either on agent type or on agent id.
         network_key = agent.split("_")[0] if self._shared_weights else agent
 
@@ -93,6 +103,16 @@ class MAPPOFeedForwardExecutor(core.Executor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
+        """select an action for a single agent in the system
+
+        Args:
+            agent (str): agent id.
+            observation (types.NestedArray): observation tensor received from the
+                environment.
+
+        Returns:
+            types.NestedArray: agent action
+        """
 
         # Step the recurrent policy/value network forward
         # given the current observation and state.
@@ -112,6 +132,16 @@ class MAPPOFeedForwardExecutor(core.Executor):
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Dict[str, types.NestedArray]:
+        """select the actions for all agents in the system
+
+        Args:
+           observations (Dict[str, types.NestedArray]): agent observations from the
+                environment.
+
+        Returns:
+            Dict[str, types.NestedArray]: actions and policies for all agents in
+                the system.
+        """
 
         actions = {}
         for agent, observation in observations.items():
@@ -125,6 +155,14 @@ class MAPPOFeedForwardExecutor(core.Executor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
+        """record first observed timestep from the environment
+
+        Args:
+            timestep (dm_env.TimeStep): data emitted by an environment at first step of
+                interaction.
+            extras (Dict[str, types.NestedArray], optional): possible extra information
+                to record during the first step. Defaults to {}.
+        """
 
         if self._adder:
             self._adder.add_first(timestep)
@@ -135,6 +173,15 @@ class MAPPOFeedForwardExecutor(core.Executor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
+        """record observed timestep from the environment
+
+        Args:
+            actions (Dict[str, types.NestedArray]): system agents' actions.
+            next_timestep (dm_env.TimeStep): data emitted by an environment during
+                interaction.
+            next_extras (Dict[str, types.NestedArray], optional): possible extra
+                information to record during the transition. Defaults to {}.
+        """
 
         if not self._adder:
             return
@@ -146,5 +193,12 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self._adder.add(actions, next_timestep, next_extras)
 
     def update(self, wait: bool = False) -> None:
+        """update executor variables
+
+        Args:
+            wait (bool, optional): whether to stall the executor's request for new
+                variables. Defaults to False.
+        """
+
         if self._variable_client:
             self._variable_client.update(wait)

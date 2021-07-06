@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""QMIX system builder implementation."""
+
 import dataclasses
 from typing import Any, Dict, Iterator, Optional, Type
 
@@ -31,39 +33,40 @@ from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.qmix import execution, training
 from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
 
-# TODO Clean up documentation
-
 
 @dataclasses.dataclass
 class QMIXConfig(MADQNConfig):
-    # TODO Match documentation with MADQNConfig once cleaned.
     """Configuration options for the QMIX system.
     Args:
-            environment_spec: description of the actions, observations, etc.
-            discount: discount to use for TD updates.
-            batch_size: batch size for updates.
-            prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-              the target networks.
-            min_replay_size: minimum replay size before updating.
-            max_replay_size: maximum replay size.
-            samples_per_insert: number of samples to take from replay for every insert
-              that is made.
-            n_step: number of steps to squash into a single transition.
-            sigma: standard deviation of zero-mean, Gaussian exploration noise.
-            clipping: whether to clip gradients by global norm.
-            replay_table_name: string indicating what name to give the replay table."""
+        environment_spec: description of the action and observation spaces etc. for
+            each agent in the system.
+        epsilon_min: final minimum value for epsilon at the end of a decay schedule.
+        epsilon_decay: the rate at which epislon decays.
+        shared_weights: boolean indicating whether agents should share weights.
+        target_update_period: number of learner steps to perform before updating
+            the target networks.
+        executor_variable_update_period: the rate at which executors sync their
+            paramters with the trainer.
+        max_gradient_norm: value to specify the maximum clipping value for the gradient
+            norm during optimization.
+        min_replay_size: minimum replay size before updating.
+        max_replay_size: maximum replay size.
+        samples_per_insert: number of samples to take from replay for every insert
+            that is made.
+        prefetch_size: size to prefetch from replay.
+        batch_size: batch size for updates.
+        n_step: number of steps to include prior to boostrapping.
+        sequence_length: recurrent sequence rollout length.
+        period: consecutive starting points for overlapping rollouts across a sequence.
+        discount: discount to use for TD updates.
+        checkpoint: boolean to indicate whether to checkpoint models.
+        optimizer: type of optimizer to use for updating the parameters of models.
+        replay_table_name: string indicating what name to give the replay table.
+        checkpoint_subpath: subdirectory specifying where to store checkpoints."""
 
 
 class QMIXBuilder(MADQNBuilder):
     """Builder for QMIX which constructs individual components of the system."""
-
-    """Defines an interface for defining the components of an MARL system.
-      Implementations of this interface contain a complete specification of a
-      concrete MARL system. An instance of this class can be used to build an
-      MARL system which interacts with the environment either locally or in a
-      distributed setup.
-      """
 
     def __init__(
         self,
@@ -77,10 +80,28 @@ class QMIXBuilder(MADQNBuilder):
         ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ) -> None:
-        """Args:
-        _config: Configuration options for the QMIX system.
-        _trainer_fn: Trainer module to use.
+        """Initialise the system.
+
+        Args:
+            config (QMIXConfig): system configuration specifying hyperparameters and
+                additional information for constructing the system.
+            trainer_fn (Type[training.QMIXTrainer], optional): Trainer function, of a
+                correpsonding type to work with the selected system architecture.
+                Defaults to training.QMIXTrainer.
+            executor_fn (Type[core.Executor], optional): Executor function, of a
+                corresponding type to work with the selected system architecture.
+                Defaults to execution.QMIXFeedForwardExecutor.
+            mixer (Type[MonotonicMixing], optional): mixer module type, e.g. additive or
+                monotonic mixing. Defaults to MonotonicMixing.
+            extra_specs (Dict[str, Any], optional): defines the specifications of extra
+                information used by the system. Defaults to {}.
+            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
+                epsilon decay scheduler. Defaults to LinearExplorationScheduler.
+            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
+                optional): optional function to stabilise experience replay. Defaults
+                to None.
         """
+
         super(QMIXBuilder, self).__init__(
             config=config,
             trainer_fn=trainer_fn,
@@ -99,15 +120,24 @@ class QMIXBuilder(MADQNBuilder):
         logger: Optional[types.NestedLogger] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
     ) -> core.Trainer:
-        """Creates an instance of the trainer.
+        """Create a trainer instance.
+
         Args:
-          networks: struct describing the networks needed by the trainer; this can
-            be specific to the trainer in question.
-          dataset: iterator over samples from replay.
-          counter: a Counter which allows for recording of counts (trainer steps,
-            executor steps, etc.) distributed throughout the system.
-          logger: Logger object for logging metadata.
+            networks (Dict[str, Dict[str, snt.Module]]): system networks.
+            dataset (Iterator[reverb.ReplaySample]): dataset iterator to feed data to
+                the trainer networks.
+            counter (Optional[counting.Counter], optional): a Counter which allows for
+                recording of counts, e.g. trainer steps. Defaults to None.
+            logger (Optional[types.NestedLogger], optional): Logger object for logging
+                metadata.. Defaults to None.
+            communication_module (BaseCommunicationModule): module to enable
+                agent communication. Defaults to None.
+
+        Returns:
+            core.Trainer: system trainer, that uses the collected data from the
+                executors to update the parameters of the agent networks in the system.
         """
+
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 

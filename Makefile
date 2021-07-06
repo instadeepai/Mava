@@ -17,7 +17,7 @@ DOCKER_RUN_TENSORBOARD=docker run $(RUN_FLAGS_TENSORBOARD) $(IMAGE)
 
 # Set example to run when using `make run`
 # Default example
-EXAMPLE=examples/debugging_envs/run_decentralised_feedforward_maddpg_continous.py
+EXAMPLE=examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py
 
 # make file commands
 run:
@@ -37,6 +37,9 @@ build:
 
 build_robocup:
 	docker build --tag $(IMAGE) -f ./Dockerfile.robocup .
+
+build_sc2:
+	docker build --tag $(IMAGE) -f ./Dockerfile.sc2 .
 
 push:
 	docker login

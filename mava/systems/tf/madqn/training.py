@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""MADQN system trainer implementation."""
+
 import copy
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -63,6 +65,35 @@ class MADQNTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
     ):
+        """Initialise MADQN trainer
+
+        Args:
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            q_networks (Dict[str, snt.Module]): q-value networks.
+            target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            target_update_period (int): number of steps before updating target networks.
+            dataset (tf.data.Dataset): training dataset.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
+                optimizer for updating the parameters of the networks.
+            discount (float): discount factor for TD updates.
+            shared_weights (bool): wether agents are sharing weights or not.
+            exploration_scheduler (LinearExplorationScheduler): function specifying a
+                decaying scheduler for epsilon exploration.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            fingerprint (bool, optional): whether to apply replay stabilisation using
+                policy fingerprints. Defaults to False.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+            communication_module (BaseCommunicationModule): module for communication
+                between agents. Defaults to None.
+        """
 
         self._agents = agents
         self._agent_types = agent_types
@@ -153,15 +184,32 @@ class MADQNTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def get_epsilon(self) -> float:
+        """get the current value for the exploration parameter epsilon
+
+        Returns:
+            float: epsilon parameter value
+        """
+
         return self._exploration_scheduler.get_epsilon()
 
     def get_trainer_steps(self) -> float:
+        """get trainer step count
+
+        Returns:
+            float: number of trainer steps
+        """
+
         return self._num_steps.numpy()
 
     def _decrement_epsilon(self) -> None:
+        """Decay epsilon exploration value"""
+
         self._exploration_scheduler.decrement_epsilon()
 
     def _update_target_networks(self) -> None:
+        """Sync the target network parameters with the latest online network
+        parameters"""
+
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (*self._q_networks[key].variables,)
@@ -181,6 +229,19 @@ class MADQNTrainer(mava.Trainer):
         a_tm1: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        """get data to feed to the agent networks
+
+        Args:
+            o_tm1_trans (Dict[str, np.ndarray]): transformed (e.g. using observation
+                network) observation at timestep t-1
+            o_t_trans (Dict[str, np.ndarray]): transformed observation at timestep t
+            a_tm1 (Dict[str, np.ndarray]): action at timestep t-1
+            agent (str): agent id
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor]: agent network feeds, observations
+                at t-1, t and action at time t.
+        """
 
         # Decentralised
         o_tm1_feed = o_tm1_trans[agent].observation
@@ -190,6 +251,8 @@ class MADQNTrainer(mava.Trainer):
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
     def step(self) -> None:
+        """trainer step to update the parameters of the agents in the system"""
+
         # Run the learning step.
         fetches = self._step()
 
@@ -218,9 +281,8 @@ class MADQNTrainer(mava.Trainer):
             self._logger.write(fetches)
 
     @tf.function
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
+    def _step(self) -> Dict[str, Dict[str, Any]]:
+        """Trainer forward and backward passes."""
 
         # Update the target networks
         self._update_target_networks()
@@ -237,6 +299,12 @@ class MADQNTrainer(mava.Trainer):
         return self._q_network_losses
 
     def _forward(self, inputs: Any) -> None:
+        """Trainer forward pass
+
+        Args:
+            inputs (Any): input data from the data table (transitions)
+        """
+
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -299,6 +367,8 @@ class MADQNTrainer(mava.Trainer):
         self.tape = tape
 
     def _backward(self) -> None:
+        """Trainer backward pass updating network parameters"""
+
         q_network_losses = self._q_network_losses
         tape = self.tape
         for agent in self._agents:
@@ -319,6 +389,15 @@ class MADQNTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+        """get network variables
+
+        Args:
+            names (Sequence[str]): network names
+
+        Returns:
+            Dict[str, Dict[str, np.ndarray]]: network variables
+        """
+
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         for network_type in names:
             variables[network_type] = {
@@ -356,6 +435,36 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
     ):
+        """Initialise recurrent MADQN trainer
+
+        Args:
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            q_networks (Dict[str, snt.Module]): q-value networks.
+            target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            target_update_period (int): number of steps before updating target networks.
+            dataset (tf.data.Dataset): training dataset.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
+                optimizer for updating the parameters of the networks.
+            discount (float): discount factor for TD updates.
+            shared_weights (bool): wether agents are sharing weights or not.
+            exploration_scheduler (LinearExplorationScheduler): function specifying a
+                decaying scheduler for epsilon exploration.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            fingerprint (bool, optional): whether to apply replay stabilisation using
+                policy fingerprints. Defaults to False.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+            communication_module (BaseCommunicationModule): module for communication
+                between agents. Defaults to None.
+        """
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -376,6 +485,12 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         )
 
     def _forward(self, inputs: Any) -> None:
+        """Trainer forward pass
+
+        Args:
+            inputs (Any): input data from the data table (transitions)
+        """
+
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
         )
@@ -426,7 +541,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
 
 
 class MADQNRecurrentCommTrainer(MADQNTrainer):
-    """Recurrent MADQN trainer.
+    """Recurrent MADQN trainer with communication.
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -451,6 +566,36 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ):
+        """Initialise recurrent MADQN trainer with communication
+
+        Args:
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            q_networks (Dict[str, snt.Module]): q-value networks.
+            target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            target_update_period (int): number of steps before updating target networks.
+            dataset (tf.data.Dataset): training dataset.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
+                optimizer for updating the parameters of the networks.
+            discount (float): discount factor for TD updates.
+            shared_weights (bool): wether agents are sharing weights or not.
+            exploration_scheduler (LinearExplorationScheduler): function specifying a
+                decaying scheduler for epsilon exploration.
+            communication_module (BaseCommunicationModule): module for communication
+                between agents.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            fingerprint (bool, optional): whether to apply replay stabilisation using
+                policy fingerprints. Defaults to False.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+        """
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -473,6 +618,12 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         self._communication_module = communication_module
 
     def _forward(self, inputs: Any) -> None:
+        """Trainer forward pass
+
+        Args:
+            inputs (Any): input data from the data table (transitions)
+        """
+
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
         )

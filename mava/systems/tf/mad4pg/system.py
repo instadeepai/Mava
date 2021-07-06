@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """MAD4PG system implementation."""
+
 from typing import Callable, Dict, Optional, Type, Union
 
 import dm_env
@@ -31,12 +32,7 @@ from mava.utils.loggers import MavaLogger
 
 
 class MAD4PG(MADDPG):
-    """MAD4PG system.
-    This implements a single-process D4PG system. This is an actor-critic based
-    system that generates data via a behavior policy, inserts N-step transitions into
-    a replay buffer, and periodically updates the policies of each agent
-    (and as a result the behavior) by sampling uniformly from this buffer.
-    """
+    """MAD4PG system."""
 
     def __init__(
         self,
@@ -64,7 +60,7 @@ class MAD4PG(MADDPG):
         executor_variable_update_period: int = 1000,
         min_replay_size: int = 1000,
         max_replay_size: int = 1000000,
-        samples_per_insert: float = 32.0,
+        samples_per_insert: Optional[float] = 32.0,
         policy_optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=1e-4),
@@ -83,47 +79,81 @@ class MAD4PG(MADDPG):
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
     ):
-        """Initialize the system.
+        """Initialise the system
+
         Args:
-            environment_factory: Callable to instantiate an environment
-                on a compute node.
-            network_factory: Callable to instantiate system networks on a compute node.
-            logger_factory: Callable to instantiate a system logger on a compute node.
-            architecture: system architecture, e.g. decentralised or centralised.
-            trainer_fn: training type associated with executor and architecture,
-                e.g. centralised training.
-            executor_fn: executor type for example feedforward or recurrent.
-            num_executors: number of executor processes to run in parallel.
-            num_caches: number of trainer node caches.
-            environment_spec: description of the actions, observations, etc.
-            shared_weights: set whether agents should share network weights.
-            discount: discount to use for TD updates.
-            batch_size: batch size for updates.
-            prefetch_size: size to prefetch from replay.
-            target_update_period: number of learner steps to perform before updating
-              the target networks.
-            min_replay_size: minimum replay size before updating.
-            max_replay_size: maximum replay size.
-            samples_per_insert: number of samples to take from replay for every insert
-              that is made.
-            n_step: number of steps to squash into a single transition.
-            sequence_length: Length of the sequences to use in recurrent
-            training (if using recurrence).
-            period: Overlapping period of sequences used in recurrent
-            training (if using recurrence).
-            sigma: standard deviation of zero-mean, Gaussian exploration noise.
-            max_gradient_norm:
-            logger: logger object to be used by trainers.
-            counter: counter object used to keep track of steps.
-            checkpoint: boolean indicating whether to checkpoint the trainers.
-            checkpoint_subpath: directory for checkpoints.
-            replay_table_name: string indicating what name to give the replay table.
-            train_loop_fn: loop for training.
-            eval_loop_fn: loop for evaluation.
-            policy_optimizer: the optimizer to be applied to the policy loss.
-                This can be a single optimizer or an optimizer per agent key.
-            critic_optimizer: the optimizer to be applied to the critic loss.
+            environment_factory (Callable[[bool], dm_env.Environment]): function to
+                instantiate an environment.
+            network_factory (Callable[[acme_specs.BoundedArray],
+                Dict[str, snt.Module]]): function to instantiate system networks.
+            logger_factory (Callable[[str], MavaLogger], optional): function to
+                instantiate a system logger. Defaults to None.
+            architecture (Type[ DecentralisedQValueActorCritic ], optional):
+                system architecture, e.g. decentralised or centralised. Defaults to
+                DecentralisedQValueActorCritic.
+            trainer_fn (Union[ Type[training.MAD4PGBaseTrainer],
+                Type[training.MAD4PGBaseRecurrentTrainer], ], optional): training type
+                associated with executor and architecture, e.g. centralised training.
+                Defaults to training.MAD4PGDecentralisedTrainer.
+            executor_fn (Type[core.Executor], optional): executor type, e.g.
+                feedforward or recurrent. Defaults to MADDPGFeedForwardExecutor.
+            num_executors (int, optional): number of executor processes to run in
+                parallel. Defaults to 1.
+            num_caches (int, optional): number of trainer node caches. Defaults to 0.
+            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
+                the action, observation spaces etc. for each agent in the system.
+                Defaults to None.
+            shared_weights (bool, optional): whether agents should share weights or not.
+                Defaults to True.
+            discount (float, optional): discount factor to use for TD updates. Defaults
+                to 0.99.
+            batch_size (int, optional): sample batch size for updates. Defaults to 256.
+            prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
+            target_averaging (bool, optional): whether to use polyak averaging for
+                target network updates. Defaults to False.
+            target_update_period (int, optional): number of steps before target
+                networks are updated. Defaults to 100.
+            target_update_rate (Optional[float], optional): update rate when using
+                averaging. Defaults toNone.
+            executor_variable_update_period (int, optional): number of steps before
+                updating executor variables from the variable source. Defaults to 1000.
+            min_replay_size (int, optional): minimum replay size before updating.
+                Defaults to 1000.
+            max_replay_size (int, optional): maximum replay size. Defaults to 1000000.
+            samples_per_insert (Optional[float], optional): number of samples to take
+                from replay for every insert that is made. Defaults to 32.0.
+            policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
+                optional): optimizer(s) for updating policy networks Defaults to
+                snt.optimizers.Adam(learning_rate=1e-4).
+            critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
+                networks Defaults to snt.optimizers.Adam(learning_rate=1e-4).
+            n_step (int, optional): number of steps to include prior to boostrapping.
+                Defaults to 5.
+            sequence_length (int, optional): recurrent sequence rollout length. Defaults
+                to 20.
+            period (int, optional): [consecutive starting points for overlapping
+                rollouts across a sequence. Defaults to 20.
+            sigma (float, optional): Gaussian sigma parameter. Defaults to 0.3.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            max_executor_steps (int, optional): maximum number of steps and executor
+                can in an episode. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint models. Defaults to
+                False.
+            checkpoint_subpath (str, optional): subdirectory specifying where to store
+                checkpoints. Defaults to "~/mava/".
+            logger_config (Dict, optional): additional configuration settings for the
+                logger factory. Defaults to {}.
+            train_loop_fn (Callable, optional): function to instantiate a train loop.
+                Defaults to ParallelEnvironmentLoop.
+            eval_loop_fn (Callable, optional): function to instantiate an evaluation
+                loop. Defaults to ParallelEnvironmentLoop.
+            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
+                to the training loop. Defaults to {}.
+            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
+            the evaluation loop. Defaults to {}.
         """
+
         super().__init__(
             environment_factory=environment_factory,
             network_factory=network_factory,

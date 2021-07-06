@@ -15,6 +15,9 @@ RUN apt-get install unrar
 RUN python -m pip install autorom
 RUN AutoROM -v
 
+# cmake and clang for openspiel
+RUN apt-get install clang -y
+RUN python -m pip install cmake
 
 # OpenCV
 RUN apt-get update
@@ -30,6 +33,7 @@ ENV DISPLAY=:0
 COPY . /home/app/mava
 RUN python -m pip install --upgrade pip
 RUN python -m pip install -e .[flatland]
+RUN python -m pip install -e .[open_spiel] --no-cache
 RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting,record_episode]
 
 # Install starcraft 2 environment

@@ -25,10 +25,10 @@ from acme.testing.fakes import Environment as MockedEnvironment
 from acme.testing.fakes import _generate_from_spec, _validate_spec
 
 from mava import core
-from mava.systems.system import System
 from mava.types import OLT, Observation
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
+from tests.system import System
 
 """Mock Objects for Tests"""
 
@@ -208,7 +208,6 @@ class SequentialEnvironment(MockedEnvironment, SequentialEnvWrapper):
         self._agents = agents
         self._possible_agents = agents
         self._specs = specs
-        self.agent_selection = self.agents[0]
         self.agent_step_counter = 0
 
     def agent_iter(self, n_agents: int) -> Iterator[str]:
@@ -217,6 +216,10 @@ class SequentialEnvironment(MockedEnvironment, SequentialEnvWrapper):
     @property
     def current_agent(self) -> Any:
         return self.agent_selection
+
+    @property
+    def agent_selection(self) -> str:
+        return self.possible_agents[self.agent_step_counter]
 
     def observation_spec(self) -> OLT:
 

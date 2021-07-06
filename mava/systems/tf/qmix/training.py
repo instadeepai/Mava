@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Qmix trainer implementation."""
+"""QMIX system trainer implementation."""
+
 import time
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -64,6 +65,38 @@ class QMIXTrainer(MADQNTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
     ) -> None:
+        """Initialise QMIX trainer
+
+        Args:
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            q_networks (Dict[str, snt.Module]): q-value networks.
+            target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            mixing_network (snt.Module): mixing networks learning factorised q-value
+                weights.
+            target_mixing_network (snt.Module): target mixing networks.
+            target_update_period (int): number of steps before updating target networks.
+            dataset (tf.data.Dataset): training dataset.
+            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
+                optimizer for updating the parameters of the networks.
+            discount (float): discount factor for TD updates.
+            shared_weights (bool): wether agents are sharing weights or not.
+            exploration_scheduler (LinearExplorationScheduler): function specifying a
+                decaying scheduler for epsilon exploration.
+            communication_module (BaseCommunicationModule): module for communication
+                between agents. Defaults to None.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            fingerprint (bool, optional): whether to apply replay stabilisation using
+                policy fingerprints. Defaults to False.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+        """
 
         self._mixing_network = mixing_network
         self._target_mixing_network = target_mixing_network
@@ -93,6 +126,9 @@ class QMIXTrainer(MADQNTrainer):
         # TODO add checkpointing for mixing networks
 
     def _update_target_networks(self) -> None:
+        """Sync the target network parameters with the latest online network
+        parameters"""
+
         # Update target networks (incl. mixing networks).
         if tf.math.mod(self._num_steps, self._target_update_period) == 0:
             for key in self.unique_net_keys:
@@ -108,14 +144,9 @@ class QMIXTrainer(MADQNTrainer):
                     dest.assign(src)
 
             # NOTE These shouldn't really be in the agent for loop.
-            online_variables = [
-                *self._mixing_network.variables,
-                # *self._mixing_network._hypernetworks.variables,
-            ]
-            target_variables = [
-                *self._target_mixing_network.variables,
-                # *self._target_mixing_network._hypernetworks.variables,
-            ]
+            online_variables = self.get_mixing_vars("mixing")
+            target_variables = self.get_mixing_vars("target_mixing")
+
             # Make online -> target network update ops.
             for src, dest in zip(online_variables, target_variables):
                 dest.assign(src)
@@ -123,6 +154,8 @@ class QMIXTrainer(MADQNTrainer):
         self._num_steps.assign_add(1)
 
     def step(self) -> None:
+        """trainer step to update the parameters of the agents in the system"""
+
         # Run the learning step.
         fetches = self._step()
 
@@ -154,6 +187,7 @@ class QMIXTrainer(MADQNTrainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
+        """Trainer forward and backward passes."""
 
         # Update the target networks
         self._update_target_networks()
@@ -170,6 +204,12 @@ class QMIXTrainer(MADQNTrainer):
         return {agent: {"q_value_loss": self.loss} for agent in self._agents}
 
     def _forward(self, inputs: Any) -> None:
+        """Trainer forward pass
+
+        Args:
+            inputs (Any): input data from the data table (transitions)
+        """
+
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
         # a_tm1 = dictionary of actions taken from obs in o_tm1
@@ -230,7 +270,6 @@ class QMIXTrainer(MADQNTrainer):
 
             # Calculate Q loss.
             targets = rewards + pcont * q_tot_target_mixed
-            targets = tf.stop_gradient(targets)
             td_error = targets - q_tot_mixed
 
             # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
@@ -238,27 +277,35 @@ class QMIXTrainer(MADQNTrainer):
             self.tape = tape
 
     def _backward(self) -> None:
+        """Trainer backward pass updating network parameters"""
+
         for agent in self._agents:
             agent_key = self.agent_net_keys[agent]
-
             # Update agent networks
-            variables = [*self._q_networks[agent_key].trainable_variables]
+            variables = self._q_networks[agent_key].trainable_variables
             gradients = self.tape.gradient(self.loss, variables)
             gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
             self._optimizers[agent_key].apply(gradients, variables)
 
         # Update mixing network
-        variables = [
-            *self._mixing_network.trainable_variables,
-            # *self._mixing_network._hypernetworks.trainable_variables,
-        ]
+        variables = self.get_mixing_trainable_vars("mixing")
         gradients = self.tape.gradient(self.loss, variables)
+
         gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
         self._optimizer.apply(gradients, variables)
 
         train_utils.safe_del(self, "tape")
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+        """get network variables
+
+        Args:
+            names (Sequence[str]): network names
+
+        Returns:
+            Dict[str, Dict[str, np.ndarray]]: network variables
+        """
+
         variables: Dict[str, Dict[str, np.ndarray]] = {}
         variables = {}
         for network_type in names:
@@ -273,3 +320,35 @@ class QMIXTrainer(MADQNTrainer):
                     for key in self.unique_net_keys
                 }
         return variables
+
+    def get_mixing_trainable_vars(self, network: str = "mixing") -> List:
+        """get trainable mixing network variables
+
+        Args:
+            network (str, optional): mixing network name. Defaults to "mixing".
+
+        Returns:
+            List: network variables
+        """
+
+        mixing_trainable_vars = []
+        for var in self._mixing_network.trainable_variables:
+            if var.name.startswith(network):
+                mixing_trainable_vars.append(var)
+        return mixing_trainable_vars
+
+    def get_mixing_vars(self, network: str = "mixing") -> List:
+        """get all network variables, including target mixing variables.
+
+        Args:
+            network (str, optional): mixing network name. Defaults to "mixing".
+
+        Returns:
+            List: network variables
+        """
+
+        mixing_vars = []
+        for var in self._mixing_network.variables:
+            if var.name.startswith(network):
+                mixing_vars.append(var)
+        return mixing_vars
