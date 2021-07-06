@@ -58,10 +58,13 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [2D RoboCup][robocup]
 * [OpenSpiel][openspiel]
 
+<center>
 
 |<img  src="docs/images/multiw_animation.gif" width="250" height="150"/> | <img src="docs/images/sc2_animation.gif" width="250" height="150"/>  |
 |:---:|:---:|
 |MAD4PG solving the Multi-Walker environment <br/> from PettingZoo. | VDN agents performing well on the SMAC 3m <br/> map.|
+
+</center>
 
 ## System Implementations
 
