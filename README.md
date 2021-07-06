@@ -29,7 +29,7 @@ Mava is a library for building multi-agent reinforcement learning (MARL) systems
 > It is also inevitable that there might be bugs we are not aware of and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
 
 ## Overview
-### Systems and the Executor-Trainer paradigm
+### Systems and the Executor-Trainer Paradigm
 
 At the core of the Mava framework is the concept of a `system`. A system refers to a full multi-agent reinforcement learning algorithm consisting of the following specific components: an `Executor`, a `Trainer` and a `Dataset`.
 
@@ -40,21 +40,17 @@ Several examples of system implementations can be viewed [here][Systems].
   <img align="center" src="docs/images/animation_quick.gif" width="70%">
 </p>
 
-### Distributed system training
+### Distributed System Training
 
 Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to scale systems in a simple way, using the same underlying multi-agent RL system code. Mava uses [Launchpad](launchpad) for creating distributed programs. In Mava, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of all the actor networks used within each executor. This approach to distributed system training is illustrated on the right in the figure above. ✋ **NOTE: In the near future, Mava aims to support additional training setups, e.g. distributed training using multiple trainers to support Bayesian optimisation or population based training (PBT).**
 
 ## Getting Started
 We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System. For more information on how to use Mava, please view our [usage section](#usage).
 
-## Supported environments
+## Supported Environments
 
 A given multi-agent system interacts with its environment via an `EnvironmentLoop`. This loop takes as input a `system` instance and a multi-agent `environment`
 instance which implements the [DeepMind Environment API][dm_env]. Mava currently supports multi-agent environment loops and environment wrappers for the following environments and environment suites:
-
-<figure >
-    <img align="right" src="docs/images/animation.gif" width="40%">
-</figure>
 
 * [PettingZoo][pettingzoo]
 * [SMAC][smac]
@@ -62,9 +58,12 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [2D RoboCup][robocup]
 * [OpenSpiel][openspiel]
 
-The animation on the right shows MAD4PG solving the Multi-Walker environment from PettingZoo.
 
-## System implementations
+|<img  src="docs/images/multiw_animation.gif" width="250" height="150"/> | <img src="docs/images/sc2_animation.gif" width="250" height="150"/>  |
+|:---:|:---:|
+|<div style="width:250px"> MAD4PG solving the Multi-Walker environment from PettingZoo.</div> | <div style="width:250px"> VDN agents performing well on the SMAC 3m map.</div> |
+
+## System Implementations
 
 Mava includes several system implementations. Below we list these together with an indication of the maturity of the system using the following keys: 🟩  -- Tested and working well, 🟨  -- Running and training on simple environments, but not extensively tested and 🟥  -- Implemented but untested and yet to show clear signs of stable training.
 
