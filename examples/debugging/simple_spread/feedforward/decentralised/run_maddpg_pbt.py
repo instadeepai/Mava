@@ -25,7 +25,7 @@ from absl import app, flags
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava.systems.tf import maddpg_scaled
-from mava.systems.tf.maddpg import make_default_networks
+from mava.systems.tf.maddpg_scaled import make_default_networks
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 

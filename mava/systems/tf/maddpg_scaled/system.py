@@ -37,6 +37,10 @@ from mava.systems.tf.maddpg_scaled.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
+import numpy as np
+from dm_env import specs
+
+Array = specs.Array
 
 
 class MADDPG:
@@ -161,10 +165,13 @@ class MADDPG:
                 for agent in agents
             }
 
-        self._network_factory_config = self._agent_net_config
+        self._net_spec_config = self._agent_net_config
         if do_pbt:
             # Note: Assuming all agents have the same specs for now.
-            self._network_factory_config = {f"agent_{i}": "agent_0" for i in range(num_agents_in_population)}
+            # TODO (dries): Allow for an non input/output space sharing in the future
+            self._net_spec_config = {
+                f"agent_{i}": "agent_0" for i in range(num_agents_in_population)
+            }
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -189,10 +196,15 @@ class MADDPG:
         else:
             self._connection_spec = None  # type: ignore
 
+        extra_specs = {}
         if issubclass(executor_fn, executors.RecurrentExecutor):
-            extra_specs = self._get_extra_specs()
-        else:
-            extra_specs = {}
+            extra_specs.update(self._get_extra_specs())
+
+        if do_pbt:
+            str_spec = Array((), dtype=np.dtype("U10"))
+            agents = environment_spec.get_agent_ids()
+            net_spec = {"network_keys": {agent: str_spec for agent in agents}}
+            extra_specs.update(net_spec)
 
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
@@ -231,7 +243,7 @@ class MADDPG:
         core_state_specs = {}
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
-            agent_net_config=self._network_factory_config,
+            agent_net_config=self._net_spec_config,
         )
         for agent in agents:
             # agent_type = agent.split("_")[0]
@@ -253,7 +265,7 @@ class MADDPG:
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
-            agent_net_config=self._network_factory_config,
+            net_spec_config=self._net_spec_config,
         )
 
         # Create system architecture with target networks.
@@ -268,7 +280,7 @@ class MADDPG:
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
             "agent_net_config": self._agent_net_config,
-            # "shared_weights": self._shared_weights,
+            "net_spec_config": self._net_spec_config,
         }
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
@@ -389,7 +401,9 @@ class MADDPG:
         # Create the system
         _, system_networks = self.create_system()
 
-        dataset = self._builder.make_dataset_iterator(replay)
+        dataset = self._builder.make_dataset_iterator(
+            replay, f"{self._builder._config.replay_table_name}_{trainer_id}"
+        )
 
         return self._builder.make_trainer(
             # trainer_id=trainer_id,

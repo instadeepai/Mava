@@ -30,6 +30,7 @@ from dm_env import specs
 
 from mava import adders
 from mava.systems.tf import executors
+import numpy as np
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
@@ -51,7 +52,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_config: Dict[str, str],
-        do_pbt: bool=False,
+        do_pbt: bool = False,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -69,7 +70,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
         # Store these for later use.
         self._agent_specs = agent_specs
-        self._do_pbt= do_pbt
+        self._do_pbt = do_pbt
         self._counts = counts
         super().__init__(
             policy_networks=policy_networks,
@@ -126,6 +127,15 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
 
+    def shuffle_agent_keys(self):
+        net_keys = list(self._policy_networks.keys())
+        save_net_keys = {}
+        for agent in self._agent_net_config.keys():
+            key = net_keys[randint(len(net_keys))]
+            self._agent_net_config[agent] = key
+            save_net_keys[agent] = np.array(key, dtype=np.dtype("U10"))
+        return save_net_keys
+
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
@@ -144,10 +154,8 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             if self._do_pbt:
                 """In population based trianing select new networks randomly for each agent.
                 Also ddd the network key used by each agent."""
-                net_keys = self._policy_networks.keys()
-                for agent in self._agent_net_config.keys():
-                    self._agent_net_config[agent] = net_keys[randint(len(net_keys))]
-                extras["networks": self._agent_net_config]
+
+                extras["network_keys"] = self.shuffle_agent_keys()
             self._adder.add_first(timestep, extras)
 
     def observe(
@@ -163,7 +171,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
             if self._do_pbt:
                 """Add the network key used by each agent."""
-                next_extras["networks": self._agent_net_config]
+                next_extras["network_keys"] = self.shuffle_agent_keys()
 
             # TODO (dries): Sort out this mypy issue.
             self._adder.add(policy, next_timestep, next_extras)  # type: ignore

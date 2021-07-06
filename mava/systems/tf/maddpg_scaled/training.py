@@ -314,9 +314,6 @@ class MADDPGBaseTrainer(feedforward_trainer):
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
         o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
 
-        print("e_t: ", e_t)
-        exit()
-
         self.policy_losses = {}
         self.critic_losses = {}
 

@@ -23,3 +23,4 @@ from mava.systems.tf.maddpg_scaled.training import (
     MADDPGBaseTrainer,
     MADDPGDecentralisedTrainer,
 )
+from mava.systems.tf.maddpg_scaled.networks import make_default_networks

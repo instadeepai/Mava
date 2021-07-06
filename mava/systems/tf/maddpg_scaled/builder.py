@@ -64,7 +64,7 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
-    do_pbt = False,
+    do_pbt: bool = False
     max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
     logger: loggers.Logger = None
@@ -158,32 +158,39 @@ class MADDPGBuilder:
         if self._config.samples_per_insert is None:
             # We will take a samples_per_insert ratio of None to mean that there is
             # no limit, i.e. this only implies a min size limit.
-            limiter = reverb.rate_limiters.MinSize(self._config.min_replay_size)
+            limiter_fn = lambda: reverb.rate_limiters.MinSize(
+                self._config.min_replay_size
+            )
 
         else:
             # Create enough of an error buffer to give a 10% tolerance in rate.
             samples_per_insert_tolerance = 0.1 * self._config.samples_per_insert
             error_buffer = self._config.min_replay_size * samples_per_insert_tolerance
-            limiter = reverb.rate_limiters.SampleToInsertRatio(
+            limiter_fn = lambda: reverb.rate_limiters.SampleToInsertRatio(
                 min_size_to_sample=self._config.min_replay_size,
                 samples_per_insert=self._config.samples_per_insert,
                 error_buffer=error_buffer,
             )
 
-        replay_table = reverb.Table(
-            name=self._config.replay_table_name,
-            sampler=reverb.selectors.Uniform(),
-            remover=reverb.selectors.Fifo(),
-            max_size=self._config.max_replay_size,
-            rate_limiter=limiter,
-            signature=adder_sig,
-        )
-
-        return [replay_table]
+        # Create table per trainer
+        replay_tables = []
+        for t_i in range(self._config.num_trainers):
+            replay_tables.append(
+                reverb.Table(
+                    name=f"{self._config.replay_table_name}_{t_i}",
+                    sampler=reverb.selectors.Uniform(),
+                    remover=reverb.selectors.Fifo(),
+                    max_size=self._config.max_replay_size,
+                    rate_limiter=limiter_fn(),
+                    signature=adder_sig,
+                )
+            )
+        return replay_tables
 
     def make_dataset_iterator(
         self,
         replay_client: reverb.Client,
+        table_name: str,
     ) -> Iterator[reverb.ReplaySample]:
 
         sequence_length = (
@@ -194,7 +201,7 @@ class MADDPGBuilder:
 
         """Create a dataset iterator to use for learning/updating the system."""
         dataset = datasets.make_reverb_dataset(
-            table=self._config.replay_table_name,
+            table=table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
@@ -321,7 +328,7 @@ class MADDPGBuilder:
             counts=counts,
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_config=self._config.agent_net_config,
-            do_pbt=self.config.do_pbt,
+            do_pbt=self._config.do_pbt,
             variable_client=variable_client,
             adder=adder,
         )
