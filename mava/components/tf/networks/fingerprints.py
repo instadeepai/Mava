@@ -16,7 +16,6 @@
 """Sonnet module that takes two inputs
 [observation, fingerprint]"""
 
-# import launchpad as lp
 import sonnet as snt
 import tensorflow as tf
 
