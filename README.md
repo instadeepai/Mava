@@ -297,8 +297,8 @@ If you use Mava in your work, please cite the accompanying
     and Jonathan Shock and Herman Kamper and Willie Brink and Herman Engelbrecht
     and Alexandre Laterre and Karim Beguir},
     year={2021},
-    journal={arXiv preprint},
-    url={},
+    journal={arXiv preprint arXiv:2107.01460},
+    url={https://arxiv.org/pdf/2107.01460.pdf},
 }
 ```
 
@@ -306,7 +306,7 @@ If you use Mava in your work, please cite the accompanying
 [Systems]: mava/systems/
 [Examples]: examples
 [debug]: examples/debugging_envs/
-[Paper]: https://arxiv.org
+[Paper]: https://arxiv.org/pdf/2107.01460.pdf
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [smac]: https://github.com/oxwhirl/smac
 [openspiel]: https://github.com/deepmind/open_spiel
