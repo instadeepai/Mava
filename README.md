@@ -61,7 +61,7 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 
 |<img  src="docs/images/multiw_animation.gif" width="250" height="150"/> | <img src="docs/images/sc2_animation.gif" width="250" height="150"/>  |
 |:---:|:---:|
-|<div style="width:250px"> MAD4PG solving the Multi-Walker environment from PettingZoo.</div> | <div style="width:250px"> VDN agents performing well on the SMAC 3m map.</div> |
+|MAD4PG solving the Multi-Walker environment <br/> from PettingZoo. | VDN agents performing well on the SMAC 3m <br/> map.|
 
 ## System Implementations
 
