@@ -19,8 +19,6 @@ from typing import Dict, Tuple
 import dm_env
 import numpy as np
 from acme import specs
-
-# from acme.specs import EnvironmentSpec
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym import spaces
 
@@ -194,12 +192,7 @@ class SwitchGameWrapper(PettingZooParallelEnvWrapper):
         )
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
-        return {
-            # agent: _convert_to_spec(
-            #     spaces.Box(-np.inf, np.inf, (1,), dtype=np.float32)
-            # )
-            # for agent in self._environment.agent_ids
-        }
+        return {}
 
 
 class TwoStepWrapper(PettingZooParallelEnvWrapper):
