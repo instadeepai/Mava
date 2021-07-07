@@ -37,10 +37,10 @@ def make_default_networks(
     Args:
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
             observation spaces etc. for each agent in the system.
+        agent_net_config: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of policy networks. Defaults to (128,128).
-        shared_weights (bool, optional): whether agents should share weights or not.
-            Defaults to True.
         archecture_type (ArchitectureType, optional): archecture used for
             agent networks. Can be feedforward or recurrent.
             Defaults to ArchitectureType.recurrent.

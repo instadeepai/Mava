@@ -79,7 +79,8 @@ class MAPPOTrainer(mava.Trainer):
                 optimizer(s) for updating policy networks.
             critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
                 optimizer for updating critic networks.
-            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             discount (float, optional): discount factor for TD updates. Defaults
                 to 0.99.
             lambda_gae (float, optional): scalar determining the mix of bootstrapping

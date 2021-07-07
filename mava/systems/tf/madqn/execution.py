@@ -62,7 +62,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             action_selectors (Dict[str, Any]): policy action selector method, e.g.
                 epsilon greedy.
             trainer (MADQNTrainer, optional): system trainer.
-            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
@@ -302,6 +303,8 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
                 system.
             action_selectors (Dict[str, Any]): policy action selector method, e.g.
                 epsilon greedy.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             agent_net_config (Dict[str, Any]): specifies what network each agent uses.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
@@ -457,7 +460,8 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
                 epsilon greedy.
             communication_module (BaseCommunicationModule): module for enabling
                 communication protocols between agents.
-            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):

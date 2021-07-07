@@ -12,6 +12,15 @@ class VariableSource:
     def __init__(
         self, variables: Dict[str, Any], checkpoint: bool, checkpoint_subpath: str
     ) -> None:
+        """Initialise the variable source
+        Args:
+            variables (Dict[str, Any]): a dictionary with
+            variables which should be stored in it.
+            checkpoint (bool): Indicates whether checkpointing should be performed.
+            checkpoint_subpath (str): checkpoint path
+        Returns:
+            None
+        """
         # Init the variable dictionary
         self.variables = variables
 
@@ -36,6 +45,13 @@ class VariableSource:
     def get_variables(
         self, names: Union[str, Sequence[str]]
     ) -> Dict[str, Dict[str, np.ndarray]]:
+        """Get variables from the variable source.
+        Args:
+            names (Union[str, Sequence[str]]): Names of the variables to get.
+        Returns:
+            variables(Dict[str, Dict[str, np.ndarray]]): The variables that
+            were requested.
+        """
         if type(names) == str:
             return self.variables[names]  # type: ignore
         else:
@@ -48,6 +64,13 @@ class VariableSource:
             return variables
 
     def set_variables(self, names: Sequence[str], vars: Dict[str, np.ndarray]) -> None:
+        """Set variables in the variable source.
+        Args:
+            names (Union[str, Sequence[str]]): Names of the variables to set.
+            vars(Dict[str, np.ndarray]): The values to set the variables to.
+        Returns:
+            None
+        """
         if type(names) == str:
             vars = {names: vars}  # type: ignore
             names = [names]  # type: ignore
@@ -65,6 +88,13 @@ class VariableSource:
     def add_to_variables(
         self, names: Sequence[str], vars: Dict[str, np.ndarray]
     ) -> None:
+        """Add to the variables in the variable source.
+        Args:
+            names (Union[str, Sequence[str]]): Names of the variables to add to.
+            vars(Dict[str, np.ndarray]): The values to add to the variables to.
+        Returns:
+            None
+        """
         if type(names) == str:
             vars = {names: vars}  # type: ignore
             names = [names]  # type: ignore
@@ -77,6 +107,14 @@ class VariableSource:
         return
 
     def run(self) -> None:
+        """Run the variable source. This function allows for
+        checkpointing and other centralised computations to
+        be performed by the variable source.
+                Args:
+                    None
+                Returns:
+                    None
+        """
         # Checkpoints every 15 minutes
         while True:
             time.sleep(15 * 60)

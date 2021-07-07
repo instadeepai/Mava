@@ -35,6 +35,7 @@ class FeedForwardExecutor(core.Executor):
     """A generic feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system.
     """
+
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],
@@ -47,7 +48,8 @@ class FeedForwardExecutor(core.Executor):
         Args:
             policy_networks (Dict[str, snt.Module]): policy networks for each agent in
                 the system.
-            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
@@ -207,7 +209,8 @@ class RecurrentExecutor(core.Executor):
         Args:
             policy_networks (Dict[str, snt.RNNCore]): policy networks for each agent in
                 the system.
-            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
@@ -429,7 +432,8 @@ class RecurrentCommExecutor(RecurrentExecutor):
                 the system.
             communication_module (BaseCommunicationModule): module for enabling
                 communication protocols between agents.
-            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):

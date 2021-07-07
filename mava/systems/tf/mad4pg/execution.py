@@ -85,12 +85,12 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
                 the system.
             agent_specs (Dict[str, EnvironmentSpec]): agent observation and action
                 space specifications.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
         """
 
         super().__init__(

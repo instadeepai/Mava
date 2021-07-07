@@ -95,7 +95,8 @@ class MADDPGBaseTrainer(mava.Trainer):
                 extraction from raw observation.
             target_observation_networks (Dict[str, snt.Module]): target observation
                 network.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
@@ -947,7 +948,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 extraction from raw observation.
             target_observation_networks (Dict[str, snt.Module]): target observation
                 network.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
