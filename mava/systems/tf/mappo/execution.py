@@ -48,11 +48,12 @@ class MAPPOFeedForwardExecutor(core.Executor):
         Args:
             policy_networks (Dict[str, snt.Module]): policy networks for each agent in
                 the system.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
-            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
         """
 
         # Store these for later use.

@@ -117,6 +117,8 @@ class MADDPG:
                 Defaults to None.
             shared_weights (bool, optional): whether agents should share weights or not.
                 Defaults to True.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
             batch_size (int, optional): sample batch size for updates. Defaults to 256.

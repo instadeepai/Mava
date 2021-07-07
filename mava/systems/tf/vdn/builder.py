@@ -40,7 +40,8 @@ class VDNConfig(MADQNConfig):
             each agent in the system.
         epsilon_min: final minimum value for epsilon at the end of a decay schedule.
         epsilon_decay: the rate at which epislon decays.
-        shared_weights: boolean indicating whether agents should share weights.
+        agent_net_config: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
         target_update_period: number of learner steps to perform before updating
             the target networks.
         executor_variable_update_period: the rate at which executors sync their

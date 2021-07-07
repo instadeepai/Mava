@@ -61,7 +61,8 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
-            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
         """
 
         # Store these for later use.
@@ -203,7 +204,8 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
-            agent_net_config (Dict[str, Any]): specifies what network each agent uses.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             store_recurrent_state (bool, optional): boolean to store the recurrent
                 network hidden state. Defaults to True.
         """

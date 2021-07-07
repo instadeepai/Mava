@@ -46,7 +46,8 @@ class MADDPGConfig:
             each agent in the system.
         policy_optimizer: optimizer(s) for updating policy networks.
         critic_optimizer: optimizer for updating critic networks.
-        shared_weights: boolean indicating whether agents should share weights.
+        agent_net_config: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
         discount: discount to use for TD updates.
         batch_size: batch size for updates.
         prefetch_size: size to prefetch from replay.
