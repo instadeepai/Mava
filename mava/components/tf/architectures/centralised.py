@@ -98,7 +98,7 @@ class CentralisedValueCritic(DecentralisedValueActorCritic):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            agent_key = self._agent_net_config[agents[0]]
+            agent_key = agents[0]
             critic_obs_shape = list(copy.copy(self._embed_specs[agent_key].shape))
             critic_obs_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
@@ -142,7 +142,7 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            agent_key = self._agent_net_config[agents[0]]
+            agent_key = agents[0]
 
             # TODO (dries): Add a check to see if all
             #  self._embed_specs[agent_key].shape are of the same shape
