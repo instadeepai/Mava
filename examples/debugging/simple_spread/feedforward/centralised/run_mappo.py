@@ -61,7 +61,7 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        mappo.make_default_networks, shared_weights=False
+        mappo.make_default_networks,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
