@@ -105,6 +105,8 @@ class MAPPO:
                 Defaults to None.
             shared_weights (bool, optional): whether agents should share weights or not.
                 Defaults to True.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             executor_variable_update_period (int, optional): number of steps before
                 updating executor variables from the variable source. Defaults to 100.
             policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],

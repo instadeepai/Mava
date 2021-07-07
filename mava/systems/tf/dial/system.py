@@ -133,6 +133,8 @@ class DIAL:
                 Defaults to None.
             shared_weights (bool, optional): whether agents should share weights or not.
                 Defaults to True.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             batch_size (int, optional): sample batch size for updates. Defaults to 256.
             prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
             min_replay_size (int, optional): minimum replay size before updating.
@@ -259,7 +261,8 @@ class DIAL:
         core_message_specs = {}
 
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
         for agent in agents:
             agent_type = agent.split("_")[0]

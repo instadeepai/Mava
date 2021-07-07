@@ -77,7 +77,8 @@ class MADQNTrainer(mava.Trainer):
             optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
                 optimizer for updating the parameters of the networks.
             discount (float): discount factor for TD updates.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -443,7 +444,8 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
                 optimizer for updating the parameters of the networks.
             discount (float): discount factor for TD updates.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -574,7 +576,8 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
                 optimizer for updating the parameters of the networks.
             discount (float): discount factor for TD updates.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             communication_module (BaseCommunicationModule): module for communication

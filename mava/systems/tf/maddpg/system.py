@@ -117,6 +117,8 @@ class MADDPG:
                 Defaults to None.
             shared_weights (bool, optional): whether agents should share weights or not.
                 Defaults to True.
+            agent_net_config: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
             batch_size (int, optional): sample batch size for updates. Defaults to 256.
@@ -259,7 +261,8 @@ class MADDPG:
         agents = self._environment_spec.get_agent_ids()
         core_state_specs = {}
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec,
+            agent_net_config=self._agent_net_config,
         )
         for agent in agents:
             agent_type = agent.split("_")[0]

@@ -47,12 +47,12 @@ def make_default_networks(
     Args:
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
             observation spaces etc. for each agent in the system.
+        agent_net_config: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of policy networks. Defaults to (256, 256, 256).
         critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of critic networks. Defaults to (512, 512, 256).
-        shared_weights (bool, optional): whether agents should share weights or not.
-            Defaults to True.
         sigma (float, optional): hyperparameters used to add Gaussian noise for
             simple exploration. Defaults to 0.3.
         archecture_type (ArchitectureType, optional): archecture used for

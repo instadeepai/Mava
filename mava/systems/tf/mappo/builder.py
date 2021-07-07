@@ -40,10 +40,11 @@ class MAPPOConfig:
             each agent in the system.
         policy_optimizer: optimizer(s) for updating policy networks.
         critic_optimizer: optimizer for updating critic networks.
+        agent_net_config: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
         sequence_length: recurrent sequence rollout length.
         sequence_period: consecutive starting points for overlapping rollouts across a
             sequence.
-        shared_weights: boolean indicating whether agents should share weights.
         discount: discount to use for TD updates.
         lambda_gae: scalar determining the mix of bootstrapping vs further accumulation
             of multi-step returns at each timestep. See `High-Dimensional Continuous
