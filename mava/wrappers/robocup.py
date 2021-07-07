@@ -29,9 +29,6 @@ from mava.utils.environments.RoboCup_env.robocup_utils.util_functions import (  
 class RoboCupWrapper(SpecWrapper):
     """Environment wrapper for 2D RoboCup environment."""
 
-    # Note: we don't inherit from base.EnvironmentWrapper because that class
-    # assumes that the wrapped environment is a dm_env.Environment.
-
     def __init__(self, environment: RoboCup2D) -> None:
         self._environment = environment
         self._reset_next_step = True
