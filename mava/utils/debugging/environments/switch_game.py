@@ -48,12 +48,12 @@ class MultiAgentSwitchGame(gym.Env):
             agent_id = "agent_" + str(a_i)
             self.agent_ids.append(agent_id)
             self.action_spaces[agent_id] = spaces.Discrete(2)
-            # self.observation_spaces[agent_id] = spaces.Discrete(2)
             self.observation_spaces[agent_id] = spaces.Box(
                 low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32
             )
 
         self.possible_agents = self.agent_ids
+
         # environment parameters
         self.max_time = 4 * self.num_agents - 6
         self.selected_agent = -1
@@ -81,7 +81,6 @@ class MultiAgentSwitchGame(gym.Env):
             self.tell = True
 
         self.time += 1
-        # self.selected_agent = np.random.randint(0, self.num_agents)
 
         if self.time >= self.max_time:
             self.env_done = True
@@ -93,7 +92,6 @@ class MultiAgentSwitchGame(gym.Env):
             obs_n[agent_id] = self._get_obs(a_i, agent_id)
             reward_n[agent_id] = self._get_reward(a_i, agent_id)
             done_n[agent_id] = self._get_done(agent_id)
-            # info_n["n"][agent_id] = self._get_info(agent_id)
 
             if done_n[agent_id]:
                 self.env_done = True
@@ -112,7 +110,6 @@ class MultiAgentSwitchGame(gym.Env):
             self._agent_order = np.random.randint(0, self.num_agents, (self.max_time,))
 
         self.selected_agent = self._agent_order[0]
-        # self.selected_agent = np.random.randint(0, self.num_agents)
 
         self.env_done = False
         # record observations for each agent
