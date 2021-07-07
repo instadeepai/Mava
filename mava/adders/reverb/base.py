@@ -202,7 +202,6 @@ class ReverbParallelAdder(base.ParallelAdder):
 
         discount = next_timestep.discount
         if next_timestep.last():
-            # print("LAST")
             # Terminal timesteps created by dm_env.termination() will have a scalar
             # discount of 0.0. This may not match the array shape / nested structure
             # of the previous timesteps' discounts. The below will match

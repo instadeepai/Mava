@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Kevin): complete class for broadcasted communication
-
 """Broadcasted communication for multi-agent RL systems"""
 
 from typing import Dict
@@ -46,15 +44,10 @@ class BroadcastedCommunication(BaseCommunicationModule):
         self._shared = shared
         self._channel_noise = channel_noise
 
-    # def create_communication_variables(self) -> Dict[str, Dict[str, snt.Module]]:
-    #     print(self._architecture)
-    #     pass
-
     def create_system(
         self,
     ) -> Dict[str, Dict[str, snt.Module]]:
         """Create system architecture with communication by modifying architecture."""
-        # networks = self.create_communication_variables()
 
         return self._architecture.create_system()
 

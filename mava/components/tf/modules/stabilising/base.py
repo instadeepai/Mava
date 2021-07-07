@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Claude): complete base class for stabilisation
-
 import abc
 from typing import Dict
 
@@ -29,10 +27,6 @@ class BaseStabilisationModule:
     to create systems that can stabilise training for agents in a
     multi-agent RL system.
     """
-
-    @abc.abstractmethod
-    def some_abstract_stabilising_function(self) -> Dict[str, Dict[str, snt.Module]]:
-        """Abstract communication function."""
 
     @abc.abstractmethod
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
