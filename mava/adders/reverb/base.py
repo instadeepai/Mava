@@ -106,6 +106,7 @@ class ReverbParallelAdder(base.ParallelAdder):
           max_in_flight_items: The maximum number of items allowed to be "in flight"
             at the same time. See `reverb.Writer.writer` for more info.
         """
+        
         if priority_fns:
             priority_fns = dict(priority_fns)
         else:

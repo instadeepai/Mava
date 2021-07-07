@@ -235,9 +235,15 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             # Insert the transition into replay along with its priority.
             self._writer.append(transition)
             for table, priority in table_priorities.items():
+                
+                trajectory = None
+                print("table: ", table, ". priority: ", priority)
+
                 self._writer.create_item(
-                    table=table, num_timesteps=1, priority=priority
+                    table=table, num_timesteps=1, priority=priority, trajectory=trajectory
                 )
+            print("Done")
+            exit()
         else:
             raise ValueError("next_observations cannot be None here.")
 

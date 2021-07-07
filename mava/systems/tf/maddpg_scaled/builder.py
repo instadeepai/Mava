@@ -218,17 +218,18 @@ class MADDPGBuilder:
           replay_client: Reverb Client which points to the replay server.
         """
 
+        priority_fns = {f"priority_table_{trainer_id}":  lambda x: 1.0 for trainer_id in range(self._config.num_trainers)}
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
-                priority_fns=None,
+                priority_fns=priority_fns,
                 client=replay_client,
                 n_step=self._config.n_step,
                 discount=self._config.discount,
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder = reverb_adders.ParallelSequenceAdder(
-                priority_fns=None,
+                priority_fns=priority_fns,
                 client=replay_client,
                 sequence_length=self._config.sequence_length,
                 period=self._config.period,

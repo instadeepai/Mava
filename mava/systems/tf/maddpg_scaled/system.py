@@ -168,7 +168,8 @@ class MADDPG:
         self._net_spec_config = self._agent_net_config
         if do_pbt:
             # Note: Assuming all agents have the same specs for now.
-            # TODO (dries): Allow for an non input/output space sharing in the future
+            # TODO (dries): Allow agents to have different input/output spaces with 
+            # population based training in the future.
             self._net_spec_config = {
                 f"agent_{i}": "agent_0" for i in range(num_agents_in_population)
             }

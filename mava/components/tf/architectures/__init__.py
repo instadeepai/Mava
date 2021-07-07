@@ -31,8 +31,6 @@ from mava.components.tf.architectures.decentralised import (
     DecentralisedQValueActorCritic,
     DecentralisedValueActor,
     DecentralisedValueActorCritic,
-    DecentralisedPBTValueActorCritic,
-    DecentralisedPBTQValueActorCritic,
 )
 from mava.components.tf.architectures.networked import (
     NetworkedPolicyActor,
