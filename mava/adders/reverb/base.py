@@ -29,12 +29,12 @@ from typing import (
     Union,
 )
 
-from absl import logging
 import dm_env
 import numpy as np
 import reverb
 import tensorflow as tf
 import tree
+from absl import logging
 from acme import specs as acme_specs
 from acme import types
 
@@ -129,47 +129,34 @@ class ReverbParallelAdder(base.ParallelAdder):
         # distributed setup where the replay may take a while to spin up.
         self._get_signature_timeout_ms = 300_000
 
-        def __del__(self):
-            if self.__writer is not None:
-                timeout_ms = 10_000
-                # Try flush all appended data before closing to avoid loss of experience.
-                try:
-                    self.__writer.flush(self._max_in_flight_items, timeout_ms=timeout_ms)
-                except reverb.DeadlineExceededError as e:
-                    logging.error(
-                        'Timeout (%d ms) exceeded when flushing the writer before '
-                        'deleting it. Caught Reverb exception: %s', timeout_ms, str(e))
-                self.__writer.close()
-
-        # The state of the adder is captured by a buffer of `buffer_size` steps
-        # (generally SAR tuples) and one additional dangling observation.
-        # self._buffer: Deque = collections.deque(maxlen=buffer_size)
-        # self._next_extras: Union[None, Dict[str, types.NestedArray]] = None
-        # self._next_observations = None
-        # self._start_of_episode = False
-
-    def __del__(self) -> None:
+    def __del__(self):
         if self.__writer is not None:
-            # Explicitly close the writer with no retry on server unavailable.
-            # This is to avoid hang on closing if the server has already terminated.
-            self.__writer.close(retry_on_unavailable=False)
+            timeout_ms = 10_000
+            # Try flush all appended data before closing to avoid loss of experience.
+            try:
+                self.__writer.flush(self._max_in_flight_items, timeout_ms=timeout_ms)
+            except reverb.DeadlineExceededError as e:
+                logging.error(
+                    "Timeout (%d ms) exceeded when flushing the writer before "
+                    "deleting it. Caught Reverb exception: %s",
+                    timeout_ms,
+                    str(e),
+                )
+            self.__writer.close()
 
     @property
-    def _writer(self) -> reverb.Writer:
+    def _writer(self) -> reverb.TrajectoryWriter:
         if self.__writer is None:
-            self.__writer = self._client.writer(
-                self._max_sequence_length,
-                delta_encoded=self._delta_encoded,
-                chunk_length=self._chunk_length,
-                max_in_flight_items=self._max_in_flight_items,
+            self.__writer = self._client.trajectory_writer(
+                num_keep_alive_refs=self._max_sequence_length,
+                get_signature_timeout_ms=self._get_signature_timeout_ms,
             )
         return self.__writer
 
-    def add_priority_table(self, table_name: str,
-                           priority_fn: Optional[PriorityFn]):
+    def add_priority_table(self, table_name: str, priority_fn: Optional[PriorityFn]):
         if table_name in self._priority_fns:
             raise ValueError(
-                f'A priority function already exists for {table_name}. '
+                f"A priority function already exists for {table_name}. "
                 f'Existing tables: {", ".join(self._priority_fns.keys())}.'
             )
         self._priority_fns[table_name] = priority_fn
@@ -186,15 +173,21 @@ class ReverbParallelAdder(base.ParallelAdder):
     ) -> None:
         """Record the first observation of a trajectory."""
         if not timestep.first():
-            raise ValueError('adder.add_first with an initial timestep (i.e. one for '
-                            'which timestep.first() is True')
+            raise ValueError(
+                "adder.add_first with an initial timestep (i.e. one for "
+                "which timestep.first() is True"
+            )
 
         # Record the next observation but leave the history buffer row open by
         # passing `partial_step=True`.
-        self._writer.append(dict(observation=timestep.observation,
-                                extras=extras,
-                                start_of_episode=timestep.first()),
-                            partial_step=True)
+        self._writer.append(
+            dict(
+                observations=timestep.observation,
+                extras=extras,
+                start_of_episode=timestep.first(),
+            ),
+            partial_step=True,
+        )
         self._add_first_called = True
 
     def add(
@@ -204,15 +197,15 @@ class ReverbParallelAdder(base.ParallelAdder):
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Record an action and the following timestep."""
-        if self._next_observations is None:
+        if not self._add_first_called:
             raise ValueError("adder.add_first must be called before adder.add.")
 
         # Add the timestep to the buffer.
         current_step = dict(
             # Observations was passed at the previous add call.
             actions=actions,
-            reward=next_timestep.reward,
-            discount=next_timestep.discount,
+            rewards=next_timestep.reward,
+            discounts=next_timestep.discount,
             # Start of episode indicator was passed at the previous add call.
         )
         self._writer.append(current_step)
@@ -220,10 +213,12 @@ class ReverbParallelAdder(base.ParallelAdder):
         # Record the next observation and write.
         self._writer.append(
             dict(
-                observation=next_timestep.observation,
-                **({'extras': next_extras} if next_extras else {}),
-                start_of_episode=next_timestep.first()),
-            partial_step=True)
+                observations=next_timestep.observation,
+                **({"extras": next_extras} if next_extras else {}),
+                start_of_episode=next_timestep.first(),
+            ),
+            partial_step=True,
+        )
         self._write()
 
         if next_timestep.last():
@@ -259,12 +254,13 @@ class ReverbParallelAdder(base.ParallelAdder):
         A `Step` whose leaf nodes are `tf.TensorSpec` objects.
         """
         spec_step = Step(
-        observation=environment_spec.observations,
-        action=environment_spec.actions,
-        reward=environment_spec.rewards,
-        discount=environment_spec.discounts,
-        start_of_episode=acme_specs.Array(shape=(), dtype=bool),
-        extras=extras_spec)
+            observations=environment_spec.observations,
+            actions=environment_spec.actions,
+            rewards=environment_spec.rewards,
+            discounts=environment_spec.discounts,
+            start_of_episode=acme_specs.Array(shape=(), dtype=bool),
+            extras=extras_spec,
+        )
         return tree.map_structure_with_path(spec_like_to_tensor_spec, spec_step)
 
     @abc.abstractmethod

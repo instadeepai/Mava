@@ -21,8 +21,6 @@ This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
-import itertools
-import operator
 from typing import Any, Optional, Tuple
 
 import numpy as np
@@ -30,12 +28,13 @@ import reverb
 import tensorflow as tf
 import tree
 from acme import specs as acme_specs
-from acme import acme_types
 from acme.adders.reverb import utils as acme_utils
 from acme.utils import tree_utils
 
 from mava import specs as mava_specs
+from mava import types as mava_types
 from mava.adders.reverb import base
+
 # from mava.adders.reverb import utils as mava_utils
 
 
@@ -112,7 +111,9 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             client=client,
             max_sequence_length=n_step + 1,
             priority_fns=priority_fns,
-            max_in_flight_items=max_in_flight_items)
+            max_in_flight_items=max_in_flight_items,
+        )
+
     def add(self, *args, **kwargs):
         # Increment the indices for the start and end of the window for computing
         # n-step returns.
@@ -131,21 +132,25 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     def _n_step(self) -> int:
         """Effective n-step, which may vary at starts and ends of episodes."""
         return self._last_idx - self._first_idx
-    
+
     def _write(self):
         # Convenient getters for use in tree operations.
         get_first = lambda x: x[self._first_idx]
         get_last = lambda x: x[self._last_idx]
         # Note: this getter is meant to be used on a TrajectoryWriter.history to
         # obtain its numpy values.
-        get_all_np = lambda x: x[self._first_idx:self._last_idx].numpy()
+        get_all_np = lambda x: x[self._first_idx : self._last_idx].numpy()
 
         # Get the state, action, next_state, as well as possibly extras for the
         # transition that is about to be written.
         history = self._writer.history
-        s, e, a = tree.map_structure(get_first,
-                                (history['observations'], history['extras'], history['actions']))
-        s_,e_ = tree.map_structure(get_last, history['observations'], history['extras'])
+        s, e, a = tree.map_structure(
+            get_first, (history["observations"], history["extras"], history["actions"])
+        )
+
+        s_, e_ = tree.map_structure(
+            get_last, (history["observations"], history["extras"])
+        )
 
         # # Maybe get extras to add to the transition later.
         # if 'extras' in history:
@@ -157,18 +162,21 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # N-1, ...). See the Note in the docstring.
         # Get numpy view of the steps to be fed into the priority functions.
         rewards, discounts = tree.map_structure(
-            get_all_np, (history['rewards'], history['discounts']))
+            get_all_np, (history["rewards"], history["discounts"])
+        )
 
         # Compute discounted return and geometric discount over n steps.
         n_step_return, total_discount = self._compute_cumulative_quantities(
-            rewards, discounts)
+            rewards, discounts
+        )
 
         # Append the computed n-step return and total discount.
         # Note: if this call to _write() is within a call to _write_last(), then
         # this is the only data being appended and so it is not a partial append.
         self._writer.append(
             dict(n_step_return=n_step_return, total_discount=total_discount),
-            partial_step=self._writer.episode_steps <= self._last_idx)
+            partial_step=self._writer.episode_steps <= self._last_idx,
+        )
         # This should be done immediately after self._writer.append so the history
         # includes the recently appended data.
         history = self._writer.history
@@ -177,26 +185,28 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # the first observation and action in the buffer, along with the cumulative
         # reward and discount computed above.
         n_step_return, total_discount = tree.map_structure(
-            lambda x: x[-1], (history['n_step_return'], history['total_discount']))
-        transition = acme_types.Transition(
+            lambda x: x[-1], (history["n_step_return"], history["total_discount"])
+        )
+        transition = mava_types.Transition(
             observation=s,
             extras=e,
             action=a,
             reward=n_step_return,
             discount=total_discount,
             next_observation=s_,
-            extras=e_,
-            )
-            
+            next_extras=e_,
+        )
 
         # Calculate the priority for this transition.
-        table_priorities = acme_utils.calculate_priorities(self._priority_fns,
-                                                    transition)
+        table_priorities = acme_utils.calculate_priorities(
+            self._priority_fns, transition
+        )
 
         # Insert the transition into replay along with its priority.
         for table, priority in table_priorities.items():
             self._writer.create_item(
-                table=table, priority=priority, trajectory=transition)
+                table=table, priority=priority, trajectory=transition
+            )
         self._writer.flush(self._max_in_flight_items)
 
     def _write_last(self):
@@ -209,14 +219,15 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             self._first_idx += 1
 
     def _compute_cumulative_quantities(
-        self, rewards: acme_types.NestedArray, discounts: acme_types.NestedArray
-    ) -> Tuple[acme_types.NestedArray, acme_types.NestedArray]:
+        self, rewards: mava_types.NestedArray, discounts: mava_types.NestedArray
+    ) -> Tuple[mava_types.NestedArray, mava_types.NestedArray]:
 
         # Give the same tree structure to the n-step return accumulator,
         # n-step discount accumulator, and self.discount, so that they can be
         # iterated in parallel using tree.map_structure.
         rewards, discounts, self_discount = tree_utils.broadcast_structures(
-            rewards, discounts, self._discount)
+            rewards, discounts, self._discount
+        )
         flat_rewards = tree.flatten(rewards)
         flat_discounts = tree.flatten(discounts)
         flat_self_discount = tree.flatten(self_discount)
@@ -227,8 +238,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # Broadcast n_step_return to have the broadcasted shape of
         # reward * discount.
         n_step_return = [
-            np.copy(np.broadcast_to(r[0],
-                                    np.broadcast(r[0], d).shape))
+            np.copy(np.broadcast_to(r[0], np.broadcast(r[0], d).shape))
             for r, d in zip(flat_rewards, total_discount)
         ]
 
@@ -237,8 +247,13 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # an additional discount we don't apply it twice. Inside the following loop
         # we will apply this right before summing up the n_step_return.
         for i in range(1, self._n_step):
-            for nsr, td, r, d, sd in zip(n_step_return, total_discount, flat_rewards,
-                                        flat_discounts, flat_self_discount):
+            for nsr, td, r, d, sd in zip(
+                n_step_return,
+                total_discount,
+                flat_rewards,
+                flat_discounts,
+                flat_self_discount,
+            ):
                 # Equivalent to: `total_discount *= self._discount`.
                 td *= sd
                 # Equivalent to: `n_step_return += reward[i] * total_discount`.
