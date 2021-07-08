@@ -29,6 +29,7 @@ from typing import (
     Union,
 )
 
+from absl import logging
 import dm_env
 import numpy as np
 import reverb
@@ -82,13 +83,12 @@ class ReverbParallelAdder(base.ParallelAdder):
     def __init__(
         self,
         client: reverb.Client,
-        buffer_size: int,
+        # buffer_size: int,
         max_sequence_length: int,
         delta_encoded: bool = False,
-        chunk_length: Optional[int] = None,
+        # chunk_length: Optional[int] = None,
         priority_fns: Optional[PriorityFnMapping] = None,
         max_in_flight_items: Optional[int] = 25,
-        use_next_extras: bool = True,
     ):
         """Initialize a ReverbAdder instance.
         Args:
@@ -109,27 +109,44 @@ class ReverbParallelAdder(base.ParallelAdder):
         if priority_fns:
             priority_fns = dict(priority_fns)
         else:
-            priority_fns = {DEFAULT_PRIORITY_TABLE: lambda x: 1.0}
+            priority_fns = {DEFAULT_PRIORITY_TABLE: None}
 
         self._client = client
         self._priority_fns = priority_fns
         self._max_sequence_length = max_sequence_length
         self._delta_encoded = delta_encoded
-        self._chunk_length = chunk_length
+        # self._chunk_length = chunk_length
         self._max_in_flight_items = max_in_flight_items
-        self._use_next_extras = use_next_extras
+        self._add_first_called = False
+        self._use_next_extras = True
 
         # This is exposed as the _writer property in such a way that it will create
         # a new writer automatically whenever the internal __writer is None. Users
         # should ONLY ever interact with self._writer.
         self.__writer = None
+        # Every time a new writer is created, it must fetch the signature from the
+        # Reverb server. If this is set too low it can crash the adders in a
+        # distributed setup where the replay may take a while to spin up.
+        self._get_signature_timeout_ms = 300_000
+
+        def __del__(self):
+            if self.__writer is not None:
+                timeout_ms = 10_000
+                # Try flush all appended data before closing to avoid loss of experience.
+                try:
+                    self.__writer.flush(self._max_in_flight_items, timeout_ms=timeout_ms)
+                except reverb.DeadlineExceededError as e:
+                    logging.error(
+                        'Timeout (%d ms) exceeded when flushing the writer before '
+                        'deleting it. Caught Reverb exception: %s', timeout_ms, str(e))
+                self.__writer.close()
 
         # The state of the adder is captured by a buffer of `buffer_size` steps
         # (generally SAR tuples) and one additional dangling observation.
-        self._buffer: Deque = collections.deque(maxlen=buffer_size)
-        self._next_extras: Union[None, Dict[str, types.NestedArray]] = None
-        self._next_observations = None
-        self._start_of_episode = False
+        # self._buffer: Deque = collections.deque(maxlen=buffer_size)
+        # self._next_extras: Union[None, Dict[str, types.NestedArray]] = None
+        # self._next_observations = None
+        # self._start_of_episode = False
 
     def __del__(self) -> None:
         if self.__writer is not None:
@@ -148,46 +165,37 @@ class ReverbParallelAdder(base.ParallelAdder):
             )
         return self.__writer
 
-    def add_priority_table(
-        self, table_name: str, priority_fn: Optional[PriorityFn]
-    ) -> None:
+    def add_priority_table(self, table_name: str,
+                           priority_fn: Optional[PriorityFn]):
         if table_name in self._priority_fns:
             raise ValueError(
-                "A priority function already exists for {}.".format(table_name)
+                f'A priority function already exists for {table_name}. '
+                f'Existing tables: {", ".join(self._priority_fns.keys())}.'
             )
         self._priority_fns[table_name] = priority_fn
 
-    def reset(self) -> None:
+    def reset(self, timeout_ms: Optional[int] = None):
         """Resets the adder's buffer."""
         if self.__writer:
-            self._writer.close()
-            self.__writer = None
-        self._buffer.clear()
-        self._next_observations = None
+            # Flush all appended data and clear the buffers.
+            self.__writer.end_episode(clear_buffers=True, timeout_ms=timeout_ms)
+        self._add_first_called = False
 
     def add_first(
         self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
     ) -> None:
         """Record the first observation of a trajectory."""
         if not timestep.first():
-            raise ValueError(
-                "adder.add_first with an initial timestep (i.e. one for "
-                "which timestep.first() is True"
-            )
+            raise ValueError('adder.add_first with an initial timestep (i.e. one for '
+                            'which timestep.first() is True')
 
-        if self._next_observations is not None:
-            raise ValueError(
-                "adder.reset must be called before adder.add_first "
-                "(called automatically if `next_timestep.last()` is "
-                "true when `add` is called)."
-            )
-
-        # Record the next observation.
-        self._next_observations = timestep.observation
-        self._start_of_episode = True
-
-        if self._use_next_extras:
-            self._next_extras = extras
+        # Record the next observation but leave the history buffer row open by
+        # passing `partial_step=True`.
+        self._writer.append(dict(observation=timestep.observation,
+                                extras=extras,
+                                start_of_episode=timestep.first()),
+                            partial_step=True)
+        self._add_first_called = True
 
     def add(
         self,
@@ -199,44 +207,33 @@ class ReverbParallelAdder(base.ParallelAdder):
         if self._next_observations is None:
             raise ValueError("adder.add_first must be called before adder.add.")
 
-        discount = next_timestep.discount
-        if next_timestep.last():
-            # Terminal timesteps created by dm_env.termination() will have a scalar
-            # discount of 0.0. This may not match the array shape / nested structure
-            # of the previous timesteps' discounts. The below will match
-            # next_timestep.discount's shape/structure to that of
-            # self._buffer[-1].discount.
-            if self._buffer and not tree.is_nested(next_timestep.discount):
-                discount = tree.map_structure(
-                    lambda d: np.broadcast_to(next_timestep.discount, np.shape(d)),
-                    self._buffer[-1].discount,
-                )
-
-        self._buffer.append(
-            Step(
-                observations=self._next_observations,
-                actions=actions,
-                rewards=next_timestep.reward,
-                discounts=discount,
-                start_of_episode=self._start_of_episode,
-                extras=self._next_extras if self._use_next_extras else next_extras,
-            )
+        # Add the timestep to the buffer.
+        current_step = dict(
+            # Observations was passed at the previous add call.
+            actions=actions,
+            reward=next_timestep.reward,
+            discount=next_timestep.discount,
+            # Start of episode indicator was passed at the previous add call.
         )
+        self._writer.append(current_step)
 
-        # Write the last "dangling" observation.
+        # Record the next observation and write.
+        self._writer.append(
+            dict(
+                observation=next_timestep.observation,
+                **({'extras': next_extras} if next_extras else {}),
+                start_of_episode=next_timestep.first()),
+            partial_step=True)
+        self._write()
+
         if next_timestep.last():
-            self._start_of_episode = False
-            self._write()
+            # Complete the row by appending zeros to remaining open fields.
+            # TODO(b/183945808): remove this when fields are no longer expected to be
+            # of equal length on the learner side.
+            dummy_step = tree.map_structure(np.zeros_like, current_step)
+            self._writer.append(dummy_step)
             self._write_last()
             self.reset()
-        else:
-            # Record the next observation and write.
-            # Possibly store next_extras
-            if self._use_next_extras:
-                self._next_extras = next_extras
-            self._next_observations = next_timestep.observation
-            self._start_of_episode = False
-            self._write()
 
     @abc.abstractmethod
     def signature(
@@ -245,19 +242,30 @@ class ReverbParallelAdder(base.ParallelAdder):
         extras_spec: tf.TypeSpec,
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
+
         Signatures are useful for validating data types and shapes, see Reverb's
         documentation for details on how they are used.
+
         Args:
-          environment_spec: A `specs.EnvironmentSpec` whose fields are nested
+        environment_spec: A `specs.EnvironmentSpec` whose fields are nested
             structures with leaf nodes that have `.shape` and `.dtype` attributes.
             This should come from the environment that will be used to generate
             the data inserted into the Reverb table.
-          core_state_spec: A nested structure with leaf nodes that have `.shape` and
+        extras_spec: A nested structure with leaf nodes that have `.shape` and
             `.dtype` attributes. The structure (and shapes/dtypes) of this must
-            be the same as the `core_state` passed into `ReverbAdder.add`.
+            be the same as the `extras` passed into `ReverbAdder.add`.
+
         Returns:
-          A `Step` whose leaf nodes are `tf.TensorSpec` objects.
+        A `Step` whose leaf nodes are `tf.TensorSpec` objects.
         """
+        spec_step = Step(
+        observation=environment_spec.observations,
+        action=environment_spec.actions,
+        reward=environment_spec.rewards,
+        discount=environment_spec.discounts,
+        start_of_episode=acme_specs.Array(shape=(), dtype=bool),
+        extras=extras_spec)
+        return tree.map_structure_with_path(spec_like_to_tensor_spec, spec_step)
 
     @abc.abstractmethod
     def _write(self) -> None:
