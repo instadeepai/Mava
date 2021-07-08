@@ -15,13 +15,19 @@
 
 """Common types used throughout Mava."""
 
-from typing import Any, Dict, NamedTuple, Union
+from typing import Any, Dict, Iterable, Mapping, NamedTuple, Union
 
 import numpy as np
-from acme import types
+from acme import specs, types
 from acme.utils import loggers
 
 NestedArray = Any
+
+NestedSpec = Union[
+    specs.Array,
+    Iterable["NestedSpec"],
+    Mapping[Any, "NestedSpec"],
+]
 
 
 class OLT(NamedTuple):

@@ -55,6 +55,9 @@ class Step(NamedTuple):
     extras: Dict[str, types.NestedArray]
 
 
+Trajectory = Step
+
+
 class PriorityFnInput(NamedTuple):
     """The input to a priority function consisting of stacked steps."""
 
