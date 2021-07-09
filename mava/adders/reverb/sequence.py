@@ -54,7 +54,9 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         delta_encoded: bool = False,
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: Optional[int] = 2,
-        end_of_episode_behavior: Optional[EndBehavior] = None,  # type: ignore
+        end_of_episode_behavior: Optional[EndBehavior] = (  # type: ignore
+            EndBehavior.ZERO_PAD,
+        ),
     ):
         """Makes a SequenceAdder instance.
 
@@ -90,8 +92,10 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
         )
+
         self._period = period
         self._sequence_length = sequence_length
+        self._end_of_episode_behavior = end_of_episode_behavior
 
     def reset(self, timeout_ms: Optional[int] = None) -> None:
         """Resets the adder's buffer."""
@@ -144,7 +148,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         else:
             raise ValueError(
                 f"Unhandled end of episode behavior: {self._end_of_episode_behavior}."
-                " This should never happen, please contact Acme dev team."
+                " This should never happen, please contact Mava dev team."
             )
 
     def _maybe_create_item(
