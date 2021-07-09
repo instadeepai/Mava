@@ -54,9 +54,10 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         delta_encoded: bool = False,
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: Optional[int] = 2,
-        end_of_episode_behavior: Optional[EndBehavior] = (  # type: ignore
-            EndBehavior.ZERO_PAD,
-        ),
+        end_of_episode_behavior: Optional[  # type: ignore
+            EndBehavior
+        ] = EndBehavior.ZERO_PAD,
+        use_next_extras: bool = True,
     ):
         """Makes a SequenceAdder instance.
 
@@ -82,6 +83,8 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             sequence in the episode may have length less than `sequence_length`.
           break_end_of_episode: If 'False' (True by default) does not break
             sequences on env reset. In this case 'pad_end_of_episode' is not used.
+          use_next_extras: If true extras will be processed the same way observations
+          are processed. If false extras will be processed as actions are processed.
         """
         super().__init__(
             client=client,
@@ -91,6 +94,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             delta_encoded=delta_encoded,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
+            use_next_extras=use_next_extras,
         )
 
         self._period = period

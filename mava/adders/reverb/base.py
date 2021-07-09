@@ -81,6 +81,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         # chunk_length: Optional[int] = None,
         priority_fns: Optional[PriorityFnMapping] = None,
         max_in_flight_items: Optional[int] = 25,
+        use_next_extras: bool = True,
     ):
         """Initialize a ReverbAdder instance.
         Args:
@@ -110,7 +111,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         # self._chunk_length = chunk_length
         self._max_in_flight_items = max_in_flight_items
         self._add_first_called = False
-        self._use_next_extras = True
+        self._use_next_extras = use_next_extras
 
         # This is exposed as the _writer property in such a way that it will create
         # a new writer automatically whenever the internal __writer is None. Users
@@ -174,12 +175,14 @@ class ReverbParallelAdder(base.ParallelAdder):
 
         # Record the next observation but leave the history buffer row open by
         # passing `partial_step=True`.
+        add_dict = dict(
+            observations=timestep.observation,
+            start_of_episode=timestep.first(),
+        )
+        if self._use_next_extras:
+            add_dict["extras"] = extras
         self._writer.append(
-            dict(
-                observations=timestep.observation,
-                extras=extras,
-                start_of_episode=timestep.first(),
-            ),
+            add_dict,
             partial_step=True,
         )
         self._add_first_called = True
@@ -202,15 +205,23 @@ class ReverbParallelAdder(base.ParallelAdder):
             discounts=next_timestep.discount,
             # Start of episode indicator was passed at the previous add call.
         )
+
+        if not self._use_next_extras:
+            current_step["extras"] = next_extras
+
         self._writer.append(current_step)
 
         # Record the next observation and write.
+        next_step = dict(
+            observations=next_timestep.observation,
+            start_of_episode=next_timestep.first(),
+        )
+
+        if self._use_next_extras:
+            next_step["extras"] = next_extras
+
         self._writer.append(
-            dict(
-                observations=next_timestep.observation,
-                **({"extras": next_extras} if next_extras else {}),
-                start_of_episode=next_timestep.first(),
-            ),
+            next_step,
             partial_step=True,
         )
         self._write()

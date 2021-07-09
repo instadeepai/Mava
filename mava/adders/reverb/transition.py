@@ -112,6 +112,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             max_sequence_length=n_step + 1,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
+            use_next_extras=True,
         )
 
     def add(self, *args: Any, **kwargs: Any) -> None:
@@ -136,15 +137,21 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     def _write(self) -> None:
         # Convenient getters for use in tree operations.
         def get_first(x: np.array) -> np.array:
-            x[self._first_idx]
+            return x[self._first_idx]
+
+        # get_first = lambda x: x[self._first_idx]
 
         def get_last(x: np.array) -> np.array:
-            x[self._last_idx]
+            return x[self._last_idx]
+
+        # get_last = lambda x: x[self._last_idx]
 
         # Note: this getter is meant to be used on a TrajectoryWriter.history to
         # obtain its numpy values.
         def get_all_np(x: np.array) -> np.array:
-            x[self._first_idx : self._last_idx].numpy()
+            return x[self._first_idx : self._last_idx].numpy()
+
+        # get_all_np = lambda x: x[self._first_idx : self._last_idx].numpy()
 
         # Get the state, action, next_state, as well as possibly extras for the
         # transition that is about to be written.
@@ -166,10 +173,10 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # called from write_last) we will write the final transitions of size (N,
         # N-1, ...). See the Note in the docstring.
         # Get numpy view of the steps to be fed into the priority functions.
+
         rewards, discounts = tree.map_structure(
             get_all_np, (history["rewards"], history["discounts"])
         )
-
         # Compute discounted return and geometric discount over n steps.
         n_step_return, total_discount = self._compute_cumulative_quantities(
             rewards, discounts
