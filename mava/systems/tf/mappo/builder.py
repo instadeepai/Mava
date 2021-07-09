@@ -141,7 +141,9 @@ class MAPPOBuilder:
             name=self._config.replay_table_name,
             max_size=self._config.max_queue_size,
             signature=reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec, self._config.sequence_length, extras_spec=extras_spec
+                environment_spec,
+                sequence_length=self._config.sequence_length,
+                extras_spec=extras_spec,
             ),
         )
 
