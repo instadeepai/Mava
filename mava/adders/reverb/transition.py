@@ -114,7 +114,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             max_in_flight_items=max_in_flight_items,
         )
 
-    def add(self, *args, **kwargs):
+    def add(self, *args: Any, **kwargs: Any) -> None:
         # Increment the indices for the start and end of the window for computing
         # n-step returns.
         if self._writer.episode_steps >= self.n_step:
@@ -123,7 +123,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
 
         super().add(*args, **kwargs)
 
-    def reset(self):
+    def reset(self, timeout_ms: Optional[int] = None) -> None:
         super().reset()
         self._first_idx = 0
         self._last_idx = 0
@@ -133,13 +133,18 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         """Effective n-step, which may vary at starts and ends of episodes."""
         return self._last_idx - self._first_idx
 
-    def _write(self):
+    def _write(self) -> None:
         # Convenient getters for use in tree operations.
-        get_first = lambda x: x[self._first_idx]
-        get_last = lambda x: x[self._last_idx]
+        def get_first(x: np.array) -> np.array:
+            x[self._first_idx]
+
+        def get_last(x: np.array) -> np.array:
+            x[self._last_idx]
+
         # Note: this getter is meant to be used on a TrajectoryWriter.history to
         # obtain its numpy values.
-        get_all_np = lambda x: x[self._first_idx : self._last_idx].numpy()
+        def get_all_np(x: np.array) -> np.array:
+            x[self._first_idx : self._last_idx].numpy()
 
         # Get the state, action, next_state, as well as possibly extras for the
         # transition that is about to be written.
@@ -209,7 +214,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             )
         self._writer.flush(self._max_in_flight_items)
 
-    def _write_last(self):
+    def _write_last(self) -> None:
         # Write the remaining shorter transitions by alternating writing and
         # incrementingfirst_idx. Note that last_idx will no longer be incremented
         # once we're in this method's scope.

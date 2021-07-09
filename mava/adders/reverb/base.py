@@ -16,18 +16,7 @@
 """Adders that use Reverb (github.com/deepmind/reverb) as a backend."""
 
 import abc
-import collections
-from typing import (
-    Callable,
-    Deque,
-    Dict,
-    Iterable,
-    Mapping,
-    NamedTuple,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import Callable, Dict, Iterable, Mapping, NamedTuple, Optional, Tuple, Union
 
 import dm_env
 import numpy as np
@@ -132,7 +121,7 @@ class ReverbParallelAdder(base.ParallelAdder):
         # distributed setup where the replay may take a while to spin up.
         self._get_signature_timeout_ms = 300_000
 
-    def __del__(self):
+    def __del__(self) -> None:
         if self.__writer is not None:
             timeout_ms = 10_000
             # Try flush all appended data before closing to avoid loss of experience.
@@ -156,7 +145,9 @@ class ReverbParallelAdder(base.ParallelAdder):
             )
         return self.__writer
 
-    def add_priority_table(self, table_name: str, priority_fn: Optional[PriorityFn]):
+    def add_priority_table(
+        self, table_name: str, priority_fn: Optional[PriorityFn]
+    ) -> None:
         if table_name in self._priority_fns:
             raise ValueError(
                 f"A priority function already exists for {table_name}. "
@@ -164,7 +155,7 @@ class ReverbParallelAdder(base.ParallelAdder):
             )
         self._priority_fns[table_name] = priority_fn
 
-    def reset(self, timeout_ms: Optional[int] = None):
+    def reset(self, timeout_ms: Optional[int] = None) -> None:
         """Resets the adder's buffer."""
         if self.__writer:
             # Flush all appended data and clear the buffers.
@@ -256,15 +247,6 @@ class ReverbParallelAdder(base.ParallelAdder):
         Returns:
         A `Step` whose leaf nodes are `tf.TensorSpec` objects.
         """
-        spec_step = Step(
-            observations=environment_spec.observations,
-            actions=environment_spec.actions,
-            rewards=environment_spec.rewards,
-            discounts=environment_spec.discounts,
-            start_of_episode=acme_specs.Array(shape=(), dtype=bool),
-            extras=extras_spec,
-        )
-        return tree.map_structure_with_path(spec_like_to_tensor_spec, spec_step)
 
     @abc.abstractmethod
     def _write(self) -> None:

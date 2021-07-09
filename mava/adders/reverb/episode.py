@@ -43,10 +43,7 @@ class ParallelEpisodeAdder(base.ReverbParallelAdder):
         client: reverb.Client,
         max_sequence_length: int,
         delta_encoded: bool = False,
-        chunk_length: Optional[int] = None,
         priority_fns: Optional[base.PriorityFnMapping] = None,
-        pad_end_of_episode: bool = True,
-        break_end_of_episode: bool = True,
         max_in_flight_items: Optional[int] = 25,
     ):
         """Makes a SequenceAdder instance.
@@ -74,10 +71,8 @@ class ParallelEpisodeAdder(base.ReverbParallelAdder):
 
         super().__init__(
             client=client,
-            buffer_size=max_sequence_length - 1,
             max_sequence_length=max_sequence_length,
             delta_encoded=delta_encoded,
-            chunk_length=chunk_length,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
         )

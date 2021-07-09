@@ -32,10 +32,10 @@ import tree
 from acme import specs
 from acme.adders.reverb import utils
 from acme.adders.reverb.sequence import EndOfEpisodeBehavior
+from acme.types import NestedSpec
 from acme.utils import tree_utils
 
 from mava.adders.reverb import base
-from mava.types import NestedSpec
 
 # from mava.adders.reverb import utils as mava_utils
 
@@ -54,11 +54,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         delta_encoded: bool = False,
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: Optional[int] = 2,
-        end_of_episode_behavior: Optional[EndBehavior] = None,
-        # Deprecated kwargs.
-        chunk_length: Optional[int] = None,
-        pad_end_of_episode: Optional[bool] = None,
-        break_end_of_episode: Optional[bool] = None,
+        end_of_episode_behavior: Optional[EndBehavior] = None,  # type: ignore
     ):
         """Makes a SequenceAdder instance.
 
@@ -85,7 +81,6 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
           break_end_of_episode: If 'False' (True by default) does not break
             sequences on env reset. In this case 'pad_end_of_episode' is not used.
         """
-        del chunk_length
         super().__init__(
             client=client,
             # We need an additional space in the buffer for the partial step the
@@ -95,54 +90,10 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
         )
-
-        if pad_end_of_episode and not break_end_of_episode:
-            raise ValueError(
-                "Can't set pad_end_of_episode=True and break_end_of_episode=False at"
-                " the same time, since those behaviors are incompatible."
-            )
-
         self._period = period
         self._sequence_length = sequence_length
 
-        if end_of_episode_behavior and (
-            pad_end_of_episode is not None or break_end_of_episode is not None
-        ):
-            raise ValueError(
-                "Using end_of_episode_behavior and either "
-                "pad_end_of_episode or break_end_of_episode is not permitted. "
-                "Please use only end_of_episode_behavior instead."
-            )
-
-        # Set pad_end_of_episode and break_end_of_episode to default values.
-        if end_of_episode_behavior is None and pad_end_of_episode is None:
-            pad_end_of_episode = True
-        if end_of_episode_behavior is None and break_end_of_episode is None:
-            break_end_of_episode = True
-
-        self._end_of_episode_behavior = EndBehavior.ZERO_PAD
-        if pad_end_of_episode is not None or break_end_of_episode is not None:
-            if not break_end_of_episode:
-                self._end_of_episode_behavior = EndBehavior.CONTINUE
-            elif break_end_of_episode and pad_end_of_episode:
-                self._end_of_episode_behavior = EndBehavior.ZERO_PAD
-            elif break_end_of_episode and not pad_end_of_episode:
-                self._end_of_episode_behavior = EndBehavior.TRUNCATE
-            else:
-                raise ValueError(
-                    "Reached an unexpected configuration of the SequenceAdder "
-                    f"with break_end_of_episode={break_end_of_episode} "
-                    f"and pad_end_of_episode={pad_end_of_episode}."
-                )
-        elif isinstance(end_of_episode_behavior, EndBehavior):
-            self._end_of_episode_behavior = end_of_episode_behavior
-        else:
-            raise ValueError(
-                "end_of_episod_behavior must be an instance of "
-                f"EndBehavior, received {end_of_episode_behavior}."
-            )
-
-    def reset(self):
+    def reset(self, timeout_ms: Optional[int] = None) -> None:
         """Resets the adder's buffer."""
         # If we do not write on end of episode, we should not reset the writer.
         if self._end_of_episode_behavior is EndBehavior.CONTINUE:
@@ -150,10 +101,10 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
 
         super().reset()
 
-    def _write(self):
+    def _write(self) -> None:
         self._maybe_create_item(self._sequence_length)
 
-    def _write_last(self):
+    def _write_last(self) -> None:
         # Maybe determine the delta to the next time we would write a sequence.
         if self._end_of_episode_behavior in (
             EndBehavior.TRUNCATE,
@@ -198,7 +149,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
 
     def _maybe_create_item(
         self, sequence_length: int, *, end_of_episode: bool = False, force: bool = False
-    ):
+    ) -> None:
 
         # Check conditions under which a new item is created.
         first_write = self._writer.episode_steps == sequence_length
@@ -233,12 +184,12 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
     # used as alternative constructors or when modifying some global state,
     # neither of which is done here.
     @classmethod
-    def signature(
+    def signature(  # type: ignore
         cls,
         environment_spec: specs.EnvironmentSpec,
+        sequence_length: int,
         extras_spec: NestedSpec = (),
-        sequence_length: Optional[int] = None,
-    ):
+    ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
 
         Signatures are useful for validating data types and shapes, see Reverb's
@@ -258,12 +209,9 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         Returns:
           A `Trajectory` whose leaf nodes are `tf.TensorSpec` objects.
         """
+        assert type(sequence_length) == int and sequence_length > 0
 
-        # TODO(dries): Fix this
-        print("Remove this line!")
-        sequence_length = 20
-
-        def add_time_dim(paths: Iterable[str], spec: tf.TensorSpec):
+        def add_time_dim(paths: Iterable[str], spec: tf.TensorSpec) -> None:
             return tf.TensorSpec(
                 shape=(sequence_length, *spec.shape),
                 dtype=spec.dtype,
