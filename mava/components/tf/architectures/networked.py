@@ -38,20 +38,18 @@ class NetworkedPolicyActor(DecentralisedPolicyActor):
         network_spec: Dict[str, List[str]],
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
         )
 
         self._network_spec = network_spec
 
-        if len(set(self._agent_net_config.values())) < len(
-            self._agent_net_config.values()
-        ):
+        if len(set(self._agent_net_keys.values())) < len(self._agent_net_keys.values()):
             raise Exception(
                 "Networked architectures currently do not support"
                 " different agents with the same network weights."
@@ -88,21 +86,19 @@ class NetworkedQValueCritic(DecentralisedQValueActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
         )
 
         self._network_spec = network_spec
 
-        if len(set(self._agent_net_config.values())) < len(
-            self._agent_net_config.values()
-        ):
+        if len(set(self._agent_net_keys.values())) < len(self._agent_net_keys.values()):
             raise Exception(
                 "Networked architectures currently do not support"
                 " different agents with the same network weights."

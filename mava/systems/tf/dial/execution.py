@@ -39,7 +39,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         communication_module: BaseCommunicationModule,
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
@@ -56,7 +56,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
                 epsilon greedy.
             communication_module (BaseCommunicationModule): module for enabling
                 communication protocols between agents.
-            agent_net_config: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
@@ -80,7 +80,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         self._action_selectors = action_selectors
         self._store_recurrent_state = store_recurrent_state
         self._trainer = trainer
-        self._agent_net_config = agent_net_config
+        self._agent_net_keys = agent_net_keys
 
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}

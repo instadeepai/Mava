@@ -26,7 +26,7 @@ from mava.utils.enums import ArchitectureType, Network
 # Default networks for qmix
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    agent_net_config: Dict[str, str],
+    agent_net_keys: Dict[str, str],
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (128, 128),
     archecture_type: ArchitectureType = ArchitectureType.feedforward,
     network_type: Network = Network.mlp,
@@ -37,7 +37,7 @@ def make_default_networks(
     Args:
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
             observation spaces etc. for each agent in the system.
-        agent_net_config: (dict, optional): specifies what network each agent uses.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of policy networks. Defaults to (128,128).
@@ -56,7 +56,7 @@ def make_default_networks(
     return make_default_networks_madqn(
         environment_spec=environment_spec,
         policy_networks_layer_sizes=policy_networks_layer_sizes,
-        agent_net_config=agent_net_config,
+        agent_net_keys=agent_net_keys,
         archecture_type=archecture_type,
         network_type=network_type,
         fingerprints=fingerprints,

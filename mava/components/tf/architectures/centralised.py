@@ -38,13 +38,13 @@ class CentralisedPolicyActor(DecentralisedPolicyActor):
         environment_spec: mava_specs.MAEnvironmentSpec,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
         )
 
     def _get_actor_specs(
@@ -68,7 +68,7 @@ class CentralisedPolicyActor(DecentralisedPolicyActor):
 
         actor_obs_specs = {}
         for agent_key in self._agents:
-            agent_net_key = self._agent_net_config[agent_key]
+            agent_net_key = self._agent_net_keys[agent_key]
             # Get observation spec for actor.
             actor_obs_specs[agent_key] = obs_specs_per_type[agent_net_key]
         return actor_obs_specs
@@ -81,14 +81,14 @@ class CentralisedValueCritic(DecentralisedValueActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
         )
 
     def _get_critic_specs(
@@ -108,7 +108,7 @@ class CentralisedValueCritic(DecentralisedValueActorCritic):
 
         critic_obs_specs = {}
         for agent_key in self._agents:
-            agent_net_key = self._agent_net_config[agent_key]
+            agent_net_key = self._agent_net_keys[agent_key]
             # Get observation and action spec for critic.
             critic_obs_specs[agent_key] = obs_specs_per_type[agent_net_key]
         return critic_obs_specs, {}
@@ -123,14 +123,14 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
         )
 
     def _get_critic_specs(
@@ -189,7 +189,7 @@ class CentralisedQValueActorCritic(  # type: ignore
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
     ):
 
         CentralisedQValueCritic.__init__(
@@ -198,5 +198,5 @@ class CentralisedQValueActorCritic(  # type: ignore
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
         )

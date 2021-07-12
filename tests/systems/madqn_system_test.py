@@ -34,7 +34,7 @@ from mava.utils.environments import debugging_utils
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    agent_net_config: Dict[str, str],
+    agent_net_keys: Dict[str, str],
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -42,7 +42,7 @@ def make_networks(
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
-    specs = {agent_net_config[key]: specs[key] for key in specs.keys()}
+    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
 
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}

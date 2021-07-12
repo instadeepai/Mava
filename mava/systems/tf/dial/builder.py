@@ -44,7 +44,7 @@ class DIALConfig:
             each agent in the system.
         epsilon_min: final minimum value for epsilon at the end of a decay schedule.
         epsilon_decay: the rate at which epislon decays.
-        agent_net_config: (dict, optional): specifies what network each agent uses.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
         target_update_period: number of learner steps to perform before updating
             the target networks.
@@ -70,7 +70,7 @@ class DIALConfig:
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
     epsilon_decay: float
-    agent_net_config: Dict[str, str]
+    agent_net_keys: Dict[str, str]
     target_update_period: int
     executor_variable_update_period: int
     max_gradient_norm: Optional[float]
@@ -292,14 +292,14 @@ class DIALBuilder:
                 of the system generating data by interacting the environment.
         """
 
-        agent_net_config = self._config.agent_net_config
+        agent_net_keys = self._config.agent_net_keys
 
         variable_client = None
         if variable_source:
             # Create policy variables
             variables = {
                 net_key: q_networks[net_key].variables
-                for net_key in set(agent_net_config.values())
+                for net_key in set(agent_net_keys.values())
             }
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
@@ -319,7 +319,7 @@ class DIALBuilder:
         return self._executor_fn(
             q_networks=q_networks,
             action_selectors=action_selectors,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             variable_client=variable_client,
             adder=adder,
             trainer=trainer,
@@ -375,7 +375,7 @@ class DIALBuilder:
             discount=self._config.discount,
             q_networks=q_networks,
             target_q_networks=target_q_networks,
-            agent_net_config=self._config.agent_net_config,
+            agent_net_keys=self._config.agent_net_keys,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,

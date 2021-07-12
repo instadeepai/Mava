@@ -25,7 +25,7 @@ from mava.utils.enums import ArchitectureType, Network
 
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    agent_net_config: Dict[str, str],
+    agent_net_keys: Dict[str, str],
     message_size: int = 1,
     archecture_type: ArchitectureType = ArchitectureType.recurrent,
     network_type: Network = Network.coms_network,
@@ -36,7 +36,7 @@ def make_default_networks(
     Args:
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
             observation spaces etc. for each agent in the system.
-        agent_net_config: (dict, optional): specifies what network each agent uses.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
         message_size (int, optional): size of message passed. Defaults to 1.
         archecture_type (ArchitectureType, optional): archecture used for
@@ -58,7 +58,7 @@ def make_default_networks(
 
     return make_default_networks_madqn(
         environment_spec=environment_spec,
-        agent_net_config=agent_net_config,
+        agent_net_keys=agent_net_keys,
         archecture_type=archecture_type,
         network_type=network_type,
         fingerprints=fingerprints,

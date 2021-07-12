@@ -64,7 +64,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -97,7 +97,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 extraction from raw observation.
             target_observation_networks (Dict[str, snt.Module]): target observation
                 network.
-            agent_net_config: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
@@ -126,7 +126,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
@@ -163,7 +163,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             a_t = self._target_policy_actions(o_t_trans)
 
             for agent in self._agents:
-                agent_key = self._agent_net_config[agent]
+                agent_key = self._agent_net_keys[agent]
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
@@ -234,7 +234,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -256,7 +256,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -287,7 +287,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -309,7 +309,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -340,7 +340,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -362,7 +362,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -396,7 +396,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -430,7 +430,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 extraction from raw observation.
             target_observation_networks (Dict[str, snt.Module]): target observation
                 network.
-            agent_net_config: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
@@ -457,7 +457,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -512,7 +512,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             )
 
             for agent in self._agents:
-                agent_key = self._agent_net_config[agent]
+                agent_key = self._agent_net_keys[agent]
 
                 # Get critic feed
                 (
@@ -630,7 +630,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -653,7 +653,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -687,7 +687,7 @@ class MAD4PGCentralisedRecurrentTrainer(
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -710,7 +710,7 @@ class MAD4PGCentralisedRecurrentTrainer(
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -744,7 +744,7 @@ class MAD4PGStateBasedRecurrentTrainer(
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -767,7 +767,7 @@ class MAD4PGStateBasedRecurrentTrainer(
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
