@@ -21,6 +21,7 @@ from typing import Dict, Iterator, List, Optional, Type, Union
 import reverb
 import sonnet as snt
 import tensorflow as tf
+from acme import datasets
 from acme import types as acme_types
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils
@@ -142,7 +143,9 @@ class MAPPOBuilder:
             name=self._config.replay_table_name,
             max_size=self._config.max_queue_size,
             signature=reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec, extras_spec=extras_spec
+                environment_spec,
+                sequence_length=self._config.sequence_length,
+                extras_spec=extras_spec,
             ),
         )
 
@@ -166,16 +169,10 @@ class MAPPOBuilder:
         """
 
         # Create tensorflow dataset to interface with reverb
-        dataset = reverb.ReplayDataset.from_table_signature(
+        dataset = datasets.make_reverb_dataset(
             server_address=replay_client.server_address,
-            table=self._config.replay_table_name,
-            max_in_flight_samples_per_worker=1,
-            sequence_length=self._config.sequence_length,
-            emit_timesteps=False,
+            batch_size=self._config.batch_size,
         )
-
-        # Batching
-        dataset = dataset.batch(self._config.batch_size, drop_remainder=True)
 
         return iter(dataset)
 

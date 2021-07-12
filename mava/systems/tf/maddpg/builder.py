@@ -194,7 +194,7 @@ class MADDPGBuilder:
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder_sig = reverb_adders.ParallelSequenceAdder.signature(
-                env_adder_spec, self._extra_specs
+                env_adder_spec, self._config.sequence_length, self._extra_specs
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)

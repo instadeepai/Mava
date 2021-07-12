@@ -161,7 +161,7 @@ class DIALBuilder:
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder_sig = reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec, self._extra_specs
+                environment_spec, self._config.sequence_length, self._extra_specs
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
