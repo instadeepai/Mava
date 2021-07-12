@@ -32,6 +32,7 @@ from acme.adders.reverb import utils as acme_utils
 from acme.utils import tree_utils
 
 from mava import specs as mava_specs
+from mava import types
 from mava import types as mava_types
 from mava.adders.reverb import base
 
@@ -319,18 +320,18 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             reward_specs[agent] = rewards_spec
             step_discount_specs[agent] = step_discounts_spec
 
-        transition_spec = [
-            obs_specs,
-            act_specs,
-            extras_spec,
-            reward_specs,
-            step_discount_specs,
-            obs_specs,  # next_observation
-            extras_spec,
-        ]
+        transition_spec = types.Transition(
+            observation=obs_specs,
+            action=act_specs,
+            extras=extras_spec,
+            reward=reward_specs,
+            discount=step_discount_specs,
+            next_observation=obs_specs,
+            next_extras=extras_spec,
+        )
 
         return tree.map_structure_with_path(
-            base.spec_like_to_tensor_spec, tuple(transition_spec)
+            base.spec_like_to_tensor_spec, transition_spec
         )
 
 
