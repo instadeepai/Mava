@@ -57,6 +57,7 @@ testing_formatting_requirements = [
     "flake8==3.9.1",
     "black==21.4b1",
     "pytest-cov",
+    "interrogate",
 ]
 
 record_episode_requirements = ["array2gif"]
