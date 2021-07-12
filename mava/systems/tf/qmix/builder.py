@@ -165,7 +165,7 @@ class QMIXBuilder(MADQNBuilder):
             target_q_networks=target_q_networks,
             mixing_network=mixing_network,
             target_mixing_network=target_mixing_network,
-            agent_net_config=self._config.agent_net_config,
+            agent_net_keys=self._config.agent_net_keys,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,

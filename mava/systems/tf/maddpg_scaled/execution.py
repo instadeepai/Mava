@@ -46,7 +46,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -62,7 +62,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
-            agent_net_config: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
         """
 
@@ -71,7 +71,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self._counts = counts
         super().__init__(
             policy_networks=policy_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             adder=adder,
             variable_client=variable_client,
         )
@@ -98,7 +98,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         batched_observation = tf2_utils.add_batch_dim(observation)
 
         # index network either on agent type or on agent id
-        agent_key = self._agent_net_config[agent]
+        agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
         policy = self._policy_networks[agent_key](batched_observation)

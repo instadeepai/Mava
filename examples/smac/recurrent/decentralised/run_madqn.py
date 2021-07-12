@@ -52,7 +52,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 def custom_recurrent_network(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    agent_net_config: Dict[str, str],
+    agent_net_keys: Dict[str, str],
     q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = [128, 128],
 ) -> Mapping[str, types.TensorTransformation]:
     """Creates networks used by the agents."""
@@ -60,7 +60,7 @@ def custom_recurrent_network(
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
-    specs = {agent_net_config[key]: specs[key] for key in specs.keys()}
+    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
 
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}

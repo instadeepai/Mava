@@ -64,7 +64,7 @@ class MADDPGBaseTrainer(feedforward_trainer):
         variable_client: VariableClient,
         counts: Dict[str, Any],
         num_steps: int,
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -93,7 +93,7 @@ class MADDPGBaseTrainer(feedforward_trainer):
                 extraction from raw observation.
             target_observation_networks (Dict[str, snt.Module]): target observation
                 network.
-            agent_net_config: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
@@ -108,7 +108,7 @@ class MADDPGBaseTrainer(feedforward_trainer):
 
         self._agents = agents
         self._agent_types = agent_types
-        self._agent_net_config = agent_net_config
+        self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
 
         # Setup counts
@@ -151,12 +151,12 @@ class MADDPGBaseTrainer(feedforward_trainer):
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         # Dictionary with unique network keys.
-        self.unique_net_keys = set(self._agent_net_config.values())
+        self.unique_net_keys = set(self._agent_net_keys.values())
 
         # Get the agents which shoud be updated and ran
         self._trainer_agent_list = []
         for agent in self._agents:
-            agent_key = self._agent_net_config[agent]
+            agent_key = self._agent_net_keys[agent]
             if agent_key in trainer_net_config:
                 self._trainer_agent_list.append(agent)
 
@@ -241,7 +241,7 @@ class MADDPGBaseTrainer(feedforward_trainer):
         o_tm1 = {}
         o_t = {}
         for agent in self._agents:
-            agent_key = self._agent_net_config[agent]
+            agent_key = self._agent_net_keys[agent]
             o_tm1[agent] = self._observation_networks[agent_key](obs[agent].observation)
             o_t[agent] = self._target_observation_networks[agent_key](
                 next_obs[agent].observation
@@ -318,7 +318,7 @@ class MADDPGBaseTrainer(feedforward_trainer):
         """
         actions = {}
         for agent in self._agents:
-            agent_key = self._agent_net_config[agent]
+            agent_key = self._agent_net_keys[agent]
             next_observation = next_obs[agent]
             actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
@@ -377,7 +377,7 @@ class MADDPGBaseTrainer(feedforward_trainer):
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
             a_t = self._target_policy_actions(o_t_trans)
             for agent in self._trainer_agent_list:
-                agent_key = self._agent_net_config[agent]
+                agent_key = self._agent_net_keys[agent]
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
@@ -441,7 +441,7 @@ class MADDPGBaseTrainer(feedforward_trainer):
         critic_losses = self.critic_losses
         tape = self.tape
         for agent in self._trainer_agent_list:
-            agent_key = self._agent_net_config[agent]
+            agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
             policy_variables = (
@@ -532,7 +532,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         variable_client: VariableClient,
         counts: Dict[str, Any],
         num_steps: int,
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -551,7 +551,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,

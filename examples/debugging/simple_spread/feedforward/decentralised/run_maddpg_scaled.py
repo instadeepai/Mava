@@ -105,7 +105,7 @@ def main(_: Any) -> None:
             "trainer_1": ["agent_1"],
             "trainer_2": ["agent_2"],
         },
-        agent_net_config={
+        agent_net_keys={
             "agent_0": "agent_0",
             "agent_1": "agent_1",
             "agent_2": "agent_2",

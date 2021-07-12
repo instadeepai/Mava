@@ -40,7 +40,7 @@ class MAPPOConfig:
             each agent in the system.
         policy_optimizer: optimizer(s) for updating policy networks.
         critic_optimizer: optimizer for updating critic networks.
-        agent_net_config: (dict, optional): specifies what network each agent uses.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         sequence_length: recurrent sequence rollout length.
         sequence_period: consecutive starting points for overlapping rollouts across a
@@ -69,7 +69,7 @@ class MAPPOConfig:
     environment_spec: specs.EnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
-    agent_net_config: Dict[str, str]
+    agent_net_keys: Dict[str, str]
     sequence_length: int = 10
     sequence_period: int = 5
     discount: float = 0.99
@@ -248,7 +248,7 @@ class MAPPOBuilder:
         # Create the executor which defines how agents take actions.
         return self._executor_fn(
             policy_networks=policy_networks,
-            agent_net_config=self._config.agent_net_config,
+            agent_net_keys=self._config.agent_net_keys,
             variable_client=variable_client,
             adder=adder,
         )
@@ -278,7 +278,7 @@ class MAPPOBuilder:
 
         agents = self._agents
         agent_types = self._agent_types
-        agent_net_config = self._config.agent_net_config
+        agent_net_keys = self._config.agent_net_keys
 
         observation_networks = networks["observations"]
         policy_networks = networks["policies"]
@@ -292,7 +292,7 @@ class MAPPOBuilder:
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             dataset=dataset,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             critic_optimizer=self._config.critic_optimizer,
             policy_optimizer=self._config.policy_optimizer,
             discount=self._config.discount,

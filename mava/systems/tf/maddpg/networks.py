@@ -32,7 +32,7 @@ DiscreteArray = specs.DiscreteArray
 
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    agent_net_config: Dict[str, str],
+    agent_net_keys: Dict[str, str],
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         256,
         256,
@@ -47,7 +47,7 @@ def make_default_networks(
     Args:
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
             observation spaces etc. for each agent in the system.
-        agent_net_config: (dict, optional): specifies what network each agent uses.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of policy networks. Defaults to (256, 256, 256).
@@ -73,7 +73,7 @@ def make_default_networks(
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
-    specs = {agent_net_config[key]: specs[key] for key in specs.keys()}
+    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
 
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {

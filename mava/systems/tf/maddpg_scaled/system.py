@@ -60,7 +60,7 @@ class MADDPG:
         num_trainers: int = 1,
         trainer_net_config: Dict[str, List] = {},
         shared_weights: bool = True,
-        agent_net_config: Dict[str, str] = {},
+        agent_net_keys: Dict[str, str] = {},
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -115,8 +115,9 @@ class MADDPG:
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
             shared_weights (bool, optional): whether agents should share weights or not.
+                When agent_net_keys are provided the value of shared_weights is ignored.
                 Defaults to True.
-            agent_net_config: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
@@ -184,10 +185,10 @@ class MADDPG:
             )
 
         # Setup agent networks
-        self._agent_net_config = agent_net_config
-        if not agent_net_config:
+        self._agent_net_keys = agent_net_keys
+        if not agent_net_keys:
             agents = environment_spec.get_agent_ids()
-            self._agent_net_config = {
+            self._agent_net_keys = {
                 agent: agent.split("_")[0] if shared_weights else agent
                 for agent in agents
             }
@@ -223,7 +224,7 @@ class MADDPG:
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
-                agent_net_config=self._agent_net_config,
+                agent_net_keys=self._agent_net_keys,
                 num_trainers=num_trainers,
                 num_executors=num_executors,
                 discount=discount,
@@ -261,11 +262,11 @@ class MADDPG:
         core_state_specs = {}
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
-            agent_net_config=self._agent_net_config,
+            agent_net_keys=self._agent_net_keys,
         )
         for agent in agents:
             # agent_type = agent.split("_")[0]
-            agent_net_key = self._agent_net_config[agent]
+            agent_net_key = self._agent_net_keys[agent]
             core_state_specs[agent] = (
                 tf2_utils.squeeze_batch_dim(
                     networks["policies"][agent_net_key].initial_state(1)
@@ -288,7 +289,7 @@ class MADDPG:
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
-            agent_net_config=self._agent_net_config,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture with target networks.
@@ -302,7 +303,7 @@ class MADDPG:
             "observation_networks": networks["observations"],
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
-            "agent_net_config": self._agent_net_config,
+            "agent_net_keys": self._agent_net_keys,
             # "shared_weights": self._shared_weights,
         }
         if self._connection_spec:

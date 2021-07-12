@@ -48,7 +48,7 @@ class MADDPGConfig:
             each agent in the system.
         policy_optimizer: optimizer(s) for updating policy networks.
         critic_optimizer: optimizer for updating critic networks.
-        agent_net_config: (dict, optional): specifies what network each agent uses.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         discount: discount to use for TD updates.
         batch_size: batch size for updates.
@@ -77,7 +77,7 @@ class MADDPGConfig:
     critic_optimizer: snt.Optimizer
     num_executors: int
     num_trainers: int
-    agent_net_config: Dict[str, str]
+    agent_net_keys: Dict[str, str]
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -329,7 +329,7 @@ class MADDPGBuilder:
         variables = {}
         # Network variables
         for net_key in networks.keys():
-            for agent_net_key in set(self._config.agent_net_config):
+            for agent_net_key in set(self._config.agent_net_keys):
                 # Ensure obs and target networks are sonnet modules
                 variables[f"{agent_net_key}_{net_key}"] = tf2_utils.to_sonnet_module(
                     networks[net_key][agent_net_key]
@@ -366,7 +366,7 @@ class MADDPGBuilder:
         variables = {}
         get_keys = []
 
-        for agent_net_key in self._config.agent_net_config:
+        for agent_net_key in self._config.agent_net_keys:
             var_key = f"{agent_net_key}_policies"
             variables[var_key] = policy_networks[agent_net_key].variables
             get_keys.append(var_key)
@@ -403,7 +403,7 @@ class MADDPGBuilder:
             policy_networks=policy_networks,
             counts=counts,
             agent_specs=self._config.environment_spec.get_agent_specs(),
-            agent_net_config=self._config.agent_net_config,
+            agent_net_keys=self._config.agent_net_keys,
             variable_client=variable_client,
             adder=adder,
         )
@@ -445,7 +445,7 @@ class MADDPGBuilder:
         set_keys = []
         get_keys = []
         for net_type_key in networks.keys():
-            for agent_net_key in self._config.agent_net_config:
+            for agent_net_key in self._config.agent_net_keys:
                 variables[f"{agent_net_key}_{net_type_key}"] = networks[net_type_key][
                     agent_net_key
                 ].variables
@@ -489,7 +489,7 @@ class MADDPGBuilder:
             "target_policy_networks": networks["target_policies"],
             "target_critic_networks": networks["target_critics"],
             "target_observation_networks": networks["target_observations"],
-            "agent_net_config": self._config.agent_net_config,
+            "agent_net_keys": self._config.agent_net_keys,
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
             "max_gradient_norm": max_gradient_norm,
