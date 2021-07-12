@@ -59,3 +59,6 @@ jobs:
       - name: Test with pytest and get code coverage
         run: |
           pytest --cov-report term-missing --cov=mava  -n "$(grep -c ^processor /proc/cpuinfo)" tests
+      - name: Check docstring code coverage
+        run: |
+          interrogate -c pyproject.toml
