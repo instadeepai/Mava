@@ -7,7 +7,13 @@ import numpy as np
 import tensorflow as tf
 import tree
 from acme.adders.reverb import test_utils
-from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
+
+# TODO Clean this up when using newer versions of acme.
+try:
+    from acme.adders.reverb.sequence import EndBehavior
+except ImportError:
+    from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
+
 from acme.specs import EnvironmentSpec
 from acme.utils import tree_utils
 

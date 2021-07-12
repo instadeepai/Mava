@@ -31,8 +31,13 @@ import tensorflow as tf
 import tree
 from acme import specs
 from acme.adders.reverb import utils
-from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
 from acme.types import NestedSpec
+
+# TODO Clean this up, when using newer versions of acme.
+try:
+    from acme.adders.reverb.sequence import EndBehavior
+except ImportError:
+    from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
 from acme.utils import tree_utils
 
 from mava.adders.reverb import base
