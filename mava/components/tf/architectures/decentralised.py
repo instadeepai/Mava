@@ -206,7 +206,7 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
-        net_spec_config: Dict[str, str] = {},
+        net_spec_keys: Dict[str, str] = {},
     ):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()  # All agend ids
@@ -222,15 +222,15 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         self._n_agents = len(self._agents)
         self._embed_specs: Dict[str, Any] = {}
 
-        if not net_spec_config:
+        if not net_spec_keys:
             # Check if the agents use all the networks.
             assert len(self._policy_networks.keys()) == set(
-                self._agent_net_config.values()
+                self._agent_net_keys.values()
             )
-            net_spec_config = {
-                self._agent_net_config[agent]: agent for agent in self._agents
+            net_spec_keys = {
+                self._agent_net_keys[agent]: agent for agent in self._agents
             }
-        self._net_spec_config = net_spec_config
+        self._net_spec_keys = net_spec_keys
 
         self._create_target_networks()
 
@@ -262,7 +262,7 @@ class DecentralisedValueActorCritic(BaseActorCritic):
 
         # create policy variables for each agent
         for net_key in self._net_keys:
-            agent_key = self._net_spec_config[net_key]
+            agent_key = self._net_spec_keys[net_key]
             obs_spec = actor_obs_specs[agent_key]
             emb_spec = tf2_utils.create_variables(
                 self._observation_networks[net_key], [obs_spec]
@@ -295,7 +295,7 @@ class DecentralisedValueActorCritic(BaseActorCritic):
 
         # create critics
         for net_key in self._net_keys:
-            agent_key = self._net_spec_config[net_key]
+            agent_key = self._net_spec_keys[net_key]
 
             # get specs
             emb_spec = embed_specs[agent_key]
@@ -343,7 +343,7 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
-        net_spec_config: Dict[str, str] = {},
+        net_spec_keys: Dict[str, str] = {},
     ):
         super().__init__(
             environment_spec=environment_spec,
@@ -351,7 +351,7 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             agent_net_keys=agent_net_keys,
-            net_spec_config=net_spec_config,
+            net_spec_keys=net_spec_keys,
         )
 
     def _get_critic_specs(
@@ -369,7 +369,7 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
 
         # create critics
         for net_key in self._net_keys:
-            agent_key = self._net_spec_config[net_key]
+            agent_key = self._net_spec_keys[net_key]
 
             # get specs
             emb_spec = embed_specs[agent_key]
@@ -400,7 +400,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
         environment_spec: mava_specs.MAEnvironmentSpec,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
     ):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()
@@ -410,7 +410,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
         self._observation_networks = observation_networks
         self._policy_networks = policy_networks
-        self._agent_net_config = agent_net_config
+        self._agent_net_keys = agent_net_keys
         self._n_agents = len(self._agents)
         self._embed_specs: Dict[str, Any] = {}
 
@@ -444,7 +444,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
         # create policy variables for each agent
         for agent_key in self._agents:
-            agent_net_key = self._agent_net_config[agent_key]
+            agent_net_key = self._agent_net_keys[agent_key]
 
             obs_spec = actor_obs_specs[agent_key]
             emb_spec = tf2_utils.create_variables(
@@ -472,7 +472,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
     def create_behaviour_policy(self) -> Dict[str, snt.Module]:
         behaviour_policy_networks: Dict[str, snt.Module] = {}
-        for agent_key in set(self._agent_net_config.values()):
+        for agent_key in set(self._agent_net_keys.values()):
             snt_module = type(self._policy_networks[agent_key])
             behaviour_policy_networks[agent_key] = snt_module(
                 [

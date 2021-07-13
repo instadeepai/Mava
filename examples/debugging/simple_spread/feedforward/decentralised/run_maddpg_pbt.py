@@ -24,8 +24,8 @@ import sonnet as snt
 from absl import app, flags
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
-from mava.systems.tf import maddpg_scaled
-from mava.systems.tf.maddpg_scaled import make_default_networks
+from mava.systems.tf import maddpg
+from mava.systems.tf.maddpg import make_default_networks
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 
@@ -93,12 +93,12 @@ def main(_: Any) -> None:
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # distributed program
-    program = maddpg_scaled.MADDPG(
+    program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_config=logger_config,
         num_executors=2,
-        num_trainers=3,
+        num_trainers=5,
         shared_weights=False,
         trainer_net_config={
             "trainer_0": ["agent_0", "agent_3"],

@@ -27,6 +27,7 @@ import numpy as np
 import reverb
 import tensorflow as tf
 import tree
+from absl.flags import ValidationError
 from acme import specs as acme_specs
 from acme.adders.reverb import utils as acme_utils
 from acme.utils import tree_utils
@@ -35,6 +36,7 @@ from mava import specs as mava_specs
 from mava import types
 from mava import types as mava_types
 from mava.adders.reverb import base
+from mava.utils.adder_utils import calculate_priorities
 
 # from mava.adders.reverb import utils as mava_utils
 
@@ -86,7 +88,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         discount: float,
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
-        table_net_keys: Dict[str, str] = None,
+        table_net_config: Dict[str, str] = None,
         max_in_flight_items: int = 5,
     ) -> None:
         """Creates an N-step transition adder.
@@ -108,7 +110,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         self._discount = tree.map_structure(np.float32, discount)
         self._first_idx = 0
         self._last_idx = 0
-        self._table_net_keys = table_net_keys
+        self._table_net_config = table_net_config
 
         super().__init__(
             client=client,
@@ -213,34 +215,29 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         )
 
         # Calculate the priority for this transition.
-        table_priorities = acme_utils.calculate_priorities(
-            self._priority_fns, transition
-        )
-
-        print("self._table_net_keys: ", self._table_net_keys)
-        print("transition.action.keys(): ", transition.action.keys())
-        for table, priority in table_priorities.items():
-            if (
-                not self._table_net_keys
-                or self._table_net_keys["trainer_0"] in transition.action.keys()
-            ):
-                print(table + " passed condition.")
-            else:
-                print(table + " failed condition.")
-        exit()
+        table_priorities = calculate_priorities(self._priority_fns, transition)
 
         # Insert the transition into replay along with its priority.
+        created_item = False
         for table, priority in table_priorities.items():
             # If all the network keys of a trainer is in the data then add it to that trainer's
             # data table.
-            if (
-                not self._table_net_keys
-                or self._table_net_keys[table] in transition.action.keys()
+            if not self._table_net_config or all(
+                elem in transition.action.keys()
+                for elem in self._table_net_config[table]
             ):
+                created_item = True
+
                 self._writer.create_item(
                     table=table, priority=priority, trajectory=transition
                 )
         self._writer.flush(self._max_in_flight_items)
+
+        if not created_item:
+            raise ValidationError(
+                "This experience was not used by any trainer: ",
+                transition.action.keys(),
+            )
 
     def _write_last(self) -> None:
         # Write the remaining shorter transitions by alternating writing and

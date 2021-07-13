@@ -21,11 +21,13 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 import acme
 import dm_env
 import launchpad as lp
+import numpy as np
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
 from acme.utils import loggers
+from dm_env import specs
 
 import mava
 from mava import core
@@ -38,6 +40,8 @@ from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
+
+Array = specs.Array
 
 
 class MADDPG:
@@ -79,6 +83,8 @@ class MADDPG:
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
+        do_pbt: bool = False,
+        num_agents_in_population: int = 10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
         # max_executor_steps: int = None,
@@ -206,6 +212,16 @@ class MADDPG:
             self._trainer_net_config["trainer_0"] = [
                 net_key for net_key in set(self._agent_net_keys.values())
             ]
+        else:
+            assert len(trainer_net_config.keys()) == num_trainers
+        self._net_spec_keys = self._agent_net_keys
+        if do_pbt:
+            # Note: Assuming all agents have the same specs for now.
+            # TODO (dries): Allow agents to have different input/output spaces with
+            # population based training in the future.
+            self._net_spec_keys = {
+                f"agent_{i}": "agent_0" for i in range(num_agents_in_population)
+            }
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -229,15 +245,21 @@ class MADDPG:
         else:
             self._connection_spec = None  # type: ignore
 
+        extra_specs = {}
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
-        else:
-            extra_specs = {}
+
+        if do_pbt:
+            str_spec = Array((), dtype=np.dtype("U10"))
+            agents = environment_spec.get_agent_ids()
+            net_spec = {"network_keys": {agent: str_spec for agent in agents}}
+            extra_specs.update(net_spec)
 
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
                 agent_net_keys=self._agent_net_keys,
+                trainer_net_config=self._trainer_net_config,
                 num_trainers=num_trainers,
                 num_executors=num_executors,
                 discount=discount,
@@ -254,6 +276,7 @@ class MADDPG:
                 sequence_length=sequence_length,
                 period=period,
                 sigma=sigma,
+                do_pbt=do_pbt,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
@@ -318,7 +341,11 @@ class MADDPG:
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
             "agent_net_keys": self._agent_net_keys,
+            "net_spec_keys": self._net_spec_keys,
         }
+
+        # TODO (dries): Can net_spec_keys and network_spec be used as the same thing? Can we use use one of those two instead of both.
+
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
         system = self._architecture(**architecture_config)

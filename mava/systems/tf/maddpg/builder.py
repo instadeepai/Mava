@@ -65,6 +65,7 @@ class MADDPGConfig:
         n_step: number of steps to include prior to boostrapping.
         sequence_length: recurrent sequence rollout length.
         period: consecutive starting points for overlapping rollouts across a sequence.
+        do_pbt: Whether to do population based training on the system or not.
         max_gradient_norm: value to specify the maximum clipping value for the gradient
             norm during optimization.
         sigma: Gaussian sigma parameter.
@@ -78,6 +79,7 @@ class MADDPGConfig:
     num_executors: int
     num_trainers: int
     agent_net_keys: Dict[str, str]
+    trainer_net_config: Dict[str, List]
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -91,6 +93,7 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
+    do_pbt: bool = False
     max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
     logger: loggers.Logger = None
@@ -276,20 +279,34 @@ class MADDPGBuilder:
             Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
         """
 
+        priority_fns = {
+            f"priority_table_{trainer_id}": lambda x: 1.0
+            for trainer_id in range(self._config.num_trainers)
+        }
+
+        table_net_config = {
+            f"priority_table_{trainer_id}": self._config.trainer_net_config[
+                f"trainer_{trainer_id}"
+            ]
+            for trainer_id in range(self._config.num_trainers)
+        }
+
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
-                priority_fns=None,
+                priority_fns=priority_fns,
                 client=replay_client,
                 n_step=self._config.n_step,
+                table_net_config=table_net_config,
                 discount=self._config.discount,
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder = reverb_adders.ParallelSequenceAdder(
-                priority_fns=None,
+                priority_fns=priority_fns,
                 client=replay_client,
                 sequence_length=self._config.sequence_length,
                 period=self._config.period,
+                table_net_config=table_net_config,
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
@@ -404,6 +421,7 @@ class MADDPGBuilder:
             counts=counts,
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
+            do_pbt=self._config.do_pbt,
             variable_client=variable_client,
             adder=adder,
         )
