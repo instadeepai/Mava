@@ -188,6 +188,86 @@ TEST_CASES = [
         agents=agents,
     ),
     dict(
+        testcase_name="OneStepDiffActionContArray",
+        n_step=1,
+        discount=default_discount,
+        first=env_restart,
+        steps=(
+            (
+                {
+                    "agent_0": np.array([1.5, 2.5]),
+                    "agent_1": np.array([2.5, 3.5]),
+                    "agent_2": np.array([3.5, 4.5]),
+                },
+                dm_env.transition(
+                    reward=reward_step1,
+                    observation=obs_step1,
+                    discount=default_discount,
+                ),
+            ),
+            (
+                {
+                    "agent_0": np.array([2.5, 3.5]),
+                    "agent_1": np.array([3.5, 4.5]),
+                    "agent_2": np.array([4.5, 5.5]),
+                },
+                dm_env.transition(
+                    reward=reward_step2,
+                    observation=obs_step2,
+                    discount=default_discount,
+                ),
+            ),
+            (
+                {
+                    "agent_0": np.array([5.5, 6.5]),
+                    "agent_1": np.array([6.5, 7.5]),
+                    "agent_2": np.array([7.5, 8.5]),
+                },
+                parameterized_termination(
+                    reward=reward_step3,
+                    observation=obs_step3,
+                    discount=final_step_discount,
+                ),
+            ),
+        ),
+        expected_transitions=(
+            types.Transition(
+                obs_first,
+                {
+                    "agent_0": np.array([1.5, 2.5]),
+                    "agent_1": np.array([2.5, 3.5]),
+                    "agent_2": np.array([3.5, 4.5]),
+                },
+                reward_step1,
+                default_discount,
+                obs_step1,
+            ),
+            types.Transition(
+                obs_step1,
+                {
+                    "agent_0": np.array([2.5, 3.5]),
+                    "agent_1": np.array([3.5, 4.5]),
+                    "agent_2": np.array([4.5, 5.5]),
+                },
+                reward_step2,
+                default_discount,
+                obs_step2,
+            ),
+            types.Transition(
+                obs_step2,
+                {
+                    "agent_0": np.array([5.5, 6.5]),
+                    "agent_1": np.array([6.5, 7.5]),
+                    "agent_2": np.array([7.5, 8.5]),
+                },
+                reward_step3,
+                final_step_discount,
+                obs_step3,
+            ),
+        ),
+        agents=agents,
+    ),
+    dict(
         testcase_name="OneStepWithExtras",
         n_step=1,
         discount=default_discount,
@@ -470,6 +550,93 @@ TEST_CASES = [
                 obs_step3,
                 {"state": 1},
                 {"state": 2},
+            ),
+        ),
+        agents=agents,
+    ),
+    dict(
+        testcase_name="ThreeStepDiffDiscounts",
+        n_step=3,
+        discount=default_discount,
+        first=env_restart,
+        steps=(
+            (
+                default_action,
+                dm_env.transition(
+                    reward=reward_step1,
+                    observation=obs_step1,
+                    discount={agent: 0.5 for agent in agents},
+                ),
+            ),
+            (
+                default_action,
+                dm_env.transition(
+                    reward=reward_step2,
+                    observation=obs_step2,
+                    discount={agent: 0.25 for agent in agents},
+                ),
+            ),
+            (
+                default_action,
+                parameterized_termination(
+                    reward=reward_step3,
+                    observation=obs_step3,
+                    discount=final_step_discount,
+                ),
+            ),
+        ),
+        expected_transitions=(
+            types.Transition(
+                obs_first,
+                default_action,
+                reward_step1,
+                {agent: 0.5 for agent in agents},
+                obs_step1,
+            ),
+            types.Transition(
+                obs_first,
+                default_action,
+                calc_nstep_return(
+                    r_t=reward_step1,
+                    discounts=[
+                        {agent: 0.5 for agent in agents},
+                    ],
+                    rewards=[reward_step2],
+                ),
+                {agent: 0.125 for agent in agents},
+                obs_step2,
+            ),
+            types.Transition(
+                obs_first,
+                default_action,
+                calc_nstep_return(
+                    r_t=reward_step1,
+                    discounts=[
+                        {agent: 0.5 for agent in agents},
+                        {agent: 0.125 for agent in agents},
+                    ],
+                    rewards=[reward_step2, reward_step3],
+                ),
+                final_step_discount,
+                obs_step3,
+            ),
+            types.Transition(
+                obs_step1,
+                default_action,
+                calc_nstep_return(
+                    r_t=reward_step2,
+                    discounts=[{agent: 0.25 for agent in agents}],
+                    rewards=[reward_step3],
+                ),
+                final_step_discount,
+                obs_step3,
+            ),
+            types.Transition(
+                obs_step2,
+                default_action,
+                reward_step3,
+                final_step_discount,
+                obs_step3,
             ),
         ),
         agents=agents,
