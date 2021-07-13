@@ -1,5 +1,6 @@
 """Utilities for testing Reverb adders."""
 
+from collections import Counter
 from typing import Any, Dict, Sequence
 
 import dm_env
@@ -21,11 +22,34 @@ from mava import specs
 from mava.adders.reverb.base import ReverbParallelAdder
 
 
+def calc_nstep_return(
+    r_t: Dict[str, float], discounts: list, rewards: list
+) -> Dict[str, float]:
+    """Function that calculates n_step_return as follows:
+    R_{t:t+n} := r_t + d_t * r_{t+1} + ...    + d_t * ... * d_{t+n-2} * r_{t+n-1}.
+
+    Args:
+        r_t (Dict[str,float]): reward achieved from action a_t.
+        discounts (list): list of discounts.
+        rewards (list): list of rewards.
+
+    Returns:
+        A [Dict[str,float] with the return per agent.
+    """
+    reward = Counter(r_t)
+    for index, r_tn in enumerate(rewards):
+        d_t = discounts[index]
+        return_t = {key: d_t[key] * r_tn.get(key, 0) for key in r_tn.keys()}
+        reward.update(Counter(return_t))
+    return dict(reward)
+
+
 class MAAdderTestMixin(test_utils.AdderTestMixin):
-    #   """A helper mixin for testing Reverb adders.
-    #   Note that any test inheriting from this mixin must also inherit from something
-    #   that provides the Python unittest assert methods.
-    #   """
+    """A helper mixin for testing Reverb adders.
+    Note that any test inheriting from this mixin must also inherit from something
+    that provides the Python unittest assert methods.
+    """
+
     def run_test_adder(
         self,
         adder: ReverbParallelAdder,
@@ -37,7 +61,6 @@ class MAAdderTestMixin(test_utils.AdderTestMixin):
         repeat_episode_times: int = 1,
         end_behavior: EndBehavior = EndBehavior.ZERO_PAD,
     ) -> None:
-
         """
         Runs a unit test case for the adder.
         Args:
