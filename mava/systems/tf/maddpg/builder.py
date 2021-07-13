@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG system builder implementation."""
+"""MADDPG scaled system builder implementation."""
 
 import copy
 import dataclasses
@@ -21,18 +21,20 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import reverb
 import sonnet as snt
+import tensorflow as tf
 from acme import datasets
 from acme.specs import EnvironmentSpec
-from acme.tf import variable_utils
-from acme.utils import counting
+from acme.tf import utils as tf2_utils
+from acme.utils import counting, loggers
 from dm_env import specs as dm_specs
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.systems.tf import executors
+from mava.systems.tf import executors, variable_utils
 from mava.systems.tf.maddpg import training
 from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
-from mava.wrappers import DetailedTrainerStatistics
+from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerStatistics
 
 BoundedArray = dm_specs.BoundedArray
 DiscreteArray = dm_specs.DiscreteArray
@@ -46,7 +48,7 @@ class MADDPGConfig:
             each agent in the system.
         policy_optimizer: optimizer(s) for updating policy networks.
         critic_optimizer: optimizer for updating critic networks.
-        agent_net_config: (dict, optional): specifies what network each agent uses.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         discount: discount to use for TD updates.
         batch_size: batch size for updates.
@@ -73,7 +75,9 @@ class MADDPGConfig:
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
-    agent_net_config: Dict[str, str]
+    num_executors: int
+    num_trainers: int
+    agent_net_keys: Dict[str, str]
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -89,13 +93,16 @@ class MADDPGConfig:
     period: int = 20
     max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
+    logger: loggers.Logger = None
+    counter: counting.Counter = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
 class MADDPGBuilder:
-    """Builder for MADDPG which constructs individual components of the system."""
+    """Builder for scaled MADDPG which constructs individual components of the
+    system."""
 
     def __init__(
         self,
@@ -108,7 +115,6 @@ class MADDPGBuilder:
         extra_specs: Dict[str, Any] = {},
     ):
         """Initialise the system.
-
         Args:
             config (MADDPGConfig): system configuration specifying hyperparameters and
                 additional information for constructing the system.
@@ -125,7 +131,6 @@ class MADDPGBuilder:
 
         self._config = config
         self._extra_specs = extra_specs
-
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
@@ -135,11 +140,9 @@ class MADDPGBuilder:
         self, environment_spec: specs.MAEnvironmentSpec
     ) -> specs.MAEnvironmentSpec:
         """convert discrete action space to bounded continuous action space
-
         Args:
             environment_spec (specs.MAEnvironmentSpec): description of
                 the action, observation spaces etc. for each agent in the system.
-
         Returns:
             specs.MAEnvironmentSpec: updated environment spec.
         """
@@ -172,15 +175,13 @@ class MADDPGBuilder:
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
-        """Create tables to insert data into.
+        """ "Create tables to insert data into.
 
         Args:
             environment_spec (specs.MAEnvironmentSpec): description of the action and
                 observation spaces etc. for each agent in the system.
-
         Raises:
             NotImplementedError: unknown executor type.
-
         Returns:
             List[reverb.Table]: a list of data tables for inserting data.
         """
@@ -248,6 +249,7 @@ class MADDPGBuilder:
             else None
         )
 
+        """Create a dataset iterator to use for learning/updating the system."""
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
@@ -293,14 +295,62 @@ class MADDPGBuilder:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
         return adder
 
+    def create_counter_variables(
+        self, variables: Dict[str, tf.Variable]
+    ) -> Dict[str, tf.Variable]:
+        """Create counter variables.
+        Args:
+            variables (Dict[str, snt.Variable]): dictionary with variable_source
+            variables in.
+        Returns:
+            variables (Dict[str, snt.Variable]): dictionary with variable_source
+            variables in.
+        """
+        variables["trainer_steps"] = tf.Variable(0, dtype=tf.int32)
+        variables["trainer_walltime"] = tf.Variable(0, dtype=tf.float32)
+        variables["evaluator_steps"] = tf.Variable(0, dtype=tf.int32)
+        variables["evaluator_episodes"] = tf.Variable(0, dtype=tf.int32)
+        variables["executor_episodes"] = tf.Variable(0, dtype=tf.int32)
+        variables["executor_steps"] = tf.Variable(0, dtype=tf.int32)
+        return variables
+
+    def make_variable_server(
+        self,
+        networks: Dict[str, Dict[str, snt.Module]],
+    ) -> MavaVariableSource:
+        """Create the variable server.
+        Args:
+            networks (Dict[str, Dict[str, snt.Module]]): dictionary with the
+            system's networks in.
+        Returns:
+            variable_source (MavaVariableSource): A Mava variable source object.
+        """
+        # Create variables
+        variables = {}
+        # Network variables
+        for net_type_key in networks.keys():
+            for net_key in set(self._config.agent_net_keys.values()):
+                # Ensure obs and target networks are sonnet modules
+                variables[f"{net_key}_{net_type_key}"] = tf2_utils.to_sonnet_module(
+                    networks[net_type_key][net_key]
+                ).variables
+
+        variables = self.create_counter_variables(variables)
+
+        # Create variable source
+        variable_source = MavaVariableSource(
+            variables, self._config.checkpoint, self._config.checkpoint_subpath
+        )
+        return variable_source
+
     def make_executor(
         self,
+        # executor_id: str,
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
-        variable_source: Optional[core.VariableSource] = None,
+        variable_source: Optional[MavaVariableSource] = None,
     ) -> core.Executor:
         """Create an executor instance.
-
         Args:
             policy_networks (Dict[str, snt.Module]): policy networks for each agent in
                 the system.
@@ -308,37 +358,52 @@ class MADDPGBuilder:
                 a replay buffer. Defaults to None.
             variable_source (Optional[core.VariableSource], optional): variables server.
                 Defaults to None.
-
         Returns:
             core.Executor: system executor, a collection of agents making up the part
                 of the system generating data by interacting the environment.
         """
+        # Create policy variables
+        variables = {}
+        get_keys = []
 
-        agent_net_config = self._config.agent_net_config
+        for net_key in set(self._config.agent_net_keys.values()):
+            var_key = f"{net_key}_policies"
+            variables[var_key] = policy_networks[net_key].variables
+            get_keys.append(var_key)
+
+        variables = self.create_counter_variables(variables)
+
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        get_keys.extend(count_names)
+        counts = {name: variables[name] for name in count_names}
 
         variable_client = None
         if variable_source:
-            # Create policy variables
-            variables = {}
-            for agent in set(agent_net_config.values()):
-                variables[agent] = policy_networks[agent].variables
-
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
-                variables={"policy": variables},
-                update_period=self._config.executor_variable_update_period,
+                variables=variables,
+                get_keys=get_keys,
+                get_period=self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
-            variable_client.update_and_wait()
+            variable_client.get_and_wait()
 
         # Create the actor which defines how we take actions.
         return self._executor_fn(
             policy_networks=policy_networks,
+            counts=counts,
             agent_specs=self._config.environment_spec.get_agent_specs(),
-            agent_net_config=agent_net_config,
+            agent_net_keys=self._config.agent_net_keys,
             variable_client=variable_client,
             adder=adder,
         )
@@ -347,12 +412,12 @@ class MADDPGBuilder:
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        counter: Optional[counting.Counter] = None,
+        variable_source: MavaVariableSource,
+        trainer_net_config: List[Any],
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
         """Create a trainer instance.
-
         Args:
             networks (Dict[str, Dict[str, snt.Module]]): system networks.
             dataset (Iterator[reverb.ReplaySample]): dataset iterator to feed data to
@@ -363,24 +428,60 @@ class MADDPGBuilder:
                 metadata. Defaults to None.
             connection_spec (Dict[str, List[str]], optional): connection topology used
                 for networked system architectures. Defaults to None.
-
         Returns:
             core.Trainer: system trainer, that uses the collected data from the
                 executors to update the parameters of the agent networks in the system.
         """
-
         agents = self._agents
         agent_types = self._agent_types
-        agent_net_config = self._config.agent_net_config
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         target_update_period = self._config.target_update_period
         target_averaging = self._config.target_averaging
         target_update_rate = self._config.target_update_rate
 
+        # Create variable client
+        variables = {}
+        set_keys = []
+        get_keys = []
+        for net_type_key in networks.keys():
+            for net_key in set(self._config.agent_net_keys.values()):
+                variables[f"{net_key}_{net_type_key}"] = networks[net_type_key][
+                    net_key
+                ].variables
+                if net_key in trainer_net_config:
+                    set_keys.append(f"{net_key}_{net_type_key}")
+                else:
+                    get_keys.append(f"{net_key}_{net_type_key}")
+
+        variables = self.create_counter_variables(variables)
+        num_steps = variables["trainer_steps"]
+
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        get_keys.extend(count_names)
+        counts = {name: variables[name] for name in count_names}
+
+        variable_client = variable_utils.VariableClient(
+            client=variable_source,
+            variables=variables,
+            get_keys=get_keys,
+            set_keys=set_keys,
+        )
+
+        # Get all the initial variables
+        variable_client.get_all_and_wait()
+
         # trainer args
         trainer_config: Dict[str, Any] = {
             "agents": agents,
+            "trainer_net_config": trainer_net_config,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
@@ -388,7 +489,7 @@ class MADDPGBuilder:
             "target_policy_networks": networks["target_policies"],
             "target_critic_networks": networks["target_critics"],
             "target_observation_networks": networks["target_observations"],
-            "agent_net_config": agent_net_config,
+            "agent_net_keys": self._config.agent_net_keys,
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
             "max_gradient_norm": max_gradient_norm,
@@ -396,11 +497,11 @@ class MADDPGBuilder:
             "target_averaging": target_averaging,
             "target_update_period": target_update_period,
             "target_update_rate": target_update_rate,
+            "variable_client": variable_client,
             "dataset": dataset,
-            "counter": counter,
+            "counts": counts,
+            "num_steps": num_steps,
             "logger": logger,
-            "checkpoint": self._config.checkpoint,
-            "checkpoint_subpath": self._config.checkpoint_subpath,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
@@ -408,7 +509,12 @@ class MADDPGBuilder:
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(**trainer_config)
 
-        trainer = DetailedTrainerStatistics(  # type: ignore
+        # NB If using both NetworkStatistics and TrainerStatistics, order is important.
+        # NetworkStatistics needs to appear before TrainerStatistics.
+        # TODO(Kale-ab/Arnu): need to fix wrapper type issues
+        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
+
+        trainer = ScaledDetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]
         )
 

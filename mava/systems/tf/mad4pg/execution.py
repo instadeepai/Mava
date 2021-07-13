@@ -15,7 +15,7 @@
 
 """MAD4PG system executor implementation."""
 
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import sonnet as snt
 from acme.specs import EnvironmentSpec
@@ -37,12 +37,13 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
+        counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
-        """Initialise the system executor
 
+        """Initialise the system executor
         Args:
             policy_networks (Dict[str, snt.Module]): policy networks for each agent in
                 the system.
@@ -52,8 +53,8 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
         """
 
         super().__init__(
@@ -61,7 +62,8 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
             agent_specs=agent_specs,
             adder=adder,
             variable_client=variable_client,
-            agent_net_config=agent_net_config,
+            counts=counts,
+            agent_net_keys=agent_net_keys,
         )
 
 
@@ -74,8 +76,9 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
+        counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
         """Initialise the system executor
@@ -85,7 +88,7 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
                 the system.
             agent_specs (Dict[str, EnvironmentSpec]): agent observation and action
                 space specifications.
-            agent_net_config: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
@@ -98,5 +101,6 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
             agent_specs=agent_specs,
             adder=adder,
             variable_client=variable_client,
-            agent_net_config=agent_net_config,
+            counts=counts,
+            agent_net_keys=agent_net_keys,
         )

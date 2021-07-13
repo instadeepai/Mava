@@ -38,7 +38,7 @@ class DecentralisedValueActor(BaseArchitecture):
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
         value_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
     ):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()
@@ -47,7 +47,7 @@ class DecentralisedValueActor(BaseArchitecture):
         self._agent_type_specs = self._env_spec.get_agent_type_specs()
 
         self._value_networks = value_networks
-        self._agent_net_config = agent_net_config
+        self._agent_net_keys = agent_net_keys
         self._n_agents = len(self._agents)
 
         self._create_target_networks()
@@ -77,7 +77,7 @@ class DecentralisedValueActor(BaseArchitecture):
 
         # create policy variables for each agent
         for agent_key in self._agents:
-            agent_net_key = self._agent_net_config[agent_key]
+            agent_net_key = self._agent_net_keys[agent_key]
             obs_spec = actor_obs_specs[agent_key]
             # Create variables for value and policy networks.
             tf2_utils.create_variables(self._value_networks[agent_net_key], [obs_spec])
@@ -107,7 +107,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
         environment_spec: mava_specs.MAEnvironmentSpec,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
     ):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()
@@ -117,7 +117,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
         self._observation_networks = observation_networks
         self._policy_networks = policy_networks
-        self._agent_net_config = agent_net_config
+        self._agent_net_keys = agent_net_keys
         self._n_agents = len(self._agents)
         self._embed_specs: Dict[str, Any] = {}
 
@@ -151,7 +151,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
         # create policy variables for each agent
         for agent_key in self._agents:
-            agent_net_key = self._agent_net_config[agent_key]
+            agent_net_key = self._agent_net_keys[agent_key]
 
             obs_spec = actor_obs_specs[agent_key]
             emb_spec = tf2_utils.create_variables(
@@ -179,7 +179,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
     def create_behaviour_policy(self) -> Dict[str, snt.Module]:
         behaviour_policy_networks: Dict[str, snt.Module] = {}
-        for net_key in set(self._agent_net_config.values()):
+        for net_key in set(self._agent_net_keys.values()):
             snt_module = type(self._policy_networks[net_key])
             behaviour_policy_networks[net_key] = snt_module(
                 [
@@ -205,7 +205,7 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         net_spec_config: Dict[str, str] = {},
     ):
         self._env_spec = environment_spec
@@ -217,7 +217,7 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         self._observation_networks = observation_networks
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
-        self._agent_net_config = agent_net_config
+        self._agent_net_keys = agent_net_keys
         self._net_keys = self._policy_networks.keys()
         self._n_agents = len(self._agents)
         self._embed_specs: Dict[str, Any] = {}
@@ -342,7 +342,7 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         net_spec_config: Dict[str, str] = {},
     ):
         super().__init__(
@@ -350,7 +350,7 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             net_spec_config=net_spec_config,
         )
 

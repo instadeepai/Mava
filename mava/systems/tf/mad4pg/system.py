@@ -48,10 +48,9 @@ class MAD4PG(MADDPG):
         ] = training.MAD4PGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
-        num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
-        agent_net_config: Dict[str, str] = {},
+        agent_net_keys: Dict[str, str] = {},
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -71,7 +70,6 @@ class MAD4PG(MADDPG):
         period: int = 20,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
-        max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         logger_config: Dict = {},
@@ -100,7 +98,6 @@ class MAD4PG(MADDPG):
                 feedforward or recurrent. Defaults to MADDPGFeedForwardExecutor.
             num_executors (int, optional): number of executor processes to run in
                 parallel. Defaults to 1.
-            num_caches (int, optional): number of trainer node caches. Defaults to 0.
             environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
@@ -137,8 +134,6 @@ class MAD4PG(MADDPG):
             sigma (float, optional): Gaussian sigma parameter. Defaults to 0.3.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
-            max_executor_steps (int, optional): maximum number of steps and executor
-                can in an episode. Defaults to None.
             checkpoint (bool, optional): whether to checkpoint models. Defaults to
                 False.
             checkpoint_subpath (str, optional): subdirectory specifying where to store
@@ -163,10 +158,9 @@ class MAD4PG(MADDPG):
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             num_executors=num_executors,
-            num_caches=num_caches,
             environment_spec=environment_spec,
             shared_weights=shared_weights,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             discount=discount,
             batch_size=batch_size,
             prefetch_size=prefetch_size,
@@ -182,7 +176,6 @@ class MAD4PG(MADDPG):
             period=period,
             sigma=sigma,
             max_gradient_norm=max_gradient_norm,
-            max_executor_steps=max_executor_steps,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             logger_config=logger_config,

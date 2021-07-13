@@ -50,7 +50,7 @@ class VDNTrainer(MADQNTrainer):
         dataset: tf.data.Dataset,
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: Optional[BaseCommunicationModule] = None,
         max_gradient_norm: float = None,
@@ -75,7 +75,7 @@ class VDNTrainer(MADQNTrainer):
             optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
                 optimizer for updating the parameters of the networks.
             discount (float): discount factor for TD updates.
-            agent_net_config: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
@@ -106,7 +106,7 @@ class VDNTrainer(MADQNTrainer):
             dataset=dataset,
             optimizer=optimizer,
             discount=discount,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             max_gradient_norm=max_gradient_norm,
@@ -161,7 +161,7 @@ class VDNTrainer(MADQNTrainer):
             q_acts = []  # Q vals
             q_targets = []  # Target Q vals
             for agent in self._agents:
-                agent_key = self._agent_net_config[agent]
+                agent_key = self._agent_net_keys[agent]
 
                 o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
                     o_tm1, o_t, a_tm1, agent
@@ -215,7 +215,7 @@ class VDNTrainer(MADQNTrainer):
 
         # Calculate the gradients and update the networks
         for agent in self._agents:
-            agent_key = self._agent_net_config[agent]
+            agent_key = self._agent_net_keys[agent]
             # Get trainable variables.
             trainable_variables = self._q_networks[agent_key].trainable_variables
 

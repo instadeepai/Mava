@@ -36,7 +36,7 @@ class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         trainer: MADQNTrainer,
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
@@ -51,7 +51,7 @@ class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
             action_selectors (Dict[str, Any]): policy action selector method, e.g.
                 epsilon greedy.
             trainer (MADQNTrainer, optional): system trainer.
-            agent_net_config: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
@@ -68,7 +68,7 @@ class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
         super(QMIXFeedForwardExecutor, self).__init__(
             q_networks=q_networks,
             action_selectors=action_selectors,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             adder=adder,
             variable_client=variable_client,
             communication_module=communication_module,

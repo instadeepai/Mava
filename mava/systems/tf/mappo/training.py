@@ -53,7 +53,7 @@ class MAPPOTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         discount: float = 0.99,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.0,
@@ -79,7 +79,7 @@ class MAPPOTrainer(mava.Trainer):
                 optimizer(s) for updating policy networks.
             critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
                 optimizer for updating critic networks.
-            agent_net_config: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
             discount (float, optional): discount factor for TD updates. Defaults
                 to 0.99.
@@ -108,15 +108,15 @@ class MAPPOTrainer(mava.Trainer):
         self._agent_types = agent_types
         self._checkpoint = checkpoint
 
-        # Store agent_net_config.
-        self._agent_net_config = agent_net_config
+        # Store agent_net_keys.
+        self._agent_net_keys = agent_net_keys
 
         # Store networks.
         self._observation_networks = observation_networks
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
 
-        self.unique_net_keys = set(self._agent_net_config.values())
+        self.unique_net_keys = set(self._agent_net_keys.values())
 
         # Create optimizers for different agent types.
         if not isinstance(policy_optimizer, dict):
@@ -234,7 +234,7 @@ class MAPPOTrainer(mava.Trainer):
 
         observation_trans = {}
         for agent in self._agents:
-            agent_key = self._agent_net_config[agent]
+            agent_key = self._agent_net_keys[agent]
             observation_trans[agent] = self._observation_networks[agent_key](
                 observation[agent].observation
             )
@@ -310,7 +310,7 @@ class MAPPOTrainer(mava.Trainer):
                 discount = discount[:-1]
 
                 # Get agent network
-                agent_key = self._agent_net_config[agent]
+                agent_key = self._agent_net_keys[agent]
                 policy_network = self._policy_networks[agent_key]
                 critic_network = self._critic_networks[agent_key]
 
@@ -400,7 +400,7 @@ class MAPPOTrainer(mava.Trainer):
 
         for agent in self._agents:
             # Get agent_key.
-            agent_key = self._agent_net_config[agent]
+            agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
             policy_variables = (
@@ -483,7 +483,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         dataset: tf.data.Dataset,
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        agent_net_config: Dict[str, str],
+        agent_net_keys: Dict[str, str],
         discount: float = 0.99,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.0,
@@ -503,7 +503,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             critic_networks=critic_networks,
             observation_networks=observation_networks,
             dataset=dataset,
-            agent_net_config=agent_net_config,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             discount=discount,

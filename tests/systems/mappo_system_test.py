@@ -37,7 +37,7 @@ from mava.utils.environments import debugging_utils
 
 def make_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    agent_net_config: Dict[str, str],
+    agent_net_keys: Dict[str, str],
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         256,
         256,
@@ -50,7 +50,7 @@ def make_networks(
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
-    specs = {agent_net_config[key]: specs[key] for key in specs.keys()}
+    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
 
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
