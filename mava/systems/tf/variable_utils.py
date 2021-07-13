@@ -37,6 +37,7 @@ class VariableClient:
         get_period: int = 1,
         set_period: int = 1,
     ):
+        """Initialise the variable server."""
         self._all_keys = list(variables.keys())
         self._get_keys = get_keys if get_keys is not None else self._all_keys
         self._set_keys = set_keys if set_keys is not None else self._all_keys
@@ -64,18 +65,7 @@ class VariableClient:
         self._future: Optional[futures.Future] = None
 
     def get_async(self) -> None:
-        """Periodically updates the variables with the latest copy from the source.
-
-        This stateful update method keeps track of the number of calls to it and,
-        every `update_period` call, sends a request to its server to retrieve the
-        latest variables.
-
-        This method makes an asynchronous request for variables
-        and returns. Unless the request is immediately fulfilled, the variables are
-        only copied _within a subsequent call to_ `update()`, whenever the request
-        is fulfilled by the `VariableSource`. If there is an existing fulfilled
-        request when this method is called, the resulting variables are immediately
-        copied."""
+        """Asynchronously updates the get variables with the latest copy from source."""
 
         # Track the number of calls (we only update periodically).
         if self._get_call_counter < self._get_update_period:
@@ -97,6 +87,7 @@ class VariableClient:
         return
 
     def set_async(self) -> None:
+        """Asynchronously updates source with the set variables."""
         # Track the number of calls (we only update periodically).
         if self._set_call_counter < self._set_update_period:
             self._set_call_counter += 1
@@ -114,20 +105,25 @@ class VariableClient:
         return
 
     def add_and_wait(self, names: List[str], vars: Dict[str, Any]) -> None:
+        """Adds the specified variables to the corresponding variables in source
+        and waits for the process to complete before continuing."""
         self._client.add_to_variables(names, vars)
 
     def get_and_wait(self) -> None:
-        """Immediately update and block until we get the result."""
+        """Updates the get variables with the latest copy from source
+        and waits for the process to complete before continuing."""
         self._copy(self._request())  # type: ignore
         return
 
     def get_all_and_wait(self) -> None:
-        """Immediately update and block until we get the result."""
+        """Updates all the variables with the latest copy from source
+        and waits for the process to complete before continuing."""
         self._copy(self._request_all())  # type: ignore
         return
 
     def set_and_wait(self) -> None:
-        """Immediately update and block until we get the result."""
+        """Updates source with the set variables
+        and waits for the process to complete before continuing."""
         self._adjust()  # type: ignore
         return
 

@@ -23,7 +23,7 @@ import tensorflow as tf
 import tree
 from acme.tf import losses
 from acme.tf import utils as tf2_utils
-from acme.utils import counting, loggers
+from acme.utils import loggers
 
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf.maddpg.training import (
@@ -36,6 +36,7 @@ from mava.systems.tf.maddpg.training import (
     MADDPGStateBasedRecurrentTrainer,
     MADDPGStateBasedTrainer,
 )
+from mava.systems.tf.variable_utils import VariableClient
 from mava.utils import training_utils as train_utils
 
 train_utils.set_growing_gpu_memory()
@@ -51,12 +52,13 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
+        trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: snt.Optimizer,
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -64,15 +66,14 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
+        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
-        counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
     ):
-        """Initialise MAD4PG trainer
-
+        """Initialise MADDPG trainer
         Args:
             agents (List[str]): agent ids, e.g. "agent_0".
             agent_types (List[str]): agent types, e.g. "speaker" or "listener".
@@ -110,15 +111,15 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 Defaults to "~/mava/".
         """
 
+        """Initialise the decentralised MADDPG trainer."""
         super().__init__(
             agents=agents,
             agent_types=agent_types,
+            trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
-            policy_optimizer=policy_optimizer,
-            critic_optimizer=critic_optimizer,
             discount=discount,
             target_averaging=target_averaging,
             target_update_period=target_update_period,
@@ -127,11 +128,13 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
-            counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
+            variable_client=variable_client,
+            counts=counts,
+            num_steps=num_steps,
         )
 
     # Forward pass that calculates loss.
@@ -221,6 +224,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
+        trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -234,17 +238,18 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
+        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
-        counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
     ):
-
+        """Initialise the decentralised MAD4PG trainer."""
         super().__init__(
             agents=agents,
             agent_types=agent_types,
+            trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -260,10 +265,10 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
-            counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
+            variable_client=variable_client,
+            counts=counts,
+            num_steps=num_steps,
         )
 
 
@@ -274,6 +279,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
+        trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -287,17 +293,18 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
+        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
-        counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
     ):
-
+        """Initialise the centralised MAD4PG trainer."""
         super().__init__(
             agents=agents,
             agent_types=agent_types,
+            trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -313,10 +320,10 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
-            counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
+            variable_client=variable_client,
+            counts=counts,
+            num_steps=num_steps,
         )
 
 
@@ -327,6 +334,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
+        trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -340,17 +348,18 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
+        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
-        counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
     ):
-
+        """Initialise the state-based MAD4PG trainer."""
         super().__init__(
             agents=agents,
             agent_types=agent_types,
+            trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -366,10 +375,10 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
-            counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
+            variable_client=variable_client,
+            counts=counts,
+            num_steps=num_steps,
         )
 
 
@@ -383,12 +392,13 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
+        trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: snt.Optimizer,
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -396,56 +406,19 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
+        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
-        counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
-        """Initialise Recurrent MAD4PG trainer
-
-        Args:
-            agents (List[str]): agent ids, e.g. "agent_0".
-            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
-                the system.
-            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
-                each agent in the system.
-            target_policy_networks (Dict[str, snt.Module]): target policy networks.
-            target_critic_networks (Dict[str, snt.Module]): target critic networks.
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                optimizer(s) for updating policy networks.
-            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                optimizer for updating critic networks.
-            discount (float): discount factor for TD updates.
-            target_averaging (bool): whether to use polyak averaging for target network
-                updates.
-            target_update_period (int): number of steps before target networks are
-                updated.
-            target_update_rate (float): update rate when using averaging.
-            dataset (tf.data.Dataset): training dataset.
-            observation_networks (Dict[str, snt.Module]): network for feature
-                extraction from raw observation.
-            target_observation_networks (Dict[str, snt.Module]): target observation
-                network.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
-            max_gradient_norm (float, optional): maximum allowed norm for gradients
-                before clipping is applied. Defaults to None.
-            counter (counting.Counter, optional): step counter object. Defaults to None.
-            logger (loggers.Logger, optional): logger object for logging trainer
-                statistics. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
-                True.
-            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
-                Defaults to "~/mava/".
-        """
 
         super().__init__(
             agents=agents,
             agent_types=agent_types,
+            trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -461,10 +434,10 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
-            counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
+            variable_client=variable_client,
+            counts=counts,
+            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -617,12 +590,13 @@ class MAD4PGDecentralisedRecurrentTrainer(
         self,
         agents: List[str],
         agent_types: List[str],
+        trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: snt.Optimizer,
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -630,18 +604,19 @@ class MAD4PGDecentralisedRecurrentTrainer(
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
+        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
-        counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
 
         super().__init__(
             agents=agents,
             agent_types=agent_types,
+            trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -657,10 +632,10 @@ class MAD4PGDecentralisedRecurrentTrainer(
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
-            counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
+            variable_client=variable_client,
+            counts=counts,
+            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -674,12 +649,13 @@ class MAD4PGCentralisedRecurrentTrainer(
         self,
         agents: List[str],
         agent_types: List[str],
+        trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: snt.Optimizer,
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -687,18 +663,19 @@ class MAD4PGCentralisedRecurrentTrainer(
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
+        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
-        counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
 
         super().__init__(
             agents=agents,
             agent_types=agent_types,
+            trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -714,10 +691,10 @@ class MAD4PGCentralisedRecurrentTrainer(
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
-            counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
+            variable_client=variable_client,
+            counts=counts,
+            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -731,12 +708,13 @@ class MAD4PGStateBasedRecurrentTrainer(
         self,
         agents: List[str],
         agent_types: List[str],
+        trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: snt.Optimizer,
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -744,18 +722,19 @@ class MAD4PGStateBasedRecurrentTrainer(
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
+        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
-        counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = True,
-        checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
     ):
 
         super().__init__(
             agents=agents,
             agent_types=agent_types,
+            trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -771,9 +750,9 @@ class MAD4PGStateBasedRecurrentTrainer(
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
-            counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
+            variable_client=variable_client,
+            counts=counts,
+            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
