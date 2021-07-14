@@ -80,6 +80,8 @@ class MADDPGConfig:
     num_trainers: int
     agent_net_keys: Dict[str, str]
     trainer_net_config: Dict[str, List]
+    do_pbt: bool
+    pbt_samples: List
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -93,7 +95,6 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
-    do_pbt: bool = False
     max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
     logger: loggers.Logger = None
@@ -346,7 +347,7 @@ class MADDPGBuilder:
         variables = {}
         # Network variables
         for net_type_key in networks.keys():
-            for net_key in set(self._config.agent_net_keys.values()):
+            for net_key in networks[net_type_key].keys():
                 # Ensure obs and target networks are sonnet modules
                 variables[f"{net_key}_{net_type_key}"] = tf2_utils.to_sonnet_module(
                     networks[net_type_key][net_key]
@@ -415,6 +416,9 @@ class MADDPGBuilder:
             # assigning variables before running the environment loop.
             variable_client.get_and_wait()
 
+        print("agent_net_keys: ", self._config.agent_net_keys.values())
+        print("policy_networks keys: ", policy_networks.keys())
+        exit()
         # Create the actor which defines how we take actions.
         return self._executor_fn(
             policy_networks=policy_networks,
@@ -422,6 +426,7 @@ class MADDPGBuilder:
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
             do_pbt=self._config.do_pbt,
+            pbt_samples=self._config.pbt_samples,
             variable_client=variable_client,
             adder=adder,
         )
@@ -462,8 +467,10 @@ class MADDPGBuilder:
         variables = {}
         set_keys = []
         get_keys = []
+        # TODO (dries): Only add the networks this trainer is working with.
+        # Not all of them.
         for net_type_key in networks.keys():
-            for net_key in set(self._config.agent_net_keys.values()):
+            for net_key in networks[net_type_key].keys():
                 variables[f"{net_key}_{net_type_key}"] = networks[net_type_key][
                     net_key
                 ].variables
@@ -496,10 +503,19 @@ class MADDPGBuilder:
         # Get all the initial variables
         variable_client.get_all_and_wait()
 
-        # trainer args
+        # Convert network keys for the trainer. Therefore the trainer
+        # TODO (dries): This still seems a bit hacky. Maybe there is a better way?
+        trainer_agent_net_keys = {}
+        trainer_agents = []
+        for agent in self._agents:
+            agent_net_key = self._config.agent_net_keys[agent]
+            if agent_net_key in trainer_net_config:
+                trainer_agents.append(agent)
+                trainer_agent_net_keys[agent] = agent_net_key
+
         trainer_config: Dict[str, Any] = {
-            "agents": agents,
-            "trainer_net_config": trainer_net_config,
+            "agents": trainer_agents,
+            # "trainer_net_config": trainer_net_config,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
@@ -507,7 +523,7 @@ class MADDPGBuilder:
             "target_policy_networks": networks["target_policies"],
             "target_critic_networks": networks["target_critics"],
             "target_observation_networks": networks["target_observations"],
-            "agent_net_keys": self._config.agent_net_keys,
+            "agent_net_keys": trainer_agent_net_keys,
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
             "max_gradient_norm": max_gradient_norm,

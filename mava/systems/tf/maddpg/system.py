@@ -84,6 +84,7 @@ class MADDPG:
         sequence_length: int = 20,
         period: int = 20,
         do_pbt: bool = False,
+        pbt_samples: List = [],
         num_agents_in_population: int = 10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
@@ -210,10 +211,11 @@ class MADDPG:
                 )
 
             self._trainer_net_config["trainer_0"] = [
-                net_key for net_key in set(self._agent_net_keys.values())
+                net_key for net_key in self._all_net_keys
             ]
         else:
             assert len(trainer_net_config.keys()) == num_trainers
+            assert len(pbt_samples) > 0
         self._net_spec_keys = self._agent_net_keys
         if do_pbt:
             # Note: Assuming all agents have the same specs for now.
@@ -277,6 +279,7 @@ class MADDPG:
                 period=period,
                 sigma=sigma,
                 do_pbt=do_pbt,
+                pbt_samples=pbt_samples,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,

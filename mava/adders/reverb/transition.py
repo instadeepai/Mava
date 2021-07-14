@@ -228,6 +228,11 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             ):
                 created_item = True
 
+                print("table: ", table)
+                print("table_net_config: ", self._table_net_config[table])
+                print("transition: ", transition)
+
+                exit()
                 self._writer.create_item(
                     table=table, priority=priority, trajectory=transition
                 )

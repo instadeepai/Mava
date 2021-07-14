@@ -55,6 +55,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        num_agents=4,
     )
 
     # networks
@@ -108,6 +109,13 @@ def main(_: Any) -> None:
             "trainer_4": ["agent_7", "agent_8"],
         },
         do_pbt=True,
+        pbt_samples=[
+            ["agent_0", "agent_3"],
+            ["agent_1", "agent_4"],
+            ["agent_2", "agent_5"],
+            ["agent_6", "agent_9"],
+            ["agent_7", "agent_8"],
+        ],
         num_agents_in_population=10,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),

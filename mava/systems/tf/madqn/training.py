@@ -130,7 +130,7 @@ class MADQNTrainer(mava.Trainer):
         self._exploration_scheduler = exploration_scheduler
 
         # Dictionary with network keys for each agent.
-        self.unique_net_keys = set(self._agent_net_keys.values())
+        self.unique_net_keys = self._q_networks.keys()
 
         # Create optimizers for different agent types.
         if not isinstance(optimizer, dict):

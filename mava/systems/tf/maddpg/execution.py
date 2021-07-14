@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dm_env
@@ -50,6 +51,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         do_pbt: bool = False,
+        pbt_samples: List = [],
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -72,6 +74,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         # Store these for later use.
         self._agent_specs = agent_specs
         self._do_pbt = do_pbt
+        self._pbt_samples = pbt_samples
         self._counts = counts
         super().__init__(
             policy_networks=policy_networks,
@@ -160,13 +163,16 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
 
-    def shuffle_agent_keys(self):
-        net_keys = list(self._policy_networks.keys())
+    def sample_agent_keys(self):
         save_net_keys = {}
-        for agent in self._agent_net_keys.keys():
-            key = net_keys[randint(len(net_keys))]
-            self._agent_net_keys[agent] = key
-            save_net_keys[agent] = np.array(key, dtype=np.dtype("U10"))
+        agent_slots = copy.copy(sorted(list(self._agent_net_keys.keys())))
+        self._agent_net_keys = {}
+        while len(agent_slots) > 0:
+            sample = self._pbt_samples[randint(len(self._pbt_samples))]
+            for net_key in sample:
+                agent = agent_slots.pop()
+                self._agent_net_keys[agent] = net_key
+                save_net_keys[agent] = np.array(net_key, dtype=np.dtype("U10"))
         return save_net_keys
 
     def observe_first(
@@ -184,10 +190,11 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
         if self._adder:
             if self._do_pbt:
-                """In population based trianing select new networks randomly for each agent.
-                Also ddd the network key used by each agent."""
+                """In population based trianing select new networks from the sampler
+                at the start of each episode. Also add the network key used by each
+                agent."""
+                extras["network_keys"] = self.sample_agent_keys()
 
-                extras["network_keys"] = self.shuffle_agent_keys()
             self._adder.add_first(timestep, extras)
 
     def observe(

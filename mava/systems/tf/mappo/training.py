@@ -116,7 +116,7 @@ class MAPPOTrainer(mava.Trainer):
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
 
-        self.unique_net_keys = set(self._agent_net_keys.values())
+        self.unique_net_keys = policy_networks.keys()
 
         # Create optimizers for different agent types.
         if not isinstance(policy_optimizer, dict):

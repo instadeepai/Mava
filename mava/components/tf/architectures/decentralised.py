@@ -179,7 +179,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
     def create_behaviour_policy(self) -> Dict[str, snt.Module]:
         behaviour_policy_networks: Dict[str, snt.Module] = {}
-        for net_key in set(self._agent_net_keys.values()):
+        for net_key in self._policy_networks.keys():
             snt_module = type(self._policy_networks[net_key])
             behaviour_policy_networks[net_key] = snt_module(
                 [
@@ -472,12 +472,12 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
     def create_behaviour_policy(self) -> Dict[str, snt.Module]:
         behaviour_policy_networks: Dict[str, snt.Module] = {}
-        for agent_key in set(self._agent_net_keys.values()):
-            snt_module = type(self._policy_networks[agent_key])
-            behaviour_policy_networks[agent_key] = snt_module(
+        for net_key in self._policy_networks.keys():
+            snt_module = type(self._policy_networks[net_key])
+            behaviour_policy_networks[net_key] = snt_module(
                 [
-                    self._observation_networks[agent_key],
-                    self._policy_networks[agent_key],
+                    self._observation_networks[net_key],
+                    self._policy_networks[net_key],
                 ]
             )
         return behaviour_policy_networks
