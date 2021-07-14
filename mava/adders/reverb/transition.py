@@ -222,19 +222,52 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         for table, priority in table_priorities.items():
             # If all the network keys of a trainer is in the data then add it to that trainer's
             # data table.
+            net_keys = transition.extras["network_keys"]
+            agents = sorted(transition.action.keys())
+
+            trans_nets_agent = {
+                str(net_keys[agent].numpy().astype(str)): agent for agent in agents
+            }
+
             if not self._table_net_config or all(
-                elem in transition.action.keys()
+                elem in trans_nets_agent.keys()
                 for elem in self._table_net_config[table]
             ):
                 created_item = True
 
-                print("table: ", table)
-                print("table_net_config: ", self._table_net_config[table])
-                print("transition: ", transition)
+                observation = {}
+                extras = {}
+                action = {}
+                reward = {}
+                discount = {}
+                next_observation = {}
+                next_extras = {}
+                for a_i, net_key in enumerate(self._table_net_config[table]):
+                    cur_agent = trans_nets_agent[net_key]
+                    want_agent = agents[a_i]
+                    observation[want_agent] = transition.observation[cur_agent]
 
-                exit()
+                    # TODO (dries): Handle the extras case
+                    # extras[want_agent] = transition.extras[cur_agent]
+                    action[want_agent] = transition.action[cur_agent]
+                    reward[want_agent] = transition.reward[cur_agent]
+                    discount[want_agent] = transition.discount[cur_agent]
+                    next_observation[want_agent] = transition.next_observation[
+                        cur_agent
+                    ]
+                    # next_extras[want_agent] = transition.next_extras[cur_agent]
+
+                new_transition = mava_types.Transition(
+                    observation=observation,
+                    extras=extras,
+                    action=action,
+                    reward=reward,
+                    discount=discount,
+                    next_observation=next_observation,
+                    next_extras=next_extras,
+                )
                 self._writer.create_item(
-                    table=table, priority=priority, trajectory=transition
+                    table=table, priority=priority, trajectory=new_transition
                 )
         self._writer.flush(self._max_in_flight_items)
 

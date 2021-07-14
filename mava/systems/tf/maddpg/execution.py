@@ -76,6 +76,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self._do_pbt = do_pbt
         self._pbt_samples = pbt_samples
         self._counts = counts
+        self._network_keys_extras = {}
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,
@@ -163,14 +164,14 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
 
-    def sample_agent_keys(self):
+    def sample_new_agent_keys(self):
         save_net_keys = {}
         agent_slots = copy.copy(sorted(list(self._agent_net_keys.keys())))
         self._agent_net_keys = {}
         while len(agent_slots) > 0:
             sample = self._pbt_samples[randint(len(self._pbt_samples))]
             for net_key in sample:
-                agent = agent_slots.pop()
+                agent = agent_slots.pop(0)
                 self._agent_net_keys[agent] = net_key
                 save_net_keys[agent] = np.array(net_key, dtype=np.dtype("U10"))
         return save_net_keys
@@ -193,7 +194,8 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
                 """In population based trianing select new networks from the sampler
                 at the start of each episode. Also add the network key used by each
                 agent."""
-                extras["network_keys"] = self.sample_agent_keys()
+                self._network_keys_extras = self.sample_new_agent_keys()
+                extras["network_keys"] = self._network_keys_extras
 
             self._adder.add_first(timestep, extras)
 
@@ -216,11 +218,11 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         """
         if self._adder:
             _, policy = actions
-
             if self._do_pbt:
-                """Add the network key used by each agent."""
-                next_extras["network_keys"] = self.shuffle_agent_keys()
-
+                """In population based trianing select new networks from the sampler
+                at the start of each episode. Also add the network key used by each
+                agent."""
+                next_extras["network_keys"] = self._network_keys_extras
             # TODO (dries): Sort out this mypy issue.
             self._adder.add(policy, next_timestep, next_extras)  # type: ignore
 
@@ -312,7 +314,6 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             action = tf.math.argmax(policy, axis=1)
         else:
             raise NotImplementedError
-
         return action, policy, new_state
 
     def select_action(

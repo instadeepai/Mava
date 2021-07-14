@@ -216,13 +216,18 @@ class MADDPG:
         else:
             assert len(trainer_net_config.keys()) == num_trainers
             assert len(pbt_samples) > 0
-        self._net_spec_keys = self._agent_net_keys
+
         if do_pbt:
             # Note: Assuming all agents have the same specs for now.
             # TODO (dries): Allow agents to have different input/output spaces with
             # population based training in the future.
             self._net_spec_keys = {
                 f"agent_{i}": "agent_0" for i in range(num_agents_in_population)
+            }
+        else:
+            self._net_spec_keys = {
+                net_key: agent_key
+                for agent_key, net_key in self._agent_net_keys.items()
             }
 
         self._architecture = architecture
@@ -302,6 +307,7 @@ class MADDPG:
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
             agent_net_keys=self._agent_net_keys,
+            net_spec_keys=self._net_spec_keys,
         )
         for agent in agents:
             # agent_type = agent.split("_")[0]
@@ -330,6 +336,7 @@ class MADDPG:
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
             agent_net_keys=self._agent_net_keys,
+            net_spec_keys=self._net_spec_keys,
         )
 
         # Create system architecture with target networks.
@@ -493,7 +500,9 @@ class MADDPG:
         # Create the system
         _, system_networks = self.create_system()
 
-        dataset = self._builder.make_dataset_iterator(replay)
+        dataset = self._builder.make_dataset_iterator(
+            replay, f"{self._builder._config.replay_table_name}_{trainer_id}"
+        )
 
         return self._builder.make_trainer(
             # trainer_id=trainer_id,
