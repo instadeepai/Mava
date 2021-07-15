@@ -198,7 +198,7 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
     def signature(  # type: ignore
         cls,
         environment_spec: specs.EnvironmentSpec,
-        sequence_length: int,
+        sequence_length: Optional[int] = None,
         extras_spec: NestedSpec = (),
     ) -> tf.TypeSpec:
         """This is a helper method for generating signatures for Reverb tables.
@@ -220,7 +220,6 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         Returns:
           A `Trajectory` whose leaf nodes are `tf.TensorSpec` objects.
         """
-        assert type(sequence_length) == int and sequence_length > 0
 
         def add_time_dim(paths: Iterable[str], spec: tf.TensorSpec) -> None:
             return tf.TensorSpec(
@@ -267,15 +266,6 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             ),
         )
 
-        # trajectory_env_spec, trajectory_extras_spec = tree.map_structure_with_path(
-        #     add_time_dim, (environment_spec, extras_spec))
-
-        # spec_step = base.Trajectory(
-        #     *trajectory_env_spec,
-        #     start_of_episode=tf.TensorSpec(
-        #         shape=(sequence_length,), dtype=tf.bool, name='start_of_episode'),
-        #     extras=trajectory_extras_spec)
-
         spec_step = base.Step(
             observations=obs_specs,
             actions=act_specs,
@@ -284,4 +274,5 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             start_of_episode=soe_spec,
             extras=extras_spec,
         )
+
         return tree.map_structure_with_path(base.spec_like_to_tensor_spec, spec_step)
