@@ -5,7 +5,7 @@ additional `EnvironmentSpec` class which collects all of the specs for a given
 environment. An `EnvironmentSpec` instance can be created directly or by using
 the `make_environment_spec` helper given a `dm_env.Environment` instance.
 """
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import dm_env
 from acme.specs import EnvironmentSpec
@@ -18,7 +18,7 @@ class MAEnvironmentSpec:
         self,
         environment: dm_env.Environment,
         specs: Dict[str, EnvironmentSpec] = None,
-        extra_specs: Dict = None,
+        extra_specs: Dict[str, Any] = None,
     ):
         if not specs:
             specs = self._make_ma_environment_spec(environment)

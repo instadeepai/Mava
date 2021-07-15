@@ -61,7 +61,7 @@ class MADDPG:
         ] = training.MADDPGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
-        num_trainers: int = 1,
+        # num_trainers: int = 1,
         trainer_net_config: Dict[str, List] = {},
         shared_weights: bool = True,
         agent_net_keys: Dict[str, str] = {},
@@ -84,8 +84,9 @@ class MADDPG:
         sequence_length: int = 20,
         period: int = 20,
         do_pbt: bool = False,
-        pbt_samples: List = [],
-        num_agents_in_population: int = 10,
+        pbt_samples: List = [],  # Each trainer can train on all the data in
+        # one sample per episode.
+        # num_agents_in_population: int = 10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
         # max_executor_steps: int = None,
@@ -200,22 +201,14 @@ class MADDPG:
                 for agent in agents
             }
 
-        # Setup trainer_net_config
-        self._trainer_net_config = trainer_net_config
+        num_trainers = len(trainer_net_config.keys())
 
-        if not trainer_net_config:
-            if num_trainers > 1:
-                raise ValueError(
-                    "Warning: For more than one trainer the "
-                    "trainer_net_config needs to be specified."
-                )
+        # Get the number of agents in the population
+        all_trainer_nets = []
+        for t_id in range(num_trainers):
+            all_trainer_nets.extend(trainer_net_config[f"trainer_{t_id}"])
 
-            self._trainer_net_config["trainer_0"] = [
-                net_key for net_key in self._all_net_keys
-            ]
-        else:
-            assert len(trainer_net_config.keys()) == num_trainers
-            assert len(pbt_samples) > 0
+        num_agents_in_population = len(set(all_trainer_nets))
 
         if do_pbt:
             # Note: Assuming all agents have the same specs for now.
@@ -229,6 +222,20 @@ class MADDPG:
                 net_key: agent_key
                 for agent_key, net_key in self._agent_net_keys.items()
             }
+
+        # Setup trainer_net_config
+        self._trainer_net_config = trainer_net_config
+        if not trainer_net_config:
+            networks = self._network_factory(  # type: ignore
+                environment_spec=environment_spec,
+                agent_net_keys=self._agent_net_keys,
+                net_spec_keys=self._net_spec_keys,
+            )
+            self._trainer_net_config["trainer_0"] = networks["policies"].keys()
+        else:
+            # TODO (dries): Make that executor always samples for the sampler.
+            # If no sampler is specified create a defualt sampler.
+            assert len(pbt_samples) > 0
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -354,7 +361,8 @@ class MADDPG:
             "net_spec_keys": self._net_spec_keys,
         }
 
-        # TODO (dries): Can net_spec_keys and network_spec be used as the same thing? Can we use use one of those two instead of both.
+        # TODO (dries): Can net_spec_keys and network_spec be used as
+        # the same thing? Can we use use one of those two instead of both.
 
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec

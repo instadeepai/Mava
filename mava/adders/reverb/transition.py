@@ -21,7 +21,7 @@ This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import reverb
@@ -29,7 +29,6 @@ import tensorflow as tf
 import tree
 from absl.flags import ValidationError
 from acme import specs as acme_specs
-from acme.adders.reverb import utils as acme_utils
 from acme.utils import tree_utils
 
 from mava import specs as mava_specs
@@ -86,9 +85,9 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         client: reverb.Client,
         n_step: int,
         discount: float,
+        table_net_config: Dict[str, List] = None,
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
-        table_net_config: Dict[str, str] = None,
         max_in_flight_items: int = 5,
     ) -> None:
         """Creates an N-step transition adder.
@@ -220,8 +219,8 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         # Insert the transition into replay along with its priority.
         created_item = False
         for table, priority in table_priorities.items():
-            # If all the network keys of a trainer is in the data then add it to that trainer's
-            # data table.
+            # If all the network keys of a trainer is in the data then add it to that
+            # trainer's data table.
             net_keys = transition.extras["network_keys"]
             agents = sorted(transition.action.keys())
 
@@ -229,33 +228,48 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
                 str(net_keys[agent].numpy().astype(str)): agent for agent in agents
             }
 
-            if not self._table_net_config or all(
+            if self._table_net_config is None:
+                self._writer.create_item(
+                    table=table, priority=priority, trajectory=transition
+                )
+            elif all(
                 elem in trans_nets_agent.keys()
                 for elem in self._table_net_config[table]
             ):
                 created_item = True
 
                 observation = {}
-                extras = {}
+                extras: Dict[str, Any] = {}
                 action = {}
                 reward = {}
                 discount = {}
                 next_observation = {}
-                next_extras = {}
+                next_extras: Dict[str, Any] = {}
+
+                # Create extras
+                for key in transition.extras.keys():
+                    extras[key] = {}
+                    next_extras[key] = {}
+
                 for a_i, net_key in enumerate(self._table_net_config[table]):
                     cur_agent = trans_nets_agent[net_key]
                     want_agent = agents[a_i]
+                    # print("cur_agent: ", cur_agent, ". want_agent: ", want_agent)
                     observation[want_agent] = transition.observation[cur_agent]
 
-                    # TODO (dries): Handle the extras case
-                    # extras[want_agent] = transition.extras[cur_agent]
                     action[want_agent] = transition.action[cur_agent]
                     reward[want_agent] = transition.reward[cur_agent]
                     discount[want_agent] = transition.discount[cur_agent]
                     next_observation[want_agent] = transition.next_observation[
                         cur_agent
                     ]
-                    # next_extras[want_agent] = transition.next_extras[cur_agent]
+
+                    # Convert extras
+                    for key in transition.extras.keys():
+                        extras[key][want_agent] = transition.extras[key][cur_agent]
+                        next_extras[key][want_agent] = transition.next_extras[key][
+                            cur_agent
+                        ]
 
                 new_transition = mava_types.Transition(
                     observation=observation,
@@ -266,6 +280,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
                     next_observation=next_observation,
                     next_extras=next_extras,
                 )
+
                 self._writer.create_item(
                     table=table, priority=priority, trajectory=new_transition
                 )
@@ -377,11 +392,11 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
 
         transition_spec = types.Transition(
             observation=obs_specs,
+            next_observation=obs_specs,
             action=act_specs,
-            extras=extras_spec,
             reward=reward_specs,
             discount=step_discount_specs,
-            next_observation=obs_specs,
+            extras=extras_spec,
             next_extras=extras_spec,
         )
 

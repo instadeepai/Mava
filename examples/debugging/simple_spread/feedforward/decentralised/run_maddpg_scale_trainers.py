@@ -98,7 +98,6 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_config=logger_config,
         num_executors=2,
-        num_trainers=3,
         shared_weights=False,
         trainer_net_config={
             "trainer_0": ["agent_0"],

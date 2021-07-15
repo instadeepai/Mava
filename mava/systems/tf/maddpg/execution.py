@@ -76,7 +76,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self._do_pbt = do_pbt
         self._pbt_samples = pbt_samples
         self._counts = counts
-        self._network_keys_extras = {}
+        self._network_keys_extras: Dict[str, np.array] = {}
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,
@@ -164,7 +164,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
 
-    def sample_new_agent_keys(self):
+    def sample_new_agent_keys(self) -> Dict[str, np.array]:
         save_net_keys = {}
         agent_slots = copy.copy(sorted(list(self._agent_net_keys.keys())))
         self._agent_net_keys = {}
