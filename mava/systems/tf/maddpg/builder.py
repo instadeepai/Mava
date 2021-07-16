@@ -255,15 +255,11 @@ class MADDPGBuilder:
             env_spec = copy.deepcopy(env_adder_spec)
             env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
             env_spec._keys = list(sorted(env_spec._specs.keys()))
-
             if env_spec.extra_specs is not None:
                 env_spec.extra_specs = self.covert_specs(
                     env_spec.extra_specs, num_networks
                 )
 
-            # env_spec = self.covert_specs(
-            #     env_adder_spec, )
-            # )
             extra_specs = self.covert_specs(
                 self._extra_specs,
                 num_networks,

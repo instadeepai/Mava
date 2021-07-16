@@ -15,7 +15,7 @@
 
 """MAD4PG system implementation."""
 
-from typing import Callable, Dict, Optional, Type, Union
+from typing import Callable, Dict, List, Optional, Type, Union
 
 import dm_env
 import sonnet as snt
@@ -49,6 +49,7 @@ class MAD4PG(MADDPG):
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
+        trainer_net_config: Dict[str, List] = {},
         shared_weights: bool = True,
         agent_net_keys: Dict[str, str] = {},
         discount: float = 0.99,
@@ -68,6 +69,8 @@ class MAD4PG(MADDPG):
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
+        do_pbt: bool = False,
+        pbt_samples: List = [],  # Each trainer can train on all the data in
         sigma: float = 0.3,
         max_gradient_norm: float = None,
         checkpoint: bool = True,
@@ -159,6 +162,7 @@ class MAD4PG(MADDPG):
             executor_fn=executor_fn,
             num_executors=num_executors,
             environment_spec=environment_spec,
+            trainer_net_config=trainer_net_config,
             shared_weights=shared_weights,
             agent_net_keys=agent_net_keys,
             discount=discount,
@@ -174,6 +178,8 @@ class MAD4PG(MADDPG):
             n_step=n_step,
             sequence_length=sequence_length,
             period=period,
+            do_pbt=do_pbt,
+            pbt_samples=pbt_samples,
             sigma=sigma,
             max_gradient_norm=max_gradient_norm,
             checkpoint=checkpoint,

@@ -61,7 +61,6 @@ class MADDPG:
         ] = training.MADDPGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
-        # num_trainers: int = 1,
         trainer_net_config: Dict[str, List] = {},
         shared_weights: bool = True,
         agent_net_keys: Dict[str, str] = {},
