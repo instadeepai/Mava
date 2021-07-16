@@ -159,6 +159,10 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     make build
     ```
+    For Windows, before the docker image build, we recommend to first install the package manager [chocolatey](https://chocolatey.org/install) and run:
+    ```bash
+    choco install make
+    ```
 
 2. Run an example:
     ```bash
