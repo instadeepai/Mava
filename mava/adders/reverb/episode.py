@@ -29,13 +29,14 @@ import tensorflow as tf
 import tree
 from acme import specs, types
 from acme.adders.reverb import utils
-from acme.utils import tree_utils
+from acme.adders.reverb.episode import EpisodeAdder, _PaddingFn
 
 from mava.adders.reverb import base
 from mava.adders.reverb import utils as mava_utils
+from mava.adders.reverb.base import ReverbParallelAdder
 
 
-class ParallelEpisodeAdder(base.ReverbParallelAdder):
+class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
     """An adder which adds sequences of fixed length."""
 
     def __init__(
@@ -44,7 +45,8 @@ class ParallelEpisodeAdder(base.ReverbParallelAdder):
         max_sequence_length: int,
         delta_encoded: bool = False,
         priority_fns: Optional[base.PriorityFnMapping] = None,
-        max_in_flight_items: Optional[int] = 25,
+        max_in_flight_items: int = 1,
+        padding_fn: Optional[_PaddingFn] = None,
     ):
         """Makes a SequenceAdder instance.
 
@@ -69,103 +71,76 @@ class ParallelEpisodeAdder(base.ReverbParallelAdder):
             at the same time. See `reverb.Writer.writer` for more info.
         """
 
-        super().__init__(
+        ReverbParallelAdder.__init__(
+            self,
             client=client,
             max_sequence_length=max_sequence_length,
             delta_encoded=delta_encoded,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
         )
+        self._padding_fn = padding_fn
 
     def add(
         self,
         action: types.NestedArray,
         next_timestep: dm_env.TimeStep,
-        extras: types.NestedArray = (),
+        next_extras: types.NestedArray = (),
     ) -> None:
-        if len(self._buffer) == self._buffer.maxlen:
-            # If the buffer is full that means we've buffered max_sequence_length-1
-            # steps, one dangling observation, and are trying to add one more (which
-            # will overflow the buffer).
+        if self._writer.episode_steps >= self._max_sequence_length - 1:
             raise ValueError(
-                "The number of observations within the same episode exceeds "
-                "max_sequence_length"
+                "The number of observations within the same episode will exceed "
+                "max_sequence_length with the addition of this transition."
             )
 
-        super().add(action, next_timestep, extras)
+        super().add(action, next_timestep, next_extras)
 
-    def _write(self) -> None:
-        # Append the previous step and increment number of steps written.
-        self._writer.append(self._buffer[-1])
-
+    # TODO(Kale-ab) Consider deprecating in future versions and using acme
+    # version of this function.
     def _write_last(self) -> None:
-        # Create a final step.
-        # TODO (Dries): Should self._next_observation be used
-        #  here? Should this function be used for sequential?
-        final_step = mava_utils.final_step_like(
-            self._buffer[0], self._next_observations, self._next_extras
-        )
+        if (
+            self._padding_fn is not None
+            and self._writer.episode_steps < self._max_sequence_length
+        ):
+            history = self._writer.history
+            padding_step = dict(
+                observation=history["observation"],
+                action=history["action"],
+                reward=history["reward"],
+                discount=history["discount"],
+                extras=history.get("extras", ()),
+            )
+            # Get shapes and dtypes from the last element.
+            padding_step = tree.map_structure(
+                lambda col: self._padding_fn(col[-1].shape, col[-1].dtype), padding_step
+            )
+            padding_step["start_of_episode"] = False
+            while self._writer.episode_steps < self._max_sequence_length:
+                self._writer.append(padding_step)
 
-        # Append the final step.
-        self._writer.append(final_step)
+        trajectory = tree.map_structure(lambda x: x[:], self._writer.history)
 
-        # The length of the sequence we will be adding is the size of the buffer
-        # plus one due to the final step.
-        steps = list(self._buffer) + [final_step]
-        num_steps = len(steps)
+        # Pack the history into a base.Step structure and get numpy converted
+        # variant for priotiy computation.
+        trajectory = base.Trajectory(**trajectory)
 
         # Calculate the priority for this episode.
-        table_priorities = utils.calculate_priorities(self._priority_fns, steps)
+        table_priorities = utils.calculate_priorities(self._priority_fns, trajectory)
 
         # Create a prioritized item for each table.
         for table_name, priority in table_priorities.items():
-            self._writer.create_item(table_name, num_steps, priority)
+            self._writer.create_item(table_name, priority, trajectory)
+            self._writer.flush(self._max_in_flight_items)
 
     @classmethod
     def signature(
         cls,
         environment_spec: specs.EnvironmentSpec,
-        extras_specs: tf.TypeSpec,
+        sequence_length: Optional[int] = None,
+        extras_spec: types.NestedSpec = (),
     ) -> tf.TypeSpec:
-        """This is a helper method for generating signatures for Reverb tables.
-
-        Signatures are useful for validating data types and shapes, see Reverb's
-        documentation for details on how they are used.
-
-        Args:
-          environment_spec: A `specs.EnvironmentSpec` whose fields are nested
-            structures with leaf nodes that have `.shape` and `.dtype` attributes.
-            This should come from the environment that will be used to generate
-            the data inserted into the Reverb table.
-          extras_spec: A nested structure with leaf nodes that have `.shape` and
-            `.dtype` attributes. The structure (and shapes/dtypes) of this must
-            be the same as the `extras` passed into `ReverbAdder.add`.
-
-        Returns:
-          A `Step` whose leaf nodes are `tf.TensorSpec` objects.
-        """
-        agent_specs = environment_spec.get_agent_specs()
-        agents = environment_spec.get_agent_ids()
-        extras_specs.update(environment_spec.get_extra_specs())
-        obs_specs = {}
-        act_specs = {}
-        reward_specs = {}
-        step_discount_specs = {}
-        for agent in agents:
-            rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
-                agent_specs[agent].rewards, agent_specs[agent].discounts
-            )
-            obs_specs[agent] = agent_specs[agent].observations
-            act_specs[agent] = agent_specs[agent].actions
-            reward_specs[agent] = rewards_spec
-            step_discount_specs[agent] = step_discounts_spec
-
-        spec_step = base.Step(
-            observations=obs_specs,
-            actions=act_specs,
-            rewards=reward_specs,
-            discounts=step_discount_specs,
-            start_of_episode=specs.Array(shape=(), dtype=bool),
-            extras=extras_specs,
+        return mava_utils.trajectory_signature(
+            environment_spec=environment_spec,
+            sequence_length=sequence_length,
+            extras_spec=extras_spec,
         )
-        return tree.map_structure_with_path(base.spec_like_to_tensor_spec, spec_step)
