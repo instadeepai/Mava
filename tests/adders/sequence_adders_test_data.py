@@ -38,7 +38,6 @@ env_restart = parameterized_restart(
 
 final_step_discount = {agent: 0.0 for agent in agents}
 
-# TODO(Kale-ab): Use Trajectory class in expected transitions, once implemented.
 
 TEST_CASES = [
     dict(
@@ -83,24 +82,24 @@ TEST_CASES = [
         expected_sequences=(
             # (observation, action, reward, discount, start_of_episode,  next_extras)
             [
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1, default_action, reward_step2, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step1, default_action, reward_step2, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step3,
                     default_action,
                     reward_step4,
@@ -110,10 +109,10 @@ TEST_CASES = [
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step3,
                     default_action,
                     reward_step4,
@@ -121,7 +120,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step4,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -179,7 +178,7 @@ TEST_CASES = [
         expected_sequences=(
             # (observation, action, reward, discount, start_of_episode,  next_extras)
             [
-                base.Step(
+                base.Trajectory(
                     obs_first,
                     default_action,
                     reward_step1,
@@ -187,7 +186,7 @@ TEST_CASES = [
                     True,
                     {"state": -1},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1,
                     default_action,
                     reward_step2,
@@ -195,7 +194,7 @@ TEST_CASES = [
                     False,
                     {"state": 0},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2,
                     default_action,
                     reward_step3,
@@ -205,7 +204,7 @@ TEST_CASES = [
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step1,
                     default_action,
                     reward_step2,
@@ -213,7 +212,7 @@ TEST_CASES = [
                     False,
                     {"state": 0},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2,
                     default_action,
                     reward_step3,
@@ -221,7 +220,7 @@ TEST_CASES = [
                     False,
                     {"state": 1},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step3,
                     default_action,
                     reward_step4,
@@ -231,7 +230,7 @@ TEST_CASES = [
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step2,
                     default_action,
                     reward_step3,
@@ -239,7 +238,7 @@ TEST_CASES = [
                     False,
                     {"state": 1},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step3,
                     default_action,
                     reward_step4,
@@ -247,7 +246,7 @@ TEST_CASES = [
                     False,
                     {"state": 2},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step4,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -285,10 +284,10 @@ TEST_CASES = [
         expected_sequences=(
             # (observation, action, reward, discount, start_of_episode, next_extras)
             [
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1,
                     default_action,
                     reward_step2,
@@ -296,7 +295,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -334,10 +333,10 @@ TEST_CASES = [
         expected_sequences=(
             # (observation, action, reward, discount, start_of_episode,  next_extras)
             [
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1,
                     default_action,
                     reward_step2,
@@ -345,7 +344,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -353,7 +352,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     {
                         agent: np.zeros_like(obs_step2[list(agents)[0]])
                         for agent in agents
@@ -394,10 +393,10 @@ TEST_CASES = [
         expected_sequences=(
             # (observation, action, reward, discount, start_of_episode,  next_extras)
             [
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1,
                     default_action,
                     reward_step2,
@@ -405,7 +404,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -460,21 +459,21 @@ TEST_CASES = [
         expected_sequences=(
             # (observation, action, reward, discount, start_of_episode,  next_extras)
             [
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1, default_action, reward_step2, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step3,
                     default_action,
                     reward_step4,
@@ -482,7 +481,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step4,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -560,29 +559,29 @@ TEST_CASES = [
         expected_sequences=(
             # (observation, action, reward, discount, start_of_episode,  next_extras)
             [
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1, default_action, reward_step2, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step3, default_action, reward_step4, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step4, default_action, reward_step5, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step5, default_action, reward_step6, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step6,
                     default_action,
                     reward_step7,
@@ -590,7 +589,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step7,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -598,7 +597,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     {
                         agent: np.zeros_like(obs_step7[list(agents)[0]])
                         for agent in agents
@@ -679,29 +678,29 @@ TEST_CASES = [
         expected_sequences=(
             # (observation, action, reward, discount, start_of_episode,  next_extras)
             [
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1, default_action, reward_step2, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step3, default_action, reward_step4, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step4, default_action, reward_step5, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step5, default_action, reward_step6, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step6,
                     default_action,
                     reward_step7,
@@ -709,7 +708,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step7,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -780,32 +779,32 @@ TEST_CASES = [
         expected_sequences=(
             # (observation, action, reward, discount, start_of_episode,  next_extras)
             [
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1, default_action, reward_step2, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step3, default_action, reward_step4, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step4, default_action, reward_step5, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step4, default_action, reward_step5, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step5,
                     default_action,
                     reward_step6,
@@ -813,7 +812,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step6,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -823,7 +822,7 @@ TEST_CASES = [
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step6,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -831,32 +830,32 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1, default_action, reward_step2, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step1, default_action, reward_step2, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step3, default_action, reward_step4, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step3, default_action, reward_step4, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step4, default_action, reward_step5, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step5,
                     default_action,
                     reward_step6,
@@ -866,7 +865,7 @@ TEST_CASES = [
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step5,
                     default_action,
                     reward_step6,
@@ -874,7 +873,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step6,
                     default_action,
                     {agent: 0.0 for agent in agents},
@@ -882,37 +881,37 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_first, default_action, reward_step1, default_discount, True, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step1, default_action, reward_step2, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step2, default_action, reward_step3, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step3, default_action, reward_step4, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step4, default_action, reward_step5, default_discount, False, {}
                 ),
             ],
             [
-                base.Step(
+                base.Trajectory(
                     obs_step4, default_action, reward_step5, default_discount, False, {}
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step5,
                     default_action,
                     reward_step6,
@@ -920,7 +919,7 @@ TEST_CASES = [
                     False,
                     {},
                 ),
-                base.Step(
+                base.Trajectory(
                     obs_step6,
                     default_action,
                     {agent: 0.0 for agent in agents},

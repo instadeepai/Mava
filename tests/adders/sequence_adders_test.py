@@ -5,7 +5,7 @@ from absl.testing import parameterized
 
 from mava.adders import reverb as reverb_adders
 from tests.adders.sequence_adders_test_data import TEST_CASES
-from tests.utils.adders_utils import MAAdderTestMixin
+from tests.utils.adders_utils import MultiAgentAdderTestMixin
 
 # TODO Clean this up, when using newer versions of acme.
 try:
@@ -14,7 +14,7 @@ except ImportError:
     from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
 
 
-class SequenceAdderTest(MAAdderTestMixin, parameterized.TestCase):
+class SequenceAdderTest(MultiAgentAdderTestMixin, parameterized.TestCase):
     @parameterized.named_parameters(*TEST_CASES)
     def test_adder(
         self,

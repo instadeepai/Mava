@@ -1,7 +1,7 @@
 """Utilities for testing Reverb adders."""
 
 from collections import Counter
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Sequence, Set
 
 import dm_env
 import numpy as np
@@ -20,6 +20,7 @@ from acme.utils import tree_utils
 
 from mava import specs
 from mava.adders.reverb.base import ReverbParallelAdder
+from mava.utils.wrapper_utils import parameterized_restart, parameterized_termination
 
 
 def calc_nstep_return(
@@ -44,7 +45,7 @@ def calc_nstep_return(
     return dict(reward)
 
 
-class MAAdderTestMixin(test_utils.AdderTestMixin):
+class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
     """A helper mixin for testing Reverb adders.
     Note that any test inheriting from this mixin must also inherit from something
     that provides the Python unittest assert methods.
@@ -158,3 +159,78 @@ class MAAdderTestMixin(test_utils.AdderTestMixin):
 
         # Check the last transition's signature.
         tree.map_structure(_check_signature, signature, observed_items[-1])
+
+
+def make_trajectory(
+    observations: np.ndarray, agents: Set[str] = {"agent_0", "agent_1", "agent_2"}
+) -> Any:
+    """Make a simple trajectory from a sequence of observations.
+    Arguments:
+        observations: a sequence of observations.
+    Returns:
+        a tuple (first, steps) where first contains the initial dm_env.TimeStep
+        object and steps contains a list of (action, step) tuples. The length of
+        steps is given by episode_length.
+    """
+    default_action = {agent: 0.0 for agent in agents}
+    default_discount = {agent: 1.0 for agent in agents}
+    final_discount = {agent: 0.0 for agent in agents}
+
+    first = parameterized_restart(
+        reward={agent: 0.0 for agent in agents},
+        discount=default_discount,
+        observation={agent: observations[0] for agent in agents},
+    )
+
+    middle = [
+        (
+            default_action,
+            dm_env.transition(
+                reward={agent: 0.0 for agent in agents},
+                observation={agent: observation for agent in agents},
+                discount=default_discount,
+            ),
+        )
+        for observation in observations[1:-1]
+    ]
+    last = (
+        default_action,
+        parameterized_termination(
+            reward={agent: 0.0 for agent in agents},
+            observation={agent: observations[-1] for agent in agents},
+            discount=final_discount,
+        ),
+    )
+    return first, middle + [last]
+
+
+def make_sequence(observations: np.ndarray) -> Any:
+    """Create a sequence of timesteps of the form `first, [second, ..., last]`."""
+    first, steps = make_trajectory(observations)
+
+    agents = first.observation.keys()
+    default_action = {agent: 0.0 for agent in agents}
+    default_reward = {agent: 0.0 for agent in agents}
+    final_discount = {agent: 0.0 for agent in agents}
+
+    observation = first.observation
+    sequence = []
+    start_of_episode = True
+    for action, timestep in steps:
+        extras = ()
+        sequence.append(
+            (
+                observation,
+                action,
+                timestep.reward,
+                timestep.discount,
+                start_of_episode,
+                extras,
+            )
+        )
+        observation = timestep.observation
+        start_of_episode = False
+    sequence.append(
+        (observation, default_action, default_reward, final_discount, False, ())
+    )
+    return sequence
