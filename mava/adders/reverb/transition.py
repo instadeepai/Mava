@@ -28,13 +28,13 @@ import reverb
 import tensorflow as tf
 import tree
 from acme import specs as acme_specs
-from acme.adders.reverb import utils as acme_utils
 from acme.utils import tree_utils
 
 from mava import specs as mava_specs
 from mava import types
 from mava import types as mava_types
 from mava.adders.reverb import base
+from mava.adders.reverb import utils as mava_utils
 
 # from mava.adders.reverb import utils as mava_utils
 
@@ -211,7 +211,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         )
 
         # Calculate the priority for this transition.
-        table_priorities = acme_utils.calculate_priorities(
+        table_priorities = mava_utils.calculate_priorities(
             self._priority_fns, transition
         )
 
