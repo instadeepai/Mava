@@ -41,7 +41,9 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.dial import builder
-from mava.systems.tf.madqn import execution, training
+from mava.systems.tf.dial.execution import DIALSwitchExecutor
+from mava.systems.tf.dial.training import DIALSwitchTrainer
+from mava.systems.tf.madqn import training
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
@@ -56,11 +58,9 @@ class DIAL:
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
-        trainer_fn: Type[
-            training.MADQNRecurrentCommTrainer
-        ] = training.MADQNRecurrentCommTrainer,
+        trainer_fn: Type[training.MADQNRecurrentCommTrainer] = DIALSwitchTrainer,
         communication_module: Type[BaseCommunicationModule] = BroadcastedCommunication,
-        executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
+        executor_fn: Type[core.Executor] = DIALSwitchExecutor,
         exploration_scheduler_fn: Type[
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
@@ -77,7 +77,7 @@ class DIAL:
         max_replay_size: int = 1000000,
         samples_per_insert: Optional[float] = 4.0,
         n_step: int = 5,
-        sequence_length: int = 6,
+        sequence_length: int = 20,
         period: int = 20,
         max_gradient_norm: float = None,
         discount: float = 1,
