@@ -36,7 +36,7 @@ flags.DEFINE_string(
 class TestNetworks:
     # Test that we can load a env module and that it contains agents,
     #   agents and possible_agents.
-    def test_network_keys(self) -> None:
+    def test_shared_networks(self) -> None:
         # Environment.
         env = debugging_utils.make_environment(
             env_name=FLAGS.env_name, action_space=FLAGS.action_space, evaluation=False
@@ -60,6 +60,16 @@ class TestNetworks:
             for key in networks.keys():
                 assert ["agent"] == list(networks[key].keys())
 
+    def test_non_shared_networks(self) -> None:
+        # Environment.
+        env = debugging_utils.make_environment(
+            env_name=FLAGS.env_name, action_space=FLAGS.action_space, evaluation=False
+        )
+        environment_spec = mava_specs.MAEnvironmentSpec(env)
+
+        system_fns = [maddpg, mad4pg, madqn, mappo, qmix, vdn]
+
+        for system in system_fns:
             # Test individual agent network setup.
             agent_net_keys = {
                 "agent_0": "agent_0",
@@ -72,6 +82,3 @@ class TestNetworks:
             )
             for key in networks.keys():
                 assert ["agent_0", "agent_1", "agent_2"] == list(networks[key].keys())
-
-
-TestNetworks().test_network_keys()
