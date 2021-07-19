@@ -206,7 +206,6 @@ class MADDPGBuilder:
         env_adder_spec = self.convert_discrete_to_bounded(environment_spec)
 
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
-
             def adder_sig_fn(
                 env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
             ) -> Any:
@@ -251,7 +250,7 @@ class MADDPGBuilder:
             # weights in the single trainer setup.
 
             # Convert a Mava spec
-            num_networks = len(self._config.trainer_agent_nets[f"trainer_{t_i}"])
+            num_networks = len(self._config.trainer_networks[f"trainer_{t_i}"])
             env_spec = copy.deepcopy(env_adder_spec)
             env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
             env_spec._keys = list(sorted(env_spec._specs.keys()))
@@ -259,7 +258,6 @@ class MADDPGBuilder:
                 env_spec.extra_specs = self.covert_specs(
                     env_spec.extra_specs, num_networks
                 )
-
             extra_specs = self.covert_specs(
                 self._extra_specs,
                 num_networks,
@@ -327,12 +325,12 @@ class MADDPGBuilder:
         Returns:
             Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
         """
-        table_entry_config = {
-            f"priority_table_{trainer_id}": self._config.trainer_net_config[
-                f"trainer_{trainer_id}"
-            ]
-            for trainer_id in range(self._config.num_trainers)
-        }
+        # table_entry_config = {
+        #     f"priority_table_{trainer_id}": self._config.trainer_net_config[
+        #         f"trainer_{trainer_id}"
+        #     ]
+        #     for trainer_id in range(self._config.num_trainers)
+        # }
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):

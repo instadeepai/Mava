@@ -205,11 +205,6 @@ class MADDPG:
                 agents, self._executor_sampler
             )
 
-            raise NotImplementedError(
-                "executor_samples not implemented. Sample from"
-                "pbt_samples to populate _agent_net_keys"
-            )
-
         num_trainers = len(trainer_networks.keys())
         # Get the number of agents (networks) in the population
         all_trainer_nets = []
@@ -240,6 +235,28 @@ class MADDPG:
             self._trainer_networks["trainer_0"] = networks["policies"].keys()
         else:
             self._trainer_networks = trainer_networks
+
+        # Setup table_network_config
+        self._table_network_config = {}
+        for t_id in range(num_trainers):
+            
+
+            most_matches = 0
+            trainer_nets = trainer_networks[f"trainer_{t_id}"]
+            for sample in executor_samples:
+                matches = 0
+                for entry in sample:
+                    if entry == trainer_nets:
+                        most_matches += 1
+                if most_matches < matches:
+                    matches = most_matches
+                    self._table_network_config[f"trainer_{t_id}"] = sample
+        
+
+        print(self._table_network_config)
+        exit()
+            
+
 
         # Check that the environment and agent_net_keys has the same amount of agents
         sample_length = len(executor_samples[0])
