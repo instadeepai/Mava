@@ -59,9 +59,9 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [OpenSpiel][openspiel]
 
 
-|<img src="docs/images/multiw_animation.gif" width="80%" height="150"> | <img src="docs/images/sc2_animation.gif" width="80%" height="150"> |
+|<img  src="docs/images/multiw_animation.gif" width="85%" /> | <img src="docs/images/sc2_animation.gif" width="85%" />  |
 |:---:|:---:|
-|MAD4PG on PettingZoo's <br/> Multi-Walker environment. | VDN on the SMAC 3m map.|
+|MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.|
 
 
 ## System Implementations

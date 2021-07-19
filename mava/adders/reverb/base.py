@@ -62,10 +62,21 @@ PriorityFnMapping = Mapping[str, Optional[PriorityFn]]
 def spec_like_to_tensor_spec(
     paths: Iterable[str], spec: acme_specs.Array
 ) -> tf.TypeSpec:
+    """Convert spec like object to tensorspec.
+
+    Args:
+        paths (Iterable[str]): Spec like path.
+        spec (acme_specs.Array): Spec to use.
+
+    Returns:
+        tf.TypeSpec: Returned tensorspec.
+    """
     return tf.TensorSpec.from_spec(spec, name="/".join(str(p) for p in paths))
 
 
 class ReverbParallelAdder(ReverbAdder):
+    """Base reverb class."""
+
     def __init__(
         self,
         client: reverb.Client,
@@ -76,6 +87,22 @@ class ReverbParallelAdder(ReverbAdder):
         get_signature_timeout_ms: int = 300_000,
         use_next_extras: bool = True,
     ):
+        """Reverb Base Adder.
+
+        Args:
+            client (reverb.Client): Client to access reverb.
+            max_sequence_length (int): The number of observations that can be added to
+                replay.
+            max_in_flight_items (int): [description]
+            delta_encoded (bool, optional): Enables delta encoding, see `Client` for
+                more information. Defaults to False.
+            priority_fns (Optional[PriorityFnMapping], optional): A mapping from
+                table names to priority functions. Defaults to None.
+            get_signature_timeout_ms (int, optional): Timeout while fetching
+                signature. Defaults to 300_000.
+            use_next_extras (bool, optional): Whether to use extras or not. Defaults to
+                True.
+        """
         super().__init__(
             client=client,
             max_sequence_length=max_sequence_length,
