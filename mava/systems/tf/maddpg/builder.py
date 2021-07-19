@@ -498,7 +498,7 @@ class MADDPGBuilder:
                 executors to update the parameters of the agent networks in the system.
         """
         # This assumes agents are sorted in the other methods
-        trainer_agents = self._agents[:len(trainer_agent_nets)]
+        trainer_agents = self._agents[: len(trainer_agent_nets)]
         agent_types = self._agent_types
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount

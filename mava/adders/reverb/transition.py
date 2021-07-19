@@ -225,7 +225,8 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             agents = sorted(transition.action.keys())
 
             trans_nets_agent = {
-                str(entry_net_keys[agent].numpy().astype(str)): agent for agent in agents
+                str(entry_net_keys[agent].numpy().astype(str)): agent
+                for agent in agents
             }
 
             if self._table_entry_nets is None:

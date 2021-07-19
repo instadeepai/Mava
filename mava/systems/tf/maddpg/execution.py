@@ -38,17 +38,19 @@ BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
 tfd = tfp.distributions
 
+
 def sample_new_agent_keys(agents, executor_sampler) -> Dict[str, np.array]:
-        save_net_keys = {}
-        agent_net_keys = {}
-        agent_slots = copy.copy(agents)
-        while len(agent_slots) > 0:
-            sample = executor_sampler[randint(len(executor_sampler))]
-            for net_key in sample:
-                agent = agent_slots.pop(0)
-                agent_net_keys[agent] = net_key
-                save_net_keys[agent] = np.array(net_key, dtype=np.dtype("U10"))
-        return save_net_keys, agent_net_keys
+    save_net_keys = {}
+    agent_net_keys = {}
+    agent_slots = copy.copy(agents)
+    while len(agent_slots) > 0:
+        sample = executor_sampler[randint(len(executor_sampler))]
+        for net_key in sample:
+            agent = agent_slots.pop(0)
+            agent_net_keys[agent] = net_key
+            save_net_keys[agent] = np.array(net_key, dtype=np.dtype("U10"))
+    return save_net_keys, agent_net_keys
+
 
 class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
     """A feed-forward executor for discrete actions.
@@ -193,7 +195,9 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
                 at the start of each episode. Also add the network key used by each
                 agent."""
                 agents = sorted(list(self._agent_net_keys.keys()))
-                self._network_keys_extras, self._agent_net_keys = sample_new_agent_keys(agents, self._executor_sampler)
+                self._network_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+                    agents, self._executor_sampler
+                )
                 extras["network_keys"] = self._network_keys_extras
 
             self._adder.add_first(timestep, extras)

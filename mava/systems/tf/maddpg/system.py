@@ -36,7 +36,10 @@ from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import builder, training
-from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor, sample_new_agent_keys
+from mava.systems.tf.maddpg.execution import (
+    MADDPGFeedForwardExecutor,
+    sample_new_agent_keys,
+)
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
@@ -63,7 +66,7 @@ class MADDPG:
         num_executors: int = 1,
         trainer_networks: Dict[str, List] = {},
         executor_samples: List = [],
-        do_pbt: bool = False, # TODO (dries): Update code so that you can remove this flag.
+        do_pbt: bool = False,  # TODO (dries): Update code so that you can remove this flag.
         shared_weights: bool = True,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
@@ -198,10 +201,14 @@ class MADDPG:
             }
         else:
             # if executor samples provided, use executor_samples to determine setup
-            _, self._agent_net_keys = sample_new_agent_keys(agents, self._executor_sampler)
+            _, self._agent_net_keys = sample_new_agent_keys(
+                agents, self._executor_sampler
+            )
 
-            raise NotImplementedError("executor_samples not implemented. Sample from"
-            "pbt_samples to populate _agent_net_keys")
+            raise NotImplementedError(
+                "executor_samples not implemented. Sample from"
+                "pbt_samples to populate _agent_net_keys"
+            )
 
         num_trainers = len(trainer_networks.keys())
         # Get the number of agents (networks) in the population
