@@ -15,7 +15,6 @@
 
 """Adders that use Reverb (github.com/deepmind/reverb) as a backend."""
 
-import abc
 from typing import Callable, Dict, Iterable, Mapping, NamedTuple, Optional, Tuple, Union
 
 import dm_env
@@ -23,12 +22,9 @@ import numpy as np
 import reverb
 import tensorflow as tf
 import tree
-from absl import logging
 from acme import specs as acme_specs
 from acme import types
-
-from mava import specs as mava_specs
-from mava.adders import base
+from acme.adders.reverb.base import ReverbAdder
 
 DEFAULT_PRIORITY_TABLE = "priority_table"
 
@@ -69,100 +65,27 @@ def spec_like_to_tensor_spec(
     return tf.TensorSpec.from_spec(spec, name="/".join(str(p) for p in paths))
 
 
-class ReverbParallelAdder(base.ParallelAdder):
-    """Base class for Reverb adders."""
-
+class ReverbParallelAdder(ReverbAdder):
     def __init__(
         self,
         client: reverb.Client,
-        # buffer_size: int,
         max_sequence_length: int,
+        max_in_flight_items: int,
         delta_encoded: bool = False,
-        # chunk_length: Optional[int] = None,
         priority_fns: Optional[PriorityFnMapping] = None,
-        max_in_flight_items: Optional[int] = 25,
+        get_signature_timeout_ms: int = 300_000,
         use_next_extras: bool = True,
     ):
-        """Initialize a ReverbAdder instance.
-        Args:
-          client: A client to the Reverb backend.
-          buffer_size: Number of steps to retain in memory.
-          max_sequence_length: The maximum length of sequences (corresponding to the
-            number of observations) that can be added to replay.
-          delta_encoded: If `True` (False by default) enables delta encoding, see
-            `Client` for more information.
-          chunk_length: Number of timesteps grouped together before delta encoding
-            and compression. See `Client` for more information.
-          priority_fns: A mapping from table names to priority functions; if
-            omitted, all transitions/steps/sequences are given uniform priorities
-            (1.0) and placed in DEFAULT_PRIORITY_TABLE.
-          max_in_flight_items: The maximum number of items allowed to be "in flight"
-            at the same time. See `reverb.Writer.writer` for more info.
-        """
-
-        if priority_fns:
-            priority_fns = dict(priority_fns)
-        else:
-            priority_fns = {DEFAULT_PRIORITY_TABLE: None}
-
-        self._client = client
-        self._priority_fns = priority_fns
-        self._max_sequence_length = max_sequence_length
-        self._delta_encoded = delta_encoded
-        # self._chunk_length = chunk_length
-        self._max_in_flight_items = max_in_flight_items
-        self._add_first_called = False
+        super().__init__(
+            client=client,
+            max_sequence_length=max_sequence_length,
+            max_in_flight_items=max_in_flight_items,
+            delta_encoded=delta_encoded,
+            priority_fns=priority_fns,
+            # TODO(Kale-ab) Re-add this when using newer version of acme.
+            # get_signature_timeout_ms=get_signature_timeout_ms
+        )
         self._use_next_extras = use_next_extras
-
-        # This is exposed as the _writer property in such a way that it will create
-        # a new writer automatically whenever the internal __writer is None. Users
-        # should ONLY ever interact with self._writer.
-        self.__writer = None
-        # Every time a new writer is created, it must fetch the signature from the
-        # Reverb server. If this is set too low it can crash the adders in a
-        # distributed setup where the replay may take a while to spin up.
-        self._get_signature_timeout_ms = 300_000
-
-    def __del__(self) -> None:
-        if self.__writer is not None:
-            timeout_ms = 10_000
-            # Try flush all appended data before closing to avoid loss of experience.
-            try:
-                self.__writer.flush(self._max_in_flight_items, timeout_ms=timeout_ms)
-            except reverb.DeadlineExceededError as e:
-                logging.error(
-                    "Timeout (%d ms) exceeded when flushing the writer before "
-                    "deleting it. Caught Reverb exception: %s",
-                    timeout_ms,
-                    str(e),
-                )
-            self.__writer.close()
-
-    @property
-    def _writer(self) -> reverb.TrajectoryWriter:
-        if self.__writer is None:
-            self.__writer = self._client.trajectory_writer(
-                num_keep_alive_refs=self._max_sequence_length,
-                get_signature_timeout_ms=self._get_signature_timeout_ms,
-            )
-        return self.__writer
-
-    def add_priority_table(
-        self, table_name: str, priority_fn: Optional[PriorityFn]
-    ) -> None:
-        if table_name in self._priority_fns:
-            raise ValueError(
-                f"A priority function already exists for {table_name}. "
-                f'Existing tables: {", ".join(self._priority_fns.keys())}.'
-            )
-        self._priority_fns[table_name] = priority_fn
-
-    def reset(self, timeout_ms: Optional[int] = None) -> None:
-        """Resets the adder's buffer."""
-        if self.__writer:
-            # Flush all appended data and clear the buffers.
-            self.__writer.end_episode(clear_buffers=True, timeout_ms=timeout_ms)
-        self._add_first_called = False
 
     def add_first(
         self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
@@ -180,8 +103,10 @@ class ReverbParallelAdder(base.ParallelAdder):
             observations=timestep.observation,
             start_of_episode=timestep.first(),
         )
+
         if self._use_next_extras:
             add_dict["extras"] = extras
+
         self._writer.append(
             add_dict,
             partial_step=True,
@@ -235,35 +160,3 @@ class ReverbParallelAdder(base.ParallelAdder):
             self._writer.append(dummy_step)
             self._write_last()
             self.reset()
-
-    @abc.abstractmethod
-    def signature(
-        cls,
-        environment_spec: mava_specs.MAEnvironmentSpec,
-        extras_spec: tf.TypeSpec,
-    ) -> tf.TypeSpec:
-        """This is a helper method for generating signatures for Reverb tables.
-
-        Signatures are useful for validating data types and shapes, see Reverb's
-        documentation for details on how they are used.
-
-        Args:
-        environment_spec: A `specs.EnvironmentSpec` whose fields are nested
-            structures with leaf nodes that have `.shape` and `.dtype` attributes.
-            This should come from the environment that will be used to generate
-            the data inserted into the Reverb table.
-        extras_spec: A nested structure with leaf nodes that have `.shape` and
-            `.dtype` attributes. The structure (and shapes/dtypes) of this must
-            be the same as the `extras` passed into `ReverbAdder.add`.
-
-        Returns:
-        A `Step` whose leaf nodes are `tf.TensorSpec` objects.
-        """
-
-    @abc.abstractmethod
-    def _write(self) -> None:
-        """Write data to replay from the buffer."""
-
-    @abc.abstractmethod
-    def _write_last(self) -> None:
-        """Write data to replay from the buffer."""

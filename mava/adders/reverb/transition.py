@@ -21,26 +21,24 @@ This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Optional, Tuple, Dict, Any, List
 
 import numpy as np
 import reverb
 import tensorflow as tf
 import tree
-from absl.flags import ValidationError
-from acme import specs as acme_specs
+from acme.adders.reverb.transition import NStepTransitionAdder, _broadcast_specs
 from acme.utils import tree_utils
 
 from mava import specs as mava_specs
 from mava import types
 from mava import types as mava_types
 from mava.adders.reverb import base
-from mava.utils.adder_utils import calculate_priorities
+from mava.adders.reverb import utils as mava_utils
+from mava.adders.reverb.base import ReverbParallelAdder
 
-# from mava.adders.reverb import utils as mava_utils
 
-
-class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
+class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
     """An N-step transition adder.
     This will buffer a sequence of N timesteps in order to form a single N-step
     transition which is added to reverb for future retrieval.
@@ -111,7 +109,8 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         self._last_idx = 0
         self._table_entry_nets = table_entry_nets
 
-        super().__init__(
+        ReverbParallelAdder.__init__(
+            self,
             client=client,
             max_sequence_length=n_step + 1,
             priority_fns=priority_fns,
@@ -119,36 +118,13 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
             use_next_extras=True,
         )
 
-    def add(self, *args: Any, **kwargs: Any) -> None:
-        # Increment the indices for the start and end of the window for computing
-        # n-step returns.
-        if self._writer.episode_steps >= self.n_step:
-            self._first_idx += 1
-        self._last_idx += 1
-
-        super().add(*args, **kwargs)
-
-    def reset(self, timeout_ms: Optional[int] = None) -> None:
-        super().reset()
-        self._first_idx = 0
-        self._last_idx = 0
-
-    @property
-    def _n_step(self) -> int:
-        """Effective n-step, which may vary at starts and ends of episodes."""
-        return self._last_idx - self._first_idx
-
     def _write(self) -> None:
         # Convenient getters for use in tree operations.
         def get_first(x: np.array) -> np.array:
             return x[self._first_idx]
 
-        # get_first = lambda x: x[self._first_idx]
-
         def get_last(x: np.array) -> np.array:
             return x[self._last_idx]
-
-        # get_last = lambda x: x[self._last_idx]
 
         # Note: this getter is meant to be used on a TrajectoryWriter.history to
         # obtain its numpy values.
@@ -214,7 +190,9 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         )
 
         # Calculate the priority for this transition.
-        table_priorities = calculate_priorities(self._priority_fns, transition)
+        table_priorities = mava_utils.calculate_priorities(
+            self._priority_fns, transition
+        )
 
         # Insert the transition into replay along with its priority.
         created_item = False
@@ -293,22 +271,14 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
                         table=table, priority=priority, trajectory=new_transition
                     )
         self._writer.flush(self._max_in_flight_items)
-
         if not created_item:
-            raise ValidationError(
+            raise EOFError(
                 "This experience was not used by any trainer: ",
                 transition.action.keys(),
             )
 
-    def _write_last(self) -> None:
-        # Write the remaining shorter transitions by alternating writing and
-        # incrementingfirst_idx. Note that last_idx will no longer be incremented
-        # once we're in this method's scope.
-        self._first_idx += 1
-        while self._first_idx < self._last_idx:
-            self._write()
-            self._first_idx += 1
-
+    # TODO(Kale-ab) Consider deprecating in future versions and using acme
+    # version of this function.
     def _compute_cumulative_quantities(
         self, rewards: mava_types.NestedArray, discounts: mava_types.NestedArray
     ) -> Tuple[mava_types.NestedArray, mava_types.NestedArray]:
@@ -411,15 +381,3 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         return tree.map_structure_with_path(
             base.spec_like_to_tensor_spec, transition_spec
         )
-
-
-def _broadcast_specs(*args: acme_specs.Array) -> acme_specs.Array:
-    """Like np.broadcast, but for specs.Array.
-    Args:
-      *args: one or more specs.Array instances.
-    Returns:
-      A specs.Array with the broadcasted shape and dtype of the specs in *args.
-    """
-    bc_info = np.broadcast(*tuple(a.generate_value() for a in args))
-    dtype = np.result_type(*tuple(a.dtype for a in args))
-    return acme_specs.Array(shape=bc_info.shape, dtype=dtype)
