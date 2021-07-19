@@ -16,8 +16,9 @@
 
 """MAD4PG system trainer implementation."""
 
-from typing import Any, Dict, List, Union
+from typing import Dict, List, Union
 
+import reverb
 import sonnet as snt
 import tensorflow as tf
 import tree
@@ -25,6 +26,8 @@ from acme.tf import losses
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
+from mava import types as mava_types
+from mava.adders.reverb.base import Trajectory
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf.maddpg.training import (
     MADDPGBaseRecurrentTrainer,
@@ -134,7 +137,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         )
 
     # Forward pass that calculates loss.
-    def _forward(self, inputs: Any) -> None:
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
 
         Args:
@@ -152,7 +155,17 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
-        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+        trans = mava_types.Transition(*inputs.data)
+
+        o_tm1, o_t, a_tm1, r_t, d_t, e_tm1, e_t = (
+            trans.observation,
+            trans.next_observation,
+            trans.action,
+            trans.reward,
+            trans.discount,
+            trans.extras,
+            trans.next_extras,
+        )
 
         # Do forward passes through the networks and calculate the losses
         self.policy_losses = {}
@@ -467,7 +480,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         )
 
     # Forward pass that calculates loss.
-    def _forward(self, inputs: Any) -> None:
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
 
         Args:
@@ -475,7 +488,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         """
 
         # TODO: Update this forward function to work like MAD4PG
-        data = inputs.data
+        data: Trajectory = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
         observations, actions, rewards, discounts, _, extras = (
