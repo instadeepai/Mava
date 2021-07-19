@@ -34,7 +34,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import execution, training
-from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
+from mava.wrappers import MADQNDetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -80,6 +80,8 @@ class MADQNConfig:
     prefetch_size: int
     batch_size: int
     n_step: int
+    max_priority_weight: float
+    importance_sampling_exponent: Optional[float]
     sequence_length: int
     period: int
     discount: float
@@ -180,9 +182,17 @@ class MADQNBuilder:
                 error_buffer=error_buffer,
             )
 
+        # Maybe use prioritized sampling.
+        if self._config.importance_sampling_exponent is not None:
+            sampler = reverb.selectors.Prioritized(
+                self._config.importance_sampling_exponent
+            )
+        else:
+            sampler = reverb.selectors.Uniform()
+
         replay_table = reverb.Table(
             name=self._config.replay_table_name,
-            sampler=reverb.selectors.Uniform(),
+            sampler=sampler,
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
             rate_limiter=limiter,
@@ -333,6 +343,7 @@ class MADQNBuilder:
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
+        replay_client: Optional[reverb.TFClient] = None,
     ) -> core.Trainer:
         """Create a trainer instance.
 
@@ -388,6 +399,6 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type:ignore
+        trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore
 
         return trainer

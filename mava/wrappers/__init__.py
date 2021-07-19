@@ -34,7 +34,7 @@ except ModuleNotFoundError:
     pass
 from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
-    DetailedTrainerStatisticsWithEpsilon,
+    MADQNDetailedTrainerStatistics,
     NetworkStatisticsActorCritic,
     NetworkStatisticsMixing,
 )
