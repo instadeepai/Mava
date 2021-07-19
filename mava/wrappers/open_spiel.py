@@ -17,15 +17,11 @@ from typing import Any, Dict, Iterator, List, Tuple, Union
 
 import dm_env
 import numpy as np
-
-try:
-    import pyspiel  # type: ignore
-    from open_spiel.python import rl_environment  # type: ignore
-except ModuleNotFoundError:
-    pass
+import pyspiel  # type: ignore
 from acme import specs
 from gym.spaces import Discrete
 from gym.spaces.box import Box
+from open_spiel.python import rl_environment  # type: ignore
 
 from mava import types
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
@@ -35,7 +31,7 @@ from mava.wrappers.env_wrappers import SequentialEnvWrapper
 class OpenSpielSequentialWrapper(SequentialEnvWrapper):
     def __init__(
         self,
-        environment: "rl_environment.Environment",
+        environment: rl_environment.Environment,
     ):
         self._environment = environment
         self._possible_agents = [
@@ -83,7 +79,7 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
 
     def _to_observation(
         self,
-        timestep: "rl_environment.TimeStep",
+        timestep: rl_environment.TimeStep,
     ) -> Dict[str, np.ndarray]:
 
         obs = np.array(
@@ -246,7 +242,7 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         return self._possible_agents
 
     @property
-    def environment(self) -> "rl_environment.Environment":
+    def environment(self) -> rl_environment.Environment:
         """Returns the wrapped environment."""
         return self._environment
 

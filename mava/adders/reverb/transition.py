@@ -21,24 +21,24 @@ This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
-from typing import Optional, Tuple
+import itertools
+import operator
+from typing import Any, Optional, Tuple
 
 import numpy as np
 import reverb
 import tensorflow as tf
 import tree
-from acme.adders.reverb.transition import NStepTransitionAdder, _broadcast_specs
+from acme import specs as acme_specs
+from acme.adders.reverb import utils as acme_utils
 from acme.utils import tree_utils
 
 from mava import specs as mava_specs
-from mava import types
-from mava import types as mava_types
 from mava.adders.reverb import base
 from mava.adders.reverb import utils as mava_utils
-from mava.adders.reverb.base import ReverbParallelAdder
 
 
-class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
+class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
     """An N-step transition adder.
     This will buffer a sequence of N timesteps in order to form a single N-step
     transition which is added to reverb for future retrieval.
@@ -83,9 +83,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         client: reverb.Client,
         n_step: int,
         discount: float,
-        *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
-        max_in_flight_items: int = 5,
     ) -> None:
         """Creates an N-step transition adder.
         Args:
@@ -102,151 +100,153 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         """
         # Makes the additional discount a float32, which means that it will be
         # upcast if rewards/discounts are float64 and left alone otherwise.
-        self.n_step = n_step
         self._discount = tree.map_structure(np.float32, discount)
-        self._first_idx = 0
-        self._last_idx = 0
 
-        ReverbParallelAdder.__init__(
-            self,
+        # Creates a placeholder for the final Step, which will have zeros for every
+        # member except the observation.
+        self._final_step_placeholder: Optional[base.Step] = None
+
+        super().__init__(
             client=client,
-            max_sequence_length=n_step + 1,
+            buffer_size=n_step,
+            max_sequence_length=1,
             priority_fns=priority_fns,
-            max_in_flight_items=max_in_flight_items,
             use_next_extras=True,
         )
 
     def _write(self) -> None:
-        # Convenient getters for use in tree operations.
-        def get_first(x: np.array) -> np.array:
-            return x[self._first_idx]
-
-        def get_last(x: np.array) -> np.array:
-            return x[self._last_idx]
-
-        # Note: this getter is meant to be used on a TrajectoryWriter.history to
-        # obtain its numpy values.
-        def get_all_np(x: np.array) -> np.array:
-            return x[self._first_idx : self._last_idx].numpy()
-
-        # get_all_np = lambda x: x[self._first_idx : self._last_idx].numpy()
-
-        # Get the state, action, next_state, as well as possibly extras for the
-        # transition that is about to be written.
-        history = self._writer.history
-        s, e, a = tree.map_structure(
-            get_first, (history["observations"], history["extras"], history["actions"])
-        )
-
-        s_, e_ = tree.map_structure(
-            get_last, (history["observations"], history["extras"])
-        )
-
-        # # Maybe get extras to add to the transition later.
-        # if 'extras' in history:
-        #     extras = tree.map_structure(get_first, history['extras'])
-
-        # Note: at the beginning of an episode we will add the initial N-1
+        # NOTE: we do not check that the buffer is of length N here. This means
+        # that at the beginning of an episode we will add the initial N-1
         # transitions (of size 1, 2, ...) and at the end of an episode (when
         # called from write_last) we will write the final transitions of size (N,
         # N-1, ...). See the Note in the docstring.
-        # Get numpy view of the steps to be fed into the priority functions.
 
-        rewards, discounts = tree.map_structure(
-            get_all_np, (history["rewards"], history["discounts"])
-        )
-        # Compute discounted return and geometric discount over n steps.
-        n_step_return, total_discount = self._compute_cumulative_quantities(
-            rewards, discounts
-        )
-
-        # Append the computed n-step return and total discount.
-        # Note: if this call to _write() is within a call to _write_last(), then
-        # this is the only data being appended and so it is not a partial append.
-        self._writer.append(
-            dict(n_step_return=n_step_return, total_discount=total_discount),
-            partial_step=self._writer.episode_steps <= self._last_idx,
-        )
-        # This should be done immediately after self._writer.append so the history
-        # includes the recently appended data.
-        history = self._writer.history
-
-        # Form the n-step transition by using the following:
-        # the first observation and action in the buffer, along with the cumulative
-        # reward and discount computed above.
-        n_step_return, total_discount = tree.map_structure(
-            lambda x: x[-1], (history["n_step_return"], history["total_discount"])
-        )
-        transition = mava_types.Transition(
-            observation=s,
-            extras=e,
-            action=a,
-            reward=n_step_return,
-            discount=total_discount,
-            next_observation=s_,
-            next_extras=e_,
-        )
-
-        # Calculate the priority for this transition.
-        table_priorities = mava_utils.calculate_priorities(
-            self._priority_fns, transition
-        )
-
-        # Insert the transition into replay along with its priority.
-        for table, priority in table_priorities.items():
-            self._writer.create_item(
-                table=table, priority=priority, trajectory=transition
-            )
-        self._writer.flush(self._max_in_flight_items)
-
-    # TODO(Kale-ab) Consider deprecating in future versions and using acme
-    # version of this function.
-    def _compute_cumulative_quantities(
-        self, rewards: mava_types.NestedArray, discounts: mava_types.NestedArray
-    ) -> Tuple[mava_types.NestedArray, mava_types.NestedArray]:
+        # Form the n-step transition given the steps.
+        observations = self._buffer[0].observations
+        actions = self._buffer[0].actions
+        extras = self._buffer[0].extras
+        next_observations = self._next_observations
+        next_extras = self._next_extras
+        self._discounts = {agent: self._discount for agent in observations.keys()}
 
         # Give the same tree structure to the n-step return accumulator,
         # n-step discount accumulator, and self.discount, so that they can be
         # iterated in parallel using tree.map_structure.
-        rewards, discounts, self_discount = tree_utils.broadcast_structures(
-            rewards, discounts, self._discount
-        )
-        flat_rewards = tree.flatten(rewards)
-        flat_discounts = tree.flatten(discounts)
-        flat_self_discount = tree.flatten(self_discount)
 
-        # Copy total_discount as it is otherwise read-only.
-        total_discount = [np.copy(a[0]) for a in flat_discounts]
+        # If rewards dict is empty populate with zeros
+        if not self._buffer[0].rewards:
+            rewards = {
+                agent: np.dtype("float32").type(0.0)
+                for agent in self._buffer[0].discounts.keys()
+            }
+        else:
+            rewards = self._buffer[0].rewards
+        (
+            n_step_return,
+            total_discount,
+            self_discount,
+        ) = tree_utils.broadcast_structures(
+            rewards, self._buffer[0].discounts, self._discounts
+        )
+
+        # Copy total_discount, so that accumulating into it doesn't affect
+        # _buffer[0].discount.
+        total_discount = tree.map_structure(np.copy, total_discount)
 
         # Broadcast n_step_return to have the broadcasted shape of
-        # reward * discount.
-        n_step_return = [
-            np.copy(np.broadcast_to(r[0], np.broadcast(r[0], d).shape))
-            for r, d in zip(flat_rewards, total_discount)
-        ]
+        # reward * discount. Also copy, to avoid accumulating into
+        # _buffer[0].reward.
+        n_step_return = tree.map_structure(
+            lambda r, d: np.copy(np.broadcast_to(r, np.broadcast(r, d).shape)),
+            n_step_return,
+            total_discount,
+        )
 
-        # NOTE: total_discount will have one less self_discount applied to it than
-        # the value of self._n_step. This is so that when the learner/update uses
-        # an additional discount we don't apply it twice. Inside the following loop
-        # we will apply this right before summing up the n_step_return.
-        for i in range(1, self._n_step):
-            for nsr, td, r, d, sd in zip(
+        # NOTE: total discount will have one less discount than it does
+        # step.discounts. This is so that when the learner/update uses an additional
+        # discount we don't apply it twice. Inside the following loop we will
+        # apply this right before summing up the n_step_return.
+        for step in itertools.islice(self._buffer, 1, None):
+
+            # If rewards dict is empty populate with zeros
+            if not step.rewards:
+                rewards = {
+                    agent: np.dtype("float32").type(0.0)
+                    for agent in step.discounts.keys()
+                }
+            else:
+                rewards = step.rewards
+            (
+                step_discount,
+                step_reward,
+                total_discount,
+            ) = tree_utils.broadcast_structures(step.discounts, rewards, total_discount)
+
+            # Equivalent to: `total_discount *= self._discount`.
+            tree.map_structure(operator.imul, total_discount, self_discount)
+
+            # Equivalent to: `n_step_return += step.reward * total_discount`.
+            tree.map_structure(
+                lambda nsr, sr, td: operator.iadd(nsr, sr * td),
+                n_step_return,
+                step_reward,
+                total_discount,
+            )
+
+            # Equivalent to: `total_discount *= step.discount`.
+            tree.map_structure(operator.imul, total_discount, step_discount)
+
+        if extras:
+            transition: Tuple[Any, ...] = (
+                observations,
+                actions,
+                extras,
                 n_step_return,
                 total_discount,
-                flat_rewards,
-                flat_discounts,
-                flat_self_discount,
-            ):
-                # Equivalent to: `total_discount *= self._discount`.
-                td *= sd
-                # Equivalent to: `n_step_return += reward[i] * total_discount`.
-                nsr += r[i] * td
-                # Equivalent to: `total_discount *= discount[i]`.
-                td *= d[i]
+                next_observations,
+                next_extras,
+            )
+        else:
+            transition = (
+                observations,
+                actions,
+                n_step_return,
+                total_discount,
+                next_observations,
+            )
+        # Create a list of steps.
+        if self._final_step_placeholder is None:
+            # utils.final_step_like is expensive (around 0.085ms) to run every time
+            # so we cache its output.
+            self._final_step_placeholder = mava_utils.final_step_like(
+                self._buffer[0], next_observations, next_extras
+            )
 
-        n_step_return = tree.unflatten_as(rewards, n_step_return)
-        total_discount = tree.unflatten_as(rewards, total_discount)
-        return n_step_return, total_discount
+        if next_observations is not None:
+            final_step: base.Step = self._final_step_placeholder._replace(
+                observations=next_observations
+            )
+            steps = list(self._buffer) + [final_step]
+
+            # Calculate the priority for this transition.
+            table_priorities = acme_utils.calculate_priorities(
+                self._priority_fns, steps
+            )
+            # Insert the transition into replay along with its priority.
+            self._writer.append(transition)
+            for table, priority in table_priorities.items():
+                self._writer.create_item(
+                    table=table, num_timesteps=1, priority=priority
+                )
+        else:
+            raise ValueError("next_observations cannot be None here.")
+
+    def _write_last(self) -> None:
+        # Drain the buffer until there are no transitions.
+        self._buffer.popleft()
+        while self._buffer:
+            self._write()
+            self._buffer.popleft()
 
     @classmethod
     def signature(
@@ -290,16 +290,28 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             reward_specs[agent] = rewards_spec
             step_discount_specs[agent] = step_discounts_spec
 
-        transition_spec = types.Transition(
-            observation=obs_specs,
-            action=act_specs,
-            extras=extras_spec,
-            reward=reward_specs,
-            discount=step_discount_specs,
-            next_observation=obs_specs,
-            next_extras=extras_spec,
-        )
+        transition_spec = [
+            obs_specs,
+            act_specs,
+            extras_spec,
+            reward_specs,
+            step_discount_specs,
+            obs_specs,  # next_observation
+            extras_spec,
+        ]
 
         return tree.map_structure_with_path(
-            base.spec_like_to_tensor_spec, transition_spec
+            base.spec_like_to_tensor_spec, tuple(transition_spec)
         )
+
+
+def _broadcast_specs(*args: acme_specs.Array) -> acme_specs.Array:
+    """Like np.broadcast, but for specs.Array.
+    Args:
+      *args: one or more specs.Array instances.
+    Returns:
+      A specs.Array with the broadcasted shape and dtype of the specs in *args.
+    """
+    bc_info = np.broadcast(*tuple(a.generate_value() for a in args))
+    dtype = np.result_type(*tuple(a.dtype for a in args))
+    return acme_specs.Array(shape=bc_info.shape, dtype=dtype)

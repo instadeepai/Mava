@@ -15,13 +15,11 @@
 
 """Common types used throughout Mava."""
 
-from typing import Any, Dict, NamedTuple, Union
+from typing import Dict, NamedTuple, Union
 
 import numpy as np
 from acme import types
 from acme.utils import loggers
-
-NestedArray = Any
 
 
 class OLT(NamedTuple):
@@ -42,15 +40,3 @@ Reward = Union[SingleAgentReward, Dict[str, SingleAgentReward]]
 Discount = Reward
 
 Observation = Union[OLT, Dict[str, OLT]]
-
-
-class Transition(NamedTuple):
-    """Container for a transition."""
-
-    observation: NestedArray
-    action: NestedArray
-    reward: NestedArray
-    discount: NestedArray
-    next_observation: NestedArray
-    extras: NestedArray = ()
-    next_extras: NestedArray = ()

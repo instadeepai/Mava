@@ -12,13 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Iterable, Optional, Union
-
-import tensorflow as tf
 import tree
-from acme import specs, types
+from acme import types
 from acme.adders.reverb import utils as acme_utils
-from acme.utils import tree_utils
 
 from mava.adders.reverb import base
 
@@ -42,120 +38,3 @@ def final_step_like(
         if next_extras
         else tree.map_structure(acme_utils.zeros_like, step.extras),
     )
-
-
-# TODO(Kale-ab): Deprecate this in newer versions of acme.
-def calculate_priorities(
-    priority_fns: base.PriorityFnMapping,
-    trajectory_or_transition: Union[base.Trajectory, types.Transition],
-) -> Dict[str, float]:
-    """Helper used to calculate the priority of a Trajectory or Transition.
-    This helper converts the leaves of the Trajectory or Transition from
-    `reverb.TrajectoryColumn` objects into numpy arrays. The converted Trajectory
-    or Transition is then passed into each of the functions in `priority_fns`.
-    Args:
-        priority_fns: a mapping from table names to priority functions (i.e. a
-        callable of type PriorityFn). The given function will be used to generate
-        the priority (a float) for the given table.
-        trajectory_or_transition: the trajectory or transition used to compute
-        priorities.
-    Returns:
-        A dictionary mapping from table names to the priority (a float) for the
-        given collection Trajectory or Transition.
-    """
-    if any([priority_fn is not None for priority_fn in priority_fns.values()]):
-
-        trajectory_or_transition = tree.map_structure(
-            lambda col: col.numpy(), trajectory_or_transition
-        )
-
-    return {
-        table: (
-            priority_fn(trajectory_or_transition)  # type: ignore
-            if priority_fn
-            else 1.0
-        )
-        for table, priority_fn in priority_fns.items()
-    }
-
-
-def trajectory_signature(
-    environment_spec: specs.EnvironmentSpec,
-    sequence_length: Optional[int] = None,
-    extras_spec: types.NestedSpec = (),
-) -> tf.TypeSpec:
-    """This is a helper method for generating signatures for Reverb tables.
-
-    Signatures are useful for validating data types and shapes, see Reverb's
-    documentation for details on how they are used.
-
-    Args:
-        environment_spec: A `specs.EnvironmentSpec` whose fields are nested
-        structures with leaf nodes that have `.shape` and `.dtype` attributes.
-        This should come from the environment that will be used to generate
-        the data inserted into the Reverb table.
-        extras_spec: A nested structure with leaf nodes that have `.shape` and
-        `.dtype` attributes. The structure (and shapes/dtypes) of this must
-        be the same as the `extras` passed into `ReverbAdder.add`.
-        sequence_length: An optional integer representing the expected length of
-        sequences that will be added to replay.
-
-    Returns:
-        A `Trajectory` whose leaf nodes are `tf.TensorSpec` objects.
-    """
-
-    def add_time_dim(paths: Iterable[str], spec: tf.TensorSpec) -> None:
-        return tf.TensorSpec(
-            shape=(sequence_length, *spec.shape),
-            dtype=spec.dtype,
-            name="/".join(str(p) for p in paths),
-        )
-
-    agent_specs = environment_spec.get_agent_specs()
-    agents = environment_spec.get_agent_ids()
-    env_extras_spec = environment_spec.get_extra_specs()
-    extras_spec.update(env_extras_spec)
-
-    obs_specs = {}
-    act_specs = {}
-    reward_specs = {}
-    step_discount_specs = {}
-    for agent in agents:
-        rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
-            agent_specs[agent].rewards, agent_specs[agent].discounts
-        )
-        obs_specs[agent] = agent_specs[agent].observations
-        act_specs[agent] = agent_specs[agent].actions
-        reward_specs[agent] = rewards_spec
-        step_discount_specs[agent] = step_discounts_spec
-
-    # Add a time dimension to the specs
-    (
-        obs_specs,
-        act_specs,
-        reward_specs,
-        step_discount_specs,
-        soe_spec,
-        extras_spec,
-    ) = tree.map_structure_with_path(
-        add_time_dim,
-        (
-            obs_specs,
-            act_specs,
-            reward_specs,
-            step_discount_specs,
-            specs.Array(shape=(), dtype=bool),
-            extras_spec,
-        ),
-    )
-
-    spec_step = base.Trajectory(
-        observations=obs_specs,
-        actions=act_specs,
-        rewards=reward_specs,
-        discounts=step_discount_specs,
-        start_of_episode=soe_spec,
-        extras=extras_spec,
-    )
-
-    return tree.map_structure_with_path(base.spec_like_to_tensor_spec, spec_step)

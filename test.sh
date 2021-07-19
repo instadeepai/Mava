@@ -28,7 +28,12 @@ source mava_testing/bin/activate
 # Install dependencies.
 pip install --upgrade pip setuptools
 pip --version
-pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
+pip install .
+pip install .[tf]
+pip install .[reverb]
+pip install .[envs]
+pip install .[launchpad]
+pip install .[testing]
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
