@@ -79,7 +79,7 @@ class MADDPGConfig:
     num_executors: int
     num_trainers: int
     agent_net_keys: Dict[str, str]
-    trainer_net_config: Dict[str, List]
+    trainer_agent_nets: Dict[str, List]
     do_pbt: bool
     pbt_samples: List
     discount: float = 0.99
@@ -251,7 +251,7 @@ class MADDPGBuilder:
             # weights in the single trainer setup.
 
             # Convert a Mava spec
-            num_networks = len(self._config.trainer_net_config[f"trainer_{t_i}"])
+            num_networks = len(self._config.trainer_agent_nets[f"trainer_{t_i}"])
             env_spec = copy.deepcopy(env_adder_spec)
             env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
             env_spec._keys = list(sorted(env_spec._specs.keys()))
@@ -327,13 +327,7 @@ class MADDPGBuilder:
         Returns:
             Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
         """
-
-        priority_fns = {
-            f"priority_table_{trainer_id}": lambda x: 1.0
-            for trainer_id in range(self._config.num_trainers)
-        }
-
-        table_net_config = {
+        table_entry_config = {
             f"priority_table_{trainer_id}": self._config.trainer_net_config[
                 f"trainer_{trainer_id}"
             ]
@@ -343,10 +337,10 @@ class MADDPGBuilder:
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
-                priority_fns=priority_fns,
+                priority_fns=table_entry_config.keys(),
                 client=replay_client,
                 n_step=self._config.n_step,
-                table_net_config=table_net_config,
+                table_entry_nets=self._config.table_entry_nets,
                 discount=self._config.discount,
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
@@ -354,7 +348,7 @@ class MADDPGBuilder:
                 "Implement table_net_config for the " "ParallelSequenceAdder."
             )
             adder = reverb_adders.ParallelSequenceAdder(
-                priority_fns=priority_fns,
+                priority_fns=table_entry_config.keys(),
                 client=replay_client,
                 sequence_length=self._config.sequence_length,
                 period=self._config.period,
@@ -484,7 +478,7 @@ class MADDPGBuilder:
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         variable_source: MavaVariableSource,
-        trainer_net_config: List[Any],
+        trainer_agent_nets: List[Any],
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
@@ -504,7 +498,7 @@ class MADDPGBuilder:
                 executors to update the parameters of the agent networks in the system.
         """
         # This assumes agents are sorted in the other methods
-        trainer_agents = sorted(self._agents)[: len(trainer_net_config)]
+        trainer_agents = self._agents[:len(trainer_agent_nets)]
         agent_types = self._agent_types
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
@@ -523,7 +517,7 @@ class MADDPGBuilder:
                 variables[f"{net_key}_{net_type_key}"] = networks[net_type_key][
                     net_key
                 ].variables
-                if net_key in trainer_net_config:
+                if net_key in set(trainer_agent_nets):
                     set_keys.append(f"{net_key}_{net_type_key}")
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")
@@ -563,7 +557,6 @@ class MADDPGBuilder:
 
         trainer_config: Dict[str, Any] = {
             "agents": trainer_agents,
-            # "trainer_net_config": trainer_net_config,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],

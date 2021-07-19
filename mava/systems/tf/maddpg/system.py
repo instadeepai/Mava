@@ -36,7 +36,7 @@ from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import builder, training
-from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
+from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor, sample_new_agent_keys
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
@@ -61,9 +61,10 @@ class MADDPG:
         ] = training.MADDPGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
-        trainer_net_config: Dict[str, List] = {},
+        trainer_networks: Dict[str, List] = {},
+        executor_samples: List = [],
+        do_pbt: bool = False, # TODO (dries): Update code so that you can remove this flag.
         shared_weights: bool = True,
-        agent_net_keys: Dict[str, str] = {},
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -82,10 +83,6 @@ class MADDPG:
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
-        do_pbt: bool = False,
-        pbt_samples: List = [],  # Each trainer can train on all the data in
-        # one sample per episode.
-        # num_agents_in_population: int = 10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
         # max_executor_steps: int = None,
@@ -192,21 +189,25 @@ class MADDPG:
             )
 
         # Setup agent networks
-        self._agent_net_keys = agent_net_keys
-        if not agent_net_keys:
-            agents = environment_spec.get_agent_ids()
+        agents = environment_spec.get_agent_ids()
+        if not executor_samples:
+            # if no executor samples provided, use shared_weights to determine setup
             self._agent_net_keys = {
                 agent: agent.split("_")[0] if shared_weights else agent
                 for agent in agents
             }
+        else:
+            # if executor samples provided, use executor_samples to determine setup
+            _, self._agent_net_keys = sample_new_agent_keys(agents, self._executor_sampler)
 
-        num_trainers = len(trainer_net_config.keys())
+            raise NotImplementedError("executor_samples not implemented. Sample from"
+            "pbt_samples to populate _agent_net_keys")
 
-        # Get the number of agents in the population
+        num_trainers = len(trainer_networks.keys())
+        # Get the number of agents (networks) in the population
         all_trainer_nets = []
         for t_id in range(num_trainers):
-            all_trainer_nets.extend(trainer_net_config[f"trainer_{t_id}"])
-
+            all_trainer_nets.extend(trainer_networks[f"trainer_{t_id}"])
         num_agents_in_population = len(set(all_trainer_nets))
 
         if do_pbt:
@@ -222,19 +223,25 @@ class MADDPG:
                 for agent_key, net_key in self._agent_net_keys.items()
             }
 
-        # Setup trainer_net_config
-        self._trainer_net_config = trainer_net_config
-        if not trainer_net_config:
+        # Setup trainer_networks
+        if not trainer_networks:
             networks = self._network_factory(  # type: ignore
                 environment_spec=environment_spec,
                 agent_net_keys=self._agent_net_keys,
                 net_spec_keys=self._net_spec_keys,
             )
-            self._trainer_net_config["trainer_0"] = networks["policies"].keys()
+            self._trainer_networks["trainer_0"] = networks["policies"].keys()
         else:
-            # TODO (dries): Make that executor always samples for the sampler.
-            # If no sampler is specified create a defualt sampler.
-            assert len(pbt_samples) > 0
+            self._trainer_networks = trainer_networks
+
+        # Check that the environment and agent_net_keys has the same amount of agents
+        sample_length = len(executor_samples[0])
+        assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
+
+        # Check if the samples are of the same length and that they perfectly fit into the total number of agents
+        assert len(self._agent_net_keys.keys()) % sample_length == 0
+        for i in range(1, len(executor_samples)):
+            assert len(executor_samples[i]) == sample_length
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -272,9 +279,10 @@ class MADDPG:
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
                 agent_net_keys=self._agent_net_keys,
-                trainer_net_config=self._trainer_net_config,
+                trainer_networks=self._trainer_networks,
                 num_trainers=num_trainers,
                 num_executors=num_executors,
+                executor_samples=executor_samples,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -290,7 +298,6 @@ class MADDPG:
                 period=period,
                 sigma=sigma,
                 do_pbt=do_pbt,
-                pbt_samples=pbt_samples,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
@@ -514,7 +521,7 @@ class MADDPG:
         return self._builder.make_trainer(
             # trainer_id=trainer_id,
             networks=system_networks,
-            trainer_net_config=self._trainer_net_config[f"trainer_{trainer_id}"],
+            trainer_agent_nets=self._trainer_agent_nets[f"trainer_{trainer_id}"],
             dataset=dataset,
             logger=trainer_logger,
             connection_spec=self._connection_spec,

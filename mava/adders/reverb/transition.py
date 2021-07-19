@@ -85,7 +85,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         client: reverb.Client,
         n_step: int,
         discount: float,
-        table_net_config: Dict[str, List] = None,
+        table_entry_nets: Dict[str, List] = None,
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: int = 5,
@@ -109,7 +109,7 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         self._discount = tree.map_structure(np.float32, discount)
         self._first_idx = 0
         self._last_idx = 0
-        self._table_net_config = table_net_config
+        self._table_entry_nets = table_entry_nets
 
         super().__init__(
             client=client,
@@ -221,69 +221,76 @@ class ParallelNStepTransitionAdder(base.ReverbParallelAdder):
         for table, priority in table_priorities.items():
             # If all the network keys of a trainer is in the data then add it to that
             # trainer's data table.
-            net_keys = transition.extras["network_keys"]
+            entry_net_keys = transition.extras["network_keys"]
             agents = sorted(transition.action.keys())
 
             trans_nets_agent = {
-                str(net_keys[agent].numpy().astype(str)): agent for agent in agents
+                str(entry_net_keys[agent].numpy().astype(str)): agent for agent in agents
             }
 
-            if self._table_net_config is None:
+            if self._table_entry_nets is None:
                 self._writer.create_item(
                     table=table, priority=priority, trajectory=transition
                 )
-            elif all(
-                elem in trans_nets_agent.keys()
-                for elem in self._table_net_config[table]
-            ):
-                created_item = True
+            else:
+                # Check if all the networks are in trans_nets_agent.
+                entry_nets = copy.deepcopy(trans_nets_agent.keys())
+                is_in_entry = True
+                for net_key in self._table_net_config[table]:
+                    if net_key in entry_nets:
+                        entry_nets.pop(net_key)
+                    else:
+                        is_in_entry = False
+                        break
 
-                observation = {}
-                extras: Dict[str, Any] = {}
-                action = {}
-                reward = {}
-                discount = {}
-                next_observation = {}
-                next_extras: Dict[str, Any] = {}
+                if is_in_entry:
+                    created_item = True
 
-                # Create extras
-                for key in transition.extras.keys():
-                    extras[key] = {}
-                    next_extras[key] = {}
+                    observation = {}
+                    extras: Dict[str, Any] = {}
+                    action = {}
+                    reward = {}
+                    discount = {}
+                    next_observation = {}
+                    next_extras: Dict[str, Any] = {}
 
-                for a_i, net_key in enumerate(self._table_net_config[table]):
-                    cur_agent = trans_nets_agent[net_key]
-                    want_agent = agents[a_i]
-                    # print("cur_agent: ", cur_agent, ". want_agent: ", want_agent)
-                    observation[want_agent] = transition.observation[cur_agent]
-
-                    action[want_agent] = transition.action[cur_agent]
-                    reward[want_agent] = transition.reward[cur_agent]
-                    discount[want_agent] = transition.discount[cur_agent]
-                    next_observation[want_agent] = transition.next_observation[
-                        cur_agent
-                    ]
-
-                    # Convert extras
+                    # Create extras
                     for key in transition.extras.keys():
-                        extras[key][want_agent] = transition.extras[key][cur_agent]
-                        next_extras[key][want_agent] = transition.next_extras[key][
+                        extras[key] = {}
+                        next_extras[key] = {}
+
+                    for a_i, net_key in enumerate(self._table_net_config[table]):
+                        cur_agent = trans_nets_agent[net_key]
+                        want_agent = agents[a_i]
+                        observation[want_agent] = transition.observation[cur_agent]
+
+                        action[want_agent] = transition.action[cur_agent]
+                        reward[want_agent] = transition.reward[cur_agent]
+                        discount[want_agent] = transition.discount[cur_agent]
+                        next_observation[want_agent] = transition.next_observation[
                             cur_agent
                         ]
 
-                new_transition = mava_types.Transition(
-                    observation=observation,
-                    extras=extras,
-                    action=action,
-                    reward=reward,
-                    discount=discount,
-                    next_observation=next_observation,
-                    next_extras=next_extras,
-                )
+                        # Convert extras
+                        for key in transition.extras.keys():
+                            extras[key][want_agent] = transition.extras[key][cur_agent]
+                            next_extras[key][want_agent] = transition.next_extras[key][
+                                cur_agent
+                            ]
 
-                self._writer.create_item(
-                    table=table, priority=priority, trajectory=new_transition
-                )
+                    new_transition = mava_types.Transition(
+                        observation=observation,
+                        extras=extras,
+                        action=action,
+                        reward=reward,
+                        discount=discount,
+                        next_observation=next_observation,
+                        next_extras=next_extras,
+                    )
+
+                    self._writer.create_item(
+                        table=table, priority=priority, trajectory=new_transition
+                    )
         self._writer.flush(self._max_in_flight_items)
 
         if not created_item:
