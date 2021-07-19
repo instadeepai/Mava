@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for MADQN."""
+"""Tests for mad4pg."""
 
 import functools
 
@@ -22,16 +22,16 @@ import sonnet as snt
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
-from mava.systems.tf import madqn
+from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
 from mava.utils.environments import debugging_utils
 
 
-class TestMADQN:
-    """Simple integration/smoke test for MADQN."""
+class TestMAD4PG:
+    """Simple integration/smoke test for mad4pg."""
 
-    def test_madqn_on_debugging_env(self) -> None:
+    def test_mad4pg_on_debugging_env(self) -> None:
         """Tests that the system can run on the simple spread
         debugging environment without crashing."""
 
@@ -39,24 +39,24 @@ class TestMADQN:
         environment_factory = functools.partial(
             debugging_utils.make_environment,
             env_name="simple_spread",
-            action_space="discrete",
+            action_space="continuous",
         )
 
         # networks
-        network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)
+        network_factory = lp_utils.partial_kwargs(mad4pg.make_default_networks)
 
         # system
-        system = madqn.MADQN(
+        system = mad4pg.MAD4PG(
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=1,
             batch_size=32,
             min_replay_size=32,
             max_replay_size=1000,
-            optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             checkpoint=False,
         )
-
         program = system.build()
 
         (trainer_node,) = program.groups["trainer"]
@@ -70,6 +70,7 @@ class TestMADQN:
             "evaluator": PythonProcess(env=env_vars),
             "executor": PythonProcess(env=env_vars),
         }
+
         lp.launch(
             program,
             launch_type="test_mt",
@@ -81,7 +82,7 @@ class TestMADQN:
         for _ in range(5):
             trainer.step()
 
-    def test_recurrent_madqn_on_debugging_env(self) -> None:
+    def test_recurrent_mad4pg_on_debugging_env(self) -> None:
         """Tests that the system can run on the simple spread
         debugging environment without crashing."""
 
@@ -89,28 +90,28 @@ class TestMADQN:
         environment_factory = functools.partial(
             debugging_utils.make_environment,
             env_name="simple_spread",
-            action_space="discrete",
+            action_space="continuous",
         )
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            madqn.make_default_networks, archecture_type=ArchitectureType.recurrent
+            mad4pg.make_default_networks, archecture_type=ArchitectureType.recurrent
         )
 
         # system
-        system = madqn.MADQN(
+        system = mad4pg.MAD4PG(
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=1,
             batch_size=16,
             min_replay_size=16,
             max_replay_size=1000,
-            optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             checkpoint=False,
-            trainer_fn=madqn.training.MADQNRecurrentTrainer,
-            executor_fn=madqn.execution.MADQNRecurrentExecutor,
+            trainer_fn=mad4pg.training.MAD4PGDecentralisedRecurrentTrainer,
+            executor_fn=mad4pg.execution.MAD4PGRecurrentExecutor,
         )
-
         program = system.build()
 
         (trainer_node,) = program.groups["trainer"]
@@ -124,6 +125,7 @@ class TestMADQN:
             "evaluator": PythonProcess(env=env_vars),
             "executor": PythonProcess(env=env_vars),
         }
+
         lp.launch(
             program,
             launch_type="test_mt",

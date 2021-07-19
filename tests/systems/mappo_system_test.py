@@ -16,105 +16,15 @@
 """Tests for MAPPO."""
 
 import functools
-from typing import Dict, Sequence, Union
 
-import dm_env
 import launchpad as lp
-import numpy as np
 import sonnet as snt
-import tensorflow as tf
-import tensorflow_probability as tfp
-from acme.tf import networks
-from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
-from mava import specs as mava_specs
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
-
-
-def make_networks(
-    environment_spec: mava_specs.MAEnvironmentSpec,
-    agent_net_keys: Dict[str, str],
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        256,
-        256,
-        256,
-    ),
-    critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
-) -> Dict[str, snt.Module]:
-
-    """Creates networks used by the agents."""
-
-    # Create agent_type specs.
-    specs = environment_spec.get_agent_specs()
-    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
-
-    if isinstance(policy_networks_layer_sizes, Sequence):
-        policy_networks_layer_sizes = {
-            key: policy_networks_layer_sizes for key in specs.keys()
-        }
-    if isinstance(critic_networks_layer_sizes, Sequence):
-        critic_networks_layer_sizes = {
-            key: critic_networks_layer_sizes for key in specs.keys()
-        }
-
-    observation_networks = {}
-    policy_networks = {}
-    critic_networks = {}
-    for key in specs.keys():
-
-        # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
-
-        # Note: The discrete case must be placed first as it inherits from BoundedArray.
-        if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discrete
-            num_actions = specs[key].actions.num_values
-            policy_network = snt.Sequential(
-                [
-                    networks.LayerNormMLP(
-                        tuple(policy_networks_layer_sizes[key]) + (num_actions,),
-                        activate_final=False,
-                    ),
-                    tf.keras.layers.Lambda(
-                        lambda logits: tfp.distributions.Categorical(logits=logits)
-                    ),
-                ]
-            )
-        elif isinstance(specs[key].actions, dm_env.specs.BoundedArray):  # continuous
-            num_actions = np.prod(specs[key].actions.shape, dtype=int)
-            policy_network = snt.Sequential(
-                [
-                    networks.LayerNormMLP(
-                        policy_networks_layer_sizes[key], activate_final=True
-                    ),
-                    networks.MultivariateNormalDiagHead(num_dimensions=num_actions),
-                    networks.TanhToSpec(specs[key].actions),
-                ]
-            )
-        else:
-            raise ValueError(f"Unknown action_spec type, got {specs[key].actions}.")
-
-        critic_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(
-                    critic_networks_layer_sizes[key], activate_final=True
-                ),
-                networks.NearZeroInitializedLinear(1),
-            ]
-        )
-
-        observation_networks[key] = observation_network
-        policy_networks[key] = policy_network
-        critic_networks[key] = critic_network
-
-    return {
-        "policies": policy_networks,
-        "critics": critic_networks,
-        "observations": observation_networks,
-    }
 
 
 class TestMAPPO:
@@ -132,13 +42,13 @@ class TestMAPPO:
         )
 
         # networks
-        network_factory = lp_utils.partial_kwargs(make_networks)
+        network_factory = lp_utils.partial_kwargs(mappo.make_default_networks)
 
         # system
         system = mappo.MAPPO(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            num_executors=2,
+            num_executors=1,
             batch_size=32,
             max_queue_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
