@@ -14,11 +14,12 @@
 # limitations under the License.
 
 """Example running MADDPG on debug MPE environments."""
-from mava import specs as mava_specs
 from absl import flags
 
-from mava.systems.tf import maddpg, mad4pg, madqn, mappo, qmix, vdn
+from mava import specs as mava_specs
+from mava.systems.tf import mad4pg, maddpg, madqn, mappo, qmix, vdn
 from mava.utils.environments import debugging_utils
+
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
@@ -31,14 +32,16 @@ flags.DEFINE_string(
     "Environment action space type (str).",
 )
 
-class TestNetworks():
+
+class TestNetworks:
     # Test that we can load a env module and that it contains agents,
     #   agents and possible_agents.
     def test_network_keys(self) -> None:
-         # Environment.
-        env = debugging_utils.make_environment(env_name=FLAGS.env_name, action_space=FLAGS.action_space,evaluation=False)
+        # Environment.
+        env = debugging_utils.make_environment(
+            env_name=FLAGS.env_name, action_space=FLAGS.action_space, evaluation=False
+        )
         environment_spec = mava_specs.MAEnvironmentSpec(env)
-
 
         system_fns = [maddpg, mad4pg, madqn, mappo, qmix, vdn]
 
@@ -49,9 +52,11 @@ class TestNetworks():
                 "agent_1": "agent",
                 "agent_2": "agent",
             }
-            networks = system.make_default_networks(environment_spec=environment_spec, # type: ignore
-                        agent_net_keys=agent_net_keys)
-            
+            networks = system.make_default_networks(  # type: ignore
+                environment_spec=environment_spec,  # type: ignore
+                agent_net_keys=agent_net_keys,
+            )
+
             for key in networks.keys():
                 assert ["agent"] == list(networks[key].keys())
 
@@ -61,9 +66,12 @@ class TestNetworks():
                 "agent_1": "agent_1",
                 "agent_2": "agent_2",
             }
-            networks = system.make_default_networks(environment_spec=environment_spec, # type: ignore
-                        agent_net_keys=agent_net_keys)
+            networks = system.make_default_networks(  # type: ignore
+                environment_spec=environment_spec,  # type: ignore
+                agent_net_keys=agent_net_keys,
+            )
             for key in networks.keys():
                 assert ["agent_0", "agent_1", "agent_2"] == list(networks[key].keys())
+
 
 TestNetworks().test_network_keys()
