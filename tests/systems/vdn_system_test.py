@@ -39,6 +39,7 @@ class TestVdn:
             debugging_utils.make_environment,
             env_name="simple_spread",
             action_space="discrete",
+            return_state_info=True,
         )
 
         # networks

@@ -131,3 +131,8 @@ class TestMADDPG:
             launch_type="test_mt",
             local_resources=local_resources,
         )
+
+        trainer: mava.Trainer = trainer_node.create_handle().dereference()
+
+        for _ in range(2):
+            trainer.step()

@@ -82,5 +82,5 @@ class TestDial:
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
-        for _ in range(1):
+        for _ in range(2):
             trainer.step()

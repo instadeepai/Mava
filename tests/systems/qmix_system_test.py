@@ -21,6 +21,8 @@ import launchpad as lp
 import sonnet as snt
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
+import mava
+
 # import mava
 from mava.systems.tf import qmix
 from mava.utils import lp_utils
@@ -39,6 +41,7 @@ class TestQmix:
             debugging_utils.make_environment,
             env_name="simple_spread",
             action_space="discrete",
+            return_state_info=True,
         )
 
         # networks
@@ -75,9 +78,7 @@ class TestQmix:
             local_resources=local_resources,
         )
 
-        # trainer: mava.Trainer = trainer_node.create_handle().dereference()
+        trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
-        # TODO(Kale-ab): This currently doesn't run/takes forever, it could be
-        # because we need to initialize the hypernets first before the test.
-        # for _ in range(1):
-        #     trainer.step()
+        for _ in range(5):
+            trainer.step()
