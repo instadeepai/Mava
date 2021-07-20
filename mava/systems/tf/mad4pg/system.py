@@ -136,7 +136,8 @@ class MAD4PG(MADDPG):
             period (int, optional): Consecutive starting points for overlapping
                 rollouts across a sequence. Defaults to 20.
             bootstrap_n (int, optional): Used to determine the spacing between
-                q_value/value estimation for bootstrapping.
+                q_value/value estimation for bootstrapping. Should be less
+                than sequence_length.
             sigma (float, optional): Gaussian sigma parameter. Defaults to 0.3.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
