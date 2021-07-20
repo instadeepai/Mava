@@ -62,7 +62,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -95,7 +95,8 @@ class MADDPGBaseTrainer(mava.Trainer):
                 extraction from raw observation.
             target_observation_networks (Dict[str, snt.Module]): target observation
                 network.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
@@ -109,7 +110,7 @@ class MADDPGBaseTrainer(mava.Trainer):
 
         self._agents = agents
         self._agent_types = agent_types
-        self._shared_weights = shared_weights
+        self._agent_net_keys = agent_net_keys
         self._checkpoint = checkpoint
 
         # Store online and target networks.
@@ -150,11 +151,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         # Dictionary with network keys for each agent.
-        self.agent_net_keys = {agent: agent for agent in self._agents}
-        if self._shared_weights:
-            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
-
-        self.unique_net_keys = self._agent_types if shared_weights else self._agents
+        self.unique_net_keys = set(self._agent_net_keys.values())
 
         # Create optimizers for different agent types.
         if not isinstance(policy_optimizer, dict):
@@ -265,7 +262,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         o_tm1 = {}
         o_t = {}
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_keys[agent]
             o_tm1[agent] = self._observation_networks[agent_key](obs[agent].observation)
             o_t[agent] = self._target_observation_networks[agent_key](
                 next_obs[agent].observation
@@ -343,7 +340,7 @@ class MADDPGBaseTrainer(mava.Trainer):
 
         actions = {}
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_keys[agent]
             next_observation = next_obs[agent]
             actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
@@ -404,7 +401,7 @@ class MADDPGBaseTrainer(mava.Trainer):
             a_t = self._target_policy_actions(o_t_trans)
 
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_keys[agent]
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
@@ -468,7 +465,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         critic_losses = self.critic_losses
         tape = self.tape
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
             policy_variables = (
@@ -565,7 +562,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -587,7 +584,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -618,7 +615,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -640,7 +637,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -711,7 +708,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         critic_optimizer: snt.Optimizer,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -733,7 +730,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -822,7 +819,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -844,7 +841,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -917,7 +914,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -951,7 +948,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 extraction from raw observation.
             target_observation_networks (Dict[str, snt.Module]): target observation
                 network.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
@@ -965,7 +963,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
         self._agents = agents
         self._agent_types = agent_types
-        self._shared_weights = shared_weights
+        self._agent_net_keys = agent_net_keys
         self._checkpoint = checkpoint
         self._bootstrap_n = bootstrap_n
 
@@ -1007,11 +1005,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         # Dictionary with network keys for each agent.
-        self.agent_net_keys = {agent: agent for agent in self._agents}
-        if self._shared_weights:
-            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
 
-        self.unique_net_keys = self._agent_types if shared_weights else self._agents
+        self.unique_net_keys = set(self._agent_net_keys.values())
 
         # Create optimizers for different agent types.
         if not isinstance(policy_optimizer, dict):
@@ -1124,7 +1119,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         obs_trans = {}
         obs_target_trans = {}
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_keys[agent]
 
             reshaped_obs, dims = train_utils.combine_dim(
                 observations[agent].observation
@@ -1222,7 +1217,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
         for agent in self._agents:
             time.time()
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_keys[agent]
             target_trans_obs = target_obs_trans[agent]
             # TODO (dries): Why is there an extra tuple
             #  wrapping that needs to be removed?
@@ -1308,7 +1303,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             )
 
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_keys[agent]
                 # Get critic feed
                 (
                     obs_trans_feed,
@@ -1417,7 +1412,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         critic_losses = self.critic_losses
         tape = self.tape
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
             policy_variables = (
@@ -1517,7 +1512,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -1540,7 +1535,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -1575,7 +1570,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -1598,7 +1593,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -1673,7 +1668,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dataset: tf.data.Dataset,
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
-        shared_weights: bool = False,
+        agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -1696,7 +1691,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,

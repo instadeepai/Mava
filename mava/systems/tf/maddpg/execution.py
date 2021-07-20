@@ -46,9 +46,9 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
+        agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
     ):
         """Initialise the system executor
 
@@ -61,15 +61,15 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
         """
 
         # Store these for later use.
         self._agent_specs = agent_specs
         super().__init__(
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             adder=adder,
             variable_client=variable_client,
         )
@@ -96,7 +96,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         batched_observation = tf2_utils.add_batch_dim(observation)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
         policy = self._policy_networks[agent_key](batched_observation)
@@ -189,13 +189,12 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
+        agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
         store_recurrent_state: bool = True,
     ):
         """Initialise the system executor
-
         Args:
             policy_networks (Dict[str, snt.Module]): policy networks for each agent in
                 the system.
@@ -205,8 +204,8 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             store_recurrent_state (bool, optional): boolean to store the recurrent
                 network hidden state. Defaults to True.
         """
@@ -216,7 +215,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
 
         super().__init__(
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             adder=adder,
             variable_client=variable_client,
             store_recurrent_state=store_recurrent_state,
@@ -249,7 +248,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         batched_observation = tf2_utils.add_batch_dim(observation)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
         policy, new_state = self._policy_networks[agent_key](batched_observation, state)
@@ -283,7 +282,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         # Initialize the RNN state if necessary.
         if self._states[agent] is None:
             # index network either on agent type or on agent id
-            agent_key = agent.split("_")[0] if self._shared_weights else agent
+            agent_key = self._agent_net_keys[agent]
             self._states[agent] = self._policy_networks[agent_key].initia_state(1)
 
         # Step the recurrent policy forward given the current observation and state.

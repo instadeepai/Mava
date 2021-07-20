@@ -38,13 +38,13 @@ class CentralisedPolicyActor(DecentralisedPolicyActor):
         environment_spec: mava_specs.MAEnvironmentSpec,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_keys: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
         )
 
     def _get_actor_specs(
@@ -67,10 +67,10 @@ class CentralisedPolicyActor(DecentralisedPolicyActor):
             )
 
         actor_obs_specs = {}
-        for agent_key in self._actor_agent_keys:
-            agent_type = agent_key.split("_")[0]
+        for agent_key in self._agents:
+            agent_net_key = self._agent_net_keys[agent_key]
             # Get observation spec for actor.
-            actor_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+            actor_obs_specs[agent_key] = obs_specs_per_type[agent_net_key]
         return actor_obs_specs
 
 
@@ -81,14 +81,14 @@ class CentralisedValueCritic(DecentralisedValueActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_keys: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
         )
 
     def _get_critic_specs(
@@ -98,7 +98,7 @@ class CentralisedValueCritic(DecentralisedValueActorCritic):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            agent_key = agent_type if self._shared_weights else agents[0]
+            agent_key = agents[0]
             critic_obs_shape = list(copy.copy(self._embed_specs[agent_key].shape))
             critic_obs_shape.insert(0, len(agents))
             obs_specs_per_type[agent_type] = tf.TensorSpec(
@@ -107,10 +107,10 @@ class CentralisedValueCritic(DecentralisedValueActorCritic):
             )
 
         critic_obs_specs = {}
-        for agent_key in self._critic_agent_keys:
-            agent_type = agent_key.split("_")[0]
+        for agent_key in self._agents:
+            agent_net_key = self._agent_net_keys[agent_key]
             # Get observation and action spec for critic.
-            critic_obs_specs[agent_key] = obs_specs_per_type[agent_type]
+            critic_obs_specs[agent_key] = obs_specs_per_type[agent_net_key]
         return critic_obs_specs, {}
 
 
@@ -123,14 +123,14 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_keys: Dict[str, str],
     ):
         super().__init__(
             environment_spec=environment_spec,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
         )
 
     def _get_critic_specs(
@@ -142,7 +142,7 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            agent_key = agent_type if self._shared_weights else agents[0]
+            agent_key = agents[0]
 
             # TODO (dries): Add a check to see if all
             #  self._embed_specs[agent_key].shape are of the same shape
@@ -168,7 +168,7 @@ class CentralisedQValueCritic(DecentralisedQValueActorCritic):
 
         critic_obs_specs = {}
         critic_act_specs = {}
-        for agent_key in self._critic_agent_keys:
+        for agent_key in self._agents:
             agent_type = agent_key.split("_")[0]
             # Get observation and action spec for critic.
             critic_obs_specs[agent_key] = obs_specs_per_type[agent_type]
@@ -189,7 +189,7 @@ class CentralisedQValueActorCritic(  # type: ignore
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_keys: Dict[str, str],
     ):
 
         CentralisedQValueCritic.__init__(
@@ -198,5 +198,5 @@ class CentralisedQValueActorCritic(  # type: ignore
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
         )

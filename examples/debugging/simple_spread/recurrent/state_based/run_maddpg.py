@@ -23,6 +23,7 @@ import sonnet as snt
 from absl import app, flags
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
+from mava.components.tf import architectures
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
@@ -55,6 +56,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        return_state_info=True,
     )
 
     # Networks.
@@ -88,6 +90,7 @@ def main(_: Any) -> None:
         max_gradient_norm=40.0,
         trainer_fn=maddpg.training.MADDPGStateBasedRecurrentTrainer,
         executor_fn=maddpg.execution.MADDPGRecurrentExecutor,
+        architecture=architectures.StateBasedQValueCritic,
         batch_size=32,
     ).build()
 

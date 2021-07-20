@@ -67,6 +67,7 @@ class MADQN:
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
+        agent_net_keys: Dict[str, str] = {},
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
@@ -128,7 +129,10 @@ class MADQN:
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
             shared_weights (bool, optional): whether agents should share weights or not.
+                When agent_net_keys are provided the value of shared_weights is ignored.
                 Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             batch_size (int, optional): sample batch size for updates. Defaults to 256.
             prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
             min_replay_size (int, optional): minimum replay size before updating.
@@ -191,7 +195,14 @@ class MADQN:
         self._network_factory = network_factory
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
-        self._shared_weights = shared_weights
+        # Setup agent networks
+        self._agent_net_keys = agent_net_keys
+        if not agent_net_keys:
+            agents = environment_spec.get_agent_ids()
+            self._agent_net_keys = {
+                agent: agent.split("_")[0] if shared_weights else agent
+                for agent in agents
+            }
         self._num_exectors = num_executors
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
@@ -213,7 +224,7 @@ class MADQN:
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
-                shared_weights=shared_weights,
+                agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -249,7 +260,8 @@ class MADQN:
         core_message_specs = {}
 
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
         for agent in agents:
             agent_type = agent.split("_")[0]
@@ -329,14 +341,15 @@ class MADQN:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture with target networks.
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_keys=self._agent_net_keys,
         )
 
         if self._builder._replay_stabiliser_fn is not None:
@@ -400,14 +413,15 @@ class MADQN:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture with target networks.
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_keys=self._agent_net_keys,
         )
 
         if self._builder._replay_stabiliser_fn is not None:
@@ -487,14 +501,15 @@ class MADQN:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture with target networks.
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_keys=self._agent_net_keys,
         )
 
         if self._builder._replay_stabiliser_fn is not None:
