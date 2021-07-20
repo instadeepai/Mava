@@ -26,25 +26,36 @@ jobs:
           export LC_ALL=en_US.UTF-8
           export LANG=en_US.UTF-8
 
-          # Mava dependencies
+          # Updates
           pip install --upgrade pip setuptools
+          sudo apt-get update
+
+          ## Open CV and Headless screen.
+          sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
+
+          ## To install smac below
+          sudo apt-get install git -y
+
+          ## To install open_spiel below
+          sudo apt-get install clang -y
+
+          ## Fix module 'enum' has no attribute 'IntFlag'
+          pip uninstall -y enum34
+
+          # Mava dependencies
           pip install .
           pip install .[flatland]
+
           # openspiel
-          sudo apt-get update
-          sudo apt-get install clang -y
           pip install .[open_spiel]
           pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
+
           # For atari envs
           sudo apt-get install unrar
           pip install autorom
           AutoROM -v
-          # Open CV and Headless screen.
-          sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
-          # Fix module 'enum' has no attribute 'IntFlag'
-          # pip uninstall -y enum34
+
           # SC2
-          sudo apt-get install git -y
           pip install git+https://github.com/oxwhirl/smac.git
       - name: Format code
         run: |
