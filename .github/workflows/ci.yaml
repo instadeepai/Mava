@@ -39,9 +39,6 @@ jobs:
           ## To install open_spiel below
           sudo apt-get install clang -y
 
-          ## Fix module 'enum' has no attribute 'IntFlag'
-          pip uninstall -y enum34
-
           # Mava dependencies
           pip install .
           pip install .[flatland]
@@ -54,6 +51,9 @@ jobs:
           sudo apt-get install unrar
           pip install autorom
           AutoROM -v
+
+          ## Fix module 'enum' has no attribute 'IntFlag'
+          pip uninstall -y enum34
 
           # SC2
           pip install git+https://github.com/oxwhirl/smac.git
