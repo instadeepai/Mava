@@ -77,5 +77,5 @@ class TestMAPPO:
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
-        for _ in range(5):
+        for _ in range(2):
             trainer.step()

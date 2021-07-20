@@ -79,7 +79,7 @@ class TestMAD4PG:
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
-        for _ in range(5):
+        for _ in range(2):
             trainer.step()
 
     def test_recurrent_mad4pg_on_debugging_env(self) -> None:
@@ -111,6 +111,9 @@ class TestMAD4PG:
             checkpoint=False,
             trainer_fn=mad4pg.training.MAD4PGDecentralisedRecurrentTrainer,
             executor_fn=mad4pg.execution.MAD4PGRecurrentExecutor,
+            sequence_length=4,
+            period=4,
+            bootstrap_n=2,
         )
         program = system.build()
 

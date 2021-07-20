@@ -87,6 +87,7 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
+    bootstrap_n: int = 10
     max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
     checkpoint: bool = True
@@ -401,6 +402,7 @@ class MADDPGBuilder:
             "logger": logger,
             "checkpoint": self._config.checkpoint,
             "checkpoint_subpath": self._config.checkpoint_subpath,
+            "bootstrap_n": self._config.bootstrap_n,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec

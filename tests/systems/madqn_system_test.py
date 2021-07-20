@@ -78,7 +78,7 @@ class TestMADQN:
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
-        for _ in range(5):
+        for _ in range(2):
             trainer.step()
 
     def test_recurrent_madqn_on_debugging_env(self) -> None:
