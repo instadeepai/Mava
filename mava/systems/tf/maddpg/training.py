@@ -32,6 +32,7 @@ from acme.utils import loggers
 
 import mava
 from mava import types as mava_types
+from mava.adders.reverb.base import Trajectory
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf.variable_utils import VariableClient
 from mava.utils import training_utils as train_utils
@@ -350,7 +351,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         )
 
     # Forward pass that calculates loss.
-    def _forward(self, inputs: Any) -> None:
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
         Args:
             inputs (Any): input data from the data table (transitions)
@@ -1214,13 +1215,13 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         )
 
     # Forward pass that calculates loss.
-    def _forward(self, inputs: Any) -> None:
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
         Args:
             inputs (Any): input data from the data table (transitions)
         """
 
-        data = inputs.data
+        data: Trajectory = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
         observations, actions, rewards, discounts, _, extras = (

@@ -58,6 +58,7 @@ testing_formatting_requirements = [
     "black==21.4b1",
     "pytest-cov",
     "interrogate",
+    "pydocstyle",
 ]
 
 record_episode_requirements = ["array2gif"]
