@@ -109,6 +109,10 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         self._last_idx = 0
         self._table_entry_nets = table_entry_nets
 
+        print("self._table_entry_nets: ", self._table_entry_nets)
+        print("priority_fns: ", priority_fns)
+        exit()
+
         ReverbParallelAdder.__init__(
             self,
             client=client,

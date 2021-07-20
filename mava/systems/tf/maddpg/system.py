@@ -15,6 +15,7 @@
 
 """MADDPG scaled system implementation."""
 
+from enum import unique
 import functools
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
@@ -49,7 +50,6 @@ Array = specs.Array
 
 class MADDPG:
     """MADDPG system."""
-
     def __init__(
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
@@ -191,81 +191,71 @@ class MADDPG:
                 time_delta=10,
             )
 
-        # Setup agent networks
-        agents = environment_spec.get_agent_ids()
+        # Setup agent networks and executor sampler
+        agents = sorted(environment_spec.get_agent_ids())
+        self._executor_sampler = executor_samples
         if not executor_samples:
             # if no executor samples provided, use shared_weights to determine setup
             self._agent_net_keys = {
                 agent: agent.split("_")[0] if shared_weights else agent
                 for agent in agents
             }
+            self._executor_sampler = [list(self._agent_net_keys.values())]
         else:
             # if executor samples provided, use executor_samples to determine setup
             _, self._agent_net_keys = sample_new_agent_keys(
                 agents, self._executor_sampler
             )
 
-        num_trainers = len(trainer_networks.keys())
-        # Get the number of agents (networks) in the population
-        all_trainer_nets = []
-        for t_id in range(num_trainers):
-            all_trainer_nets.extend(trainer_networks[f"trainer_{t_id}"])
-        num_agents_in_population = len(set(all_trainer_nets))
-
-        if do_pbt:
-            # Note: Assuming all agents have the same specs for now.
-            # TODO (dries): Allow agents to have different input/output spaces with
-            # population based training in the future.
-            self._net_spec_keys = {
-                f"agent_{i}": "agent_0" for i in range(num_agents_in_population)
-            }
-        else:
-            self._net_spec_keys = {
-                net_key: agent_key
-                for agent_key, net_key in self._agent_net_keys.items()
-            }
-
-        # Setup trainer_networks
-        if not trainer_networks:
-            networks = self._network_factory(  # type: ignore
-                environment_spec=environment_spec,
-                agent_net_keys=self._agent_net_keys,
-                net_spec_keys=self._net_spec_keys,
-            )
-            self._trainer_networks["trainer_0"] = networks["policies"].keys()
-        else:
-            self._trainer_networks = trainer_networks
-
-        # Setup table_network_config
-        self._table_network_config = {}
-        for t_id in range(num_trainers):
-            
-
-            most_matches = 0
-            trainer_nets = trainer_networks[f"trainer_{t_id}"]
-            for sample in executor_samples:
-                matches = 0
-                for entry in sample:
-                    if entry == trainer_nets:
-                        most_matches += 1
-                if most_matches < matches:
-                    matches = most_matches
-                    self._table_network_config[f"trainer_{t_id}"] = sample
-        
-
-        print(self._table_network_config)
-        exit()
-            
-
-
-        # Check that the environment and agent_net_keys has the same amount of agents
-        sample_length = len(executor_samples[0])
+         # Check that the environment and agent_net_keys has the same amount of agents
+        sample_length = len(self._executor_sampler[0])
         assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
 
         # Check if the samples are of the same length and that they perfectly fit into the total number of agents
         assert len(self._agent_net_keys.keys()) % sample_length == 0
-        for i in range(1, len(executor_samples)):
-            assert len(executor_samples[i]) == sample_length
+        for i in range(1, len(self._executor_sampler)):
+            assert len(self._executor_sampler[i]) == sample_length
+
+        # Get all the unique agent network keys
+        all_samples = []
+        for sample in self._executor_sampler:
+            all_samples.extend(sample)
+        all_unique_net_keys = set(all_samples)
+
+        # Setup trainer_networks
+        if not trainer_networks:
+            self._trainer_networks = {"trainer_0": list(all_unique_net_keys)}
+        else:
+            self._trainer_networks = trainer_networks
+
+        # Get all the unique trainer network keys
+        all_trainer_net_keys = []
+        for trainer_nets in self._trainer_networks.values():
+            all_trainer_net_keys.extend(trainer_nets)
+        unique_trainer_net_keys = set(all_trainer_net_keys)
+
+        # Check that all agent_net_keys are in trainer_networks
+        assert all_unique_net_keys == unique_trainer_net_keys
+
+        # Setup specs for each network
+        self._net_spec_keys = {}
+        unique_net_keys = sorted(list(set(all_unique_net_keys)))
+        for i in range(len(unique_net_keys)):
+            self._net_spec_keys[unique_net_keys[i]]=agents[i%len(agents)]
+
+        # Setup table_network_config
+        self._table_network_config = {}
+        for t_id in range(len(self._trainer_networks.keys())):
+            most_matches = 0
+            trainer_nets = self._trainer_networks[f"trainer_{t_id}"]
+            for sample in self._executor_sampler:
+                matches = 0
+                for entry in sample:
+                    if entry in trainer_nets:
+                        matches += 1
+                if most_matches < matches:
+                    matches = most_matches
+                    self._table_network_config[f"trainer_{t_id}"] = sample
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -273,7 +263,6 @@ class MADDPG:
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
         self._num_exectors = num_executors
-        self._num_trainers = num_trainers
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
         self._logger_config = logger_config
@@ -304,9 +293,8 @@ class MADDPG:
                 environment_spec=environment_spec,
                 agent_net_keys=self._agent_net_keys,
                 trainer_networks=self._trainer_networks,
-                num_trainers=num_trainers,
                 num_executors=num_executors,
-                executor_samples=executor_samples,
+                executor_samples=self._executor_sampler,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
