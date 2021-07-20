@@ -193,32 +193,32 @@ class MADDPG:
 
         # Setup agent networks and executor sampler
         agents = sorted(environment_spec.get_agent_ids())
-        self._executor_sampler = executor_samples
+        self._executor_samples = executor_samples
         if not executor_samples:
             # if no executor samples provided, use shared_weights to determine setup
             self._agent_net_keys = {
                 agent: agent.split("_")[0] if shared_weights else agent
                 for agent in agents
             }
-            self._executor_sampler = [list(self._agent_net_keys.values())]
+            self._executor_samples = [list(self._agent_net_keys.values())]
         else:
             # if executor samples provided, use executor_samples to determine setup
             _, self._agent_net_keys = sample_new_agent_keys(
-                agents, self._executor_sampler
+                agents, self._executor_samples
             )
 
          # Check that the environment and agent_net_keys has the same amount of agents
-        sample_length = len(self._executor_sampler[0])
+        sample_length = len(self._executor_samples[0])
         assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
 
         # Check if the samples are of the same length and that they perfectly fit into the total number of agents
         assert len(self._agent_net_keys.keys()) % sample_length == 0
-        for i in range(1, len(self._executor_sampler)):
-            assert len(self._executor_sampler[i]) == sample_length
+        for i in range(1, len(self._executor_samples)):
+            assert len(self._executor_samples[i]) == sample_length
 
         # Get all the unique agent network keys
         all_samples = []
-        for sample in self._executor_sampler:
+        for sample in self._executor_samples:
             all_samples.extend(sample)
         all_unique_net_keys = set(all_samples)
 
@@ -244,18 +244,18 @@ class MADDPG:
             self._net_spec_keys[unique_net_keys[i]]=agents[i%len(agents)]
 
         # Setup table_network_config
-        self._table_network_config = {}
+        table_network_config = {}
         for t_id in range(len(self._trainer_networks.keys())):
             most_matches = 0
             trainer_nets = self._trainer_networks[f"trainer_{t_id}"]
-            for sample in self._executor_sampler:
+            for sample in self._executor_samples:
                 matches = 0
                 for entry in sample:
                     if entry in trainer_nets:
                         matches += 1
                 if most_matches < matches:
                     matches = most_matches
-                    self._table_network_config[f"trainer_{t_id}"] = sample
+                    table_network_config[f"trainer_{t_id}"] = sample
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -293,8 +293,9 @@ class MADDPG:
                 environment_spec=environment_spec,
                 agent_net_keys=self._agent_net_keys,
                 trainer_networks=self._trainer_networks,
+                table_network_config=table_network_config,
                 num_executors=num_executors,
-                executor_samples=self._executor_sampler,
+                executor_samples=self._executor_samples,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -533,7 +534,7 @@ class MADDPG:
         return self._builder.make_trainer(
             # trainer_id=trainer_id,
             networks=system_networks,
-            trainer_agent_nets=self._trainer_agent_nets[f"trainer_{trainer_id}"],
+            trainer_networks=self._trainer_networks[f"trainer_{trainer_id}"],
             dataset=dataset,
             logger=trainer_logger,
             connection_spec=self._connection_spec,
@@ -557,7 +558,7 @@ class MADDPG:
 
         with program.group("trainer"):
             # Add executors which pull round-robin from our variable sources.
-            for trainer_id in range(self._num_trainers):
+            for trainer_id in range(len(self._trainer_networks.keys())):
                 program.add_node(
                     lp.CourierNode(self.trainer, trainer_id, replay, variable_server)
                 )

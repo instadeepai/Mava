@@ -117,7 +117,7 @@ def main(_: Any) -> None:
             "trainer_4": ["agent_7", "agent_8"],
         },
         do_pbt=True,
-        pbt_samples=[
+        executor_samples=[
             ["agent_0", "agent_3"],
             ["agent_1", "agent_4"],
             ["agent_2", "agent_5"],

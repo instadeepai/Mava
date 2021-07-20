@@ -21,6 +21,7 @@ This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
+from operator import ne
 from typing import Optional, Tuple, Dict, Any, List
 
 import numpy as np
@@ -83,7 +84,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         client: reverb.Client,
         n_step: int,
         discount: float,
-        table_entry_nets: Dict[str, List] = None,
+        table_network_config: Dict[str, List] = None,
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: int = 5,
@@ -107,11 +108,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         self._discount = tree.map_structure(np.float32, discount)
         self._first_idx = 0
         self._last_idx = 0
-        self._table_entry_nets = table_entry_nets
-
-        print("self._table_entry_nets: ", self._table_entry_nets)
-        print("priority_fns: ", priority_fns)
-        exit()
+        self._table_network_config = table_network_config
 
         ReverbParallelAdder.__init__(
             self,
@@ -200,28 +197,32 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
 
         # Insert the transition into replay along with its priority.
         created_item = False
+
+        # Get a dictionary of the transition nets and agents.
+        entry_net_keys = transition.extras["network_keys"]
+        agents = sorted(transition.action.keys())
+        trans_nets_agent = {}
+        for agent in agents:
+            net_key = str(entry_net_keys[agent].numpy().astype(str))
+            if net_key in trans_nets_agent:
+                trans_nets_agent[net_key].append(agent)
+            else:
+                trans_nets_agent[net_key] = [agent]
+
+        # If all the network entries of a trainer is in the data then add it to that
+        # trainer's data table.
         for table, priority in table_priorities.items():
-            # If all the network keys of a trainer is in the data then add it to that
-            # trainer's data table.
-            entry_net_keys = transition.extras["network_keys"]
-            agents = sorted(transition.action.keys())
-
-            trans_nets_agent = {
-                str(entry_net_keys[agent].numpy().astype(str)): agent
-                for agent in agents
-            }
-
-            if self._table_entry_nets is None:
+            if self._table_network_config is None:
                 self._writer.create_item(
                     table=table, priority=priority, trajectory=transition
                 )
             else:
                 # Check if all the networks are in trans_nets_agent.
-                entry_nets = copy.deepcopy(trans_nets_agent.keys())
+                trans_dict_copy = copy.deepcopy(trans_nets_agent)
                 is_in_entry = True
-                for net_key in self._table_net_config[table]:
-                    if net_key in entry_nets:
-                        entry_nets.pop(net_key)
+                for net_key in self._table_network_config[table]:
+                    if net_key in trans_dict_copy and len(trans_dict_copy[net_key]) > 0:
+                        trans_dict_copy[net_key].pop()
                     else:
                         is_in_entry = False
                         break
@@ -242,8 +243,9 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
                         extras[key] = {}
                         next_extras[key] = {}
 
-                    for a_i, net_key in enumerate(self._table_net_config[table]):
-                        cur_agent = trans_nets_agent[net_key]
+                    trans_dict_copy = copy.deepcopy(trans_nets_agent)
+                    for a_i, net_key in enumerate(self._table_network_config[table]):
+                        cur_agent = trans_dict_copy[net_key].pop()
                         want_agent = agents[a_i]
                         observation[want_agent] = transition.observation[cur_agent]
 

@@ -77,11 +77,11 @@ class MADDPGConfig:
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
     num_executors: int
-    num_trainers: int
     agent_net_keys: Dict[str, str]
-    trainer_agent_nets: Dict[str, List]
+    trainer_networks: Dict[str, List]
+    table_network_config: Dict[str, List]
     do_pbt: bool
-    pbt_samples: List
+    executor_samples: List
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -101,7 +101,7 @@ class MADDPGConfig:
     counter: counting.Counter = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
-    replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    replay_table_name: str = "trainer"#reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
 class MADDPGBuilder:
@@ -245,7 +245,7 @@ class MADDPGBuilder:
 
         replay_tables = []
         # Create table per trainer
-        for t_i in range(self._config.num_trainers):
+        for t_i in range(len(self._config.trainer_networks.keys())):
             # TODO (dries): Fix this. This does not work where one has shared agent
             # weights in the single trainer setup.
 
@@ -325,20 +325,19 @@ class MADDPGBuilder:
         Returns:
             Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
         """
-        # table_entry_config = {
-        #     f"priority_table_{trainer_id}": self._config.trainer_net_config[
-        #         f"trainer_{trainer_id}"
-        #     ]
-        #     for trainer_id in range(self._config.num_trainers)
-        # }
+        # Create custom priority functons for the adder
+        priority_fns = {
+            table_key: lambda x: 1.0
+            for table_key in self._config.table_network_config.keys()
+        }
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
-                priority_fns=table_entry_config.keys(),
+                priority_fns=priority_fns,
                 client=replay_client,
                 n_step=self._config.n_step,
-                table_entry_nets=self._config.table_entry_nets,
+                table_network_config=self._config.table_network_config,
                 discount=self._config.discount,
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
@@ -346,7 +345,7 @@ class MADDPGBuilder:
                 "Implement table_net_config for the " "ParallelSequenceAdder."
             )
             adder = reverb_adders.ParallelSequenceAdder(
-                priority_fns=table_entry_config.keys(),
+                priority_fns=priority_fns,
                 client=replay_client,
                 sequence_length=self._config.sequence_length,
                 period=self._config.period,
@@ -466,7 +465,7 @@ class MADDPGBuilder:
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
             do_pbt=self._config.do_pbt,
-            pbt_samples=self._config.pbt_samples,
+            executor_samples=self._config.executor_samples,
             variable_client=variable_client,
             adder=adder,
         )
@@ -476,7 +475,7 @@ class MADDPGBuilder:
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         variable_source: MavaVariableSource,
-        trainer_agent_nets: List[Any],
+        trainer_networks: List[Any],
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
@@ -496,7 +495,7 @@ class MADDPGBuilder:
                 executors to update the parameters of the agent networks in the system.
         """
         # This assumes agents are sorted in the other methods
-        trainer_agents = self._agents[: len(trainer_agent_nets)]
+        trainer_agents = self._agents[: len(trainer_networks)]
         agent_types = self._agent_types
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
@@ -515,7 +514,7 @@ class MADDPGBuilder:
                 variables[f"{net_key}_{net_type_key}"] = networks[net_type_key][
                     net_key
                 ].variables
-                if net_key in set(trainer_agent_nets):
+                if net_key in set(trainer_networks):
                     set_keys.append(f"{net_key}_{net_type_key}")
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")

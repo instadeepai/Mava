@@ -39,12 +39,12 @@ DiscreteArray = specs.DiscreteArray
 tfd = tfp.distributions
 
 
-def sample_new_agent_keys(agents, executor_sampler) -> Dict[str, np.array]:
+def sample_new_agent_keys(agents, executor_samples) -> Dict[str, np.array]:
     save_net_keys = {}
     agent_net_keys = {}
     agent_slots = copy.copy(agents)
     while len(agent_slots) > 0:
-        sample = executor_sampler[randint(len(executor_sampler))]
+        sample = executor_samples[randint(len(executor_samples))]
         for net_key in sample:
             agent = agent_slots.pop(0)
             agent_net_keys[agent] = net_key
@@ -63,7 +63,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         do_pbt: bool = False,
-        pbt_samples: List = [],
+        executor_samples: List = [],
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -86,7 +86,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         # Store these for later use.
         self._agent_specs = agent_specs
         self._do_pbt = do_pbt
-        self._pbt_samples = pbt_samples
+        self._executor_samples = executor_samples
         self._counts = counts
         self._network_keys_extras: Dict[str, np.array] = {}
         super().__init__(
@@ -190,14 +190,14 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         """
 
         if self._adder:
+            "Select new networks from the sampler at the start of each episode."
+            agents = sorted(list(self._agent_net_keys.keys()))
+            self._network_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+                agents, self._executor_samples
+            )
             if self._do_pbt:
-                """In population based trianing select new networks from the sampler
-                at the start of each episode. Also add the network key used by each
+                """In population based trianing add the network key used by each
                 agent."""
-                agents = sorted(list(self._agent_net_keys.keys()))
-                self._network_keys_extras, self._agent_net_keys = sample_new_agent_keys(
-                    agents, self._executor_sampler
-                )
                 extras["network_keys"] = self._network_keys_extras
 
             self._adder.add_first(timestep, extras)
