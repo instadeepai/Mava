@@ -27,6 +27,7 @@ jobs:
           export LANG=en_US.UTF-8
 
           # Updates
+          pip uninstall -y enum34
           pip install --upgrade pip setuptools
           sudo apt-get update
 
