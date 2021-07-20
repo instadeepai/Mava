@@ -42,7 +42,7 @@ jobs:
           # Open CV and Headless screen.
           sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
           # Fix module 'enum' has no attribute 'IntFlag'
-          pip uninstall -y enum34
+          # pip uninstall -y enum34
           # SC2
           sudo apt-get install git -y
           pip install git+https://github.com/oxwhirl/smac.git
