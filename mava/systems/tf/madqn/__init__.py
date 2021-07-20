@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from mava.systems.tf.madqn.networks import make_default_networks
 from mava.systems.tf.madqn.system import MADQN
 from mava.systems.tf.madqn.training import MADQNRecurrentTrainer, MADQNTrainer

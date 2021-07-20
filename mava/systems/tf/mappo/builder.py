@@ -40,10 +40,11 @@ class MAPPOConfig:
             each agent in the system.
         policy_optimizer: optimizer(s) for updating policy networks.
         critic_optimizer: optimizer for updating critic networks.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
         sequence_length: recurrent sequence rollout length.
         sequence_period: consecutive starting points for overlapping rollouts across a
             sequence.
-        shared_weights: boolean indicating whether agents should share weights.
         discount: discount to use for TD updates.
         lambda_gae: scalar determining the mix of bootstrapping vs further accumulation
             of multi-step returns at each timestep. See `High-Dimensional Continuous
@@ -68,9 +69,9 @@ class MAPPOConfig:
     environment_spec: specs.EnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
+    agent_net_keys: Dict[str, str]
     sequence_length: int = 10
     sequence_period: int = 5
-    shared_weights: bool = False
     discount: float = 0.99
     lambda_gae: float = 0.95
     max_queue_size: int = 100_000
@@ -247,7 +248,7 @@ class MAPPOBuilder:
         # Create the executor which defines how agents take actions.
         return self._executor_fn(
             policy_networks=policy_networks,
-            shared_weights=self._config.shared_weights,
+            agent_net_keys=self._config.agent_net_keys,
             variable_client=variable_client,
             adder=adder,
         )
@@ -277,7 +278,7 @@ class MAPPOBuilder:
 
         agents = self._agents
         agent_types = self._agent_types
-        shared_weights = self._config.shared_weights
+        agent_net_keys = self._config.agent_net_keys
 
         observation_networks = networks["observations"]
         policy_networks = networks["policies"]
@@ -291,7 +292,7 @@ class MAPPOBuilder:
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             dataset=dataset,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             critic_optimizer=self._config.critic_optimizer,
             policy_optimizer=self._config.policy_optimizer,
             discount=self._config.discount,

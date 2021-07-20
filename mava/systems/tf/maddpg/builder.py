@@ -46,7 +46,8 @@ class MADDPGConfig:
             each agent in the system.
         policy_optimizer: optimizer(s) for updating policy networks.
         critic_optimizer: optimizer for updating critic networks.
-        shared_weights: boolean indicating whether agents should share weights.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
         discount: discount to use for TD updates.
         batch_size: batch size for updates.
         prefetch_size: size to prefetch from replay.
@@ -72,7 +73,7 @@ class MADDPGConfig:
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
-    shared_weights: bool = True
+    agent_net_keys: Dict[str, str]
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -313,15 +314,13 @@ class MADDPGBuilder:
                 of the system generating data by interacting the environment.
         """
 
-        shared_weights = self._config.shared_weights
+        agent_net_keys = self._config.agent_net_keys
 
         variable_client = None
         if variable_source:
-            agent_keys = self._agent_types if shared_weights else self._agents
-
             # Create policy variables
             variables = {}
-            for agent in agent_keys:
+            for agent in set(agent_net_keys.values()):
                 variables[agent] = policy_networks[agent].variables
 
             # Get new policy variables
@@ -339,7 +338,7 @@ class MADDPGBuilder:
         return self._executor_fn(
             policy_networks=policy_networks,
             agent_specs=self._config.environment_spec.get_agent_specs(),
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             variable_client=variable_client,
             adder=adder,
         )
@@ -372,7 +371,7 @@ class MADDPGBuilder:
 
         agents = self._agents
         agent_types = self._agent_types
-        shared_weights = self._config.shared_weights
+        agent_net_keys = self._config.agent_net_keys
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         target_update_period = self._config.target_update_period
@@ -389,7 +388,7 @@ class MADDPGBuilder:
             "target_policy_networks": networks["target_policies"],
             "target_critic_networks": networks["target_critics"],
             "target_observation_networks": networks["target_observations"],
-            "shared_weights": shared_weights,
+            "agent_net_keys": agent_net_keys,
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
             "max_gradient_norm": max_gradient_norm,
