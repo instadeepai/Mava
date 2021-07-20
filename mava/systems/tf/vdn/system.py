@@ -211,7 +211,7 @@ class VDN(MADQN):
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
-                agent_net_keys=agent_net_keys,
+                agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
