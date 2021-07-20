@@ -53,7 +53,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         dataset: tf.data.Dataset,
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
-        shared_weights: bool,
+        agent_net_keys: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: BaseCommunicationModule,
         max_gradient_norm: float = None,
@@ -75,7 +75,8 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
                 optimizer for updating the parameters of the networks.
             discount (float): discount factor for TD updates.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             communication_module (BaseCommunicationModule): module for communication
@@ -102,7 +103,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             dataset=dataset,
             optimizer=optimizer,
             discount=discount,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,
@@ -147,7 +148,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             # _target_q_networks must be 1 step ahead
             target_channel = self._communication_module.process_messages(target_message)
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_keys[agent]
                 (q_targ, m), s = self._target_q_networks[agent_key](
                     observations[agent].observation[0],
                     target_state[agent],
@@ -163,7 +164,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
                 )
 
                 for agent in self._agents:
-                    agent_key = self.agent_net_keys[agent]
+                    agent_key = self._agent_net_keys[agent]
 
                     # Cast the additional discount
                     # to match the environment discount dtype.

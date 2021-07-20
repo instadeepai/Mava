@@ -57,7 +57,7 @@ class MADQNTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         optimizer: Union[Dict[str, snt.Optimizer], snt.Optimizer],
         discount: float,
-        shared_weights: bool,
+        agent_net_keys: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
         max_gradient_norm: float = None,
         importance_sampling_exponent: Optional[float] = None,
@@ -83,7 +83,8 @@ class MADQNTrainer(mava.Trainer):
             optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
                 optimizer for updating the parameters of the networks.
             discount (float): discount factor for TD updates.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -103,7 +104,7 @@ class MADQNTrainer(mava.Trainer):
 
         self._agents = agents
         self._agent_types = agent_types
-        self._shared_weights = shared_weights
+        self._agent_net_keys = agent_net_keys
         self._checkpoint = checkpoint
 
         # Store online and target q-networks.
@@ -150,11 +151,7 @@ class MADQNTrainer(mava.Trainer):
             assert isinstance(self._replay_client, reverb.Client)
 
         # Dictionary with network keys for each agent.
-        self.agent_net_keys = {agent: agent for agent in self._agents}
-        if self._shared_weights:
-            self.agent_net_keys = {agent: agent.split("_")[0] for agent in self._agents}
-
-        self.unique_net_keys = self._agent_types if shared_weights else self._agents
+        self.unique_net_keys = set(self._agent_net_keys.values())
 
         # Create optimizers for different agent types.
         if not isinstance(optimizer, dict):
@@ -386,7 +383,7 @@ class MADQNTrainer(mava.Trainer):
             q_network_losses: Dict[str, NestedArray] = {}
 
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_keys[agent]
 
                 # Cast the additional discount to match the environment discount dtype.
                 discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
@@ -465,7 +462,7 @@ class MADQNTrainer(mava.Trainer):
         q_network_losses = self._q_network_losses
         tape = self.tape
         for agent in self._agents:
-            agent_key = self.agent_net_keys[agent]
+            agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables
             q_network_variables = self._q_networks[agent_key].trainable_variables
@@ -518,7 +515,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         dataset: tf.data.Dataset,
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
-        shared_weights: bool,
+        agent_net_keys: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
@@ -540,7 +537,8 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
                 optimizer for updating the parameters of the networks.
             discount (float): discount factor for TD updates.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -567,7 +565,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             dataset=dataset,
             optimizer=optimizer,
             discount=discount,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
@@ -600,7 +598,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             q_network_losses: Dict[str, NestedArray] = {}
 
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_keys[agent]
                 # Cast the additional discount to match the environment discount dtype.
                 discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
 
@@ -649,7 +647,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         dataset: tf.data.Dataset,
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
-        shared_weights: bool,
+        agent_net_keys: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: BaseCommunicationModule,
         max_gradient_norm: float = None,
@@ -671,7 +669,8 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
                 optimizer for updating the parameters of the networks.
             discount (float): discount factor for TD updates.
-            shared_weights (bool): wether agents are sharing weights or not.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             communication_module (BaseCommunicationModule): module for communication
@@ -698,7 +697,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             dataset=dataset,
             optimizer=optimizer,
             discount=discount,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,
@@ -748,7 +747,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             # _target_q_networks must be 1 step ahead
             target_channel = self._communication_module.process_messages(target_message)
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_keys[agent]
                 (q_targ, m), s = self._target_q_networks[agent_key](
                     observations[agent].observation[0],
                     target_state[agent],
@@ -764,7 +763,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
                 )
 
                 for agent in self._agents:
-                    agent_key = self.agent_net_keys[agent]
+                    agent_key = self._agent_net_keys[agent]
 
                     # Cast the additional discount
                     # to match the environment discount dtype.
