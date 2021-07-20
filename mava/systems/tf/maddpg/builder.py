@@ -243,14 +243,14 @@ class MADDPGBuilder:
                     error_buffer=error_buffer,
                 )
 
-        replay_tables = []
         # Create table per trainer
-        for t_i in range(len(self._config.trainer_networks.keys())):
+        replay_tables = []
+        for t_i in range(len(self._config.table_network_config.keys())):
             # TODO (dries): Fix this. This does not work where one has shared agent
             # weights in the single trainer setup.
 
             # Convert a Mava spec
-            num_networks = len(self._config.trainer_networks[f"trainer_{t_i}"])
+            num_networks = len(self._config.table_network_config[f"trainer_{t_i}"])
             env_spec = copy.deepcopy(env_adder_spec)
             env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
             env_spec._keys = list(sorted(env_spec._specs.keys()))
