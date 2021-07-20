@@ -101,7 +101,7 @@ class MADDPGConfig:
     counter: counting.Counter = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
-    replay_table_name: str = "trainer"#reverb_adders.DEFAULT_PRIORITY_TABLE
+    replay_table_name: str = "trainer"  # reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
 class MADDPGBuilder:
@@ -206,6 +206,7 @@ class MADDPGBuilder:
         env_adder_spec = self.convert_discrete_to_bounded(environment_spec)
 
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+
             def adder_sig_fn(
                 env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
             ) -> Any:
