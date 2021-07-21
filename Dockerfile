@@ -39,7 +39,7 @@ RUN python -m pip uninstall -y enum34
 COPY . /home/app/mava
 RUN python -m pip install --upgrade pip
 RUN python -m pip install -e .[flatland]
-RUN python -m pip install -e .[open_spiel] --no-cache
+RUN python -m pip install -e .[open_spiel]
 RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting,record_episode]
 
 EXPOSE 6006
