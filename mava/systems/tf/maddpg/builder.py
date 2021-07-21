@@ -406,7 +406,7 @@ class MADDPGBuilder:
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
 
-        if isinstance(self._trainer_fn, training.MADDPGBaseRecurrentTrainer):
+        if issubclass(self._trainer_fn, training.MADDPGBaseRecurrentTrainer):
             trainer_config["bootstrap_n"] = self._config.bootstrap_n
 
         # The learner updates the parameters (and initializes them).
