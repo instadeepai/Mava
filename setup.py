@@ -41,7 +41,7 @@ tf_requirements = [
 env_requirements = [
     "pettingzoo==1.9.0",
     "multi_agent_ale_py",
-    "supersuit",
+    "supersuit==2.6.6",
     "pygame",
     "pysc2",
 ]
