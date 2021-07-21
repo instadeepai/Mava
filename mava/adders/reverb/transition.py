@@ -22,7 +22,7 @@ into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
 from operator import ne
-from typing import Optional, Tuple, Dict, Any, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import reverb
@@ -37,6 +37,7 @@ from mava import types as mava_types
 from mava.adders.reverb import base
 from mava.adders.reverb import utils as mava_utils
 from mava.adders.reverb.base import ReverbParallelAdder
+from mava.utils.sort_utils import sort_str_num
 
 
 class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
@@ -200,7 +201,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
 
         # Get a dictionary of the transition nets and agents.
         entry_net_keys = transition.extras["network_keys"]
-        agents = sorted(transition.action.keys())
+        agents = sort_str_num(transition.action.keys())
         trans_nets_agent = {}
         for agent in agents:
             net_key = str(entry_net_keys[agent].numpy().astype(str))

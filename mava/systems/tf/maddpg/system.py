@@ -15,8 +15,8 @@
 
 """MADDPG scaled system implementation."""
 
-from enum import unique
 import functools
+from enum import unique
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import acme
@@ -43,6 +43,7 @@ from mava.systems.tf.maddpg.execution import (
 )
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 from mava.utils.loggers import MavaLogger, logger_utils
+from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import DetailedPerAgentStatistics
 
 Array = specs.Array
@@ -50,6 +51,7 @@ Array = specs.Array
 
 class MADDPG:
     """MADDPG system."""
+
     def __init__(
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
@@ -192,7 +194,7 @@ class MADDPG:
             )
 
         # Setup agent networks and executor sampler
-        agents = sorted(environment_spec.get_agent_ids())
+        agents = sort_str_num(environment_spec.get_agent_ids())
         self._executor_samples = executor_samples
         if not executor_samples:
             # if no executor samples provided, use shared_weights to determine setup
@@ -207,7 +209,7 @@ class MADDPG:
                 agents, self._executor_samples
             )
 
-         # Check that the environment and agent_net_keys has the same amount of agents
+        # Check that the environment and agent_net_keys has the same amount of agents
         sample_length = len(self._executor_samples[0])
         assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
 
@@ -239,9 +241,9 @@ class MADDPG:
 
         # Setup specs for each network
         self._net_spec_keys = {}
-        unique_net_keys = sorted(list(set(all_unique_net_keys)))
+        unique_net_keys = sort_str_num(list(set(all_unique_net_keys)))
         for i in range(len(unique_net_keys)):
-            self._net_spec_keys[unique_net_keys[i]]=agents[i%len(agents)]
+            self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
 
         # Setup table_network_config
         table_network_config = {}

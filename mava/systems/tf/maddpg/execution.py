@@ -32,6 +32,7 @@ from numpy.random import randint
 
 from mava import adders
 from mava.systems.tf import executors
+from mava.utils.sort_utils import sort_str_num
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
@@ -191,7 +192,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
         if self._adder:
             "Select new networks from the sampler at the start of each episode."
-            agents = sorted(list(self._agent_net_keys.keys()))
+            agents = sort_str_num(list(self._agent_net_keys.keys()))
             self._network_keys_extras, self._agent_net_keys = sample_new_agent_keys(
                 agents, self._executor_samples
             )

@@ -34,6 +34,7 @@ from mava.systems.tf import executors, variable_utils
 from mava.systems.tf.maddpg import training
 from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerStatistics
 
 BoundedArray = dm_specs.BoundedArray
@@ -176,7 +177,7 @@ class MADDPGBuilder:
         return env_adder_spec
 
     def covert_specs(self, spec: Dict[str, Any], num_networks: int) -> Dict[str, Any]:
-        agents = sorted(self._config.agent_net_keys.keys())[:num_networks]
+        agents = sort_str_num(self._config.agent_net_keys.keys())[:num_networks]
         converted_spec: Dict[str, Any] = {}
         if agents[0] in spec:
             for agent in agents:
@@ -254,7 +255,7 @@ class MADDPGBuilder:
             num_networks = len(self._config.table_network_config[f"trainer_{t_i}"])
             env_spec = copy.deepcopy(env_adder_spec)
             env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
-            env_spec._keys = list(sorted(env_spec._specs.keys()))
+            env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
             if env_spec.extra_specs is not None:
                 env_spec.extra_specs = self.covert_specs(
                     env_spec.extra_specs, num_networks
@@ -495,7 +496,7 @@ class MADDPGBuilder:
             core.Trainer: system trainer, that uses the collected data from the
                 executors to update the parameters of the agent networks in the system.
         """
-        # This assumes agents are sorted in the other methods
+        # This assumes agents are sort_str_num in the other methods
         trainer_agents = self._agents[: len(trainer_networks)]
         agent_types = self._agent_types
         max_gradient_norm = self._config.max_gradient_norm

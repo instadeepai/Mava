@@ -113,7 +113,7 @@ class Renderer:
 
     def _get_units(self) -> Any:
         if self.obs:
-            for u in sorted(
+            for u in sort_str_num(
                 self.obs.observation.raw_data.units,
                 key=lambda u: (u.pos.z, u.owner != 16, -u.radius, u.tag),
             ):

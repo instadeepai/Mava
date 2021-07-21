@@ -10,6 +10,8 @@ from typing import Any, Dict, List
 import dm_env
 from acme.specs import EnvironmentSpec
 
+from mava.utils.sort_utils import sort_str_num
+
 
 # TODO Why use this class to define specs, when you can just update
 # the specs on the wrappers themselves
@@ -24,7 +26,7 @@ class MAEnvironmentSpec:
             specs = self._make_ma_environment_spec(environment)
         else:
             self.extra_specs = extra_specs
-        self._keys = list(sorted(specs.keys()))
+        self._keys = list(sort_str_num(specs.keys()))
         self._specs = {key: specs[key] for key in self._keys}
 
     def _make_ma_environment_spec(
