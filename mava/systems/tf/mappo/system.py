@@ -55,6 +55,7 @@ class MAPPO:
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
+        agent_net_keys: Dict[str, str] = {},
         executor_variable_update_period: int = 100,
         policy_optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
@@ -103,7 +104,10 @@ class MAPPO:
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
             shared_weights (bool, optional): whether agents should share weights or not.
+                When agent_net_keys are provided the value of shared_weights is ignored.
                 Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             executor_variable_update_period (int, optional): number of steps before
                 updating executor variables from the variable source. Defaults to 100.
             policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
@@ -168,7 +172,14 @@ class MAPPO:
         self._network_factory = network_factory
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
-        self._shared_weights = shared_weights
+        # Setup agent networks
+        self._agent_net_keys = agent_net_keys
+        if not agent_net_keys:
+            agents = environment_spec.get_agent_ids()
+            self._agent_net_keys = {
+                agent: agent.split("_")[0] if shared_weights else agent
+                for agent in agents
+            }
         self._num_exectors = num_executors
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
@@ -183,7 +194,7 @@ class MAPPO:
         self._builder = builder.MAPPOBuilder(
             config=builder.MAPPOConfig(
                 environment_spec=environment_spec,
-                shared_weights=shared_weights,
+                agent_net_keys=self._agent_net_keys,
                 executor_variable_update_period=executor_variable_update_period,
                 discount=discount,
                 lambda_gae=lambda_gae,
@@ -262,7 +273,8 @@ class MAPPO:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture with target networks.
@@ -271,7 +283,7 @@ class MAPPO:
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
+            agent_net_keys=self._agent_net_keys,
         ).create_system()
 
         # create logger
@@ -315,7 +327,8 @@ class MAPPO:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture with target networks.
@@ -324,7 +337,7 @@ class MAPPO:
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # create variables
@@ -390,7 +403,8 @@ class MAPPO:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture with target networks.
@@ -399,7 +413,7 @@ class MAPPO:
             observation_networks=networks["observations"],
             policy_networks=networks["policies"],
             critic_networks=networks["critics"],
-            shared_weights=self._shared_weights,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # create variables

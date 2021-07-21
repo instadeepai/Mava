@@ -47,7 +47,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         trainer: MADQNTrainer,
-        shared_weights: bool = True,
+        agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
@@ -62,8 +62,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             action_selectors (Dict[str, Any]): policy action selector method, e.g.
                 epsilon greedy.
             trainer (MADQNTrainer, optional): system trainer.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
@@ -82,7 +82,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         self._q_networks = q_networks
         self._action_selectors = action_selectors
         self._trainer = trainer
-        self._shared_weights = shared_weights
+        self._agent_net_keys = agent_net_keys
         self._fingerprint = fingerprint
         self._evaluator = evaluator
 
@@ -116,17 +116,17 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         batched_legals = tf2_utils.add_batch_dim(legal_actions)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_net_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation and
         # possibly the fingerprint.
         if fingerprint is not None:
-            q_values = self._q_networks[agent_key](batched_observation, fingerprint)
+            q_values = self._q_networks[agent_net_key](batched_observation, fingerprint)
         else:
-            q_values = self._q_networks[agent_key](batched_observation)
+            q_values = self._q_networks[agent_net_key](batched_observation)
 
         # select legal action
-        action = self._action_selectors[agent_key](
+        action = self._action_selectors[agent_net_key](
             q_values, batched_legals, epsilon=epsilon
         )
 
@@ -287,7 +287,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         self,
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
-        shared_weights: bool = True,
+        agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
@@ -303,8 +303,9 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
                 system.
             action_selectors (Dict[str, Any]): policy action selector method, e.g.
                 epsilon greedy.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
+            agent_net_keys (Dict[str, Any]): specifies what network each agent uses.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
@@ -328,7 +329,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         self._action_selectors = action_selectors
         self._store_recurrent_state = store_recurrent_state
         self._trainer = trainer
-        self._shared_weights = shared_weights
+        self._agent_net_keys = agent_net_keys
 
         self._states: Dict[str, Any] = {}
 
@@ -362,7 +363,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         batched_legals = tf2_utils.add_batch_dim(legal_actions)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
         q_values, new_state = self._q_networks[agent_key](batched_observation, state)
@@ -442,7 +443,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         communication_module: BaseCommunicationModule,
-        shared_weights: bool = True,
+        agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
@@ -459,8 +460,8 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
                 epsilon greedy.
             communication_module (BaseCommunicationModule): module for enabling
                 communication protocols between agents.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
@@ -483,7 +484,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         self._action_selectors = action_selectors
         self._store_recurrent_state = store_recurrent_state
         self._trainer = trainer
-        self._shared_weights = shared_weights
+        self._agent_net_keys = agent_net_keys
 
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}
@@ -519,7 +520,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         batched_legals = tf2_utils.add_batch_dim(legal_actions)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
         (q_values, m_values), new_state = self._q_networks[agent_key](

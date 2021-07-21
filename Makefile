@@ -6,9 +6,12 @@ GPUS=--gpus all
 else
 GPUS=
 endif
-
+# For Windows use CURDIR
+ifeq ($(PWD),)
+PWD := $(CURDIR)
+endif
 # Set flag for docker run command
-BASE_FLAGS=-it --rm  -v $(PWD):/home/app/mava -w /home/app/mava
+BASE_FLAGS=-it --rm  -v ${PWD}:/home/app/mava -w /home/app/mava
 RUN_FLAGS=$(GPUS) $(BASE_FLAGS)
 IMAGE=mava:latest
 RUN_FLAGS_TENSORBOARD=$(GPUS) -p 6006:6006 $(BASE_FLAGS)
