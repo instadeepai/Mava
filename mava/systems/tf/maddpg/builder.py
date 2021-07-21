@@ -402,10 +402,12 @@ class MADDPGBuilder:
             "logger": logger,
             "checkpoint": self._config.checkpoint,
             "checkpoint_subpath": self._config.checkpoint_subpath,
-            "bootstrap_n": self._config.bootstrap_n,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
+
+        if isinstance(self._trainer_fn, training.MADDPGBaseRecurrentTrainer):
+            trainer_config["bootstrap_n"] = self._config.bootstrap_n
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(**trainer_config)

@@ -46,7 +46,6 @@ class TestDial:
         network_factory = lp_utils.partial_kwargs(
             dial.make_default_networks,
             archecture_type=ArchitectureType.recurrent,
-            policy_networks_layer_sizes=(64, 64),
         )
 
         # system
