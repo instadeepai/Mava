@@ -29,17 +29,17 @@ RUN apt-get update -y && \
     apt-get install -y python-opengl
 ENV DISPLAY=:0
 
+# Install starcraft 2 environment
+RUN apt-get -y install git
+RUN python -m pip install git+https://github.com/oxwhirl/smac.git
+ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
+RUN python -m pip uninstall -y enum34
+
 # Install Mava and dependencies
 COPY . /home/app/mava
 RUN python -m pip install --upgrade pip
 RUN python -m pip install -e .[flatland]
 RUN python -m pip install -e .[open_spiel] --no-cache
 RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting,record_episode]
-
-# Install starcraft 2 environment
-RUN apt-get -y install git
-RUN python -m pip uninstall -y enum34
-RUN python -m pip install git+https://github.com/oxwhirl/smac.git
-ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 
 EXPOSE 6006
