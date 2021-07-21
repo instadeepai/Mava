@@ -44,14 +44,16 @@ class TestDial:
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            dial.make_default_networks, archecture_type=ArchitectureType.recurrent
+            dial.make_default_networks,
+            archecture_type=ArchitectureType.recurrent,
+            policy_networks_layer_sizes=(64, 64),
         )
 
         # system
         system = dial.DIAL(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            num_executors=1,
+            num_executors=2,
             min_replay_size=16,
             max_replay_size=1000,
             batch_size=16,

@@ -45,13 +45,15 @@ class TestQmix:
         )
 
         # networks
-        network_factory = lp_utils.partial_kwargs(qmix.make_default_networks)
+        network_factory = lp_utils.partial_kwargs(
+            qmix.make_default_networks, policy_networks_layer_sizes=(64, 64)
+        )
 
         # system
         system = qmix.QMIX(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            num_executors=1,
+            num_executors=2,
             batch_size=32,
             min_replay_size=32,
             max_replay_size=1000,

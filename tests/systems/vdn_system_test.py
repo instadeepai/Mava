@@ -43,13 +43,15 @@ class TestVdn:
         )
 
         # networks
-        network_factory = lp_utils.partial_kwargs(vdn.make_default_networks)
+        network_factory = lp_utils.partial_kwargs(
+            vdn.make_default_networks, policy_networks_layer_sizes=(64, 64)
+        )
 
         # system
         system = vdn.VDN(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            num_executors=1,
+            num_executors=2,
             batch_size=32,
             min_replay_size=32,
             max_replay_size=1000,
