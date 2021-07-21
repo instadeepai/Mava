@@ -65,7 +65,7 @@ def main(_: Any) -> None:
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        max_gradient_norm=40.0,
+        max_gradient_norm=10.0,
         checkpoint=False,
         batch_size=1024,
 
