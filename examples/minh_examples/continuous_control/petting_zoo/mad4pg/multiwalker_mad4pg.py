@@ -1,6 +1,5 @@
-# Script run Multi-Agent DQN systems Feedforward decentralised on SMAC discrete control
+"""Example running MAD4PG on PZ environments."""
 
-"""Example running MADQN on multi-agent Starcraft 2 (SMAC) environment."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -10,42 +9,47 @@ import sonnet as snt
 from absl import app, flags
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
-
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.systems.tf import madqn
+from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
-from mava.utils.environments import smac_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
-from mava.wrappers import MonitorParallelEnvironmentLoop
+from mava.wrappers.environment_loop_wrappers import MonitorParallelEnvironmentLoop
 
 FLAGS = flags.FLAGS
+
 flags.DEFINE_string(
-    "map_name",
-    "3m",
-    "Starcraft 2 micromanagement map name (str).",
+    "env_class",
+    "sisl",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 
+flags.DEFINE_string(
+    "env_name",
+    "multiwalker_v7",
+    "Pettingzoo environment name, e.g. pong (str).",
+)
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava/checkpoints_smac", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava/multi_walker_mad4pg", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
 
-    # Environment
+    # Environment.
     environment_factory = functools.partial(
-        smac_utils.make_environment, map_name=FLAGS.map_name
+        pettingzoo_utils.make_environment,
+        env_name=FLAGS.env_name,
+        env_class=FLAGS.env_class,
+        remove_on_fall=False,
     )
 
     # Networks.
-    network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks, policy_networks_layer_sizes=[64, 64]
-    )
+    network_factory = lp_utils.partial_kwargs(mad4pg.make_default_networks)
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    # Checkpointer appends "Checkpoints" to checkpoint_dir.
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
@@ -59,28 +63,22 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
-    program = madqn.MADQN(
+    # Distributed program.
+    program = mad4pg.MAD4PG(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.05,
-        epsilon_decay=1e-5,
-        optimizer=snt.optimizers.SGD(learning_rate=1e-2),
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        batch_size=512,
-        executor_variable_update_period=100,
-        target_update_period=200,
         max_gradient_norm=10.0,
-
-        # Record agents in environment. 
+        
         eval_loop_fn=MonitorParallelEnvironmentLoop,
-        eval_loop_fn_kwargs={"path": checkpoint_dir, "record_every": 10, "fps": 5},
+        eval_loop_fn_kwargs={"path": checkpoint_dir, "record_every": 100},
     ).build()
 
-    # launch
+    # Ensure only trainer runs on gpu, while other processes run on cpu.
     gpu_id = -1
     env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
     local_resources = {
@@ -88,13 +86,15 @@ def main(_: Any) -> None:
         "evaluator": PythonProcess(env=env_vars),
         "executor": PythonProcess(env=env_vars),
     }
+
+    # Launch.
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
-        terminal="current_terminal", # "current_terminal" output_to_files
+        terminal="current_terminal", # output_to_files
         local_resources=local_resources,
     )
-    
+
 
 if __name__ == "__main__":
     app.run(main)
