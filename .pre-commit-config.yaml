@@ -64,12 +64,12 @@ repos:
     hooks:
     -   id: pydocstyle
         name: Checking docstring style.
-        args: ["--convention=google"]
+        args: ["--convention=google","--add-ignore=D100,D202,D101"]
 
   - repo: https://github.com/econchick/interrogate
     rev: 1.4.0
     hooks:
       - id: interrogate
         name: Checking docstring code coverage.
-        args: [--config=pyproject.toml]
+        args: ["--config=pyproject.toml","mava"]
         pass_filenames: false
