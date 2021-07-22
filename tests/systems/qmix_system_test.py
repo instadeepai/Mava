@@ -22,8 +22,6 @@ import sonnet as snt
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
-
-# import mava
 from mava.systems.tf import qmix
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
@@ -33,9 +31,7 @@ class TestQmix:
     """Simple integration/smoke test for qmix."""
 
     def test_qmix_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
-
+        """Test feedforward qmix."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,

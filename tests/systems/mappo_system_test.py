@@ -31,9 +31,7 @@ class TestMAPPO:
     """Simple integration/smoke test for MAPPO."""
 
     def test_mappo_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
-
+        """Test feedforward mappo."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,

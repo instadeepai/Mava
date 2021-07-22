@@ -32,9 +32,7 @@ class TestDial:
     """Simple integration/smoke test for dial."""
 
     def test_recurrent_dial_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
-
+        """Test recurrent dial."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,

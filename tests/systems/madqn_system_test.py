@@ -32,9 +32,7 @@ class TestMADQN:
     """Simple integration/smoke test for MADQN."""
 
     def test_madqn_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
-
+        """Test feedforward madqn."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -84,9 +82,7 @@ class TestMADQN:
             trainer.step()
 
     def test_recurrent_madqn_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
-
+        """Test recurrent maddpg."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
