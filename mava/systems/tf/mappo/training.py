@@ -271,7 +271,6 @@ class MAPPOTrainer(mava.Trainer):
         """
 
         # Convert to sequence data
-        # TODO(Kale-ab): Is this the recurrent trainer?
         data = tf2_utils.batch_to_sequence(inputs.data)
 
         # Unpack input data as follows:

@@ -50,7 +50,7 @@ class MAEnvironmentSpec:
         return specs
 
     def get_extra_specs(self) -> Dict[str, EnvironmentSpec]:
-        return self.extra_specs  # type: ignore
+        return self.extra_specs
 
     def get_agent_specs(self) -> Dict[str, EnvironmentSpec]:
         return self._specs

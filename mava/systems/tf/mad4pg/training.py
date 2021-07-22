@@ -18,7 +18,6 @@
 
 from typing import Any, Dict, List, Union
 
-import reverb
 import sonnet as snt
 import tensorflow as tf
 import tree
@@ -26,8 +25,6 @@ from acme.tf import losses
 from acme.tf import utils as tf2_utils
 from acme.utils import loggers
 
-from mava import types as mava_types
-from mava.adders.reverb.base import Trajectory
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf.maddpg.training import (
     MADDPGBaseRecurrentTrainer,
@@ -141,7 +138,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         )
 
     # Forward pass that calculates loss.
-    def _forward(self, inputs: reverb.ReplaySample) -> None:
+    def _forward(self, inputs: Any) -> None:
         """Trainer forward pass
 
         Args:
@@ -454,7 +451,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         )
 
     # Forward pass that calculates loss.
-    def _forward(self, inputs: reverb.ReplaySample) -> None:
+    def _forward(self, inputs: Any) -> None:
         """Trainer forward pass
 
         Args:
@@ -462,7 +459,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         """
 
         # TODO: Update this forward function to work like MAD4PG
-        data: Trajectory = inputs.data
+        data = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
         observations, actions, rewards, discounts, _, extras = (

@@ -120,16 +120,8 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         )
         data = tf2_utils.batch_to_sequence(data)
 
-        observations, actions, rewards, discounts, _, _ = (
-            data.observations,
-            data.actions,
-            data.rewards,
-            data.discounts,
-            data.start_of_episode,
-            data.extras,
-        )
+        observations, actions, rewards, discounts, _, extra = data
 
-        # Using extra directly from inputs due to shape.
         core_state = tree.map_structure(
             lambda s: s[:, 0, :], inputs.data.extras["core_states"]
         )

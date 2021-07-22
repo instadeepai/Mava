@@ -15,13 +15,11 @@
 
 """Common types used throughout Mava."""
 
-from typing import Any, Dict, NamedTuple, Union
+from typing import Dict, NamedTuple, Union
 
 import numpy as np
 from acme import types
 from acme.utils import loggers
-
-NestedArray = Any
 
 
 class OLT(NamedTuple):

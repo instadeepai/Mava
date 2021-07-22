@@ -16,12 +16,20 @@
 """Tests for MAPPO."""
 
 import functools
+from typing import Dict, Sequence, Union
 
+import dm_env
 import launchpad as lp
+import numpy as np
 import sonnet as snt
+import tensorflow as tf
+import tensorflow_probability as tfp
+from acme.tf import networks
+from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
+from mava import specs as mava_specs
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
@@ -42,13 +50,13 @@ class TestMAPPO:
         )
 
         # networks
-        network_factory = lp_utils.partial_kwargs(mappo.make_default_networks)
+        network_factory = lp_utils.partial_kwargs(make_networks)
 
         # system
         system = mappo.MAPPO(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            num_executors=1,
+            num_executors=2,
             batch_size=32,
             max_queue_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
