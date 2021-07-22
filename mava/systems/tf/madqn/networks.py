@@ -26,12 +26,11 @@ from mava.components.tf.networks.communication import CommunicationNetwork
 from mava.utils.enums import ArchitectureType, Network
 
 
-#
 # TODO Use fingerprints variable
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     archecture_type: ArchitectureType = ArchitectureType.feedforward,
     network_type: Network = Network.mlp,
     fingerprints: bool = False,
@@ -45,7 +44,7 @@ def make_default_networks(
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
-            size of policy networks. Defaults to (512, 512, 256).
+            size of policy networks.
         archecture_type (ArchitectureType, optional): archecture used
             for agent networks. Can be feedforward or recurrent.
             Defaults to ArchitectureType.feedforward.
@@ -61,12 +60,19 @@ def make_default_networks(
         Mapping[str, types.TensorTransformation]: returned agent networks.
     """
 
-    # Set Policy function and layer size
+    # Set Policy function and layer size.
+    # Default size per arch type.
     if archecture_type == ArchitectureType.feedforward:
+        if not policy_networks_layer_sizes:
+            policy_networks_layer_sizes = (512, 512, 256)
         q_network_func = snt.Sequential
     elif archecture_type == ArchitectureType.recurrent:
-        policy_networks_layer_sizes = (128, 128)
+        if not policy_networks_layer_sizes:
+            policy_networks_layer_sizes = (128, 128)
         q_network_func = snt.DeepRNN
+
+    assert policy_networks_layer_sizes is not None
+    assert q_network_func is not None
 
     specs = environment_spec.get_agent_specs()
 

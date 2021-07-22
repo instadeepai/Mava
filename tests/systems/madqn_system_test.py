@@ -16,78 +16,23 @@
 """Tests for MADQN."""
 
 import functools
-from typing import Dict, Mapping, Sequence, Union
 
 import launchpad as lp
 import sonnet as snt
-from acme import types
-from acme.tf import networks
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
-from mava import specs as mava_specs
-from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
+from mava.utils.enums import ArchitectureType
 from mava.utils.environments import debugging_utils
-
-
-def make_networks(
-    environment_spec: mava_specs.MAEnvironmentSpec,
-    agent_net_keys: Dict[str, str],
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256),
-) -> Mapping[str, types.TensorTransformation]:
-    """Creates networks used by the agents."""
-
-    specs = environment_spec.get_agent_specs()
-
-    # Create agent_type specs
-    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
-
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
-
-    def action_selector_fn(
-        q_values: types.NestedTensor, legal_actions: types.NestedTensor, epsilon: float
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
-
-    q_networks = {}
-    action_selectors = {}
-    for key in specs.keys():
-
-        # Get total number of action dimensions from action spec.
-        num_dimensions = specs[key].actions.num_values
-
-        # Create the policy network.
-        q_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(q_networks_layer_sizes[key], activate_final=True),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
-        )
-
-        # epsilon greedy action selector
-        action_selector = action_selector_fn
-
-        q_networks[key] = q_network
-        action_selectors[key] = action_selector
-
-    return {
-        "q_networks": q_networks,
-        "action_selectors": action_selectors,
-    }
 
 
 class TestMADQN:
     """Simple integration/smoke test for MADQN."""
 
     def test_madqn_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
-
+        """Test feedforward madqn."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -96,7 +41,9 @@ class TestMADQN:
         )
 
         # networks
-        network_factory = lp_utils.partial_kwargs(make_networks)
+        network_factory = lp_utils.partial_kwargs(
+            madqn.make_default_networks, policy_networks_layer_sizes=(64, 64)
+        )
 
         # system
         system = madqn.MADQN(
@@ -131,5 +78,61 @@ class TestMADQN:
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
-        for _ in range(5):
+        for _ in range(2):
+            trainer.step()
+
+    def test_recurrent_madqn_on_debugging_env(self) -> None:
+        """Test recurrent maddpg."""
+        # environment
+        environment_factory = functools.partial(
+            debugging_utils.make_environment,
+            env_name="simple_spread",
+            action_space="discrete",
+        )
+
+        # networks
+        network_factory = lp_utils.partial_kwargs(
+            madqn.make_default_networks,
+            archecture_type=ArchitectureType.recurrent,
+            policy_networks_layer_sizes=(32, 32),
+        )
+
+        # system
+        system = madqn.MADQN(
+            environment_factory=environment_factory,
+            network_factory=network_factory,
+            num_executors=2,
+            batch_size=16,
+            min_replay_size=16,
+            max_replay_size=1000,
+            optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            checkpoint=False,
+            trainer_fn=madqn.training.MADQNRecurrentTrainer,
+            executor_fn=madqn.execution.MADQNRecurrentExecutor,
+            sequence_length=4,
+            period=4,
+        )
+
+        program = system.build()
+
+        (trainer_node,) = program.groups["trainer"]
+        trainer_node.disable_run()
+
+        # Launch gpu config - don't use gpu
+        gpu_id = -1
+        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+        local_resources = {
+            "trainer": PythonProcess(env=env_vars),
+            "evaluator": PythonProcess(env=env_vars),
+            "executor": PythonProcess(env=env_vars),
+        }
+        lp.launch(
+            program,
+            launch_type="test_mt",
+            local_resources=local_resources,
+        )
+
+        trainer: mava.Trainer = trainer_node.create_handle().dereference()
+
+        for _ in range(2):
             trainer.step()

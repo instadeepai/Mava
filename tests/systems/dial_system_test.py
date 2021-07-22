@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for MAPPO."""
+"""Tests for Dial."""
 
 import functools
 
@@ -22,16 +22,17 @@ import sonnet as snt
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
-from mava.systems.tf import mappo
+from mava.systems.tf import dial
 from mava.utils import lp_utils
+from mava.utils.enums import ArchitectureType
 from mava.utils.environments import debugging_utils
 
 
-class TestMAPPO:
-    """Simple integration/smoke test for MAPPO."""
+class TestDial:
+    """Simple integration/smoke test for dial."""
 
-    def test_mappo_on_debugging_env(self) -> None:
-        """Test feedforward mappo."""
+    def test_recurrent_dial_on_debugging_env(self) -> None:
+        """Test recurrent dial."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -41,20 +42,24 @@ class TestMAPPO:
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            mappo.make_default_networks, policy_networks_layer_sizes=(64, 64)
+            dial.make_default_networks,
+            archecture_type=ArchitectureType.recurrent,
         )
 
         # system
-        system = mappo.MAPPO(
+        system = dial.DIAL(
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=2,
-            batch_size=32,
-            max_queue_size=1000,
-            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
-            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            min_replay_size=16,
+            max_replay_size=1000,
+            batch_size=16,
+            optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
+            sequence_length=3,
+            period=3,
         )
+
         program = system.build()
 
         (trainer_node,) = program.groups["trainer"]
@@ -68,7 +73,6 @@ class TestMAPPO:
             "evaluator": PythonProcess(env=env_vars),
             "executor": PythonProcess(env=env_vars),
         }
-
         lp.launch(
             program,
             launch_type="test_mt",

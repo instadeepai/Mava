@@ -14,8 +14,16 @@ from acme.specs import EnvironmentSpec
 # TODO Why use this class to define specs, when you can just update
 # the specs on the wrappers themselves
 class MAEnvironmentSpec:
-    def __init__(self, environment: dm_env.Environment):
-        specs = self._make_ma_environment_spec(environment)
+    def __init__(
+        self,
+        environment: dm_env.Environment,
+        specs: Dict[str, EnvironmentSpec] = None,
+        extra_specs: Dict = None,
+    ):
+        if not specs:
+            specs = self._make_ma_environment_spec(environment)
+        else:
+            self.extra_specs = extra_specs
         self._keys = list(sorted(specs.keys()))
         self._specs = {key: specs[key] for key in self._keys}
 
@@ -40,7 +48,7 @@ class MAEnvironmentSpec:
         return specs
 
     def get_extra_specs(self) -> Dict[str, EnvironmentSpec]:
-        return self.extra_specs
+        return self.extra_specs  # type: ignore
 
     def get_agent_specs(self) -> Dict[str, EnvironmentSpec]:
         return self._specs

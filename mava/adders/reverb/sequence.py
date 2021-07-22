@@ -17,30 +17,33 @@
 # https://github.com/deepmind/acme/blob/master/acme/adders/reverb/sequence.py
 
 """Sequence adders.
+
 This implements adders which add sequences or partial trajectories.
 """
 
-from typing import NamedTuple, Optional
+import operator
+from typing import Optional
 
 import reverb
 import tensorflow as tf
 import tree
-from acme import specs, types
+from acme import specs
 from acme.adders.reverb import utils
-from acme.utils import tree_utils
+from acme.adders.reverb.sequence import SequenceAdder
+from acme.types import NestedSpec
 
 from mava.adders.reverb import base
-from mava.adders.reverb import utils as mava_utils
+from mava.adders.reverb.base import ReverbParallelAdder
+from mava.adders.reverb.utils import trajectory_signature
+
+# TODO Clean this up, when using newer versions of acme.
+try:
+    from acme.adders.reverb.sequence import EndBehavior
+except ImportError:
+    from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
 
 
-class StateSpecs(NamedTuple):
-    """Container for (observation, legal_actions, terminal) tuples."""
-
-    hidden: types.Nest
-    cell: types.Nest
-
-
-class ParallelSequenceAdder(base.ReverbParallelAdder):
+class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
     """An adder which adds sequences of fixed length."""
 
     def __init__(
@@ -48,15 +51,15 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
         client: reverb.Client,
         sequence_length: int,
         period: int,
+        *,
         delta_encoded: bool = False,
-        chunk_length: Optional[int] = None,
         priority_fns: Optional[base.PriorityFnMapping] = None,
-        pad_end_of_episode: bool = True,
-        break_end_of_episode: bool = True,
-        max_in_flight_items: Optional[int] = 25,
+        max_in_flight_items: int = 2,
+        end_of_episode_behavior: Optional[EndBehavior] = EndBehavior.ZERO_PAD,
         use_next_extras: bool = True,
     ):
         """Makes a SequenceAdder instance.
+
         Args:
           client: See docstring for BaseAdder.
           sequence_length: The fixed length of sequences we wish to add.
@@ -65,183 +68,93 @@ class ParallelSequenceAdder(base.ReverbParallelAdder):
             sequence_length, sequences are exactly non-overlapping.
           delta_encoded: If `True` (False by default) enables delta encoding, see
             `Client` for more information.
-          chunk_length: Number of timesteps grouped together before delta encoding
-            and compression. See `Client` for more information.
           priority_fns: See docstring for BaseAdder.
+          max_in_flight_items: The maximum number of items allowed to be "in flight"
+            at the same time. See `block_until_num_items` in
+            `reverb.TrajectoryWriter.flush` for more info.
+          end_of_episode_behavior:  Determines how sequences at the end of the
+            episode are handled (default `EndOfEpisodeBehavior.ZERO_PAD`). See
+            the docstring for `EndOfEpisodeBehavior` for more information.
+          chunk_length: Deprecated and unused.
           pad_end_of_episode: If True (default) then upon end of episode the current
             sequence will be padded (with observations, actions, etc... whose values
             are 0) until its length is `sequence_length`. If False then the last
             sequence in the episode may have length less than `sequence_length`.
           break_end_of_episode: If 'False' (True by default) does not break
             sequences on env reset. In this case 'pad_end_of_episode' is not used.
-          max_in_flight_items: The maximum number of items allowed to be "in flight"
-            at the same time. See `reverb.Writer.writer` for more info.
+          use_next_extras: If true extras will be processed the same way observations
+          are processed. If false extras will be processed as actions are processed.
         """
-
-        if delta_encoded:
-            NotImplementedError(
-                "Note (dries): Delta encoding has not been verified to "
-                "work in Mava yet. If you want to use delta encoding"
-                " first verify that it is working and then contribute "
-                "the update with a working example of delta encoding"
-                " to the Mava repo."
-            )
-
-        super().__init__(
+        ReverbParallelAdder.__init__(
+            self,
             client=client,
-            buffer_size=sequence_length,
-            max_sequence_length=sequence_length,
+            # We need an additional space in the buffer for the partial step the
+            # base.ReverbAdder will add with the next observation.
+            max_sequence_length=sequence_length + 1,
             delta_encoded=delta_encoded,
-            chunk_length=chunk_length,
             priority_fns=priority_fns,
             max_in_flight_items=max_in_flight_items,
             use_next_extras=use_next_extras,
         )
 
-        if pad_end_of_episode and not break_end_of_episode:
-            raise ValueError(
-                "Can't set pad_end_of_episode=True and break_end_of_episode=False at"
-                " the same time, since those behaviors are incompatible."
-            )
         self._period = period
-        self._step = 0
-        self._pad_end_of_episode = pad_end_of_episode
-        self._break_end_of_episode = break_end_of_episode
+        self._sequence_length = sequence_length
+        self._end_of_episode_behavior = end_of_episode_behavior
 
-    def reset(self) -> None:
-        # If we do not break on end of episode, we should not reset the _step
-        # counter, neither clear the buffer/writer.
-        if self._break_end_of_episode:
-            self._step = 0
-            super().reset()
+    # TODO(Kale-ab) Consider deprecating in future versions and using acme
+    # version of this function.
+    def _maybe_create_item(
+        self, sequence_length: int, *, end_of_episode: bool = False, force: bool = False
+    ) -> None:
 
-    def _write(self) -> None:
-        # Append the previous step and increment number of steps written.
-        self._writer.append(self._buffer[-1])
-        self._step += 1
-        self._maybe_add_priorities()
-
-    def _write_last(self) -> None:
-        # Create a final step.
-        # TODO (Dries): Should self._next_observation be used
-        #  here? Should this function be used for sequential?
-
-        final_step = mava_utils.final_step_like(
-            self._buffer[0],
-            self._next_observations,
-            self._next_extras if self._use_next_extras else None,
+        # Check conditions under which a new item is created.
+        first_write = self._writer.episode_steps == sequence_length
+        # NOTE(acme): the following line assumes that the only way sequence_length
+        # is less than self._sequence_length, is if the episode is shorter than
+        # self._sequence_length.
+        period_reached = self._writer.episode_steps > self._sequence_length and (
+            (self._writer.episode_steps - self._sequence_length) % self._period == 0
         )
 
-        # Append the final step.
-        self._buffer.append(final_step)
-        self._writer.append(final_step)
-        self._step += 1
-
-        if not self._break_end_of_episode:
-            # Write priorities for the sequence.
-            self._maybe_add_priorities()
-
-            # base.py has a check that on add_first self._next_observation should be
-            # None, thus we need to clear it at the end of each episode.
-            self._next_observations = None
-            self._next_extras = None
-            return None
-
-        # Determine the delta to the next time we would write a sequence.
-        first_write = self._step <= self._max_sequence_length
-        if first_write:
-            delta = self._max_sequence_length - self._step
-        else:
-            delta = (
-                self._period - (self._step - self._max_sequence_length)
-            ) % self._period
-
-        # Bump up to the position where we will write a sequence.
-        self._step += delta
-
-        if self._pad_end_of_episode:
-            zero_step = tree.map_structure(utils.zeros_like, final_step)
-
-            # Pad with zeros to get a full sequence.
-            for _ in range(delta):
-                self._buffer.append(zero_step)
-                self._writer.append(zero_step)
-        elif not first_write:
-            # Pop items from the buffer to get a truncated sequence.
-            # Note: this is consistent with the padding loop above, since adding zero
-            # steps pops the left-most elements. Here we just pop without padding.
-            for _ in range(delta):
-                self._buffer.popleft()
-
-        # Write priorities for the sequence.
-        self._maybe_add_priorities()
-
-    def _maybe_add_priorities(self) -> None:
-        if not (
-            # Write the first time we hit the max sequence length...
-            self._step == self._max_sequence_length
-            or
-            # ... or every `period`th time after hitting max length.
-            (
-                self._step > self._max_sequence_length
-                and (self._step - self._max_sequence_length) % self._period == 0
-            )
-        ):
+        if not first_write and not period_reached and not force:
             return
 
+        if not end_of_episode:
+            get_traj = operator.itemgetter(slice(-sequence_length - 1, -1))
+        else:
+            get_traj = operator.itemgetter(slice(-sequence_length, None))
+
+        history = self._writer.history
+        trajectory = base.Trajectory(**tree.map_structure(get_traj, history))
+
         # Compute priorities for the buffer.
-        steps = list(self._buffer)
-        num_steps = len(steps)
-        table_priorities = utils.calculate_priorities(self._priority_fns, steps)
+        table_priorities = utils.calculate_priorities(self._priority_fns, trajectory)
 
         # Create a prioritized item for each table.
         for table_name, priority in table_priorities.items():
-            self._writer.create_item(table_name, num_steps, priority)
+            self._writer.create_item(table_name, priority, trajectory)
+            self._writer.flush(self._max_in_flight_items)
 
     @classmethod
     def signature(
         cls,
         environment_spec: specs.EnvironmentSpec,
-        extras_spec: tf.TypeSpec = {},
+        sequence_length: Optional[int] = None,
+        extras_spec: NestedSpec = (),
     ) -> tf.TypeSpec:
-        """This is a helper method for generating signatures for Reverb tables.
-        Signatures are useful for validating data types and shapes, see Reverb's
-        documentation for details on how they are used.
+        """Returns adder signature.
+
         Args:
-          environment_spec: A `specs.EnvironmentSpec` whose fields are nested
-            structures with leaf nodes that have `.shape` and `.dtype` attributes.
-            This should come from the environment that will be used to generate
-            the data inserted into the Reverb table.
-          extras_spec: A nested structure with leaf nodes that have `.shape` and
-            `.dtype` attributes. The structure (and shapes/dtypes) of this must
-            be the same as the `extras` passed into `ReverbAdder.add`.
+            environment_spec (specs.EnvironmentSpec): Spec of MA environment.
+            sequence_length (Optional[int], optional): Length of sequence.
+                Defaults to None.
+            extras_spec (NestedSpec, optional): Spec for extra data. Defaults to ().
+
         Returns:
-          A `Step` whose leaf nodes are `tf.TensorSpec` objects.
+            tf.TypeSpec: Signature for sequence adder.
         """
-        agent_specs = environment_spec.get_agent_specs()
-        agents = environment_spec.get_agent_ids()
-        env_extras_spec = environment_spec.get_extra_specs()
-        extras_spec.update(env_extras_spec)
-
-        obs_specs = {}
-        act_specs = {}
-        reward_specs = {}
-        step_discount_specs = {}
-        for agent in agents:
-            rewards_spec, step_discounts_spec = tree_utils.broadcast_structures(
-                agent_specs[agent].rewards, agent_specs[agent].discounts
-            )
-            obs_specs[agent] = agent_specs[agent].observations
-            act_specs[agent] = agent_specs[agent].actions
-            reward_specs[agent] = rewards_spec
-            step_discount_specs[agent] = step_discounts_spec
-
-        spec_step = base.Step(
-            observations=obs_specs,
-            actions=act_specs,
-            rewards=reward_specs,
-            discounts=step_discount_specs,
-            start_of_episode=specs.Array(shape=(), dtype=bool),
-            extras=extras_spec,
+        return trajectory_signature(
+            environment_spec=environment_spec,
+            sequence_length=sequence_length,
+            extras_spec=extras_spec,
         )
-        return tree.map_structure_with_path(base.spec_like_to_tensor_spec, spec_step)
