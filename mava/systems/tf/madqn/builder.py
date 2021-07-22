@@ -161,7 +161,7 @@ class MADQNBuilder:
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder_sig = reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec, self._extra_specs
+                environment_spec, self._config.sequence_length, self._extra_specs
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
@@ -298,8 +298,7 @@ class MADQNBuilder:
         if variable_source:
             # Create policy variables
             variables = {
-                net_key: q_networks[net_key].variables
-                for net_key in set(agent_net_keys.values())
+                net_key: q_networks[net_key].variables for net_key in q_networks.keys()
             }
             # Get new policy variables
             variable_client = variable_utils.VariableClient(

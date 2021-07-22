@@ -31,6 +31,8 @@ from acme.tf import utils as tf2_utils
 from acme.utils import loggers
 
 import mava
+from mava import types as mava_types
+from mava.adders.reverb.base import Trajectory
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf.variable_utils import VariableClient
 from mava.utils import training_utils as train_utils
@@ -48,7 +50,6 @@ class MADDPGBaseTrainer(mava.Trainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -108,7 +109,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         """
 
         self._agents = agents
-        self._agent_types = agent_types
+        # self._agent_types = agent_types
         self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
 
@@ -152,14 +153,10 @@ class MADDPGBaseTrainer(mava.Trainer):
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         # Dictionary with unique network keys.
-        self.unique_net_keys = set(self._agent_net_keys.values())
+        self.unique_net_keys = self._policy_networks.keys()
 
         # Get the agents which shoud be updated and ran
-        self._trainer_agent_list = []
-        for agent in self._agents:
-            agent_key = self._agent_net_keys[agent]
-            if agent_key in trainer_net_config:
-                self._trainer_agent_list.append(agent)
+        self._trainer_agent_list = self._agents
 
         # Create optimizers for different agent types.
         if not isinstance(policy_optimizer, dict):
@@ -354,7 +351,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         )
 
     # Forward pass that calculates loss.
-    def _forward(self, inputs: Any) -> None:
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
         Args:
             inputs (Any): input data from the data table (transitions)
@@ -371,11 +368,19 @@ class MADDPGBaseTrainer(mava.Trainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
-        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+        trans = mava_types.Transition(*inputs.data)
+        o_tm1, o_t, a_tm1, r_t, d_t, e_tm1, e_t = (
+            trans.observation,
+            trans.next_observation,
+            trans.action,
+            trans.reward,
+            trans.discount,
+            trans.extras,
+            trans.next_extras,
+        )
 
         self.policy_losses = {}
         self.critic_losses = {}
-
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
 
@@ -520,7 +525,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        trainer_net_config: List[str],
+        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -545,7 +550,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            trainer_net_config=trainer_net_config,
+            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -575,7 +580,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        trainer_net_config: List[str],
+        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -600,7 +605,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            trainer_net_config=trainer_net_config,
+            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -670,7 +675,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         agents: List[str],
         agent_types: List[str],
         connection_spec: Dict[str, List[str]],
-        trainer_net_config: List[str],
+        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -695,7 +700,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            trainer_net_config=trainer_net_config,
+            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -782,7 +787,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        trainer_net_config: List[str],
+        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -807,7 +812,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            trainer_net_config=trainer_net_config,
+            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -879,7 +884,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        trainer_net_config: List[str],
+        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -943,7 +948,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._bootstrap_n = bootstrap_n
 
         self._agents = agents
-        self._agent_types = agent_types
+        # self._agent_types = agent_types
         self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
 
@@ -987,14 +992,10 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         # Dictionary with unique network keys.
-        self.unique_net_keys = set(self._agent_net_keys.values())
+        self.unique_net_keys = self._policy_networks.keys()
 
         # Get the agents which shoud be updated and ran
-        self._trainer_agent_list = []
-        for agent in self._agents:
-            agent_key = self._agent_net_keys[agent]
-            if agent_key in trainer_net_config:
-                self._trainer_agent_list.append(agent)
+        self._trainer_agent_list = self._agents
 
         # Create optimizers for different agent types.
         if not isinstance(policy_optimizer, dict):
@@ -1214,13 +1215,13 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         )
 
     # Forward pass that calculates loss.
-    def _forward(self, inputs: Any) -> None:
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
         Args:
             inputs (Any): input data from the data table (transitions)
         """
 
-        data = inputs.data
+        data: Trajectory = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
         observations, actions, rewards, discounts, _, extras = (
@@ -1460,7 +1461,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        trainer_net_config: List[str],
+        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -1486,7 +1487,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            trainer_net_config=trainer_net_config,
+            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -1520,7 +1521,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        trainer_net_config: List[str],
+        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -1546,7 +1547,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            trainer_net_config=trainer_net_config,
+            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -1620,7 +1621,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        trainer_net_config: List[str],
+        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -1646,7 +1647,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            trainer_net_config=trainer_net_config,
+            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,

@@ -31,15 +31,11 @@ BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
 
 
-#
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
-        256,
-        256,
-        256,
-    ),
+    net_spec_keys: Dict[str, str] = {},
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     sigma: float = 0.3,
     archecture_type: ArchitectureType = ArchitectureType.feedforward,
@@ -53,7 +49,7 @@ def make_default_networks(
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
             observation spaces etc. for each agent in the system.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
-            size of policy networks. Defaults to (256, 256, 256).
+            size of policy networks.
         critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of critic networks. Defaults to (512, 512, 256).
         shared_weights (bool, optional): whether agents should share weights or not.
@@ -73,17 +69,31 @@ def make_default_networks(
     Returns:
         Mapping[str, types.TensorTransformation]: returned agent networks.
     """
-    # Set Policy function and layer size
+    # Set Policy function and layer size.
+    # Default size per arch type.
     if archecture_type == ArchitectureType.feedforward:
+        if not policy_networks_layer_sizes:
+            policy_networks_layer_sizes = (
+                256,
+                256,
+                256,
+            )
         policy_network_func = snt.Sequential
     elif archecture_type == ArchitectureType.recurrent:
-        policy_networks_layer_sizes = (128, 128)
+        if not policy_networks_layer_sizes:
+            policy_networks_layer_sizes = (128, 128)
         policy_network_func = snt.DeepRNN
+
+    assert policy_networks_layer_sizes is not None
+    assert policy_network_func is not None
 
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
-    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+    if not net_spec_keys:
+        specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+    else:
+        specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {

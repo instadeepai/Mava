@@ -15,7 +15,7 @@
 
 """MAD4PG system implementation."""
 
-from typing import Callable, Dict, Optional, Type, Union
+from typing import Callable, Dict, List, Optional, Type, Union
 
 import dm_env
 import sonnet as snt
@@ -49,8 +49,9 @@ class MAD4PG(MADDPG):
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
+        trainer_networks: Dict[str, List] = {},
+        executor_samples: List = [],
         shared_weights: bool = True,
-        agent_net_keys: Dict[str, str] = {},
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -68,6 +69,7 @@ class MAD4PG(MADDPG):
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
+        bootstrap_n: int = 10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
         checkpoint: bool = True,
@@ -129,8 +131,11 @@ class MAD4PG(MADDPG):
                 Defaults to 5.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 20.
-            period (int, optional): [consecutive starting points for overlapping
+            period (int, optional): Consecutive starting points for overlapping
                 rollouts across a sequence. Defaults to 20.
+            bootstrap_n (int, optional): Used to determine the spacing between
+                q_value/value estimation for bootstrapping. Should be less
+                than sequence_length.
             sigma (float, optional): Gaussian sigma parameter. Defaults to 0.3.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
@@ -159,8 +164,9 @@ class MAD4PG(MADDPG):
             executor_fn=executor_fn,
             num_executors=num_executors,
             environment_spec=environment_spec,
+            trainer_networks=trainer_networks,
+            executor_samples=executor_samples,
             shared_weights=shared_weights,
-            agent_net_keys=agent_net_keys,
             discount=discount,
             batch_size=batch_size,
             prefetch_size=prefetch_size,
@@ -173,6 +179,7 @@ class MAD4PG(MADDPG):
             critic_optimizer=critic_optimizer,
             n_step=n_step,
             sequence_length=sequence_length,
+            bootstrap_n=bootstrap_n,
             period=period,
             sigma=sigma,
             max_gradient_norm=max_gradient_norm,

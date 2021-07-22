@@ -51,7 +51,7 @@ class ParallelAdder(adders.Adder):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {"": ()},
+        next_extras: Dict[str, types.NestedArray] = {"": ()},
     ) -> None:
         """Defines the adder `add` interface.
         Args:
@@ -59,6 +59,6 @@ class ParallelAdder(adders.Adder):
             a_t for each agent.
           next_timestep: A dm_env Timestep object corresponding to the resulting
             data obtained by taking the given action.
-          extras: Dictionary of a possibly nested structure of extra data to add
-            to replay.
+          next_extras: Dictionary of a possibly nested structure of extra data to add
+            to replay. This is linked to next_timestep.observation.
         """

@@ -33,12 +33,13 @@ ENV DISPLAY=:0
 RUN apt-get -y install git
 RUN python -m pip install git+https://github.com/oxwhirl/smac.git
 ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
-EXPOSE 6006
 RUN python -m pip uninstall -y enum34
 
 # Install Mava and dependencies
 COPY . /home/app/mava
 RUN python -m pip install --upgrade pip
 RUN python -m pip install -e .[flatland]
-RUN python -m pip install -e .[open_spiel] --no-cache
+RUN python -m pip install -e .[open_spiel]
 RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting,record_episode]
+
+EXPOSE 6006

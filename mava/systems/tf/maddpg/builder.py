@@ -34,6 +34,7 @@ from mava.systems.tf import executors, variable_utils
 from mava.systems.tf.maddpg import training
 from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerStatistics
 
 BoundedArray = dm_specs.BoundedArray
@@ -76,8 +77,10 @@ class MADDPGConfig:
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
     num_executors: int
-    num_trainers: int
     agent_net_keys: Dict[str, str]
+    trainer_networks: Dict[str, List]
+    table_network_config: Dict[str, List]
+    executor_samples: List
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -91,13 +94,14 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
+    bootstrap_n: int = 10
     max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
     logger: loggers.Logger = None
     counter: counting.Counter = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
-    replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    replay_table_name: str = "trainer"  # reverb_adders.DEFAULT_PRIORITY_TABLE
 
 
 class MADDPGBuilder:
@@ -171,6 +175,18 @@ class MADDPGBuilder:
                 )
         return env_adder_spec
 
+    def covert_specs(self, spec: Dict[str, Any], num_networks: int) -> Dict[str, Any]:
+        agents = sort_str_num(self._config.agent_net_keys.keys())[:num_networks]
+        converted_spec: Dict[str, Any] = {}
+        if agents[0] in spec:
+            for agent in agents:
+                converted_spec[agent] = spec[agent]
+        else:
+            # For the extras
+            for key in spec.keys():
+                converted_spec[key] = self.covert_specs(spec[key], num_networks)
+        return converted_spec
+
     def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
@@ -186,49 +202,84 @@ class MADDPGBuilder:
             List[reverb.Table]: a list of data tables for inserting data.
         """
 
+        # Select adder
         env_adder_spec = self.convert_discrete_to_bounded(environment_spec)
 
-        # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
-            adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
-                env_adder_spec, self._extra_specs
-            )
+
+            def adder_sig_fn(
+                env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
+            ) -> Any:
+                return reverb_adders.ParallelNStepTransitionAdder.signature(
+                    env_spec, extra_specs
+                )
+
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
-            adder_sig = reverb_adders.ParallelSequenceAdder.signature(
-                env_adder_spec, self._extra_specs
-            )
+
+            def adder_sig_fn(
+                env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
+            ) -> Any:
+                return reverb_adders.ParallelSequenceAdder.signature(
+                    env_spec, self._config.sequence_length, extra_specs
+                )
+
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
 
         if self._config.samples_per_insert is None:
             # We will take a samples_per_insert ratio of None to mean that there is
             # no limit, i.e. this only implies a min size limit.
-            limiter = reverb.rate_limiters.MinSize(self._config.min_replay_size)
+            def limiter_fn() -> reverb.rate_limiters:
+                return reverb.rate_limiters.MinSize(self._config.min_replay_size)
 
         else:
             # Create enough of an error buffer to give a 10% tolerance in rate.
             samples_per_insert_tolerance = 0.1 * self._config.samples_per_insert
             error_buffer = self._config.min_replay_size * samples_per_insert_tolerance
-            limiter = reverb.rate_limiters.SampleToInsertRatio(
-                min_size_to_sample=self._config.min_replay_size,
-                samples_per_insert=self._config.samples_per_insert,
-                error_buffer=error_buffer,
+
+            def limiter_fn() -> reverb.rate_limiters:
+                return reverb.rate_limiters.SampleToInsertRatio(
+                    min_size_to_sample=self._config.min_replay_size,
+                    samples_per_insert=self._config.samples_per_insert,
+                    error_buffer=error_buffer,
+                )
+
+        # Create table per trainer
+        replay_tables = []
+        for t_i in range(len(self._config.table_network_config.keys())):
+            # TODO (dries): Fix this. This does not work where one has shared agent
+            # weights in the single trainer setup.
+
+            # Convert a Mava spec
+            num_networks = len(self._config.table_network_config[f"trainer_{t_i}"])
+            env_spec = copy.deepcopy(env_adder_spec)
+            env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
+            env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
+            if env_spec.extra_specs is not None:
+                env_spec.extra_specs = self.covert_specs(
+                    env_spec.extra_specs, num_networks
+                )
+            extra_specs = self.covert_specs(
+                self._extra_specs,
+                num_networks,
             )
 
-        replay_table = reverb.Table(
-            name=self._config.replay_table_name,
-            sampler=reverb.selectors.Uniform(),
-            remover=reverb.selectors.Fifo(),
-            max_size=self._config.max_replay_size,
-            rate_limiter=limiter,
-            signature=adder_sig,
-        )
-
-        return [replay_table]
+            replay_tables.append(
+                reverb.Table(
+                    name=f"{self._config.replay_table_name}_{t_i}",
+                    sampler=reverb.selectors.Uniform(),
+                    remover=reverb.selectors.Fifo(),
+                    max_size=self._config.max_replay_size,
+                    rate_limiter=limiter_fn(),
+                    signature=adder_sig_fn(env_spec, extra_specs),
+                )
+            )
+        return replay_tables
 
     def make_dataset_iterator(
         self,
         replay_client: reverb.Client,
+        table_name: str,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for training/updating the system.
 
@@ -251,7 +302,7 @@ class MADDPGBuilder:
 
         """Create a dataset iterator to use for learning/updating the system."""
         dataset = datasets.make_reverb_dataset(
-            table=self._config.replay_table_name,
+            table=table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
@@ -275,20 +326,27 @@ class MADDPGBuilder:
         Returns:
             Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
         """
+        # Create custom priority functons for the adder
+        priority_fns = {
+            table_key: lambda x: 1.0
+            for table_key in self._config.table_network_config.keys()
+        }
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
-                priority_fns=None,
+                priority_fns=priority_fns,
                 client=replay_client,
                 n_step=self._config.n_step,
+                table_network_config=self._config.table_network_config,
                 discount=self._config.discount,
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder = reverb_adders.ParallelSequenceAdder(
-                priority_fns=None,
+                priority_fns=priority_fns,
                 client=replay_client,
                 sequence_length=self._config.sequence_length,
+                table_network_config=self._config.table_network_config,
                 period=self._config.period,
             )
         else:
@@ -329,7 +387,7 @@ class MADDPGBuilder:
         variables = {}
         # Network variables
         for net_type_key in networks.keys():
-            for net_key in set(self._config.agent_net_keys.values()):
+            for net_key in networks[net_type_key].keys():
                 # Ensure obs and target networks are sonnet modules
                 variables[f"{net_key}_{net_type_key}"] = tf2_utils.to_sonnet_module(
                     networks[net_type_key][net_key]
@@ -366,7 +424,7 @@ class MADDPGBuilder:
         variables = {}
         get_keys = []
 
-        for net_key in set(self._config.agent_net_keys.values()):
+        for net_key in policy_networks.keys():
             var_key = f"{net_key}_policies"
             variables[var_key] = policy_networks[net_key].variables
             get_keys.append(var_key)
@@ -404,6 +462,7 @@ class MADDPGBuilder:
             counts=counts,
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
+            executor_samples=self._config.executor_samples,
             variable_client=variable_client,
             adder=adder,
         )
@@ -413,7 +472,7 @@ class MADDPGBuilder:
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         variable_source: MavaVariableSource,
-        trainer_net_config: List[Any],
+        trainer_networks: List[Any],
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
@@ -432,7 +491,8 @@ class MADDPGBuilder:
             core.Trainer: system trainer, that uses the collected data from the
                 executors to update the parameters of the agent networks in the system.
         """
-        agents = self._agents
+        # This assumes agents are sort_str_num in the other methods
+        trainer_agents = self._agents[: len(trainer_networks)]
         agent_types = self._agent_types
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
@@ -444,12 +504,14 @@ class MADDPGBuilder:
         variables = {}
         set_keys = []
         get_keys = []
+        # TODO (dries): Only add the networks this trainer is working with.
+        # Not all of them.
         for net_type_key in networks.keys():
-            for net_key in set(self._config.agent_net_keys.values()):
+            for net_key in networks[net_type_key].keys():
                 variables[f"{net_key}_{net_type_key}"] = networks[net_type_key][
                     net_key
                 ].variables
-                if net_key in trainer_net_config:
+                if net_key in set(trainer_networks):
                     set_keys.append(f"{net_key}_{net_type_key}")
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")
@@ -478,10 +540,17 @@ class MADDPGBuilder:
         # Get all the initial variables
         variable_client.get_all_and_wait()
 
-        # trainer args
+        # Convert network keys for the trainer. Therefore the trainer
+        # TODO (dries): This still seems a bit hacky. Maybe there is a better way?
+        # Is this even correct?
+        print("Find better way here in builder.py.")
+        trainer_nets = list(self._config.agent_net_keys.values())
+        trainer_agent_net_keys = {
+            agent: trainer_nets[a_i] for a_i, agent in enumerate(trainer_agents)
+        }
+
         trainer_config: Dict[str, Any] = {
-            "agents": agents,
-            "trainer_net_config": trainer_net_config,
+            "agents": trainer_agents,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
@@ -489,7 +558,7 @@ class MADDPGBuilder:
             "target_policy_networks": networks["target_policies"],
             "target_critic_networks": networks["target_critics"],
             "target_observation_networks": networks["target_observations"],
-            "agent_net_keys": self._config.agent_net_keys,
+            "agent_net_keys": trainer_agent_net_keys,
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
             "max_gradient_norm": max_gradient_norm,
@@ -505,6 +574,9 @@ class MADDPGBuilder:
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
+
+        if issubclass(self._trainer_fn, training.MADDPGBaseRecurrentTrainer):
+            trainer_config["bootstrap_n"] = self._config.bootstrap_n
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(**trainer_config)

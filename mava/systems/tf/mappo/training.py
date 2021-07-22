@@ -116,7 +116,7 @@ class MAPPOTrainer(mava.Trainer):
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
 
-        self.unique_net_keys = set(self._agent_net_keys.values())
+        self.unique_net_keys = policy_networks.keys()
 
         # Create optimizers for different agent types.
         if not isinstance(policy_optimizer, dict):
@@ -271,6 +271,7 @@ class MAPPOTrainer(mava.Trainer):
         """
 
         # Convert to sequence data
+        # TODO(Kale-ab): Is this the recurrent trainer?
         data = tf2_utils.batch_to_sequence(inputs.data)
 
         # Unpack input data as follows:

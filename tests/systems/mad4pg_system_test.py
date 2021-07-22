@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for MADDPG."""
+"""Tests for mad4pg."""
 
 import functools
 
@@ -22,16 +22,16 @@ import sonnet as snt
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
-from mava.systems.tf import maddpg
+from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
 from mava.utils.environments import debugging_utils
 
 
-class TestMADDPG:
-    """Simple integration/smoke test for MADDPG."""
+class TestMAD4PG:
+    """Simple integration/smoke test for mad4pg."""
 
-    def test_maddpg_on_debugging_env(self) -> None:
+    def test_mad4pg_on_debugging_env(self) -> None:
         """Tests that the system can run on the simple spread
         debugging environment without crashing."""
 
@@ -44,11 +44,11 @@ class TestMADDPG:
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            maddpg.make_default_networks, policy_networks_layer_sizes=(64, 64)
+            mad4pg.make_default_networks, policy_networks_layer_sizes=(64, 64)
         )
 
         # system
-        system = maddpg.MADDPG(
+        system = mad4pg.MAD4PG(
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=2,
@@ -84,7 +84,7 @@ class TestMADDPG:
         for _ in range(2):
             trainer.step()
 
-    def test_recurrent_maddpg_on_debugging_env(self) -> None:
+    def test_recurrent_mad4pg_on_debugging_env(self) -> None:
         """Tests that the system can run on the simple spread
         debugging environment without crashing."""
 
@@ -97,13 +97,13 @@ class TestMADDPG:
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            maddpg.make_default_networks,
+            mad4pg.make_default_networks,
             archecture_type=ArchitectureType.recurrent,
             policy_networks_layer_sizes=(32, 32),
         )
 
         # system
-        system = maddpg.MADDPG(
+        system = mad4pg.MAD4PG(
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=2,
@@ -113,8 +113,8 @@ class TestMADDPG:
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
             checkpoint=False,
-            trainer_fn=maddpg.training.MADDPGDecentralisedRecurrentTrainer,
-            executor_fn=maddpg.execution.MADDPGRecurrentExecutor,
+            trainer_fn=mad4pg.training.MAD4PGDecentralisedRecurrentTrainer,
+            executor_fn=mad4pg.execution.MAD4PGRecurrentExecutor,
             sequence_length=4,
             period=4,
             bootstrap_n=2,

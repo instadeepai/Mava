@@ -16,16 +16,19 @@
 """MADDPG scaled system implementation."""
 
 import functools
+from enum import unique
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import acme
 import dm_env
 import launchpad as lp
+import numpy as np
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
 from acme.utils import loggers
+from dm_env import specs
 
 import mava
 from mava import core
@@ -34,10 +37,16 @@ from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import builder, training
-from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
+from mava.systems.tf.maddpg.execution import (
+    MADDPGFeedForwardExecutor,
+    sample_new_agent_keys,
+)
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 from mava.utils.loggers import MavaLogger, logger_utils
+from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import DetailedPerAgentStatistics
+
+Array = specs.Array
 
 
 class MADDPG:
@@ -57,10 +66,9 @@ class MADDPG:
         ] = training.MADDPGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
-        num_trainers: int = 1,
-        trainer_net_config: Dict[str, List] = {},
+        trainer_networks: Dict[str, List] = {},
+        executor_samples: List = [],
         shared_weights: bool = True,
-        agent_net_keys: Dict[str, str] = {},
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -79,6 +87,7 @@ class MADDPG:
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
+        bootstrap_n: int = 10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
         # max_executor_steps: int = None,
@@ -145,8 +154,11 @@ class MADDPG:
                 Defaults to 5.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 20.
-            period (int, optional): [consecutive starting points for overlapping
+            period (int, optional): Consecutive starting points for overlapping
                 rollouts across a sequence. Defaults to 20.
+            bootstrap_n (int, optional): Used to determine the spacing between
+                q_value/value estimation for bootstrapping. Should be less
+                than sequence_length.
             sigma (float, optional): Gaussian sigma parameter. Defaults to 0.3.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
@@ -184,28 +196,71 @@ class MADDPG:
                 time_delta=10,
             )
 
-        # Setup agent networks
-        self._agent_net_keys = agent_net_keys
-        if not agent_net_keys:
-            agents = environment_spec.get_agent_ids()
+        # Setup agent networks and executor sampler
+        agents = sort_str_num(environment_spec.get_agent_ids())
+        self._executor_samples = executor_samples
+        if not executor_samples:
+            # if no executor samples provided, use shared_weights to determine setup
             self._agent_net_keys = {
                 agent: agent.split("_")[0] if shared_weights else agent
                 for agent in agents
             }
+            self._executor_samples = [list(self._agent_net_keys.values())]
+        else:
+            # if executor samples provided, use executor_samples to determine setup
+            _, self._agent_net_keys = sample_new_agent_keys(
+                agents, self._executor_samples
+            )
 
-        # Setup trainer_net_config
-        self._trainer_net_config = trainer_net_config
+        # Check that the environment and agent_net_keys has the same amount of agents
+        sample_length = len(self._executor_samples[0])
+        assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
 
-        if not trainer_net_config:
-            if num_trainers > 1:
-                raise ValueError(
-                    "Warning: For more than one trainer the "
-                    "trainer_net_config needs to be specified."
-                )
+        # Check if the samples are of the same length and that they perfectly fit into the total number of agents
+        assert len(self._agent_net_keys.keys()) % sample_length == 0
+        for i in range(1, len(self._executor_samples)):
+            assert len(self._executor_samples[i]) == sample_length
 
-            self._trainer_net_config["trainer_0"] = [
-                net_key for net_key in set(self._agent_net_keys.values())
-            ]
+        # Get all the unique agent network keys
+        all_samples = []
+        for sample in self._executor_samples:
+            all_samples.extend(sample)
+        all_unique_net_keys = set(all_samples)
+
+        # Setup trainer_networks
+        if not trainer_networks:
+            self._trainer_networks = {"trainer_0": list(all_unique_net_keys)}
+        else:
+            self._trainer_networks = trainer_networks
+
+        # Get all the unique trainer network keys
+        all_trainer_net_keys = []
+        for trainer_nets in self._trainer_networks.values():
+            all_trainer_net_keys.extend(trainer_nets)
+        unique_trainer_net_keys = set(all_trainer_net_keys)
+
+        # Check that all agent_net_keys are in trainer_networks
+        assert all_unique_net_keys == unique_trainer_net_keys
+
+        # Setup specs for each network
+        self._net_spec_keys = {}
+        unique_net_keys = sort_str_num(list(set(all_unique_net_keys)))
+        for i in range(len(unique_net_keys)):
+            self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
+
+        # Setup table_network_config
+        table_network_config = {}
+        for t_id in range(len(self._trainer_networks.keys())):
+            most_matches = 0
+            trainer_nets = self._trainer_networks[f"trainer_{t_id}"]
+            for sample in self._executor_samples:
+                matches = 0
+                for entry in sample:
+                    if entry in trainer_nets:
+                        matches += 1
+                if most_matches < matches:
+                    matches = most_matches
+                    table_network_config[f"trainer_{t_id}"] = sample
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -213,7 +268,6 @@ class MADDPG:
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
         self._num_exectors = num_executors
-        self._num_trainers = num_trainers
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
         self._logger_config = logger_config
@@ -229,17 +283,24 @@ class MADDPG:
         else:
             self._connection_spec = None  # type: ignore
 
+        extra_specs = {}
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
-        else:
-            extra_specs = {}
+
+        # Used to store the agents network keys
+        str_spec = Array((), dtype=np.dtype("U10"))
+        agents = environment_spec.get_agent_ids()
+        net_spec = {"network_keys": {agent: str_spec for agent in agents}}
+        extra_specs.update(net_spec)
 
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
                 agent_net_keys=self._agent_net_keys,
-                num_trainers=num_trainers,
+                trainer_networks=self._trainer_networks,
+                table_network_config=table_network_config,
                 num_executors=num_executors,
+                executor_samples=self._executor_samples,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -253,6 +314,7 @@ class MADDPG:
                 n_step=n_step,
                 sequence_length=sequence_length,
                 period=period,
+                bootstrap_n=bootstrap_n,
                 sigma=sigma,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
@@ -276,6 +338,7 @@ class MADDPG:
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
             agent_net_keys=self._agent_net_keys,
+            net_spec_keys=self._net_spec_keys,
         )
         for agent in agents:
             # agent_type = agent.split("_")[0]
@@ -304,6 +367,7 @@ class MADDPG:
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
             agent_net_keys=self._agent_net_keys,
+            net_spec_keys=self._net_spec_keys,
         )
 
         # Create system architecture with target networks.
@@ -318,7 +382,12 @@ class MADDPG:
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
             "agent_net_keys": self._agent_net_keys,
+            "net_spec_keys": self._net_spec_keys,
         }
+
+        # TODO (dries): Can net_spec_keys and network_spec be used as
+        # the same thing? Can we use use one of those two instead of both.
+
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
         system = self._architecture(**architecture_config)
@@ -463,12 +532,14 @@ class MADDPG:
         # Create the system
         _, system_networks = self.create_system()
 
-        dataset = self._builder.make_dataset_iterator(replay)
+        dataset = self._builder.make_dataset_iterator(
+            replay, f"{self._builder._config.replay_table_name}_{trainer_id}"
+        )
 
         return self._builder.make_trainer(
             # trainer_id=trainer_id,
             networks=system_networks,
-            trainer_net_config=self._trainer_net_config[f"trainer_{trainer_id}"],
+            trainer_networks=self._trainer_networks[f"trainer_{trainer_id}"],
             dataset=dataset,
             logger=trainer_logger,
             connection_spec=self._connection_spec,
@@ -492,7 +563,7 @@ class MADDPG:
 
         with program.group("trainer"):
             # Add executors which pull round-robin from our variable sources.
-            for trainer_id in range(self._num_trainers):
+            for trainer_id in range(len(self._trainer_networks.keys())):
                 program.add_node(
                     lp.CourierNode(self.trainer, trainer_id, replay, variable_server)
                 )

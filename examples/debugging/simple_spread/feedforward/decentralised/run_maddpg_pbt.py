@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Example running feedforward MADDPG on debug MPE environments."""
 
 import functools
@@ -28,6 +27,10 @@ from mava.systems.tf import maddpg
 from mava.systems.tf.maddpg import make_default_networks
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
+
+# TODO (dries): Update all the other algorithms to also use
+# types.transition in their transition based trainers.
+print("Remember the above TODO in run_maddpg_pbt.py")
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -55,6 +58,7 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        num_agents=4,
     )
 
     # networks
@@ -97,18 +101,29 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_config=logger_config,
-        num_executors=2,
+        num_executors=6,
         shared_weights=False,
-        trainer_net_config={
-            "trainer_0": ["agent_0"],
-            "trainer_1": ["agent_1"],
-            "trainer_2": ["agent_2"],
-        },
         agent_net_keys={
             "agent_0": "agent_0",
             "agent_1": "agent_1",
             "agent_2": "agent_2",
+            "agent_3": "agent_3",
         },
+        trainer_net_config={
+            "trainer_0": ["agent_0", "agent_3"],
+            "trainer_1": ["agent_1", "agent_4"],
+            "trainer_2": ["agent_2", "agent_5"],
+            "trainer_3": ["agent_6", "agent_9"],
+            "trainer_4": ["agent_7", "agent_8"],
+        },
+        do_pbt=True,
+        executor_samples=[
+            ["agent_0", "agent_3"],
+            ["agent_1", "agent_4"],
+            ["agent_2", "agent_5"],
+            ["agent_6", "agent_9"],
+            ["agent_7", "agent_8"],
+        ],
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
