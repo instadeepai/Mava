@@ -18,12 +18,17 @@ import functools
 from datetime import datetime
 from typing import Any
 
+
 import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
-from mava.systems.tf import maddpg
+from mava.systems.tf import maddpg as true_maddpg
+
+
+
+from mava.systems.tf import maddpg as maddpg
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
 from mava.utils.environments import debugging_utils
@@ -45,7 +50,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "/home/mava_logs/", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -59,7 +64,7 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        maddpg.make_default_networks, archecture_type=ArchitectureType.recurrent
+        true_maddpg.make_default_networks, archecture_type=ArchitectureType.recurrent
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.

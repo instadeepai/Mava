@@ -13,21 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG scaled system implementation."""
+"""MADDPG system implementation."""
 
 import functools
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 import acme
 import dm_env
 import launchpad as lp
-import numpy as np
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
-from acme.utils import loggers
-from dm_env import specs
+from acme.utils import counting, loggers
 
 import mava
 from mava import core
@@ -35,23 +33,18 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedQValueActorCritic
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
-from mava.systems.tf.maddpg import builder, training
-from mava.systems.tf.maddpg.execution import (
-    MADDPGFeedForwardExecutor,
-    sample_new_agent_keys,
-)
-from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.systems.tf import savers as tf2_savers
+from mava.systems.tf.maddpg_old import builder, training
+from mava.systems.tf.maddpg_old.execution import MADDPGFeedForwardExecutor
+from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
-from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import DetailedPerAgentStatistics
-
-Array = specs.Array
 
 
 class MADDPG:
     """MADDPG system."""
 
-    def __init__(  # noqa
+    def __init__(
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
@@ -65,10 +58,10 @@ class MADDPG:
         ] = training.MADDPGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
-        trainer_networks: Dict[str, List] = {},
-        executor_samples: List = [],
-        shared_weights: bool = True,
+        num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
+        shared_weights: bool = True,
+        agent_net_keys: Dict[str, str] = {},
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -89,7 +82,7 @@ class MADDPG:
         bootstrap_n: int = 10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
-        # max_executor_steps: int = None,
+        max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         logger_config: Dict = {},
@@ -179,6 +172,7 @@ class MADDPG:
                 the evaluation loop. Defaults to {}.
             connection_spec (Callable[[Dict[str, List[str]]], Dict[str, List[str]]],
                 optional): network topology specification for networked system
+                architectures. Defaults to None.
         """
 
         if not environment_spec:
@@ -195,72 +189,14 @@ class MADDPG:
                 time_delta=10,
             )
 
-        # Setup agent networks and executor sampler
-        agents = sort_str_num(environment_spec.get_agent_ids())
-        self._executor_samples = executor_samples
-        if not executor_samples:
-            # if no executor samples provided, use shared_weights to determine setup
+        # Setup agent networks
+        self._agent_net_keys = agent_net_keys
+        if not agent_net_keys:
+            agents = environment_spec.get_agent_ids()
             self._agent_net_keys = {
                 agent: agent.split("_")[0] if shared_weights else agent
                 for agent in agents
             }
-            self._executor_samples = [list(self._agent_net_keys.values())]
-        else:
-            # if executor samples provided, use executor_samples to determine setup
-            _, self._agent_net_keys = sample_new_agent_keys(
-                agents, self._executor_samples
-            )
-
-        # Check that the environment and agent_net_keys has the same amount of agents
-        sample_length = len(self._executor_samples[0])
-        assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
-
-        # Check if the samples are of the same length and that they perfectly fit
-        # into the total number of agents
-        assert len(self._agent_net_keys.keys()) % sample_length == 0
-        for i in range(1, len(self._executor_samples)):
-            assert len(self._executor_samples[i]) == sample_length
-
-        # Get all the unique agent network keys
-        all_samples = []
-        for sample in self._executor_samples:
-            all_samples.extend(sample)
-        all_unique_net_keys = set(all_samples)
-
-        # Setup trainer_networks
-        if not trainer_networks:
-            self._trainer_networks = {"trainer_0": list(all_unique_net_keys)}
-        else:
-            self._trainer_networks = trainer_networks
-
-        # Get all the unique trainer network keys
-        all_trainer_net_keys = []
-        for trainer_nets in self._trainer_networks.values():
-            all_trainer_net_keys.extend(trainer_nets)
-        unique_trainer_net_keys = set(all_trainer_net_keys)
-
-        # Check that all agent_net_keys are in trainer_networks
-        assert all_unique_net_keys == unique_trainer_net_keys
-
-        # Setup specs for each network
-        self._net_spec_keys = {}
-        unique_net_keys = sort_str_num(list(set(all_unique_net_keys)))
-        for i in range(len(unique_net_keys)):
-            self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
-
-        # Setup table_network_config
-        table_network_config = {}
-        for t_id in range(len(self._trainer_networks.keys())):
-            most_matches = 0
-            trainer_nets = self._trainer_networks[f"trainer_{t_id}"]
-            for sample in self._executor_samples:
-                matches = 0
-                for entry in sample:
-                    if entry in trainer_nets:
-                        matches += 1
-                if most_matches < matches:
-                    matches = most_matches
-                    table_network_config[f"trainer_{t_id}"] = sample
 
         self._architecture = architecture
         self._environment_factory = environment_factory
@@ -268,6 +204,8 @@ class MADDPG:
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
         self._num_exectors = num_executors
+        self._num_caches = num_caches
+        self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
         self._logger_config = logger_config
@@ -283,24 +221,15 @@ class MADDPG:
         else:
             self._connection_spec = None  # type: ignore
 
-        extra_specs = {}
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
-
-        # Used to store the agents network keys
-        str_spec = Array((), dtype=np.dtype("U10"))
-        agents = environment_spec.get_agent_ids()
-        net_spec = {"network_keys": {agent: str_spec for agent in agents}}
-        extra_specs.update(net_spec)
+        else:
+            extra_specs = {}
 
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
                 agent_net_keys=self._agent_net_keys,
-                trainer_networks=self._trainer_networks,
-                table_network_config=table_network_config,
-                num_executors=num_executors,
-                executor_samples=self._executor_samples,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -338,36 +267,77 @@ class MADDPG:
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
             agent_net_keys=self._agent_net_keys,
-            net_spec_keys=self._net_spec_keys,
         )
         for agent in agents:
-            # agent_type = agent.split("_")[0]
-            agent_net_key = self._agent_net_keys[agent]
+            agent_type = agent.split("_")[0]
             core_state_specs[agent] = (
                 tf2_utils.squeeze_batch_dim(
-                    networks["policies"][agent_net_key].initial_state(1)
+                    networks["policies"][agent_type].initial_state(1)
                 ),
             )
         return {"core_states": core_state_specs}
 
     def replay(self) -> Any:
+        """Replay data storage.
+        Returns:
+            Any: replay data table built according the environment specification.
+        """
+
+        return self._builder.make_replay_tables(self._environment_spec)
+
+    def counter(self, checkpoint: bool) -> Any:
         """Step counter
         Args:
             checkpoint (bool): whether to checkpoint the counter.
         Returns:
             Any: step counter object.
         """
-        return self._builder.make_replay_tables(self._environment_spec)
 
-    def create_system(
+        if checkpoint:
+            return tf2_savers.CheckpointingRunner(
+                counting.Counter(),
+                time_delta_minutes=15,
+                directory=self._checkpoint_subpath,
+                subdirectory="counter",
+            )
+        else:
+            return counting.Counter()
+
+    def coordinator(self, counter: counting.Counter) -> Any:
+        """Coordination helper for a distributed program
+        Args:
+            counter (counting.Counter): step counter object.
+        Returns:
+            Any: step limiter object.
+        """
+
+        return lp_utils.StepsLimiter(counter, self._max_executor_steps)
+
+    def trainer(
         self,
-    ) -> Tuple[DecentralisedQValueActorCritic, Dict[str, Dict[str, snt.Module]]]:
-        """Initialise the system variables from the network factory."""
+        replay: reverb.Client,
+        counter: counting.Counter,
+    ) -> mava.core.Trainer:
+        """System trainer
+        Args:
+            replay (reverb.Client): replay data table to pull data from.
+            counter (counting.Counter): step counter object.
+        Returns:
+            mava.core.Trainer: system trainer.
+        """
+
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,
             agent_net_keys=self._agent_net_keys,
-            net_spec_keys=self._net_spec_keys,
+        )
+
+        # create logger
+        trainer_logger_config = {}
+        if self._logger_config and "trainer" in self._logger_config:
+            trainer_logger_config = self._logger_config["trainer"]
+        trainer_logger = self._logger_factory(  # type: ignore
+            "trainer", **trainer_logger_config
         )
 
         # Create system architecture with target networks.
@@ -382,28 +352,29 @@ class MADDPG:
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
             "agent_net_keys": self._agent_net_keys,
-            "net_spec_keys": self._net_spec_keys,
         }
-
-        # TODO (dries): Can net_spec_keys and network_spec be used as
-        # the same thing? Can we use use one of those two instead of both.
-
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
-        system = self._architecture(**architecture_config)
-        return system, system.create_system()
 
-    def variable_server(self) -> MavaVariableSource:
-        """Create the variable server."""
-        # Create the system
-        _, system_networks = self.create_system()
-        return self._builder.make_variable_server(system_networks)
+        system_networks = self._architecture(**architecture_config).create_system()
+
+        dataset = self._builder.make_dataset_iterator(replay)
+        counter = counting.Counter(counter, "trainer")
+
+        return self._builder.make_trainer(
+            networks=system_networks,
+            dataset=dataset,
+            counter=counter,
+            logger=trainer_logger,
+            connection_spec=self._connection_spec,
+        )
 
     def executor(
         self,
         executor_id: str,
         replay: reverb.Client,
         variable_source: acme.VariableSource,
+        counter: counting.Counter,
     ) -> mava.ParallelEnvironmentLoop:
         """System executor
         Args:
@@ -416,15 +387,34 @@ class MADDPG:
             mava.ParallelEnvironmentLoop: environment-executor loop instance.
         """
 
-        # Create the system
-        system, _ = self.create_system()
+        # Create the behavior policy.
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
+        )
+
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "agent_net_keys": self._agent_net_keys,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
+        # Create system architecture with target networks.
+        system = self._architecture(**architecture_config)
+
+        # create variables
+        _ = system.create_system()
 
         # behaviour policy networks (obs net + policy head)
         behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the executor.
         executor = self._builder.make_executor(
-            # executor_id=executor_id,
             policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
@@ -433,6 +423,9 @@ class MADDPG:
         # TODO (Arnu): figure out why factory function are giving type errors
         # Create the environment.
         environment = self._environment_factory(evaluation=False)  # type: ignore
+
+        # Create logger and counter; actors will not spam bigtable.
+        counter = counting.Counter(counter, "executor")
 
         # Create executor logger
         executor_logger_config = {}
@@ -446,6 +439,7 @@ class MADDPG:
         train_loop = self._train_loop_fn(
             environment,
             executor,
+            counter=counter,
             logger=exec_logger,
             **self._train_loop_fn_kwargs,
         )
@@ -457,6 +451,7 @@ class MADDPG:
     def evaluator(
         self,
         variable_source: acme.VariableSource,
+        counter: counting.Counter,
         logger: loggers.Logger = None,
     ) -> Any:
         """System evaluator (an executor process not connected to a dataset)
@@ -470,15 +465,34 @@ class MADDPG:
                 performance of a system.
         """
 
-        # Create the system
-        system, _ = self.create_system()
+        # Create the behavior policy.
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
+        )
+
+        # architecture args
+        architecture_config = {
+            "environment_spec": self._environment_spec,
+            "observation_networks": networks["observations"],
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "agent_net_keys": self._agent_net_keys,
+        }
+        if self._connection_spec:
+            architecture_config["network_spec"] = self._connection_spec
+
+        # Create system architecture with target networks.
+        system = self._architecture(**architecture_config)
+
+        # create variables
+        _ = system.create_system()
 
         # behaviour policy networks (obs net + policy head)
         behaviour_policy_networks = system.create_behaviour_policy()
 
         # Create the agent.
         executor = self._builder.make_executor(
-            # executor_id="evaluator",
             policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
         )
@@ -487,6 +501,7 @@ class MADDPG:
         environment = self._environment_factory(evaluation=True)  # type: ignore
 
         # Create logger and counter.
+        counter = counting.Counter(counter, "evaluator")
         evaluator_logger_config = {}
         if self._logger_config and "evaluator" in self._logger_config:
             evaluator_logger_config = self._logger_config["evaluator"]
@@ -499,52 +514,13 @@ class MADDPG:
         eval_loop = self._eval_loop_fn(
             environment,
             executor,
+            counter=counter,
             logger=eval_logger,
             **self._eval_loop_fn_kwargs,
         )
 
         eval_loop = DetailedPerAgentStatistics(eval_loop)
         return eval_loop
-
-    def trainer(
-        self,
-        trainer_id: str,
-        replay: reverb.Client,
-        variable_source: MavaVariableSource,
-        # counter: counting.Counter,
-    ) -> mava.core.Trainer:
-        """System trainer
-        Args:
-            replay (reverb.Client): replay data table to pull data from.
-            counter (counting.Counter): step counter object.
-        Returns:
-            mava.core.Trainer: system trainer.
-        """
-
-        # create logger
-        trainer_logger_config = {}
-        if self._logger_config and "trainer" in self._logger_config:
-            trainer_logger_config = self._logger_config["trainer"]
-        trainer_logger = self._logger_factory(  # type: ignore
-            f"trainer_{trainer_id}", **trainer_logger_config
-        )
-
-        # Create the system
-        _, system_networks = self.create_system()
-
-        dataset = self._builder.make_dataset_iterator(
-            replay, f"{self._builder._config.replay_table_name}_{trainer_id}"
-        )
-
-        return self._builder.make_trainer(
-            # trainer_id=trainer_id,
-            networks=system_networks,
-            trainer_networks=self._trainer_networks[f"trainer_{trainer_id}"],
-            dataset=dataset,
-            logger=trainer_logger,
-            connection_spec=self._connection_spec,
-            variable_source=variable_source,
-        )
 
     def build(self, name: str = "maddpg") -> Any:
         """Build the distributed system as a graph program.
@@ -553,29 +529,46 @@ class MADDPG:
         Returns:
             Any: graph program for distributed system training.
         """
+
         program = lp.Program(name=name)
 
         with program.group("replay"):
             replay = program.add_node(lp.ReverbNode(self.replay))
 
-        with program.group("variable_server"):
-            variable_server = program.add_node(lp.CourierNode(self.variable_server))
+        with program.group("counter"):
+            counter = program.add_node(lp.CourierNode(self.counter, self._checkpoint))
+
+        if self._max_executor_steps:
+            with program.group("coordinator"):
+                _ = program.add_node(lp.CourierNode(self.coordinator, counter))
 
         with program.group("trainer"):
-            # Add executors which pull round-robin from our variable sources.
-            for trainer_id in range(len(self._trainer_networks.keys())):
-                program.add_node(
-                    lp.CourierNode(self.trainer, trainer_id, replay, variable_server)
-                )
+            trainer = program.add_node(lp.CourierNode(self.trainer, replay, counter))
 
         with program.group("evaluator"):
-            program.add_node(lp.CourierNode(self.evaluator, variable_server))
+            program.add_node(lp.CourierNode(self.evaluator, trainer, counter))
+
+        if not self._num_caches:
+            # Use the trainer as a single variable source.
+            sources = [trainer]
+        else:
+            with program.group("cacher"):
+                # Create a set of trainer caches.
+                sources = []
+                for _ in range(self._num_caches):
+                    cacher = program.add_node(
+                        lp.CacherNode(
+                            trainer, refresh_interval_ms=2000, stale_after_ms=4000
+                        )
+                    )
+                    sources.append(cacher)
 
         with program.group("executor"):
             # Add executors which pull round-robin from our variable sources.
             for executor_id in range(self._num_exectors):
+                source = sources[executor_id % len(sources)]
                 program.add_node(
-                    lp.CourierNode(self.executor, executor_id, replay, variable_server)
+                    lp.CourierNode(self.executor, executor_id, replay, source, counter)
                 )
 
         return program

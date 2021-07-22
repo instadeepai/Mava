@@ -15,13 +15,12 @@
 
 """Implementations of a MADDPG agent."""
 
-from mava.systems.tf.maddpg.networks import make_default_networks
-from mava.systems.tf.maddpg.execution import (
+from mava.systems.tf.maddpg_old.execution import (
     MADDPGFeedForwardExecutor,
     MADDPGRecurrentExecutor,
 )
-from mava.systems.tf.maddpg.system import MADDPG
-from mava.systems.tf.maddpg.training import (
+from mava.systems.tf.maddpg_old.system import MADDPG
+from mava.systems.tf.maddpg_old.training import (
     MADDPGBaseRecurrentTrainer,
     MADDPGBaseTrainer,
     MADDPGCentralisedRecurrentTrainer,
@@ -32,7 +31,3 @@ from mava.systems.tf.maddpg.training import (
     MADDPGStateBasedRecurrentTrainer,
     MADDPGStateBasedTrainer,
 )
-
-
-
-
