@@ -27,7 +27,7 @@ try:
     import pygame
     from pysc2.lib import colors, features, point, transform
     from pysc2.lib.renderer_human import _Surface
-    from smac.env import StarCraft2Env  # type:ignore
+    from smac.env import StarCraft2Env
 except ModuleNotFoundError:
     pass
 

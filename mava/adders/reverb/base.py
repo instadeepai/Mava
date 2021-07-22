@@ -181,7 +181,7 @@ class ReverbParallelAdder(ReverbAdder):
 
         if next_timestep.last():
             # Complete the row by appending zeros to remaining open fields.
-            # TODO(b/183945808): remove this when fields are no longer expected to be
+            # TODO(acme): remove this when fields are no longer expected to be
             # of equal length on the learner side.
             dummy_step = tree.map_structure(np.zeros_like, current_step)
             self._writer.append(dummy_step)

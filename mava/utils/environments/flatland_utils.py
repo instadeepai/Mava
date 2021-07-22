@@ -16,9 +16,13 @@
 from typing import Any, Callable, Dict, Tuple, Union
 
 import numpy as np
-from flatland.envs.rail_env import RailEnv
 
 from mava.wrappers.flatland import FlatlandEnvWrapper
+
+try:
+    from flatland.envs.rail_env import RailEnv
+except ModuleNotFoundError:
+    pass
 
 
 def load_flatland_env(env_config: Dict[str, Any]) -> RailEnv:

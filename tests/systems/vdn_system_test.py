@@ -31,9 +31,7 @@ class TestVdn:
     """Simple integration/smoke test for Vdn."""
 
     def test_vdn_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
-
+        """Test feedforward vdn."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,

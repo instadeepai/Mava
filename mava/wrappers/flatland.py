@@ -24,8 +24,12 @@ import dm_env
 import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
-from flatland.envs.observations import GlobalObsForRailEnv, Node, TreeObsForRailEnv
-from flatland.envs.rail_env import RailEnv
+
+try:
+    from flatland.envs.observations import GlobalObsForRailEnv, Node, TreeObsForRailEnv
+    from flatland.envs.rail_env import RailEnv
+except ModuleNotFoundError:
+    pass
 from gym.spaces import Discrete
 from gym.spaces.box import Box
 

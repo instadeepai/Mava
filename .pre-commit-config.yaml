@@ -64,7 +64,7 @@ repos:
     hooks:
     -   id: pydocstyle
         name: Checking docstring style.
-        args: ["--convention=google","--add-ignore=D100,D202,D101"]
+        args: ["--convention=google","--add-ignore=D100,D202,D101,D415"]
 
   - repo: https://github.com/econchick/interrogate
     rev: 1.4.0

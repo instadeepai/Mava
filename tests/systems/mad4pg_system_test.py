@@ -22,6 +22,7 @@ import sonnet as snt
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
+from mava.components.tf import architectures
 from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
@@ -32,9 +33,7 @@ class TestMAD4PG:
     """Simple integration/smoke test for mad4pg."""
 
     def test_mad4pg_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
-
+        """Test feedforward mad4pg."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -85,9 +84,7 @@ class TestMAD4PG:
             trainer.step()
 
     def test_recurrent_mad4pg_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
-
+        """Test recurrent mad4pg."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -118,6 +115,117 @@ class TestMAD4PG:
             sequence_length=4,
             period=4,
             bootstrap_n=2,
+        )
+        program = system.build()
+
+        (trainer_node,) = program.groups["trainer"]
+        trainer_node.disable_run()
+
+        # Launch gpu config - don't use gpu
+        gpu_id = -1
+        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+        local_resources = {
+            "trainer": PythonProcess(env=env_vars),
+            "evaluator": PythonProcess(env=env_vars),
+            "executor": PythonProcess(env=env_vars),
+        }
+
+        lp.launch(
+            program,
+            launch_type="test_mt",
+            local_resources=local_resources,
+        )
+
+        trainer: mava.Trainer = trainer_node.create_handle().dereference()
+
+        for _ in range(2):
+            trainer.step()
+
+    def test_centralised_mad4pg_on_debugging_env(self) -> None:
+        """Test centralised mad4pg."""
+        # environment
+        environment_factory = functools.partial(
+            debugging_utils.make_environment,
+            env_name="simple_spread",
+            action_space="continuous",
+        )
+
+        # networks
+        network_factory = lp_utils.partial_kwargs(
+            mad4pg.make_default_networks,
+            policy_networks_layer_sizes=(32, 32),
+        )
+
+        # system
+        system = mad4pg.MAD4PG(
+            environment_factory=environment_factory,
+            network_factory=network_factory,
+            num_executors=2,
+            batch_size=16,
+            min_replay_size=16,
+            max_replay_size=1000,
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            checkpoint=False,
+            architecture=architectures.CentralisedQValueCritic,
+            trainer_fn=mad4pg.MAD4PGCentralisedTrainer,
+            shared_weights=False,
+        )
+        program = system.build()
+
+        (trainer_node,) = program.groups["trainer"]
+        trainer_node.disable_run()
+
+        # Launch gpu config - don't use gpu
+        gpu_id = -1
+        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+        local_resources = {
+            "trainer": PythonProcess(env=env_vars),
+            "evaluator": PythonProcess(env=env_vars),
+            "executor": PythonProcess(env=env_vars),
+        }
+
+        lp.launch(
+            program,
+            launch_type="test_mt",
+            local_resources=local_resources,
+        )
+
+        trainer: mava.Trainer = trainer_node.create_handle().dereference()
+
+        for _ in range(2):
+            trainer.step()
+
+    def test_state_based_mad4pg_on_debugging_env(self) -> None:
+        """Test state based mad4pg."""
+        # environment
+        environment_factory = functools.partial(
+            debugging_utils.make_environment,
+            env_name="simple_spread",
+            action_space="continuous",
+            return_state_info=True,
+        )
+
+        # networks
+        network_factory = lp_utils.partial_kwargs(
+            mad4pg.make_default_networks,
+            policy_networks_layer_sizes=(32, 32),
+        )
+
+        # system
+        system = mad4pg.MAD4PG(
+            environment_factory=environment_factory,
+            network_factory=network_factory,
+            num_executors=2,
+            batch_size=16,
+            min_replay_size=16,
+            max_replay_size=1000,
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            checkpoint=False,
+            trainer_fn=mad4pg.MAD4PGStateBasedTrainer,
+            architecture=architectures.StateBasedQValueCritic,
+            shared_weights=False,
         )
         program = system.build()
 

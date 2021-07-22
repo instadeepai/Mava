@@ -17,6 +17,7 @@
 # https://github.com/deepmind/acme/blob/master/acme/adders/reverb/sequence.py
 
 """Sequence adders.
+
 This implements adders which add sequences or partial trajectories.
 """
 
@@ -54,7 +55,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         *,
         delta_encoded: bool = False,
         priority_fns: Optional[base.PriorityFnMapping] = None,
-        max_in_flight_items: Optional[int] = 2,
+        max_in_flight_items: int = 2,
         end_of_episode_behavior: Optional[EndBehavior] = EndBehavior.ZERO_PAD,
         use_next_extras: bool = True,
     ):
@@ -93,7 +94,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
             max_sequence_length=sequence_length + 1,
             delta_encoded=delta_encoded,
             priority_fns=priority_fns,
-            max_in_flight_items=max_in_flight_items,  # type: ignore
+            max_in_flight_items=max_in_flight_items,
             use_next_extras=use_next_extras,
         )
 
@@ -120,7 +121,6 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         if not first_write and not period_reached and not force:
             return
 
-        # TODO(b/183945808): will need to change to adhere to the new protocol.
         if not end_of_episode:
             get_traj = operator.itemgetter(slice(-sequence_length - 1, -1))
         else:
@@ -144,6 +144,17 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         sequence_length: Optional[int] = None,
         extras_spec: NestedSpec = (),
     ) -> tf.TypeSpec:
+        """Returns adder signature.
+
+        Args:
+            environment_spec (specs.EnvironmentSpec): Spec of MA environment.
+            sequence_length (Optional[int], optional): Length of sequence.
+                Defaults to None.
+            extras_spec (NestedSpec, optional): Spec for extra data. Defaults to ().
+
+        Returns:
+            tf.TypeSpec: Signature for sequence adder.
+        """
         return trajectory_signature(
             environment_spec=environment_spec,
             sequence_length=sequence_length,

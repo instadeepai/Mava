@@ -17,6 +17,7 @@
 # https://github.com/deepmind/acme/blob/master/acme/adders/reverb/transition.py
 
 """Transition adders.
+
 This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
@@ -41,6 +42,7 @@ from mava.utils.sort_utils import sort_str_num
 
 class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
     """An N-step transition adder.
+
     This will buffer a sequence of N timesteps in order to form a single N-step
     transition which is added to reverb for future retrieval.
     For N=1 the data added to replay will be a standard one-step transition which
@@ -69,6 +71,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         i.e. it is the episode termination signal.
       s_{t+n}: The "arrival" state, i.e. the state at time t+n.
       e_t [Optional]: A nested structure of any 'extras' the user wishes to add.
+
     Notes:
       - At the beginning and end of episodes, shorter transitions are added.
         That is, at the beginning of the episode, it will add:
@@ -90,6 +93,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         max_in_flight_items: int = 5,
     ) -> None:
         """Creates an N-step transition adder.
+
         Args:
           client: A `reverb.Client` to send the data to replay through.
           n_step: The "N" in N-step transition. See the class docstring for the
@@ -99,6 +103,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
           discount: Discount factor to apply. This corresponds to the
             agent's discount in the class docstring.
           priority_fns: See docstring for BaseAdder.
+
         Raises:
           ValueError: If n_step is less than 1.
         """
@@ -131,8 +136,6 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # obtain its numpy values.
         def get_all_np(x: np.array) -> np.array:
             return x[self._first_idx : self._last_idx].numpy()
-
-        # get_all_np = lambda x: x[self._first_idx : self._last_idx].numpy()
 
         # Get the state, action, next_state, as well as possibly extras for the
         # transition that is about to be written.
@@ -338,6 +341,15 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         environment_spec: mava_specs.EnvironmentSpec,
         extras_spec: tf.TypeSpec = {},
     ) -> tf.TypeSpec:
+        """Signature for adder.
+
+        Args:
+            environment_spec (mava_specs.EnvironmentSpec): MA environment spec.
+            extras_spec (tf.TypeSpec, optional): Spec for extras data. Defaults to {}.
+
+        Returns:
+            tf.TypeSpec: Signature for transition adder.
+        """
 
         # This function currently assumes that self._discount is a scalar.
         # If it ever becomes a nested structure and/or a np.ndarray, this method

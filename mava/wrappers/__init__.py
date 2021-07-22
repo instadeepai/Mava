@@ -25,11 +25,10 @@ from mava.wrappers.pettingzoo import (
     PettingZooParallelEnvWrapper,
 )
 from mava.wrappers.robocup import RoboCupWrapper
+from mava.wrappers.smac import SMACEnvWrapper
 
 try:
-    from smac.env import StarCraft2Env  # type:ignore
-
-    from mava.wrappers.smac import SMACEnvWrapper
+    from smac.env import StarCraft2Env
 except ModuleNotFoundError:
     pass
 from mava.wrappers.system_trainer_statistics import (

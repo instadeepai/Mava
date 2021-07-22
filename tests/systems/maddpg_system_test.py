@@ -22,6 +22,8 @@ import sonnet as snt
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
+from mava.components.tf import architectures
+from mava.components.tf.architectures.utils import fully_connected_network_spec
 from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
@@ -32,8 +34,7 @@ class TestMADDPG:
     """Simple integration/smoke test for MADDPG."""
 
     def test_maddpg_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
+        """Test feedforward maddpg."""
 
         # environment
         environment_factory = functools.partial(
@@ -85,9 +86,7 @@ class TestMADDPG:
             trainer.step()
 
     def test_recurrent_maddpg_on_debugging_env(self) -> None:
-        """Tests that the system can run on the simple spread
-        debugging environment without crashing."""
-
+        """Test recurrent maddpg."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -118,6 +117,173 @@ class TestMADDPG:
             sequence_length=4,
             period=4,
             bootstrap_n=2,
+        )
+        program = system.build()
+
+        (trainer_node,) = program.groups["trainer"]
+        trainer_node.disable_run()
+
+        # Launch gpu config - don't use gpu
+        gpu_id = -1
+        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+        local_resources = {
+            "trainer": PythonProcess(env=env_vars),
+            "evaluator": PythonProcess(env=env_vars),
+            "executor": PythonProcess(env=env_vars),
+        }
+
+        lp.launch(
+            program,
+            launch_type="test_mt",
+            local_resources=local_resources,
+        )
+
+        trainer: mava.Trainer = trainer_node.create_handle().dereference()
+
+        for _ in range(2):
+            trainer.step()
+
+    def test_centralised_maddpg_on_debugging_env(self) -> None:
+        """Test centralised maddpg."""
+        # environment
+        environment_factory = functools.partial(
+            debugging_utils.make_environment,
+            env_name="simple_spread",
+            action_space="continuous",
+        )
+
+        # networks
+        network_factory = lp_utils.partial_kwargs(
+            maddpg.make_default_networks,
+            policy_networks_layer_sizes=(32, 32),
+        )
+
+        # system
+        system = maddpg.MADDPG(
+            environment_factory=environment_factory,
+            network_factory=network_factory,
+            num_executors=2,
+            batch_size=16,
+            min_replay_size=16,
+            max_replay_size=1000,
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            checkpoint=False,
+            architecture=architectures.CentralisedQValueCritic,
+            trainer_fn=maddpg.MADDPGCentralisedTrainer,
+            shared_weights=False,
+        )
+        program = system.build()
+
+        (trainer_node,) = program.groups["trainer"]
+        trainer_node.disable_run()
+
+        # Launch gpu config - don't use gpu
+        gpu_id = -1
+        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+        local_resources = {
+            "trainer": PythonProcess(env=env_vars),
+            "evaluator": PythonProcess(env=env_vars),
+            "executor": PythonProcess(env=env_vars),
+        }
+
+        lp.launch(
+            program,
+            launch_type="test_mt",
+            local_resources=local_resources,
+        )
+
+        trainer: mava.Trainer = trainer_node.create_handle().dereference()
+
+        for _ in range(2):
+            trainer.step()
+
+    def test_networked_maddpg_on_debugging_env(self) -> None:
+        """Test networked maddpg."""
+        # environment
+        environment_factory = functools.partial(
+            debugging_utils.make_environment,
+            env_name="simple_spread",
+            action_space="continuous",
+        )
+
+        # networks
+        network_factory = lp_utils.partial_kwargs(
+            maddpg.make_default_networks,
+            policy_networks_layer_sizes=(32, 32),
+        )
+
+        # system
+        system = maddpg.MADDPG(
+            environment_factory=environment_factory,
+            network_factory=network_factory,
+            num_executors=2,
+            batch_size=16,
+            min_replay_size=16,
+            max_replay_size=1000,
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            checkpoint=False,
+            trainer_fn=maddpg.MADDPGNetworkedTrainer,
+            architecture=architectures.NetworkedQValueCritic,
+            connection_spec=fully_connected_network_spec,
+            shared_weights=False,
+        )
+        program = system.build()
+
+        (trainer_node,) = program.groups["trainer"]
+        trainer_node.disable_run()
+
+        # Launch gpu config - don't use gpu
+        gpu_id = -1
+        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
+        local_resources = {
+            "trainer": PythonProcess(env=env_vars),
+            "evaluator": PythonProcess(env=env_vars),
+            "executor": PythonProcess(env=env_vars),
+        }
+
+        lp.launch(
+            program,
+            launch_type="test_mt",
+            local_resources=local_resources,
+        )
+
+        trainer: mava.Trainer = trainer_node.create_handle().dereference()
+
+        for _ in range(2):
+            trainer.step()
+
+    def test_state_based_maddpg_on_debugging_env(self) -> None:
+        """Test state based maddpg."""
+        # environment
+        environment_factory = functools.partial(
+            debugging_utils.make_environment,
+            env_name="simple_spread",
+            action_space="continuous",
+            return_state_info=True,
+        )
+
+        # networks
+        network_factory = lp_utils.partial_kwargs(
+            maddpg.make_default_networks,
+            policy_networks_layer_sizes=(32, 32),
+        )
+
+        # system
+        system = maddpg.MADDPG(
+            environment_factory=environment_factory,
+            network_factory=network_factory,
+            num_executors=2,
+            batch_size=16,
+            min_replay_size=16,
+            max_replay_size=1000,
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+            checkpoint=False,
+            trainer_fn=maddpg.MADDPGStateBasedTrainer,
+            architecture=architectures.StateBasedQValueCritic,
+            shared_weights=False,
         )
         program = system.build()
 
