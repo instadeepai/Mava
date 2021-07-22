@@ -32,7 +32,7 @@ from mava.utils.environments.render_utils import Renderer
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
-try:
+try:  # noqa
     from smac.env import StarCraft2Env
 
     class SMACEnvWrapper(ParallelEnvWrapper):
@@ -303,5 +303,5 @@ try:
 
 except ModuleNotFoundError:
 
-    class SMACEnvWrapper:
+    class SMACEnvWrapper:  # type: ignore
         pass

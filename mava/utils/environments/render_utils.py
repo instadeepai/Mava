@@ -22,7 +22,7 @@ from typing import Any
 
 import numpy as np
 
-try:
+try:  # noqa
     os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
     import pygame
     from pysc2.lib import colors, features, point, transform
@@ -350,7 +350,7 @@ try:
 
 except ModuleNotFoundError:
 
-    class Renderer:
+    class Renderer:  # type: ignore
         pass
 
 
