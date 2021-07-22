@@ -18,8 +18,11 @@
 from typing import Any, Dict, Optional
 
 import dm_env
-from smac.env import StarCraft2Env
 
+try:
+    from smac.env import StarCraft2Env
+except ModuleNotFoundError:
+    pass
 from mava.wrappers import SMACEnvWrapper  # type:ignore
 
 
