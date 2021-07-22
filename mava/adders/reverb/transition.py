@@ -21,7 +21,6 @@ This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
-from operator import ne
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -201,8 +200,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
 
         # Get a dictionary of the transition nets and agents.
         entry_net_keys = transition.extras["network_keys"]
-        agents = sorted(transition.action.keys())
-        trans_nets_agent = {}
+        agents = sort_str_num(transition.action.keys())
+        trans_nets_agent: Dict[str, List] = {}
         for agent in agents:
             net_key = str(entry_net_keys[agent].numpy().astype(str))
             if net_key in trans_nets_agent:

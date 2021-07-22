@@ -99,16 +99,12 @@ def main(_: Any) -> None:
         logger_config=logger_config,
         num_executors=2,
         shared_weights=False,
-        trainer_net_config={
+        trainer_networks={
             "trainer_0": ["agent_0"],
             "trainer_1": ["agent_1"],
             "trainer_2": ["agent_2"],
         },
-        agent_net_keys={
-            "agent_0": "agent_0",
-            "agent_1": "agent_1",
-            "agent_2": "agent_2",
-        },
+        executor_samples=[["agent_0", "agent_1", "agent_2"]],
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,

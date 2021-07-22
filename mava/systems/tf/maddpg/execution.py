@@ -40,7 +40,9 @@ DiscreteArray = specs.DiscreteArray
 tfd = tfp.distributions
 
 
-def sample_new_agent_keys(agents, executor_samples) -> Dict[str, np.array]:
+def sample_new_agent_keys(
+    agents: List, executor_samples: List
+) -> Tuple[Dict[str, np.array], Dict[str, np.array]]:
     save_net_keys = {}
     agent_net_keys = {}
     agent_slots = copy.copy(agents)
@@ -372,7 +374,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Optional[Dict[str, types.NestedArray]] = {},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """record first observed timestep from the environment
 
@@ -411,14 +413,14 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """record observed timestep from the environment
         Args:
             actions (Dict[str, types.NestedArray]): system agents' actions.
             next_timestep (dm_env.TimeStep): data emitted by an environment during
                 interaction.
-            next_extras (Dict[str, types.NestedArray], optional): possible extra
+            next_extras (Dict[str, types.NestedArray]): possible extra
                 information to record during the transition. Defaults to {}.
         """
 

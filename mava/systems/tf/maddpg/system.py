@@ -16,7 +16,6 @@
 """MADDPG scaled system implementation."""
 
 import functools
-from enum import unique
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import acme
@@ -52,7 +51,7 @@ Array = specs.Array
 class MADDPG:
     """MADDPG system."""
 
-    def __init__(
+    def __init__(  # noqa
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
@@ -216,7 +215,8 @@ class MADDPG:
         sample_length = len(self._executor_samples[0])
         assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
 
-        # Check if the samples are of the same length and that they perfectly fit into the total number of agents
+        # Check if the samples are of the same length and that they perfectly fit
+        # into the total number of agents
         assert len(self._agent_net_keys.keys()) % sample_length == 0
         for i in range(1, len(self._executor_samples)):
             assert len(self._executor_samples[i]) == sample_length
