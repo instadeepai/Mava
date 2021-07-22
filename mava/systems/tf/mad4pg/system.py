@@ -69,6 +69,7 @@ class MAD4PG(MADDPG):
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
+        bootstrap_n: int = 10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
         checkpoint: bool = True,
@@ -130,8 +131,11 @@ class MAD4PG(MADDPG):
                 Defaults to 5.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 20.
-            period (int, optional): [consecutive starting points for overlapping
+            period (int, optional): Consecutive starting points for overlapping
                 rollouts across a sequence. Defaults to 20.
+            bootstrap_n (int, optional): Used to determine the spacing between
+                q_value/value estimation for bootstrapping. Should be less
+                than sequence_length.
             sigma (float, optional): Gaussian sigma parameter. Defaults to 0.3.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
@@ -175,6 +179,7 @@ class MAD4PG(MADDPG):
             critic_optimizer=critic_optimizer,
             n_step=n_step,
             sequence_length=sequence_length,
+            bootstrap_n=bootstrap_n,
             period=period,
             sigma=sigma,
             max_gradient_norm=max_gradient_norm,

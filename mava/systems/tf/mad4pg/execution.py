@@ -15,7 +15,7 @@
 
 """MAD4PG system executor implementation."""
 
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 
 import sonnet as snt
 from acme.specs import EnvironmentSpec

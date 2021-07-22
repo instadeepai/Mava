@@ -20,7 +20,7 @@ class MAEnvironmentSpec:
         self,
         environment: dm_env.Environment,
         specs: Dict[str, EnvironmentSpec] = None,
-        extra_specs: Dict[str, Any] = None,
+        extra_specs: Dict = None,
     ):
         if not specs:
             specs = self._make_ma_environment_spec(environment)
@@ -50,7 +50,7 @@ class MAEnvironmentSpec:
         return specs
 
     def get_extra_specs(self) -> Dict[str, EnvironmentSpec]:
-        return self.extra_specs
+        return self.extra_specs  # type: ignore
 
     def get_agent_specs(self) -> Dict[str, EnvironmentSpec]:
         return self._specs

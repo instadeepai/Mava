@@ -16,20 +16,12 @@
 """Tests for MAPPO."""
 
 import functools
-from typing import Dict, Sequence, Union
 
-import dm_env
 import launchpad as lp
-import numpy as np
 import sonnet as snt
-import tensorflow as tf
-import tensorflow_probability as tfp
-from acme.tf import networks
-from acme.tf import utils as tf2_utils
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
-from mava import specs as mava_specs
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
@@ -50,7 +42,9 @@ class TestMAPPO:
         )
 
         # networks
-        network_factory = lp_utils.partial_kwargs(make_networks)
+        network_factory = lp_utils.partial_kwargs(
+            mappo.make_default_networks, policy_networks_layer_sizes=(64, 64)
+        )
 
         # system
         system = mappo.MAPPO(
@@ -85,5 +79,5 @@ class TestMAPPO:
 
         trainer: mava.Trainer = trainer_node.create_handle().dereference()
 
-        for _ in range(5):
+        for _ in range(2):
             trainer.step()

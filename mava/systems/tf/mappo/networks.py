@@ -30,6 +30,7 @@ BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
 
 
+# TODO Update for recurrent version.
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],

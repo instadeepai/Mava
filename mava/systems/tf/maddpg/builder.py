@@ -94,6 +94,7 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
+    bootstrap_n: int = 10
     max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
     logger: loggers.Logger = None
@@ -573,6 +574,9 @@ class MADDPGBuilder:
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
+
+        if issubclass(self._trainer_fn, training.MADDPGBaseRecurrentTrainer):
+            trainer_config["bootstrap_n"] = self._config.bootstrap_n
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(**trainer_config)
