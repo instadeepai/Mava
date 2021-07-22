@@ -199,7 +199,6 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         )
         """In population based trianing add the network key used by each
         agent."""
-        extras["network_keys"] = self._network_keys_extras
         self._adder.add_first(timestep, extras)
 
     def observe(
@@ -225,7 +224,6 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         """In population based trianing select new networks from the sampler
         at the start of each episode. Also add the network key used by each
         agent."""
-        next_extras["network_keys"] = self._network_keys_extras
         # TODO (dries): Sort out this mypy issue.
         self._adder.add(policy, next_timestep, next_extras)  # type: ignore
 
@@ -405,7 +403,6 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             agents, self._executor_samples
         )
 
-        extras["network_keys"] = self._network_keys_extras
         extras.update({"core_states": numpy_states})
         self._adder.add_first(timestep, extras)
 
@@ -428,7 +425,6 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             return
         _, policy = actions
 
-        next_extras["network_keys"] = self._network_keys_extras
         if self._store_recurrent_state:
             numpy_states = {
                 agent: tf2_utils.to_numpy_squeeze(_state)

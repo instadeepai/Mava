@@ -18,17 +18,12 @@ import functools
 from datetime import datetime
 from typing import Any
 
-
 import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
-from mava.systems.tf import maddpg as true_maddpg
-
-
-
-from mava.systems.tf import maddpg as maddpg
+from mava.systems.tf import maddpg
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
 from mava.utils.environments import debugging_utils
@@ -64,7 +59,7 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        true_maddpg.make_default_networks, archecture_type=ArchitectureType.recurrent
+        maddpg.make_default_networks, archecture_type=ArchitectureType.recurrent
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.

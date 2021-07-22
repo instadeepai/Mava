@@ -21,7 +21,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 import acme
 import dm_env
 import launchpad as lp
-import numpy as np
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
@@ -286,12 +285,6 @@ class MADDPG:
         extra_specs = {}
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
-
-        # Used to store the agents network keys
-        str_spec = Array((), dtype=np.dtype("U10"))
-        agents = environment_spec.get_agent_ids()
-        net_spec = {"network_keys": {agent: str_spec for agent in agents}}
-        extra_specs.update(net_spec)
 
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
