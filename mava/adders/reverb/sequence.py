@@ -17,6 +17,7 @@
 # https://github.com/deepmind/acme/blob/master/acme/adders/reverb/sequence.py
 
 """Sequence adders.
+
 This implements adders which add sequences or partial trajectories.
 """
 
@@ -118,7 +119,6 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         if not first_write and not period_reached and not force:
             return
 
-        # TODO(b/183945808): will need to change to adhere to the new protocol.
         if not end_of_episode:
             get_traj = operator.itemgetter(slice(-sequence_length - 1, -1))
         else:
@@ -142,6 +142,17 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         sequence_length: Optional[int] = None,
         extras_spec: NestedSpec = (),
     ) -> tf.TypeSpec:
+        """Returns adder signature.
+
+        Args:
+            environment_spec (specs.EnvironmentSpec): Spec of MA environment.
+            sequence_length (Optional[int], optional): Length of sequence.
+                Defaults to None.
+            extras_spec (NestedSpec, optional): Spec for extra data. Defaults to ().
+
+        Returns:
+            tf.TypeSpec: Signature for sequence adder.
+        """
         return trajectory_signature(
             environment_spec=environment_spec,
             sequence_length=sequence_length,
