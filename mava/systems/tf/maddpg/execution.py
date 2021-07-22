@@ -63,8 +63,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
-        do_pbt: bool = False,
-        executor_samples: List = [],
+        executor_samples: List,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -86,7 +85,6 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
         # Store these for later use.
         self._agent_specs = agent_specs
-        self._do_pbt = do_pbt
         self._executor_samples = executor_samples
         self._counts = counts
         self._network_keys_extras: Dict[str, np.array] = {}
@@ -189,19 +187,18 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             extras (Dict[str, types.NestedArray], optional): possible extra information
                 to record during the first step. Defaults to {}.
         """
+        if not self._adder:
+            return
 
-        if self._adder:
-            "Select new networks from the sampler at the start of each episode."
-            agents = sort_str_num(list(self._agent_net_keys.keys()))
-            self._network_keys_extras, self._agent_net_keys = sample_new_agent_keys(
-                agents, self._executor_samples
-            )
-            if self._do_pbt:
-                """In population based trianing add the network key used by each
-                agent."""
-                extras["network_keys"] = self._network_keys_extras
-
-            self._adder.add_first(timestep, extras)
+        "Select new networks from the sampler at the start of each episode."
+        agents = sort_str_num(list(self._agent_net_keys.keys()))
+        self._network_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+            agents, self._executor_samples
+        )
+        """In population based trianing add the network key used by each
+        agent."""
+        extras["network_keys"] = self._network_keys_extras
+        self._adder.add_first(timestep, extras)
 
     def observe(
         self,
@@ -220,15 +217,15 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             next_extras (Dict[str, types.NestedArray], optional): possible extra
                 information to record during the transition. Defaults to {}.
         """
-        if self._adder:
-            _, policy = actions
-            if self._do_pbt:
-                """In population based trianing select new networks from the sampler
-                at the start of each episode. Also add the network key used by each
-                agent."""
-                next_extras["network_keys"] = self._network_keys_extras
-            # TODO (dries): Sort out this mypy issue.
-            self._adder.add(policy, next_timestep, next_extras)  # type: ignore
+        if not self._adder:
+            return
+        _, policy = actions
+        """In population based trianing select new networks from the sampler
+        at the start of each episode. Also add the network key used by each
+        agent."""
+        next_extras["network_keys"] = self._network_keys_extras
+        # TODO (dries): Sort out this mypy issue.
+        self._adder.add(policy, next_timestep, next_extras)  # type: ignore
 
     def update(self, wait: bool = False) -> None:
         """Update the policy variables."""
@@ -247,6 +244,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
+        executor_samples: List,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -272,6 +270,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
 
         # Store these for later use.
         self._agent_specs = agent_specs
+        self._executor_samples = executor_samples
         self._counts = counts
         super().__init__(
             policy_networks=policy_networks,
@@ -370,6 +369,44 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
 
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Optional[Dict[str, types.NestedArray]] = {},
+    ) -> None:
+        """record first observed timestep from the environment
+
+        Args:
+            timestep (dm_env.TimeStep): data emitted by an environment at first step of
+                interaction.
+            extras (Dict[str, types.NestedArray], optional): possible extra information
+                to record during the first step. Defaults to {}.
+        """
+
+        # Re-initialize the RNN state.
+        for agent, _ in timestep.observation.items():
+            # index network either on agent type or on agent id
+            agent_key = self._agent_net_keys[agent]
+            self._states[agent] = self._policy_networks[agent_key].initial_state(1)
+
+        if not self._adder:
+            return
+
+        numpy_states = {
+            agent: tf2_utils.to_numpy_squeeze(_state)
+            for agent, _state in self._states.items()
+        }
+
+        # Sample new agent_net_keys.
+        agents = sort_str_num(list(self._agent_net_keys.keys()))
+        self._network_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+            agents, self._executor_samples
+        )
+
+        extras["network_keys"] = self._network_keys_extras
+        extras.update({"core_states": numpy_states})
+        self._adder.add_first(timestep, extras)
+
     def observe(
         self,
         actions: Dict[str, types.NestedArray],
@@ -388,23 +425,15 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         if not self._adder:
             return
         _, policy = actions
-        if not self._store_recurrent_state:
-            if next_extras:
-                # TODO (dries): Sort out this mypy issue.
-                self._adder.add(policy, next_timestep, next_extras)  # type: ignore
-            else:
-                self._adder.add(policy, next_timestep)  # type: ignore
-            return
 
-        numpy_states = {
-            agent: tf2_utils.to_numpy_squeeze(_state)
-            for agent, _state in self._states.items()
-        }
-        if next_extras:
+        next_extras["network_keys"] = self._network_keys_extras
+        if self._store_recurrent_state:
+            numpy_states = {
+                agent: tf2_utils.to_numpy_squeeze(_state)
+                for agent, _state in self._states.items()
+            }
             next_extras.update({"core_states": numpy_states})
-            self._adder.add(policy, next_timestep, next_extras)  # type: ignore
-        else:
-            self._adder.add(policy, next_timestep, numpy_states)  # type: ignore
+        self._adder.add(policy, next_timestep, next_extras)  # type: ignore
 
     def update(self, wait: bool = False) -> None:
         """Update the policy variables."""

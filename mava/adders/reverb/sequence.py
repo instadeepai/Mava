@@ -21,7 +21,7 @@ This implements adders which add sequences or partial trajectories.
 """
 
 import operator
-from typing import Optional
+from typing import Optional, Dict, List
 
 import reverb
 import tensorflow as tf
@@ -50,6 +50,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         client: reverb.Client,
         sequence_length: int,
         period: int,
+        table_network_config: Dict[str, List] = None,
         *,
         delta_encoded: bool = False,
         priority_fns: Optional[base.PriorityFnMapping] = None,
@@ -99,6 +100,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         self._period = period
         self._sequence_length = sequence_length
         self._end_of_episode_behavior = end_of_episode_behavior
+        self._table_network_config = table_network_config
 
     # TODO(Kale-ab) Consider deprecating in future versions and using acme
     # version of this function.

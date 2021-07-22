@@ -68,7 +68,6 @@ class MADDPG:
         num_executors: int = 1,
         trainer_networks: Dict[str, List] = {},
         executor_samples: List = [],
-        do_pbt: bool = False,  # TODO (dries): Update code so that you can remove this flag.
         shared_weights: bool = True,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
@@ -284,11 +283,11 @@ class MADDPG:
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
 
-        if do_pbt:
-            str_spec = Array((), dtype=np.dtype("U10"))
-            agents = environment_spec.get_agent_ids()
-            net_spec = {"network_keys": {agent: str_spec for agent in agents}}
-            extra_specs.update(net_spec)
+        # Used to store the agents network keys
+        str_spec = Array((), dtype=np.dtype("U10"))
+        agents = environment_spec.get_agent_ids()
+        net_spec = {"network_keys": {agent: str_spec for agent in agents}}
+        extra_specs.update(net_spec)
 
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
@@ -312,7 +311,6 @@ class MADDPG:
                 sequence_length=sequence_length,
                 period=period,
                 sigma=sigma,
-                do_pbt=do_pbt,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,

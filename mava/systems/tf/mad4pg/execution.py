@@ -15,7 +15,7 @@
 
 """MAD4PG system executor implementation."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 import sonnet as snt
 from acme.specs import EnvironmentSpec
@@ -38,6 +38,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
+        executor_samples: List,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -64,6 +65,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
             variable_client=variable_client,
             counts=counts,
             agent_net_keys=agent_net_keys,
+            executor_samples=executor_samples,
         )
 
 
@@ -77,6 +79,7 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
+        executor_samples: List,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -103,4 +106,5 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
             variable_client=variable_client,
             counts=counts,
             agent_net_keys=agent_net_keys,
+            executor_samples=executor_samples,
         )

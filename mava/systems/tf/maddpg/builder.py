@@ -66,7 +66,6 @@ class MADDPGConfig:
         n_step: number of steps to include prior to boostrapping.
         sequence_length: recurrent sequence rollout length.
         period: consecutive starting points for overlapping rollouts across a sequence.
-        do_pbt: Whether to do population based training on the system or not.
         max_gradient_norm: value to specify the maximum clipping value for the gradient
             norm during optimization.
         sigma: Gaussian sigma parameter.
@@ -81,7 +80,6 @@ class MADDPGConfig:
     agent_net_keys: Dict[str, str]
     trainer_networks: Dict[str, List]
     table_network_config: Dict[str, List]
-    do_pbt: bool
     executor_samples: List
     discount: float = 0.99
     batch_size: int = 256
@@ -343,15 +341,12 @@ class MADDPGBuilder:
                 discount=self._config.discount,
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
-            raise NotImplementedError(
-                "Implement table_net_config for the " "ParallelSequenceAdder."
-            )
             adder = reverb_adders.ParallelSequenceAdder(
                 priority_fns=priority_fns,
                 client=replay_client,
                 sequence_length=self._config.sequence_length,
+                table_network_config=self._config.table_network_config,
                 period=self._config.period,
-                # table_net_config=table_net_config,
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
@@ -466,7 +461,6 @@ class MADDPGBuilder:
             counts=counts,
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
-            do_pbt=self._config.do_pbt,
             executor_samples=self._config.executor_samples,
             variable_client=variable_client,
             adder=adder,
