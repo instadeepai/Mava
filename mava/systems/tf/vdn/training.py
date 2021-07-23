@@ -17,11 +17,13 @@
 
 from typing import Any, Dict, List, Optional, Union
 
+import reverb
 import sonnet as snt
 import tensorflow as tf
 from acme.utils import counting, loggers
 from trfl.indexing_ops import batched_index
 
+from mava import types as mava_types
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
@@ -137,7 +139,7 @@ class VDNTrainer(MADQNTrainer):
         # Log losses per agent
         return {agent: {"q_value_loss": self.loss} for agent in self._agents}
 
-    def _forward(self, inputs: Any) -> None:
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
 
         Args:
@@ -154,7 +156,17 @@ class VDNTrainer(MADQNTrainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t = [Optional] = extra data that the agents persist in replay.
-        o_tm1, a_tm1, _, r_t, d_t, o_t, _ = inputs.data
+        trans = mava_types.Transition(*inputs.data)
+
+        o_tm1, o_t, a_tm1, r_t, d_t, _, _ = (
+            trans.observation,
+            trans.next_observation,
+            trans.action,
+            trans.reward,
+            trans.discount,
+            trans.extras,
+            trans.next_extras,
+        )
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:

@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+try:
+    from open_spiel.python import rl_environment  # type: ignore
+except ModuleNotFoundError:
+    pass
 
-from open_spiel.python import rl_environment  # type: ignore
 
-
-def load_open_spiel_env(game_name: str) -> rl_environment.Environment:
+def load_open_spiel_env(game_name: str) -> "rl_environment.Environment":
     """Loads an open spiel environment given a game name Also, the possible agents in the
     environment are set"""
 

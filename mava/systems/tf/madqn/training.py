@@ -31,6 +31,7 @@ from acme.utils import counting, loggers
 
 import mava
 from mava.adders import reverb as reverb_adders
+from mava import types as mava_types
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
@@ -354,7 +355,7 @@ class MADQNTrainer(mava.Trainer):
         # Log losses and epsilon
         return fetches
 
-    def _forward(self, inputs: Any) -> None:
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
 
         Args:
@@ -378,7 +379,18 @@ class MADQNTrainer(mava.Trainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data that the agents persist in replay.
-        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+        trans = mava_types.Transition(*inputs.data)
+
+        o_tm1, o_t, a_tm1, r_t, d_t, e_tm1, e_t = (
+            trans.observation,
+            trans.next_observation,
+            trans.action,
+            trans.reward,
+            trans.discount,
+            trans.extras,
+            trans.next_extras,
+        )
+
         with tf.GradientTape(persistent=True) as tape:
             q_network_losses: Dict[str, NestedArray] = {}
 
@@ -587,9 +599,16 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         )
         data = tf2_utils.batch_to_sequence(data)
 
-        observations, actions, rewards, discounts, _, extra = data
+        observations, actions, rewards, discounts, _, _ = (
+            data.observations,
+            data.actions,
+            data.rewards,
+            data.discounts,
+            data.start_of_episode,
+            data.extras,
+        )
 
-        # core_states = extra["core_states"]
+        # Using extra directly from inputs due to shape.
         core_state = tree.map_structure(
             lambda s: s[:, 0, :], inputs.data.extras["core_states"]
         )
@@ -721,9 +740,16 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         )
         data = tf2_utils.batch_to_sequence(data)
 
-        observations, actions, rewards, discounts, _, extra = data
+        observations, actions, rewards, discounts, _, _ = (
+            data.observations,
+            data.actions,
+            data.rewards,
+            data.discounts,
+            data.start_of_episode,
+            data.extras,
+        )
 
-        # core_states = extra["core_states"]
+        # Using extra directly from inputs due to shape.
         core_state = tree.map_structure(
             lambda s: s[:, 0, :], inputs.data.extras["core_states"]
         )

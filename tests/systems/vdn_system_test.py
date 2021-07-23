@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for MAPPO."""
+"""Tests for VDN."""
 
 import functools
 
@@ -22,39 +22,41 @@ import sonnet as snt
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
-from mava.systems.tf import mappo
+from mava.systems.tf import vdn
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 
 
-class TestMAPPO:
-    """Simple integration/smoke test for MAPPO."""
+class TestVdn:
+    """Simple integration/smoke test for Vdn."""
 
-    def test_mappo_on_debugging_env(self) -> None:
-        """Test feedforward mappo."""
+    def test_vdn_on_debugging_env(self) -> None:
+        """Test feedforward vdn."""
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
             env_name="simple_spread",
             action_space="discrete",
+            return_state_info=True,
         )
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            mappo.make_default_networks, policy_networks_layer_sizes=(64, 64)
+            vdn.make_default_networks, policy_networks_layer_sizes=(64, 64)
         )
 
         # system
-        system = mappo.MAPPO(
+        system = vdn.VDN(
             environment_factory=environment_factory,
             network_factory=network_factory,
             num_executors=2,
             batch_size=32,
-            max_queue_size=1000,
-            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
-            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            min_replay_size=32,
+            max_replay_size=1000,
+            optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
         )
+
         program = system.build()
 
         (trainer_node,) = program.groups["trainer"]
@@ -68,7 +70,6 @@ class TestMAPPO:
             "evaluator": PythonProcess(env=env_vars),
             "executor": PythonProcess(env=env_vars),
         }
-
         lp.launch(
             program,
             launch_type="test_mt",

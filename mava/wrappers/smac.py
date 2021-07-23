@@ -30,7 +30,7 @@ from pettingzoo.utils.env import ParallelEnv
 from mava.utils.environments.render_utils import Renderer
 
 try:
-    from smac.env import StarCraft2Env  # type:ignore
+    from smac.env import StarCraft2Env
 except ModuleNotFoundError:
     pass
 

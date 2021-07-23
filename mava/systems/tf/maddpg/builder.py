@@ -87,6 +87,7 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
+    bootstrap_n: int = 10
     max_gradient_norm: Optional[float] = None
     sigma: float = 0.3
     checkpoint: bool = True
@@ -194,7 +195,7 @@ class MADDPGBuilder:
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder_sig = reverb_adders.ParallelSequenceAdder.signature(
-                env_adder_spec, self._extra_specs
+                env_adder_spec, self._config.sequence_length, self._extra_specs
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
@@ -404,6 +405,9 @@ class MADDPGBuilder:
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
+
+        if issubclass(self._trainer_fn, training.MADDPGBaseRecurrentTrainer):
+            trainer_config["bootstrap_n"] = self._config.bootstrap_n
 
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(**trainer_config)

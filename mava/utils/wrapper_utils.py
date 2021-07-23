@@ -37,6 +37,15 @@ def parameterized_restart(
     return dm_env.TimeStep(dm_env.StepType.FIRST, reward, discount, observation)
 
 
+def parameterized_termination(
+    reward: types.Reward,
+    discount: types.Discount,
+    observation: types.Observation,
+) -> dm_env.TimeStep:
+    """Returns a `TimeStep` with `step_type` set to `StepType.LAST`."""
+    return dm_env.TimeStep(dm_env.StepType.LAST, reward, discount, observation)
+
+
 """Project single timestep to all agents."""
 
 

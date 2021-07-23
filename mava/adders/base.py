@@ -25,6 +25,7 @@ DEFAULT_PRIORITY_TABLE = "priority_table"
 
 class ParallelAdder(adders.Adder):
     """The Adder interface.
+
     An adder packs together data to send to the replay buffer, and potentially
     performs some reduction/transformation to this data in the process.
     All adders will use this API. Below is an illustrative example of how they
@@ -51,14 +52,15 @@ class ParallelAdder(adders.Adder):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {"": ()},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """Defines the adder `add` interface.
+
         Args:
           actions: Dictionary of a possibly nested structure corresponding to
             a_t for each agent.
           next_timestep: A dm_env Timestep object corresponding to the resulting
             data obtained by taking the given action.
-          extras: Dictionary of a possibly nested structure of extra data to add
-            to replay.
+          next_extras: Dictionary of a possibly nested structure of extra data to add
+            to replay. This is linked to next_timestep.observation.
         """
