@@ -354,7 +354,7 @@ class MADDPG:
 
     def create_system(
         self,
-    ) -> Tuple[DecentralisedQValueActorCritic, Dict[str, Dict[str, snt.Module]]]:
+    ) -> Tuple[Dict[str, Dict[str, snt.Module]], Dict[str, Dict[str, snt.Module]]]:
         """Initialise the system variables from the network factory."""
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
@@ -384,13 +384,15 @@ class MADDPG:
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
         system = self._architecture(**architecture_config)
-        return system, system.create_system()
+        networks = system.create_system()
+        behaviour_networks = system.create_behaviour_policy()
+        return behaviour_networks, networks
 
     def variable_server(self) -> MavaVariableSource:
         """Create the variable server."""
         # Create the system
-        _, system_networks = self.create_system()
-        return self._builder.make_variable_server(system_networks)
+        _, networks = self.create_system()
+        return self._builder.make_variable_server(networks)
 
     def executor(
         self,
@@ -410,14 +412,12 @@ class MADDPG:
         """
 
         # Create the system
-        system, _ = self.create_system()
-
-        # behaviour policy networks (obs net + policy head)
-        behaviour_policy_networks = system.create_behaviour_policy()
+        behaviour_policy_networks, networks = self.create_system()
 
         # Create the executor.
         executor = self._builder.make_executor(
             # executor_id=executor_id,
+            networks=networks,
             policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
@@ -464,14 +464,12 @@ class MADDPG:
         """
 
         # Create the system
-        system, _ = self.create_system()
-
-        # behaviour policy networks (obs net + policy head)
-        behaviour_policy_networks = system.create_behaviour_policy()
+        behaviour_policy_networks, networks = self.create_system()
 
         # Create the agent.
         executor = self._builder.make_executor(
             # executor_id="evaluator",
+            networks=networks,
             policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
         )
@@ -523,7 +521,7 @@ class MADDPG:
         )
 
         # Create the system
-        _, system_networks = self.create_system()
+        _, networks = self.create_system()
 
         dataset = self._builder.make_dataset_iterator(
             replay, f"{self._builder._config.replay_table_name}_{trainer_id}"
@@ -531,7 +529,7 @@ class MADDPG:
 
         return self._builder.make_trainer(
             # trainer_id=trainer_id,
-            networks=system_networks,
+            networks=networks,
             trainer_networks=self._trainer_networks[f"trainer_{trainer_id}"],
             dataset=dataset,
             logger=trainer_logger,

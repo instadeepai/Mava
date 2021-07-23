@@ -397,6 +397,7 @@ class MADDPGBuilder:
     def make_executor(
         self,
         # executor_id: str,
+        networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[MavaVariableSource] = None,
@@ -416,12 +417,11 @@ class MADDPGBuilder:
         # Create policy variables
         variables = {}
         get_keys = []
-
-        for net_key in policy_networks.keys():
-            var_key = f"{net_key}_policies"
-            variables[var_key] = policy_networks[net_key].variables
-            get_keys.append(var_key)
-
+        for net_type_key in ["observations", "policies"]:
+            for net_key in networks[net_type_key].keys():
+                var_key = f"{net_key}_{net_type_key}"
+                variables[var_key] = networks[net_type_key][net_key].variables
+                get_keys.append(var_key)
         variables = self.create_counter_variables(variables)
 
         count_names = [

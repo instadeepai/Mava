@@ -104,6 +104,7 @@ def make_default_networks(
         agent_act_spec = specs[key].actions
         if type(specs[key].actions) == DiscreteArray:
             num_actions = agent_act_spec.num_values
+            # Question (dries): Why is the minimum -1 and not 0?
             minimum = [-1.0] * num_actions
             maximum = [1.0] * num_actions
             agent_act_spec = BoundedArray(
