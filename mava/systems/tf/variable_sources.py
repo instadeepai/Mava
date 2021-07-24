@@ -115,9 +115,9 @@ class VariableSource:
                 Returns:
                     None
         """
-        # Checkpoints every 15 minutes
+        # Checkpoints every 5 minutes
         while True:
-            time.sleep(15 * 60)
+            time.sleep(5 * 60)
             if self._system_checkpointer:
                 self._system_checkpointer.save()
                 print("Updated variables checkpoint.")
