@@ -537,6 +537,8 @@ class MADDPGBuilder:
         # TODO (dries): This still seems a bit hacky. Maybe there is a better way?
         # Is this even correct?
         print("Find better way here in builder.py.")
+        print("Fix ths in MA-DDPG builder.py")
+        exit()
         trainer_nets = list(self._config.agent_net_keys.values())
         trainer_agent_net_keys = {
             agent: trainer_nets[a_i] for a_i, agent in enumerate(trainer_agents)

@@ -23,6 +23,7 @@ import tensorflow as tf
 from acme.tf import utils as tf2_utils
 
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils.sort_utils import sort_str_num
 
 
 class VariableClient:
@@ -38,7 +39,7 @@ class VariableClient:
         set_period: int = 1,
     ):
         """Initialise the variable server."""
-        self._all_keys = list(variables.keys())
+        self._all_keys = sort_str_num(list(variables.keys()))
         self._get_keys = get_keys if get_keys is not None else self._all_keys
         self._set_keys = set_keys if set_keys is not None else self._all_keys
         self._variables: Dict[str, tf.Variable] = variables

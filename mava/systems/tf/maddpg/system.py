@@ -203,7 +203,12 @@ class MADDPG:
                 agent: agent.split("_")[0] if shared_weights else agent
                 for agent in agents
             }
-            self._executor_samples = [list(self._agent_net_keys.values())]
+            self._executor_samples = [
+                [
+                    self._agent_net_keys[key]
+                    for key in sort_str_num(self._agent_net_keys.keys())
+                ]
+            ]
         else:
             # if executor samples provided, use executor_samples to determine setup
             _, self._agent_net_keys = sample_new_agent_keys(

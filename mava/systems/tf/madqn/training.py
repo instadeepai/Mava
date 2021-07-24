@@ -37,6 +37,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 )
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
+from mava.utils.sort_utils import sort_str_num
 
 train_utils.set_growing_gpu_memory()
 
@@ -132,7 +133,7 @@ class MADQNTrainer(mava.Trainer):
         self._exploration_scheduler = exploration_scheduler
 
         # Dictionary with network keys for each agent.
-        self.unique_net_keys = self._q_networks.keys()
+        self.unique_net_keys = sort_str_num(self._q_networks.keys())
 
         # Create optimizers for different agent types.
         if not isinstance(optimizer, dict):

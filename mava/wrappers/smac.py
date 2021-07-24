@@ -29,6 +29,7 @@ from pettingzoo.utils.env import ParallelEnv
 
 from mava import types
 from mava.utils.environments.render_utils import Renderer
+from mava.utils.sort_utils import sort_str_num
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
@@ -99,7 +100,7 @@ try:  # noqa
                 observe, {agent: False for agent in self._possible_agents}
             )
 
-            self._agents = list(observe.keys())
+            self._agents = sort_str_num(list(observe.keys()))
 
             # create discount spec
             discount_spec = self.discount_spec()
@@ -138,6 +139,9 @@ try:  # noqa
             if self._reset_next_step:
                 return self.reset()
 
+            raise ValueError(
+                "Fix all .values() stacking. Cannot assume .values() returns in the same order each time."
+            )
             actions_feed = list(actions.values())
             reward, terminated, info = self._environment.step(actions_feed)
             obs_list = self._environment.get_obs()
@@ -159,7 +163,7 @@ try:  # noqa
                 dones[agent] = terminated
 
             observations = self._convert_observations(observe, dones)
-            self._agents = list(observe.keys())
+            self._agents = sort_str_num(list(observe.keys()))
             rewards_spec = self.reward_spec()
 
             #  Handle empty rewards

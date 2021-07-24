@@ -36,6 +36,7 @@ from mava.adders.reverb.base import Trajectory
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf.variable_utils import VariableClient
 from mava.utils import training_utils as train_utils
+from mava.utils.sort_utils import sort_str_num
 
 train_utils.set_growing_gpu_memory()
 
@@ -153,7 +154,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         # Dictionary with unique network keys.
-        self.unique_net_keys = self._policy_networks.keys()
+        self.unique_net_keys = sort_str_num(self._policy_networks.keys())
 
         # Get the agents which shoud be updated and ran
         self._trainer_agent_list = self._agents
@@ -992,7 +993,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._iterator = iter(dataset)  # pytype: disable=wrong-arg-types
 
         # Dictionary with unique network keys.
-        self.unique_net_keys = self._policy_networks.keys()
+        self.unique_net_keys = sort_str_num(self._policy_networks.keys())
 
         # Get the agents which shoud be updated and ran
         self._trainer_agent_list = self._agents
