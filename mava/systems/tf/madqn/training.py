@@ -26,6 +26,7 @@ import tensorflow as tf
 import tree
 import trfl
 from acme.tf import utils as tf2_utils
+from acme.tf.losses import transformed_n_step_loss
 from acme.types import NestedArray
 from acme.utils import counting, loggers
 
@@ -63,6 +64,7 @@ class MADQNTrainer(mava.Trainer):
         importance_sampling_exponent: Optional[float] = None,
         replay_client: Optional[reverb.TFClient] = None,
         max_priority_weight: float = 0.9,
+        n_step: int = 1,
         fingerprint: bool = False,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -117,6 +119,8 @@ class MADQNTrainer(mava.Trainer):
 
         # Other learner parameters.
         self._discount = discount
+        self._n_step = n_step
+
         # Set up gradient clipping.
         if max_gradient_norm is not None:
             self._max_gradient_norm = tf.convert_to_tensor(max_gradient_norm)
@@ -517,6 +521,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         discount: float,
         agent_net_keys: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
+        n_step: int = 1,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -568,6 +573,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             agent_net_keys=agent_net_keys,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
+            n_step=n_step,
             counter=counter,
             logger=logger,
             fingerprint=fingerprint,
@@ -581,6 +587,13 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         Args:
             inputs (Any): input data from the data table (transitions)
         """
+        # Get info about the samples from reverb.
+        sample_info = inputs.info
+        sample_keys = tf.transpose(inputs.info.key)
+        sample_probs = tf.transpose(sample_info.probability)
+
+        # Initialize sample priorities at zero.
+        sample_priorities = np.zeros(len(inputs.info.key))
 
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
@@ -602,17 +615,17 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         with tf.GradientTape(persistent=True) as tape:
 
             # Unroll over time dimension.
-            T = list(observations.values())[0].shape[0]  # time dimension
-            q_stacks = {agent: [] for agent in self._agents}
-            q_target_stacks = {agent: [] for agent in self._agents}
+            T = list(observations.values())[0].observation.shape[0]  # time dimension
+            q_stacks: Dict[str, list] = {agent: [] for agent in self._agents}
+            q_target_stacks: Dict[str, list] = {agent: [] for agent in self._agents}
             for t in range(T):
 
                 # Step each agent.
                 for agent in self._agents:
-                    agent_key = self.agent_net_keys[agent]
+                    agent_key = self._agent_net_keys[agent]
 
                     # Get agent observation at timestep t
-                    observation = observations[agent][t]
+                    observation = observations[agent].observation[t]
 
                     # Target Q-Network
                     q_target, new_target_state = self._target_q_networks[agent_key](
@@ -636,7 +649,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
 
             # Loop through agents and compute losses.
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
+                agent_key = self._agent_net_keys[agent]
 
                 # Get q by stacking
                 q = tf.stack(q_stacks[agent], axis=0)
@@ -665,19 +678,19 @@ class MADQNRecurrentTrainer(MADQNTrainer):
 
                 # Maybe calculate importance weights and use them to scale the loss.
                 if self._importance_sampling_exponent is not None:
-                    importance_weights = 1.0 / (self._max_replay_size * probs)  # [T, B]
+                    importance_weights = 1.0 / sample_probs  # [B]
                     importance_weights **= self._importance_sampling_exponent
                     importance_weights /= tf.reduce_max(importance_weights)
 
                     # Reweight loss.
-                    loss *= tf.cast(importance_weights, tf.float32)  # [T, B]
+                    loss *= tf.cast(importance_weights, loss.dtype)  # [B]
 
                     # Update priorities.
                     errors = loss_extras.errors
                     abs_errors = tf.abs(errors)
                     mean_priority = tf.reduce_mean(abs_errors, axis=0)
                     max_priority = tf.reduce_max(abs_errors, axis=0)
-                    priorities += (
+                    sample_priorities += (
                         self._max_priority_weight * max_priority
                         + (1 - self._max_priority_weight) * mean_priority
                     )
@@ -688,6 +701,12 @@ class MADQNRecurrentTrainer(MADQNTrainer):
 
         self._q_network_losses = q_network_losses
         self.tape = tape
+
+        # Store sample keys and priorities
+        self._sample_keys = sample_keys
+        self._sample_priorities = sample_priorities / len(
+            self._agents
+        )  # averaged over agents.
 
 
 class MADQNRecurrentCommTrainer(MADQNTrainer):
