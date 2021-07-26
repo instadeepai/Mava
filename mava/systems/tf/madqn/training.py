@@ -509,9 +509,9 @@ class MADQNRecurrentTrainer(MADQNTrainer):
 
         q_network_losses: Dict[str, NestedArray] = {}
         with tf.GradientTape(persistent=True) as tape:
-            
+
             # Unroll over time dimension.
-            T = list(observations.values())[0].shape[0] # time dimension
+            T = list(observations.values())[0].shape[0]  # time dimension
             q_stacks = {agent: [] for agent in self._agents}
             q_target_stacks = {agent: [] for agent in self._agents}
             for t in range(T):
@@ -545,7 +545,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
 
             # Loop through agents and compute losses.
             for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]       
+                agent_key = self.agent_net_keys[agent]
 
                 # Get q by stacking
                 q = tf.stack(q_stacks[agent], axis=0)
@@ -561,7 +561,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
                 # Cast discount type.
                 discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
 
-                # See Acme/tf/losses/R2D2 
+                # See Acme/tf/losses/R2D2
                 loss, loss_extras = transformed_n_step_loss(
                     q,
                     q_target,
@@ -574,7 +574,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
 
                 # Maybe calculate importance weights and use them to scale the loss.
                 if self._importance_sampling_exponent is not None:
-                    importance_weights = 1. / (self._max_replay_size * probs)  # [T, B]
+                    importance_weights = 1.0 / (self._max_replay_size * probs)  # [T, B]
                     importance_weights **= self._importance_sampling_exponent
                     importance_weights /= tf.reduce_max(importance_weights)
 
@@ -586,12 +586,14 @@ class MADQNRecurrentTrainer(MADQNTrainer):
                     abs_errors = tf.abs(errors)
                     mean_priority = tf.reduce_mean(abs_errors, axis=0)
                     max_priority = tf.reduce_max(abs_errors, axis=0)
-                    priorities += self._max_priority_weight * max_priority + (1 - self._max_priority_weight) * mean_priority
+                    priorities += (
+                        self._max_priority_weight * max_priority
+                        + (1 - self._max_priority_weight) * mean_priority
+                    )
 
                 loss = tf.reduce_mean(loss)  # []
 
-                q_network_losses[agent] = {"q_value_loss" : loss}
-
+                q_network_losses[agent] = {"q_value_loss": loss}
 
         self._q_network_losses = q_network_losses
         self.tape = tape
