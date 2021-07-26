@@ -266,6 +266,7 @@ class MADDPG:
                     matches = most_matches
                     table_network_config[f"trainer_{t_id}"] = sample
 
+        self._table_network_config = table_network_config
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
@@ -536,6 +537,7 @@ class MADDPG:
             # trainer_id=trainer_id,
             networks=networks,
             trainer_networks=self._trainer_networks[f"trainer_{trainer_id}"],
+            trainer_table_entry=self._table_network_config[f"trainer_{trainer_id}"],
             dataset=dataset,
             logger=trainer_logger,
             connection_spec=self._connection_spec,

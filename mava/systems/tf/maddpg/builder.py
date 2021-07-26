@@ -466,6 +466,7 @@ class MADDPGBuilder:
         dataset: Iterator[reverb.ReplaySample],
         variable_source: MavaVariableSource,
         trainer_networks: List[Any],
+        trainer_table_entry: List[Any],
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
@@ -485,7 +486,6 @@ class MADDPGBuilder:
                 executors to update the parameters of the agent networks in the system.
         """
         # This assumes agents are sort_str_num in the other methods
-        trainer_agents = self._agents[: len(trainer_networks)]
         agent_types = self._agent_types
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
@@ -533,15 +533,10 @@ class MADDPGBuilder:
         # Get all the initial variables
         variable_client.get_all_and_wait()
 
-        # Convert network keys for the trainer. Therefore the trainer
-        # TODO (dries): This still seems a bit hacky. Maybe there is a better way?
-        # Is this even correct?
-        print("Find better way here in builder.py.")
-        print("Fix ths in MA-DDPG builder.py")
-        exit()
-        trainer_nets = list(self._config.agent_net_keys.values())
+        # Convert network keys for the trainer.
+        trainer_agents = self._agents[: len(trainer_table_entry)]
         trainer_agent_net_keys = {
-            agent: trainer_nets[a_i] for a_i, agent in enumerate(trainer_agents)
+            agent: trainer_table_entry[a_i] for a_i, agent in enumerate(trainer_agents)
         }
 
         trainer_config: Dict[str, Any] = {
