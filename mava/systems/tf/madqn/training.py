@@ -496,45 +496,102 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         )
         data = tf2_utils.batch_to_sequence(data)
 
-        observations, actions, rewards, discounts, _, extra = data
+        observations, actions, rewards, discounts, _, extras = data
 
         # core_states = extra["core_states"]
-        core_state = tree.map_structure(
+        core_states = tree.map_structure(
             lambda s: s[:, 0, :], inputs.data.extras["core_states"]
         )
 
+        # Initial states.
+        states = {agent: core_states[agent][0] for agent in self._agents}
+        target_states = {agent: core_states[agent][0] for agent in self._agents}
+
+        q_network_losses: Dict[str, NestedArray] = {}
         with tf.GradientTape(persistent=True) as tape:
-            q_network_losses: Dict[str, NestedArray] = {}
+            
+            # Unroll over time dimension.
+            T = list(observations.values())[0].shape[0] # time dimension
+            q_stacks = {agent: [] for agent in self._agents}
+            q_target_stacks = {agent: [] for agent in self._agents}
+            for t in range(T):
 
-            for agent in self._agents:
-                agent_key = self.agent_net_keys[agent]
-                # Cast the additional discount to match the environment discount dtype.
-                discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
+                # Step each agent.
+                for agent in self._agents:
+                    agent_key = self.agent_net_keys[agent]
 
-                q, s = snt.static_unroll(
-                    self._q_networks[agent_key],
-                    observations[agent].observation,
-                    core_state[agent][0],
-                )
+                    # Get agent observation at timestep t
+                    observation = observations[agent][t]
 
-                q_targ, s = snt.static_unroll(
-                    self._target_q_networks[agent_key],
-                    observations[agent].observation,
-                    core_state[agent][0],
-                )
-
-                q_network_losses[agent] = {"q_value_loss": tf.zeros(())}
-                for t in range(1, q.shape[0]):
-                    loss, _ = trfl.qlearning(
-                        q[t - 1],
-                        actions[agent][t - 1],
-                        rewards[agent][t],
-                        discount * discounts[agent][t],
-                        q_targ[t],
+                    # Target Q-Network
+                    q_target, new_target_state = self._target_q_networks[agent_key](
+                        observation,
+                        target_states[agent],
                     )
 
-                    loss = tf.reduce_mean(loss)
-                    q_network_losses[agent]["q_value_loss"] += loss
+                    # Online Q-Network
+                    q, new_state = self._q_networks[agent_key](
+                        observation,
+                        states[agent],
+                    )
+
+                    # Update states.
+                    states[agent] = new_state
+                    target_states[agent] = new_target_state
+
+                    # Add qs to stack.
+                    q_stacks[agent].append(q)
+                    q_target_stacks[agent].append(q_target)
+
+            # Loop through agents and compute losses.
+            for agent in self._agents:
+                agent_key = self.agent_net_keys[agent]       
+
+                # Get q by stacking
+                q = tf.stack(q_stacks[agent], axis=0)
+                q_target = tf.stack(q_target_stacks[agent], axis=0)
+
+                # Argmax over online policy for double q_learning
+                greedy_actions = tf.argmax(q, axis=-1)
+                num_actions = q_target.shape[-1]
+                target_policy_probs = tf.one_hot(
+                    greedy_actions, depth=num_actions, dtype=q_target.dtype
+                )
+
+                # Cast discount type.
+                discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
+
+                # See Acme/tf/losses/R2D2 
+                loss, loss_extras = transformed_n_step_loss(
+                    q,
+                    q_target,
+                    actions[agent],
+                    rewards[agent][:-1],
+                    discount * discounts[agent][:-1],
+                    target_policy_probs,
+                    self._n_step,
+                )
+
+                # Maybe calculate importance weights and use them to scale the loss.
+                if self._importance_sampling_exponent is not None:
+                    importance_weights = 1. / (self._max_replay_size * probs)  # [T, B]
+                    importance_weights **= self._importance_sampling_exponent
+                    importance_weights /= tf.reduce_max(importance_weights)
+
+                    # Reweight loss.
+                    loss *= tf.cast(importance_weights, tf.float32)  # [T, B]
+
+                    # Update priorities.
+                    errors = loss_extras.errors
+                    abs_errors = tf.abs(errors)
+                    mean_priority = tf.reduce_mean(abs_errors, axis=0)
+                    max_priority = tf.reduce_max(abs_errors, axis=0)
+                    priorities += self._max_priority_weight * max_priority + (1 - self._max_priority_weight) * mean_priority
+
+                loss = tf.reduce_mean(loss)  # []
+
+                q_network_losses[agent] = {"q_value_loss" : loss}
+
 
         self._q_network_losses = q_network_losses
         self.tape = tape
