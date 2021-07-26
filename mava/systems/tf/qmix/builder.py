@@ -31,7 +31,7 @@ from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.qmix import execution, training
-from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
+from mava.wrappers import MADQNDetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -119,6 +119,7 @@ class QMIXBuilder(MADQNBuilder):
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
+        replay_client: Optional[reverb.TFClient] = None,
     ) -> core.Trainer:
         """Create a trainer instance.
 
@@ -132,6 +133,8 @@ class QMIXBuilder(MADQNBuilder):
                 metadata.. Defaults to None.
             communication_module (BaseCommunicationModule): module to enable
                 agent communication. Defaults to None.
+            replay_client (reverb.TFClient): Used for importance sampling.
+                Not implemented yet.
 
         Returns:
             core.Trainer: system trainer, that uses the collected data from the
@@ -165,7 +168,7 @@ class QMIXBuilder(MADQNBuilder):
             target_q_networks=target_q_networks,
             mixing_network=mixing_network,
             target_mixing_network=target_mixing_network,
-            shared_weights=self._config.shared_weights,
+            agent_net_keys=self._config.agent_net_keys,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
@@ -179,6 +182,6 @@ class QMIXBuilder(MADQNBuilder):
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type:ignore
+        trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore
 
         return trainer

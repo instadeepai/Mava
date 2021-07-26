@@ -67,6 +67,7 @@ class MADQN:
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
+        agent_net_keys: Dict[str, str] = {},
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
@@ -74,6 +75,8 @@ class MADQN:
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
         sequence_length: int = 20,
+        importance_sampling_exponent: Optional[float] = None,
+        max_priority_weight: float = 0.9,
         period: int = 20,
         max_gradient_norm: float = None,
         discount: float = 0.99,
@@ -128,7 +131,10 @@ class MADQN:
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
             shared_weights (bool, optional): whether agents should share weights or not.
+                When agent_net_keys are provided the value of shared_weights is ignored.
                 Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             batch_size (int, optional): sample batch size for updates. Defaults to 256.
             prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
             min_replay_size (int, optional): minimum replay size before updating.
@@ -140,6 +146,11 @@ class MADQN:
                 Defaults to 5.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 20.
+            importance_sampling_exponent (float, optional): value of importance sampling
+                exponent (usually around 0.2). If None, importance sampling is not used.
+            max_priority_weight (float): Required if importance_sampling_exponent
+                is not None. Defaults to 0.9. Used to scale the maximum priority of
+                reverb samples.
             period (int, optional): consecutive starting points for overlapping
                 rollouts across a sequence. Defaults to 20.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -191,9 +202,17 @@ class MADQN:
         self._network_factory = network_factory
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
-        self._shared_weights = shared_weights
+        # Setup agent networks
+        self._agent_net_keys = agent_net_keys
+        if not agent_net_keys:
+            agents = environment_spec.get_agent_ids()
+            self._agent_net_keys = {
+                agent: agent.split("_")[0] if shared_weights else agent
+                for agent in agents
+            }
         self._num_exectors = num_executors
         self._num_caches = num_caches
+
         self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
@@ -213,7 +232,7 @@ class MADQN:
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
-                shared_weights=shared_weights,
+                agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -224,6 +243,8 @@ class MADQN:
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
                 sequence_length=sequence_length,
+                importance_sampling_exponent=importance_sampling_exponent,
+                max_priority_weight=max_priority_weight,
                 period=period,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
@@ -249,7 +270,8 @@ class MADQN:
         core_message_specs = {}
 
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
         for agent in agents:
             agent_type = agent.split("_")[0]
@@ -329,14 +351,15 @@ class MADQN:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture with target networks.
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_keys=self._agent_net_keys,
         )
 
         if self._builder._replay_stabiliser_fn is not None:
@@ -370,6 +393,7 @@ class MADQN:
         return self._builder.make_trainer(
             networks=system_networks,
             dataset=dataset,
+            replay_client=replay,
             counter=counter,
             communication_module=communication_module,
             logger=trainer_logger,
@@ -400,14 +424,15 @@ class MADQN:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture with target networks.
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_keys=self._agent_net_keys,
         )
 
         if self._builder._replay_stabiliser_fn is not None:
@@ -487,14 +512,15 @@ class MADQN:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture with target networks.
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_keys=self._agent_net_keys,
         )
 
         if self._builder._replay_stabiliser_fn is not None:

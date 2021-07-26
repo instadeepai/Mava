@@ -59,6 +59,7 @@ class VDN(MADQN):
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
+        agent_net_keys: Dict[str, str] = {},
         batch_size: int = 256,
         prefetch_size: int = 4,
         min_replay_size: int = 1000,
@@ -66,6 +67,8 @@ class VDN(MADQN):
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
         sequence_length: int = 20,
+        importance_sampling_exponent: Optional[float] = None,
+        max_priority_weight: float = 0.9,
         period: int = 20,
         max_gradient_norm: float = None,
         discount: float = 0.99,
@@ -114,7 +117,10 @@ class VDN(MADQN):
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
             shared_weights (bool, optional): whether agents should share weights or not.
+                When agent_net_keys are provided the value of shared_weights is ignored.
                 Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             batch_size (int, optional): sample batch size for updates. Defaults to 256.
             prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
             min_replay_size (int, optional): minimum replay size before updating.
@@ -126,6 +132,8 @@ class VDN(MADQN):
                 Defaults to 5.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 20.
+            importance_sampling_exponent: (float): Not implemented yet.
+            max_priority_weight(float): Not implemented yet.
             period (int, optional): [description]. Defaults to 20.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
@@ -180,6 +188,7 @@ class VDN(MADQN):
             logger_factory=logger_factory,
             environment_spec=environment_spec,
             shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             num_executors=num_executors,
             num_caches=num_caches,
             max_executor_steps=max_executor_steps,
@@ -202,7 +211,7 @@ class VDN(MADQN):
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
-                shared_weights=shared_weights,
+                agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -213,6 +222,8 @@ class VDN(MADQN):
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
                 sequence_length=sequence_length,
+                importance_sampling_exponent=importance_sampling_exponent,
+                max_priority_weight=max_priority_weight,
                 period=period,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
@@ -242,14 +253,15 @@ class VDN(MADQN):
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # Create system architecture
         architecture = self._architecture(
             environment_spec=self._environment_spec,
             value_networks=networks["q_networks"],
-            shared_weights=self._shared_weights,
+            agent_net_keys=self._agent_net_keys,
         )
         # Augment network architecture by adding mixing layer network.
         system_networks = self._mixer(

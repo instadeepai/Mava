@@ -61,6 +61,7 @@ class MADDPG:
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
+        agent_net_keys: Dict[str, str] = {},
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -115,7 +116,10 @@ class MADDPG:
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
             shared_weights (bool, optional): whether agents should share weights or not.
+                When agent_net_keys are provided the value of shared_weights is ignored.
                 Defaults to True.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
             batch_size (int, optional): sample batch size for updates. Defaults to 256.
@@ -182,12 +186,20 @@ class MADDPG:
                 time_delta=10,
             )
 
+        # Setup agent networks
+        self._agent_net_keys = agent_net_keys
+        if not agent_net_keys:
+            agents = environment_spec.get_agent_ids()
+            self._agent_net_keys = {
+                agent: agent.split("_")[0] if shared_weights else agent
+                for agent in agents
+            }
+
         self._architecture = architecture
         self._environment_factory = environment_factory
         self._network_factory = network_factory
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
-        self._shared_weights = shared_weights
         self._num_exectors = num_executors
         self._num_caches = num_caches
         self._max_executor_steps = max_executor_steps
@@ -214,7 +226,7 @@ class MADDPG:
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
-                shared_weights=shared_weights,
+                agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,
@@ -250,7 +262,8 @@ class MADDPG:
         agents = self._environment_spec.get_agent_ids()
         core_state_specs = {}
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
         for agent in agents:
             agent_type = agent.split("_")[0]
@@ -319,7 +332,8 @@ class MADDPG:
 
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # create logger
@@ -341,7 +355,7 @@ class MADDPG:
             "observation_networks": networks["observations"],
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
-            "shared_weights": self._shared_weights,
+            "agent_net_keys": self._agent_net_keys,
         }
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
@@ -381,7 +395,8 @@ class MADDPG:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # architecture args
@@ -390,7 +405,7 @@ class MADDPG:
             "observation_networks": networks["observations"],
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
-            "shared_weights": self._shared_weights,
+            "agent_net_keys": self._agent_net_keys,
         }
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec
@@ -460,7 +475,8 @@ class MADDPG:
 
         # Create the behavior policy.
         networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec, shared_weights=self._shared_weights
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
         )
 
         # architecture args
@@ -469,7 +485,7 @@ class MADDPG:
             "observation_networks": networks["observations"],
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
-            "shared_weights": self._shared_weights,
+            "agent_net_keys": self._agent_net_keys,
         }
         if self._connection_spec:
             architecture_config["network_spec"] = self._connection_spec

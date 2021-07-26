@@ -34,7 +34,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import execution, training
-from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
+from mava.wrappers import MADQNDetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -45,7 +45,8 @@ class MADQNConfig:
             each agent in the system.
         epsilon_min: final minimum value for epsilon at the end of a decay schedule.
         epsilon_decay: the rate at which epislon decays.
-        shared_weights: boolean indicating whether agents should share weights.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
         target_update_period: number of learner steps to perform before updating
             the target networks.
         executor_variable_update_period: the rate at which executors sync their
@@ -70,7 +71,7 @@ class MADQNConfig:
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
     epsilon_decay: float
-    shared_weights: bool
+    agent_net_keys: Dict[str, str]
     target_update_period: int
     executor_variable_update_period: int
     max_gradient_norm: Optional[float]
@@ -80,6 +81,8 @@ class MADQNConfig:
     prefetch_size: int
     batch_size: int
     n_step: int
+    max_priority_weight: float
+    importance_sampling_exponent: Optional[float]
     sequence_length: int
     period: int
     discount: float
@@ -180,9 +183,17 @@ class MADQNBuilder:
                 error_buffer=error_buffer,
             )
 
+        # Maybe use prioritized sampling.
+        if self._config.importance_sampling_exponent is not None:
+            sampler = reverb.selectors.Prioritized(
+                self._config.importance_sampling_exponent
+            )
+        else:
+            sampler = reverb.selectors.Uniform()
+
         replay_table = reverb.Table(
             name=self._config.replay_table_name,
-            sampler=reverb.selectors.Uniform(),
+            sampler=sampler,
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
             rate_limiter=limiter,
@@ -291,14 +302,15 @@ class MADQNBuilder:
                 of the system generating data by interacting the environment.
         """
 
-        shared_weights = self._config.shared_weights
+        agent_net_keys = self._config.agent_net_keys
 
         variable_client = None
         if variable_source:
-            agent_keys = self._agent_types if shared_weights else self._agents
-
             # Create policy variables
-            variables = {agent: q_networks[agent].variables for agent in agent_keys}
+            variables = {
+                net_key: q_networks[net_key].variables
+                for net_key in set(agent_net_keys.values())
+            }
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
@@ -317,7 +329,7 @@ class MADQNBuilder:
         return self._executor_fn(
             q_networks=q_networks,
             action_selectors=action_selectors,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             variable_client=variable_client,
             adder=adder,
             trainer=trainer,
@@ -333,6 +345,7 @@ class MADQNBuilder:
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
+        replay_client: Optional[reverb.TFClient] = None,
     ) -> core.Trainer:
         """Create a trainer instance.
 
@@ -374,7 +387,7 @@ class MADQNBuilder:
             discount=self._config.discount,
             q_networks=q_networks,
             target_q_networks=target_q_networks,
-            shared_weights=self._config.shared_weights,
+            agent_net_keys=self._config.agent_net_keys,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
@@ -388,6 +401,6 @@ class MADQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type:ignore
+        trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore
 
         return trainer

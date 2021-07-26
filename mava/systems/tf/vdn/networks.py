@@ -26,8 +26,8 @@ from mava.utils.enums import ArchitectureType, Network
 # Default networks for vdn
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
+    agent_net_keys: Dict[str, str],
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (128, 128),
-    shared_weights: bool = True,
     archecture_type: ArchitectureType = ArchitectureType.feedforward,
     network_type: Network = Network.mlp,
     fingerprints: bool = False,
@@ -37,10 +37,10 @@ def make_default_networks(
     Args:
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
             observation spaces etc. for each agent in the system.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of policy networks. Defaults to (128,128).
-        shared_weights (bool, optional): whether agents should share weights or not.
-            Defaults to True.
         archecture_type (ArchitectureType, optional): archecture used
             for agent networks. Can be feedforward or recurrent.
             Defaults to ArchitectureType.recurrent.
@@ -56,7 +56,7 @@ def make_default_networks(
     return make_default_networks_madqn(
         environment_spec=environment_spec,
         policy_networks_layer_sizes=policy_networks_layer_sizes,
-        shared_weights=shared_weights,
+        agent_net_keys=agent_net_keys,
         archecture_type=archecture_type,
         network_type=network_type,
         fingerprints=fingerprints,
