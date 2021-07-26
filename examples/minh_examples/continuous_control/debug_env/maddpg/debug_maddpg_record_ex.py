@@ -1,4 +1,8 @@
 """Example running MADDPG on debug MPE environments, while recording agents."""
+# Might be useful, might be not
+import os
+from pyvirtualdisplay import Display
+
 import functools
 from datetime import datetime
 from typing import Any, Dict, Mapping, Sequence, Union
@@ -21,11 +25,17 @@ from mava.wrappers import MonitorParallelEnvironmentLoop
 from mava.components.tf import architectures
 from mava.utils.loggers import logger_utils
 
+# display = Display(visible=0, size=(1024, 768))
+# display.start()
+# os.environ["DISPLAY"] = ":" + str(display.display)
+
+# multi-agent deep deterministic policy gradient (MADDPG)
 def main(_: Any) -> None: 
+    
     # Defind Agent Networks
     network_factory = lp_utils.partial_kwargs(maddpg.make_default_networks)
 
-    # Select Envrironment
+    # Select Envrironment - debug environment
     env_name = "simple_spread"
     action_space = "continuous"
 
@@ -37,13 +47,13 @@ def main(_: Any) -> None:
 
     # Create MARL Systems:
     # Specify logging and checkpoint for configuration:
-    base_dir = "~/mava/checkpoints"
+    base_dir = "~/mava/checkpoints_debug"
 
     # File name 
     mava_id = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 
     # Log every [log_every] seconds
-    log_every = 15
+    log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=base_dir,
@@ -61,12 +71,12 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=1,
+        num_executors=1, # might change to 2
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        max_gradient_norm=10.0,
-        checkpoint=False,
+        max_gradient_norm=20.0,
+        checkpoint=False, # generate checkpoints, not sure what to do though
         batch_size=1024,
 
         # Record agents in environment. 
@@ -87,7 +97,7 @@ def main(_: Any) -> None:
     lp.launch(
         system,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
-        terminal="output_to_files",
+        terminal="current_terminal", # output_to_files
         local_resources=local_resources,
     )
 
