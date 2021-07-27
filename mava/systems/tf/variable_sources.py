@@ -23,7 +23,7 @@ class VariableSource:
         """
         # Init the variable dictionary
         self.variables = variables
-
+        self._system_checkpointer = None
         if checkpoint:
             # Only save variables that are not empty.
             save_variables = {}

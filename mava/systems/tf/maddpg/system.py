@@ -243,11 +243,12 @@ class MADDPG:
         all_trainer_net_keys = []
         for trainer_nets in self._trainer_networks.values():
             all_trainer_net_keys.extend(trainer_nets)
-        unique_trainer_net_keys = list(set(all_trainer_net_keys))
+        unique_trainer_net_keys = sort_str_num(list(set(all_trainer_net_keys)))
 
         # Check that all agent_net_keys are in trainer_networks
+        print("unique_net_keys: ", unique_net_keys)
+        print("unique_trainer_net_keys: ", unique_trainer_net_keys)
         assert unique_net_keys == unique_trainer_net_keys
-
         # Setup specs for each network
         self._net_spec_keys = {}
         for i in range(len(unique_net_keys)):
