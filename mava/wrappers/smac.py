@@ -139,10 +139,8 @@ try:  # noqa
             if self._reset_next_step:
                 return self.reset()
 
-            raise ValueError(
-                "Fix all .values() stacking. Cannot assume .values() returns in the same order each time."
-            )
-            actions_feed = list(actions.values())
+            actions_feed = [actions[key] for key in self._agents]
+
             reward, terminated, info = self._environment.step(actions_feed)
             obs_list = self._environment.get_obs()
             state = self._environment.get_state()

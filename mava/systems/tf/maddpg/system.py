@@ -18,6 +18,8 @@
 import functools
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
+
+import numpy as np
 import acme
 import dm_env
 import launchpad as lp
@@ -43,9 +45,6 @@ from mava.systems.tf.variable_sources import VariableSource as MavaVariableSourc
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import DetailedPerAgentStatistics
-
-Array = specs.Array
-
 
 class MADDPG:
     """MADDPG system."""
@@ -229,11 +228,14 @@ class MADDPG:
         all_samples = []
         for sample in self._executor_samples:
             all_samples.extend(sample)
-        all_unique_net_keys = set(all_samples)
+        unique_net_keys = set(all_samples)
+
+        # Create mapping from ints to networks
+        net_to_ints = {net_key: i for i, net_key in enumerate(unique_net_keys)}
 
         # Setup trainer_networks
         if not trainer_networks:
-            self._trainer_networks = {"trainer_0": list(all_unique_net_keys)}
+            self._trainer_networks = {"trainer_0": list(unique_net_keys)}
         else:
             self._trainer_networks = trainer_networks
 
@@ -244,11 +246,11 @@ class MADDPG:
         unique_trainer_net_keys = set(all_trainer_net_keys)
 
         # Check that all agent_net_keys are in trainer_networks
-        assert all_unique_net_keys == unique_trainer_net_keys
+        assert unique_net_keys == unique_trainer_net_keys
 
         # Setup specs for each network
         self._net_spec_keys = {}
-        unique_net_keys = sort_str_num(list(set(all_unique_net_keys)))
+        unique_net_keys = sort_str_num(list(set(unique_net_keys)))
         for i in range(len(unique_net_keys)):
             self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
 
@@ -292,6 +294,11 @@ class MADDPG:
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
 
+        int_spec = specs.DiscreteArray(len(unique_net_keys))
+        agents = environment_spec.get_agent_ids()
+        net_spec = {"network_keys": {agent: int_spec for agent in agents}}
+        extra_specs.update(net_spec)
+
         self._builder = builder.MADDPGBuilder(
             builder.MADDPGConfig(
                 environment_spec=environment_spec,
@@ -300,6 +307,8 @@ class MADDPG:
                 table_network_config=table_network_config,
                 num_executors=num_executors,
                 executor_samples=self._executor_samples,
+                net_to_ints=net_to_ints,
+                unique_net_keys=unique_net_keys,
                 discount=discount,
                 batch_size=batch_size,
                 prefetch_size=prefetch_size,

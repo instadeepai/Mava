@@ -41,7 +41,8 @@ tfd = tfp.distributions
 
 
 def sample_new_agent_keys(
-    agents: List, executor_samples: List
+    agents: List, executor_samples: List,
+    net_to_ints: Dict[str, int]
 ) -> Tuple[Dict[str, np.array], Dict[str, np.array]]:
     save_net_keys = {}
     agent_net_keys = {}
@@ -51,7 +52,7 @@ def sample_new_agent_keys(
         for net_key in sample:
             agent = agent_slots.pop(0)
             agent_net_keys[agent] = net_key
-            save_net_keys[agent] = np.array(net_key, dtype=np.dtype("U10"))
+            save_net_keys[agent] = np.array(net_to_ints[net_key], dtype=np.int32)
     return save_net_keys, agent_net_keys
 
 
@@ -66,6 +67,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         executor_samples: List,
+        net_to_ints: Dict[str, int],
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -89,7 +91,8 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self._agent_specs = agent_specs
         self._executor_samples = executor_samples
         self._counts = counts
-        self._network_keys_extras: Dict[str, np.array] = {}
+        self._network_int_keys_extras: Dict[str, np.array] = {}
+        self._net_to_ints = net_to_ints
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,
@@ -194,11 +197,12 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
         "Select new networks from the sampler at the start of each episode."
         agents = sort_str_num(list(self._agent_net_keys.keys()))
-        self._network_keys_extras, self._agent_net_keys = sample_new_agent_keys(
-            agents, self._executor_samples
+        self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+            agents, self._executor_samples,
+            self.net_to_ints,
         )
-        """In population based trianing add the network key used by each
-        agent."""
+
+        extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add_first(timestep, extras)
 
     def observe(
@@ -221,9 +225,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         if not self._adder:
             return
         _, policy = actions
-        """In population based trianing select new networks from the sampler
-        at the start of each episode. Also add the network key used by each
-        agent."""
+        next_extras["network_int_keys"] = self._network_int_keys_extras
         # TODO (dries): Sort out this mypy issue.
         self._adder.add(policy, next_timestep, next_extras)  # type: ignore
 
@@ -244,6 +246,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
+        net_to_ints: Dict[str, int],
         executor_samples: List,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
@@ -272,6 +275,8 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self._agent_specs = agent_specs
         self._executor_samples = executor_samples
         self._counts = counts
+        self._net_to_ints = net_to_ints
+        self._network_int_keys_extras: Dict[str, np.array] = {}
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,
@@ -392,18 +397,20 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         if not self._adder:
             return
 
-        numpy_states = {
-            agent: tf2_utils.to_numpy_squeeze(_state)
-            for agent, _state in self._states.items()
-        }
-
         # Sample new agent_net_keys.
         agents = sort_str_num(list(self._agent_net_keys.keys()))
-        self._network_keys_extras, self._agent_net_keys = sample_new_agent_keys(
-            agents, self._executor_samples
+        self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+            agents, self._executor_samples,
+            self._net_to_ints,
         )
 
-        extras.update({"core_states": numpy_states})
+        if self._store_recurrent_state:
+            numpy_states = {
+            agent: tf2_utils.to_numpy_squeeze(_state)
+            for agent, _state in self._states.items()
+            }
+            extras.update({"core_states": numpy_states})
+        extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add_first(timestep, extras)
 
     def observe(
@@ -431,6 +438,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
                 for agent, _state in self._states.items()
             }
             next_extras.update({"core_states": numpy_states})
+        next_extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add(policy, next_timestep, next_extras)  # type: ignore
 
     def update(self, wait: bool = False) -> None:

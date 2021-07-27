@@ -81,6 +81,8 @@ class MADDPGConfig:
     trainer_networks: Dict[str, List]
     table_network_config: Dict[str, List]
     executor_samples: List
+    net_to_ints: Dict[str, int]
+    unique_net_keys: List[str]
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -246,9 +248,7 @@ class MADDPGBuilder:
         # Create table per trainer
         replay_tables = []
         for t_i in range(len(self._config.table_network_config.keys())):
-            # TODO (dries): Fix this. This does not work where one has shared agent
-            # weights in the single trainer setup.
-
+            # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
             num_networks = len(self._config.table_network_config[f"trainer_{t_i}"])
             env_spec = copy.deepcopy(env_adder_spec)
@@ -330,6 +330,7 @@ class MADDPGBuilder:
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=priority_fns,
                 client=replay_client,
+                int_to_nets=self._config.unique_net_keys,
                 n_step=self._config.n_step,
                 table_network_config=self._config.table_network_config,
                 discount=self._config.discount,
@@ -338,6 +339,7 @@ class MADDPGBuilder:
             adder = reverb_adders.ParallelSequenceAdder(
                 priority_fns=priority_fns,
                 client=replay_client,
+                int_to_nets=self._config.unique_net_keys,
                 sequence_length=self._config.sequence_length,
                 table_network_config=self._config.table_network_config,
                 period=self._config.period,
@@ -453,6 +455,7 @@ class MADDPGBuilder:
         return self._executor_fn(
             policy_networks=policy_networks,
             counts=counts,
+            net_to_ints=self._config.net_to_ints,
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
             executor_samples=self._config.executor_samples,

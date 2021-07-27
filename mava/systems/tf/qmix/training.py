@@ -262,10 +262,6 @@ class QMIXTrainer(MADQNTrainer):
                 q_acts.append(q_act)
                 q_targets.append(q_target)
 
-            raise ValueError(
-                "Fix all .values() stacking. Cannot assume .values() returns in the same order each time."
-            )
-
             rewards = tf.concat(
                 [tf.reshape(val, (-1, 1)) for val in list(r_t.values())], axis=1
             )

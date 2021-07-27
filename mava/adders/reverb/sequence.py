@@ -24,6 +24,7 @@ This implements adders which add sequences or partial trajectories.
 import operator
 from typing import Dict, List, Optional
 
+import copy
 import reverb
 import tensorflow as tf
 import tree
@@ -33,7 +34,7 @@ from acme.adders.reverb.sequence import SequenceAdder
 from acme.types import NestedSpec
 
 from mava.adders.reverb import base
-from mava.adders.reverb.base import ReverbParallelAdder
+from mava.adders.reverb.base import ReverbParallelAdder, Step
 from mava.adders.reverb.utils import trajectory_signature
 
 # TODO Clean this up, when using newer versions of acme.
@@ -42,6 +43,8 @@ try:
 except ImportError:
     from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
 
+from mava.utils.sort_utils import sort_str_num
+
 
 class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
     """An adder which adds sequences of fixed length."""
@@ -49,6 +52,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
     def __init__(
         self,
         client: reverb.Client,
+        int_to_nets: List[str],
         sequence_length: int,
         period: int,
         table_network_config: Dict[str, List] = None,
@@ -99,6 +103,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         )
 
         self._period = period
+        self._int_to_nets = int_to_nets
         self._sequence_length = sequence_length
         self._end_of_episode_behavior = end_of_episode_behavior
         self._table_network_config = table_network_config
@@ -133,9 +138,12 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         table_priorities = utils.calculate_priorities(self._priority_fns, trajectory)
 
         # Create a prioritized item for each table.
-        for table_name, priority in table_priorities.items():
-            self._writer.create_item(table_name, priority, trajectory)
-            self._writer.flush(self._max_in_flight_items)
+        # for table_name, priority in table_priorities.items():
+        #     self._writer.create_item(table_name, priority, trajectory)
+        #     self._writer.flush(self._max_in_flight_items)
+
+        # Add the experience to the trainer tables in the correct form.
+        self.write_experience_to_tables(trajectory, table_priorities)
 
     @classmethod
     def signature(

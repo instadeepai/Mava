@@ -85,6 +85,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
     def __init__(
         self,
         client: reverb.Client,
+        int_to_nets: List[str],
         n_step: int,
         discount: float,
         table_network_config: Dict[str, List] = None,
@@ -110,6 +111,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # Makes the additional discount a float32, which means that it will be
         # upcast if rewards/discounts are float64 and left alone otherwise.
         self.n_step = n_step
+        self._int_to_nets = int_to_nets
         self._discount = tree.map_structure(np.float32, discount)
         self._first_idx = 0
         self._last_idx = 0
@@ -198,93 +200,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             self._priority_fns, transition
         )
 
-        # Insert the transition into replay along with its priority.
-        created_item = False
-
-        # Get a dictionary of the transition nets and agents.
-        entry_net_keys = transition.extras["network_keys"]
-        agents = sort_str_num(transition.action.keys())
-        trans_nets_agent: Dict[str, List] = {}
-        for agent in agents:
-            net_key = str(entry_net_keys[agent].numpy().astype(str))
-            if net_key in trans_nets_agent:
-                trans_nets_agent[net_key].append(agent)
-            else:
-                trans_nets_agent[net_key] = [agent]
-
-        # If all the network entries of a trainer is in the data then add it to that
-        # trainer's data table.
-        for table, priority in table_priorities.items():
-            if self._table_network_config is None:
-                self._writer.create_item(
-                    table=table, priority=priority, trajectory=transition
-                )
-            else:
-                # Check if all the networks are in trans_nets_agent.
-                trans_dict_copy = copy.deepcopy(trans_nets_agent)
-                is_in_entry = True
-                for net_key in self._table_network_config[table]:
-                    if net_key in trans_dict_copy and len(trans_dict_copy[net_key]) > 0:
-                        trans_dict_copy[net_key].pop()
-                    else:
-                        is_in_entry = False
-                        break
-
-                if is_in_entry:
-                    created_item = True
-
-                    observation = {}
-                    extras: Dict[str, Any] = {}
-                    action = {}
-                    reward = {}
-                    discount = {}
-                    next_observation = {}
-                    next_extras: Dict[str, Any] = {}
-
-                    # Create extras
-                    for key in transition.extras.keys():
-                        extras[key] = {}
-                        next_extras[key] = {}
-
-                    trans_dict_copy = copy.deepcopy(trans_nets_agent)
-                    for a_i, net_key in enumerate(self._table_network_config[table]):
-                        cur_agent = trans_dict_copy[net_key].pop()
-                        want_agent = agents[a_i]
-                        observation[want_agent] = transition.observation[cur_agent]
-
-                        action[want_agent] = transition.action[cur_agent]
-                        reward[want_agent] = transition.reward[cur_agent]
-                        discount[want_agent] = transition.discount[cur_agent]
-                        next_observation[want_agent] = transition.next_observation[
-                            cur_agent
-                        ]
-
-                        # Convert extras
-                        for key in transition.extras.keys():
-                            extras[key][want_agent] = transition.extras[key][cur_agent]
-                            next_extras[key][want_agent] = transition.next_extras[key][
-                                cur_agent
-                            ]
-
-                    new_transition = mava_types.Transition(
-                        observation=observation,
-                        extras=extras,
-                        action=action,
-                        reward=reward,
-                        discount=discount,
-                        next_observation=next_observation,
-                        next_extras=next_extras,
-                    )
-
-                    self._writer.create_item(
-                        table=table, priority=priority, trajectory=new_transition
-                    )
-        self._writer.flush(self._max_in_flight_items)
-        if not created_item:
-            raise EOFError(
-                "This experience was not used by any trainer: ",
-                transition.action.keys(),
-            )
+        # Add the experience to the trainer tables in the correct form.
+        self.write_experience_to_tables(transition, table_priorities)
 
     # TODO(Kale-ab) Consider deprecating in future versions and using acme
     # version of this function.
