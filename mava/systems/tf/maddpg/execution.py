@@ -41,8 +41,9 @@ tfd = tfp.distributions
 
 
 def sample_new_agent_keys(
-    agents: List, executor_samples: List,
-    net_to_ints: Dict[str, int]
+    agents: List,
+    executor_samples: List,
+    net_to_ints: Dict[str, int] = None,
 ) -> Tuple[Dict[str, np.array], Dict[str, np.array]]:
     save_net_keys = {}
     agent_net_keys = {}
@@ -52,7 +53,9 @@ def sample_new_agent_keys(
         for net_key in sample:
             agent = agent_slots.pop(0)
             agent_net_keys[agent] = net_key
-            save_net_keys[agent] = np.array(net_to_ints[net_key], dtype=np.int32)
+            if net_to_ints:
+                save_net_keys[agent] = np.array(net_to_ints[net_key], dtype=np.int32)
+
     return save_net_keys, agent_net_keys
 
 
@@ -198,8 +201,9 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         "Select new networks from the sampler at the start of each episode."
         agents = sort_str_num(list(self._agent_net_keys.keys()))
         self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
-            agents, self._executor_samples,
-            self.net_to_ints,
+            agents,
+            self._executor_samples,
+            self._net_to_ints,
         )
 
         extras["network_int_keys"] = self._network_int_keys_extras
@@ -400,14 +404,15 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         # Sample new agent_net_keys.
         agents = sort_str_num(list(self._agent_net_keys.keys()))
         self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
-            agents, self._executor_samples,
+            agents,
+            self._executor_samples,
             self._net_to_ints,
         )
 
         if self._store_recurrent_state:
             numpy_states = {
-            agent: tf2_utils.to_numpy_squeeze(_state)
-            for agent, _state in self._states.items()
+                agent: tf2_utils.to_numpy_squeeze(_state)
+                for agent, _state in self._states.items()
             }
             extras.update({"core_states": numpy_states})
         extras["network_int_keys"] = self._network_int_keys_extras

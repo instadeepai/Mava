@@ -17,6 +17,7 @@
 
 import copy
 from typing import (
+    Any,
     Callable,
     Dict,
     Iterable,
@@ -37,6 +38,7 @@ from acme import specs as acme_specs
 from acme import types
 from acme.adders.reverb.base import ReverbAdder
 
+from mava import types as mava_types
 from mava.utils.sort_utils import sort_str_num
 
 DEFAULT_PRIORITY_TABLE = "priority_table"
@@ -87,7 +89,9 @@ def spec_like_to_tensor_spec(
     return tf.TensorSpec.from_spec(spec, name="/".join(str(p) for p in paths))
 
 
-def get_trans_net_agents(trajectory, entry_net_keys):
+def get_trans_net_agents(
+    trajectory: Union[Trajectory, mava_types.Transition], entry_net_keys: Dict[str, str]
+) -> Tuple[List, Dict[str, List]]:
     agents = sort_str_num(trajectory.actions.keys())
     unique_nets = sort_str_num(set(entry_net_keys.values()))
     trans_nets_agent: Dict[str, List] = {key: [] for key in unique_nets}
@@ -136,7 +140,11 @@ class ReverbParallelAdder(ReverbAdder):
         )
         self._use_next_extras = use_next_extras
 
-    def write_experience_to_tables(self, trajectory, table_priorities) -> None:
+    def write_experience_to_tables(  # noqa
+        self,
+        trajectory: Union[Trajectory, mava_types.Transition],
+        table_priorities: Dict[str, Any],
+    ) -> None:
         # Get a dictionary of the transition nets and agents.
         if self._table_network_config:
             entry_extras = trajectory.extras["network_int_keys"]
@@ -188,24 +196,26 @@ class ReverbParallelAdder(ReverbAdder):
                         created_item = True
 
                         # Create new empty transition
-                        new_trans = (
-                            Step(
+                        if type(trajectory) == Step:
+                            soe = trajectory.start_of_episode  # type: ignore
+                            new_trans = Step(  # type: ignore
                                 {},
                                 {},
                                 {},
                                 {},
-                                start_of_episode=trajectory.start_of_episode,
+                                start_of_episode=soe,
                                 extras={},
                             )
-                            if type(trajectory) == Step
-                            else types.Transition({}, {}, {}, {}, {}, {}, {})
-                        )
+                        else:
+                            new_trans = mava_types.Transition(  # type: ignore
+                                {}, {}, {}, {}, {}, {}, {}
+                            )
 
                         for key in trajectory.extras.keys():
                             new_trans.extras[key] = {}
 
-                            if type(trajectory) == types.Transition:
-                                new_trans.next_extras[key] = {}
+                            if type(trajectory) == mava_types.Transition:
+                                new_trans.next_extras[key] = {}  # type: ignore
 
                         for a_i in range(len(item_agents)):
                             cur_agent = item_agents[a_i]
@@ -223,19 +233,25 @@ class ReverbParallelAdder(ReverbAdder):
                                 cur_agent
                             ]
 
-                            if type(trajectory) == types.Transition:
-                                new_trans.next_observations[
+                            if type(trajectory) == mava_types.Transition:
+                                new_trans.next_observations[  # type: ignore
                                     want_agent
-                                ] = trajectory.next_observations[cur_agent]
+                                ] = trajectory.next_observations[  # type: ignore
+                                    cur_agent
+                                ]  # type: ignore
                             # Convert extras
                             for key in trajectory.extras.keys():
                                 new_trans.extras[key][want_agent] = trajectory.extras[
                                     key
                                 ][cur_agent]
-                                if type(trajectory) == types.Transition:
-                                    new_trans.next_extras[key][
+                                if type(trajectory) == mava_types.Transition:
+                                    new_trans.next_extras[key][  # type: ignore
                                         want_agent
-                                    ] = trajectory.next_extras[key][cur_agent]
+                                    ] = trajectory.next_extras[  # type: ignore
+                                        key
+                                    ][  # type: ignore
+                                        cur_agent
+                                    ]  # type: ignore
 
                         self._writer.create_item(
                             table=table, priority=priority, trajectory=new_trans
@@ -244,7 +260,7 @@ class ReverbParallelAdder(ReverbAdder):
         if not created_item:
             raise EOFError(
                 "This experience was not used by any trainer: ",
-                trajectory.action.keys(),
+                trajectory.actions.keys(),
             )
 
     def add_first(

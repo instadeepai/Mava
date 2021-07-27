@@ -22,7 +22,7 @@ This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import reverb
@@ -37,7 +37,6 @@ from mava import types as mava_types
 from mava.adders.reverb import base
 from mava.adders.reverb import utils as mava_utils
 from mava.adders.reverb.base import ReverbParallelAdder
-from mava.utils.sort_utils import sort_str_num
 
 
 class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
@@ -186,12 +185,12 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             lambda x: x[-1], (history["n_step_return"], history["total_discount"])
         )
         transition = mava_types.Transition(
-            observation=s,
+            observations=s,
             extras=e,
-            action=a,
-            reward=n_step_return,
-            discount=total_discount,
-            next_observation=s_,
+            actions=a,
+            rewards=n_step_return,
+            discounts=total_discount,
+            next_observations=s_,
             next_extras=e_,
         )
 
@@ -304,11 +303,11 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             step_discount_specs[agent] = step_discounts_spec
 
         transition_spec = types.Transition(
-            observation=obs_specs,
-            next_observation=obs_specs,
-            action=act_specs,
-            reward=reward_specs,
-            discount=step_discount_specs,
+            observations=obs_specs,
+            next_observations=obs_specs,
+            actions=act_specs,
+            rewards=reward_specs,
+            discounts=step_discount_specs,
             extras=extras_spec,
             next_extras=extras_spec,
         )

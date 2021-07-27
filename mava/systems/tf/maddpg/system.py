@@ -18,8 +18,6 @@
 import functools
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
-
-import numpy as np
 import acme
 import dm_env
 import launchpad as lp
@@ -45,6 +43,7 @@ from mava.systems.tf.variable_sources import VariableSource as MavaVariableSourc
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import DetailedPerAgentStatistics
+
 
 class MADDPG:
     """MADDPG system."""
@@ -211,7 +210,8 @@ class MADDPG:
         else:
             # if executor samples provided, use executor_samples to determine setup
             _, self._agent_net_keys = sample_new_agent_keys(
-                agents, self._executor_samples
+                agents,
+                self._executor_samples,
             )
 
         # Check that the environment and agent_net_keys has the same amount of agents
@@ -228,7 +228,7 @@ class MADDPG:
         all_samples = []
         for sample in self._executor_samples:
             all_samples.extend(sample)
-        unique_net_keys = set(all_samples)
+        unique_net_keys = sort_str_num(list(set(all_samples)))
 
         # Create mapping from ints to networks
         net_to_ints = {net_key: i for i, net_key in enumerate(unique_net_keys)}
@@ -243,14 +243,13 @@ class MADDPG:
         all_trainer_net_keys = []
         for trainer_nets in self._trainer_networks.values():
             all_trainer_net_keys.extend(trainer_nets)
-        unique_trainer_net_keys = set(all_trainer_net_keys)
+        unique_trainer_net_keys = list(set(all_trainer_net_keys))
 
         # Check that all agent_net_keys are in trainer_networks
         assert unique_net_keys == unique_trainer_net_keys
 
         # Setup specs for each network
         self._net_spec_keys = {}
-        unique_net_keys = sort_str_num(list(set(unique_net_keys)))
         for i in range(len(unique_net_keys)):
             self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
 
