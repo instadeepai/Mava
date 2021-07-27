@@ -21,10 +21,10 @@
 This implements adders which add sequences or partial trajectories.
 """
 
+import copy
 import operator
 from typing import Dict, List, Optional
 
-import copy
 import reverb
 import tensorflow as tf
 import tree
@@ -52,9 +52,9 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
     def __init__(
         self,
         client: reverb.Client,
-        int_to_nets: List[str],
         sequence_length: int,
         period: int,
+        int_to_nets: List[str] = None,
         table_network_config: Dict[str, List] = None,
         *,
         delta_encoded: bool = False,

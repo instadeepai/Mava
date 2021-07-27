@@ -85,9 +85,9 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
     def __init__(
         self,
         client: reverb.Client,
-        int_to_nets: List[str],
         n_step: int,
         discount: float,
+        int_to_nets: List[str] = None,
         table_network_config: Dict[str, List] = None,
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
