@@ -180,6 +180,10 @@ class MADDPGBuilder:
     def covert_specs(self, spec: Dict[str, Any], num_networks: int) -> Dict[str, Any]:
         agents = sort_str_num(self._config.agent_net_keys.keys())[:num_networks]
         converted_spec: Dict[str, Any] = {}
+
+        if type(spec) is not Dict:
+            return spec
+
         if agents[0] in spec:
             for agent in agents:
                 converted_spec[agent] = spec[agent]

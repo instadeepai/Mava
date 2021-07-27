@@ -241,17 +241,39 @@ class ReverbParallelAdder(ReverbAdder):
                                 ]  # type: ignore
                             # Convert extras
                             for key in trajectory.extras.keys():
-                                new_trans.extras[key][want_agent] = trajectory.extras[
-                                    key
-                                ][cur_agent]
-                                if type(trajectory) == mava_types.Transition:
-                                    new_trans.next_extras[key][  # type: ignore
+                                if (
+                                    trajectory.extras[key] is Dict
+                                    and cur_agent in trajectory.extras[key]
+                                ):
+                                    new_trans.extras[key][
                                         want_agent
-                                    ] = trajectory.next_extras[  # type: ignore
-                                        key
-                                    ][  # type: ignore
-                                        cur_agent
-                                    ]  # type: ignore
+                                    ] = trajectory.extras[key][cur_agent]
+                                else:
+                                    # TODO: (dries) Only actually need to do this once
+                                    # and not per agent. Maybe fix this in the future.
+                                    new_trans.extras[key] = trajectory.extras[key]
+                                if type(trajectory) == mava_types.Transition:
+                                    ext = trajectory.next_extras[key]  # type: ignore
+                                    if (
+                                        ext is Dict  # type: ignore
+                                        and cur_agent in ext  # type: ignore
+                                    ):
+                                        new_trans.next_extras[key][  # type: ignore
+                                            want_agent
+                                        ] = trajectory.next_extras[  # type: ignore
+                                            key
+                                        ][  # type: ignore
+                                            cur_agent
+                                        ]  # type: ignore
+                                    else:
+                                        # TODO: (dries) Only actually need to
+                                        # do this once and not per agent. Maybe
+                                        # fix this in the future.
+                                        new_trans.next_extras[  # type: ignore
+                                            key
+                                        ] = trajectory.next_extras[  # type: ignore
+                                            key
+                                        ]  # type: ignore
 
                         self._writer.create_item(
                             table=table, priority=priority, trajectory=new_trans

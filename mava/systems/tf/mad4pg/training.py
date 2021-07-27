@@ -346,7 +346,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        trainer_net_config: List[str],
+        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
