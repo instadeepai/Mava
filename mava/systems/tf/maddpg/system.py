@@ -31,7 +31,10 @@ from dm_env import specs
 import mava
 from mava import core
 from mava import specs as mava_specs
-from mava.components.tf.architectures import DecentralisedQValueActorCritic
+from mava.components.tf.architectures import (
+    DecentralisedQValueActorCritic,
+    DecentralisedValueActorCritic,
+)
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.maddpg import builder, training
@@ -246,8 +249,6 @@ class MADDPG:
         unique_trainer_net_keys = sort_str_num(list(set(all_trainer_net_keys)))
 
         # Check that all agent_net_keys are in trainer_networks
-        print("unique_net_keys: ", unique_net_keys)
-        print("unique_trainer_net_keys: ", unique_trainer_net_keys)
         assert unique_net_keys == unique_trainer_net_keys
         # Setup specs for each network
         self._net_spec_keys = {}
@@ -390,8 +391,14 @@ class MADDPG:
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
             "agent_net_keys": self._agent_net_keys,
-            "net_spec_keys": self._net_spec_keys,
         }
+
+        # net_spec_keys is only implemented for the Decentralised architectures
+        if (
+            self._architecture == DecentralisedValueActorCritic
+            or self._architecture == DecentralisedQValueActorCritic
+        ):
+            architecture_config["net_spec_keys"] = self._net_spec_keys
 
         # TODO (dries): Can net_spec_keys and network_spec be used as
         # the same thing? Can we use use one of those two instead of both.
