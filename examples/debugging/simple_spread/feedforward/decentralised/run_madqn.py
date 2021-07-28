@@ -85,6 +85,7 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
         epsilon_decay=5e-4,
+        importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()

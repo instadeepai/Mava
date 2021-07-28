@@ -67,6 +67,8 @@ class VDN(MADQN):
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
         sequence_length: int = 20,
+        importance_sampling_exponent: Optional[float] = None,
+        max_priority_weight: float = 0.9,
         period: int = 20,
         max_gradient_norm: float = None,
         discount: float = 0.99,
@@ -130,6 +132,8 @@ class VDN(MADQN):
                 Defaults to 5.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 20.
+            importance_sampling_exponent: (float): Not implemented yet.
+            max_priority_weight(float): Not implemented yet.
             period (int, optional): [description]. Defaults to 20.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
@@ -218,6 +222,8 @@ class VDN(MADQN):
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
                 sequence_length=sequence_length,
+                importance_sampling_exponent=importance_sampling_exponent,
+                max_priority_weight=max_priority_weight,
                 period=period,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,

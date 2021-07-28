@@ -178,13 +178,12 @@ class MADDPGBuilder:
         return env_adder_spec
 
     def covert_specs(self, spec: Dict[str, Any], num_networks: int) -> Dict[str, Any]:
-        agents = sort_str_num(self._config.agent_net_keys.keys())[:num_networks]
-        converted_spec: Dict[str, Any] = {}
-
-        if type(spec) is not Dict:
+        if type(spec) is not dict:
             return spec
 
-        if agents[0] in spec:
+        agents = sort_str_num(self._config.agent_net_keys.keys())[:num_networks]
+        converted_spec: Dict[str, Any] = {}
+        if agents[0] in spec.keys():
             for agent in agents:
                 converted_spec[agent] = spec[agent]
         else:
@@ -257,6 +256,7 @@ class MADDPGBuilder:
             num_networks = len(self._config.table_network_config[f"trainer_{t_i}"])
             env_spec = copy.deepcopy(env_adder_spec)
             env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
+
             env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
             if env_spec.extra_specs is not None:
                 env_spec.extra_specs = self.covert_specs(

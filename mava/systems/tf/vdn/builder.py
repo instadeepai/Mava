@@ -30,7 +30,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.vdn import execution, training
-from mava.wrappers import DetailedTrainerStatisticsWithEpsilon
+from mava.wrappers import MADQNDetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -113,6 +113,7 @@ class VDNBuilder(MADQNBuilder):
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
+        replay_client: Optional[reverb.TFClient] = None,
     ) -> core.Trainer:
         """Create a trainer instance.
 
@@ -126,6 +127,8 @@ class VDNBuilder(MADQNBuilder):
                 metadata.. Defaults to None.
             communication_module (BaseCommunicationModule): module to enable
                 agent communication. Defaults to None.
+            replay_client (reverb.TFClient): Used for importance sampling.
+                Not implemented yet.
 
         Returns:
             core.Trainer: system trainer, that uses the collected data from the
@@ -173,6 +176,6 @@ class VDNBuilder(MADQNBuilder):
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = DetailedTrainerStatisticsWithEpsilon(trainer)  # type:ignore
+        trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore
 
         return trainer
