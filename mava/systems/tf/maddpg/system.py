@@ -218,6 +218,9 @@ class MADDPG:
             )
 
         # Check that the environment and agent_net_keys has the same amount of agents
+        # TODO (dries): Try using self._executor_samples = [['agent]].
+        # This might accelerate training as experience gets batched instead of training
+        # sequentially.
         sample_length = len(self._executor_samples[0])
         assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
 
