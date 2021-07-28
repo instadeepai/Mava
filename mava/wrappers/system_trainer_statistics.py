@@ -149,7 +149,7 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
                 self._network_loggers[network].write(network_running_statistics)
 
 
-class DetailedTrainerStatisticsWithEpsilon(DetailedTrainerStatistics):
+class MADQNDetailedTrainerStatistics(DetailedTrainerStatistics):
     """Custom DetailedTrainerStatistics class for exposing get_epsilon()"""
 
     def __init__(
