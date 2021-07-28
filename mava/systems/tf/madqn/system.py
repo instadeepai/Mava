@@ -75,6 +75,8 @@ class MADQN:
         samples_per_insert: Optional[float] = 32.0,
         n_step: int = 5,
         sequence_length: int = 20,
+        importance_sampling_exponent: Optional[float] = None,
+        max_priority_weight: float = 0.9,
         period: int = 20,
         max_gradient_norm: float = None,
         discount: float = 0.99,
@@ -144,6 +146,11 @@ class MADQN:
                 Defaults to 5.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 20.
+            importance_sampling_exponent (float, optional): value of importance sampling
+                exponent (usually around 0.2). If None, importance sampling is not used.
+            max_priority_weight (float): Required if importance_sampling_exponent
+                is not None. Defaults to 0.9. Used to scale the maximum priority of
+                reverb samples.
             period (int, optional): consecutive starting points for overlapping
                 rollouts across a sequence. Defaults to 20.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -205,6 +212,7 @@ class MADQN:
             }
         self._num_exectors = num_executors
         self._num_caches = num_caches
+
         self._max_executor_steps = max_executor_steps
         self._checkpoint_subpath = checkpoint_subpath
         self._checkpoint = checkpoint
@@ -235,6 +243,8 @@ class MADQN:
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
                 sequence_length=sequence_length,
+                importance_sampling_exponent=importance_sampling_exponent,
+                max_priority_weight=max_priority_weight,
                 period=period,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
@@ -383,6 +393,7 @@ class MADQN:
         return self._builder.make_trainer(
             networks=system_networks,
             dataset=dataset,
+            replay_client=replay,
             counter=counter,
             communication_module=communication_module,
             logger=trainer_logger,

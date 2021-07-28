@@ -80,6 +80,7 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationScheduler,
         epsilon_min=0.05,
         epsilon_decay=1e-5,
+        importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.SGD(learning_rate=1e-2),
         checkpoint_subpath=checkpoint_dir,
         batch_size=512,
