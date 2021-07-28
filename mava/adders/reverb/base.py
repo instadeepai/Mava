@@ -242,7 +242,7 @@ class ReverbParallelAdder(ReverbAdder):
                             # Convert extras
                             for key in trajectory.extras.keys():
                                 if (
-                                    trajectory.extras[key] is Dict
+                                    type(trajectory.extras[key]) is dict
                                     and cur_agent in trajectory.extras[key]
                                 ):
                                     new_trans.extras[key][
@@ -255,7 +255,7 @@ class ReverbParallelAdder(ReverbAdder):
                                 if type(trajectory) == mava_types.Transition:
                                     ext = trajectory.next_extras[key]  # type: ignore
                                     if (
-                                        ext is Dict  # type: ignore
+                                        type(ext) is dict  # type: ignore
                                         and cur_agent in ext  # type: ignore
                                     ):
                                         new_trans.next_extras[key][  # type: ignore
