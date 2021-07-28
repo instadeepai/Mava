@@ -49,7 +49,7 @@ class TestVdn:
         system = vdn.VDN(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            num_executors=2,
+            num_executors=1,
             batch_size=32,
             min_replay_size=32,
             max_replay_size=1000,

@@ -48,7 +48,7 @@ class TestMAPPO:
         system = mappo.MAPPO(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            num_executors=2,
+            num_executors=1,
             batch_size=32,
             max_queue_size=1000,
             policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),

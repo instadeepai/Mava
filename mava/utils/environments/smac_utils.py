@@ -26,7 +26,7 @@ except ModuleNotFoundError:
 from mava.wrappers import SMACEnvWrapper  # type:ignore
 
 
-def load_smac_env(env_config: Dict[str, Any]) -> StarCraft2Env:
+def load_smac_env(env_config: Dict[str, Any]) -> "StarCraft2Env":
     """Loads a smac environment given a config dict. Also, the possible agents in the
     environment are set"""
 

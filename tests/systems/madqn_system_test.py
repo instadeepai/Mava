@@ -49,7 +49,7 @@ class TestMADQN:
         system = madqn.MADQN(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            num_executors=2,
+            num_executors=1,
             batch_size=32,
             min_replay_size=32,
             max_replay_size=1000,
@@ -101,7 +101,7 @@ class TestMADQN:
         system = madqn.MADQN(
             environment_factory=environment_factory,
             network_factory=network_factory,
-            num_executors=2,
+            num_executors=1,
             batch_size=16,
             min_replay_size=16,
             max_replay_size=1000,
