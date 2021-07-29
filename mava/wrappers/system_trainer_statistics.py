@@ -181,8 +181,12 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
         )
 
         # Update the variable source and the trainer
-        # TODO (dries): Can this be simplified? Do an async set and get?
+        # TODO (dries): Can this be simplified? Do an async get? Not async set
+        # because we need to wait to get the generationin the case of PBT.
+        # Send the updated trainer variable to the variable server.
         self._variable_client.set_and_wait()
+
+        # Get the latest variables from the variable server
         self._variable_client.get_and_wait()
 
         fetches.update(self._counts)

@@ -77,7 +77,7 @@ class MADDPG:
         target_update_rate: Optional[float] = None,
         executor_variable_update_period: int = 1000,
         min_replay_size: int = 1000,
-        max_replay_size: int = 1000000,
+        max_replay_size: int = 100000,
         samples_per_insert: Optional[float] = 32.0,
         policy_optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
@@ -435,13 +435,12 @@ class MADDPG:
         Returns:
             mava.ParallelEnvironmentLoop: environment-executor loop instance.
         """
-
         # Create the system
         behaviour_policy_networks, networks = self.create_system()
 
         # Create the executor.
         executor = self._builder.make_executor(
-            # executor_id=executor_id,
+            executor_id=executor_id,
             networks=networks,
             policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
@@ -457,7 +456,7 @@ class MADDPG:
         if self._logger_config and "executor" in self._logger_config:
             executor_logger_config = self._logger_config["executor"]
         exec_logger = self._logger_factory(  # type: ignore
-            f"executor_{executor_id}", **executor_logger_config
+            executor_id, **executor_logger_config
         )
 
         # Create the loop to connect environment and executor.
@@ -493,7 +492,7 @@ class MADDPG:
 
         # Create the agent.
         executor = self._builder.make_executor(
-            # executor_id="evaluator",
+            executor_id="evaluator",
             networks=networks,
             policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
@@ -542,21 +541,19 @@ class MADDPG:
         if self._logger_config and "trainer" in self._logger_config:
             trainer_logger_config = self._logger_config["trainer"]
         trainer_logger = self._logger_factory(  # type: ignore
-            f"trainer_{trainer_id}", **trainer_logger_config
+            trainer_id, **trainer_logger_config
         )
 
         # Create the system
         _, networks = self.create_system()
 
-        dataset = self._builder.make_dataset_iterator(
-            replay, f"{self._builder._config.replay_table_name}_{trainer_id}"
-        )
+        dataset = self._builder.make_dataset_iterator(replay, trainer_id)
 
         return self._builder.make_trainer(
-            # trainer_id=trainer_id,
+            trainer_id=trainer_id,
             networks=networks,
-            trainer_networks=self._trainer_networks[f"trainer_{trainer_id}"],
-            trainer_table_entry=self._table_network_config[f"trainer_{trainer_id}"],
+            trainer_networks=self._trainer_networks[trainer_id],
+            trainer_table_entry=self._table_network_config[trainer_id],
             dataset=dataset,
             logger=trainer_logger,
             connection_spec=self._connection_spec,
@@ -582,7 +579,9 @@ class MADDPG:
             # Add executors which pull round-robin from our variable sources.
             for trainer_id in range(len(self._trainer_networks.keys())):
                 program.add_node(
-                    lp.CourierNode(self.trainer, trainer_id, replay, variable_server)
+                    lp.CourierNode(
+                        self.trainer, f"trainer_{trainer_id}", replay, variable_server
+                    )
                 )
 
         with program.group("evaluator"):
@@ -592,7 +591,12 @@ class MADDPG:
             # Add executors which pull round-robin from our variable sources.
             for executor_id in range(self._num_exectors):
                 program.add_node(
-                    lp.CourierNode(self.executor, executor_id, replay, variable_server)
+                    lp.CourierNode(
+                        self.executor,
+                        f"executor_{executor_id}",
+                        replay,
+                        variable_server,
+                    )
                 )
 
         return program

@@ -363,13 +363,35 @@ class MADDPGBuilder:
             variables (Dict[str, snt.Variable]): dictionary with variable_source
             variables in.
         """
-        variables["trainer_steps"] = tf.Variable(0, dtype=tf.int32)
-        variables["trainer_walltime"] = tf.Variable(0, dtype=tf.float32)
-        variables["evaluator_steps"] = tf.Variable(0, dtype=tf.int32)
-        variables["evaluator_episodes"] = tf.Variable(0, dtype=tf.int32)
-        variables["executor_episodes"] = tf.Variable(0, dtype=tf.int32)
-        variables["executor_steps"] = tf.Variable(0, dtype=tf.int32)
-        return variables
+
+        count_vars = {}
+        count_vars["trainer_steps"] = tf.Variable(0, dtype=tf.int32)
+        count_vars["trainer_walltime"] = tf.Variable(0, dtype=tf.float32)
+        count_vars["evaluator_steps"] = tf.Variable(0, dtype=tf.int32)
+        count_vars["evaluator_episodes"] = tf.Variable(0, dtype=tf.int32)
+        count_vars["executor_episodes"] = tf.Variable(0, dtype=tf.int32)
+        count_vars["executor_steps"] = tf.Variable(0, dtype=tf.int32)
+        variables.update(count_vars)
+        return count_vars.keys()
+
+    def create_hyperparameter_variables(
+        self, variables: Dict[str, tf.Variable]
+    ) -> Dict[str, tf.Variable]:
+        """Create counter variables.
+        Args:
+            variables (Dict[str, snt.Variable]): dictionary with variable_source
+            variables in.
+        Returns:
+            variables (Dict[str, snt.Variable]): dictionary with variable_source
+            variables in.
+        """
+        pass
+        return []
+
+    def variable_server_fn(
+        self, variables, checkpoint, checkpoint_subpath, unique_net_keys, trainer_ids
+    ):
+        return MavaVariableSource(variables, checkpoint, checkpoint_subpath)
 
     def make_variable_server(
         self,
@@ -392,17 +414,25 @@ class MADDPGBuilder:
                     networks[net_type_key][net_key]
                 ).variables
 
-        variables = self.create_counter_variables(variables)
+        # Create the counter variables
+        self.create_counter_variables(variables)
+
+        # Create hyperparameter_variables if they exist
+        self.create_hyperparameter_variables(variables)
 
         # Create variable source
-        variable_source = MavaVariableSource(
-            variables, self._config.checkpoint, self._config.checkpoint_subpath
+        variable_source = self.variable_server_fn(
+            variables,
+            self._config.checkpoint,
+            self._config.checkpoint_subpath,
+            self._config.unique_net_keys,
+            self._config.trainer_networks.keys(),
         )
         return variable_source
 
     def make_executor(
         self,
-        # executor_id: str,
+        executor_id: str,
         networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
@@ -428,16 +458,8 @@ class MADDPGBuilder:
                 var_key = f"{net_key}_{net_type_key}"
                 variables[var_key] = networks[net_type_key][net_key].variables
                 get_keys.append(var_key)
-        variables = self.create_counter_variables(variables)
+        count_names = self.create_counter_variables(variables)
 
-        count_names = [
-            "trainer_steps",
-            "trainer_walltime",
-            "evaluator_steps",
-            "evaluator_episodes",
-            "executor_episodes",
-            "executor_steps",
-        ]
         get_keys.extend(count_names)
         counts = {name: variables[name] for name in count_names}
 
@@ -446,6 +468,7 @@ class MADDPGBuilder:
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
+                worker_id=executor_id,
                 variables=variables,
                 get_keys=get_keys,
                 get_period=self._config.executor_variable_update_period,
@@ -467,8 +490,31 @@ class MADDPGBuilder:
             adder=adder,
         )
 
+    def get_hyper_parameters(
+        self, discount, target_update_rate, target_update_period, variables, get_keys
+    ):
+        """Get the hyperparameters.
+        Args:
+            discount (float): the discount factor
+            target_update_rate (float): the rate at which the target network is
+            target_update_period (int): the period at which the target network is
+            variables (Dict[str, tf.Variable]): the variables in the system.
+            get_keys (List[str]): the keys of the variables to get.
+        Returns:
+            hyper_parameters (Dict[str, tf.Variable]): the hyperparameters.
+        """
+        discounts = {net_key: discount for net_key in self._config.unique_net_keys}
+        target_update_rates = {
+            net_key: target_update_rate for net_key in self._config.unique_net_keys
+        }
+        target_update_periods = {
+            net_key: target_update_period for net_key in self._config.unique_net_keys
+        }
+        return discounts, target_update_rates, target_update_periods
+
     def make_trainer(
         self,
+        trainer_id: str,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         variable_source: MavaVariableSource,
@@ -513,21 +559,22 @@ class MADDPGBuilder:
                 ].variables
                 if net_key in set(trainer_networks):
                     set_keys.append(f"{net_key}_{net_type_key}")
-                else:
                     get_keys.append(f"{net_key}_{net_type_key}")
+                # else:
+                #     get_keys.append(f"{net_key}_{net_type_key}")
 
-        variables = self.create_counter_variables(variables)
+        count_names = self.create_counter_variables(variables)
         num_steps = variables["trainer_steps"]
-
-        count_names = [
-            "trainer_steps",
-            "trainer_walltime",
-            "evaluator_steps",
-            "evaluator_episodes",
-            "executor_episodes",
-            "executor_steps",
-        ]
         get_keys.extend(count_names)
+
+        (
+            discounts,
+            target_update_rates,
+            target_update_periods,
+        ) = self.get_hyper_parameters(
+            discount, target_update_rate, target_update_period, variables, get_keys
+        )
+
         counts = {name: variables[name] for name in count_names}
 
         variable_client = variable_utils.VariableClient(
@@ -535,6 +582,7 @@ class MADDPGBuilder:
             variables=variables,
             get_keys=get_keys,
             set_keys=set_keys,
+            worker_id=trainer_id,
         )
 
         # Get all the initial variables
@@ -559,10 +607,10 @@ class MADDPGBuilder:
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
             "max_gradient_norm": max_gradient_norm,
-            "discount": discount,
+            "discounts": discounts,
             "target_averaging": target_averaging,
-            "target_update_period": target_update_period,
-            "target_update_rate": target_update_rate,
+            "target_update_periods": target_update_periods,
+            "target_update_rates": target_update_rates,
             "variable_client": variable_client,
             "dataset": dataset,
             "counts": counts,

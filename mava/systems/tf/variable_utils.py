@@ -33,6 +33,7 @@ class VariableClient:
         self,
         client: MavaVariableSource,
         variables: Dict[str, tf.Variable],
+        worker_id: str,
         get_keys: List[str] = None,
         set_keys: List[str] = None,
         get_period: int = 1,
@@ -43,17 +44,21 @@ class VariableClient:
         self._get_keys = get_keys if get_keys is not None else self._all_keys
         self._set_keys = set_keys if set_keys is not None else self._all_keys
         self._variables: Dict[str, tf.Variable] = variables
+        self._worker_id = worker_id
         self._get_call_counter = 0
         self._set_call_counter = 0
         self._get_update_period = get_period
         self._set_update_period = set_period
         self._client = client
-        self._request = lambda: client.get_variables(self._get_keys)
-        self._request_all = lambda: client.get_variables(self._all_keys)
+        self._request = lambda: client.get_variables(self._get_keys, self._worker_id)
+        self._request_all = lambda: client.get_variables(
+            self._all_keys, self._worker_id
+        )
 
         self._adjust = lambda: client.set_variables(
             self._set_keys,
             tf2_utils.to_numpy({key: self._variables[key] for key in self._set_keys}),
+            self._worker_id,
         )
         # Create a single background thread to fetch variables without necessarily
         # blocking the actor.
@@ -108,7 +113,7 @@ class VariableClient:
     def add_and_wait(self, names: List[str], vars: Dict[str, Any]) -> None:
         """Adds the specified variables to the corresponding variables in source
         and waits for the process to complete before continuing."""
-        self._client.add_to_variables(names, vars)
+        self._client.add_to_variables(names, vars, self._worker_id)
 
     def get_and_wait(self) -> None:
         """Updates the get variables with the latest copy from source

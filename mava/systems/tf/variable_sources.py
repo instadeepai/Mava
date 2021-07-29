@@ -10,7 +10,10 @@ from mava.systems.tf import savers as tf2_savers
 
 class VariableSource:
     def __init__(
-        self, variables: Dict[str, Any], checkpoint: bool, checkpoint_subpath: str
+        self,
+        variables: Dict[str, Any],
+        checkpoint: bool,
+        checkpoint_subpath: str,
     ) -> None:
         """Initialise the variable source
         Args:
@@ -23,6 +26,9 @@ class VariableSource:
         """
         # Init the variable dictionary
         self.variables = variables
+
+        # Init any extra custom variables
+        self.variables.update(self.get_init_custom_variables())
         self._system_checkpointer = None
         if checkpoint:
             # Only save variables that are not empty.
@@ -35,15 +41,35 @@ class VariableSource:
 
             # Create checkpointer
             subdir = os.path.join("variable_source")
+            self._checkpoint_time_interval = 5
             self._system_checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=15,
+                time_delta_minutes=self._checkpoint_time_interval,
                 directory=checkpoint_subpath,
                 objects_to_save=save_variables,
                 subdirectory=subdir,
             )
 
+    def get_init_custom_variables(self) -> None:
+        """Initialise custom variables.
+        Args:
+            variables (Dict[str, Any]): The custom variables to initialise.
+        Returns:
+            None
+        """
+        return {}
+
+    def custom_get_logic(self, var_names: Sequence[str], worked_id: str) -> None:
+        """Custom logic to get variables.
+        Args:
+            var_names (Sequence[str]): Names of the variables to get.
+            worked_id (str): The id of the worker that is currently working.
+        Returns:
+            None
+        """
+        pass
+
     def get_variables(
-        self, names: Union[str, Sequence[str]]
+        self, names: Union[str, Sequence[str]], worked_id: str
     ) -> Dict[str, Dict[str, np.ndarray]]:
         """Get variables from the variable source.
         Args:
@@ -52,6 +78,9 @@ class VariableSource:
             variables(Dict[str, Dict[str, np.ndarray]]): The variables that
             were requested.
         """
+        assert type(worked_id) == str
+        self.custom_get_logic(names, worked_id)
+
         if type(names) == str:
             return self.variables[names]  # type: ignore
         else:
@@ -63,7 +92,12 @@ class VariableSource:
                 variables[var_key] = tf2_utils.to_numpy(self.variables[var_key])
             return variables
 
-    def set_variables(self, names: Sequence[str], vars: Dict[str, np.ndarray]) -> None:
+    def can_update_vars(self, var_names, worked_id) -> bool:
+        return True
+
+    def set_variables(
+        self, names: Sequence[str], vars: Dict[str, np.ndarray], worked_id: str
+    ) -> None:
         """Set variables in the variable source.
         Args:
             names (Union[str, Sequence[str]]): Names of the variables to set.
@@ -74,6 +108,9 @@ class VariableSource:
         if type(names) == str:
             vars = {names: vars}  # type: ignore
             names = [names]  # type: ignore
+
+        if not self.can_update_vars(names, worked_id):
+            return
 
         for var_key in names:
             assert var_key in self.variables
@@ -86,7 +123,10 @@ class VariableSource:
         return
 
     def add_to_variables(
-        self, names: Sequence[str], vars: Dict[str, np.ndarray]
+        self,
+        names: Sequence[str],
+        vars: Dict[str, np.ndarray],
+        worked_id: str,
     ) -> None:
         """Add to the variables in the variable source.
         Args:
@@ -117,7 +157,9 @@ class VariableSource:
         """
         # Checkpoints every 5 minutes
         while True:
-            time.sleep(5 * 60)
+            # Add 1 extra second just to make sure that the checkpointer
+            # is ready to save.
+            time.sleep(self._checkpoint_time_interval * 60 + 1)
             if self._system_checkpointer:
                 self._system_checkpointer.save()
                 print("Updated variables checkpoint.")

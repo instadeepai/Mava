@@ -60,7 +60,7 @@ class MAD4PG(MADDPG):
         target_update_rate: Optional[float] = None,
         executor_variable_update_period: int = 1000,
         min_replay_size: int = 1000,
-        max_replay_size: int = 1000000,
+        max_replay_size: int = 100000,
         samples_per_insert: Optional[float] = 32.0,
         policy_optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
