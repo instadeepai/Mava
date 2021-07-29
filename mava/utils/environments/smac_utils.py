@@ -18,12 +18,15 @@
 from typing import Any, Dict, Optional
 
 import dm_env
-from smac.env import StarCraft2Env
 
+try:
+    from smac.env import StarCraft2Env
+except ModuleNotFoundError:
+    pass
 from mava.wrappers import SMACEnvWrapper  # type:ignore
 
 
-def load_smac_env(env_config: Dict[str, Any]) -> StarCraft2Env:
+def load_smac_env(env_config: Dict[str, Any]) -> "StarCraft2Env":
     """Loads a smac environment given a config dict. Also, the possible agents in the
     environment are set"""
 

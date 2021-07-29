@@ -27,7 +27,7 @@ try:
     import pygame
     from pysc2.lib import colors, features, point, transform
     from pysc2.lib.renderer_human import _Surface
-    from smac.env import StarCraft2Env  # type:ignore
+    from smac.env import StarCraft2Env
 except ModuleNotFoundError:
     pass
 
@@ -42,7 +42,7 @@ class Renderer:
     Adapted from https://github.com/oxwhirl/smac/pull/71.
     """
 
-    def __init__(self, env: StarCraft2Env, mode: str):
+    def __init__(self, env: "StarCraft2Env", mode: str):
         os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 
         self.env = env

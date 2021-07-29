@@ -30,7 +30,7 @@ from pettingzoo.utils.env import ParallelEnv
 from mava.utils.environments.render_utils import Renderer
 
 try:
-    from smac.env import StarCraft2Env  # type:ignore
+    from smac.env import StarCraft2Env
 except ModuleNotFoundError:
     pass
 
@@ -46,7 +46,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
     Based on RLlib wrapper provided by SMAC.
     """
 
-    def __init__(self, environment: StarCraft2Env) -> None:
+    def __init__(self, environment: "StarCraft2Env") -> None:
         """Create a new multi-agent StarCraft env compatible with RLlib.
         Arguments:
             smac_args (dict): Arguments to pass to the underlying

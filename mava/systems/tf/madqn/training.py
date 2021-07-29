@@ -31,6 +31,7 @@ from acme.types import NestedArray
 from acme.utils import counting, loggers
 
 import mava
+from mava import types as mava_types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
@@ -44,6 +45,7 @@ train_utils.set_growing_gpu_memory()
 
 class MADQNTrainer(mava.Trainer):
     """MADQN trainer.
+
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -93,7 +95,16 @@ class MADQNTrainer(mava.Trainer):
                 before clipping is applied. Defaults to None.
             fingerprint (bool, optional): whether to apply replay stabilisation using
                 policy fingerprints. Defaults to False.
+            n_step (int): For computing n-step returns.
             counter (counting.Counter, optional): step counter object. Defaults to None.
+            importance_sampling_exponent (float, optional): exponent used for
+                prioritized experience replay. None for no prioritized experience
+                replay.
+            max_priority_weight (float): weight used in prioritised experience
+                replay. Only required if importance_sampling_exponent is not None.
+            replay_client (): The reverb replay client. used to mutate priorities when
+                using prioritised experience replay.
+            replay_table_name (str): Name of the replay table on the reverb server.
             logger (loggers.Logger, optional): logger object for logging trainer
                 statistics. Defaults to None.
             checkpoint (bool, optional): whether to checkpoint networks. Defaults to
@@ -206,7 +217,7 @@ class MADQNTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def get_epsilon(self) -> float:
-        """get the current value for the exploration parameter epsilon
+        """Get the current value for the exploration parameter epsilon.
 
         Returns:
             float: epsilon parameter value
@@ -215,7 +226,7 @@ class MADQNTrainer(mava.Trainer):
         return self._exploration_scheduler.get_epsilon()
 
     def get_trainer_steps(self) -> float:
-        """get trainer step count
+        """Get trainer step count
 
         Returns:
             float: number of trainer steps
@@ -224,13 +235,12 @@ class MADQNTrainer(mava.Trainer):
         return self._num_steps.numpy()
 
     def _decrement_epsilon(self) -> None:
-        """Decay epsilon exploration value"""
+        """Decay epsilon exploration value."""
 
         self._exploration_scheduler.decrement_epsilon()
 
     def _update_target_networks(self) -> None:
-        """Sync the target network parameters with the latest online network
-        parameters"""
+        """Sync target parameters with the latest online parameters."""
 
         for key in self.unique_net_keys:
             # Update target network.
@@ -268,7 +278,7 @@ class MADQNTrainer(mava.Trainer):
         a_tm1: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
-        """get data to feed to the agent networks
+        """Get data to feed to the agent networks.
 
         Args:
             o_tm1_trans (Dict[str, np.ndarray]): transformed (e.g. using observation
@@ -290,7 +300,7 @@ class MADQNTrainer(mava.Trainer):
         return o_tm1_feed, o_t_feed, a_tm1_feed
 
     def step(self) -> None:
-        """trainer step to update the parameters of the agents in the system"""
+        """Trainer step to update the parameters of the agents in the system."""
 
         # Run the learning step.
         fetches = self._step()
@@ -358,7 +368,7 @@ class MADQNTrainer(mava.Trainer):
         # Log losses and epsilon
         return fetches
 
-    def _forward(self, inputs: Any) -> None:
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
 
         Args:
@@ -382,7 +392,18 @@ class MADQNTrainer(mava.Trainer):
         #   This discount is applied to future rewards after r_t.
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data that the agents persist in replay.
-        o_tm1, a_tm1, e_tm1, r_t, d_t, o_t, e_t = inputs.data
+        trans = mava_types.Transition(*inputs.data)
+
+        o_tm1, o_t, a_tm1, r_t, d_t, e_tm1, e_t = (
+            trans.observation,
+            trans.next_observation,
+            trans.action,
+            trans.reward,
+            trans.discount,
+            trans.extras,
+            trans.next_extras,
+        )
+
         with tf.GradientTape(persistent=True) as tape:
             q_network_losses: Dict[str, NestedArray] = {}
 
@@ -483,7 +504,7 @@ class MADQNTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
-        """get network variables
+        """Get network variables.
 
         Args:
             names (Sequence[str]): network names
@@ -505,6 +526,7 @@ class MADQNTrainer(mava.Trainer):
 
 class MADQNRecurrentTrainer(MADQNTrainer):
     """Recurrent MADQN trainer.
+
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -549,6 +571,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
+            n_step (int): For computing N-step returns.
             logger (loggers.Logger, optional): logger object for logging trainer
                 statistics. Defaults to None.
             fingerprint (bool, optional): whether to apply replay stabilisation using
@@ -711,6 +734,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
 
 class MADQNRecurrentCommTrainer(MADQNTrainer):
     """Recurrent MADQN trainer with communication.
+
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -799,9 +823,16 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         )
         data = tf2_utils.batch_to_sequence(data)
 
-        observations, actions, rewards, discounts, _, extra = data
+        observations, actions, rewards, discounts, _, _ = (
+            data.observations,
+            data.actions,
+            data.rewards,
+            data.discounts,
+            data.start_of_episode,
+            data.extras,
+        )
 
-        # core_states = extra["core_states"]
+        # Using extra directly from inputs due to shape.
         core_state = tree.map_structure(
             lambda s: s[:, 0, :], inputs.data.extras["core_states"]
         )

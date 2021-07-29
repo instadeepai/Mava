@@ -22,9 +22,13 @@ import dm_env
 import numpy as np
 import numpy.testing as npt
 import pytest
-from flatland.envs.observations import TreeObsForRailEnv
-from flatland.envs.rail_generators import sparse_rail_generator
-from flatland.envs.schedule_generators import sparse_schedule_generator
+
+try:
+    from flatland.envs.observations import TreeObsForRailEnv
+    from flatland.envs.rail_generators import sparse_rail_generator
+    from flatland.envs.schedule_generators import sparse_schedule_generator
+except ModuleNotFoundError:
+    pass
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 from mava import specs as mava_specs

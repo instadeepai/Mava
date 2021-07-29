@@ -52,6 +52,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
+    """Main function to run experiment."""
 
     # Environment.
     environment_factory = functools.partial(
@@ -90,6 +91,7 @@ def main(_: Any) -> None:
         epsilon_decay=5e-4,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        importance_sampling_exponent=0.2,
         trainer_fn=madqn.training.MADQNRecurrentTrainer,
         executor_fn=madqn.execution.MADQNRecurrentExecutor,
         batch_size=32,
