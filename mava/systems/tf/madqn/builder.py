@@ -40,6 +40,7 @@ from mava.wrappers import MADQNDetailedTrainerStatistics
 @dataclasses.dataclass
 class MADQNConfig:
     """Configuration options for the MADQN system.
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
@@ -66,7 +67,8 @@ class MADQNConfig:
         checkpoint: boolean to indicate whether to checkpoint models.
         optimizer: type of optimizer to use for updating the parameters of models.
         replay_table_name: string indicating what name to give the replay table.
-        checkpoint_subpath: subdirectory specifying where to store checkpoints."""
+        checkpoint_subpath: subdirectory specifying where to store checkpoints.
+    """
 
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
@@ -119,11 +121,10 @@ class MADQNBuilder:
                 Defaults to execution.MADQNFeedForwardExecutor.
             extra_specs (Dict[str, Any], optional): defines the specifications of extra
                 information used by the system. Defaults to {}.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
-                epsilon decay scheduler. Defaults to LinearExplorationScheduler.
-            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
-                optional): optional function to stabilise experience replay. Defaults
-                to None.
+            exploration_scheduler_fn (LinearExplorationScheduler, optional): epsilon
+                decay scheduler. Defaults to LinearExplorationScheduler.
+            replay_stabilisation_fn (FingerPrintStabalisation, optional): optional
+                function to stabilise experience replay. Defaults to None.
         """
 
         self._config = config
@@ -393,6 +394,11 @@ class MADQNBuilder:
             max_gradient_norm=self._config.max_gradient_norm,
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
+            replay_client=replay_client,
+            importance_sampling_exponent=self._config.importance_sampling_exponent,
+            max_priority_weight=self._config.max_priority_weight,
+            n_step=self._config.n_step,
+            replay_table_name=self._config.replay_table_name,
             dataset=dataset,
             counter=counter,
             fingerprint=fingerprint,

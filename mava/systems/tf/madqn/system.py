@@ -99,8 +99,7 @@ class MADQN:
         Args:
             environment_factory (Callable[[bool], dm_env.Environment]): function to
                 instantiate an environment.
-            network_factory (Callable[[acme_specs.BoundedArray],
-                Dict[str, snt.Module]]): function to instantiate system networks.
+            network_factory (str): function to instantiate system networks.
             logger_factory (Callable[[str], MavaLogger], optional): function to
                 instantiate a system logger. Defaults to None.
             architecture (Type[DecentralisedValueActor], optional): system architecture,
@@ -109,14 +108,14 @@ class MADQN:
                 Type[training.MADQNRecurrentTrainer] ], optional): training type
                 associated with executor and architecture, e.g. centralised training.
                 Defaults to training.MADQNTrainer.
-            communication_module (Type[BaseCommunicationModule], optional):
-                module for enabling communication protocols between agents. Defaults to
+            communication_module (Type[BaseCommunicationModule], optional): module
+                for enabling communication protocols between agents. Defaults to
                 None.
             executor_fn (Type[core.Executor], optional): executor type, e.g.
                 feedforward or recurrent. Defaults to
                 execution.MADQNFeedForwardExecutor.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
-                function specifying a decaying scheduler for epsilon exploration.
+            exploration_scheduler_fn (LinearExplorationScheduler, optional): function
+                specifying a decaying scheduler for epsilon exploration.
                 Defaults to LinearExplorationScheduler.
             replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
                 optional): replay buffer stabilisaiton function, e.g. fingerprints.
@@ -242,9 +241,9 @@ class MADQN:
                 max_replay_size=max_replay_size,
                 samples_per_insert=samples_per_insert,
                 n_step=n_step,
-                sequence_length=sequence_length,
                 importance_sampling_exponent=importance_sampling_exponent,
                 max_priority_weight=max_priority_weight,
+                sequence_length=sequence_length,
                 period=period,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
@@ -259,7 +258,7 @@ class MADQN:
         )
 
     def _get_extra_specs(self) -> Any:
-        """helper to establish specs for extra information
+        """Helper to establish specs for extra information.
 
         Returns:
             Dict[str, Any]: dictionary containing extra specs
@@ -496,7 +495,7 @@ class MADQN:
         counter: counting.Counter,
         trainer: training.MADQNTrainer,
     ) -> Any:
-        """System evaluator (an executor process not connected to a dataset)
+        """System evaluator.
 
         Args:
             variable_source (acme.VariableSource): variable server for updating

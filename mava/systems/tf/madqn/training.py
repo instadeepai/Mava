@@ -102,8 +102,8 @@ class MADQNTrainer(mava.Trainer):
                 replay.
             max_priority_weight (float): weight used in prioritised experience
                 replay. Only required if importance_sampling_exponent is not None.
-            replay_client (): The reverb replay client. used to mutate priorities when
-                using prioritised experience replay.
+            replay_client (reverb.TFClient, optional): The reverb replay client.
+                Used to mutate priorities when using prioritised experience replay.
             replay_table_name (str): Name of the replay table on the reverb server.
             logger (loggers.Logger, optional): logger object for logging trainer
                 statistics. Defaults to None.
@@ -543,6 +543,9 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         discount: float,
         agent_net_keys: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
+        importance_sampling_exponent: Optional[float] = None,
+        replay_client: Optional[reverb.TFClient] = None,
+        max_priority_weight: float = 0.9,
         n_step: int = 1,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
@@ -551,6 +554,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
+        replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
     ):
         """Initialise recurrent MADQN trainer
 
@@ -572,6 +576,14 @@ class MADQNRecurrentTrainer(MADQNTrainer):
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
             n_step (int): For computing N-step returns.
+            importance_sampling_exponent (float, optional): exponent used for
+                prioritized experience replay. None for no prioritized experience
+                replay.
+            max_priority_weight (float): weight used in prioritised experience
+                replay. Only required if importance_sampling_exponent is not None.
+            replay_client (reverb.TFClient, optional): The reverb replay client.
+                Used to mutate priorities when using prioritised experience replay.
+            replay_table_name (str): Name of the replay table on the reverb server.
             logger (loggers.Logger, optional): logger object for logging trainer
                 statistics. Defaults to None.
             fingerprint (bool, optional): whether to apply replay stabilisation using
@@ -597,11 +609,15 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             n_step=n_step,
+            importance_sampling_exponent=importance_sampling_exponent,
+            replay_client=replay_client,
+            max_priority_weight=max_priority_weight,
             counter=counter,
             logger=logger,
             fingerprint=fingerprint,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            replay_table_name=replay_table_name,
         )
 
     def _forward(self, inputs: Any) -> None:
@@ -758,6 +774,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
     ):
         """Initialise recurrent MADQN trainer with communication
 
@@ -788,6 +805,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
+            replay_table_name (str): name of the reverb replay table.
         """
 
         super().__init__(
@@ -807,6 +825,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            replay_table_name=replay_table_name,
         )
 
         self._communication_module = communication_module
