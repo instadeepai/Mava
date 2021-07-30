@@ -378,6 +378,12 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
 
+    def _custom_end_of_episode_logic(self, timestep, agent_net_keys):
+        """Custom logic at the end of an episode.
+        """
+        print("Delete this print in maddpg execution.py!")
+        exit()
+
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
@@ -445,6 +451,10 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             next_extras.update({"core_states": numpy_states})
         next_extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add(policy, next_timestep, next_extras)  # type: ignore
+
+        # Custom end of episode logic.
+        if next_timestep.last():
+            self._custom_end_of_episode_logic(next_timestep, self._agent_net_keys)
 
     def update(self, wait: bool = False) -> None:
         """Update the policy variables."""

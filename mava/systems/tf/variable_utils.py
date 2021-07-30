@@ -114,6 +114,11 @@ class VariableClient:
         """Adds the specified variables to the corresponding variables in source
         and waits for the process to complete before continuing."""
         self._client.add_to_variables(names, vars, self._worker_id)
+    
+    def move_avg_and_wait(self, names: List[str], vars: Dict[str, Any], weight) -> None:
+        """Adds the specified variables to the corresponding variables in source
+        and waits for the process to complete before continuing."""
+        self._client.move_avg_variables(names, vars, weight, self._worker_id)
 
     def get_and_wait(self) -> None:
         """Updates the get variables with the latest copy from source

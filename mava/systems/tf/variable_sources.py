@@ -27,8 +27,7 @@ class VariableSource:
         # Init the variable dictionary
         self.variables = variables
 
-        # Init any extra custom variables
-        self.variables.update(self.get_init_custom_variables())
+        # Create the system checkpointer if requested
         self._system_checkpointer = None
         if checkpoint:
             # Only save variables that are not empty.
@@ -48,15 +47,6 @@ class VariableSource:
                 objects_to_save=save_variables,
                 subdirectory=subdir,
             )
-
-    def get_init_custom_variables(self) -> None:
-        """Initialise custom variables.
-        Args:
-            variables (Dict[str, Any]): The custom variables to initialise.
-        Returns:
-            None
-        """
-        return {}
 
     def custom_get_logic(self, var_names: Sequence[str], worked_id: str) -> None:
         """Custom logic to get variables.

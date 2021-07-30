@@ -18,6 +18,7 @@
 import copy
 import dataclasses
 from typing import Any, Dict, Iterator, List, Optional, Type, Union
+from mava.systems.tf.maddpg import execution
 
 import reverb
 import sonnet as snt
@@ -209,7 +210,7 @@ class MADDPGBuilder:
         # Select adder
         env_adder_spec = self.convert_discrete_to_bounded(environment_spec)
 
-        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+        if issubclass(self._trainer_fn, training.MADDPGBaseTrainer):
 
             def adder_sig_fn(
                 env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
@@ -218,7 +219,7 @@ class MADDPGBuilder:
                     env_spec, extra_specs
                 )
 
-        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
+        elif issubclass(self._trainer_fn, training.MADDPGBaseRecurrentTrainer):
 
             def adder_sig_fn(
                 env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
@@ -228,7 +229,7 @@ class MADDPGBuilder:
                 )
 
         else:
-            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+            raise NotImplementedError("Unknown executor type: ", self._trainer_fn)
 
         if self._config.samples_per_insert is None:
             # We will take a samples_per_insert ratio of None to mean that there is
@@ -330,7 +331,7 @@ class MADDPGBuilder:
         }
 
         # Select adder
-        if issubclass(self._executor_fn, executors.FeedForwardExecutor):
+        if issubclass(self._trainer_fn, training.MADDPGBaseTrainer):
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=priority_fns,
                 client=replay_client,
@@ -339,7 +340,7 @@ class MADDPGBuilder:
                 table_network_config=self._config.table_network_config,
                 discount=self._config.discount,
             )
-        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
+        elif issubclass(self._trainer_fn, training.MADDPGBaseRecurrentTrainer):
             adder = reverb_adders.ParallelSequenceAdder(
                 priority_fns=priority_fns,
                 client=replay_client,
@@ -353,7 +354,8 @@ class MADDPGBuilder:
         return adder
 
     def create_counter_variables(
-        self, variables: Dict[str, tf.Variable]
+        self, variables: Dict[str, tf.Variable],
+        get_keys: List[str]=None,
     ) -> Dict[str, tf.Variable]:
         """Create counter variables.
         Args:
@@ -371,25 +373,57 @@ class MADDPGBuilder:
         count_vars["evaluator_episodes"] = tf.Variable(0, dtype=tf.int32)
         count_vars["executor_episodes"] = tf.Variable(0, dtype=tf.int32)
         count_vars["executor_steps"] = tf.Variable(0, dtype=tf.int32)
+
+        if get_keys:
+            get_keys.extend(list(count_vars.keys()))
+
         variables.update(count_vars)
         return count_vars.keys()
 
-    def create_hyperparameter_variables(
-        self, variables: Dict[str, tf.Variable]
+    def create_custom_var_server_variables(
+        self, variables: Dict[str, tf.Variable],
     ) -> Dict[str, tf.Variable]:
         """Create counter variables.
         Args:
             variables (Dict[str, snt.Variable]): dictionary with variable_source
             variables in.
         Returns:
-            variables (Dict[str, snt.Variable]): dictionary with variable_source
-            variables in.
+            None
         """
         pass
-        return []
+    
+    def create_trainer_variables(
+        self, variables: Dict[str, tf.Variable], get_keys: List[str] = None,
+    ) -> Dict[str, tf.Variable]:
+        """Create counter variables.
+        Args:
+            variables (Dict[str, snt.Variable]): dictionary with variable_source
+            variables in.
+            get_keys (List[str]): list of keys to get from the trainer.
+        Returns:
+            None
+        """
+        pass
+
+    def create_custom_executor_variables(
+        self, variables: Dict[str, tf.Variable], get_keys: List[str] = None,
+    ) -> Dict[str, tf.Variable]:
+        """Create counter variables.
+        Args:
+            variables (Dict[str, snt.Variable]): dictionary with variable_source
+            variables in.
+            get_keys (List[str]): list of keys to get from the executor.
+        Returns:
+            None
+        """
+        pass
+
+   
+
+    
 
     def variable_server_fn(
-        self, variables, checkpoint, checkpoint_subpath, unique_net_keys, trainer_ids
+        self, variables, checkpoint, checkpoint_subpath, unique_net_keys,
     ):
         return MavaVariableSource(variables, checkpoint, checkpoint_subpath)
 
@@ -417,8 +451,14 @@ class MADDPGBuilder:
         # Create the counter variables
         self.create_counter_variables(variables)
 
-        # Create hyperparameter_variables if they exist
-        self.create_hyperparameter_variables(variables)
+        # Create custom variable server variables
+        self.create_custom_var_server_variables(variables)
+
+        # Create custom trainer variables
+        self.create_custom_trainer_variables(variables)
+
+        # Create custom executor variables
+        self.create_custom_executor_variables(variables)
 
         # Create variable source
         variable_source = self.variable_server_fn(
@@ -426,7 +466,6 @@ class MADDPGBuilder:
             self._config.checkpoint,
             self._config.checkpoint_subpath,
             self._config.unique_net_keys,
-            self._config.trainer_networks.keys(),
         )
         return variable_source
 
@@ -458,9 +497,14 @@ class MADDPGBuilder:
                 var_key = f"{net_key}_{net_type_key}"
                 variables[var_key] = networks[net_type_key][net_key].variables
                 get_keys.append(var_key)
-        count_names = self.create_counter_variables(variables)
 
-        get_keys.extend(count_names)
+        # Create the counter variables
+        count_names = self.create_counter_variables(variables, get_keys)
+        
+        # Create custom executor variables
+        self.create_custom_executor_variables(variables)
+
+        # Link the variables to send to the executor
         counts = {name: variables[name] for name in count_names}
 
         variable_client = None
@@ -479,7 +523,8 @@ class MADDPGBuilder:
             variable_client.get_and_wait()
 
         # Create the actor which defines how we take actions.
-        return self._executor_fn(
+        tf.print("Executor at start: ", self._executor_fn)
+        executor = self._executor_fn(
             policy_networks=policy_networks,
             counts=counts,
             net_to_ints=self._config.net_to_ints,
@@ -490,8 +535,13 @@ class MADDPGBuilder:
             adder=adder,
         )
 
+        tf.print("Executor created: ", executor)
+        exit()
+
+        return executor
+
     def get_hyper_parameters(
-        self, discount, target_update_rate, target_update_period, variables, get_keys
+        self, discount, target_update_rate, target_update_period, variables,
     ):
         """Get the hyperparameters.
         Args:
@@ -563,18 +613,23 @@ class MADDPGBuilder:
                 # else:
                 #     get_keys.append(f"{net_key}_{net_type_key}")
 
-        count_names = self.create_counter_variables(variables)
-        num_steps = variables["trainer_steps"]
-        get_keys.extend(count_names)
+        # Create the counter variables
+        count_names = self.create_counter_variables(variables, get_keys)
+        
+        # Create the custom trainer variables
+        self.create_custom_trainer_variables(variables, get_keys)
 
+        # Get the hyperparameters variables
         (
             discounts,
             target_update_rates,
             target_update_periods,
         ) = self.get_hyper_parameters(
-            discount, target_update_rate, target_update_period, variables, get_keys
+            discount, target_update_rate, target_update_period, variables,
         )
 
+        # Link the variables to send to the trainer
+        num_steps = variables["trainer_steps"]
         counts = {name: variables[name] for name in count_names}
 
         variable_client = variable_utils.VariableClient(
