@@ -35,7 +35,7 @@ try:  # noqa
         Adapted from https://github.com/oxwhirl/smac/pull/71.
         """
 
-        def __init__(self, env: StarCraft2Env, mode: str):
+        def __init__(self, env: "StarCraft2Env", mode: str):
             os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
 
             self.env = env
