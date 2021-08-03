@@ -281,6 +281,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self._counts = counts
         self._net_to_ints = net_to_ints
         self._network_int_keys_extras: Dict[str, np.array] = {}
+        
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,
@@ -381,8 +382,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
     def _custom_end_of_episode_logic(self, timestep, agent_net_keys):
         """Custom logic at the end of an episode.
         """
-        print("Delete this print in maddpg execution.py!")
-        exit()
+        pass
 
     def observe_first(
         self,

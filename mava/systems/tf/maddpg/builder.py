@@ -523,7 +523,7 @@ class MADDPGBuilder:
             variable_client.get_and_wait()
 
         # Create the actor which defines how we take actions.
-        tf.print("Executor at start: ", self._executor_fn)
+        
         executor = self._executor_fn(
             policy_networks=policy_networks,
             counts=counts,
@@ -534,10 +534,6 @@ class MADDPGBuilder:
             variable_client=variable_client,
             adder=adder,
         )
-
-        tf.print("Executor created: ", executor)
-        exit()
-
         return executor
 
     def get_hyper_parameters(

@@ -466,7 +466,6 @@ class MADDPG:
             logger=exec_logger,
             **self._train_loop_fn_kwargs,
         )
-
         train_loop = DetailedPerAgentStatistics(train_loop)
 
         return train_loop

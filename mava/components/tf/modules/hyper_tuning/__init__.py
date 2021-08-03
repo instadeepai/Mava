@@ -15,4 +15,4 @@
 
 """MARL system communication modules."""
 
-from mava.components.tf.modules.hyper_tuning.pbt_base import BasePBTModule
+from mava.components.tf.modules.hyper_tuning.pbt_base import BasePBTWrapper
