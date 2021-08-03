@@ -13,25 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.systems.tf.maddpg import execution
-import numpy as np
-import sonnet as snt
-from acme.specs import EnvironmentSpec
-
-# Internal imports.
-from acme.tf import variable_utils as tf2_variable_utils
-from mava import adders
 import time
-from typing import Any, Dict, Sequence, Union, List, Optional
-from types import MethodType
+from typing import Any, Dict, List, Sequence, Union
+
 import tensorflow as tf
 
-from mava import core
+from mava.systems.tf.mad4pg.execution import MAD4PGRecurrentExecutor
 from mava.systems.tf.mad4pg.system import MAD4PG
 from mava.systems.tf.maddpg.builder import MADDPGBuilder
-from mava.systems.tf.maddpg.system import MADDPG
 from mava.systems.tf.maddpg.execution import MADDPGRecurrentExecutor
-from mava.systems.tf.mad4pg.execution import MAD4PGRecurrentExecutor
+from mava.systems.tf.maddpg.system import MADDPG
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 
 """Population based training interface for multi-agent RL systems."""
@@ -59,7 +50,7 @@ class PBTVariableSource(MavaVariableSource):
         """
         # TODO (dries): Change this back to 5 * 60 for self._checkpoint_interval
         self._checkpoint_interval = 5 * 60
-        self._gen_time_interval = 10 * 60
+        self._gen_time_interval = 1 * 20  # TODO (dries): Change this back to 5 * 60
         self._last_checkpoint_time = time.time()
         self._last_gen_start_time = time.time()
         self._unique_net_keys = unique_net_keys
@@ -131,164 +122,183 @@ class PBTVariableSource(MavaVariableSource):
                 for net_key in self._unique_net_keys:
                     net_reward = self.variables[f"{net_key}_moving_avg_rewards"]
                     tf.print(f"{net_key} moving average rewards:{net_reward}")
+
                 # Reset the rewards
                 for net_key in self._unique_net_keys:
                     self.variables[f"{net_key}_moving_avg_rewards"].assign(0.0)
-                
-                # self.variables["gen_version"] += 1
+
+                # Increament the generation
+                self.variables["gen_version"].assign_add(1)
+
 
 def BasePBTWrapper(
-        system: Union[MADDPG, MAD4PG],
-    ) -> None:
-        """Initializes the broadcaster communicator.
-        Args:
-            architecture: the BaseArchitecture used.
-            shared: if a shared communication channel is used.
-            channel_noise: stddev of normal noise in channel.
-        """
-        if type(system) not in supported_pbt_systems:
-            raise NotImplementedError(
-                f"Currently only the {supported_pbt_systems} systems have "
-                f"the correct hooks to support PBT. Not {type(system)}."
-            )
-        
-        if system._builder._executor_fn not in supported_pbt_executors:
-            raise NotImplementedError(
-                f"Currently only the {supported_pbt_executors} executors have "
-                f"the correct hooks to support PBT. Not {system._builder._executor_fn}."
-            )
+    system: Union[MADDPG, MAD4PG],
+) -> None:
+    """Initializes the broadcaster communicator.
+    Args:
+        architecture: the BaseArchitecture used.
+        shared: if a shared communication channel is used.
+        channel_noise: stddev of normal noise in channel.
+    """
+    if type(system) not in supported_pbt_systems:
+        raise NotImplementedError(
+            f"Currently only the {supported_pbt_systems} systems have "
+            f"the correct hooks to support PBT. Not {type(system)}."
+        )
 
-        
-        # Wrap the executor with the PBT hooks 
-        class PBTExecutor(system._builder._executor_fn):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-            # PBT executor
-            def _custom_end_of_episode_logic(self, timestep, agent_net_keys):
-                """Custom logic at the end of an episode.
-                """
-                
-                print("timestep: ", timestep.reward)
+    if system._builder._executor_fn not in supported_pbt_executors:
+        raise NotImplementedError(
+            f"Currently only the {supported_pbt_executors} executors have "
+            f"the correct hooks to support PBT. Not {system._builder._executor_fn}."
+        )
 
-                self._variable_client.
-                exit()
+    # Wrap the executor with the PBT hooks
+    class PBTExecutor(system._builder._executor_fn):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
 
-        system._builder._executor_fn = PBTExecutor        
+        # PBT executor
+        def _custom_end_of_episode_logic(self, timestep, agent_net_keys):
+            """Custom logic at the end of an episode."""
+            mvg_avg_weighting = 0.01
+            rewards = timestep.reward
+            for agent in rewards.keys():
+                net_key = self._agent_net_keys[agent]
+                self._variable_client.move_avg_and_wait(
+                    f"{net_key}_moving_avg_rewards", rewards[agent], mvg_avg_weighting
+                )
 
-        # Wrap the system builder with the PBT hooks
-        class PBTBuilder(type(system._builder)):
-            def __init__(
-                self,
-                builder: MADDPGBuilder,
-                ):
-                """Initialise the system.
-                Args:
-                    config (MADDPGConfig): system configuration specifying hyperparameters and
-                        additional information for constructing the system.
-                    trainer_fn (Union[ Type[training.MADDPGBaseTrainer],
-                        Type[training.MADDPGBaseRecurrentTrainer], ], optional): Trainer
-                        function, of a correpsonding type to work with the selected system
-                        architecture. Defaults to training.MADDPGDecentralisedTrainer.
-                    executor_fn (Type[core.Executor], optional): Executor function, of a
-                        corresponding type to work with the selected system architecture.
-                        Defaults to MADDPGFeedForwardExecutor.
-                    extra_specs (Dict[str, Any], optional): defines the specifications of extra
-                        information used by the system. Defaults to {}.
-                """
-            
-                self.__dict__ = builder.__dict__
-            def create_custom_var_server_variables(self, variables: Dict[str, tf.Variable],
-                ) -> Dict[str, tf.Variable]:
-                    """Create counter variables.
-                    Args:
-                        variables (Dict[str, snt.Variable]): dictionary with variable_source
-                        variables in.
-                    Returns:
-                        variables (Dict[str, snt.Variable]): dictionary with variable_source
-                        variables in.
-                    """
-                    var_server_vars = {
-                        "gen_version": tf.Variable(0, dtype=tf.int32),
-                        "worker_gen_version": {
-                            trainer_id: tf.Variable(0, dtype=tf.int32)
-                            for trainer_id in self._config.trainer_networks.keys()
-                        },
-                    }
-                    variables.update(var_server_vars)
-                    
-            def create_custom_trainer_variables(
-                self, variables: Dict[str, tf.Variable], get_keys: List[str] = None,
-            ) -> Dict[str, tf.Variable]:
-                """Create counter variables.
-                Args:
-                    variables (Dict[str, snt.Variable]): dictionary with variable_source
-                    variables in.
-                Returns:
-                    variables (Dict[str, snt.Variable]): dictionary with variable_source
-                    variables in.
-                """
-                hyper_vars = {}
-                for net_key in self._config.unique_net_keys:
-                    hyper_vars[f"{net_key}_discount"] = tf.Variable(0.99, dtype=tf.float32)
-                    hyper_vars[f"{net_key}_target_update_rate"] = tf.Variable(
-                        0.01, dtype=tf.float32
-                    )
-                    hyper_vars[f"{net_key}_target_update_period"] = tf.Variable(
-                        100, dtype=tf.int32
-                    )
-                if get_keys:
-                    get_keys.extend(hyper_vars)
-                variables.update(hyper_vars)
+    system._builder._executor_fn = PBTExecutor
 
-            def create_custom_executor_variables(
-                self, variables: Dict[str, tf.Variable], get_keys: List[str] = None,
-            ) -> Dict[str, tf.Variable]:
-                """Create counter variables.
-                Args:
-                    variables (Dict[str, snt.Variable]): dictionary with variable_source
-                    variables in.
-                Returns:
-                    variables (Dict[str, snt.Variable]): dictionary with variable_source
-                    variables in.
-                """
-                reward_vars = {}
-                for net_key in self._config.unique_net_keys:
-                    reward_vars[f"{net_key}_moving_avg_rewards"] = tf.Variable(0, dtype=tf.float32)
-                if get_keys:
-                    get_keys.extend(reward_vars)
-                variables.update(reward_vars)        
+    # Wrap the system builder with the PBT hooks
+    class PBTBuilder(type(system._builder)):
+        def __init__(
+            self,
+            builder: MADDPGBuilder,
+        ):
+            """Initialise the system.
+            Args:
+                config (MADDPGConfig): system configuration specifying hyperparameters and
+                    additional information for constructing the system.
+                trainer_fn (Union[ Type[training.MADDPGBaseTrainer],
+                    Type[training.MADDPGBaseRecurrentTrainer], ], optional): Trainer
+                    function, of a correpsonding type to work with the selected system
+                    architecture. Defaults to training.MADDPGDecentralisedTrainer.
+                executor_fn (Type[core.Executor], optional): Executor function, of a
+                    corresponding type to work with the selected system architecture.
+                    Defaults to MADDPGFeedForwardExecutor.
+                extra_specs (Dict[str, Any], optional): defines the specifications of extra
+                    information used by the system. Defaults to {}.
+            """
 
-            def variable_server_fn(
-                self, *args, **kwargs,
-            ):
-                return PBTVariableSource(*args, **kwargs)
+            self.__dict__ = builder.__dict__
 
-            def get_hyper_parameters(
-                self, discount, target_update_rate, target_update_period, variables,
-            ):
-                """Get the hyperparameters.
-                Args:
-                    discount (float): the discount factor
-                    target_update_rate (float): the rate at which the target network is
-                    target_update_period (int): the period at which the target network is
-                    variables (Dict[str, tf.Variable]): the variables in the system.
-                    get_keys (List[str]): the keys of the variables to get.
-                Returns:
-                    hyper_parameters (Dict[str, tf.Variable]): the hyperparameters.
-                """
-                discounts = {
-                    net_key: variables[f"{net_key}_discount"]
-                    for net_key in self._config.unique_net_keys
-                }
-                target_update_rates = {
-                    net_key: variables[f"{net_key}_target_update_rate"]
-                    for net_key in self._config.unique_net_keys
-                }
-                target_update_periods = {
-                    net_key: variables[f"{net_key}_target_update_period"]
-                    for net_key in self._config.unique_net_keys
-                }
-                return discounts, target_update_rates, target_update_periods
+        def create_custom_var_server_variables(
+            self,
+            variables: Dict[str, tf.Variable],
+        ) -> Dict[str, tf.Variable]:
+            """Create counter variables.
+            Args:
+                variables (Dict[str, snt.Variable]): dictionary with variable_source
+                variables in.
+            Returns:
+                variables (Dict[str, snt.Variable]): dictionary with variable_source
+                variables in.
+            """
+            var_server_vars = {
+                "gen_version": tf.Variable(0, dtype=tf.int32),
+                "worker_gen_version": {
+                    trainer_id: tf.Variable(0, dtype=tf.int32)
+                    for trainer_id in self._config.trainer_networks.keys()
+                },
+            }
+            variables.update(var_server_vars)
 
-        system._builder = PBTBuilder(system._builder)
-        return system
+        def create_custom_trainer_variables(
+            self,
+            variables: Dict[str, tf.Variable],
+            get_keys: List[str] = None,
+        ) -> Dict[str, tf.Variable]:
+            """Create counter variables.
+            Args:
+                variables (Dict[str, snt.Variable]): dictionary with variable_source
+                variables in.
+            Returns:
+                variables (Dict[str, snt.Variable]): dictionary with variable_source
+                variables in.
+            """
+            hyper_vars = {}
+            for net_key in self._config.unique_net_keys:
+                hyper_vars[f"{net_key}_discount"] = tf.Variable(0.99, dtype=tf.float32)
+                hyper_vars[f"{net_key}_target_update_rate"] = tf.Variable(
+                    0.01, dtype=tf.float32
+                )
+                hyper_vars[f"{net_key}_target_update_period"] = tf.Variable(
+                    100, dtype=tf.int32
+                )
+            if get_keys:
+                get_keys.extend(hyper_vars)
+            variables.update(hyper_vars)
+
+        def create_custom_executor_variables(
+            self,
+            variables: Dict[str, tf.Variable],
+            get_keys: List[str] = None,
+        ) -> Dict[str, tf.Variable]:
+            """Create counter variables.
+            Args:
+                variables (Dict[str, snt.Variable]): dictionary with variable_source
+                variables in.
+            Returns:
+                variables (Dict[str, snt.Variable]): dictionary with variable_source
+                variables in.
+            """
+            reward_vars = {}
+            for net_key in self._config.unique_net_keys:
+                reward_vars[f"{net_key}_moving_avg_rewards"] = tf.Variable(
+                    0, dtype=tf.float32
+                )
+            if get_keys:
+                get_keys.extend(reward_vars)
+            variables.update(reward_vars)
+
+        def variable_server_fn(
+            self,
+            *args,
+            **kwargs,
+        ):
+            return PBTVariableSource(*args, **kwargs)
+
+        def get_hyper_parameters(
+            self,
+            discount,
+            target_update_rate,
+            target_update_period,
+            variables,
+        ):
+            """Get the hyperparameters.
+            Args:
+                discount (float): the discount factor
+                target_update_rate (float): the rate at which the target network is
+                target_update_period (int): the period at which the target network is
+                variables (Dict[str, tf.Variable]): the variables in the system.
+                get_keys (List[str]): the keys of the variables to get.
+            Returns:
+                hyper_parameters (Dict[str, tf.Variable]): the hyperparameters.
+            """
+            discounts = {
+                net_key: variables[f"{net_key}_discount"]
+                for net_key in self._config.unique_net_keys
+            }
+            target_update_rates = {
+                net_key: variables[f"{net_key}_target_update_rate"]
+                for net_key in self._config.unique_net_keys
+            }
+            target_update_periods = {
+                net_key: variables[f"{net_key}_target_update_period"]
+                for net_key in self._config.unique_net_keys
+            }
+            return discounts, target_update_rates, target_update_periods
+
+    system._builder = PBTBuilder(system._builder)
+    return system

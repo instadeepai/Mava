@@ -122,6 +122,7 @@ class VariableSource:
         Args:
             names (Union[str, Sequence[str]]): Names of the variables to add to.
             vars(Dict[str, np.ndarray]): The values to add to the variables to.
+            worked_id(str): The id of the worker that is sending the request.
         Returns:
             None
         """
@@ -135,6 +136,32 @@ class VariableSource:
             # self.variables[var_key] + vars[var_key]
             self.variables[var_key].assign_add(vars[var_key])
         return
+
+    def move_avg_variables(
+        self,
+        names: Sequence[str],
+        vars: Dict[str, np.ndarray],
+        weight: float,
+        worked_id: str,
+    ) -> None:
+        """Implements a moving average on a given varable.
+        Args:
+            names (Union[str, Sequence[str]]): Names of the variables to add to.
+            vars(Dict[str, np.ndarray]): The values to add to the variables to.
+            weight(float): The weight to use for the moving average.
+            worked_id(str): The id of the worker that is sending the request.
+        Returns:
+            None
+        """
+        if type(names) == str:
+            vars = {names: vars}  # type: ignore
+            names = [names]  # type: ignore
+
+        for var_key in names:
+            assert var_key in self.variables
+            self.variables[var_key].assign(
+                (1.0 - weight) * self.variables[var_key] + weight * vars[var_key]
+            )
 
     def run(self) -> None:
         """Run the variable source. This function allows for
