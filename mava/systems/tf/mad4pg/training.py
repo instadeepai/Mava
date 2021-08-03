@@ -178,7 +178,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             a_t = self._target_policy_actions(o_t_trans)
 
             for agent in self._agents:
-                agent_key = self._agent_net_keys[agent]
+                net_key = self._agent_net_keys[agent]
 
                 # Get critic feed
                 o_tm1_feed, o_t_feed, a_tm1_feed, a_t_feed = self._get_critic_feed(
@@ -192,11 +192,11 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 )
 
                 # Critic learning.
-                q_tm1 = self._critic_networks[agent_key](o_tm1_feed, a_tm1_feed)
-                q_t = self._target_critic_networks[agent_key](o_t_feed, a_t_feed)
+                q_tm1 = self._critic_networks[net_key](o_tm1_feed, a_tm1_feed)
+                q_t = self._target_critic_networks[net_key](o_t_feed, a_t_feed)
 
                 # Cast the additional discount to match the environment discount dtype.
-                discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
+                discount = tf.cast(self._discounts[net_key], dtype=d_t[agent].dtype)
 
                 # Critic loss.
                 critic_loss = losses.categorical(
@@ -205,13 +205,13 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
                 # Actor learning.
                 o_t_agent_feed = o_t_trans[agent]
-                dpg_a_t = self._policy_networks[agent_key](o_t_agent_feed)
+                dpg_a_t = self._policy_networks[net_key](o_t_agent_feed)
 
                 # Get dpg actions
                 dpg_a_t_feed = self._get_dpg_feed(a_t, dpg_a_t, agent)
 
                 # Get dpg Q values.
-                dpg_z_t = self._critic_networks[agent_key](o_t_feed, dpg_a_t_feed)
+                dpg_z_t = self._critic_networks[net_key](o_t_feed, dpg_a_t_feed)
                 dpg_q_t = dpg_z_t.mean()
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
@@ -497,7 +497,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             )
 
             for agent in self._agents:
-                agent_key = self._agent_net_keys[agent]
+                net_key = self._agent_net_keys[agent]
 
                 # Get critic feed
                 (
@@ -518,13 +518,13 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 # Remove the last sequence step for the normal network
                 obs_comb, dims = train_utils.combine_dim(obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(action_feed)
-                q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                q_values = self._critic_networks[net_key](obs_comb, act_comb)
                 q_values.set_dimensions(dims)
 
                 # Remove first sequence step for the target
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(target_actions_feed)
-                target_q_values = self._target_critic_networks[agent_key](
+                target_q_values = self._target_critic_networks[net_key](
                     obs_comb, act_comb
                 )
                 target_q_values.set_dimensions(dims)
@@ -532,7 +532,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 # Cast the additional discount to match
                 # the environment discount dtype.
                 agent_discount = discounts[agent]
-                discount = tf.cast(self._discount, dtype=agent_discount.dtype)
+                discount = tf.cast(self._discounts[net_key], dtype=agent_discount.dtype)
 
                 # Critic loss.
                 critic_loss = recurrent_n_step_critic_loss(
@@ -551,7 +551,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 agent_core_state = core_state[agent][0]
                 transposed_obs = tf2_utils.batch_to_sequence(obs_agent_feed)
                 outputs, updated_states = snt.static_unroll(
-                    self._policy_networks[agent_key],
+                    self._policy_networks[net_key],
                     transposed_obs,
                     agent_core_state,
                 )
@@ -575,7 +575,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 # Get dpg Q values.
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(dpg_actions_feed)
-                dpg_z_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                dpg_z_values = self._critic_networks[net_key](obs_comb, act_comb)
                 dpg_q_values = dpg_z_values.mean()
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.

@@ -360,9 +360,11 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
 
-    def _custom_end_of_episode_logic(self, timestep, agent_net_keys):
+    def _custom_end_of_episode_logic(
+        self, timestep: dm_env.TimeStep, agent_net_keys: Dict[str, str]
+    ) -> None:
         """Custom logic at the end of an episode."""
-        pass
+        return
 
     def observe_first(
         self,

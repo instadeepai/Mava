@@ -14,8 +14,10 @@
 # limitations under the License.
 
 import time
-from typing import Any, Dict, List, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
+import dm_env
+import numpy as np
 import tensorflow as tf
 
 from mava.systems.tf.mad4pg.execution import MAD4PGRecurrentExecutor
@@ -30,7 +32,7 @@ supported_pbt_systems = [MADDPG, MAD4PG]
 supported_pbt_executors = [MADDPGRecurrentExecutor, MAD4PGRecurrentExecutor]
 
 
-### PBT variable source
+# PBT variable source
 class PBTVariableSource(MavaVariableSource):
     def __init__(
         self,
@@ -50,10 +52,17 @@ class PBTVariableSource(MavaVariableSource):
         """
         # TODO (dries): Change this back to 5 * 60 for self._checkpoint_interval
         self._checkpoint_interval = 5 * 60
-        self._gen_time_interval = 1 * 20  # TODO (dries): Change this back to 5 * 60
+        self._gen_time_interval = 5 * 60
         self._last_checkpoint_time = time.time()
         self._last_gen_start_time = time.time()
         self._unique_net_keys = unique_net_keys
+
+        # The mutate info. [minimum, maximum, mutation rate]
+        self._mutate_info = {
+            "discount": [0.0, 1.0, 0.01],
+            "target_update_rate": [0.0, 1.0, 0.01],
+            "target_update_period": [0, 1000, 5],
+        }
 
         super().__init__(
             variables=variables,
@@ -75,11 +84,11 @@ class PBTVariableSource(MavaVariableSource):
                 self.variables["gen_version"]
             )
 
-    def can_update_vars(self, var_names, worked_id) -> bool:
+    def can_update_vars(self, var_names: Sequence[str], worked_id: str) -> bool:
         """Check if the variables can be updated.
         Args:
-            var_names (Sequence[str]): Names of the variables to update.
-            worked_id (str): The id of the worker that called the set function.
+            var_names (List[str]): Names of the variables to check.
+            worked_id (str): The id of the worker that is making the request.
         Returns:
             can_update (bool): True if the variables can be updated.
         """
@@ -87,6 +96,52 @@ class PBTVariableSource(MavaVariableSource):
             self.variables["worker_gen_version"][worked_id]
             == self.variables["gen_version"]
         )
+
+    def copy_and_mutate(self, weak_net_key: str, strong_net_key: str) -> None:
+        """
+        Copy and mutate the variables from the stronger network
+        to the weaker network.
+        Args:
+            weak_net_key (str): The id of the network that should be mutated.
+            strong_net_key (str): The id of the network that should be copied.
+        Returns:
+            None
+        """
+
+        # Copy the networks
+        for net_type in [
+            "policies",
+            "observations",
+            "target_policies",
+            "target_observations",
+            "critics",
+            "target_critics",
+        ]:
+            weak_key = f"{weak_net_key}_{net_type}"
+            strong_key = f"{strong_net_key}_{net_type}"
+            # Loop through tuple
+            # TODO (dries): Should we add some mutation here as well?
+            for var_i in range(len(self.variables[strong_key])):
+                self.variables[weak_key][var_i].assign(
+                    self.variables[strong_key][var_i]
+                )
+
+        # Copy and mutate the hyperparameters (within bounding boxes)
+        # TODO (dries): Add this back in again.
+        for net_type in ["discount", "target_update_rate", "target_update_period"]:
+            weak_key = f"{weak_net_key}_{net_type}"
+            strong_key = f"{strong_net_key}_{net_type}"
+            original_val = self.variables[strong_key]
+
+            m_min, m_max, m_rate = self._mutate_info[net_type]  # type: ignore
+
+            if original_val.dtype == tf.int32:
+                mutation_val = np.random.randint(-m_rate, m_rate)  # type: ignore
+            else:
+                mutation_val = np.random.uniform(-m_rate, m_rate)  # type: ignore
+            self.variables[weak_key].assign(
+                np.clip(original_val + mutation_val, m_min, m_max)  # type: ignore
+            )
 
     def run(self) -> None:
         """Run the variable source. This function allows for
@@ -119,9 +174,24 @@ class PBTVariableSource(MavaVariableSource):
                 tf.print("Starting a new generation.")
 
                 # Get the rewards and reset them
+                net_list = []
+                reward_list = []
                 for net_key in self._unique_net_keys:
+                    net_list.append(net_key)
                     net_reward = self.variables[f"{net_key}_moving_avg_rewards"]
-                    tf.print(f"{net_key} moving average rewards:{net_reward}")
+                    reward_list.append(net_reward)
+                sorted_ind = np.argsort(reward_list)
+                sorted_nets = np.array(net_list)[sorted_ind]
+
+                # For the lowest 20% sample randomly from the top 20%.
+                # After sampling add some random noise.
+                lowest_20_percent = int(len(sorted_nets) * 0.2 + 1)
+                for i in range(lowest_20_percent):
+                    weak_net = sorted_nets[i]
+                    strong_net = sorted_nets[
+                        np.random.randint(lowest_20_percent, len(sorted_nets))
+                    ]
+                    self.copy_and_mutate(weak_net, strong_net)
 
                 # Reset the rewards
                 for net_key in self._unique_net_keys:
@@ -131,14 +201,14 @@ class PBTVariableSource(MavaVariableSource):
                 self.variables["gen_version"].assign_add(1)
 
 
-def BasePBTWrapper(
-    system: Union[MADDPG, MAD4PG],
-) -> None:
+def BasePBTWrapper(  # noqa
+    system: Union[MADDPG, MAD4PG],  # noqa
+) -> Union[MADDPG, MAD4PG]:
     """Initializes the broadcaster communicator.
     Args:
-        architecture: the BaseArchitecture used.
-        shared: if a shared communication channel is used.
-        channel_noise: stddev of normal noise in channel.
+        system: The system that should be wrapped.
+    Returns:
+        system: The wrapped system.
     """
     if type(system) not in supported_pbt_systems:
         raise NotImplementedError(
@@ -153,12 +223,14 @@ def BasePBTWrapper(
         )
 
     # Wrap the executor with the PBT hooks
-    class PBTExecutor(system._builder._executor_fn):
-        def __init__(self, *args, **kwargs):
+    class PBTExecutor(system._builder._executor_fn):  # type: ignore
+        def __init__(self, *args: Any, **kwargs: Any):
             super().__init__(*args, **kwargs)
 
         # PBT executor
-        def _custom_end_of_episode_logic(self, timestep, agent_net_keys):
+        def _custom_end_of_episode_logic(
+            self, timestep: dm_env.TimeStep, agent_net_keys: Dict[str, str]
+        ) -> None:
             """Custom logic at the end of an episode."""
             mvg_avg_weighting = 0.01
             rewards = timestep.reward
@@ -171,24 +243,14 @@ def BasePBTWrapper(
     system._builder._executor_fn = PBTExecutor
 
     # Wrap the system builder with the PBT hooks
-    class PBTBuilder(type(system._builder)):
+    class PBTBuilder(type(system._builder)):  # type: ignore
         def __init__(
             self,
             builder: MADDPGBuilder,
         ):
             """Initialise the system.
             Args:
-                config (MADDPGConfig): system configuration specifying hyperparameters and
-                    additional information for constructing the system.
-                trainer_fn (Union[ Type[training.MADDPGBaseTrainer],
-                    Type[training.MADDPGBaseRecurrentTrainer], ], optional): Trainer
-                    function, of a correpsonding type to work with the selected system
-                    architecture. Defaults to training.MADDPGDecentralisedTrainer.
-                executor_fn (Type[core.Executor], optional): Executor function, of a
-                    corresponding type to work with the selected system architecture.
-                    Defaults to MADDPGFeedForwardExecutor.
-                extra_specs (Dict[str, Any], optional): defines the specifications of extra
-                    information used by the system. Defaults to {}.
+                builder: The builder to wrap.
             """
 
             self.__dict__ = builder.__dict__
@@ -196,14 +258,14 @@ def BasePBTWrapper(
         def create_custom_var_server_variables(
             self,
             variables: Dict[str, tf.Variable],
-        ) -> Dict[str, tf.Variable]:
+        ) -> None:
             """Create counter variables.
             Args:
-                variables (Dict[str, snt.Variable]): dictionary with variable_source
-                variables in.
+                variables (Dict[str, snt.Variable]): dictionary with
+                variable_source variables in.
             Returns:
-                variables (Dict[str, snt.Variable]): dictionary with variable_source
-                variables in.
+                variables (Dict[str, snt.Variable]): dictionary with
+                variable_source variables in.
             """
             var_server_vars = {
                 "gen_version": tf.Variable(0, dtype=tf.int32),
@@ -218,14 +280,14 @@ def BasePBTWrapper(
             self,
             variables: Dict[str, tf.Variable],
             get_keys: List[str] = None,
-        ) -> Dict[str, tf.Variable]:
+        ) -> None:
             """Create counter variables.
             Args:
                 variables (Dict[str, snt.Variable]): dictionary with variable_source
                 variables in.
+                get_keys (List[str]): list of keys to get from the variable server.
             Returns:
-                variables (Dict[str, snt.Variable]): dictionary with variable_source
-                variables in.
+                None.
             """
             hyper_vars = {}
             for net_key in self._config.unique_net_keys:
@@ -244,14 +306,14 @@ def BasePBTWrapper(
             self,
             variables: Dict[str, tf.Variable],
             get_keys: List[str] = None,
-        ) -> Dict[str, tf.Variable]:
+        ) -> None:
             """Create counter variables.
             Args:
                 variables (Dict[str, snt.Variable]): dictionary with variable_source
                 variables in.
+                get_keys (List[str]): list of keys to get from the variable server.
             Returns:
-                variables (Dict[str, snt.Variable]): dictionary with variable_source
-                variables in.
+                None.
             """
             reward_vars = {}
             for net_key in self._config.unique_net_keys:
@@ -264,27 +326,39 @@ def BasePBTWrapper(
 
         def variable_server_fn(
             self,
-            *args,
-            **kwargs,
-        ):
+            *args: Any,
+            **kwargs: Any,
+        ) -> PBTVariableSource:
+            """Create a variable server.
+            Args:
+                *args: Variable arguments.
+                **kwargs: Variable keyword arguments.
+            Returns:
+                a PBTVariableSource.
+            """
             return PBTVariableSource(*args, **kwargs)
 
         def get_hyper_parameters(
             self,
-            discount,
-            target_update_rate,
-            target_update_period,
-            variables,
-        ):
+            discount: float,
+            target_update_rate: Optional[float],
+            target_update_period: Optional[int],
+            variables: Dict[str, tf.Variable],
+        ) -> Tuple[tf.Variable, tf.Variable, tf.Variable]:
             """Get the hyperparameters.
             Args:
                 discount (float): the discount factor
                 target_update_rate (float): the rate at which the target network is
+                updated.
                 target_update_period (int): the period at which the target network is
+                updated.
                 variables (Dict[str, tf.Variable]): the variables in the system.
-                get_keys (List[str]): the keys of the variables to get.
             Returns:
-                hyper_parameters (Dict[str, tf.Variable]): the hyperparameters.
+                discounts (Dict[str, tf.Variable]): the discount factors
+                target_update_rate (Dict[str, tf.Variable]): the rates at which the
+                target network is updated.
+                target_update_period (Dict[str, tf.Variable]): the periods at which the
+                target network is updated.
             """
             discounts = {
                 net_key: variables[f"{net_key}_discount"]

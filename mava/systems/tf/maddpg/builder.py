@@ -17,8 +17,7 @@
 
 import copy
 import dataclasses
-from typing import Any, Dict, Iterator, List, Optional, Type, Union
-from mava.systems.tf.maddpg import execution
+from typing import Any, Dict, Iterator, KeysView, List, Optional, Tuple, Type, Union
 
 import reverb
 import sonnet as snt
@@ -354,9 +353,10 @@ class MADDPGBuilder:
         return adder
 
     def create_counter_variables(
-        self, variables: Dict[str, tf.Variable],
-        get_keys: List[str]=None,
-    ) -> Dict[str, tf.Variable]:
+        self,
+        variables: Dict[str, tf.Variable],
+        get_keys: List[str] = None,
+    ) -> KeysView[str]:
         """Create counter variables.
         Args:
             variables (Dict[str, snt.Variable]): dictionary with variable_source
@@ -381,32 +381,37 @@ class MADDPGBuilder:
         return count_vars.keys()
 
     def create_custom_var_server_variables(
-        self, variables: Dict[str, tf.Variable],
+        self,
+        variables: Dict[str, tf.Variable],
     ) -> Dict[str, tf.Variable]:
         """Create counter variables.
         Args:
             variables (Dict[str, snt.Variable]): dictionary with variable_source
             variables in.
-        Returns:
-            None
-        """
-        pass
-    
-    def create_trainer_variables(
-        self, variables: Dict[str, tf.Variable], get_keys: List[str] = None,
-    ) -> Dict[str, tf.Variable]:
-        """Create counter variables.
-        Args:
-            variables (Dict[str, snt.Variable]): dictionary with variable_source
-            variables in.
-            get_keys (List[str]): list of keys to get from the trainer.
         Returns:
             None
         """
         pass
 
+    def create_custom_trainer_variables(
+        self,
+        variables: Dict[str, tf.Variable],
+        get_keys: List[str] = None,
+    ) -> None:
+        """Create counter variables.
+        Args:
+            variables (Dict[str, snt.Variable]): dictionary with variable_source
+            variables in.
+            get_keys (List[str]): list of keys to get from the variable server.
+        Returns:
+            None.
+        """
+        pass
+
     def create_custom_executor_variables(
-        self, variables: Dict[str, tf.Variable], get_keys: List[str] = None,
+        self,
+        variables: Dict[str, tf.Variable],
+        get_keys: List[str] = None,
     ) -> Dict[str, tf.Variable]:
         """Create counter variables.
         Args:
@@ -418,13 +423,13 @@ class MADDPGBuilder:
         """
         pass
 
-   
-
-    
-
     def variable_server_fn(
-        self, variables, checkpoint, checkpoint_subpath, unique_net_keys,
-    ):
+        self,
+        variables: Dict[str, Any],
+        checkpoint: bool,
+        checkpoint_subpath: str,
+        unique_net_keys: List[str],
+    ) -> MavaVariableSource:
         return MavaVariableSource(variables, checkpoint, checkpoint_subpath)
 
     def make_variable_server(
@@ -500,7 +505,7 @@ class MADDPGBuilder:
 
         # Create the counter variables
         count_names = self.create_counter_variables(variables, get_keys)
-        
+
         # Create custom executor variables
         self.create_custom_executor_variables(variables)
 
@@ -523,7 +528,7 @@ class MADDPGBuilder:
             variable_client.get_and_wait()
 
         # Create the actor which defines how we take actions.
-        
+
         executor = self._executor_fn(
             policy_networks=policy_networks,
             counts=counts,
@@ -537,17 +542,26 @@ class MADDPGBuilder:
         return executor
 
     def get_hyper_parameters(
-        self, discount, target_update_rate, target_update_period, variables,
-    ):
+        self,
+        discount: float,
+        target_update_rate: Optional[float],
+        target_update_period: Optional[int],
+        variables: Dict[str, tf.Variable],
+    ) -> Tuple[tf.Variable, tf.Variable, tf.Variable]:
         """Get the hyperparameters.
         Args:
             discount (float): the discount factor
             target_update_rate (float): the rate at which the target network is
+            updated.
             target_update_period (int): the period at which the target network is
+            updated.
             variables (Dict[str, tf.Variable]): the variables in the system.
-            get_keys (List[str]): the keys of the variables to get.
         Returns:
-            hyper_parameters (Dict[str, tf.Variable]): the hyperparameters.
+            discount (Dict[str, tf.Variable]): the discount factors
+            target_update_rate (Dict[str, tf.Variable]): the rates at which the
+            target network is updated.
+            target_update_period (Dict[str, tf.Variable]): the periods at which the
+            target network is updated.
         """
         discounts = {net_key: discount for net_key in self._config.unique_net_keys}
         target_update_rates = {
@@ -611,7 +625,7 @@ class MADDPGBuilder:
 
         # Create the counter variables
         count_names = self.create_counter_variables(variables, get_keys)
-        
+
         # Create the custom trainer variables
         self.create_custom_trainer_variables(variables, get_keys)
 
@@ -621,7 +635,10 @@ class MADDPGBuilder:
             target_update_rates,
             target_update_periods,
         ) = self.get_hyper_parameters(
-            discount, target_update_rate, target_update_period, variables,
+            discount,
+            target_update_rate,
+            target_update_period,
+            variables,
         )
 
         # Link the variables to send to the trainer

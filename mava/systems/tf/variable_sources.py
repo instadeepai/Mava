@@ -82,7 +82,14 @@ class VariableSource:
                 variables[var_key] = tf2_utils.to_numpy(self.variables[var_key])
             return variables
 
-    def can_update_vars(self, var_names, worked_id) -> bool:
+    def can_update_vars(self, var_names: Sequence[str], worked_id: str) -> bool:
+        """Check if the variables can be updated.
+        Args:
+            var_names (List[str]): Names of the variables to check.
+            worked_id (str): The id of the worker that is making the request.
+        Returns:
+            can_update (bool): True if the variables can be updated.
+        """
         return True
 
     def set_variables(

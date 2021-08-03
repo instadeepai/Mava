@@ -26,7 +26,7 @@ from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 try:
     from supersuit import black_death_v1
-except:
+except ImportError:
     black_death_v1 = None
 
 from mava import types

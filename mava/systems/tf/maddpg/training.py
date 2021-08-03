@@ -1060,7 +1060,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
             if self._target_averaging:
                 assert 0.0 < self._target_update_rates[net_key] < 1.0
-                tau = self._target_update_rate
+                tau = self._target_update_rates[net_key]
                 for src, dest in zip(online_variables, target_variables):
                     dest.assign(dest * (1.0 - tau) + src * tau)
             else:
@@ -1268,7 +1268,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             )
 
             for agent in self._agents:
-                agent_key = self._agent_net_keys[agent]
+                net_key = self._agent_net_keys[agent]
                 # Get critic feed
                 (
                     obs_trans_feed,
@@ -1288,13 +1288,13 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 # Remove the last sequence step for the normal network
                 obs_comb, dims = train_utils.combine_dim(obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(action_feed)
-                flat_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                flat_q_values = self._critic_networks[net_key](obs_comb, act_comb)
                 q_values = train_utils.extract_dim(flat_q_values, dims)[:, :, 0]
 
                 # Remove first sequence step for the target
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(target_actions_feed)
-                flat_target_q_values = self._target_critic_networks[agent_key](
+                flat_target_q_values = self._target_critic_networks[net_key](
                     obs_comb, act_comb
                 )
                 target_q_values = train_utils.extract_dim(flat_target_q_values, dims)[
@@ -1307,7 +1307,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 # Cast the additional discount to match
                 # the environment discount dtype.
                 agent_discount = discounts[agent]
-                discount = tf.cast(self._discount, dtype=agent_discount.dtype)
+                discount = tf.cast(self._discounts[net_key], dtype=agent_discount.dtype)
 
                 # Critic loss.
                 critic_loss = recurrent_n_step_critic_loss(
@@ -1327,7 +1327,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 agent_core_state = core_state[agent][0]
                 transposed_obs = tf2_utils.batch_to_sequence(obs_agent_feed)
                 outputs, updated_states = snt.static_unroll(
-                    self._policy_networks[agent_key], transposed_obs, agent_core_state
+                    self._policy_networks[net_key], transposed_obs, agent_core_state
                 )
 
                 dpg_actions = tf2_utils.batch_to_sequence(outputs)
@@ -1351,7 +1351,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 act_comb, _ = train_utils.combine_dim(dpg_actions_feed)
 
                 dpg_q_values = tf.squeeze(
-                    self._critic_networks[agent_key](obs_comb, act_comb)
+                    self._critic_networks[net_key](obs_comb, act_comb)
                 )
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
