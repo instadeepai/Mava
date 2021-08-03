@@ -29,6 +29,7 @@ from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import smac_utils
 from mava.utils.loggers import logger_utils
+from mava.wrappers.environment_loop_wrappers import MonitorParallelEnvironmentLoop
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -87,6 +88,9 @@ def main(_: Any) -> None:
         executor_variable_update_period=100,
         target_update_period=200,
         max_gradient_norm=10.0,
+
+        eval_loop_fn=MonitorParallelEnvironmentLoop,
+        eval_loop_fn_kwargs={"path": checkpoint_dir, "record_every": 1000},
     ).build()
 
     # launch
