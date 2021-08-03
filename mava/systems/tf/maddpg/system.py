@@ -89,7 +89,6 @@ class MADDPG:
         bootstrap_n: int = 10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
-        # max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         logger_config: Dict = {},
@@ -440,7 +439,6 @@ class MADDPG:
 
         # Create the executor.
         executor = self._builder.make_executor(
-            # executor_id=executor_id,
             networks=networks,
             policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
