@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG scaled system implementation."""
+"""MADDPG system implementation."""
 
 import functools
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
@@ -89,7 +89,6 @@ class MADDPG:
         bootstrap_n: int = 10,
         sigma: float = 0.3,
         max_gradient_norm: float = None,
-        # max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         logger_config: Dict = {},
@@ -122,11 +121,14 @@ class MADDPG:
             environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
+            trainer_networks (Dict[str, List[snt.Module]], optional): networks each
+                trainer trains on. Defaults to {}.
+            executor_samples (List, optional): List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+                Defaults to [].
             shared_weights (bool, optional): whether agents should share weights or not.
-                When agent_net_keys are provided the value of shared_weights is ignored.
-                Defaults to True.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
+                When executor_samples are provided the value of shared_weights is
+                ignored. Defaults to True.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
             batch_size (int, optional): sample batch size for updates. Defaults to 256.
@@ -353,7 +355,6 @@ class MADDPG:
             net_spec_keys=self._net_spec_keys,
         )
         for agent in agents:
-            # agent_type = agent.split("_")[0]
             agent_net_key = self._agent_net_keys[agent]
             core_state_specs[agent] = (
                 tf2_utils.squeeze_batch_dim(

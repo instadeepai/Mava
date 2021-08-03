@@ -102,6 +102,10 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             (s_t, a_t, r_t, d_t, s_t+1, e_t).
           discount: Discount factor to apply. This corresponds to the
             agent's discount in the class docstring.
+          int_to_nets: A list of network names to convert from integers to
+            strings.
+          table_network_config: A dictionary mapping table names to lists of
+            network names.
           priority_fns: See docstring for BaseAdder.
 
         Raises:

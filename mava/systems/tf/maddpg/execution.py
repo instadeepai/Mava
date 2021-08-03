@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
+"""MADDPG system executor implementation."""
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dm_env
@@ -28,35 +28,15 @@ from acme.specs import EnvironmentSpec
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 from dm_env import specs
-from numpy.random import randint
 
 from mava import adders
 from mava.systems.tf import executors
-from mava.utils.sort_utils import sort_str_num
+from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
 tfd = tfp.distributions
-
-
-def sample_new_agent_keys(
-    agents: List,
-    executor_samples: List,
-    net_to_ints: Dict[str, int] = None,
-) -> Tuple[Dict[str, np.array], Dict[str, np.array]]:
-    save_net_keys = {}
-    agent_net_keys = {}
-    agent_slots = copy.copy(agents)
-    while len(agent_slots) > 0:
-        sample = executor_samples[randint(len(executor_samples))]
-        for net_key in sample:
-            agent = agent_slots.pop(0)
-            agent_net_keys[agent] = net_key
-            if net_to_ints:
-                save_net_keys[agent] = np.array(net_to_ints[net_key], dtype=np.int32)
-
-    return save_net_keys, agent_net_keys
 
 
 class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
@@ -148,11 +128,12 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
         Args:
             agent (str): agent id.
-            observation (types.NestedArray): observation tensor received from the
-                environment.
+            observation (types.NestedArray): observation tensor received
+            from the environment.
 
         Returns:
-            Tuple[types.NestedArray, types.NestedArray]: agent action and policy.
+            Tuple[types.NestedArray, types.NestedArray]: agent action and
+            policy.
         """
         # Step the recurrent policy/value network forward
         # given the current observation and state.
@@ -281,7 +262,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self._counts = counts
         self._net_to_ints = net_to_ints
         self._network_int_keys_extras: Dict[str, np.array] = {}
-        
+
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,
@@ -380,8 +361,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         return actions, policies
 
     def _custom_end_of_episode_logic(self, timestep, agent_net_keys):
-        """Custom logic at the end of an episode.
-        """
+        """Custom logic at the end of an episode."""
         pass
 
     def observe_first(
