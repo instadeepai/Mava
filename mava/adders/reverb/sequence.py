@@ -20,8 +20,6 @@
 
 This implements adders which add sequences or partial trajectories.
 """
-
-import copy
 import operator
 from typing import Dict, List, Optional
 
@@ -34,7 +32,7 @@ from acme.adders.reverb.sequence import SequenceAdder
 from acme.types import NestedSpec
 
 from mava.adders.reverb import base
-from mava.adders.reverb.base import ReverbParallelAdder, Step
+from mava.adders.reverb.base import ReverbParallelAdder
 from mava.adders.reverb.utils import trajectory_signature
 
 # TODO Clean this up, when using newer versions of acme.
@@ -42,8 +40,6 @@ try:
     from acme.adders.reverb.sequence import EndBehavior
 except ImportError:
     from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
-
-from mava.utils.sort_utils import sort_str_num
 
 
 class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
@@ -71,6 +67,10 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
           period: The period with which we add sequences. If less than
             sequence_length, overlapping sequences are added. If equal to
             sequence_length, sequences are exactly non-overlapping.
+          int_to_nets: A list of network names to convert from integers to
+            strings.
+          table_network_config: A dictionary mapping table names to lists of
+            network names.
           delta_encoded: If `True` (False by default) enables delta encoding, see
             `Client` for more information.
           priority_fns: See docstring for BaseAdder.
@@ -136,11 +136,6 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
 
         # Compute priorities for the buffer.
         table_priorities = utils.calculate_priorities(self._priority_fns, trajectory)
-
-        # Create a prioritized item for each table.
-        # for table_name, priority in table_priorities.items():
-        #     self._writer.create_item(table_name, priority, trajectory)
-        #     self._writer.flush(self._max_in_flight_items)
 
         # Add the experience to the trainer tables in the correct form.
         self.write_experience_to_tables(trajectory, table_priorities)

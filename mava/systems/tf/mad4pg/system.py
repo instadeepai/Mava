@@ -103,8 +103,14 @@ class MAD4PG(MADDPG):
             environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
+            trainer_networks (Dict[str, List[snt.Module]], optional): networks each
+                trainer trains on. Defaults to {}.
+            executor_samples (List, optional): List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+                Defaults to [].
             shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
+                When executor_samples are provided the value of shared_weights is
+                ignored. Defaults to True.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
             batch_size (int, optional): sample batch size for updates. Defaults to 256.
