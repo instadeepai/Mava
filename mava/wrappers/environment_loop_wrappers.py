@@ -127,6 +127,13 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
         self._running_statistics.update({"episode_length": episode_steps})
         self._running_statistics.update(counts)
 
+        # Log extra env stats, e.g. for smac.
+        extra_stats = getattr(self._environment_loop._environment, "get_stats", None)
+        if callable(extra_stats):
+            self._running_statistics.update(
+                self._environment_loop._environment.get_stats()
+            )
+
 
 class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
     """
@@ -222,6 +229,13 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
         self._running_statistics.update({"episode_length": episode_steps})
         self._running_statistics.update(counts)
+
+        # Log extra env stats, e.g. for smac.
+        extra_stats = getattr(self._environment_loop._environment, "get_stats", None)
+        if callable(extra_stats):
+            self._running_statistics.update(
+                self._environment_loop._environment.get_stats()
+            )
 
 
 class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
