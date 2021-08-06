@@ -28,6 +28,7 @@ from mava.systems.tf import maddpg
 from mava.systems.tf.maddpg import make_default_networks
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
+from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -63,10 +64,22 @@ def main(_: Any) -> None:
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
+    # Log every [log_every] seconds.
+    log_every = 10
+    logger_factory = functools.partial(
+        logger_utils.make_logger,
+        directory=FLAGS.base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=FLAGS.mava_id,
+        time_delta=log_every,
+    )
+
     # distributed program
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        logger_factory=logger_factory,
         num_executors=2,
         shared_weights=False,
         trainer_networks={
