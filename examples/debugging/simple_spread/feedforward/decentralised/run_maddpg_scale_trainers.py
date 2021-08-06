@@ -60,35 +60,6 @@ def main(_: Any) -> None:
     # networks
     network_factory = lp_utils.partial_kwargs(make_default_networks)
 
-    # loggers
-    # set custom logger config for each process
-    # -- log trainer,executor and evaluator to TF
-    # -- log only evaluator to terminal
-    log_every = 10
-    logger_config = {
-        "trainer": {
-            "directory": FLAGS.base_dir,
-            "to_terminal": False,
-            "to_tensorboard": True,
-            "time_stamp": FLAGS.mava_id,
-            "time_delta": log_every,
-        },
-        "executor": {
-            "directory": FLAGS.base_dir,
-            "to_terminal": False,
-            "to_tensorboard": True,
-            "time_stamp": FLAGS.mava_id,
-            "time_delta": log_every,
-        },
-        "evaluator": {
-            "directory": FLAGS.base_dir,
-            "to_terminal": True,
-            "to_tensorboard": True,
-            "time_stamp": FLAGS.mava_id,
-            "time_delta": log_every,
-        },
-    }
-
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
@@ -96,7 +67,6 @@ def main(_: Any) -> None:
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        logger_config=logger_config,
         num_executors=2,
         shared_weights=False,
         trainer_networks={

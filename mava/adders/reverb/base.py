@@ -89,15 +89,27 @@ def spec_like_to_tensor_spec(
     return tf.TensorSpec.from_spec(spec, name="/".join(str(p) for p in paths))
 
 
-def get_trans_net_agents(
+def get_trajectory_net_agents(
     trajectory: Union[Trajectory, mava_types.Transition], entry_net_keys: Dict[str, str]
 ) -> Tuple[List, Dict[str, List]]:
+    """Returns a dictionary that maps network_keys to a list of agents using each
+    network key.
+
+    Args:
+        trajectory (Union[Trajectory, mava_types.Transition]): Trajectory recorded by
+        the adders.
+        entry_net_keys (Dict[str, str]): The network_keys used by each entry.
+    Returns:
+        agents (List): A sorted list of al the agent_keys.
+        trajectory_net_agents (Dict[str, List]): A dictionary that maps network_keys to
+        a list of agents using each network key.
+    """
     agents = sort_str_num(trajectory.actions.keys())
     unique_nets = sort_str_num(set(entry_net_keys.values()))
-    trans_nets_agent: Dict[str, List] = {key: [] for key in unique_nets}
+    trajectory_net_agents: Dict[str, List] = {key: [] for key in unique_nets}
     for agent in agents:
-        trans_nets_agent[entry_net_keys[agent]].append(agent)
-    return agents, trans_nets_agent
+        trajectory_net_agents[entry_net_keys[agent]].append(agent)
+    return agents, trajectory_net_agents
 
 
 class ReverbParallelAdder(ReverbAdder):
@@ -158,7 +170,7 @@ class ReverbParallelAdder(ReverbAdder):
                     entry_net_keys[agent] = self._int_to_nets[arr]
 
             # Get the unique agents and mapping from net_keys to agents.
-            agents, trans_nets_agent = get_trans_net_agents(
+            agents, trajectory_nets_agent = get_trajectory_net_agents(
                 trajectory=trajectory, entry_net_keys=entry_net_keys
             )
 
@@ -175,7 +187,7 @@ class ReverbParallelAdder(ReverbAdder):
                 )
             else:
                 # Check if all the networks are in trans_nets_agent.
-                trans_dict_copy = copy.deepcopy(trans_nets_agent)
+                trajectory_dict_copy = copy.deepcopy(trajectory_nets_agent)
 
                 # While the networks are in the data keep creating tables
                 # Each training example can therefore create multiple items
@@ -184,10 +196,10 @@ class ReverbParallelAdder(ReverbAdder):
                     item_agents = []
                     for net_key in self._table_network_config[table]:
                         if (
-                            net_key in trans_dict_copy
-                            and len(trans_dict_copy[net_key]) > 0
+                            net_key in trajectory_dict_copy
+                            and len(trajectory_dict_copy[net_key]) > 0
                         ):
-                            item_agents.append(trans_dict_copy[net_key].pop())
+                            item_agents.append(trajectory_dict_copy[net_key].pop())
                         else:
                             is_in_entry = False
                             break
