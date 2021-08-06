@@ -15,8 +15,6 @@
 
 # Adapted from https://github.com/openai/multiagent-particle-envs.
 
-from typing import List
-
 import numpy as np
 
 from mava.utils.debugging.core import Agent, Landmark, World
@@ -96,30 +94,27 @@ class Scenario(BaseScenario):
         return rew
 
     def observation(self, agent: Agent, a_i: int, world: World) -> np.array:
-        # get positions of all entities in this agent's reference frame
-        entity_pos = []
-        for entity in world.landmarks:  # world.entities:
-            entity_pos.append(entity.state.p_pos - agent.state.p_pos)
-        # entity colors
-        entity_color: List[np.array] = []
-        for entity in world.landmarks:  # world.entities:
-            entity_color.append(entity.color)
-        other_pos = []
-        other_landmarks = []
-        for i, other in enumerate(world.agents):
-            if other is agent:
+        # get the position of the agent's target landmark
+        target_landmark = world.landmarks[a_i].state.p_pos - agent.state.p_pos
+
+        # Get the other agent and landmark positions
+        other_agents_pos = []
+        other_landmarks_pos = []
+        for i, other_agent in enumerate(world.agents):
+            if other_agent is agent:
                 continue
-            landmark = world.landmarks[i]
-            other_landmarks.append(landmark.state.p_pos - landmark.state.p_pos)
-            other_pos.append(other.state.p_pos - agent.state.p_pos)
+            other_agents_pos.append(other_agent.state.p_pos - agent.state.p_pos)
+            other_landmarks_pos.append(
+                world.landmarks[i].state.p_pos - agent.state.p_pos
+            )
 
         return np.concatenate(
             [agent.state.p_vel]
             + [agent.state.p_pos]
             + [[world.current_step / 50]]
-            + [entity_pos[a_i]]
-            + other_pos
-            + other_landmarks  # + comm
+            + [target_landmark]
+            + other_agents_pos
+            + other_landmarks_pos  # + comm
         )
 
     def done(self, agent: Agent, world: World) -> bool:
