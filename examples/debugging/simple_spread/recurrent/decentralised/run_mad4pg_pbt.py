@@ -78,16 +78,6 @@ def main(_: Any) -> None:
     )
 
     # Distributed program.
-
-    # program = mad4pg.MAD4PG(
-    #     environment_factory=environment_factory,
-    #     network_factory=network_factory,
-    #     logger_config=logger_config,
-    #
-
-    # # Wrap the system with population based training.
-    #
-
     program = mad4pg.MAD4PG(
         environment_factory=environment_factory,
         network_factory=network_factory,
