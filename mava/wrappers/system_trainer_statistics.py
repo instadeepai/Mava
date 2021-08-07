@@ -189,7 +189,16 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
         # Get the latest variables from the variable server
         self._variable_client.get_and_wait()
 
+        # Log the counts
         fetches.update(self._counts)
+
+        # Log hyperparameters
+        for key in self._discounts.keys():
+            fetches[f"{key}_discount"] = float(self._discounts[key])
+            fetches[f"{key}_target_update_period"] = int(
+                self._target_update_periods[key]
+            )
+            fetches[f"{key}_target_update_rate"] = float(self._target_update_rates[key])
 
         if self._logger:
             self._logger.write(fetches)
