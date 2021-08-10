@@ -15,7 +15,7 @@
 
 """Utilities for nested data structures involving NumPy and TensorFlow 2.x."""
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import sonnet as snt
 import tensorflow as tf
@@ -31,6 +31,41 @@ def ones_like(nest: types.Nest) -> types.NestedTensor:
     return tree.map_structure(lambda x: tf.ones(x.shape, x.dtype), nest)
 
 
+def create_optimizer_variables(
+    networks: snt.Module,
+    policy_optimizers: Dict[str, snt.Optimizer],
+    critic_optimizers: Dict[str, snt.Optimizer],
+) -> None:
+    """Builds the network with dummy inputs to create the necessary variables.
+    Args:
+      network: Sonnet Module whose variables are to be created.
+      input_spec: list of input specs to the network. The length of this list
+        should match the number of arguments expected by `network`.
+    Returns:
+      output_spec: only returns an output spec if the output is a tf.Tensor, else
+          it doesn't return anything (None); e.g. if the output is a
+          tfp.distributions.Distribution.
+    """
+    for net_key in networks["observations"].keys():
+        # Get trainable variables.
+        policy_variables = (
+            networks["observations"][net_key].trainable_variables
+            + networks["policies"][net_key].trainable_variables
+        )
+        critic_variables = (
+            # In this agent, the critic loss trains the observation network.
+            networks["observations"][net_key].trainable_variables
+            + networks["critics"][net_key].trainable_variables
+        )
+
+        # Initialise the optimizer variables.
+        policy_optimizers[net_key]._initialize(policy_variables)
+        critic_optimizers[net_key]._initialize(critic_variables)
+    return
+
+
+# TODO (Dries): Should this be removed? How is this different that
+# Acme's implementation?
 def create_variables(
     network: snt.Module,
     input_spec: List[OLT],

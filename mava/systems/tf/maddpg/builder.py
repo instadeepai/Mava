@@ -34,6 +34,7 @@ from mava.systems.tf import executors, variable_utils
 from mava.systems.tf.maddpg import training
 from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils import tf_utils as mava_tf2_utils
 from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerStatistics
 
@@ -47,8 +48,8 @@ class MADDPGConfig:
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
-        policy_optimizer: optimizer(s) for updating policy networks.
-        critic_optimizer: optimizer for updating critic networks.
+        policy_optimizer: optimizers for updating policy networks.
+        critic_optimizer: optimizers for updating critic networks.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         discount: discount to use for TD updates.
@@ -74,8 +75,8 @@ class MADDPGConfig:
         replay_table_name: string indicating what name to give the replay table."""
 
     environment_spec: specs.MAEnvironmentSpec
-    policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
-    critic_optimizer: snt.Optimizer
+    policy_optimizer: Dict[str, snt.Optimizer]
+    critic_optimizer: Dict[str, snt.Optimizer]
     num_executors: int
     agent_net_keys: Dict[str, str]
     trainer_networks: Dict[str, List]
@@ -380,6 +381,54 @@ class MADDPGBuilder:
         variables.update(count_vars)
         return count_vars.keys()
 
+    def create_network_variables(
+        self,
+        network_types: List[str],
+        networks: Dict[str, snt.Module],
+        variables: Dict[str, tf.Variable],
+        get_keys: List[str] = None,
+        set_keys: List[str] = None,
+        set_get_net_keys: List[str] = None,
+        policy_optimizer: Dict[str, snt.Optimizer] = None,
+        critic_optimizer: Dict[str, snt.Optimizer] = None,
+    ) -> None:
+
+        # Setup the network variables
+        for net_type_key in network_types:
+            for net_key in networks[net_type_key].keys():
+                # Ensure obs and target networks are sonnet modules
+                var_key = f"{net_key}_{net_type_key}"
+                variables[var_key] = tf2_utils.to_sonnet_module(
+                    networks[net_type_key][net_key]
+                ).variables
+
+                # Add to get_keys and set_keys
+                if (set_get_net_keys is not None and net_key in set_get_net_keys) or (
+                    not set_get_net_keys and get_keys is not None
+                ):
+                    get_keys.append(var_key)  # type: ignore
+                    if set_keys is not None:
+                        set_keys.append(var_key)
+
+        if policy_optimizer is not None and critic_optimizer is not None:
+            for net_key in policy_optimizer.keys():
+                # Ensure obs and target networks are sonnet modules
+                policy_opt_var_key = f"{net_key}_policy_optimizer"
+                critic_opt_var_key = f"{net_key}_critic_optimizer"
+                variables[policy_opt_var_key] = policy_optimizer[net_key].variables
+                variables[critic_opt_var_key] = critic_optimizer[net_key].variables
+
+                # Add to get_keys and set_keys
+                if (set_get_net_keys is not None and net_key in set_get_net_keys) or (
+                    not set_get_net_keys and get_keys is not None
+                ):
+                    extend_keys = [policy_opt_var_key, critic_opt_var_key]
+                    get_keys.extend(extend_keys)  # type: ignore
+                    if set_keys is not None:
+                        set_keys.extend(extend_keys)
+
+        return
+
     def create_custom_var_server_variables(
         self,
         variables: Dict[str, tf.Variable],
@@ -432,6 +481,23 @@ class MADDPGBuilder:
     ) -> MavaVariableSource:
         return MavaVariableSource(variables, checkpoint, checkpoint_subpath)
 
+    def init_optimizers(
+        self,
+        networks: Dict[str, snt.Module],
+    ) -> Tuple[Dict[str, snt.Optimizer], Dict[str, snt.Optimizer]]:
+        # Copy the optimizers from config.
+        policy_opt = copy.deepcopy(self._config.policy_optimizer)
+        critic_opt = copy.deepcopy(self._config.critic_optimizer)
+
+        # Create the optimizer variables.
+        mava_tf2_utils.create_optimizer_variables(
+            networks,
+            policy_opt,
+            critic_opt,
+        )
+
+        return policy_opt, critic_opt
+
     def make_variable_server(
         self,
         networks: Dict[str, Dict[str, snt.Module]],
@@ -444,14 +510,18 @@ class MADDPGBuilder:
             variable_source (MavaVariableSource): A Mava variable source object.
         """
         # Create variables
-        variables = {}
-        # Network variables
-        for net_type_key in networks.keys():
-            for net_key in networks[net_type_key].keys():
-                # Ensure obs and target networks are sonnet modules
-                variables[f"{net_key}_{net_type_key}"] = tf2_utils.to_sonnet_module(
-                    networks[net_type_key][net_key]
-                ).variables
+        variables: Dict[str, Union[Tuple, tf.Variable]] = {}
+
+        # Create the network variables
+        policy_opt, critic_opt = self.init_optimizers(networks)
+
+        self.create_network_variables(
+            list(networks.keys()),
+            networks,
+            variables,
+            policy_optimizer=policy_opt,
+            critic_optimizer=critic_opt,
+        )
 
         # Create the counter variables
         self.create_counter_variables(variables)
@@ -494,14 +564,14 @@ class MADDPGBuilder:
             core.Executor: system executor, a collection of agents making up the part
                 of the system generating data by interacting the environment.
         """
-        # Create policy variables
-        variables = {}
-        get_keys = []
-        for net_type_key in ["observations", "policies"]:
-            for net_key in networks[net_type_key].keys():
-                var_key = f"{net_key}_{net_type_key}"
-                variables[var_key] = networks[net_type_key][net_key].variables
-                get_keys.append(var_key)
+        # Create variables
+        variables: Dict[str, Union[Tuple, tf.Variable]] = {}
+        get_keys: List[str] = []
+
+        # Create the network variables
+        self.create_network_variables(
+            ["observations", "policies"], networks, variables, get_keys
+        )
 
         # Create the counter variables
         count_names = self.create_counter_variables(variables, get_keys)
@@ -564,6 +634,13 @@ class MADDPGBuilder:
             target network is updated.
         """
         discounts = {net_key: discount for net_key in self._config.unique_net_keys}
+
+        if target_update_rate is None:
+            target_update_rate = -1.0
+
+        if target_update_period is None:
+            target_update_period = -1
+
         target_update_rates = {
             net_key: target_update_rate for net_key in self._config.unique_net_keys
         }
@@ -607,21 +684,24 @@ class MADDPGBuilder:
         target_update_rate = self._config.target_update_rate
 
         # Create variable client
-        variables = {}
-        set_keys = []
-        get_keys = []
-        # TODO (dries): Only add the networks this trainer is working with.
-        # Not all of them.
-        for net_type_key in networks.keys():
-            for net_key in networks[net_type_key].keys():
-                variables[f"{net_key}_{net_type_key}"] = networks[net_type_key][
-                    net_key
-                ].variables
-                if net_key in set(trainer_networks):
-                    set_keys.append(f"{net_key}_{net_type_key}")
-                    get_keys.append(f"{net_key}_{net_type_key}")
-                # else:
-                #     get_keys.append(f"{net_key}_{net_type_key}")
+        variables: Dict[str, Union[Tuple, tf.Variable]] = {}
+        set_keys: List[str] = []
+        get_keys: List[str] = []
+
+        # Create the optimizor variables
+        policy_opt, critic_opt = self.init_optimizers(networks)
+
+        # Create the network variables and link the optimizer variables
+        self.create_network_variables(
+            list(networks.keys()),
+            networks,
+            variables,
+            get_keys,
+            set_keys,
+            set_get_net_keys=list(set(trainer_networks)),
+            policy_optimizer=policy_opt,
+            critic_optimizer=critic_opt,
+        )
 
         # Create the counter variables
         count_names = self.create_counter_variables(variables, get_keys)
@@ -672,8 +752,8 @@ class MADDPGBuilder:
             "target_critic_networks": networks["target_critics"],
             "target_observation_networks": networks["target_observations"],
             "agent_net_keys": trainer_agent_net_keys,
-            "policy_optimizer": self._config.policy_optimizer,
-            "critic_optimizer": self._config.critic_optimizer,
+            "policy_optimizer": policy_opt,
+            "critic_optimizer": critic_opt,
             "max_gradient_norm": max_gradient_norm,
             "discounts": discounts,
             "target_averaging": target_averaging,

@@ -79,10 +79,8 @@ class MADDPG:
         min_replay_size: int = 1000,
         max_replay_size: int = 100000,
         samples_per_insert: Optional[float] = 32.0,
-        policy_optimizer: Union[
-            snt.Optimizer, Dict[str, snt.Optimizer]
-        ] = snt.optimizers.Adam(learning_rate=1e-4),
-        critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        policy_optimizer: Dict[str, snt.Optimizer] = None,
+        critic_optimizer: Dict[str, snt.Optimizer] = None,
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
@@ -146,10 +144,11 @@ class MADDPG:
             max_replay_size (int, optional): maximum replay size. Defaults to 1000000.
             samples_per_insert (Optional[float], optional): number of samples to take
                 from replay for every insert that is made. Defaults to 32.0.
-            policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
+            policy_optimizer (Dict[str, snt.Optimizer],
                 optional): optimizer(s) for updating policy networks. Defaults to
                 snt.optimizers.Adam(learning_rate=1e-4).
-            critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
+            critic_optimizer (Dict[str, snt.Optimizer],
+                optional): optimizer for updating critic
                 networks. Defaults to snt.optimizers.Adam(learning_rate=1e-4).
             n_step (int, optional): number of steps to include prior to boostrapping.
                 Defaults to 5.
@@ -237,6 +236,21 @@ class MADDPG:
         for sample in self._executor_samples:
             all_samples.extend(sample)
         unique_net_keys = sort_str_num(list(set(all_samples)))
+
+        # Create the optimizers if not specified
+        if type(policy_optimizer) is not dict:
+            if not policy_optimizer:
+                policy_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
+            policy_optimizer = {
+                net_key: policy_optimizer for net_key in unique_net_keys
+            }
+
+        if type(critic_optimizer) is not dict:
+            if not critic_optimizer:
+                critic_optimizer = snt.optimizers.Adam(learning_rate=1e-4)
+            critic_optimizer = {
+                net_key: critic_optimizer for net_key in unique_net_keys
+            }
 
         # Create mapping from ints to networks
         net_to_ints = {net_key: i for i, net_key in enumerate(unique_net_keys)}
@@ -332,8 +346,8 @@ class MADDPG:
                 sigma=sigma,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
-                policy_optimizer=policy_optimizer,
-                critic_optimizer=critic_optimizer,
+                policy_optimizer=policy_optimizer,  # type: ignore
+                critic_optimizer=critic_optimizer,  # type: ignore
                 checkpoint_subpath=checkpoint_subpath,
             ),
             trainer_fn=trainer_fn,

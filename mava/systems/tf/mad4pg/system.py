@@ -65,7 +65,9 @@ class MAD4PG(MADDPG):
         policy_optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=1e-4),
-        critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer: Union[
+            snt.Optimizer, Dict[str, snt.Optimizer]
+        ] = snt.optimizers.Adam(learning_rate=1e-4),
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,

@@ -709,17 +709,17 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             else self._agents
         )
         for agent in agents:
-            agent_key = self._agent_net_keys[agent]
+            net_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
             policy_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._policy_networks[agent_key].trainable_variables
+                self._observation_networks[net_key].trainable_variables
+                + self._policy_networks[net_key].trainable_variables
             )
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_networks[agent_key].trainable_variables
+                self._observation_networks[net_key].trainable_variables
+                + self._critic_networks[net_key].trainable_variables
             )
 
             # Compute gradients.
@@ -735,8 +735,8 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             )[0]
 
             # Apply gradients.
-            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
-            self._critic_optimizers[agent_key].apply(critic_gradients, critic_variables)
+            self._policy_optimizers[net_key].apply(policy_gradients, policy_variables)
+            self._critic_optimizers[net_key].apply(critic_gradients, critic_variables)
 
             if log_current_timestep:
                 if self.log_weights:

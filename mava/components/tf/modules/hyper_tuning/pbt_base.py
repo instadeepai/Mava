@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -50,7 +51,6 @@ class PBTVariableSource(MavaVariableSource):
         Returns:
             None
         """
-        # TODO (dries): Change this back to 5 * 60 for self._checkpoint_interval
         self._checkpoint_interval = 5 * 60
         self._gen_time_interval = 5 * 60
         self._last_checkpoint_time = time.time()
@@ -108,7 +108,7 @@ class PBTVariableSource(MavaVariableSource):
             None
         """
 
-        # Copy the networks
+        # Copy the network and optimizor variables
         for net_type in [
             "policies",
             "observations",
@@ -116,6 +116,8 @@ class PBTVariableSource(MavaVariableSource):
             "target_observations",
             "critics",
             "target_critics",
+            "policy_optimizer",
+            "critic_optimizer",
         ]:
             weak_key = f"{weak_net_key}_{net_type}"
             strong_key = f"{strong_net_key}_{net_type}"
@@ -127,7 +129,6 @@ class PBTVariableSource(MavaVariableSource):
                 )
 
         # Copy and mutate the hyperparameters (within bounding boxes)
-        # TODO (dries): Add this back in again.
         for net_type in ["discount", "target_update_rate", "target_update_period"]:
             weak_key = f"{weak_net_key}_{net_type}"
             strong_key = f"{strong_net_key}_{net_type}"
@@ -174,12 +175,12 @@ class PBTVariableSource(MavaVariableSource):
                 tf.print("Starting a new generation.")
 
                 # Get the rewards and reset them
-                net_list = []
-                reward_list = []
-                for net_key in self._unique_net_keys:
-                    net_list.append(net_key)
-                    net_reward = self.variables[f"{net_key}_moving_avg_rewards"]
-                    reward_list.append(net_reward)
+                net_list = copy.copy(self._unique_net_keys)
+                reward_list = [
+                    self.variables[f"{net_key}_moving_avg_rewards"]
+                    for net_key in self._unique_net_keys
+                ]
+
                 sorted_ind = np.argsort(reward_list)
                 sorted_nets = np.array(net_list)[sorted_ind]
 
@@ -236,6 +237,9 @@ def BasePBTWrapper(  # noqa
             rewards = timestep.reward
             for agent in rewards.keys():
                 net_key = self._agent_net_keys[agent]
+                # TODO (dries): Is this correct?
+                # If a network is used more in training its moving average will be
+                # updated faster. Should we use the average reward of the networks?
                 self._variable_client.move_avg_and_wait(
                     f"{net_key}_moving_avg_rewards", rewards[agent], mvg_avg_weighting
                 )

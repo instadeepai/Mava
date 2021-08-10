@@ -69,6 +69,7 @@ class VariableSource:
             were requested.
         """
         assert type(worked_id) == str
+        assert len(names) > 0
         self.custom_get_logic(names, worked_id)
 
         if type(names) == str:
@@ -102,6 +103,7 @@ class VariableSource:
         Returns:
             None
         """
+        assert len(names) > 0
         if type(names) == str:
             vars = {names: vars}  # type: ignore
             names = [names]  # type: ignore
@@ -133,6 +135,7 @@ class VariableSource:
         Returns:
             None
         """
+        assert len(names) > 0
         if type(names) == str:
             vars = {names: vars}  # type: ignore
             names = [names]  # type: ignore
@@ -160,6 +163,7 @@ class VariableSource:
         Returns:
             None
         """
+        assert len(names) > 0
         if type(names) == str:
             vars = {names: vars}  # type: ignore
             names = [names]  # type: ignore

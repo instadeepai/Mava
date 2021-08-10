@@ -18,7 +18,7 @@
 
 import copy
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import reverb
@@ -55,8 +55,8 @@ class MADDPGBaseTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discounts: Dict[str, float],
         target_averaging: bool,
         target_update_periods: Dict[str, int],
@@ -81,9 +81,9 @@ class MADDPGBaseTrainer(mava.Trainer):
                 each agent in the system.
             target_policy_networks (Dict[str, snt.Module]): target policy networks.
             target_critic_networks (Dict[str, snt.Module]): target critic networks.
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+            policy_optimizer (Dict[str, snt.Optimizer]):
                 optimizer(s) for updating policy networks.
-            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+            critic_optimizer (Dict[str, snt.Optimizer]):
                 optimizer for updating critic networks.
             discount (float): discount factor for TD updates.
             target_averaging (bool): whether to use polyak averaging for target network
@@ -159,17 +159,9 @@ class MADDPGBaseTrainer(mava.Trainer):
         # Get the agents which shoud be updated and ran
         self._trainer_agent_list = self._agents
 
-        # Create optimizers for different agent types.
-        if not isinstance(policy_optimizer, dict):
-            self._policy_optimizers: Dict[str, snt.Optimizer] = {}
-            for agent in self.unique_net_keys:
-                self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
-        else:
-            self._policy_optimizers = policy_optimizer
-
-        self._critic_optimizers: Dict[str, snt.Optimizer] = {}
-        for agent in self.unique_net_keys:
-            self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
+        # Create optimizers
+        self._policy_optimizers = policy_optimizer
+        self._critic_optimizers = critic_optimizer
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -457,17 +449,17 @@ class MADDPGBaseTrainer(mava.Trainer):
         critic_losses = self.critic_losses
         tape = self.tape
         for agent in self._trainer_agent_list:
-            agent_key = self._agent_net_keys[agent]
+            net_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
             policy_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._policy_networks[agent_key].trainable_variables
+                self._observation_networks[net_key].trainable_variables
+                + self._policy_networks[net_key].trainable_variables
             )
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_networks[agent_key].trainable_variables
+                self._observation_networks[net_key].trainable_variables
+                + self._critic_networks[net_key].trainable_variables
             )
 
             # Compute gradients.
@@ -487,8 +479,8 @@ class MADDPGBaseTrainer(mava.Trainer):
             )[0]
 
             # Apply gradients.
-            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
-            self._critic_optimizers[agent_key].apply(critic_gradients, critic_variables)
+            self._policy_optimizers[net_key].apply(policy_gradients, policy_variables)
+            self._critic_optimizers[net_key].apply(critic_gradients, critic_variables)
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
@@ -531,13 +523,12 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discounts: Dict[str, float],
         target_averaging: bool,
         target_update_periods: Dict[str, int],
@@ -556,7 +547,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -586,13 +576,12 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discounts: Dict[str, float],
         target_averaging: bool,
         target_update_periods: Dict[str, int],
@@ -611,7 +600,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -681,13 +669,12 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         agents: List[str],
         agent_types: List[str],
         connection_spec: Dict[str, List[str]],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discounts: Dict[str, float],
         target_averaging: bool,
         target_update_periods: Dict[str, int],
@@ -706,7 +693,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -793,13 +779,12 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: snt.Optimizer,
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discounts: Dict[str, float],
         target_averaging: bool,
         target_update_periods: Dict[str, int],
@@ -818,7 +803,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -890,13 +874,12 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discounts: Dict[str, float],
         target_averaging: bool,
         target_update_periods: Dict[str, int],
@@ -922,9 +905,9 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 each agent in the system.
             target_policy_networks (Dict[str, snt.Module]): target policy networks.
             target_critic_networks (Dict[str, snt.Module]): target critic networks.
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+            policy_optimizer (Dict[str, snt.Optimizer]):
                 optimizer(s) for updating policy networks.
-            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+            critic_optimizer (Dict[str, snt.Optimizer]):
                 optimizer for updating critic networks.
             discount (float): discount factor for TD updates.
             target_averaging (bool): whether to use polyak averaging for target network
@@ -1003,17 +986,9 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         # Get the agents which shoud be updated and ran
         self._trainer_agent_list = self._agents
 
-        # Create optimizers for different agent types.
-        if not isinstance(policy_optimizer, dict):
-            self._policy_optimizers: Dict[str, snt.Optimizer] = {}
-            for agent in self.unique_net_keys:
-                self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
-        else:
-            self._policy_optimizers = policy_optimizer
-
-        self._critic_optimizers: Dict[str, snt.Optimizer] = {}
-        for agent in self.unique_net_keys:
-            self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
+        # Create optimizers
+        self._policy_optimizers = policy_optimizer
+        self._critic_optimizers = critic_optimizer
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -1377,17 +1352,17 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         critic_losses = self.critic_losses
         tape = self.tape
         for agent in self._agents:
-            agent_key = self._agent_net_keys[agent]
+            net_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
             policy_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._policy_networks[agent_key].trainable_variables
+                self._observation_networks[net_key].trainable_variables
+                + self._policy_networks[net_key].trainable_variables
             )
             critic_variables = (
                 # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_networks[agent_key].trainable_variables
+                self._observation_networks[net_key].trainable_variables
+                + self._critic_networks[net_key].trainable_variables
             )
 
             # Compute gradients.
@@ -1407,8 +1382,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             )[0]
 
             # Apply gradients.
-            self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
-            self._critic_optimizers[agent_key].apply(critic_gradients, critic_variables)
+            self._policy_optimizers[net_key].apply(policy_gradients, policy_variables)
+            self._critic_optimizers[net_key].apply(critic_gradients, critic_variables)
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
@@ -1472,13 +1447,12 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discounts: Dict[str, float],
         target_averaging: bool,
         target_update_periods: Dict[str, int],
@@ -1498,7 +1472,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -1532,13 +1505,12 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discounts: Dict[str, float],
         target_averaging: bool,
         target_update_periods: Dict[str, int],
@@ -1558,7 +1530,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -1632,13 +1603,12 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
         target_critic_networks: Dict[str, snt.Module],
-        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        policy_optimizer: Dict[str, snt.Optimizer],
+        critic_optimizer: Dict[str, snt.Optimizer],
         discounts: Dict[str, float],
         target_averaging: bool,
         target_update_periods: Dict[str, int],
@@ -1658,7 +1628,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,

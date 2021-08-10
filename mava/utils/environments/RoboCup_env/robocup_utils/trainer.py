@@ -224,7 +224,6 @@ class Trainer:
             # if b'goal_l' in raw_msg or b'goal_r' in raw_msg:
             # print("Trainer message: '" , raw_msg,
             # ". Scores: ", self.wm.score_l, self.wm.score_r)
-            # exit()
 
             # if msg_type is not None:
             # print(type(raw_msg))
