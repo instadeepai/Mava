@@ -262,6 +262,9 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self._counts = counts
         self._net_to_ints = net_to_ints
         self._network_int_keys_extras: Dict[str, np.array] = {}
+        self._cum_rewards: Dict[str, float] = {
+            agent_key: 0.0 for agent_key in self._agent_specs.keys()
+        }
 
         super().__init__(
             policy_networks=policy_networks,
@@ -360,11 +363,13 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
 
-    def _custom_end_of_episode_logic(
-        self, timestep: dm_env.TimeStep, agent_net_keys: Dict[str, str]
-    ) -> None:
+    def _custom_end_of_episode_logic(self) -> None:
         """Custom logic at the end of an episode."""
         return
+
+    def _add_to_cum_rewards(self, rewards: Dict[str, float]) -> None:
+        for agent_key in rewards.keys():
+            self._cum_rewards[agent_key] += rewards[agent_key]
 
     def observe_first(
         self,
@@ -432,11 +437,11 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             }
             next_extras.update({"core_states": numpy_states})
         next_extras["network_int_keys"] = self._network_int_keys_extras
+        self._add_to_cum_rewards(next_timestep.reward)
         self._adder.add(policy, next_timestep, next_extras)  # type: ignore
-
         # Custom end of episode logic.
         if next_timestep.last():
-            self._custom_end_of_episode_logic(next_timestep, self._agent_net_keys)
+            self._custom_end_of_episode_logic()
 
     def update(self, wait: bool = False) -> None:
         """Update the policy variables."""

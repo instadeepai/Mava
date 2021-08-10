@@ -17,7 +17,6 @@ import copy
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
-import dm_env
 import numpy as np
 import tensorflow as tf
 
@@ -181,25 +180,27 @@ class PBTVariableSource(MavaVariableSource):
                     for net_key in self._unique_net_keys
                 ]
 
-                sorted_ind = np.argsort(reward_list)
-                sorted_nets = np.array(net_list)[sorted_ind]
+                # Only mutate if the networks have different rewards
+                if np.sum(np.abs(reward_list)) > 0.0:
+                    sorted_ind = np.argsort(reward_list)
+                    sorted_nets = np.array(net_list)[sorted_ind]
 
-                # For the lowest 20% sample randomly from the top 20%.
-                # After sampling add some random noise.
-                lowest_20_percent = int(len(sorted_nets) * 0.2 + 1)
-                for i in range(lowest_20_percent):
-                    weak_net = sorted_nets[i]
-                    strong_net = sorted_nets[
-                        np.random.randint(lowest_20_percent, len(sorted_nets))
-                    ]
-                    self.copy_and_mutate(weak_net, strong_net)
+                    # For the lowest 20% sample randomly from the top 20%.
+                    # After sampling add some random noise.
+                    lowest_20_percent = int(len(sorted_nets) * 0.2 + 1)
+                    for i in range(lowest_20_percent):
+                        weak_net = sorted_nets[i]
+                        strong_net = sorted_nets[
+                            np.random.randint(lowest_20_percent, len(sorted_nets))
+                        ]
+                        self.copy_and_mutate(weak_net, strong_net)
 
-                # Reset the rewards
-                for net_key in self._unique_net_keys:
-                    self.variables[f"{net_key}_moving_avg_rewards"].assign(0.0)
+                    # Reset the rewards
+                    for net_key in self._unique_net_keys:
+                        self.variables[f"{net_key}_moving_avg_rewards"].assign(0.0)
 
-                # Increament the generation
-                self.variables["gen_version"].assign_add(1)
+                    # Increament the generation
+                    self.variables["gen_version"].assign_add(1)
 
 
 def BasePBTWrapper(  # noqa
@@ -229,20 +230,20 @@ def BasePBTWrapper(  # noqa
             super().__init__(*args, **kwargs)
 
         # PBT executor
-        def _custom_end_of_episode_logic(
-            self, timestep: dm_env.TimeStep, agent_net_keys: Dict[str, str]
-        ) -> None:
+        def _custom_end_of_episode_logic(self) -> None:
             """Custom logic at the end of an episode."""
             mvg_avg_weighting = 0.01
-            rewards = timestep.reward
-            for agent in rewards.keys():
+            for agent in self._cum_rewards.keys():
                 net_key = self._agent_net_keys[agent]
                 # TODO (dries): Is this correct?
                 # If a network is used more in training its moving average will be
                 # updated faster. Should we use the average reward of the networks?
                 self._variable_client.move_avg_and_wait(
-                    f"{net_key}_moving_avg_rewards", rewards[agent], mvg_avg_weighting
+                    f"{net_key}_moving_avg_rewards",
+                    self._cum_rewards[agent],
+                    mvg_avg_weighting,
                 )
+                self._cum_rewards[agent] = 0.0
 
     system._builder._executor_fn = PBTExecutor
 
