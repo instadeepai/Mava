@@ -15,11 +15,13 @@
 
 
 """Stabilising for multi-agent RL systems"""
-from typing import Dict
+from typing import Dict, Tuple
 
+import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme.tf import utils as tf2_utils
+from tensorflow.python.ops.gen_array_ops import concat
 
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.stabilising import BaseStabilisationModule
@@ -30,47 +32,56 @@ class FingerPrintStabalisation(BaseStabilisationModule):
 
     def __init__(
         self,
-        architecture: DecentralisedValueActor,
     ) -> None:
-        self._architecture = architecture
-        self._fingerprint_spec = tf.ones((2,), dtype="float32")
+        self._spec = tf.ones((2,), dtype="float32")
+        self._scale_factor = 100000
 
-    def create_actor_variables_with_fingerprints(
+    def get_spec(self):
+        return self._spec
+
+    def apply_to_architecture(self, architecture: DecentralisedValueActor):
+        for key, spec in architecture._actor_specs.items():
+            spec = tf.ones(shape=spec.shape, dtype="float32")
+            spec = tf.concat([spec, self._spec], axis=0)
+            architecture._actor_specs[key] = spec
+
+    def trainer_hook(
         self,
-    ) -> Dict[str, Dict[str, snt.Module]]:
+        o_tm1_trans: tf.Tensor,
+        o_t_trans: tf.Tensor,
+        e_tm1: Dict[str, np.array],
+        e_t: Dict[str, np.array],
+    ) -> Tuple[tf.Tensor, tf.Tensor]:
+        # Get fingerprints from extras.
+        f_tm1 = tf.convert_to_tensor(e_tm1["fingerprint"], dtype="float32")
+        f_t = tf.convert_to_tensor(e_t["fingerprint"], dtype="float32")
 
-        actor_networks: Dict[str, Dict[str, snt.Module]] = {
-            "values": {},
-            "target_values": {},
-        }
+        # Concatenate fingerprints to observation embeddings.
+        o_tm1_fprint = tf.concat([o_tm1_trans, f_tm1], axis=1)
+        o_t_fprint = tf.concat([o_t_trans, f_t], axis=1)
 
-        # get actor specs
-        actor_obs_specs = self._architecture._get_actor_specs()
+        return o_tm1_fprint, o_t_fprint
 
-        # create policy variables for each agent
-        for agent_key in self._architecture._agents:
-            agent_net_key = self._architecture._agent_net_keys[agent_key]
-            obs_spec = actor_obs_specs[agent_key]
+    def executor_act_hook(
+        self, observation: tf.Tensor, info: Dict[str, tf.Tensor]
+    ) -> np.array:
+        fingerprint = [info["epsilon"], info["trainer_step"] / self._scale_factor]
+        fingerprint = np.array(fingerprint)
+        fingerprint = tf.convert_to_tensor(fingerprint, dtype="float32")
 
-            # Create variables for value and policy networks.
-            tf2_utils.create_variables(
-                self._architecture._value_networks[agent_net_key],
-                [obs_spec, self._fingerprint_spec],
-            )
+        observation = tf.concat([observation, fingerprint], axis=0)
+        return observation
 
-            # create target value network variables
-            tf2_utils.create_variables(
-                self._architecture._target_value_networks[agent_net_key],
-                [obs_spec, self._fingerprint_spec],
-            )
+    def executor_observe_hook(
+        self, extras: Dict[str, np.array], info: Dict[str, np.array]
+    ) -> Dict[str, np.array]:
+        # Compute fingerprint using info
+        fingerprint = np.array(
+            [info["epsilon"], info["trainer_step"] / self._scale_factor],
+            dtype="float32",
+        )
 
-        actor_networks["values"] = self._architecture._value_networks
-        actor_networks["target_values"] = self._architecture._target_value_networks
+        # Add fingerprint to extras.
+        extras["fingerprint"] = fingerprint
 
-        return actor_networks
-
-    def create_system(
-        self,
-    ) -> Dict[str, Dict[str, snt.Module]]:
-        networks = self.create_actor_variables_with_fingerprints()
-        return networks
+        return extras

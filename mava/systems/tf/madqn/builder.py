@@ -34,7 +34,6 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import execution, training
-from mava.wrappers import MADQNDetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -76,6 +75,7 @@ class MADQNConfig:
     agent_net_keys: Dict[str, str]
     target_update_period: int
     executor_variable_update_period: int
+    exploration_scheduler: Type[LinearExplorationScheduler]
     max_gradient_norm: Optional[float]
     min_replay_size: int
     max_replay_size: int
@@ -83,10 +83,7 @@ class MADQNConfig:
     prefetch_size: int
     batch_size: int
     n_step: int
-    max_priority_weight: float
     importance_sampling_exponent: Optional[float]
-    sequence_length: int
-    period: int
     discount: float
     checkpoint: bool
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
@@ -103,10 +100,6 @@ class MADQNBuilder:
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
-        replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ):
         """Initialise the system.
 
@@ -130,12 +123,13 @@ class MADQNBuilder:
         self._config = config
         self._extra_specs = extra_specs
 
+        # Agent info.
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
+
+        # Store trainer and executor functions.
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
-        self._exploration_scheduler_fn = exploration_scheduler_fn
-        self._replay_stabiliser_fn = replay_stabilisation_fn
 
     def make_replay_tables(
         self,
@@ -154,26 +148,18 @@ class MADQNBuilder:
             List[reverb.Table]: a list of data tables for inserting data.
         """
 
-        # Select adder
+        # Create adder signiture
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
-            # Check if we should use fingerprints
-            if self._replay_stabiliser_fn is not None:
-                self._extra_specs.update({"fingerprint": np.array([1.0, 1.0])})
             adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
                 environment_spec, self._extra_specs
             )
-        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
-            adder_sig = reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec, self._config.sequence_length, self._extra_specs
-            )
         else:
-            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+            raise NotImplementedError("Unsupported executor type: ", self._executor_fn)
 
         if self._config.samples_per_insert is None:
             # We will take a samples_per_insert ratio of None to mean that there is
             # no limit, i.e. this only implies a min size limit.
             limiter = reverb.rate_limiters.MinSize(self._config.min_replay_size)
-
         else:
             # Create enough of an error buffer to give a 10% tolerance in rate.
             samples_per_insert_tolerance = 0.1 * self._config.samples_per_insert
@@ -218,21 +204,15 @@ class MADQNBuilder:
         Yields:
             Iterator[reverb.ReplaySample]: data samples from the dataset.
         """
-
-        sequence_length = (
-            self._config.sequence_length
-            if issubclass(self._executor_fn, executors.RecurrentExecutor)
-            else None
-        )
-
+        # Make dataset.
         dataset = datasets.make_reverb_dataset(
             table=self._config.replay_table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
-            sequence_length=sequence_length,
         )
-        return iter(dataset)
+
+        return dataset
 
     def make_adder(
         self, replay_client: reverb.Client
@@ -250,7 +230,7 @@ class MADQNBuilder:
             Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
         """
 
-        # Select adder
+        # Create adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=None,
@@ -258,15 +238,8 @@ class MADQNBuilder:
                 n_step=self._config.n_step,
                 discount=self._config.discount,
             )
-        elif issubclass(self._executor_fn, executors.RecurrentExecutor):
-            adder = reverb_adders.ParallelSequenceAdder(
-                priority_fns=None,
-                client=replay_client,
-                sequence_length=self._config.sequence_length,
-                period=self._config.period,
-            )
         else:
-            raise NotImplementedError("Unknown executor type: ", self._executor_fn)
+            raise NotImplementedError("Unsupported executor type: ", self._executor_fn)
 
         return adder
 
@@ -277,8 +250,8 @@ class MADQNBuilder:
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
         trainer: Optional[training.MADQNTrainer] = None,
-        communication_module: Optional[BaseCommunicationModule] = None,
         evaluator: bool = False,
+        fingerprint_module: FingerPrintStabalisation = None,
     ) -> core.Executor:
         """Create an executor instance.
 
@@ -323,9 +296,6 @@ class MADQNBuilder:
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
-        # Check if we should use fingerprints
-        fingerprint = True if self._replay_stabiliser_fn is not None else False
-
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
@@ -334,9 +304,8 @@ class MADQNBuilder:
             variable_client=variable_client,
             adder=adder,
             trainer=trainer,
-            communication_module=communication_module,
             evaluator=evaluator,
-            fingerprint=fingerprint,
+            fingerprint_module=fingerprint_module,
         )
 
     def make_trainer(
@@ -345,8 +314,8 @@ class MADQNBuilder:
         dataset: Iterator[reverb.ReplaySample],
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        communication_module: Optional[BaseCommunicationModule] = None,
         replay_client: Optional[reverb.TFClient] = None,
+        fingerprint_module: FingerPrintStabalisation = None,
     ) -> core.Trainer:
         """Create a trainer instance.
 
@@ -358,8 +327,6 @@ class MADQNBuilder:
                 recording of counts, e.g. trainer steps. Defaults to None.
             logger (Optional[types.NestedLogger], optional): Logger object for logging
                 metadata.. Defaults to None.
-            communication_module (BaseCommunicationModule): module to enable
-                agent communication. Defaults to None.
 
         Returns:
             core.Trainer: system trainer, that uses the collected data from the
@@ -372,16 +339,13 @@ class MADQNBuilder:
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
-        # Make epsilon scheduler
-        exploration_scheduler = self._exploration_scheduler_fn(
+        # Make exploration scheduler
+        exploration_scheduler = self._config.exploration_scheduler(
             epsilon_min=self._config.epsilon_min,
             epsilon_decay=self._config.epsilon_decay,
         )
 
-        # Check if we should use fingerprints
-        fingerprint = True if self._replay_stabiliser_fn is not None else False
-
-        # The learner updates the parameters (and initializes them).
+        # The trainer updates the network parameters.
         trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
@@ -393,20 +357,16 @@ class MADQNBuilder:
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
             exploration_scheduler=exploration_scheduler,
-            communication_module=communication_module,
             replay_client=replay_client,
             importance_sampling_exponent=self._config.importance_sampling_exponent,
-            max_priority_weight=self._config.max_priority_weight,
             n_step=self._config.n_step,
             replay_table_name=self._config.replay_table_name,
             dataset=dataset,
             counter=counter,
-            fingerprint=fingerprint,
+            fingerprint_module=fingerprint_module,
             logger=logger,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
-
-        trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore
 
         return trainer

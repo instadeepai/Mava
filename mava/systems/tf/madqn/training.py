@@ -25,6 +25,7 @@ import sonnet as snt
 import tensorflow as tf
 import tree
 import trfl
+from acme.tf import losses
 from acme.tf import utils as tf2_utils
 from acme.tf.losses import transformed_n_step_loss
 from acme.types import NestedArray
@@ -37,6 +38,7 @@ from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
+from mava.components.tf.modules.stabilising.fingerprints import FingerPrintStabalisation
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
@@ -62,18 +64,19 @@ class MADQNTrainer(mava.Trainer):
         discount: float,
         agent_net_keys: Dict[str, str],
         exploration_scheduler: LinearExplorationScheduler,
+        observation_networks: Optional[Dict[str, snt.Module]] = None,
+        target_observation_networks: Optional[Dict[str, snt.Module]] = None,
         max_gradient_norm: float = None,
         importance_sampling_exponent: Optional[float] = None,
         replay_client: Optional[reverb.TFClient] = None,
-        max_priority_weight: float = 0.9,
         n_step: int = 1,
-        fingerprint: bool = False,
+        huber_loss_parameter: float = 1.0,
+        fingerprint_module: FingerPrintStabalisation = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
-        communication_module: Optional[BaseCommunicationModule] = None,
     ):
         """Initialise MADQN trainer
 
@@ -82,6 +85,8 @@ class MADQNTrainer(mava.Trainer):
             agent_types (List[str]): agent types, e.g. "speaker" or "listener".
             q_networks (Dict[str, snt.Module]): q-value networks.
             target_q_networks (Dict[str, snt.Module]): target q-value networks.
+            observation_networks(Dict[str, snt.Module]): observation networks.
+            target_observation_networks(Dict[str, snt.Module]): target observation networks.
             target_update_period (int): number of steps before updating target networks.
             dataset (tf.data.Dataset): training dataset.
             optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): type of
@@ -97,6 +102,7 @@ class MADQNTrainer(mava.Trainer):
                 policy fingerprints. Defaults to False.
             n_step (int): For computing n-step returns.
             counter (counting.Counter, optional): step counter object. Defaults to None.
+            huber_loss_parameter (float): parameter used for calculating the huber loss.
             importance_sampling_exponent (float, optional): exponent used for
                 prioritized experience replay. None for no prioritized experience
                 replay.
@@ -124,6 +130,22 @@ class MADQNTrainer(mava.Trainer):
         self._q_networks = q_networks
         self._target_q_networks = target_q_networks
 
+        # TODO: remove this once observation networks are fully supported
+        # in madqn system
+        if observation_networks is None:
+            self._observation_networks = {}
+            self._target_observation_networks = {}
+            for key in q_networks.keys():
+                self._observation_networks[key] = tf2_utils.to_sonnet_module(
+                    tf.identity
+                )
+                self._target_observation_networks[key] = tf2_utils.to_sonnet_module(
+                    tf.identity
+                )
+        else:
+            self._observation_networks = observation_networks
+            self._target_observation_networks = target_observation_networks
+
         # General learner book-keeping and loggers.
         self._counter = counter or counting.Counter()
         self._logger = logger
@@ -131,6 +153,7 @@ class MADQNTrainer(mava.Trainer):
         # Other learner parameters.
         self._discount = discount
         self._n_step = n_step
+        self._huber_loss_parameter = huber_loss_parameter
 
         # Set up gradient clipping.
         if max_gradient_norm is not None:
@@ -138,20 +161,19 @@ class MADQNTrainer(mava.Trainer):
         else:  # A very large number. Infinity results in NaNs.
             self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
-        self._fingerprint = fingerprint
+        self._fingerprint_module = fingerprint_module
 
         # Necessary to track when to update target networks.
         self._num_steps = tf.Variable(0, dtype=tf.int32)
         self._target_update_period = target_update_period
 
         # Create an iterator to go through the dataset.
-        self._iterator = dataset
+        self._iterator = iter(dataset)
 
         # Store the exploration scheduler
         self._exploration_scheduler = exploration_scheduler
 
         # Importance sampling hyper-parameters
-        self._max_priority_weight = max_priority_weight
         self._importance_sampling_exponent = importance_sampling_exponent
 
         # Replay client for updating priorities.
@@ -177,6 +199,7 @@ class MADQNTrainer(mava.Trainer):
             self._optimizers = optimizer
 
         # Expose the variables.
+        # TODO expose observation networks
         q_networks_to_expose = {}
         self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
             "q_network": {},
@@ -243,7 +266,9 @@ class MADQNTrainer(mava.Trainer):
         """Sync target parameters with the latest online parameters."""
 
         for key in self.unique_net_keys:
-            # Update target network.
+            # TODO update observation networks
+
+            # Get variables.
             online_variables = (*self._q_networks[key].variables,)
 
             target_variables = (*self._target_q_networks[key].variables,)
@@ -273,37 +298,76 @@ class MADQNTrainer(mava.Trainer):
 
     def _get_feed(
         self,
-        o_tm1_trans: Dict[str, np.ndarray],
-        o_t_trans: Dict[str, np.ndarray],
-        a_tm1: Dict[str, np.ndarray],
         agent: str,
+        o_tm1: Dict[str, np.ndarray],
+        a_tm1: Dict[str, np.ndarray],
+        r_t: Dict[str, np.ndarray],
+        o_t: Dict[str, np.ndarray],
+        d_t: Dict[str, np.ndarray],
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
         """Get data to feed to the agent networks.
 
         Args:
-            o_tm1_trans (Dict[str, np.ndarray]): transformed (e.g. using observation
-                network) observation at timestep t-1
-            o_t_trans (Dict[str, np.ndarray]): transformed observation at timestep t
-            a_tm1 (Dict[str, np.ndarray]): action at timestep t-1
+            o_tm1 (Dict[str, np.ndarray]): observation at timestep t-1.
+            a_tm1 (Dict[str, np.ndarray]): action at timestep t-1.
+            r_t (Dict[str, np.ndarray]): reward at timestep t+n.
+            o_t (Dict[str, np.ndarray]): observation at timestep t+n.
+            d_t (Dict[str, np.ndarray]): environment discount at timestep t+n.
             agent (str): agent id
 
         Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor]: agent network feeds, observations
-                at t-1, t and action at time t.
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: agent
+            network feeds.
         """
-
-        # Decentralised
-        o_tm1_feed = o_tm1_trans[agent].observation
-        o_t_feed = o_t_trans[agent].observation
+        # Decentralised i.e. independent Q-learners
+        o_tm1_feed = o_tm1[agent].observation
         a_tm1_feed = a_tm1[agent]
+        r_t_feed = r_t[agent]
+        o_t_feed = o_t[agent].observation
+        d_t_feed = d_t[agent]
 
-        return o_tm1_feed, o_t_feed, a_tm1_feed
+        return o_tm1_feed, a_tm1_feed, r_t_feed, o_t_feed, d_t_feed
+
+    def _transform_observation(
+        self, agent_key: str, o_tm1_feed: tf.Tensor, o_t_feed: tf.Tensor
+    ) -> Tuple[tf.Tensor, tf.Tensor]:
+        """Transform the agents observation with its observation network.
+
+        Args:
+            agent_key (str): the key for the agent's observation network.
+            o_tm1_feed (tf.Tensor): the agent's observation feed.
+            o_t_feed (tf.Tensor): the agent's next observation feed.
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor]: Returns a tuple with the transformed
+                observation and next observation.
+        """
+        o_tm1_trans = self._observation_networks[agent_key](o_tm1_feed)
+        o_t_trans = self._target_observation_networks[agent_key](o_t_feed)
+
+        return o_tm1_trans, o_t_trans
 
     def step(self) -> None:
         """Trainer step to update the parameters of the agents in the system."""
 
         # Run the learning step.
         fetches = self._step()
+
+        # Add epsilon to fetches.
+        fetches["epsilon"] = self.get_epsilon()
+
+        # Decrement epsilon
+        self._decrement_epsilon()
+
+        # Maybe update priorities.
+        # NOTE _update_sample_priorities must happen outside of
+        # tf.function.
+        if self._importance_sampling_exponent is not None:
+            # Get the keys and priorities.
+            keys = fetches.pop("keys")
+            priorities = fetches.pop("priorities")
+            # Update the sample priorities in reverb.
+            self._update_sample_priorities(keys, priorities)
 
         # Compute elapsed time.
         timestamp = time.time()
@@ -321,16 +385,12 @@ class MADQNTrainer(mava.Trainer):
         if self._checkpoint:
             train_utils.checkpoint_networks(self._system_checkpointer)
 
-        # Log and decrement epsilon
-        epsilon = self.get_epsilon()
-        fetches["epsilon"] = epsilon
-        self._decrement_epsilon()
-
         if self._logger:
             self._logger.write(fetches)
 
     @tf.function
-    def _forward_backward(self) -> Tuple:
+    def _step(self) -> Dict:
+        """Trainer forward and backward passes."""
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
@@ -339,33 +399,21 @@ class MADQNTrainer(mava.Trainer):
 
         self._backward()
 
-        extras = {}
-
-        if self._importance_sampling_exponent is not None:
-            extras.update(
-                {"keys": self._sample_keys, "priorities": self._sample_priorities}
-            )
-
-        # Return Q-value losses.
-        fetches = self._q_network_losses
-
-        return fetches, extras
-
-    def _step(self) -> Dict:
-        """Trainer forward and backward passes."""
-
         # Update the target networks
         self._update_target_networks()
 
-        fetches, extras = self._forward_backward()
-
-        # Maybe update priorities.
-        # NOTE _update_sample_priorities must happen outside of
-        # tf.function. That is why we seperate out forward_backward().
+        # Report loss & statistics for logging.
+        fetches = {
+            "loss": self._q_network_losses,
+        }
         if self._importance_sampling_exponent is not None:
-            self._update_sample_priorities(extras["keys"], extras["priorities"])
+            fetches.update(
+                {
+                    "keys": self._keys,
+                    "priorities": self._priorities,
+                }
+            )
 
-        # Log losses and epsilon
         return fetches
 
     def _forward(self, inputs: reverb.ReplaySample) -> None:
@@ -376,12 +424,12 @@ class MADQNTrainer(mava.Trainer):
         """
 
         # Get info about the samples from reverb.
-        sample_info = inputs.info
-        sample_keys = tf.transpose(inputs.info.key)
-        sample_probs = tf.transpose(sample_info.probability)
+        keys, probs = inputs.info[:2]
 
         # Initialize sample priorities at zero.
-        sample_priorities = np.zeros(len(inputs.info.key))
+        # We will add priorities from each agent
+        # to this and then average over all agents.
+        priorities = tf.zeros_like(inputs.info.priority, dtype="float32")
 
         # Unpack input data as follows:
         # o_tm1 = dictionary of observations one for each agent
@@ -410,65 +458,61 @@ class MADQNTrainer(mava.Trainer):
             for agent in self._agents:
                 agent_key = self._agent_net_keys[agent]
 
-                # Cast the additional discount to match the environment discount dtype.
-                discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
-
                 # Maybe transform the observation before feeding into policy and critic.
                 # Transforming the observations this way at the start of the learning
                 # step effectively means that the policy and critic share observation
                 # network weights.
 
-                o_tm1_feed, o_t_feed, a_tm1_feed = self._get_feed(
-                    o_tm1, o_t, a_tm1, agent
+                o_tm1_feed, a_tm1_feed, r_t_feed, o_t_feed, d_t_feed = self._get_feed(
+                    agent, o_tm1, a_tm1, r_t, o_t, d_t
                 )
 
-                if self._fingerprint:
-                    f_tm1 = e_tm1["fingerprint"]
-                    f_tm1 = tf.convert_to_tensor(f_tm1)
-                    f_tm1 = tf.cast(f_tm1, "float32")
+                # Cast the additional discount to match the environment discount dtype.
+                discount = tf.cast(self._discount, dtype=d_t_feed.dtype)
 
-                    f_t = e_t["fingerprint"]
-                    f_t = tf.convert_to_tensor(f_t)
-                    f_t = tf.cast(f_t, "float32")
+                # Transform raw observation
+                o_tm1_trans, o_t_trans = self._transform_observation(
+                    agent_key, o_tm1_feed, o_t_feed
+                )
 
-                    q_tm1 = self._q_networks[agent_key](o_tm1_feed, f_tm1)
-                    q_t_value = self._target_q_networks[agent_key](o_t_feed, f_t)
-                    q_t_selector = self._q_networks[agent_key](o_t_feed, f_t)
-                else:
-                    q_tm1 = self._q_networks[agent_key](o_tm1_feed)
-                    q_t_value = self._target_q_networks[agent_key](o_t_feed)
-                    q_t_selector = self._q_networks[agent_key](o_t_feed)
+                # Maybe apply fingerprints.
+                if self._fingerprint_module is not None:
+                    o_tm1_trans, o_t_trans = self._fingerprint_module.trainer_hook(
+                        o_tm1_trans, o_t_trans, e_tm1, e_t
+                    )
 
-                # Q-network learning
-                loss, loss_extras = trfl.double_qlearning(
+                # Compute q-values
+                q_tm1 = self._q_networks[agent_key](o_tm1_trans)
+                q_t_value = self._target_q_networks[agent_key](o_t_trans)
+                q_t_selector = self._q_networks[agent_key](o_t_trans)
+
+                # Compute the loss like in acme/dqn.
+                _, extra = trfl.double_qlearning(
                     q_tm1,
                     a_tm1_feed,
-                    r_t[agent],
-                    discount * d_t[agent],
+                    r_t_feed,
+                    discount * d_t_feed,
                     q_t_value,
                     q_t_selector,
                 )
 
-                # Maybe do importance sampling.
+                # Compute the huber loss using td_error.
+                loss = losses.huber(extra.td_error, self._huber_loss_parameter)
+
+                # Maybe apply importance weights like in acme/dqn.
                 if self._importance_sampling_exponent is not None:
-                    importance_weights = 1.0 / sample_probs  # [B]
+                    importance_weights = 1.0 / probs
                     importance_weights **= self._importance_sampling_exponent
                     importance_weights /= tf.reduce_max(importance_weights)
 
                     # Reweight loss.
                     loss *= tf.cast(importance_weights, loss.dtype)  # [B]
 
-                    # Update priorities.
-                    errors = loss_extras.td_error
-                    abs_errors = tf.abs(errors)
-                    mean_priority = tf.reduce_mean(abs_errors, axis=0)
-                    max_priority = tf.reduce_max(abs_errors, axis=0)
-                    sample_priorities += (
-                        self._max_priority_weight * max_priority
-                        + (1 - self._max_priority_weight) * mean_priority
-                    )
+                    # Compute priorities for reverb.
+                    priorities += tf.abs(extra.td_error)
 
-                loss = tf.reduce_mean(loss)
+                loss = tf.reduce_mean(loss)  # []
+
                 q_network_losses[agent] = {"q_value_loss": loss}
 
         # Store losses and tape
@@ -476,14 +520,12 @@ class MADQNTrainer(mava.Trainer):
         self.tape = tape
 
         # Store sample keys and priorities
-        self._sample_keys = sample_keys
-        self._sample_priorities = sample_priorities / len(
-            self._agents
-        )  # averaged over agents.
+        self._keys = keys
+        # Averaged over agents.
+        self._priorities = priorities / len(self._agents)
 
     def _backward(self) -> None:
         """Trainer backward pass updating network parameters"""
-
         q_network_losses = self._q_network_losses
         tape = self.tape
         for agent in self._agents:

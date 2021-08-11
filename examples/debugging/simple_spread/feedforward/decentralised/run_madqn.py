@@ -25,6 +25,7 @@ from absl import app, flags
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.stabilising.fingerprints import FingerPrintStabalisation
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
@@ -47,7 +48,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "logs/", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -82,10 +83,11 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
+        exploration_scheduler=LinearExplorationScheduler,
+        fingerprint_fn=FingerPrintStabalisation,
         epsilon_min=0.05,
-        epsilon_decay=5e-4,
-        importance_sampling_exponent=0.2,
+        epsilon_decay=1e-3,
+        # importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()

@@ -52,6 +52,8 @@ class DecentralisedValueActor(BaseArchitecture):
 
         self._create_target_networks()
 
+        self._actor_specs = self._get_actor_specs()
+
     def _create_target_networks(self) -> None:
         # create target behaviour networks
         self._target_value_networks = copy.deepcopy(self._value_networks)
@@ -72,13 +74,10 @@ class DecentralisedValueActor(BaseArchitecture):
             "target_values": {},
         }
 
-        # get actor specs
-        actor_obs_specs = self._get_actor_specs()
-
         # create policy variables for each agent
         for agent_key in self._agents:
             agent_net_key = self._agent_net_keys[agent_key]
-            obs_spec = actor_obs_specs[agent_key]
+            obs_spec = self._actor_specs[agent_key]
             # Create variables for value and policy networks.
             tf2_utils.create_variables(self._value_networks[agent_net_key], [obs_spec])
 

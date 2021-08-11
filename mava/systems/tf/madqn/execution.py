@@ -28,6 +28,7 @@ from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
+from mava.components.tf.modules.stabilising.fingerprints import FingerPrintStabalisation
 from mava.systems.tf.executors import (
     FeedForwardExecutor,
     RecurrentCommExecutor,
@@ -50,8 +51,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        communication_module: Optional[BaseCommunicationModule] = None,
-        fingerprint: bool = False,
+        fingerprint_module: FingerPrintStabalisation = None,
         evaluator: bool = False,
     ):
         """Initialise the system executor
@@ -83,7 +83,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         self._action_selectors = action_selectors
         self._trainer = trainer
         self._agent_net_keys = agent_net_keys
-        self._fingerprint = fingerprint
+        self._fingerprint_module = fingerprint_module
         self._evaluator = evaluator
 
     @tf.function
@@ -93,7 +93,6 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         observation: types.NestedTensor,
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
-        fingerprint: Optional[tf.Tensor] = None,
     ) -> types.NestedTensor:
         """Agent specific policy function
 
@@ -118,14 +117,10 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         # index network either on agent type or on agent id
         agent_net_key = self._agent_net_keys[agent]
 
-        # Compute the policy, conditioned on the observation and
-        # possibly the fingerprint.
-        if fingerprint is not None:
-            q_values = self._q_networks[agent_net_key](batched_observation, fingerprint)
-        else:
-            q_values = self._q_networks[agent_net_key](batched_observation)
+        # Compute q-values.
+        q_values = self._q_networks[agent_net_key](batched_observation)
 
-        # select legal action
+        # Select legal action.
         action = self._action_selectors[agent_net_key](
             q_values, batched_legals, epsilon=epsilon
         )
@@ -145,30 +140,40 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         Returns:
             types.NestedArray: agent action
         """
-
-        if not self._evaluator:
-            epsilon = self._trainer.get_epsilon()
-        else:
+        # Set epsilon depending
+        if self._evaluator:
+            # Near zero.
+            # Zero causes an error sometimes.
             epsilon = 1e-10
-
-        epsilon = tf.convert_to_tensor(epsilon)
-
-        if self._fingerprint:
-            trainer_step = self._trainer.get_trainer_steps()
-            fingerprint = tf.concat([epsilon, trainer_step], axis=0)
-            fingerprint = tf.expand_dims(fingerprint, axis=0)
-            fingerprint = tf.cast(fingerprint, "float32")
         else:
-            fingerprint = None
+            epsilon = self._trainer.get_epsilon()
+        # Convert to tensor.
+        epsilon = tf.convert_to_tensor(epsilon, dtype="float32")
 
+        # Get legal actions and observations.
+        legal_actions = tf.convert_to_tensor(observation.legal_actions)
+        observation_tensor = tf.convert_to_tensor(observation.observation)
+
+        # Maybe do fingerprinting.
+        if self._fingerprint_module is not None:
+            info = {
+                "trainer_step": self._trainer.get_trainer_steps(),
+                "epsilon": self._trainer.get_epsilon(),
+            }
+            # Apply fingerprinting hook.
+            observation_tensor = self._fingerprint_module.executor_act_hook(
+                observation_tensor, info
+            )
+
+        # Apply epsilon-greedy policy
         action = self._policy(
             agent,
-            observation.observation,
-            observation.legal_actions,
+            observation_tensor,
+            legal_actions,
             epsilon,
-            fingerprint,
         )
 
+        # Squeeze out batch dimension.
         action = tf2_utils.to_numpy_squeeze(action)
 
         return action
@@ -187,11 +192,14 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
                 to record during the first step. Defaults to {}.
         """
 
-        if self._fingerprint and self._trainer is not None:
-            epsilon = self._trainer.get_epsilon()
-            trainer_step = self._trainer.get_trainer_steps()
-            fingerprint = np.array([epsilon, trainer_step])
-            extras.update({"fingerprint": fingerprint})
+        # Maybe apply fingerprinting.
+        if self._fingerprint_module is not None:
+            # Get useful info for fingerprinting
+            info = {
+                "trainer_step": self._trainer.get_trainer_steps(),
+                "epsilon": self._trainer.get_epsilon(),
+            }
+            extras = self._fingerprint_module.executor_observe_hook(extras, info=info)
 
         if self._adder:
             self._adder.add_first(timestep, extras)
@@ -211,12 +219,16 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             next_extras (Dict[str, types.NestedArray], optional): possible extra
                 information to record during the transition. Defaults to {}.
         """
-
-        if self._fingerprint and self._trainer is not None:
-            trainer_step = self._trainer.get_trainer_steps()
-            epsilon = self._trainer.get_epsilon()
-            fingerprint = np.array([epsilon, trainer_step])
-            next_extras.update({"fingerprint": fingerprint})
+        # Maybe apply fingerprinting.
+        if self._fingerprint_module is not None:
+            # Get useful info for fingerprinting
+            info = {
+                "trainer_step": self._trainer.get_trainer_steps(),
+                "epsilon": self._trainer.get_epsilon(),
+            }
+            next_extras = self._fingerprint_module.executor_observe_hook(
+                next_extras, info=info
+            )
 
         if self._adder:
             self._adder.add(actions, next_timestep, next_extras)
@@ -236,34 +248,9 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
 
         actions = {}
         for agent, observation in observations.items():
-            # Pass the observation through the policy network.
-            if not self._evaluator:
-                epsilon = self._trainer.get_epsilon()
-            else:
-                # Note (dries): For some reason 0 epsilon breaks on StarCraft.
-                epsilon = 1e-10
+            # Select action for agent.
+            actions[agent] = self.select_action(agent, observation)
 
-            epsilon = tf.convert_to_tensor(epsilon)
-
-            if self._fingerprint:
-                trainer_step = self._trainer.get_trainer_steps()
-                fingerprint = tf.concat([epsilon, trainer_step], axis=0)
-                fingerprint = tf.expand_dims(fingerprint, axis=0)
-                fingerprint = tf.cast(fingerprint, "float32")
-            else:
-                fingerprint = None
-
-            action = self._policy(
-                agent,
-                observation.observation,
-                observation.legal_actions,
-                epsilon,
-                fingerprint,
-            )
-
-            actions[agent] = tf2_utils.to_numpy_squeeze(action)
-
-        # Return a numpy array with squeezed out batch dimension.
         return actions
 
     def update(self, wait: bool = False) -> None:

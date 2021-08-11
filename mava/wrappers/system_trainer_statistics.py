@@ -170,12 +170,28 @@ class MADQNDetailedTrainerStatistics(DetailedTrainerStatistics):
         # Run the learning step.
         fetches = self._step()
 
+        # Add epsilon to fetches.
+        fetches["epsilon"] = self.get_epsilon()
+
+        # Decrement epsilon
+        self._trainer._decrement_epsilon()
+
+        # Maybe update priorities.
+        # NOTE _update_sample_priorities must happen outside of
+        # tf.function and can therefore not happen in _step().
+        if self._trainer._importance_sampling_exponent is not None:
+            # Get the keys and priorities.
+            keys = fetches.pop("keys")
+            priorities = fetches.pop("priorities")
+            # Update the sample priorities in reverb.
+            self._trainer._update_sample_priorities(keys, priorities)
+
         if self._require_loggers:
-            self._create_loggers(list(fetches.keys()))
+            self._create_loggers(list(fetches["loss"].keys()))
             self._require_loggers = False
 
-        # compute statistics
-        self._compute_statistics(fetches)
+        # Compute statistics
+        self._compute_statistics(fetches["loss"])
 
         timestamp = time.time()
         elapsed_time = timestamp - self._timestamp if self._timestamp else 0
@@ -187,9 +203,6 @@ class MADQNDetailedTrainerStatistics(DetailedTrainerStatistics):
 
         if self._system_checkpointer:
             train_utils.checkpoint_networks(self._system_checkpointer)
-
-        fetches["epsilon"] = self.get_epsilon()
-        self._trainer._decrement_epsilon()  # type: ignore
 
         if self._logger:
             self._logger.write(fetches)
