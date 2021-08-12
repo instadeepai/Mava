@@ -113,7 +113,7 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
 
         # Record counts.
         if not self._counter:
-            self._executor._variable_client.add_and_wait(
+            self._executor._variable_client.add_async(
                 ["executor_episodes", "executor_steps"],
                 {"executor_episodes": 1, "executor_steps": episode_steps},
             )
@@ -208,7 +208,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         # Record counts.
         if hasattr(self._executor, "_counts"):
             if hasattr(self._executor, "_variable_client"):
-                self._executor._variable_client.add_and_wait(
+                self._executor._variable_client.add_async(
                     ["executor_episodes", "executor_steps"],
                     {"executor_episodes": 1, "executor_steps": episode_steps},
                 )

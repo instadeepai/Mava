@@ -55,15 +55,23 @@ class VariableClient:
             self._set_keys,
             tf2_utils.to_numpy({key: self._variables[key] for key in self._set_keys}),
         )
+
+        self._add = lambda names, vars: client.add_to_variables(names, vars)
+
         # Create a single background thread to fetch variables without necessarily
         # blocking the actor.
         self._executor = futures.ThreadPoolExecutor(max_workers=1)
         self._async_request = lambda: self._executor.submit(self._request)
         self._async_adjust = lambda: self._executor.submit(self._adjust)
+        self._async_add = lambda names, vars: self._executor.submit(  # type: ignore
+            self._add(names, vars)  # type: ignore
+        )
 
         # Initialize this client's future to None to indicate to the `update()`
         # method that there is no pending/running request.
-        self._future: Optional[futures.Future] = None
+        self._get_future: Optional[futures.Future] = None
+        self._set_future: Optional[futures.Future] = None
+        self._add_future: Optional[futures.Future] = None
 
     def get_async(self) -> None:
         """Asynchronously updates the get variables with the latest copy from source."""
@@ -74,16 +82,16 @@ class VariableClient:
 
         period_reached: bool = self._get_call_counter >= self._get_update_period
 
-        if period_reached and self._future is None:
+        if period_reached and self._get_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            self._future = self._async_request()  # type: ignore
-
-        if self._future is not None and self._future.done():
-            # The active request is done so copy the result and remove the future.\
-            self._copy(self._future.result())
-            self._future = None
+            self._get_future = self._async_request()  # type: ignore
             self._get_call_counter = 0
+
+        if self._get_future is not None and self._get_future.done():
+            # The active request is done so copy the result and remove the future.\
+            self._copy(self._get_future.result())
+            self._get_future = None
 
         return
 
@@ -95,14 +103,30 @@ class VariableClient:
 
         period_reached: bool = self._set_call_counter >= self._set_update_period
 
-        if period_reached and self._future is None:
+        if period_reached and self.set_future is None:  # type: ignore
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            self._future = self._async_adjust()  # type: ignore
-            return
-        if self._future is not None and self._future.done():
-            self._future = None
+            self.set_future = self._async_adjust()  # type: ignore
             self._set_call_counter = 0
+            return
+        if self.set_future is not None and self.set_future.done():
+            self.set_future = None  # type: ignore
+        return
+
+    def add_async(self, names: List[str], vars: Dict[str, Any]) -> None:
+        """Asynchronously adds to source variables."""
+        if self._add_future is not None and self._add_future.done():
+            self._add_future = None
+
+        if self._add_future is None:
+            # The update period has been reached and no request has been sent yet, so
+            # making an asynchronous request now.
+            self._add_future = self._async_add(names, vars)  # type: ignore
+            return
+        else:
+            tf.print("We got a problem!")
+            exit()
+
         return
 
     def add_and_wait(self, names: List[str], vars: Dict[str, Any]) -> None:

@@ -217,8 +217,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
     def update(self, wait: bool = False) -> None:
         """Update the policy variables."""
         if self._variable_client:
-            # TODO (dries): Maybe changes this to a async get?
-            self._variable_client.get_and_wait()
+            self._variable_client.get_async()
 
 
 class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
@@ -430,5 +429,4 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
     def update(self, wait: bool = False) -> None:
         """Update the policy variables."""
         if self._variable_client:
-            # TODO (dries): Maybe changes this to a async get?
-            self._variable_client.get_and_wait()
+            self._variable_client.get_async()
