@@ -134,7 +134,8 @@ class VDN(MADQN):
                 to 20.
             importance_sampling_exponent: (float): Not implemented yet.
             max_priority_weight(float): Not implemented yet.
-            period (int, optional): [description]. Defaults to 20.
+            period (int, optional): The period with which we add sequences. See `period`
+                in `acme.SequenceAdder.period` for more info. Defaults to 20.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             discount (float, optional): discount factor to use for TD updates. Defaults

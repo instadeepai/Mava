@@ -28,6 +28,7 @@ from supersuit import black_death_v1
 from mava import types
 from mava.utils.wrapper_utils import (
     apply_env_wrapper_preprocessers,
+    convert_dm_compatible_observations,
     convert_np_type,
     parameterized_restart,
 )
@@ -170,7 +171,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
             observation = observe["observation"]
         else:
             legals = np.ones(
-                _convert_to_spec(self._environment.action_spaces[agent]).shape,
+                self._environment.action_spaces[agent].shape,
                 dtype=self._environment.action_spaces[agent].dtype,
             )
             observation = observe
@@ -480,46 +481,16 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             dones (Dict[str, bool]): dones per agent.
 
         Returns:
-            types.Observation: [description]
+            types.Observation: dm compatible observations.
         """
-        observations: Dict[str, types.OLT] = {}
-        if observes:
-            for agent, observation in observes.items():
-                if isinstance(observation, dict) and "action_mask" in observation:
-                    legals = observation["action_mask"]
-                    observation = observation["observation"]
-                else:
-                    # TODO Handle legal actions better for continous envs,
-                    # maybe have min and max for each action and clip the
-                    # agents actions  accordingly
-                    legals = np.ones(
-                        _convert_to_spec(self._environment.action_spaces[agent]).shape,
-                        dtype=self._environment.action_spaces[agent].dtype,
-                    )
-                    observations[agent] = types.OLT(
-                        observation=observation,
-                        legal_actions=legals,
-                        terminal=np.asarray([dones[agent]], dtype=np.float32),
-                    )
-        # Handle empty observations - some envs return {} at last step.
-        else:
-            observations = {
-                agent: types.OLT(
-                    observation=np.zeros(
-                        _convert_to_spec(
-                            self._environment.observation_spaces[agent]
-                        ).shape,
-                        dtype=self._environment.observation_spaces[agent].dtype,
-                    ),
-                    legal_actions=np.ones(
-                        _convert_to_spec(self._environment.action_spaces[agent]).shape,
-                        dtype=self._environment.action_spaces[agent].dtype,
-                    ),
-                    terminal=np.asarray([self.env_done()], dtype=np.float32),
-                )
-                for agent in self.possible_agents
-            }
-        return observations
+        return convert_dm_compatible_observations(
+            observes,
+            dones,
+            self._environment.action_spaces,
+            self._environment.observation_spaces,
+            self.env_done(),
+            self.possible_agents,
+        )
 
     def observation_spec(self) -> types.Observation:
         """Observation spec.
