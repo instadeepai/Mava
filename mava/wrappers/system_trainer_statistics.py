@@ -483,6 +483,7 @@ class NetworkStatistics(NetworkStatisticsBase):
             log_gradients,
         )
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -570,6 +571,7 @@ class NetworkStatisticsMixing(NetworkStatisticsBase):
             log_gradients,
         )
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -660,6 +662,7 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             log_gradients,
         )
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
