@@ -175,7 +175,7 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
 
         # Update our counts and record it.
         # TODO (dries): Can this be simplified? Only one set and one get?
-        self._variable_client.add_and_wait(
+        self._variable_client.add_async(
             ["trainer_steps", "trainer_walltime"],
             {"trainer_steps": 1, "trainer_walltime": elapsed_time},
         )
@@ -185,9 +185,8 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
         # because we need to wait to get the generationin the case of PBT.
         # Send the updated trainer variable to the variable server.
         self._variable_client.set_and_wait()
-
         # Get the latest variables from the variable server
-        self._variable_client.get_and_wait()
+        self._variable_client.get_async()
 
         # Log the counts
         fetches.update(self._counts)
@@ -496,6 +495,7 @@ class NetworkStatistics(NetworkStatisticsBase):
             log_gradients,
         )
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -583,6 +583,7 @@ class NetworkStatisticsMixing(NetworkStatisticsBase):
             log_gradients,
         )
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -673,6 +674,7 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             log_gradients,
         )
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:

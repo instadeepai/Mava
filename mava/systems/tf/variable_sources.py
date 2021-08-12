@@ -125,7 +125,7 @@ class VariableSource:
         self,
         names: Sequence[str],
         vars: Dict[str, np.ndarray],
-        worked_id: str,
+        worked_id: str = None,
     ) -> None:
         """Add to the variables in the variable source.
         Args:
@@ -152,7 +152,7 @@ class VariableSource:
         names: Sequence[str],
         vars: Dict[str, np.ndarray],
         weight: float,
-        worked_id: str,
+        worked_id: str = None,
     ) -> None:
         """Implements a moving average on a given varable.
         Args:
