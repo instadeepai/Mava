@@ -48,21 +48,21 @@ flags.DEFINE_string("base_dir", "logs/", "Base dir to store experiments.")
 
 # flatland environment config
 rail_gen_cfg: Dict = {
-    "max_num_cities": 2,
+    "max_num_cities": 4,
     "max_rails_between_cities": 2,
-    "max_rails_in_city": 4,
-    "grid_mode": True,
-    "seed": 42,
+    "max_rails_in_city": 3,
+    "grid_mode": False,
+    "seed": 0,
 }
 
 flatland_env_config: Dict = {
-    "number_of_agents": 6,
+    "number_of_agents": 5,
     "width": 25,
     "height": 25,
     "rail_generator": sparse_rail_generator(**rail_gen_cfg),
     "schedule_generator": sparse_schedule_generator(),
     "obs_builder_object": TreeObsForRailEnv(
-        max_depth=2, predictor=ShortestPathPredictorForRailEnv()
+        max_depth=2, predictor=ShortestPathPredictorForRailEnv(max_depth=30)
     ),
 }
 
@@ -75,7 +75,8 @@ def main(_: Any) -> None:
     )
 
     # Networks.
-    network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)
+    network_factory = lp_utils.partial_kwargs(
+        madqn.make_default_networks, policy_networks_layer_sizes=(256, 256))
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
@@ -96,13 +97,13 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=1,
+        num_executors=3,
         exploration_scheduler=LinearExplorationScheduler,
-        fingerprint_fn=FingerPrintStabalisation,
+        # fingerprint_fn=FingerPrintStabalisation,
         epsilon_min=0.05,
-        epsilon_decay=1e-4,
-        importance_sampling_exponent=0.2,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        epsilon_decay=5e-5,
+        # importance_sampling_exponent=0.2,
+        optimizer=snt.optimizers.Adam(learning_rate=1e-3),
         checkpoint_subpath=checkpoint_dir,
     ).build()
 

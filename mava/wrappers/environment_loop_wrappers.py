@@ -196,7 +196,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
         # Collect the results and combine with counts.
         steps_per_second = episode_steps / (time.time() - start_time)
-        mean_episode_return = np.mean(np.array(list(episode_returns.values())))
+        mean_episode_return = np.sum(np.array(list(episode_returns.values())))
 
         # Record counts.
         counts = self._counter.increment(episodes=1, steps=episode_steps)

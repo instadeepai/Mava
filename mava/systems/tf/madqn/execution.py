@@ -89,7 +89,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
     @tf.function
     def _policy(
         self,
-        agent: str,
+        q_network: snt.Module,
+        action_selector: Any,
         observation: types.NestedTensor,
         legal_actions: types.NestedTensor,
         epsilon: tf.Tensor,
@@ -114,14 +115,10 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         batched_observation = tf2_utils.add_batch_dim(observation)
         batched_legals = tf2_utils.add_batch_dim(legal_actions)
 
-        # index network either on agent type or on agent id
-        agent_net_key = self._agent_net_keys[agent]
-
-        # Compute q-values.
-        q_values = self._q_networks[agent_net_key](batched_observation)
+        q_values = q_network(batched_observation)
 
         # Select legal action.
-        action = self._action_selectors[agent_net_key](
+        action = action_selector(
             q_values, batched_legals, epsilon=epsilon
         )
 
@@ -165,9 +162,17 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
                 observation_tensor, info
             )
 
+        # index network either on agent type or on agent id
+        agent_net_key = self._agent_net_keys[agent]
+
+        # Get q_network and action selector.
+        q_network = self._q_networks[agent_net_key]
+        action_selector = self._action_selectors[agent_net_key]
+
         # Apply epsilon-greedy policy
         action = self._policy(
-            agent,
+            q_network,
+            action_selector,
             observation_tensor,
             legal_actions,
             epsilon,
