@@ -186,7 +186,7 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
         # Send the updated trainer variable to the variable server.
         self._variable_client.set_and_wait()
         # Get the latest variables from the variable server
-        self._variable_client.get_async()
+        self._variable_client.get_and_wait()
 
         # Log the counts
         fetches.update(self._counts)
