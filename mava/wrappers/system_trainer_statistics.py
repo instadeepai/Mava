@@ -175,7 +175,7 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
 
         # Update our counts and record it.
         # TODO (dries): Can this be simplified? Only one set and one get?
-        self._variable_client.add_and_wait(
+        self._variable_client.add_async(
             ["trainer_steps", "trainer_walltime"],
             {"trainer_steps": 1, "trainer_walltime": elapsed_time},
         )
@@ -183,7 +183,7 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
         # Update the variable source and the trainer
         # TODO (dries): Can this be simplified? Do an async set and get?
         self._variable_client.set_and_wait()
-        self._variable_client.get_and_wait()
+        self._variable_client.get_async()
 
         fetches.update(self._counts)
 
