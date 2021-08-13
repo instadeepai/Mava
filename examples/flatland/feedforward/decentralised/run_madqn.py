@@ -28,7 +28,7 @@ from flatland.envs.schedule_generators import sparse_schedule_generator
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
+    ExponentialExplorationScheduler,
 )
 from mava.components.tf.modules.stabilising.fingerprints import FingerPrintStabalisation
 from mava.systems.tf import madqn
@@ -76,7 +76,8 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks, policy_networks_layer_sizes=(256, 256))
+        madqn.make_default_networks, policy_networks_layer_sizes=(256, 256)
+    )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
@@ -97,13 +98,13 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=3,
-        exploration_scheduler=LinearExplorationScheduler,
+        num_executors=4,
+        exploration_scheduler=ExponentialExplorationScheduler,
         # fingerprint_fn=FingerPrintStabalisation,
-        epsilon_min=0.05,
-        epsilon_decay=5e-5,
+        epsilon_min=0.01,
+        epsilon_decay=0.999994,
         # importance_sampling_exponent=0.2,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+        optimizer=snt.optimizers.Adam(learning_rate=5e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
