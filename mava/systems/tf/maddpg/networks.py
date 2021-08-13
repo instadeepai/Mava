@@ -161,17 +161,28 @@ def make_default_networks(
         # Create the critic network.
         critic_network = [
             # The multiplexer concatenates the observations/actions.
-            networks.CriticMultiplexer(),
-            networks.LayerNormMLP(
-                list(critic_networks_layer_sizes[key]) + [1],
-                activate_final=False,
-                seed=seed,
-            ),
+            networks.CriticMultiplexer()
         ]
 
         # Only for mad4pg
         if vmin and vmax and num_atoms:
-            critic_network += [DiscreteValuedHead(vmin, vmax, num_atoms)]
+            critic_network += [
+                networks.LayerNormMLP(
+                    list(critic_networks_layer_sizes[key]),
+                    activate_final=False,
+                    seed=seed,
+                ),
+                DiscreteValuedHead(vmin, vmax, num_atoms),
+            ]
+        # maddpg
+        else:
+            critic_network += [
+                networks.LayerNormMLP(
+                    list(critic_networks_layer_sizes[key]) + [1],
+                    activate_final=False,
+                    seed=seed,
+                )
+            ]
 
         critic_network = snt.Sequential(critic_network)
 
