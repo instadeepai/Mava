@@ -47,20 +47,22 @@ def create_optimizer_variables(
           tfp.distributions.Distribution.
     """
     for net_key in networks["observations"].keys():
-        # Get trainable variables.
-        policy_variables = (
-            networks["observations"][net_key].trainable_variables
-            + networks["policies"][net_key].trainable_variables
-        )
-        critic_variables = (
-            # In this agent, the critic loss trains the observation network.
-            networks["observations"][net_key].trainable_variables
-            + networks["critics"][net_key].trainable_variables
-        )
+        # Check if network has an optimizer
+        if net_key in policy_optimizers:
+            # Get trainable variables.
+            policy_variables = (
+                networks["observations"][net_key].trainable_variables
+                + networks["policies"][net_key].trainable_variables
+            )
+            critic_variables = (
+                # In this agent, the critic loss trains the observation network.
+                networks["observations"][net_key].trainable_variables
+                + networks["critics"][net_key].trainable_variables
+            )
 
-        # Initialise the optimizer variables.
-        policy_optimizers[net_key]._initialize(policy_variables)
-        critic_optimizers[net_key]._initialize(critic_variables)
+            # Initialise the optimizer variables.
+            policy_optimizers[net_key]._initialize(policy_variables)
+            critic_optimizers[net_key]._initialize(critic_variables)
     return
 
 

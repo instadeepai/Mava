@@ -370,6 +370,15 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         for agent_key in rewards.keys():
             self._cum_rewards[agent_key] += rewards[agent_key]
 
+    def sample_new_keys(self) -> None:
+        """Sample new keys for the network ints."""
+        agents = sort_str_num(list(self._agent_net_keys.keys()))
+        self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+            agents,
+            self._executor_samples,
+            self._net_to_ints,
+        )
+
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
@@ -390,16 +399,11 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             agent_key = self._agent_net_keys[agent]
             self._states[agent] = self._policy_networks[agent_key].initial_state(1)
 
+        # Sample new agent_net_keys.
+        self.sample_new_keys()
+
         if not self._adder:
             return
-
-        # Sample new agent_net_keys.
-        agents = sort_str_num(list(self._agent_net_keys.keys()))
-        self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
-            agents,
-            self._executor_samples,
-            self._net_to_ints,
-        )
 
         if self._store_recurrent_state:
             numpy_states = {

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MARL hyperparameter tuning modules."""
+"""MARL game theory modules."""
 
-from mava.components.tf.modules.hyper_tuning.pbt_base import BasePBTWrapper
+from mava.components.tf.modules.game_theory.best_response_base import (
+    BestResponseWrapper,
+)

@@ -50,10 +50,11 @@ class PBTVariableSource(MavaVariableSource):
         Returns:
             None
         """
-        self._checkpoint_interval = 20 * 60
-        self._gen_time_interval = 5 * 60
-        self._last_checkpoint_time = time.time()
+        self._gen_time_interval = 10 * 60
+
+        self._checkpoint_interval = 5 * 60
         self._last_gen_start_time = time.time()
+        self._last_checkpoint_time = time.time()
         self._unique_net_keys = unique_net_keys
 
         # The mutate info. [minimum, maximum, mutation rate]
