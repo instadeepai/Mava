@@ -96,4 +96,4 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
             self._epsilon = self._epsilon_min
             return
 
-        self._epsilon *= 1 - self._epsilon_decay
+        self._epsilon *= self._epsilon_decay
