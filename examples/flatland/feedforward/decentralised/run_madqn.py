@@ -103,6 +103,7 @@ def main(_: Any) -> None:
         # fingerprint_fn=FingerPrintStabalisation,
         epsilon_min=0.01,
         epsilon_decay=0.999994,
+        max_replay_size=500000,
         # importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=5e-4),
         checkpoint_subpath=checkpoint_dir,
