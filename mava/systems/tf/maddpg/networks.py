@@ -168,7 +168,7 @@ def make_default_networks(
         if vmin and vmax and num_atoms:
             critic_network += [
                 networks.LayerNormMLP(
-                    list(critic_networks_layer_sizes[key]),
+                    critic_networks_layer_sizes[key],
                     activate_final=False,
                     seed=seed,
                 ),
