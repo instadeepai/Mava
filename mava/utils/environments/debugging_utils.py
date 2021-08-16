@@ -27,7 +27,7 @@ from mava.wrappers.debugging_envs import (
 
 
 def make_environment(
-    evaluation: bool,
+    evaluation: bool = None,
     env_name: str = "simple_spread",
     action_space: str = "discrete",
     num_agents: int = 3,

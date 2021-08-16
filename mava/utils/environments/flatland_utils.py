@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
 
@@ -42,6 +42,7 @@ def flatland_env_factory(
         [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
     ] = None,
     include_agent_info: bool = False,
+    random_seed: Optional[int] = None,
 ) -> FlatlandEnvWrapper:
     """Loads a flatand environment and wraps it using the flatland wrapper"""
 
@@ -49,5 +50,8 @@ def flatland_env_factory(
 
     env = load_flatland_env(env_config)
     wrapped_env = FlatlandEnvWrapper(env, preprocessor, include_agent_info)
+
+    if random_seed and hasattr(wrapped_env, "seed"):
+        wrapped_env.seed(random_seed)
 
     return wrapped_env
