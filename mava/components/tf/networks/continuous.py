@@ -47,7 +47,7 @@ class NearZeroInitializedLinear(snt.Linear):
     def __init__(
         self, output_size: int, scale: float = 1e-4, seed: Optional[int] = None
     ):
-        """[summary]
+        """Constructor for seeded initializer.
 
         Args:
             output_size (int): output size of layer.
@@ -88,8 +88,9 @@ class LayerNormMLP(snt.Module):
         """
         super().__init__(name="feedforward_mlp_torso")
 
+        self._seed = seed
         # First Layer
-        network = [snt.Linear(layer_sizes[0], w_init=get_initialization(seed))]
+        network = [snt.Linear(layer_sizes[0], w_init=get_initialization(self._seed))]
 
         if layernorm:
             network += [
@@ -103,7 +104,7 @@ class LayerNormMLP(snt.Module):
             intermediate_act,
             snt.nets.MLP(
                 layer_sizes[1:],
-                w_init=get_initialization(seed),
+                w_init=get_initialization(self._seed),
                 activation=final_act,
                 activate_final=activate_final,
             ),
@@ -135,18 +136,20 @@ class LayerNormAndResidualMLP(snt.Module):
         """
         super().__init__(name="LayerNormAndResidualMLP")
 
+        self._seed = seed
+
         # Create initial MLP layer.
-        layers = [snt.nets.MLP([hidden_size], w_init=get_initialization(seed))]
+        layers = [snt.nets.MLP([hidden_size], w_init=get_initialization(self._seed))]
 
         # Follow it up with num_blocks MLPs with layernorm and residual connections.
         for _ in range(num_blocks):
             mlp = snt.nets.MLP(
-                [hidden_size, hidden_size], w_init=get_initialization(seed)
+                [hidden_size, hidden_size], w_init=get_initialization(self._seed)
             )
             layers.append(ResidualLayernormWrapper(mlp))
 
-        self._module = snt.Sequential(layers)
+        self._network = snt.Sequential(layers)
 
     def __call__(self, inputs: tf.Tensor) -> tf.Tensor:
         """Forward for the policy network."""
-        return self._module(inputs)
+        return self._network(inputs)
