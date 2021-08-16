@@ -47,7 +47,7 @@ env_requirements = [
 ]
 
 launchpad_requirements = [
-    "dm-launchpad-nightly==0.3.0.dev20210730",
+    "dm-launchpad-nightly",
 ]
 
 testing_formatting_requirements = [
