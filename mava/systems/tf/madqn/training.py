@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """MADQN system trainer implementation."""
-
+import os
 import copy
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
@@ -218,6 +218,7 @@ class MADQNTrainer(mava.Trainer):
         if checkpoint:
             for agent_key in self.unique_net_keys:
 
+                subdir = os.path.join("trainer", agent_key)
                 checkpointer = tf2_savers.Checkpointer(
                     directory=checkpoint_subpath,
                     time_delta_minutes=15,
@@ -229,6 +230,7 @@ class MADQNTrainer(mava.Trainer):
                         "num_steps": self._num_steps,
                     },
                     enable_checkpointing=checkpoint,
+                    subdirectory=subdir
                 )
 
                 self._system_checkpointer[agent_key] = checkpointer

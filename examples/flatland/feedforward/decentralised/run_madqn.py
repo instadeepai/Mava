@@ -43,7 +43,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "logs/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "logs", "Base dir to store experiments.")
 
 
 # flatland environment config
