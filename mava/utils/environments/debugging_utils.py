@@ -27,7 +27,7 @@ from mava.wrappers.debugging_envs import (
 
 
 def make_environment(
-    evaluation: bool,
+    evaluation: bool = None,
     env_name: str = "simple_spread",
     action_space: str = "discrete",
     num_agents: int = 3,
@@ -50,12 +50,12 @@ def make_environment(
         return environment_fn
     else:
         """Creates a MPE environment."""
-        env_module = make_debugging_env(env_name, action_space, num_agents)
+        env_module = make_debugging_env(env_name, action_space, num_agents, random_seed)
         environment = DebuggingEnvWrapper(
             env_module, return_state_info=return_state_info
         )
 
-        if random_seed and hasattr(environment, "seed"):
-            environment.seed(random_seed)
+    if random_seed and hasattr(environment, "seed"):
+        environment.seed(random_seed)
 
     return environment

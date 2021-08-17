@@ -203,7 +203,7 @@ class MAPPOTrainer(mava.Trainer):
         observations_trans: Dict[str, np.ndarray],
         agent: str,
     ) -> tf.Tensor:
-        """[summary]
+        """Get critic feed.
 
         Args:
             observations_trans (Dict[str, np.ndarray]): transformed (e.g. using
