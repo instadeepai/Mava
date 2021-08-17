@@ -5,6 +5,7 @@
 ![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava)
 ![PyPI version](https://badge.fury.io/py/id-mava.svg)
 ![pytest](https://github.com/instadeepai/Mava/workflows/format_and_test/badge.svg)
+[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/instadeepai/Mava.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/instadeepai/Mava/context:python)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/instadeepai/Mava/blob/main/LICENSE)
 
 # Table of Contents

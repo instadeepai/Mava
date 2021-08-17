@@ -19,7 +19,7 @@ import tensorflow as tf
 import trfl
 from acme.tf import losses
 
-from mava.components.tf.networks.mad4pg import DiscreteValuedDistribution
+from mava.components.tf.networks import DiscreteValuedDistribution
 from mava.utils.training_utils import check_rank, combine_dim
 
 
