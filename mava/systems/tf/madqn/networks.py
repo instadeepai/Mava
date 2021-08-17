@@ -17,10 +17,10 @@ from typing import Dict, Mapping, Optional, Sequence, Union
 import sonnet as snt
 import tensorflow as tf
 from acme import types
-from acme.tf import networks
 from acme.tf.networks.atari import DQNAtariNetwork
 
 from mava import specs as mava_specs
+from mava.components.tf import networks
 from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.components.tf.networks.communication import CommunicationNetwork
 from mava.utils.enums import ArchitectureType, Network
@@ -35,6 +35,7 @@ def make_default_networks(
     network_type: Network = Network.mlp,
     fingerprints: bool = False,
     message_size: Optional[int] = None,
+    seed: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
     """Default networks for madqn.
 
@@ -55,6 +56,7 @@ def make_default_networks(
             policy fingerprints. Defaults to False.
         message_size (Optional[int], optional): size of message passed,
             if using a coms network. Defaults to None.
+        seed (int, optional): random seed for network initialization.
 
     Returns:
         Mapping[str, types.TensorTransformation]: returned agent networks.
@@ -106,25 +108,21 @@ def make_default_networks(
         elif network_type == Network.coms_network:
             assert message_size is not None, "Message size not set."
             q_network = CommunicationNetwork(
-                networks.LayerNormMLP(
-                    (128,),
-                    activate_final=True,
-                ),
-                networks.LayerNormMLP(
-                    (128,),
-                    activate_final=True,
-                ),
+                networks.LayerNormMLP((128,), activate_final=True, seed=seed),
+                networks.LayerNormMLP((128,), activate_final=True, seed=seed),
                 snt.LSTM(128),
                 snt.Sequential(
                     [
-                        networks.LayerNormMLP((128,), activate_final=True),
-                        networks.NearZeroInitializedLinear(num_dimensions),
+                        networks.LayerNormMLP((128,), activate_final=True, seed=seed),
+                        networks.NearZeroInitializedLinear(num_dimensions, seed=seed),
                         networks.TanhToSpec(specs[key].actions),
                     ]
                 ),
                 snt.Sequential(
                     [
-                        networks.LayerNormMLP((128, message_size), activate_final=True),
+                        networks.LayerNormMLP(
+                            (128, message_size), activate_final=True, seed=seed
+                        ),
                     ]
                 ),
                 message_size=message_size,
@@ -135,12 +133,15 @@ def make_default_networks(
                     networks.LayerNormMLP(
                         list(policy_networks_layer_sizes[key]) + [num_dimensions],
                         activate_final=False,
+                        seed=seed,
                     ),
                 ]
             elif archecture_type == ArchitectureType.recurrent:
                 q_network = [
                     networks.LayerNormMLP(
-                        policy_networks_layer_sizes[key][:-1], activate_final=True
+                        policy_networks_layer_sizes[key][:-1],
+                        activate_final=True,
+                        seed=seed,
                     ),
                     snt.LSTM(policy_networks_layer_sizes[key][-1]),
                     snt.Linear(num_dimensions),

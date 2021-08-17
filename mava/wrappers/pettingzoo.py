@@ -28,6 +28,7 @@ from supersuit import black_death_v1
 from mava import types
 from mava.utils.wrapper_utils import (
     apply_env_wrapper_preprocessers,
+    convert_dm_compatible_observations,
     convert_np_type,
     parameterized_restart,
 )
@@ -35,8 +36,6 @@ from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
 
 class PettingZooAECEnvWrapper(SequentialEnvWrapper):
-    """Environment wrapper for PettingZoo MARL environments."""
-
     def __init__(
         self,
         environment: AECEnv,
@@ -45,6 +44,13 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
             (black_death_v1, None),
         ],
     ):
+        """Constructor for sequential PZ wrapper.
+
+        Args:
+            environment (AECEnv): sequential PZ env.
+            env_preprocess_wrappers (Optional[List], optional): Wrappers
+                that preprocess envs. Defaults to [ (black_death_v1, None), ].
+        """
         self._environment = environment
         self._reset_next_step = True
 
@@ -56,7 +62,11 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         self.last_turn_agent = None
 
     def reset(self) -> dm_env.TimeStep:
-        """Resets the episode."""
+        """Resets the env.
+
+        Returns:
+            dm_env.TimeStep: dm timestep.
+        """
         self._reset_next_step = False
         self._environment.reset()
         self._step_types = {
@@ -74,10 +84,15 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
 
         return parameterized_restart(reward, self._discount, observation)
 
-    def step(  # type: ignore[override]
-        self, action: Union[int, float]
-    ) -> dm_env.TimeStep:
-        """Steps the environment."""
+    def step(self, action: Union[int, float]) -> dm_env.TimeStep:
+        """Steps in env.
+
+        Args:
+            action (Union[int, float]): action for a sequential (single) agent.
+
+        Returns:
+            dm_env.TimeStep: dm timestep.
+        """
         if self._reset_next_step:
             return self.reset()
 
@@ -115,16 +130,38 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         )
 
     def env_done(self) -> bool:
+        """Check if env is done.
+
+        Returns:
+            bool: bool indicating if env is done.
+        """
         return not self.agents
 
     def agent_iter(self, max_iter: int = 2 ** 63) -> Iterator:
+        """Agent iterator to loop through agents.
+
+        Args:
+            max_iter (int, optional): max iterations. Defaults to 2**63.
+
+        Returns:
+            Iterator: agent iter.
+
+        """
         return self._environment.agent_iter(max_iter)
 
-    # Convert PettingZoo observation so it's dm_env compatible. Also, the list
-    # of legal actions must be converted to a legal actions mask.
-    def _convert_observation(  # type: ignore[override]
+    def _convert_observation(
         self, agent: str, observe: Union[dict, np.ndarray], done: bool
     ) -> types.OLT:
+        """Convert PettingZoo observation so it's dm_env compatible.
+
+        Args:
+            agent (str): agent str.
+            observe (Union[dict, np.ndarray]): agent observation.
+            done (bool): is agent done.
+
+        Returns:
+            types.OLT: dm olt.
+        """
 
         legals: np.ndarray = None
         observation: np.ndarray = None
@@ -134,7 +171,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
             observation = observe["observation"]
         else:
             legals = np.ones(
-                _convert_to_spec(self._environment.action_spaces[agent]).shape,
+                self._environment.action_spaces[agent].shape,
                 dtype=self._environment.action_spaces[agent].dtype,
             )
             observation = observe
@@ -152,7 +189,9 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         )
         return observation
 
+    # TODO improve this function.
     def correct_agent_name(self) -> None:
+        """Function to correct agent names."""
         self._environment.reset()
         if "tictactoe" in self._environment.metadata["name"]:
             corrected_names = ["player_0", "player_1"]
@@ -178,6 +217,11 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
                 del self.infos[prev_name]
 
     def observation_spec(self) -> types.Observation:
+        """Observations spec.
+
+        Returns:
+            types.Observation: spec for observations.
+        """
         observation_specs = {}
         for agent in self._environment.possible_agents:
             if isinstance(self._environment.observation_spaces[agent], gym.spaces.Dict):
@@ -204,6 +248,11 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         return observation_specs
 
     def action_spec(self) -> Dict[str, specs.DiscreteArray]:
+        """Action spec.
+
+        Returns:
+            Dict[str, specs.DiscreteArray]: spec for actions.
+        """
         action_specs = {}
         for agent in self.possible_agents:
             action_specs[agent] = _convert_to_spec(
@@ -212,6 +261,11 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         return action_specs
 
     def reward_spec(self) -> Dict[str, specs.Array]:
+        """Reward spec.
+
+        Returns:
+            Dict[str, specs.Array]: Spec for rewards.
+        """
         reward_specs = {}
         for agent in self.possible_agents:
             reward_specs[agent] = specs.Array((), np.float32)
@@ -219,6 +273,11 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
+        """Discount spec.
+
+        Returns:
+            Dict[str, specs.BoundedArray]: spec for discounts.
+        """
         discount_specs = {}
         for agent in self.possible_agents:
             discount_specs[agent] = specs.BoundedArray(
@@ -227,31 +286,67 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         return discount_specs
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        """Extra data spec.
+
+        Returns:
+            Dict[str, specs.BoundedArray]: spec for extras.
+        """
         return {}
 
     @property
     def agents(self) -> List:
+        """Agents still alive in env (not done).
+
+        Returns:
+            List: alive agents in env.
+        """
         return self._environment.agents
 
     @property
     def possible_agents(self) -> List:
+        """All possible agents in env.
+
+        Returns:
+            List: all possible agents in env.
+        """
         return self._environment.possible_agents
 
     @property
     def environment(self) -> AECEnv:
-        """Returns the wrapped environment."""
+        """Returns the wrapped environment.
+
+        Returns:
+            AECEnv: sequential env.
+        """
         return self._environment
 
     @property
     def current_agent(self) -> Any:
+        """Current active agent.
+
+        Returns:
+            Any: current agent.
+        """
         return self._environment.agent_selection
 
     @property
     def num_agents(self) -> int:
+        """Number of agents in env.
+
+        Returns:
+            int: number of agents in env.
+        """
         return self._environment.num_agents
 
     def __getattr__(self, name: str) -> Any:
-        """Expose any other attributes of the underlying environment."""
+        """Expose any other attributes of the underlying environment.
+
+        Args:
+            name (str): attribute.
+
+        Returns:
+            Any: return attribute from env or underlying env.
+        """
         if hasattr(self.__class__, name):
             return self.__getattribute__(name)
         else:
@@ -269,6 +364,13 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             (black_death_v1, None),
         ],
     ):
+        """Constructor for parallel PZ wrapper.
+
+        Args:
+            environment (ParallelEnv): parallel PZ env.
+            env_preprocess_wrappers (Optional[List], optional): Wrappers
+                that preprocess envs. Defaults to [ (black_death_v1, None), ].
+        """
         self._environment = environment
         self._reset_next_step = True
 
@@ -278,7 +380,12 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             )
 
     def reset(self) -> dm_env.TimeStep:
-        """Resets the episode."""
+        """Resets the env.
+
+        Returns:
+            dm_env.TimeStep: dm timestep.
+        """
+
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
         discount_spec = self.discount_spec()
@@ -306,28 +413,22 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         return parameterized_restart(rewards, self._discounts, observations), env_extras
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
-        """Steps the environment."""
+        """Steps in env.
+
+        Args:
+            actions (Dict[str, np.ndarray]): actions per agent.
+
+        Returns:
+            dm_env.TimeStep: dm timestep
+        """
 
         if self._reset_next_step:
             return self.reset()
 
         observations, rewards, dones, infos = self._environment.step(actions)
 
-        rewards_spec = self.reward_spec()
-        #  Handle empty rewards
-        if not rewards:
-            rewards = {
-                agent: convert_np_type(rewards_spec[agent].dtype, 0)
-                for agent in self.possible_agents
-            }
-        else:
-            rewards = {
-                agent: convert_np_type(rewards_spec[agent].dtype, reward)
-                for agent, reward in rewards.items()
-            }
-
-        if observations:
-            observations = self._convert_observations(observations, dones)
+        rewards = self._convert_reward(rewards)
+        observations = self._convert_observations(observations, dones)
 
         if self.env_done():
             self._step_type = dm_env.StepType.LAST
@@ -343,36 +444,60 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         )
 
     def env_done(self) -> bool:
+        """Check if env is done.
+
+        Returns:
+            bool: bool indicating if env is done.
+        """
         return not self.agents
 
-    # Convert PettingZoo observation so it's dm_env compatible. Also, the list
-    # of legal actions must be converted to a legal actions mask.
+    def _convert_reward(self, rewards: Dict[str, float]) -> Dict[str, float]:
+        """Convert rewards to be dm_env compatible.
+
+        Args:
+            rewards (Dict[str, float]): rewards per agent.
+        """
+        rewards_spec = self.reward_spec()
+        # Handle empty rewards
+        if not rewards:
+            rewards = {
+                agent: convert_np_type(rewards_spec[agent].dtype, 0)
+                for agent in self.possible_agents
+            }
+        else:
+            rewards = {
+                agent: convert_np_type(rewards_spec[agent].dtype, reward)
+                for agent, reward in rewards.items()
+            }
+        return rewards
+
     def _convert_observations(
         self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
     ) -> types.Observation:
-        observations: Dict[str, types.OLT] = {}
-        for agent, observation in observes.items():
-            if isinstance(observation, dict) and "action_mask" in observation:
-                legals = observation["action_mask"]
-                observation = observation["observation"]
-            else:
-                # TODO Handle legal actions better for continous envs,
-                #  maybe have min and max for each action and clip the agents actions
-                #  accordingly
-                legals = np.ones(
-                    _convert_to_spec(self._environment.action_spaces[agent]).shape,
-                    dtype=self._environment.action_spaces[agent].dtype,
-                )
+        """Convert PettingZoo observation so it's dm_env compatible.
 
-            observations[agent] = types.OLT(
-                observation=observation,
-                legal_actions=legals,
-                terminal=np.asarray([dones[agent]], dtype=np.float32),
-            )
+        Args:
+            observes (Dict[str, np.ndarray]): observations per agent.
+            dones (Dict[str, bool]): dones per agent.
 
-        return observations
+        Returns:
+            types.Observation: dm compatible observations.
+        """
+        return convert_dm_compatible_observations(
+            observes,
+            dones,
+            self._environment.action_spaces,
+            self._environment.observation_spaces,
+            self.env_done(),
+            self.possible_agents,
+        )
 
     def observation_spec(self) -> types.Observation:
+        """Observation spec.
+
+        Returns:
+            types.Observation: spec for environment.
+        """
         observation_specs = {}
         for agent in self.possible_agents:
             observation_specs[agent] = types.OLT(
@@ -385,6 +510,11 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         return observation_specs
 
     def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
+        """Action spec.
+
+        Returns:
+            Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]: spec for actions.
+        """
         action_specs = {}
         action_spaces = self._environment.action_spaces
         for agent in self.possible_agents:
@@ -392,6 +522,11 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         return action_specs
 
     def reward_spec(self) -> Dict[str, specs.Array]:
+        """Reward spec.
+
+        Returns:
+            Dict[str, specs.Array]: spec for rewards.
+        """
         reward_specs = {}
         for agent in self.possible_agents:
             reward_specs[agent] = specs.Array((), np.float32)
@@ -399,6 +534,11 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
+        """Discount spec.
+
+        Returns:
+            Dict[str, specs.BoundedArray]: spec for discounts.
+        """
         discount_specs = {}
         for agent in self.possible_agents:
             discount_specs[agent] = specs.BoundedArray(
@@ -407,27 +547,58 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         return discount_specs
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        """Extra data spec.
+
+        Returns:
+            Dict[str, specs.BoundedArray]: spec for extra data.
+        """
         return {}
 
     @property
     def agents(self) -> List:
+        """Agents still alive in env (not done).
+
+        Returns:
+            List: alive agents in env.
+        """
         return self._environment.agents
 
     @property
     def possible_agents(self) -> List:
+        """All possible agents in env.
+
+        Returns:
+            List: all possible agents in env.
+        """
         return self._environment.possible_agents
 
     @property
     def environment(self) -> ParallelEnv:
-        """Returns the wrapped environment."""
+        """Returns the wrapped environment.
+
+        Returns:
+            ParallelEnv: parallel env.
+        """
         return self._environment
 
     @property
     def current_agent(self) -> Any:
+        """Current active agent.
+
+        Returns:
+            Any: current agent.
+        """
         return self._environment.agent_selection
 
     def __getattr__(self, name: str) -> Any:
-        """Expose any other attributes of the underlying environment."""
+        """Expose any other attributes of the underlying environment.
+
+        Args:
+            name (str): attribute.
+
+        Returns:
+            Any: return attribute from env or underlying env.
+        """
         if hasattr(self.__class__, name):
             return self.__getattribute__(name)
         else:

@@ -15,6 +15,8 @@
 
 # Adapted from https://github.com/openai/multiagent-particle-envs.
 
+from typing import Optional
+
 import numpy as np
 
 from mava.utils.debugging.core import Agent, Landmark, World
@@ -22,8 +24,13 @@ from mava.utils.debugging.scenario import BaseScenario
 
 
 class Scenario(BaseScenario):
+    def __init__(self) -> None:
+        super().__init__()
+        self.np_rnd = np.random.RandomState()
+
     def make_world(self, num_agents: int) -> World:
         world = World()
+
         # set any world properties first
         num_landmarks = num_agents
         # add agents
@@ -51,10 +58,10 @@ class Scenario(BaseScenario):
             landmark.color = np.array([0.25, 0.25, 0.25])
         # set random initial states
         for agent in world.agents:
-            agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
+            agent.state.p_pos = self.np_rnd.uniform(-1, +1, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
         for i, landmark in enumerate(world.landmarks):
-            landmark.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
+            landmark.state.p_pos = self.np_rnd.uniform(-1, +1, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
 
         # Reset step counter
@@ -122,3 +129,6 @@ class Scenario(BaseScenario):
             return False
         else:
             return True
+
+    def seed(self, seed: Optional[int] = None) -> None:
+        self.np_rnd.seed(seed)

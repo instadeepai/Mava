@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple, Union
 import dm_env
 import numpy as np
 from dm_env import specs
+from gym import Space
 from pettingzoo.utils.conversions import ParallelEnv
 from pettingzoo.utils.env import AECEnv
 
@@ -16,6 +17,65 @@ SeqTimestepDict = TypedDict(
     "SeqTimestepDict",
     {"timestep": dm_env.TimeStep, "action": types.Action},
 )
+
+
+def convert_dm_compatible_observations(
+    observes: Dict[str, np.ndarray],
+    dones: Dict[str, bool],
+    action_spaces: Dict[str, Space],
+    observation_spaces: Dict[str, Space],
+    env_done: bool,
+    possible_agents: List,
+) -> types.Observation:
+    """Convert Parallel observation so it's dm_env compatible.
+
+    Args:
+        observes (Dict[str, np.ndarray]): observations per agent.
+        dones (Dict[str, bool]): dones per agent.
+        action_spaces ( Dict[str, Space]): env action spaces.
+        observation_spaces ( Dict[str, Space]): env observation spaces.
+        env_done (bool): is env done.
+        possible_agents (List): possible agents in env.
+
+    Returns:
+        types.Observation: dm compatible observation.
+    """
+    observations: Dict[str, types.OLT] = {}
+    if observes:
+        for agent, observation in observes.items():
+            if isinstance(observation, dict) and "action_mask" in observation:
+                legals = observation["action_mask"]
+                observation = observation["observation"]
+            else:
+                # TODO Handle legal actions better for continous envs,
+                # maybe have min and max for each action and clip the
+                # agents actions  accordingly
+                legals = np.ones(
+                    action_spaces[agent].shape,
+                    dtype=action_spaces[agent].dtype,
+                )
+            observations[agent] = types.OLT(
+                observation=observation,
+                legal_actions=legals,
+                terminal=np.asarray([dones[agent]], dtype=np.float32),
+            )
+    # Handle empty observations - some envs return {} at last step.
+    else:
+        observations = {
+            agent: types.OLT(
+                observation=np.zeros(
+                    observation_spaces[agent].shape,
+                    dtype=observation_spaces[agent].dtype,
+                ),
+                legal_actions=np.ones(
+                    action_spaces[agent].shape,
+                    dtype=action_spaces[agent].dtype,
+                ),
+                terminal=np.asarray([env_done], dtype=np.float32),
+            )
+            for agent in possible_agents
+        }
+    return observations
 
 
 def generate_zeros_from_spec(spec: specs.Array) -> np.ndarray:

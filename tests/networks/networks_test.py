@@ -16,7 +16,10 @@
 """Network tests."""
 from typing import Any, Dict
 
+import numpy as np
 import pytest
+import sonnet as snt
+import tensorflow as tf
 from absl import flags
 
 from mava import specs as mava_specs
@@ -25,6 +28,7 @@ from mava.components.tf.architectures.decentralised import (
     DecentralisedValueActor,
     DecentralisedValueActorCritic,
 )
+from mava.components.tf.networks.continuous import LayerNormAndResidualMLP, LayerNormMLP
 from mava.systems.tf import dial, mad4pg, maddpg, madqn, mappo, qmix, vdn
 from mava.utils.environments import debugging_utils
 
@@ -108,6 +112,40 @@ class TestNetworkAgentKeys:
             assert len(networks[key].keys()) == len(
                 agent_net_keys.keys()
             ), "Incorrect number of networks returned."
+
+    def test_network_seed_is_passed(self, system: Any) -> None:
+        """Test passing of network seed.
+
+        Args:
+            system (Any): system.
+        """
+        test_seed = 42
+
+        # Environment.
+        env = debugging_utils.make_environment(
+            env_name=FLAGS.env_name, action_space=FLAGS.action_space, evaluation=False
+        )
+        environment_spec = mava_specs.MAEnvironmentSpec(env)
+
+        # Test shared weights setup.
+        agent_net_keys = {
+            "agent_0": "agent",
+            "agent_1": "agent",
+            "agent_2": "agent",
+        }
+
+        networks = system.make_default_networks(
+            environment_spec=environment_spec,
+            agent_net_keys=agent_net_keys,
+            seed=test_seed,
+        )
+
+        for key in networks:
+            for agent in networks[key]:
+                if type(networks[key][agent]) == snt.Sequential:
+                    for layer in networks[key][agent]._layers:
+                        if hasattr(layer, "_seed"):
+                            assert layer._seed == test_seed
 
 
 @pytest.mark.parametrize(
@@ -228,3 +266,84 @@ class TestArchitectureAgentKeys:
             assert len(networks[key].keys()) == len(
                 agent_net_keys.keys()
             ), "Incorrect number of networks returned."
+
+
+@pytest.mark.parametrize(
+    "network",
+    [
+        (LayerNormMLP, {"layer_sizes": [10, 10]}),
+        (LayerNormAndResidualMLP, {"hidden_size": 10, "num_blocks": 1}),
+    ],
+)
+class TestNetworksSeeding:
+    def test_network_reproducibility_0_same_seed(self, network: Any) -> None:
+        """Test with same seed, networks are the same.
+
+        Args:
+            system (Any): network.
+        """
+        test_seed = 42
+        network, network_params = network
+
+        # Network 1
+        net = network(**network_params, seed=test_seed)
+        # Simple forward pass
+        net(tf.ones([10, 10]))
+
+        # Network 2
+        net2 = network(**network_params, seed=test_seed)
+        # Simple forward pass
+        net2(tf.ones([10, 10]))
+
+        np.testing.assert_array_equal(
+            np.concatenate([x.numpy().flatten() for x in net.variables]),
+            np.concatenate([x.numpy().flatten() for x in net2.variables]),
+        )
+
+    def test_network_reproducibility_1_no_seed(self, network: Any) -> None:
+        """Test with no seed, networks are different.
+
+        Args:
+            system (Any): network.
+        """
+        network, network_params = network
+
+        # Network 1
+        net = network(**network_params)
+        # Simple forward pass
+        net(tf.ones([10, 10]))
+
+        # Network 2
+        net2 = network(**network_params)
+        # Simple forward pass
+        net2(tf.ones([10, 10]))
+
+        assert not np.array_equal(
+            np.concatenate([x.numpy().flatten() for x in net.variables]),
+            np.concatenate([x.numpy().flatten() for x in net2.variables]),
+        )
+
+    def test_network_reproducibility_2_diff_seed(self, network: Any) -> None:
+        """Test with diff seeds, networks are different.
+
+        Args:
+            system (Any): network.
+        """
+        network, network_params = network
+        test_seed = 42
+        test_seed2 = 43
+
+        # Network 1
+        net = network(**network_params, seed=test_seed)
+        # Simple forward pass
+        net(tf.ones([10, 10]))
+
+        # Network 2
+        net2 = network(**network_params, seed=test_seed2)
+        # Simple forward pass
+        net2(tf.ones([10, 10]))
+
+        assert not np.array_equal(
+            np.concatenate([x.numpy().flatten() for x in net.variables]),
+            np.concatenate([x.numpy().flatten() for x in net2.variables]),
+        )

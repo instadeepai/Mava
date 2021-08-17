@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, Mapping, Sequence, Union
+from typing import Dict, Mapping, Optional, Sequence, Union
 
 from acme import types
 
@@ -31,6 +31,7 @@ def make_default_networks(
     archecture_type: ArchitectureType = ArchitectureType.feedforward,
     network_type: Network = Network.mlp,
     fingerprints: bool = False,
+    seed: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
     """Default networks for qmix.
 
@@ -48,6 +49,7 @@ def make_default_networks(
             atari_dqn_network or coms_network. Defaults to Network.coms_network.
         fingerprints (bool, optional): whether to apply replay stabilisation using
             policy fingerprints. Defaults to False.
+        seed (int, optional): random seed for network initialization.
 
     Returns:
         Mapping[str, types.TensorTransformation]: returned agent networks.
@@ -60,4 +62,5 @@ def make_default_networks(
         archecture_type=archecture_type,
         network_type=network_type,
         fingerprints=fingerprints,
+        seed=seed,
     )

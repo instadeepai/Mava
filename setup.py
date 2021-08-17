@@ -39,7 +39,7 @@ tf_requirements = [
 ]
 
 env_requirements = [
-    "pettingzoo==1.9.0",
+    "pettingzoo~=1.11.0",
     "multi_agent_ale_py",
     "supersuit==2.6.6",
     "pygame",
@@ -47,7 +47,7 @@ env_requirements = [
 ]
 
 launchpad_requirements = [
-    "dm-launchpad-nightly==0.3.0.dev20210730",
+    "dm-launchpad-nightly",
 ]
 
 testing_formatting_requirements = [

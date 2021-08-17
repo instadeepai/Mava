@@ -93,7 +93,9 @@ class ReverbParallelAdder(ReverbAdder):
             client (reverb.Client): Client to access reverb.
             max_sequence_length (int): The number of observations that can be added to
                 replay.
-            max_in_flight_items (int): [description]
+            max_in_flight_items (int): The maximum number of "in flight" items
+                at the same time. See `block_until_num_items` in
+                `reverb.TrajectoryWriter.flush` for more info.
             delta_encoded (bool, optional): Enables delta encoding, see `Client` for
                 more information. Defaults to False.
             priority_fns (Optional[PriorityFnMapping], optional): A mapping from
