@@ -424,13 +424,17 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         else:
             # Record counts.
             if hasattr(self._executor, "_counts"):
+                loop_type = "executor"
+                if "_" not in self._loop_label:
+                    loop_type = "evaluator"
+
                 if hasattr(self._executor, "_variable_client"):
                     self._executor._variable_client.add_async(
-                        ["executor_episodes", "executor_steps"],
-                        {"executor_episodes": 1, "executor_steps": episode_steps},
+                        [f"{loop_type}_episodes", "executor_steps"],
+                        {f"{loop_type}_episodes": 1, "executor_steps": episode_steps},
                     )
                 else:
-                    self._executor._counts["executor_episodes"] += 1
+                    self._executor._counts[f"{loop_type}_episodes"] += 1
                     self._executor._counts["executor_steps"] += episode_steps
 
                 counts = self._executor._counts
