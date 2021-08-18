@@ -49,15 +49,17 @@ jobs:
           pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
 
           # For atari envs
-          # sudo apt-get install unrar
+          sudo apt-get install unrar
           # Temp fix untill autorom works again
           # pip install autorom
           # AutoROM -v
           wget http://www.atarimania.com/roms/Roms.rar
-          sudo apt-get install unar -y
-          unar Roms.rar
+          unrar x Roms.rar
+          mkdir rars
+          mv HC\ ROMS.zip rars
+          mv ROMS.zip rars
           pip install atari_py
-          python -m atari_py.import_roms Roms
+          python -m atari_py.import_roms rars
 
           ## Fix module 'enum' has no attribute 'IntFlag'
           pip uninstall -y enum34
