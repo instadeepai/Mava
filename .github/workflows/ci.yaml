@@ -54,7 +54,7 @@ jobs:
           # pip install autorom
           # AutoROM -v
           wget http://www.atarimania.com/roms/Roms.rar
-          sudo apt install unar
+          sudo apt-get install unar -y
           unar Roms.rar
           pip install atari_py
           python -m atari_py.import_roms Roms
