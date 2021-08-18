@@ -50,8 +50,13 @@ jobs:
 
           # For atari envs
           sudo apt-get install unrar
-          pip install autorom
-          AutoROM -v
+          # Temp fix untill autorom works again
+          # pip install autorom
+          # AutoROM -v
+          wget http://www.atarimania.com/roms/Roms.rar
+          unar Roms.rar
+          pip install atari_py
+          python -m atari_py.import_roms Roms
 
           ## Fix module 'enum' has no attribute 'IntFlag'
           pip uninstall -y enum34
