@@ -19,7 +19,6 @@ import functools
 
 import launchpad as lp
 import sonnet as snt
-from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 import mava
 from mava.systems.tf import dial
@@ -66,13 +65,7 @@ class TestDial:
         trainer_node.disable_run()
 
         # Launch gpu config - don't use gpu
-        gpu_id = -1
-        env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
-        local_resources = {
-            "trainer": PythonProcess(env=env_vars),
-            "evaluator": PythonProcess(env=env_vars),
-            "executor": PythonProcess(env=env_vars),
-        }
+        local_resources = lp_utils.cpu_only(program)
         lp.launch(
             program,
             launch_type="test_mt",

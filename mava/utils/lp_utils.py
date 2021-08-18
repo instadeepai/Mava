@@ -18,17 +18,34 @@
 import functools
 import inspect
 import time
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 import launchpad as lp
 from absl import flags, logging
 from acme.utils import counting
+from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 FLAGS = flags.FLAGS
 
 
+def cpu_only(program: Any) -> Dict:
+    """Return python process config that results in cpu only usage.
+
+    Args:
+        program (Any): lp program.
+
+    Returns:
+        Dict: dict with cpu only lp config.
+    """
+    return {
+        node: PythonProcess(env={"CUDA_VISIBLE_DEVICES": str(-1)})
+        for node in program.groups.keys()
+    }
+
+
 def partial_kwargs(function: Callable[..., Any], **kwargs: Any) -> Callable[..., Any]:
     """Return a partial function application by overriding default keywords.
+    
     This function is equivalent to `functools.partial(function, **kwargs)` but
     will raise a `ValueError` when called if either the given keyword arguments
     are not defined by `function` or if they do not have defaults.
