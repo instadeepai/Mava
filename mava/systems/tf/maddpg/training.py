@@ -1233,7 +1233,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
             # Note (dries): We are assuming that only the policy network
-            # is recurrent and not the observation network.
+            # is recurrent and not the observation network and critic.
 
             obs_trans, target_obs_trans = self._transform_observations(observations)
 

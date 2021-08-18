@@ -110,7 +110,6 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
         # Collect the results and combine with counts.
         steps_per_second = episode_steps / (time.time() - start_time)
         mean_episode_return = np.mean(np.array(list(episode_returns.values())))
-
         # Record counts.
         if hasattr(self._executor, "_counts"):
             loop_type = "executor"
@@ -218,12 +217,19 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
             loop_type = "executor"
             if "_" not in self._loop_label:
                 loop_type = "evaluator"
+
+            # Add to the centralised variable server. Logger will only
+            # update every time new weights are pulled.
             if hasattr(self._executor, "_variable_client"):
                 self._executor._variable_client.add_async(
                     [f"{loop_type}_episodes", f"{loop_type}_steps"],
                     {f"{loop_type}_episodes": 1, f"{loop_type}_steps": episode_steps},
                 )
             else:
+                # If there is now variable client just add to the local counts.
+                # NB (dries): The executors will not sync their stats.
+                # So the executor counts are just per executor and not
+                # a cumulative count.
                 self._executor._counts[f"{loop_type}_episodes"] += 1
                 self._executor._counts[f"{loop_type}_steps"] += episode_steps
 

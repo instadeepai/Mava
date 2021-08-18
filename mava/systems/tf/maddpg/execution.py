@@ -273,6 +273,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             store_recurrent_state=store_recurrent_state,
         )
 
+    # TODO (dries): This sometimes gives a warning. Is retracing a problem here?
     @tf.function
     def _policy(
         self,
