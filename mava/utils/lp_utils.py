@@ -45,7 +45,7 @@ def cpu_only(program: Any) -> Dict:
 
 def partial_kwargs(function: Callable[..., Any], **kwargs: Any) -> Callable[..., Any]:
     """Return a partial function application by overriding default keywords.
-    
+
     This function is equivalent to `functools.partial(function, **kwargs)` but
     will raise a `ValueError` when called if either the given keyword arguments
     are not defined by `function` or if they do not have defaults.
