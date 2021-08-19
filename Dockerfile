@@ -12,8 +12,15 @@ ENV TF_CPP_MIN_LOG_LEVEL=3
 
 # PettingZoo
 RUN apt-get install unrar
-RUN python -m pip install autorom
-RUN AutoROM -v
+# RUN python -m pip install autorom
+# RUN AutoROM -v
+# Temp fix untill autorom works again
+RUN wget http://www.atarimania.com/roms/Roms.rar
+RUN unrar x Roms.rar
+RUN sudo apt-get install unzip -y
+RUN unzip ROMS.zip
+RUN python -m atari_py.import_roms ROMS
+RUN rm Roms.rar ROMS.zip "HC ROMS.zip"
 
 # cmake and clang for openspiel
 RUN apt-get install clang -y
