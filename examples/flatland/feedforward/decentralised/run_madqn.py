@@ -24,7 +24,6 @@ from absl import app, flags
 from flatland.envs.observations import TreeObsForRailEnv
 from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
-from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
@@ -102,13 +101,9 @@ def main(_: Any) -> None:
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
-    gpu_id = -1
-    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
-    local_resources = {
-        "trainer": [],
-        "evaluator": PythonProcess(env=env_vars),
-        "executor": PythonProcess(env=env_vars),
-    }
+    local_resources = lp_utils.to_device(
+        program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
+    )
 
     # Launch.
     lp.launch(
