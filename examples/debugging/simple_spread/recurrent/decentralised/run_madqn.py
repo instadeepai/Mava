@@ -95,7 +95,7 @@ def main(_: Any) -> None:
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
-    local_resources = lp_utils.to_gpu(
+    local_resources = lp_utils.to_device(
         program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )
 

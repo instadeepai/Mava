@@ -72,7 +72,7 @@ class TestLPResourceUtils(parameterized.TestCase):
             nodes_on_gpu (List): which nodes to have on gpu.
             expected_resourse_list (List): expected resource list.
         """
-        resource_list = lp_utils.to_gpu(
+        resource_list = lp_utils.to_device(
             program_nodes=program_nodes, nodes_on_gpu=nodes_on_gpu
         )
         assert resource_list == expected_resourse_list

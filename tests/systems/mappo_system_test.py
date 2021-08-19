@@ -60,7 +60,9 @@ class TestMAPPO:
         trainer_node.disable_run()
 
         # Launch gpu config - don't use gpu
-        local_resources = lp_utils.cpu_only(program.groups.keys())
+        local_resources = lp_utils.to_device(
+            program_nodes=program.groups.keys(), nodes_on_gpu=[]
+        )
 
         lp.launch(
             program,

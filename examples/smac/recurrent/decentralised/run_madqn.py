@@ -149,7 +149,7 @@ def main(_: Any) -> None:
     ).build()
 
     # launch
-    local_resources = lp_utils.to_gpu(
+    local_resources = lp_utils.to_device(
         program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )
     lp.launch(
