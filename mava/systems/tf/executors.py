@@ -290,15 +290,6 @@ class RecurrentExecutor(core.Executor):
             types.NestedArray: action and policy.
         """
 
-        # TODO Mask actions here using observation.legal_actions
-        # What happens in discrete vs cont case
-
-        # Initialize the RNN state if necessary.
-        if self._states[agent] is None:
-            # index network either on agent type or on agent id
-            agent_key = self._agent_net_keys[agent]
-            self._states[agent] = self._policy_networks[agent_key].initial_state(1)
-
         # Step the recurrent policy forward given the current observation and state.
         policy_output, new_state = self._policy(
             agent, observation.observation, self._states[agent]

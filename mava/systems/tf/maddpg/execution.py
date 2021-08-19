@@ -21,6 +21,7 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tree
 from acme import types
 from acme.specs import EnvironmentSpec
 
@@ -140,6 +141,8 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         action, policy = self._policy(agent, observation.observation)
 
         # Return a numpy array with squeezed out batch dimension.
+
+        # TODO (dries): This is always a tensor. Maybe a tree operation is not needed here?
         action = tf2_utils.to_numpy_squeeze(action)
         policy = tf2_utils.to_numpy_squeeze(policy)
         return action, policy
@@ -274,12 +277,13 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         )
 
     # TODO (dries): This sometimes gives a warning. Is retracing a problem here?
-    @tf.function
+
     def _policy(
         self,
         agent: str,
         observation: types.NestedTensor,
         state: types.NestedTensor,
+        # is_batched: bool = False,
     ) -> Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
         """Agent specific policy function
         Args:
@@ -295,20 +299,22 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
+        # if not is_batched:
         batched_observation = tf2_utils.add_batch_dim(observation)
+        # else:
+        #     batched_observation = observation
 
         # index network either on agent type or on agent id
         agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
         policy, new_state = self._policy_networks[agent_key](batched_observation, state)
-
         # TODO (dries): Make this support hybrid action spaces.
         if type(self._agent_specs[agent].actions) == BoundedArray:
             # Continuous action
             action = policy
         elif type(self._agent_specs[agent].actions) == DiscreteArray:
-            action = tf.math.argmax(policy, axis=1)
+            action = tf.math.argmax(policy, axis=-1)
         else:
             raise NotImplementedError
         return action, policy, new_state
@@ -325,25 +331,33 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             types.NestedArray: action and policy.
         """
 
-        # TODO Mask actions here using observation.legal_actions
-        # Initialize the RNN state if necessary.
-        if self._states[agent] is None:
-            # index network either on agent type or on agent id
-            agent_key = self._agent_net_keys[agent]
-            self._states[agent] = self._policy_networks[agent_key].initia_state(1)
-
         # Step the recurrent policy forward given the current observation and state.
         action, policy, new_state = self._policy(
             agent, observation.observation, self._states[agent]
         )
 
-        # Bookkeeping of recurrent states for the observe method.
-        self._update_state(agent, new_state)
-
         # Return a numpy array with squeezed out batch dimension.
-        action = tf2_utils.to_numpy_squeeze(action)
-        policy = tf2_utils.to_numpy_squeeze(policy)
-        return action, policy
+        # TODO (dries): This is always a tensor. Maybe a tree operation is not needed here?
+        return action, policy, new_state
+
+    # @staticmethod
+    # def stack_all(s_list):
+    #     return tree.map_structure(lambda *args: tf.concat(list(args), axis=0), *s_list)
+
+    # @staticmethod
+    # def extract_state(nest, agent_i):
+    #     return tree.map_structure(lambda nes:  tf2_utils.add_batch_dim(nes[agent_i]), nest)
+
+    @tf.function
+    def do_policies(self, observations):
+        actions = {}
+        policies = {}
+        new_states = {}
+        for agent, observation in observations.items():
+            actions[agent], policies[agent], new_states[agent] = self.select_action(
+                agent, observation
+            )
+        return actions, policies, new_states
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
@@ -357,10 +371,41 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
                 actions and policies for all agents in the system.
         """
 
-        actions = {}
-        policies = {}
-        for agent, observation in observations.items():
-            actions[agent], policies[agent] = self.select_action(agent, observation)
+        # Test for a special case of completely shared weights
+        # if len(set(self._agent_net_keys.values()))==1:
+        #     agents = sort_str_num(self._agent_net_keys.keys())
+        #     @tf.function
+        #     def do_this(observations, states, agents):
+        #         batched_observations = tf.stack([observations[agent].observation for agent in agents])
+        #         batched_states = self.stack_all([states[agent] for agent in agents])
+
+        #         tf_actions, tf_policies, new_states = self._policy(
+        #             agents[0], batched_observations, batched_states, is_batched=True,
+        #         )
+
+        #         return tf_actions, tf_policies, new_states
+
+        #     tf_actions, tf_policies, new_states = do_this(observations, self._states, agents)
+
+        #     # Bookkeeping of recurrent states for the observe method.
+        #     for a_i, agent in enumerate(agents):
+        #         agent_state = self.extract_state(new_states, a_i)
+        #         self._update_state(agent, agent_state)
+        #         actions[agent] = tf_actions[a_i].numpy()
+        #         policies[agent] = tf_policies[a_i].numpy()
+        # else:
+        # Use the usual sequential method to select actions.
+
+        actions, policies, new_states = self.do_policies(observations)
+        # actions = {}
+        # policies = {}
+        # for agent, observation in observations.items():
+        #     actions[agent], policies[agent] = self.select_action(agent, observation)
+        # Bookkeeping of recurrent states for the observe method.
+        self._states = new_states
+        actions = tf2_utils.to_numpy_squeeze(actions)
+        policies = tf2_utils.to_numpy_squeeze(policies)
+
         return actions, policies
 
     def _custom_end_of_episode_logic(self) -> None:
