@@ -406,6 +406,7 @@ class MADDPGBuilder:
             "logger": logger,
             "checkpoint": self._config.checkpoint,
             "checkpoint_subpath": self._config.checkpoint_subpath,
+            "checkpoint_minute_interval": self._config.checkpoint_minute_interval,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
