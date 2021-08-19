@@ -58,6 +58,7 @@ jobs:
           sudo apt-get install unzip -y
           unzip ROMS.zip
           python -m atari_py.import_roms ROMS
+          RUN rm Roms.rar ROMS.zip "HC ROMS.zip"
 
           ## Fix module 'enum' has no attribute 'IntFlag'
           pip uninstall -y enum34
