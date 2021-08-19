@@ -28,7 +28,7 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 FLAGS = flags.FLAGS
 
 
-def cpu_only(program_nodes: Any) -> Dict:
+def cpu_only(program_nodes: List) -> Dict:
     """Return python process config that results in cpu only usage.
 
     Args:
