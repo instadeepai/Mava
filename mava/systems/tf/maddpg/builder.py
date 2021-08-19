@@ -48,6 +48,8 @@ class MADDPGConfig:
         critic_optimizer: optimizer for updating critic networks.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
+        checkpoint_minute_interval (int): The number of minutes to wait between
+            checkpoints.
         discount: discount to use for TD updates.
         batch_size: batch size for updates.
         prefetch_size: size to prefetch from replay.
@@ -66,6 +68,7 @@ class MADDPGConfig:
         max_gradient_norm: value to specify the maximum clipping value for the gradient
             norm during optimization.
         sigma: Gaussian sigma parameter.
+
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         replay_table_name: string indicating what name to give the replay table."""
@@ -74,6 +77,7 @@ class MADDPGConfig:
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
     agent_net_keys: Dict[str, str]
+    checkpoint_minute_interval: int
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
