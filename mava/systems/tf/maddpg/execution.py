@@ -21,7 +21,6 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
-import tree
 from acme import types
 from acme.specs import EnvironmentSpec
 
@@ -142,7 +141,8 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
         # Return a numpy array with squeezed out batch dimension.
 
-        # TODO (dries): This is always a tensor. Maybe a tree operation is not needed here?
+        # TODO (dries): This is always a tensor.
+        # Maybe a tree operation is not needed here?
         action = tf2_utils.to_numpy_squeeze(action)
         policy = tf2_utils.to_numpy_squeeze(policy)
         return action, policy
@@ -337,19 +337,22 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         )
 
         # Return a numpy array with squeezed out batch dimension.
-        # TODO (dries): This is always a tensor. Maybe a tree operation is not needed here?
+        # TODO (dries): This is always a tensor. Maybe a tree
+        # operation is not needed here?
         return action, policy, new_state
 
     # @staticmethod
     # def stack_all(s_list):
-    #     return tree.map_structure(lambda *args: tf.concat(list(args), axis=0), *s_list)
+    #     return tree.map_structure(lambda *args:
+    # tf.concat(list(args), axis=0), *s_list)
 
     # @staticmethod
     # def extract_state(nest, agent_i):
-    #     return tree.map_structure(lambda nes:  tf2_utils.add_batch_dim(nes[agent_i]), nest)
+    #     return tree.map_structure(lambda nes:
+    # tf2_utils.add_batch_dim(nes[agent_i]), nest)
 
     @tf.function
-    def do_policies(self, observations):
+    def do_policies(self, observations: types.NestedArray) -> Tuple[Dict, Dict, Dict]:
         actions = {}
         policies = {}
         new_states = {}
@@ -376,16 +379,19 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         #     agents = sort_str_num(self._agent_net_keys.keys())
         #     @tf.function
         #     def do_this(observations, states, agents):
-        #         batched_observations = tf.stack([observations[agent].observation for agent in agents])
+        #         batched_observations = tf.stack([observations[agent].
+        # observation for agent in agents])
         #         batched_states = self.stack_all([states[agent] for agent in agents])
 
         #         tf_actions, tf_policies, new_states = self._policy(
-        #             agents[0], batched_observations, batched_states, is_batched=True,
+        #             agents[0], batched_observations, batched_states,
+        # is_batched=True,
         #         )
 
         #         return tf_actions, tf_policies, new_states
 
-        #     tf_actions, tf_policies, new_states = do_this(observations, self._states, agents)
+        #     tf_actions, tf_policies, new_states = do_this(observations,
+        # self._states, agents)
 
         #     # Bookkeeping of recurrent states for the observe method.
         #     for a_i, agent in enumerate(agents):
@@ -400,7 +406,8 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         # actions = {}
         # policies = {}
         # for agent, observation in observations.items():
-        #     actions[agent], policies[agent] = self.select_action(agent, observation)
+        #     actions[agent], policies[agent] = self.select_action(agent,
+        # observation)
         # Bookkeeping of recurrent states for the observe method.
         self._states = new_states
         actions = tf2_utils.to_numpy_squeeze(actions)
