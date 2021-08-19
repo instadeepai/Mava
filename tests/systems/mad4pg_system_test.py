@@ -63,7 +63,7 @@ class TestMAD4PG:
         trainer_node.disable_run()
 
         # Launch gpu config - don't use gpu
-        local_resources = lp_utils.cpu_only(program)
+        local_resources = lp_utils.cpu_only(program.groups.keys())
 
         lp.launch(
             program,
@@ -115,7 +115,7 @@ class TestMAD4PG:
         trainer_node.disable_run()
 
         # Launch gpu config - don't use gpu
-        local_resources = lp_utils.cpu_only(program)
+        local_resources = lp_utils.cpu_only(program.groups.keys())
 
         lp.launch(
             program,
@@ -164,7 +164,7 @@ class TestMAD4PG:
         trainer_node.disable_run()
 
         # Launch gpu config - don't use gpu
-        local_resources = lp_utils.cpu_only(program)
+        local_resources = lp_utils.cpu_only(program.groups.keys())
 
         lp.launch(
             program,
@@ -214,7 +214,7 @@ class TestMAD4PG:
         trainer_node.disable_run()
 
         # Launch gpu config - don't use gpu
-        local_resources = lp_utils.cpu_only(program)
+        local_resources = lp_utils.cpu_only(program.groups.keys())
 
         lp.launch(
             program,

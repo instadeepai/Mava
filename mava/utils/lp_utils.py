@@ -18,7 +18,7 @@
 import functools
 import inspect
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import launchpad as lp
 from absl import flags, logging
@@ -28,18 +28,33 @@ from launchpad.nodes.python.local_multi_processing import PythonProcess
 FLAGS = flags.FLAGS
 
 
-def cpu_only(program: Any) -> Dict:
+def cpu_only(program_nodes: Any) -> Dict:
     """Return python process config that results in cpu only usage.
 
     Args:
-        program (Any): lp program.
+        program_nodes (List): nodes in lp program.
+
+    Returns:
+        Dict: dict with cpu only lp config.
+    """
+    return to_gpu(program_nodes, [])
+
+
+def to_gpu(program_nodes: List, nodes_on_gpu: List = ["trainer"]) -> Dict:
+    """Specifies which nodes should run on gpu.
+
+    Args:
+        program_nodes (List): nodes in lp program.
+        nodes_on_gpu (List, optional): nodes to run on gpu. Defaults to ["trainer"].
 
     Returns:
         Dict: dict with cpu only lp config.
     """
     return {
         node: PythonProcess(env={"CUDA_VISIBLE_DEVICES": str(-1)})
-        for node in program.groups.keys()
+        if (node not in nodes_on_gpu)
+        else []
+        for node in program_nodes
     }
 
 
