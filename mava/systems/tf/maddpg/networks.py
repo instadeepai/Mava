@@ -12,17 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, Mapping, Sequence, Union
+from typing import Dict, Mapping, Optional, Sequence, Union
 
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme import types
-from acme.tf import networks
 from acme.tf import utils as tf2_utils
 from dm_env import specs
 
 from mava import specs as mava_specs
+from mava.components.tf import networks
+from mava.components.tf.networks import DiscreteValuedHead
 from mava.utils.enums import ArchitectureType
 
 Array = specs.Array
@@ -38,6 +39,10 @@ def make_default_networks(
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     sigma: float = 0.3,
     archecture_type: ArchitectureType = ArchitectureType.feedforward,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    num_atoms: Optional[int] = None,
+    seed: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
     """Default networks for maddpg.
 
@@ -55,6 +60,13 @@ def make_default_networks(
         archecture_type (ArchitectureType, optional): archecture used for
             agent networks. Can be feedforward or recurrent. Defaults to
             ArchitectureType.feedforward.
+        vmin (float, optional): hyperparameters for the distributional critic in mad4pg.
+            Only for mad4pg.
+        vmax (float, optional): hyperparameters for the distributional critic in mad4pg.
+            Only for mad4pg.
+        num_atoms (int, optional):  hyperparameters for the distributional critic in
+            mad4pg. Only for mad4pg.
+        seed (int, optional): random seed for network initialization.
 
     Returns:
         Mapping[str, types.TensorTransformation]: returned agent networks.
@@ -102,7 +114,7 @@ def make_default_networks(
         #  return a list of specs for hybrid action space
         # Get total number of action dimensions from action spec.
         agent_act_spec = specs[key].actions
-        if type(specs[key].actions) == DiscreteArray:
+        if type(agent_act_spec) == DiscreteArray:
             num_actions = agent_act_spec.num_values
             # Question (dries): Why is the minimum -1 and not 0?
             minimum = [-1.0] * num_actions
@@ -124,19 +136,21 @@ def make_default_networks(
         if archecture_type == ArchitectureType.feedforward:
             policy_network = [
                 networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key], activate_final=True
+                    policy_networks_layer_sizes[key], activate_final=True, seed=seed
                 ),
             ]
         elif archecture_type == ArchitectureType.recurrent:
             policy_network = [
                 networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key][:-1], activate_final=True
+                    policy_networks_layer_sizes[key][:-1],
+                    activate_final=True,
+                    seed=seed,
                 ),
                 snt.LSTM(policy_networks_layer_sizes[key][-1]),
             ]
 
         policy_network += [
-            networks.NearZeroInitializedLinear(num_dimensions),
+            networks.NearZeroInitializedLinear(num_dimensions, seed=seed),
             networks.TanhToSpec(agent_act_spec),
         ]
 
@@ -150,15 +164,33 @@ def make_default_networks(
         policy_network = policy_network_func(policy_network)
 
         # Create the critic network.
-        critic_network = snt.Sequential(
-            [
-                # The multiplexer concatenates the observations/actions.
-                networks.CriticMultiplexer(),
+        critic_network = [
+            # The multiplexer concatenates the observations/actions.
+            networks.CriticMultiplexer()
+        ]
+
+        # Only for mad4pg
+        if vmin and vmax and num_atoms:
+            critic_network += [
                 networks.LayerNormMLP(
-                    list(critic_networks_layer_sizes[key]) + [1], activate_final=False
+                    critic_networks_layer_sizes[key],
+                    activate_final=False,
+                    seed=seed,
                 ),
+                DiscreteValuedHead(vmin, vmax, num_atoms),
             ]
-        )
+        # maddpg
+        else:
+            critic_network += [
+                networks.LayerNormMLP(
+                    list(critic_networks_layer_sizes[key]) + [1],
+                    activate_final=False,
+                    seed=seed,
+                )
+            ]
+
+        critic_network = snt.Sequential(critic_network)
+
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network

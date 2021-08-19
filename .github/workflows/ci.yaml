@@ -9,7 +9,7 @@ on:
 jobs:
   test-ubuntu:
     runs-on: onprem
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       matrix:
         python-version: [3.6.13, 3.7.1, 3.8.0]
@@ -50,8 +50,15 @@ jobs:
 
           # For atari envs
           sudo apt-get install unrar
-          pip install autorom
-          AutoROM -v
+          # Temp fix untill autorom works again
+          # pip install autorom
+          # AutoROM -v
+          wget http://www.atarimania.com/roms/Roms.rar
+          unrar x Roms.rar
+          sudo apt-get install unzip -y
+          unzip ROMS.zip
+          python -m atari_py.import_roms ROMS
+          rm Roms.rar ROMS.zip "HC ROMS.zip"
 
           ## Fix module 'enum' has no attribute 'IntFlag'
           pip uninstall -y enum34
@@ -71,7 +78,7 @@ jobs:
           mypy . --exclude docs/
       - name: Test with pytest and get code coverage
         run: |
-          pytest --cov-report term-missing --cov=mava  -n "$(grep -c ^processor /proc/cpuinfo)" tests
+          pytest -n "$(grep -c ^processor /proc/cpuinfo)" tests
       - name: Check docstring code coverage
         run: |
           interrogate -c pyproject.toml

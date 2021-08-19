@@ -177,10 +177,49 @@ class TestEnvWrapper:
                         bool(dm_env_timestep.terminal) is False
                     ), "Failed to set terminal."
 
+    # Test that observations from petting zoo get converted to
+    #   dm observations correctly when empty obs are returned.
+    def test_covert_env_to_dm_env_0_empty_obs(
+        self, env_spec: EnvSpec, helpers: Helpers
+    ) -> None:
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+
+        # Does the wrapper have the functions we want to test
+        if hasattr(wrapped_env, "_convert_observations") or hasattr(
+            wrapped_env, "_convert_observation"
+        ):
+            #  Get agent names from env and mock out data
+            agents = wrapped_env.agents
+            test_agents_observations: Dict = {}
+
+            # Parallel env_types
+            if env_spec.env_type == EnvType.Parallel:
+                dm_env_timestep = wrapped_env._convert_observations(
+                    test_agents_observations, dones={agent: False for agent in agents}
+                )
+
+                # We have empty OLT for all agents
+                for agent in wrapped_env.agents:
+                    np.testing.assert_array_equal(
+                        dm_env_timestep[agent].observation,
+                        np.zeros(
+                            wrapped_env.observation_spaces[agent].shape,
+                            dtype=wrapped_env.observation_spaces[agent].dtype,
+                        ),
+                    )
+
+                    np.testing.assert_array_equal(
+                        dm_env_timestep[agent].legal_actions,
+                        np.ones(
+                            wrapped_env.action_spaces[agent].shape,
+                            dtype=wrapped_env.action_spaces[agent].dtype,
+                        ),
+                    )
+
     # Test that observations **with actions masked** from petting zoo get
     #   converted to dm observations correctly. This only runs
     #   if wrapper has a _convert_observations or _convert_observation functions.
-    def test_covert_env_to_dm_env_1_with_action_mask(
+    def test_covert_env_to_dm_env_2_with_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)

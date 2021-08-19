@@ -35,7 +35,11 @@ from gym.spaces.box import Box
 
 from mava.types import OLT, Observation
 from mava.utils.sort_utils import sort_str_num
-from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
+from mava.utils.wrapper_utils import (
+    convert_dm_compatible_observations,
+    convert_np_type,
+    parameterized_restart,
+)
 from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
 
@@ -195,26 +199,14 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     def _convert_observations(
         self, observes: Dict[str, Tuple[np.array, np.ndarray]], dones: Dict[str, bool]
     ) -> Observation:
-        observations: Dict[str, OLT] = {}
-        for agent, observation in observes.items():
-            if isinstance(observation, dict) and "action_mask" in observation:
-                legals = observation["action_mask"]
-                observation = observation["observation"]
-            else:
-                # TODO Handle legal actions better for continous envs,
-                #  maybe have min and max for each action and clip the agents actions
-                #  accordingly
-                legals = np.ones(
-                    self.action_spaces[agent].shape,
-                    dtype=self.action_spaces[agent].dtype,
-                )
-            observations[agent] = OLT(
-                observation=observation,
-                legal_actions=legals,
-                terminal=np.asarray([dones[agent]], dtype=np.float32),
-            )
-
-        return observations
+        return convert_dm_compatible_observations(
+            observes,
+            dones,
+            self.action_spaces,
+            self.observation_spaces,
+            self.env_done(),
+            self.possible_agents,
+        )
 
     # collate agent info and observation into a tuple, making the agents obervation to
     # be a tuple of the observation from the env and the agent info

@@ -19,7 +19,6 @@ from typing import Any
 
 import launchpad as lp
 from absl import app, flags
-from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava.components.tf.architectures import StateBasedQValueCritic
 from mava.systems.tf import mad4pg
@@ -79,13 +78,9 @@ def main(_: Any) -> None:
     ).build()
 
     # launch
-    gpu_id = -1
-    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
-    local_resources = {
-        "trainer": [],
-        "evaluator": PythonProcess(env=env_vars),
-        "executor": PythonProcess(env=env_vars),
-    }
+    local_resources = lp_utils.to_device(
+        program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
+    )
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
