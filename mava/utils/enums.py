@@ -26,3 +26,10 @@ class Network(Enum):
     mlp = 1
     atari_dqn_network = 2
     coms_network = 3
+
+
+class NetObsType(Enum):
+    OneD = 1
+    TwoD = 2
+    OneDPlusVector = 3
+    TwoDPlusVector = 4

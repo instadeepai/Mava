@@ -25,7 +25,7 @@ from dm_env import specs
 from mava import specs as mava_specs
 from mava.components.tf import networks as mava_networks
 from mava.components.tf.networks.mad4pg import DiscreteValuedHead
-from mava.utils.enums import ArchitectureType
+from mava.utils.enums import ArchitectureType, NetObsType
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
@@ -190,7 +190,9 @@ def make_1d_conv_networks(
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     sigma: float = 0.3,
-    archecture_type: ArchitectureType = ArchitectureType.feedforward,
+    archecture_type: ArchitectureType = ArchitectureType.recurrent,
+    policy_obs: NetObsType = NetObsType.OneDPlusVector,
+    critic_obs: NetObsType = NetObsType.OneDPlusVector,
     vmin: float = -150.0,
     vmax: float = 150.0,
     num_atoms: int = 51,
@@ -281,7 +283,15 @@ def make_1d_conv_networks(
         num_dimensions = np.prod(agent_act_spec.shape, dtype=int)
 
         # An optional network to process observations
-        observation_network = snt.Sequential([mava_networks.Conv1DNetwork()])
+
+        if policy_obs == NetObsType.OneD:
+            observation_network = snt.Sequential([mava_networks.Conv1DNetwork()])
+        elif policy_obs == NetObsType.OneDPlusVector:
+            observation_network = snt.Conc snt.Sequential([mava_networks.Conv1DNetwork()])
+        else:
+            raise NotImplementedError(
+                "Observation type {} not implemented.".format(policy_obs)
+            )
 
         # Create the policy network.
         if archecture_type == ArchitectureType.feedforward:
