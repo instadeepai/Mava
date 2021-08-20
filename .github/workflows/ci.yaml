@@ -50,7 +50,7 @@ jobs:
 
           # For atari envs
           sudo apt-get install unrar
-          pip install autorom
+          pip install autorom --upgrade
           AutoROM -v
 
           ## Fix module 'enum' has no attribute 'IntFlag'
