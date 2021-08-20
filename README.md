@@ -60,10 +60,11 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [OpenSpiel][openspiel]
 
 
+For details on how to add your own environment, see [here](https://github.com/instadeepai/Mava/tree/feature/add_env_readme/mava/wrappers#readme).
+
 |<img  src="docs/images/multiw_animation.gif" width="85%" /> | <img src="docs/images/sc2_animation.gif" width="85%" />  |
 |:---:|:---:|
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.|
-
 
 ## System Implementations
 
