@@ -50,15 +50,8 @@ jobs:
 
           # For atari envs
           sudo apt-get install unrar
-          # Temp fix untill autorom works again
-          # pip install autorom
-          # AutoROM -v
-          wget http://www.atarimania.com/roms/Roms.rar
-          unrar x Roms.rar
-          sudo apt-get install unzip -y
-          unzip ROMS.zip
-          python -m atari_py.import_roms ROMS
-          rm Roms.rar ROMS.zip "HC ROMS.zip"
+          pip install autorom
+          AutoROM -v
 
           ## Fix module 'enum' has no attribute 'IntFlag'
           pip uninstall -y enum34
