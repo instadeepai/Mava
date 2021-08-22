@@ -165,8 +165,8 @@ class StateBasedQValueDecentralActionCritic(DecentralisedQValueActorCritic):
             critic_obs_spec.append(tf.TensorSpec(
             shape=spec.shape,
             dtype=tf.dtypes.float32,
-            ))        
-        
+            ))
+
         for agent_type, agents in agents_by_type.items():
             # Only feed in the main agent's policy action.
             critic_act_shape = list(
