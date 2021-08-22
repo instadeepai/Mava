@@ -27,3 +27,27 @@ class Conv1DNetwork(snt.Module):
 
     def __call__(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._network(inputs)
+
+class Conv2DNetwork(snt.Module):
+    """Simple 2D convolutional network setup."""
+
+    def __init__(
+        self,
+        channels: List[int] = [32, 32, 32, 32],
+        kernel: List[int] = [2, 4, 3, 3],
+        stride: List[int] = [2, 2, 2, 2],
+        name: str = None,
+    ):
+        super(Conv2DNetwork, self).__init__(name=name)
+        assert len(channels) == len(kernel) == len(stride)
+        seq_list = []
+        for i in range(len(channels)):
+            seq_list.append(
+                snt.Conv2D(channels[i], kernel_shape=kernel[i], stride=stride[i])
+            )
+            seq_list.append(tf.nn.relu)
+        seq_list.append(snt.Flatten())
+        self._network = snt.Sequential(seq_list)
+
+    def __call__(self, inputs: tf.Tensor) -> tf.Tensor:
+        return self._network(inputs)

@@ -308,7 +308,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
-        policy, new_state = self._policy_networks[agent_key](batched_observation, state)
+        policy, new_state = self._policy_networks[agent_key](batched_observation, prev_state=state)
         # TODO (dries): Make this support hybrid action spaces.
         if type(self._agent_specs[agent].actions) == BoundedArray:
             # Continuous action

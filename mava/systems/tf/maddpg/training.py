@@ -1067,11 +1067,12 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         obs_target_trans = {}
         for agent in self._agents:
             agent_key = self._agent_net_keys[agent]
-
             reshaped_obs, dims = train_utils.combine_dim(
                 observations[agent].observation
             )
-
+            
+            obs_out = self._observation_networks[agent_key](reshaped_obs)
+    
             obs_trans[agent] = train_utils.extract_dim(
                 self._observation_networks[agent_key](reshaped_obs), dims
             )
