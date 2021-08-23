@@ -90,6 +90,7 @@ class DIAL:
         max_executor_steps: int = None,
         checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava/",
+        checkpoint_minute_interval: int = 5,
         logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
@@ -166,6 +167,8 @@ class DIAL:
                 False.
             checkpoint_subpath (str, optional): subdirectory specifying where to store
                 checkpoints. Defaults to "~/mava/".
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             logger_config (Dict, optional): additional configuration settings for the
                 logger factory. Defaults to {}.
             train_loop_fn (Callable, optional): function to instantiate a train loop.
@@ -221,7 +224,7 @@ class DIAL:
             extra_specs = self._get_extra_specs()
         else:
             extra_specs = {}
-
+        self._checkpoint_minute_interval = checkpoint_minute_interval
         self._builder = builder.DIALBuilder(
             builder.DIALConfig(
                 environment_spec=environment_spec,
@@ -243,6 +246,7 @@ class DIAL:
                 checkpoint=checkpoint,
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
+                checkpoint_minute_interval=checkpoint_minute_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -301,7 +305,7 @@ class DIAL:
         """
         return tf2_savers.CheckpointingRunner(
             counting.Counter(),
-            time_delta_minutes=15,
+            time_delta_minutes=self._checkpoint_minute_interval,
             directory=self._checkpoint_subpath,
             subdirectory="counter",
         )
