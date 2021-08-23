@@ -26,14 +26,14 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb~=0.3.1",
+    "dm-reverb~=0.4.0",
     "jax",
     "jaxlib",
 ]
 
 tf_requirements = [
-    "tensorflow~=2.5.0",
-    "tensorflow_probability==0.12.2",
+    "tensorflow~=2.6.0",
+    "tensorflow_probability~=0.13.0",
     "dm-sonnet",
     "trfl",
 ]
