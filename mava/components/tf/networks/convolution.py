@@ -28,6 +28,7 @@ class Conv1DNetwork(snt.Module):
     def __call__(self, inputs: tf.Tensor) -> tf.Tensor:
         return self._network(inputs)
 
+
 class Conv2DNetwork(snt.Module):
     """Simple 2D convolutional network setup."""
 
@@ -35,7 +36,7 @@ class Conv2DNetwork(snt.Module):
         self,
         channels: List[int] = [32, 32, 32, 32],
         kernel: List[int] = [2, 4, 3, 3],
-        stride: List[int] = [2, 2, 2, 2],
+        stride: List[int] = [3, 3, 2, 2],
         name: str = None,
     ):
         super(Conv2DNetwork, self).__init__(name=name)
