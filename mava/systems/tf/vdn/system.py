@@ -80,6 +80,7 @@ class VDN(MADQN):
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        checkpoint_minute_interval: int = 5,
         logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
@@ -153,6 +154,8 @@ class VDN(MADQN):
                 False.
             checkpoint_subpath (str, optional): subdirectory specifying where to store
                 checkpoints. Defaults to "~/mava/".
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             logger_config (Dict, optional): additional configuration settings for the
                 logger factory. Defaults to {}.
             train_loop_fn (Callable, optional): function to instantiate a train loop.
@@ -195,6 +198,7 @@ class VDN(MADQN):
             max_executor_steps=max_executor_steps,
             checkpoint_subpath=checkpoint_subpath,
             checkpoint=checkpoint,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             train_loop_fn=train_loop_fn,
             train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn=eval_loop_fn,
@@ -230,6 +234,7 @@ class VDN(MADQN):
                 checkpoint=checkpoint,
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
+                checkpoint_minute_interval=checkpoint_minute_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,

@@ -54,6 +54,7 @@ class MAPPOTrainer(mava.Trainer):
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.0,
@@ -81,6 +82,8 @@ class MAPPOTrainer(mava.Trainer):
                 optimizer for updating critic networks.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             discount (float, optional): discount factor for TD updates. Defaults
                 to 0.99.
             lambda_gae (float, optional): scalar determining the mix of bootstrapping
@@ -186,7 +189,7 @@ class MAPPOTrainer(mava.Trainer):
 
                 subdir = os.path.join("trainer", agent_key)
                 checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=15,
+                    time_delta_minutes=checkpoint_minute_interval,
                     directory=checkpoint_subpath,
                     objects_to_save=objects_to_save,
                     subdirectory=subdir,
@@ -485,6 +488,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.0,
@@ -505,6 +509,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             observation_networks=observation_networks,
             dataset=dataset,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             discount=discount,
