@@ -5,6 +5,7 @@
 ![PyPI Python Version](https://img.shields.io/pypi/pyversions/id-mava)
 ![PyPI version](https://badge.fury.io/py/id-mava.svg)
 ![pytest](https://github.com/instadeepai/Mava/workflows/format_and_test/badge.svg)
+[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/instadeepai/Mava.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/instadeepai/Mava/context:python)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/instadeepai/Mava/blob/main/LICENSE)
 
 # Table of Contents
@@ -59,10 +60,11 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [OpenSpiel][openspiel]
 
 
+For details on how to add your own environment, see [here](https://github.com/instadeepai/Mava/tree/feature/add_env_readme/mava/wrappers#readme).
+
 |<img  src="docs/images/multiw_animation.gif" width="85%" /> | <img src="docs/images/sc2_animation.gif" width="85%" />  |
 |:---:|:---:|
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.|
-
 
 ## System Implementations
 

@@ -9,7 +9,7 @@ on:
 jobs:
   test-ubuntu:
     runs-on: onprem
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       matrix:
         python-version: [3.6.13, 3.7.1, 3.8.0]
@@ -71,7 +71,7 @@ jobs:
           mypy . --exclude docs/
       - name: Test with pytest and get code coverage
         run: |
-          pytest --cov-report term-missing --cov=mava  -n "$(grep -c ^processor /proc/cpuinfo)" tests
+          pytest  -n "$(grep -c ^processor /proc/cpuinfo)" tests --ignore-glob="*/*system_test.py"
       - name: Check docstring code coverage
         run: |
           interrogate -c pyproject.toml

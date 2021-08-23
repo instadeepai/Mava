@@ -3,7 +3,7 @@ import numpy as np
 
 from mava import types
 from mava.utils.wrapper_utils import parameterized_restart, parameterized_termination
-from tests.utils.adders_utils import calc_nstep_return
+from tests.adders.adders_utils import calc_nstep_return
 
 agents = {"agent_0", "agent_1", "agent_2"}
 reward_step1 = {"agent_0": 0.0, "agent_1": 0.0, "agent_2": 1.0}

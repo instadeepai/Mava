@@ -80,6 +80,7 @@ class VDN(MADQN):
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        checkpoint_minute_interval: int = 5,
         logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
@@ -134,7 +135,8 @@ class VDN(MADQN):
                 to 20.
             importance_sampling_exponent: (float): Not implemented yet.
             max_priority_weight(float): Not implemented yet.
-            period (int, optional): [description]. Defaults to 20.
+            period (int, optional): The period with which we add sequences. See `period`
+                in `acme.SequenceAdder.period` for more info. Defaults to 20.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             discount (float, optional): discount factor to use for TD updates. Defaults
@@ -152,6 +154,8 @@ class VDN(MADQN):
                 False.
             checkpoint_subpath (str, optional): subdirectory specifying where to store
                 checkpoints. Defaults to "~/mava/".
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             logger_config (Dict, optional): additional configuration settings for the
                 logger factory. Defaults to {}.
             train_loop_fn (Callable, optional): function to instantiate a train loop.
@@ -194,6 +198,7 @@ class VDN(MADQN):
             max_executor_steps=max_executor_steps,
             checkpoint_subpath=checkpoint_subpath,
             checkpoint=checkpoint,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             train_loop_fn=train_loop_fn,
             train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn=eval_loop_fn,
@@ -229,6 +234,7 @@ class VDN(MADQN):
                 checkpoint=checkpoint,
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
+                checkpoint_minute_interval=checkpoint_minute_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,

@@ -13,6 +13,8 @@ for all agents. Each element of the list should be a numpy array,
 of size (env.world.dim_p + env.world.dim_c, 1). Physical actions precede
 communication actions in this array. See environment.py for more details.
 """
+from typing import Optional
+
 from gym import Space
 
 from . import scenarios as scenarios
@@ -20,7 +22,7 @@ from .environment import MultiAgentEnv
 
 
 def make_debugging_env(
-    scenario_name: str, action_space: Space, num_agents: int
+    scenario_name: str, action_space: Space, num_agents: int, seed: Optional[int] = None
 ) -> MultiAgentEnv:
     """
     Creates a MultiAgentEnv object as env. This can be used similar to a gym
@@ -39,8 +41,12 @@ def make_debugging_env(
 
     # load scenario from script
     scenario = scenarios.load(scenario_name).Scenario()
+    if seed:
+        scenario.seed(seed)
+
     # create world
     world = scenario.make_world(num_agents)
+
     # create multiagent environment
 
     env = MultiAgentEnv(
@@ -51,4 +57,5 @@ def make_debugging_env(
         observation_callback=scenario.observation,
         done_callback=scenario.done,
     )
+
     return env

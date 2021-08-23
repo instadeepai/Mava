@@ -53,6 +53,7 @@ class VDNTrainer(MADQNTrainer):
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: Optional[BaseCommunicationModule] = None,
         max_gradient_norm: float = None,
@@ -79,6 +80,8 @@ class VDNTrainer(MADQNTrainer):
             discount (float): discount factor for TD updates.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             communication_module (BaseCommunicationModule): module for communication
@@ -109,6 +112,7 @@ class VDNTrainer(MADQNTrainer):
             optimizer=optimizer,
             discount=discount,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             max_gradient_norm=max_gradient_norm,
