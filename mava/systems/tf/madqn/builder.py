@@ -46,7 +46,7 @@ class MADQNConfig:
             each agent in the system.
         epsilon_min: final minimum value for epsilon at the end of a decay schedule.
         epsilon_decay: the rate at which epislon decays.
-        agent_net_keys: (dict, optional): specifies what network each agent uses.
+        agent_net_keys: specifies what network each agent uses.
             Defaults to {}.
         target_update_period: number of learner steps to perform before updating
             the target networks.
@@ -65,7 +65,7 @@ class MADQNConfig:
         period: consecutive starting points for overlapping rollouts across a sequence.
         discount: discount to use for TD updates.
         checkpoint: boolean to indicate whether to checkpoint models.
-        checkpoint_minute_interval (int): The number of minutes to wait between
+        checkpoint_minute_interval: The number of minutes to wait between
             checkpoints.
         optimizer: type of optimizer to use for updating the parameters of models.
         replay_table_name: string indicating what name to give the replay table.
