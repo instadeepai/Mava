@@ -34,13 +34,13 @@ DiscreteArray = specs.DiscreteArray
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
+    vmin: float,
+    vmax: float,
     net_spec_keys: Dict[str, str] = {},
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     sigma: float = 0.3,
     archecture_type: ArchitectureType = ArchitectureType.feedforward,
-    vmin: float = -150.0,
-    vmax: float = 150.0,
     num_atoms: int = 51,
 ) -> Mapping[str, types.TensorTransformation]:
     """Default networks for mad4pg.
@@ -48,6 +48,8 @@ def make_default_networks(
     Args:
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
             observation spaces etc. for each agent in the system.
+        vmin (float, optional): hyperparameters for the distributional critic in mad4pg.
+        vmax (float, optional): hyperparameters for the distributional critic in mad4pg.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of policy networks.
         critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
@@ -59,10 +61,6 @@ def make_default_networks(
         archecture_type (ArchitectureType, optional): archecture used
             for agent networks. Can be feedforward or recurrent.
             Defaults to ArchitectureType.feedforward.
-        vmin (float, optional): hyperparameters for the distributional critic in mad4pg.
-            Defaults to -150.0.
-        vmax (float, optional): hyperparameters for the distributional critic in mad4pg.
-            Defaults to 150.0.
         num_atoms (int, optional):  hyperparameters for the distributional critic in
             mad4pg. Defaults to 51.
 
