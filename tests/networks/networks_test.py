@@ -152,11 +152,20 @@ class TestNetworkAgentKeys:
             "agent_2": "agent",
         }
 
-        networks = system.make_default_networks(
-            environment_spec=environment_spec,
-            agent_net_keys=agent_net_keys,
-            seed=test_seed,
-        )
+        if system == mad4pg:
+            networks = system.make_default_networks(
+                environment_spec=environment_spec,
+                agent_net_keys=agent_net_keys,
+                vmin=-150,
+                vmax=150,
+                seed=test_seed,
+            )
+        else:
+            networks = system.make_default_networks(
+                environment_spec=environment_spec,
+                agent_net_keys=agent_net_keys,
+                seed=test_seed,
+            )
 
         for key in networks:
             for agent in networks[key]:
