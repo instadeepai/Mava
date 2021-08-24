@@ -880,6 +880,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         agent_types: List[str],
         q_networks: Dict[str, snt.Module],
         target_q_networks: Dict[str, snt.Module],
+        communication_module: BaseCommunicationModule,
         target_update_period: int,
         dataset: tf.data.Dataset,
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
@@ -887,11 +888,16 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
         exploration_scheduler: LinearExplorationScheduler,
-        communication_module: BaseCommunicationModule,
+        importance_sampling_exponent: Optional[float] = None,
+        replay_client: Optional[reverb.TFClient] = None,
+        max_priority_weight: float = 0.9,
+        n_step: int = 5,
+        sequence_length: int = 10,
+        max_replay_size: int = 1_000_000,
         max_gradient_norm: float = None,
-        fingerprint: bool = False,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
+        fingerprint: bool = False,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
@@ -943,14 +949,20 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             checkpoint_minute_interval=checkpoint_minute_interval,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
-            fingerprint=fingerprint,
+            n_step=n_step,
+            importance_sampling_exponent=importance_sampling_exponent,
+            replay_client=replay_client,
             counter=counter,
             logger=logger,
+            fingerprint=fingerprint,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             replay_table_name=replay_table_name,
+            sequence_length=sequence_length,
+            max_priority_weight=max_priority_weight,
+            max_replay_size=max_replay_size
         )
-
+        # Store communication module.
         self._communication_module = communication_module
 
     def _forward(self, inputs: Any) -> None:
@@ -983,6 +995,10 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         )
 
         with tf.GradientTape(persistent=True) as tape:
+            # TODO add observation networks.
+
+            # TODO add fingerprinting.
+            
             q_network_losses: Dict[str, NestedArray] = {
                 agent: {"q_value_loss": tf.zeros(())} for agent in self._agents
             }

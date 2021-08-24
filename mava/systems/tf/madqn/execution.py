@@ -284,7 +284,6 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
         trainer: MADQNTrainer = None,
-        communication_module: Optional[BaseCommunicationModule] = None,
         fingerprint: bool = False,
         evaluator: bool = False,
     ):

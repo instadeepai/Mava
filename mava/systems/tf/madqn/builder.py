@@ -85,13 +85,16 @@ class MADQNConfig:
     prefetch_size: int
     batch_size: int
     n_step: int
+    period: int
+    sequence_length: int
+    max_priority_weight: float
     importance_sampling_exponent: Optional[float]
     discount: float
     checkpoint: bool
     checkpoint_minute_interval: int
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
-    replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
-    checkpoint_subpath: str = "~/mava/"
+    replay_table_name: str
+    checkpoint_subpath: str
 
 
 class MADQNBuilder:
@@ -154,6 +157,10 @@ class MADQNBuilder:
         # Create adder signiture
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
+                environment_spec, self._extra_specs
+            )
+        elif issubclass(self._executor_fn, execution.MADQNRecurrentExecutor):
+            adder_sig = reverb_adders.ParallelSequenceAdder.signature(
                 environment_spec, self._extra_specs
             )
         else:
@@ -240,6 +247,13 @@ class MADQNBuilder:
                 client=replay_client,
                 n_step=self._config.n_step,
                 discount=self._config.discount,
+            )
+        elif issubclass(self._executor_fn, execution.MADQNRecurrentExecutor):
+            adder = reverb_adders.ParallelSequenceAdder(
+                priority_fns=None,
+                client=replay_client,
+                sequence_length=self._config.sequence_length,
+                period=self._config.period,
             )
         else:
             raise NotImplementedError("Unsupported executor type: ", self._executor_fn)
