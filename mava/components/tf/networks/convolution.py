@@ -35,7 +35,7 @@ class Conv2DNetwork(snt.Module):
     def __init__(
         self,
         channels: List[int] = [32, 32, 32, 32],
-        kernel: List[int] = [2, 4, 3, 3],
+        kernel: List[int] = [8, 4, 3, 3],
         stride: List[int] = [3, 3, 2, 2],
         name: str = None,
     ):
