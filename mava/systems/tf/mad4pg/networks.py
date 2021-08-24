@@ -31,8 +31,8 @@ DiscreteArray = specs.DiscreteArray
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
-    vmin: float,
-    vmax: float,
+    vmin: float = None,
+    vmax: float = None,
     net_spec_keys: Dict[str, str] = {},
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
@@ -70,7 +70,11 @@ def make_default_networks(
     Returns:
         Mapping[str, types.TensorTransformation]: returned agent networks.
     """
-
+    if not vmin or not vmax:
+        raise ValueError(
+            "vmin and vmax cannot be None. They should be set to the"
+            "minimum and maximum cumulative reward in the environment."
+        )
     return make_default_networks_maddpg(
         environment_spec=environment_spec,
         agent_net_keys=agent_net_keys,

@@ -68,7 +68,6 @@ class MADDPGBaseTrainer(mava.Trainer):
         counts: Dict[str, Any],
         num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -99,17 +98,11 @@ class MADDPGBaseTrainer(mava.Trainer):
                 network.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            checkpoint_minute_interval (int): The number of minutes to wait between
-            checkpoints.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
             logger (loggers.Logger, optional): logger object for logging trainer
                 statistics. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
-                True.
-            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
-                Defaults to "~/mava/".
         """
 
         self._agents = agents
@@ -546,7 +539,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         counts: Dict[str, Any],
         num_steps: int,
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -567,7 +559,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
-            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -603,7 +594,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         counts: Dict[str, Any],
         num_steps: int,
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -624,7 +614,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
-            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -700,7 +689,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         counts: Dict[str, Any],
         num_steps: int,
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -721,7 +709,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
-            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -814,7 +801,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         counts: Dict[str, Any],
         num_steps: int,
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -835,7 +821,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
-            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -913,7 +898,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         counts: Dict[str, Any],
         num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
@@ -945,8 +929,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 network.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            checkpoint_minute_interval (int): The number of minutes to wait between
-                checkpoints.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
@@ -954,8 +936,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 statistics. Defaults to None.
             checkpoint (bool, optional): whether to checkpoint networks. Defaults to
                 True.
-            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
-                Defaults to "~/mava/".
             bootstrap_n (int, optional): specifies what bootstrap step to use for the
             critics.
         """
@@ -1493,7 +1473,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         counts: Dict[str, Any],
         num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
@@ -1515,7 +1494,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
-            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -1555,7 +1533,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         counts: Dict[str, Any],
         num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
@@ -1577,7 +1554,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
-            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -1657,7 +1633,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         counts: Dict[str, Any],
         num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
@@ -1679,7 +1654,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
-            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
