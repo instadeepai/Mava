@@ -40,6 +40,7 @@ from mava.wrappers import MADQNDetailedTrainerStatistics
 @dataclasses.dataclass
 class MADQNConfig:
     """Configuration options for the MADQN system.
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
@@ -68,7 +69,8 @@ class MADQNConfig:
             checkpoints.
         optimizer: type of optimizer to use for updating the parameters of models.
         replay_table_name: string indicating what name to give the replay table.
-        checkpoint_subpath: subdirectory specifying where to store checkpoints."""
+        checkpoint_subpath: subdirectory specifying where to store checkpoints.
+    """
 
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
@@ -91,8 +93,8 @@ class MADQNConfig:
     checkpoint: bool
     checkpoint_minute_interval: int
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
-    replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
-    checkpoint_subpath: str = "~/mava/"
+    replay_table_name: str
+    checkpoint_subpath: str
 
 
 class MADQNBuilder:
@@ -122,11 +124,10 @@ class MADQNBuilder:
                 Defaults to execution.MADQNFeedForwardExecutor.
             extra_specs (Dict[str, Any], optional): defines the specifications of extra
                 information used by the system. Defaults to {}.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
-                epsilon decay scheduler. Defaults to LinearExplorationScheduler.
-            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
-                optional): optional function to stabilise experience replay. Defaults
-                to None.
+            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional): ep-
+                silon decay scheduler. Defaults to LinearExplorationScheduler.
+            replay_stabilisation_fn (Type[FingerPrintStabalisation], optional): optional
+                function to stabilise experience replay. Defaults to None.
         """
 
         self._config = config
