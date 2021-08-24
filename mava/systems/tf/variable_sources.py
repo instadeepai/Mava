@@ -10,7 +10,11 @@ from mava.systems.tf import savers as tf2_savers
 
 class VariableSource:
     def __init__(
-        self, variables: Dict[str, Any], checkpoint: bool, checkpoint_subpath: str
+        self,
+        variables: Dict[str, Any],
+        checkpoint: bool,
+        checkpoint_subpath: str,
+        checkpoint_minute_interval: int,
     ) -> None:
         """Initialise the variable source
         Args:
@@ -36,7 +40,7 @@ class VariableSource:
             # Create checkpointer
             subdir = os.path.join("variable_source")
             self._system_checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=15,
+                time_delta_minutes=checkpoint_minute_interval,
                 directory=checkpoint_subpath,
                 objects_to_save=save_variables,
                 subdirectory=subdir,

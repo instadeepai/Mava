@@ -51,6 +51,8 @@ class MADDPGConfig:
         critic_optimizer: optimizer for updating critic networks.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
+        checkpoint_minute_interval (int): The number of minutes to wait between
+            checkpoints.
         discount: discount to use for TD updates.
         batch_size: batch size for updates.
         prefetch_size: size to prefetch from replay.
@@ -69,6 +71,7 @@ class MADDPGConfig:
         max_gradient_norm: value to specify the maximum clipping value for the gradient
             norm during optimization.
         sigma: Gaussian sigma parameter.
+
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         replay_table_name: string indicating what name to give the replay table."""
@@ -83,6 +86,7 @@ class MADDPGConfig:
     executor_samples: List
     net_to_ints: Dict[str, int]
     unique_net_keys: List[str]
+    checkpoint_minute_interval: int
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -396,7 +400,10 @@ class MADDPGBuilder:
 
         # Create variable source
         variable_source = MavaVariableSource(
-            variables, self._config.checkpoint, self._config.checkpoint_subpath
+            variables,
+            self._config.checkpoint,
+            self._config.checkpoint_subpath,
+            self._config.checkpoint_minute_interval,
         )
         return variable_source
 

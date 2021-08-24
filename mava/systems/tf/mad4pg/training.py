@@ -55,7 +55,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -73,6 +72,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         counts: Dict[str, Any],
         num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -103,6 +103,8 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 network.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
@@ -118,11 +120,12 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             discount=discount,
             target_averaging=target_averaging,
             target_update_period=target_update_period,
@@ -130,14 +133,13 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_keys=agent_net_keys,
-            policy_optimizer=policy_optimizer,
-            critic_optimizer=critic_optimizer,
-            max_gradient_norm=max_gradient_norm,
-            logger=logger,
             variable_client=variable_client,
             counts=counts,
             num_steps=num_steps,
+            agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
+            max_gradient_norm=max_gradient_norm,
+            logger=logger,
         )
 
     # Forward pass that calculates loss.
@@ -254,6 +256,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         counts: Dict[str, Any],
         num_steps: int,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -274,6 +277,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -309,6 +313,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         counts: Dict[str, Any],
         num_steps: int,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -329,6 +334,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -364,6 +370,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         counts: Dict[str, Any],
         num_steps: int,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
@@ -384,6 +391,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -422,10 +430,51 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         counts: Dict[str, Any],
         num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
     ):
+        """Initialise Recurrent MAD4PG trainer
+
+        Args:
+            agents (List[str]): agent ids, e.g. "agent_0".
+            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
+            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+                the system.
+            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks (Dict[str, snt.Module]): target policy networks.
+            target_critic_networks (Dict[str, snt.Module]): target critic networks.
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                optimizer(s) for updating policy networks.
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+                optimizer for updating critic networks.
+            discount (float): discount factor for TD updates.
+            target_averaging (bool): whether to use polyak averaging for target network
+                updates.
+            target_update_period (int): number of steps before target networks are
+                updated.
+            target_update_rate (float): update rate when using averaging.
+            dataset (tf.data.Dataset): training dataset.
+            observation_networks (Dict[str, snt.Module]): network for feature
+                extraction from raw observation.
+            target_observation_networks (Dict[str, snt.Module]): target observation
+                network.
+            agent_net_keys: (dict, optional): specifies what network each agent uses.
+                Defaults to {}.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
+            max_gradient_norm (float, optional): maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter (counting.Counter, optional): step counter object. Defaults to None.
+            logger (loggers.Logger, optional): logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+        """
 
         super().__init__(
             agents=agents,
@@ -443,6 +492,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -620,6 +670,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
         counts: Dict[str, Any],
         num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
@@ -641,6 +692,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -679,6 +731,7 @@ class MAD4PGCentralisedRecurrentTrainer(
         counts: Dict[str, Any],
         num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
@@ -700,6 +753,7 @@ class MAD4PGCentralisedRecurrentTrainer(
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -738,6 +792,7 @@ class MAD4PGStateBasedRecurrentTrainer(
         counts: Dict[str, Any],
         num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
@@ -759,6 +814,7 @@ class MAD4PGStateBasedRecurrentTrainer(
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,

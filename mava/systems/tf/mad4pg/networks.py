@@ -31,13 +31,13 @@ DiscreteArray = specs.DiscreteArray
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
+    vmin: float,
+    vmax: float,
     net_spec_keys: Dict[str, str] = {},
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     sigma: float = 0.3,
     archecture_type: ArchitectureType = ArchitectureType.feedforward,
-    vmin: float = -150.0,
-    vmax: float = 150.0,
     num_atoms: int = 51,
     seed: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
@@ -46,21 +46,23 @@ def make_default_networks(
     Args:
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
             observation spaces etc. for each agent in the system.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
+        vmin (float, optional): hyperparameters for the distributional critic in mad4pg.
+            Defaults to -150.0.
+        vmax (float, optional): hyperparameters for the distributional critic in mad4pg.
+            Defaults to 150.0.
+        net_spec_keys (dict, optional): specifies the specs of each network.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of policy networks.
         critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of critic networks. Defaults to (512, 512, 256).
-        shared_weights (bool, optional): whether agents should share weights or not.
-            Defaults to True.
         sigma (float, optional): hyperparameters used to add Gaussian noise
             for simple exploration. Defaults to 0.3.
         archecture_type (ArchitectureType, optional): archecture used
             for agent networks. Can be feedforward or recurrent.
             Defaults to ArchitectureType.feedforward.
-        vmin (float, optional): hyperparameters for the distributional critic in mad4pg.
-            Defaults to -150.0.
-        vmax (float, optional): hyperparameters for the distributional critic in mad4pg.
-            Defaults to 150.0.
+
         num_atoms (int, optional):  hyperparameters for the distributional critic in
             mad4pg. Defaults to 51.
         seed (int, optional): random seed for network initialization.
@@ -68,9 +70,11 @@ def make_default_networks(
     Returns:
         Mapping[str, types.TensorTransformation]: returned agent networks.
     """
+
     return make_default_networks_maddpg(
         environment_spec=environment_spec,
         agent_net_keys=agent_net_keys,
+        net_spec_keys=net_spec_keys,
         policy_networks_layer_sizes=policy_networks_layer_sizes,
         critic_networks_layer_sizes=critic_networks_layer_sizes,
         sigma=sigma,

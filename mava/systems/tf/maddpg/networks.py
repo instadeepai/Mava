@@ -51,6 +51,7 @@ def make_default_networks(
             observation spaces etc. for each agent in the system.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
+        net_spec_keys (dict, optional): specifies the specs of each network.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of policy networks.
         critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
@@ -60,9 +61,9 @@ def make_default_networks(
         archecture_type (ArchitectureType, optional): archecture used for
             agent networks. Can be feedforward or recurrent. Defaults to
             ArchitectureType.feedforward.
-        vmin (float, optional): hyperparameters for the distributional critic in mad4pg.
+        vmin (float, optional): Minimum value the critic in mad4pg can estimate.
             Only for mad4pg.
-        vmax (float, optional): hyperparameters for the distributional critic in mad4pg.
+        vmax (float, optional): Maximum value the critic in mad4pg can estimate.
             Only for mad4pg.
         num_atoms (int, optional):  hyperparameters for the distributional critic in
             mad4pg. Only for mad4pg.

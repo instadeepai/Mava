@@ -83,6 +83,7 @@ class DIALConfig:
     sequence_length: int
     period: int
     discount: float
+    checkpoint_minute_interval: int
     checkpoint: bool
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
@@ -384,6 +385,7 @@ class DIALBuilder:
             counter=counter,
             fingerprint=fingerprint,
             logger=logger,
+            checkpoint_minute_interval=self._config.checkpoint_minute_interval,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
         )

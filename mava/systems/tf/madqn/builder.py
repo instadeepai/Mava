@@ -64,6 +64,8 @@ class MADQNConfig:
         period: consecutive starting points for overlapping rollouts across a sequence.
         discount: discount to use for TD updates.
         checkpoint: boolean to indicate whether to checkpoint models.
+        checkpoint_minute_interval (int): The number of minutes to wait between
+            checkpoints.
         optimizer: type of optimizer to use for updating the parameters of models.
         replay_table_name: string indicating what name to give the replay table.
         checkpoint_subpath: subdirectory specifying where to store checkpoints."""
@@ -87,6 +89,7 @@ class MADQNConfig:
     period: int
     discount: float
     checkpoint: bool
+    checkpoint_minute_interval: int
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
@@ -398,6 +401,7 @@ class MADQNBuilder:
             logger=logger,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
+            checkpoint_minute_interval=self._config.checkpoint_minute_interval,
         )
 
         trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore

@@ -61,7 +61,11 @@ def main(_: Any) -> None:
     )
 
     # Networks.
-    network_factory = lp_utils.partial_kwargs(mad4pg.make_default_networks)
+    network_factory = lp_utils.partial_kwargs(
+        mad4pg.make_default_networks,
+        vmin=-150,
+        vmax=150,
+    )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"

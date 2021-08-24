@@ -73,6 +73,7 @@ class MAD4PG(MADDPG):
         sigma: float = 0.3,
         max_gradient_norm: float = None,
         checkpoint: bool = True,
+        checkpoint_minute_interval: int = 5,
         checkpoint_subpath: str = "~/mava/",
         logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
@@ -147,6 +148,8 @@ class MAD4PG(MADDPG):
                 before clipping is applied. Defaults to None.
             checkpoint (bool, optional): whether to checkpoint models. Defaults to
                 False.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             checkpoint_subpath (str, optional): subdirectory specifying where to store
                 checkpoints. Defaults to "~/mava/".
             logger_config (Dict, optional): additional configuration settings for the
@@ -191,6 +194,7 @@ class MAD4PG(MADDPG):
             max_gradient_norm=max_gradient_norm,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             logger_config=logger_config,
             train_loop_fn=train_loop_fn,
             eval_loop_fn=eval_loop_fn,
