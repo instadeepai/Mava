@@ -425,6 +425,9 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         if self._reset_next_step:
             return self.reset()
 
+        # TODO Use self.agents after PZ SMac wrapper fix.
+        agents = [agent for agent in self.agents if not self.all_dones[agent]]
+        actions = {key: actions[key] for key in agents}
         observations, rewards, dones, infos = self._environment.step(actions)
 
         rewards = self._convert_reward(rewards)
@@ -499,14 +502,18 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             types.Observation: spec for environment.
         """
         observation_specs = {}
+        # TODO(Kale-ab): Check if box type
         for agent in self.possible_agents:
             observation_specs[agent] = types.OLT(
                 observation=_convert_to_spec(
-                    self._environment.observation_spaces[agent]
+                    self._environment.observation_spaces[agent]["observation"]
                 ),
-                legal_actions=_convert_to_spec(self._environment.action_spaces[agent]),
+                legal_actions=_convert_to_spec(
+                    self.observation_spaces[agent]["action_mask"]
+                ),
                 terminal=specs.Array((1,), np.float32),
             )
+
         return observation_specs
 
     def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:

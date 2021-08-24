@@ -110,7 +110,6 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         Returns:
             types.NestedTensor: agent action
         """
-
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
         batched_legals = tf2_utils.add_batch_dim(legal_actions)
@@ -125,9 +124,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         else:
             q_values = self._q_networks[agent_net_key](batched_observation)
 
-        # select legal action
         action = self._action_selectors[agent_net_key](
-            q_values, batched_legals, epsilon=epsilon
+            action_values=q_values, legal_actions_mask=batched_legals, epsilon=epsilon
         )
 
         return action
@@ -146,11 +144,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             types.NestedArray: agent action
         """
 
-        if not self._evaluator:
-            epsilon = self._trainer.get_epsilon()
-        else:
-            epsilon = 1e-10
-
+        epsilon = self._trainer.get_epsilon()
         epsilon = tf.convert_to_tensor(epsilon)
 
         if self._fingerprint:
@@ -236,13 +230,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
 
         actions = {}
         for agent, observation in observations.items():
-            # Pass the observation through the policy network.
-            if not self._evaluator:
-                epsilon = self._trainer.get_epsilon()
-            else:
-                # Note (dries): For some reason 0 epsilon breaks on StarCraft.
-                epsilon = 1e-10
-
+            epsilon = self._trainer.get_epsilon()
             epsilon = tf.convert_to_tensor(epsilon)
 
             if self._fingerprint:
@@ -260,7 +248,6 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
                 epsilon,
                 fingerprint,
             )
-
             actions[agent] = tf2_utils.to_numpy_squeeze(action)
 
         # Return a numpy array with squeezed out batch dimension.
@@ -412,7 +399,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
             if self._trainer is not None:
                 epsilon = self._trainer.get_epsilon()
             else:
-                epsilon = 0.0
+                epsilon = 0.05
 
             epsilon = tf.convert_to_tensor(epsilon)
 
@@ -573,7 +560,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
             if self._trainer is not None:
                 epsilon = self._trainer.get_epsilon()
             else:
-                epsilon = 0.0
+                epsilon = 0.05
 
             epsilon = tf.convert_to_tensor(epsilon)
 

@@ -41,10 +41,12 @@ def convert_dm_compatible_observations(
         types.Observation: dm compatible observation.
     """
     observations: Dict[str, types.OLT] = {}
+
     if observes:
         for agent, observation in observes.items():
             if isinstance(observation, dict) and "action_mask" in observation:
-                legals = observation["action_mask"]
+                # TODO: Read spec
+                legals = observation["action_mask"].astype(np.int8)
                 observation = observation["observation"]
             else:
                 # TODO Handle legal actions better for continous envs,
@@ -69,7 +71,7 @@ def convert_dm_compatible_observations(
                 ),
                 legal_actions=np.ones(
                     action_spaces[agent].shape,
-                    dtype=action_spaces[agent].dtype,
+                    dtype=np.int8,
                 ),
                 terminal=np.asarray([env_done], dtype=np.float32),
             )
