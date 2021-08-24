@@ -110,10 +110,19 @@ class TestNetworkAgentKeys:
             "agent_1": "agent_1",
             "agent_2": "agent_2",
         }
-        networks = system.make_default_networks(  # type: ignore
-            environment_spec=environment_spec,  # type: ignore
-            agent_net_keys=agent_net_keys,
-        )
+
+        if system == mad4pg:
+            networks = system.make_default_networks(  # type: ignore
+                environment_spec=environment_spec,  # type: ignore
+                agent_net_keys=agent_net_keys,
+                vmin=-150,
+                vmax=150,
+            )
+        else:
+            networks = system.make_default_networks(  # type: ignore
+                environment_spec=environment_spec,  # type: ignore
+                agent_net_keys=agent_net_keys,
+            )
         for key in networks.keys():
             assert ["agent_0", "agent_1", "agent_2"] == list(
                 networks[key].keys()
