@@ -68,6 +68,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -102,6 +103,8 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 network.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
@@ -130,6 +133,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
@@ -248,6 +252,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -270,6 +275,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -301,6 +307,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -323,6 +330,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -354,6 +362,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -376,6 +385,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -410,6 +420,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -445,6 +456,8 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 network.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
@@ -471,6 +484,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -644,6 +658,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -667,6 +682,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -701,6 +717,7 @@ class MAD4PGCentralisedRecurrentTrainer(
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -724,6 +741,7 @@ class MAD4PGCentralisedRecurrentTrainer(
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,
@@ -758,6 +776,7 @@ class MAD4PGStateBasedRecurrentTrainer(
         observation_networks: Dict[str, snt.Module],
         target_observation_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -781,6 +800,7 @@ class MAD4PGStateBasedRecurrentTrainer(
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
             max_gradient_norm=max_gradient_norm,

@@ -54,6 +54,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: BaseCommunicationModule,
         max_gradient_norm: float = None,
@@ -77,6 +78,8 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             discount (float): discount factor for TD updates.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             communication_module (BaseCommunicationModule): module for communication
@@ -104,6 +107,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             optimizer=optimizer,
             discount=discount,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,

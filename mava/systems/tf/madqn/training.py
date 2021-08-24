@@ -63,6 +63,7 @@ class MADQNTrainer(mava.Trainer):
         optimizer: Union[Dict[str, snt.Optimizer], snt.Optimizer],
         discount: float,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         exploration_scheduler: LinearExplorationScheduler,
         observation_networks: Optional[Dict[str, snt.Module]] = None,
         target_observation_networks: Optional[Dict[str, snt.Module]] = None,
@@ -94,6 +95,8 @@ class MADQNTrainer(mava.Trainer):
             discount (float): discount factor for TD updates.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -221,7 +224,7 @@ class MADQNTrainer(mava.Trainer):
                 subdir = os.path.join("trainer", agent_key)
                 checkpointer = tf2_savers.Checkpointer(
                     directory=checkpoint_subpath,
-                    time_delta_minutes=15,
+                    time_delta_minutes=checkpoint_minute_interval,
                     objects_to_save={
                         "counter": self._counter,
                         "q_network": self._q_networks[agent_key],
@@ -586,6 +589,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         exploration_scheduler: LinearExplorationScheduler,
         importance_sampling_exponent: Optional[float] = None,
         replay_client: Optional[reverb.TFClient] = None,
@@ -614,6 +618,8 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             discount (float): discount factor for TD updates.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -650,6 +656,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             optimizer=optimizer,
             discount=discount,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             n_step=n_step,
@@ -810,6 +817,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
         exploration_scheduler: LinearExplorationScheduler,
         communication_module: BaseCommunicationModule,
         max_gradient_norm: float = None,
@@ -834,6 +842,8 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             discount (float): discount factor for TD updates.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             exploration_scheduler (LinearExplorationScheduler): function specifying a
                 decaying scheduler for epsilon exploration.
             communication_module (BaseCommunicationModule): module for communication
@@ -862,6 +872,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             optimizer=optimizer,
             discount=discount,
             agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,

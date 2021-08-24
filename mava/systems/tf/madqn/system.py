@@ -655,6 +655,7 @@ class RecurrentMADQN:
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        checkpoint_minute_interval: int = 5,
         logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
@@ -736,6 +737,8 @@ class RecurrentMADQN:
                 False.
             checkpoint_subpath (str, optional): subdirectory specifying where to store
                 checkpoints. Defaults to "~/mava/".
+            checkpoint_minute_interval (int): The number of minutes to wait between
+                checkpoints.
             logger_config (Dict, optional): additional configuration settings for the
                 logger factory. Defaults to {}.
             train_loop_fn (Callable, optional): function to instantiate a train loop.
@@ -787,6 +790,7 @@ class RecurrentMADQN:
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
+        self._checkpoint_minute_interval = checkpoint_minute_interval
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
@@ -816,6 +820,7 @@ class RecurrentMADQN:
                 checkpoint=checkpoint,
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
+                checkpoint_minute_interval=checkpoint_minute_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -881,7 +886,7 @@ class RecurrentMADQN:
         if checkpoint:
             return tf2_savers.CheckpointingRunner(
                 counting.Counter(),
-                time_delta_minutes=15,
+                time_delta_minutes=self._checkpoint_minute_interval,
                 directory=self._checkpoint_subpath,
                 subdirectory="counter",
             )

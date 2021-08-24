@@ -43,6 +43,8 @@ class MAPPOConfig:
         critic_optimizer: optimizer for updating critic networks.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
+        checkpoint_minute_interval (int): The number of minutes to wait between
+            checkpoints.
         sequence_length: recurrent sequence rollout length.
         sequence_period: consecutive starting points for overlapping rollouts across a
             sequence.
@@ -71,6 +73,7 @@ class MAPPOConfig:
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
     agent_net_keys: Dict[str, str]
+    checkpoint_minute_interval: int
     sequence_length: int = 10
     sequence_period: int = 5
     discount: float = 0.99
@@ -300,6 +303,7 @@ class MAPPOBuilder:
             max_gradient_norm=self._config.max_gradient_norm,
             counter=counter,
             logger=logger,
+            checkpoint_minute_interval=self._config.checkpoint_minute_interval,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
