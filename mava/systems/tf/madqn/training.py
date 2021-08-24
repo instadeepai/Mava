@@ -433,7 +433,7 @@ class MADQNTrainer(mava.Trainer):
 
         # Initialize sample priorities at zero.
         # We will add priorities from each agent
-        # to this and then average over all agents.
+        # to this.
         priorities = tf.zeros_like(inputs.info.priority, dtype="float32")
 
         # Unpack input data as follows:
@@ -502,9 +502,10 @@ class MADQNTrainer(mava.Trainer):
                 )
 
                 # Compute the huber loss using td_error.
+                # As in Acme/dqn
                 loss = losses.huber(extra.td_error, self._huber_loss_parameter)
 
-                # Maybe apply importance weights like in acme/dqn.
+                # Maybe apply importance weights like in Acme/dqn.
                 if self._importance_sampling_exponent is not None:
                     importance_weights = 1.0 / probs
                     importance_weights **= self._importance_sampling_exponent
@@ -526,8 +527,7 @@ class MADQNTrainer(mava.Trainer):
 
         # Store sample keys and priorities
         self._keys = keys
-        # Averaged over agents.
-        self._priorities = priorities / len(self._agents)
+        self._priorities = priorities
 
     def _backward(self) -> None:
         """Trainer backward pass updating network parameters"""
@@ -574,8 +574,9 @@ class MADQNTrainer(mava.Trainer):
 class MADQNRecurrentTrainer(MADQNTrainer):
     """Recurrent MADQN trainer.
 
-    This is the trainer component of a MADQN system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
+    This is the trainer component of a recurrent MADQN system. IE it takes 
+    a dataset as input and implements update functionality to learn from 
+    this dataset.
     """
 
     def __init__(
@@ -594,14 +595,15 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         importance_sampling_exponent: Optional[float] = None,
         replay_client: Optional[reverb.TFClient] = None,
         max_priority_weight: float = 0.9,
-        n_step: int = 1,
+        n_step: int = 5,
+        sequence_length: int = 10,
+        max_replay_size: int = 1_000_000,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         fingerprint: bool = False,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        communication_module: Optional[BaseCommunicationModule] = None,
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
     ):
         """Initialise recurrent MADQN trainer
@@ -662,7 +664,6 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             n_step=n_step,
             importance_sampling_exponent=importance_sampling_exponent,
             replay_client=replay_client,
-            max_priority_weight=max_priority_weight,
             counter=counter,
             logger=logger,
             fingerprint=fingerprint,
@@ -670,6 +671,74 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             checkpoint_subpath=checkpoint_subpath,
             replay_table_name=replay_table_name,
         )
+        # Aditional variables.
+        self._sequence_length = sequence_length
+        self._max_priority_weight = max_priority_weight
+        self._max_replay_size = max_replay_size
+
+    def _get_feed(
+        self,
+        agent: str,
+        observations: Dict[str, np.ndarray],
+        actions: Dict[str, np.ndarray],
+        rewards: Dict[str, np.ndarray],
+        discounts: Dict[str, np.ndarray],
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        """Get data to feed to the agent networks.
+
+        Args:
+            agent (str): agent id
+            observations (Dict[str, np.ndarray]): Time sequence of observations.
+            actions (Dict[str, np.ndarray]): Time sequence of actions.
+            rewards (Dict[str, np.ndarray]): Time sequence of rewards.
+            discounts (Dict[str, np.ndarray]): Time sequence of env discounts.
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: agent
+            network feeds.
+        """
+        # Decentralised i.e. independent Q-learners
+        observation_feed = observations[agent].observation
+        action_feed = actions[agent]
+        reward_feed = rewards[agent]
+        discount_feed = discounts[agent]
+
+        return observation_feed, action_feed, reward_feed, discount_feed
+
+    def _transform_observation(
+        self, agent_key: str, observation_feed: tf.Tensor
+    ) -> Tuple[tf.Tensor, tf.Tensor]:
+        """Transform the agents observation with its observation network.
+
+        Args:
+            agent_key (str): the key for the agent's observation network.
+            observation_feed (tf.Tensor): the agent's observation feed.
+
+        Returns:
+            Tuple[tf.Tensor, tf.Tensor]: Returns a tuple with the transformed
+                observation and target observation.
+        """
+        # Store leaing dims.
+        T, B = observation_feed.shape[:2]
+        # Merge leading dims.
+        observation_feed = snt.merge_leading_dims(observation_feed, num_dims=2)
+
+        # Pass through observation network.
+        trans_observation = self._observation_networks[agent_key](observation_feed)
+        # Pass through target observation_network.
+        trans_target_observation = self._target_observation_networks[agent_key](observation_feed)
+
+        # Maybe apply fingerprinting.
+        if self._fingerprint_module is not None:
+            # TODO implement fingerprinting here.
+            pass
+
+        # Reshape [T, B, embed_dim]
+        dims = (T, B, -1)
+        trans_observation = tf.reshape(trans_observation, dims)
+        trans_target_observation = tf.reshape(trans_target_observation, dims)
+
+        return trans_observation, trans_target_observation
 
     def _forward(self, inputs: Any) -> None:
         """Trainer forward pass
@@ -678,109 +747,109 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             inputs (Any): input data from the data table (transitions)
         """
         # Get info about the samples from reverb.
-        sample_info = inputs.info
-        sample_keys = tf.transpose(inputs.info.key)
-        sample_probs = tf.transpose(sample_info.probability)
+        keys, probs = inputs.info[:2]
 
         # Initialize sample priorities at zero.
-        sample_priorities = np.zeros(len(inputs.info.key))
+        # We will add priorities from each agent
+        # to this.
+        priorities = tf.zeros_like(inputs.info.priority, dtype="float32")
 
+        # Add batch dim to tensors that are missing it.
         data = tree.map_structure(
             lambda v: tf.expand_dims(v, axis=0) if len(v.shape) <= 1 else v, inputs.data
         )
+
+        # [B, T, ...] -> [T, B, ...]
         data = tf2_utils.batch_to_sequence(data)
 
-        observations, actions, rewards, discounts, _, extras = data
+        observations, actions, rewards, discounts, _, extras = (data.observation,
+                                                                data.action,
+                                                                data.reward,
+                                                                data.discount,
+                                                                data.next_extras,
+                                                                data.extras)
 
-        # core_states = extra["core_states"]
+        # Get the initial states of the recurrent networks
+        # from replay. 
         core_states = tree.map_structure(
             lambda s: s[:, 0, :], inputs.data.extras["core_states"]
         )
-
-        # Initial states.
         states = {agent: core_states[agent][0] for agent in self._agents}
         target_states = {agent: core_states[agent][0] for agent in self._agents}
 
+        # TODO add in "burn in period" for recurrent networks
+        # see acme/r2d2.
+
+        # Dict to store q-network losses
         q_network_losses: Dict[str, NestedArray] = {}
         with tf.GradientTape(persistent=True) as tape:
-
-            # Unroll over time dimension.
-            T = list(observations.values())[0].observation.shape[0]  # time dimension
-            q_stacks: Dict[str, list] = {agent: [] for agent in self._agents}
-            q_target_stacks: Dict[str, list] = {agent: [] for agent in self._agents}
-            for t in range(T):
-
-                # Step each agent.
-                for agent in self._agents:
-                    agent_key = self._agent_net_keys[agent]
-
-                    # Get agent observation at timestep t
-                    observation = observations[agent].observation[t]
-
-                    # Target Q-Network
-                    q_target, new_target_state = self._target_q_networks[agent_key](
-                        observation,
-                        target_states[agent],
-                    )
-
-                    # Online Q-Network
-                    q, new_state = self._q_networks[agent_key](
-                        observation,
-                        states[agent],
-                    )
-
-                    # Update states.
-                    states[agent] = new_state
-                    target_states[agent] = new_target_state
-
-                    # Add qs to stack.
-                    q_stacks[agent].append(q)
-                    q_target_stacks[agent].append(q_target)
-
-            # Loop through agents and compute losses.
             for agent in self._agents:
                 agent_key = self._agent_net_keys[agent]
 
-                # Get q by stacking
-                q = tf.stack(q_stacks[agent], axis=0)
-                q_target = tf.stack(q_target_stacks[agent], axis=0)
+                # Get agent feed.
+                observation_feed, action_feed, reward_feed, discount_feed = self._get_feed(
+                                                                                    agent,
+                                                                                    observations,
+                                                                                    actions,
+                                                                                    rewards,
+                                                                                    discounts)
 
-                # Argmax over online policy for double q_learning
-                greedy_actions = tf.argmax(q, axis=-1)
-                num_actions = q_target.shape[-1]
-                target_policy_probs = tf.one_hot(
-                    greedy_actions, depth=num_actions, dtype=q_target.dtype
+                # Transform observations with observation network.
+                observation_feed, target_observation_feed = self._transform_observation(
+                                                        agent_key, 
+                                                        observation_feed)
+
+                # Compute q_values.
+                q_values, _ = snt.static_unroll(
+                    self._q_networks[agent],
+                    observation_feed,
+                    states[agent],
+                    self._sequence_length
+                )
+
+                # Compute target q_values.
+                target_q_values = snt.static_unroll(
+                    self._target_q_networks[agent],
+                    target_observation_feed,
+                    target_states[agent],
+                    self._sequence_length
                 )
 
                 # Cast discount type.
-                discount = tf.cast(self._discount, dtype=discounts[agent][0].dtype)
+                discount = tf.cast(self._discount, dtype=discount_feed[0].dtype)
 
-                # See Acme/tf/losses/R2D2
-                loss, loss_extras = transformed_n_step_loss(
-                    q,
-                    q_target,
-                    actions[agent],
-                    rewards[agent][:-1],
-                    discount * discounts[agent][:-1],
-                    target_policy_probs,
-                    self._n_step,
+                # Compute the target policy distribution (greedy).
+                num_actions = q_values.shape[-1]
+                greedy_actions = tf.argmax(q_values, output_type=tf.int32, axis=-1)
+                target_policy_probs = tf.one_hot(
+                    greedy_actions, depth=num_actions, dtype=q_values.dtype)
+
+                # Compute loss as in Acme/r2d2.
+                loss, extra = transformed_n_step_loss(
+                    qs=q_values,
+                    targnet_qs=target_q_values,
+                    actions=action_feed,
+                    rewards=reward_feed,
+                    pcontinues=discount_feed * discount,
+                    target_policy_probs=target_policy_probs,
+                    bootstrap_n=self._n_step,
                 )
 
                 # Maybe calculate importance weights and use them to scale the loss.
                 if self._importance_sampling_exponent is not None:
-                    importance_weights = 1.0 / sample_probs  # [B]
+                    importance_weights = 1.0 / (self._max_replay_size * probs)  # [T, B]
                     importance_weights **= self._importance_sampling_exponent
                     importance_weights /= tf.reduce_max(importance_weights)
 
                     # Reweight loss.
-                    loss *= tf.cast(importance_weights, loss.dtype)  # [B]
+                    loss *= tf.cast(importance_weights, tf.float32)  # [T, B]
 
-                    # Update priorities.
-                    errors = loss_extras.errors
+                    # Compute priority as mixture of max and mean sequence errors.
+                    errors = extra.errors
                     abs_errors = tf.abs(errors)
                     mean_priority = tf.reduce_mean(abs_errors, axis=0)
                     max_priority = tf.reduce_max(abs_errors, axis=0)
-                    sample_priorities += (
+                    priorities += (
                         self._max_priority_weight * max_priority
                         + (1 - self._max_priority_weight) * mean_priority
                     )
@@ -793,10 +862,9 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         self.tape = tape
 
         # Store sample keys and priorities
-        self._sample_keys = sample_keys
-        self._sample_priorities = sample_priorities / len(
-            self._agents
-        )  # averaged over agents.
+        # Store sample keys and priorities
+        self._keys = keys
+        self._priorities = priorities
 
 
 class MADQNRecurrentCommTrainer(MADQNTrainer):
