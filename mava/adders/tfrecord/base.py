@@ -16,6 +16,7 @@
 """Adders that use TFRecords to save experience to disk."""
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Dict
 
 import dm_env
@@ -23,7 +24,7 @@ from acme import types
 
 from mava.specs import MAEnvironmentSpec
 
-DEFAULT_SUBDIR = "~/mava/tfrecords/"
+DEFAULT_SUBDIR = "./tfrecords"
 
 
 class TFRecordParallelAdder:
@@ -51,6 +52,9 @@ class TFRecordParallelAdder:
 
         # Join id and subdir.
         self._subdir: str = os.path.join(subdir, id)
+
+        # Make the directory if it does not exist.
+        Path(self._subdir).mkdir(parents=True, exist_ok=True)
 
     def _write(self) -> None:
         raise NotImplementedError

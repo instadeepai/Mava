@@ -71,7 +71,7 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
         self._write_ctr = 0
         self._buffer_ctr = 0
 
-    def _bytes_feature(self, value: np.Array, dtype: str) -> tf.train.Feature:
+    def _bytes_feature(self, value: np.array, dtype: str) -> tf.train.Feature:
         """Returns a bytes_list from a string / byte."""
         value = tf.convert_to_tensor(value, dtype=dtype)
         value = tf.io.serialize_tensor(value).numpy()
@@ -139,7 +139,7 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
             # Store observation.
             key = "obs_" + agent
             observation = self._observations[agent].observation
-            dtype = agent_specs[agent].observations.dtype
+            dtype = agent_specs[agent].observations.observation.dtype
             transition[key] = self._bytes_feature(observation, dtype)
 
             # Store action.
@@ -157,7 +157,7 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
             # Store next observation.
             key = "nob_" + agent
             next_observation = next_timestep.observation[agent].observation
-            dtype = agent_specs[agent].observations.dtype
+            dtype = agent_specs[agent].observations.observation.dtype
             transition[key] = self._bytes_feature(next_observation, dtype)
 
             # Store discount.
