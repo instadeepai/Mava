@@ -359,6 +359,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
     def __init__(
         self,
         environment: ParallelEnv,
+        return_state_info: bool = False,
         env_preprocess_wrappers: Optional[List] = [
             # (env_preprocessor, dict_with_preprocessor_params)
             (black_death_v1, None),
@@ -373,6 +374,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         """
         self._environment = environment
         self._reset_next_step = True
+        self._return_state_info = return_state_info
 
         if env_preprocess_wrappers:
             self._environment = apply_env_wrapper_preprocessers(
@@ -410,6 +412,16 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             for agent in self.possible_agents
         }
 
+        # If we want state information and it has not been provided as part of
+        # env env_extras.
+        if (
+            self._return_state_info
+            and hasattr(self._environment, "get_state")
+            and "s_t" not in env_extras
+        ):
+            state = self._environment.get_state()
+            env_extras["s_t"] = state
+
         return parameterized_restart(rewards, self._discounts, observations), env_extras
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
@@ -426,12 +438,17 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             return self.reset()
 
         # TODO Use self.agents after PZ SMac wrapper fix.
-        agents = [agent for agent in self.agents if not self.all_dones[agent]]
-        actions = {key: actions[key] for key in agents}
+        # agents = [agent for agent in self.agents if not self.all_dones[agent]]
+        actions = {key: actions[key] for key in self.agents}
         observations, rewards, dones, infos = self._environment.step(actions)
 
         rewards = self._convert_reward(rewards)
         observations = self._convert_observations(observations, dones)
+
+        if self._return_state_info and hasattr(self._environment, "get_state"):
+            state = self._environment.get_state()
+        else:
+            state = None
 
         if self.env_done():
             self._step_type = dm_env.StepType.LAST
@@ -439,12 +456,17 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         else:
             self._step_type = dm_env.StepType.MID
 
-        return dm_env.TimeStep(
+        timestep = dm_env.TimeStep(
             observation=observations,
             reward=rewards,
             discount=self._discounts,
             step_type=self._step_type,
         )
+
+        if state:
+            return timestep, {"s_t": state}
+        else:
+            return timestep
 
     def env_done(self) -> bool:
         """Check if env is done.

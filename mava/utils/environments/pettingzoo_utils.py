@@ -84,7 +84,9 @@ def make_environment(
     if env_class == "smac":
         env = StarCraft2PZEnv.parallel_env(map_name=env_name)
         # wrap parallel environment
-        environment = PettingZooParallelEnvWrapper(env, env_preprocess_wrappers=[])
+        environment = PettingZooParallelEnvWrapper(
+            env, env_preprocess_wrappers=[], return_state_info=True
+        )
     else:
         env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
 
