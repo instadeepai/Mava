@@ -31,6 +31,7 @@ import mava
 from mava import core
 from mava import specs as mava_specs
 from mava.adders import reverb as reverb_adders
+from mava.adders.tfrecord import TFRecordParallelAdder
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
@@ -41,7 +42,7 @@ from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
-from mava.wrappers import DetailedPerAgentStatistics
+from mava.wrappers import DetailedPerAgentStatistics, TFRecordWrapper
 
 
 class MADQN:
@@ -96,6 +97,8 @@ class MADQN:
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
+        tfrecord_adder_factory: Optional[Type[TFRecordParallelAdder]] = None,
+        tfrecord_adder_kwargs: Dict = {},
     ):
         """Initialise the system
 
@@ -176,6 +179,10 @@ class MADQN:
             eval_loop_fn_kwargs: possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
             replay_table_name: reverb table name.
+            tfrecord_adder_factory: optional function to instantiate a
+                TFRecordAdder instance.
+            tfrecord_adder_kwargs: kwargs to be passed to the
+                TFRecordAdder.
         """
 
         if not environment_spec:
@@ -218,6 +225,15 @@ class MADQN:
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
         self._checkpoint_minute_interval = checkpoint_minute_interval
+
+        # Maybe instantiate TFRecordAdder.
+        if tfrecord_adder_factory:
+            self._tfrecord_adder = tfrecord_adder_factory(
+                environment_spec, **tfrecord_adder_kwargs
+            )
+        else:
+            # TODO (Claude): fix this typing error.
+            self._tfrecord_adder = None  # type: ignore
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
@@ -460,6 +476,11 @@ class MADQN:
             variable_source=variable_source,
             trainer=trainer,
         )
+
+        # Maybe wrap executor in TFRecord wrapper.
+        # TODO (Claude): fix this typing error.
+        if self._tfrecord_adder:
+            executor = TFRecordWrapper(executor, self._tfrecord_adder)  # type: ignore
 
         # TODO (Arnu): figure out why factory function are giving type errors
         # Create the environment.

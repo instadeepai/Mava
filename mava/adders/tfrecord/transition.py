@@ -57,10 +57,7 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
                 "~/mava/tfrecords/".
 
         """
-        super().__init__(id, subdir)
-
-        # Store env spec.
-        self._environment_spec = environment_spec
+        super().__init__(environment_spec, id, subdir)
 
         # A variable to store the last observation.
         self._observations: Dict = {}

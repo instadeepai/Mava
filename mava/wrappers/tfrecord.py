@@ -19,7 +19,7 @@ from typing import Any, Dict
 import dm_env
 from acme import types
 
-from mava.adders.tfrecord import TFRecordParallelTransitionAdder
+from mava.adders.tfrecord import TFRecordParallelAdder
 from mava.systems.tf.executors import FeedForwardExecutor
 
 
@@ -27,7 +27,7 @@ class TFRecordWrapper:
     def __init__(
         self,
         executor: FeedForwardExecutor,
-        tfrecord_adder: TFRecordParallelTransitionAdder,
+        tfrecord_adder: TFRecordParallelAdder,
     ):
         """A class to wrap an executor to store experience to disk.
 

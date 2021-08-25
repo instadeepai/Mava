@@ -21,6 +21,8 @@ from typing import Dict
 import dm_env
 from acme import types
 
+from mava.specs import MAEnvironmentSpec
+
 DEFAULT_SUBDIR = "~/mava/tfrecords/"
 
 
@@ -29,18 +31,25 @@ class TFRecordParallelAdder:
 
     def __init__(
         self,
+        environment_spec: MAEnvironmentSpec,
         id: str = str(datetime.now()),
         subdir: str = DEFAULT_SUBDIR,
     ):
         """A TFRecord Base Adder.
 
         Args:
+            environment_spec: specification of the environment. Used to
+                determin dtypes for the tensors.
             transitions_per_file: number of transitions to store in each file.
             id: a string identifying this set of records.
             subdir: directory to which the records should be stored. Defualts to
                 "~/mava/tfrecords/".
 
         """
+        # Store env spec.
+        self._environment_spec = environment_spec
+
+        # Join id and subdir.
         self._subdir: str = os.path.join(subdir, id)
 
     def _write(self) -> None:
