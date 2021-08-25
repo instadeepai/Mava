@@ -29,7 +29,6 @@ class TFRecordParallelAdder:
 
     def __init__(
         self,
-        transitions_per_file: int = 100_000,
         id: str = str(datetime.now()),
         subdir: str = DEFAULT_SUBDIR,
     ):
@@ -42,7 +41,6 @@ class TFRecordParallelAdder:
                 "~/mava/tfrecords/".
 
         """
-        self._max_buffer_size: int = transitions_per_file
         self._subdir: str = os.path.join(subdir, id)
 
     def _write(self) -> None:

@@ -57,6 +57,8 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
                 "~/mava/tfrecords/".
 
         """
+        super().__init__(id, subdir)
+
         # Store env spec.
         self._environment_spec = environment_spec
 
@@ -66,6 +68,7 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
         # A buffer to hold transitions before
         # writing them to disk. Periodically cleared.
         self._buffer: List = []
+        self._max_buffer_size: int = transitions_per_file
 
         # Counters.
         self._write_ctr = 0
