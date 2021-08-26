@@ -201,8 +201,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         return convert_dm_compatible_observations(
             observes,
             dones,
-            self.action_spaces,
-            self.observation_spaces,
+            self.observation_spec(),
             self.env_done(),
             self.possible_agents,
         )

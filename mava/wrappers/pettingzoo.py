@@ -22,12 +22,13 @@ import gym
 import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
+from gym import spaces
 from pettingzoo.utils.env import AECEnv, ParallelEnv
 from supersuit import black_death_v1
 
 from mava import types
 from mava.utils.wrapper_utils import (
-    apply_env_wrapper_preprocessers,
+    apply_env_wrapper_preprocessors,
     convert_dm_compatible_observations,
     convert_np_type,
     parameterized_restart,
@@ -55,7 +56,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         self._reset_next_step = True
 
         if env_preprocess_wrappers:
-            self._environment = apply_env_wrapper_preprocessers(
+            self._environment = apply_env_wrapper_preprocessors(
                 self._environment, env_preprocess_wrappers
             )
         self.correct_agent_name()
@@ -377,7 +378,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         self._return_state_info = return_state_info
 
         if env_preprocess_wrappers:
-            self._environment = apply_env_wrapper_preprocessers(
+            self._environment = apply_env_wrapper_preprocessors(
                 self._environment, env_preprocess_wrappers
             )
 
@@ -437,8 +438,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         if self._reset_next_step:
             return self.reset()
 
-        # TODO Use self.agents after PZ SMac wrapper fix.
-        # agents = [agent for agent in self.agents if not self.all_dones[agent]]
+        # Get valid actions for active agents
         actions = {key: actions[key] for key in self.agents}
         observations, rewards, dones, infos = self._environment.step(actions)
 
@@ -483,17 +483,15 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             rewards (Dict[str, float]): rewards per agent.
         """
         rewards_spec = self.reward_spec()
-        # Handle empty rewards
-        if not rewards:
-            rewards = {
-                agent: convert_np_type(rewards_spec[agent].dtype, 0)
-                for agent in self.possible_agents
-            }
-        else:
-            rewards = {
-                agent: convert_np_type(rewards_spec[agent].dtype, reward)
-                for agent, reward in rewards.items()
-            }
+        rewards = {}
+        for agent in self.possible_agents:
+            if agent in rewards:
+                rewards[agent] = convert_np_type(
+                    rewards_spec[agent].dtype, rewards[agent]
+                )
+            # Default reward
+            else:
+                rewards[agent] = convert_np_type(rewards_spec[agent].dtype, 0)
         return rewards
 
     def _convert_observations(
@@ -511,8 +509,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         return convert_dm_compatible_observations(
             observes,
             dones,
-            self._environment.action_spaces,
-            self._environment.observation_spaces,
+            self.observation_spec(),
             self.env_done(),
             self.possible_agents,
         )
@@ -524,15 +521,22 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             types.Observation: spec for environment.
         """
         observation_specs = {}
-        # TODO(Kale-ab): Check if box type
         for agent in self.possible_agents:
-            observation_specs[agent] = types.OLT(
-                observation=_convert_to_spec(
+            if type(self._environment.observation_spaces[agent]) == spaces.Box:
+                observation = self._environment.observation_spaces[agent]
+                legal_actions = self._environment.action_spaces[agent]
+            else:
+                # For env link SC2 with action mask spec
+                observation = _convert_to_spec(
                     self._environment.observation_spaces[agent]["observation"]
-                ),
-                legal_actions=_convert_to_spec(
+                )
+                legal_actions = _convert_to_spec(
                     self.observation_spaces[agent]["action_mask"]
-                ),
+                )
+
+            observation_specs[agent] = types.OLT(
+                observation=observation,
+                legal_actions=legal_actions,
                 terminal=specs.Array((1,), np.float32),
             )
 
