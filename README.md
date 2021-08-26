@@ -22,6 +22,14 @@
 
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability.
 
+<hr>
+<p align="center">
+<em>“Mava” means experience, or wisdom, in Xhosa one of South Africa’s eleven official languages.</em>
+</p>
+<hr>
+
+To read more about the motivation behind Mava, please see our [blog post][blog], [release][release] and [technical report][Paper].
+
 > 👷‍♀️ **NOTICE**: Our release of Mava is foremost to benefit the wider community and make it easier for researchers to work on MARL.
 > However, we consider this release a **Beta version of Mava**. As with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
 > From incorporating the latest research and innovations to making the framework more stable, robust and well tested.
@@ -324,3 +332,5 @@ If you use Mava in your work, please cite the accompanying
 [wishlist]: https://github.com/instadeepai/Mava/issues/247
 [bsuite]: https://github.com/deepmind/bsuite
 [quickstart]: examples/quickstart.ipynb
+[blog]: https://medium.com/instadeep/mava-a-new-framework-for-multi-agent-reinforcement-learning-5dcc158e104e
+[release]: https://www.instadeep.com/2021/07/mava-a-new-framework-for-distributed-multi-agent-reinforcement-learning/
