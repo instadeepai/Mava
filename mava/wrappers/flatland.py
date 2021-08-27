@@ -140,10 +140,15 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         """Return list of all possible agents."""
         return self._possible_agents
 
-    def render(self) -> np.array:
+    def render(self, mode: str = "human") -> np.array:
         """Renders the environment."""
+        if mode == "human":
+            show = True
+        else:
+            show = False
+
         return self._env_renderer.render_env(
-            show=True,
+            show=show,
             show_observations=False,
             show_predictions=False,
             return_image=True,
