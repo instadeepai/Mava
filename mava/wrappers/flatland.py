@@ -28,6 +28,7 @@ from acme.wrappers.gym_wrapper import _convert_to_spec
 try:
     from flatland.envs.observations import GlobalObsForRailEnv, Node, TreeObsForRailEnv
     from flatland.envs.rail_env import RailEnv
+    from flatland.utils.rendertools import AgentRenderVariant, RenderTool
 except ModuleNotFoundError:
     pass
 from gym.spaces import Discrete
@@ -80,6 +81,13 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         ] = None,
         agent_info: bool = True,
     ):
+        """Wrap Flatland environment.
+
+        Args:
+            environment: underlying RailEnv
+            preprocessor: optional preprocessor. Defaults to None.
+            agent_info: include agent info. Defaults to True.
+        """
         self._environment = environment
         decorate_step_method(self._environment)
 
@@ -114,19 +122,47 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             get_agent_id(i): infer_observation_space(ob) for i, ob in obs.items()
         }
 
+        self._env_renderer = RenderTool(
+            self._environment,
+            agent_render_variant=AgentRenderVariant.ONE_STEP_BEHIND,
+            show_debug=False,
+            screen_height=600,  # Adjust these parameters to fit your resolution
+            screen_width=800,
+        )  # Adjust these parameters to fit your resolution
+
     @property
     def agents(self) -> List[str]:
+        """Return list of active agents."""
         return self._agents
 
     @property
     def possible_agents(self) -> List[str]:
+        """Return list of all possible agents."""
         return self._possible_agents
 
+    def render(self, mode: str = "human") -> np.array:
+        """Renders the environment."""
+        if mode == "human":
+            show = True
+        else:
+            show = False
+
+        return self._env_renderer.render_env(
+            show=show,
+            show_observations=False,
+            show_predictions=False,
+            return_image=True,
+        )
+
     def env_done(self) -> bool:
+        """Checks if the environment is done."""
         return self._environment.dones["__all__"] or not self.agents
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the episode."""
+        # Reset the rendering sytem
+        self._env_renderer.reset()
+
         self._reset_next_step = False
         self._agents = self.possible_agents[:]
         self._discounts = {
@@ -230,6 +266,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         info: Dict[str, Dict[int, Any]],
         dones: Dict[int, bool],
     ) -> Observation:
+        """Convert observation."""
         observations_ = self._collate_obs_and_info(obs, info)
         dones_ = {get_agent_id(k): v for k, v in dones.items()}
         observations = self._convert_observations(observations_, dones_)
@@ -238,8 +275,11 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     def _obtain_preprocessor(
         self, preprocessor: Any
     ) -> Callable[[Dict[int, Any]], Dict[int, np.ndarray]]:
-        """Obtains the actual preprocessor to be used based on the supplied
-        preprocessor and the env's obs_builder object"""
+        """Obtains the actual preprocessor.
+
+        Obtains the actual preprocessor to be used based on the supplied
+        preprocessor and the env's obs_builder object
+        """
         if not isinstance(self.obs_builder, GlobalObsForRailEnv):
             _preprocessor = preprocessor if preprocessor else lambda x: x
             if isinstance(self.obs_builder, TreeObsForRailEnv):
@@ -273,6 +313,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             self._step_type = dm_env.StepType.LAST
 
     def observation_spec(self) -> Dict[str, OLT]:
+        """Return observation spec."""
         observation_specs = {}
         for agent in self.agents:
             observation_specs[agent] = OLT(
@@ -290,6 +331,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         return observation_specs
 
     def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
+        """Get action spec."""
         action_specs = {}
         action_spaces = self.action_spaces
         for agent in self.possible_agents:
@@ -297,12 +339,14 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         return action_specs
 
     def reward_spec(self) -> Dict[str, specs.Array]:
+        """Get the reward spec."""
         reward_specs = {}
         for agent in self.possible_agents:
             reward_specs[agent] = specs.Array((), np.float32)
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
+        """Get the discount spec."""
         discount_specs = {}
         for agent in self.possible_agents:
             discount_specs[agent] = specs.BoundedArray(
@@ -311,9 +355,11 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         return discount_specs
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        """Get the extras spec."""
         return {}
 
     def seed(self, seed: int = None) -> None:
+        """Seed the environment."""
         self._environment._seed(seed)
 
     @property
@@ -373,10 +419,12 @@ def get_agent_handle(id: str) -> int:
 
 
 def decorate_step_method(env: RailEnv) -> None:
-    """Enable the step method of the env to take action dictionaries where agent keys
+    """Step method decorator.
+
+    Enable the step method of the env to take action dictionaries where agent keys
     are the agent ids. Flatland uses the agent handles as keys instead. This function
     decorates the step method so that it accepts an action dict where the keys are the
-    agent ids
+    agent ids.
     """
     env.step_ = env.step
 
@@ -397,7 +445,8 @@ def decorate_step_method(env: RailEnv) -> None:
 
 
 def max_lt(seq: Sequence, val: Any) -> Any:
-    """
+    """Get max in sequence.
+
     Return greatest item in seq for which item < val applies.
     None is returned if seq was empty or all items in seq were >= val.
     """
@@ -411,7 +460,8 @@ def max_lt(seq: Sequence, val: Any) -> Any:
 
 
 def min_gt(seq: Sequence, val: Any) -> Any:
-    """
+    """Gets min in a sequence.
+
     Return smallest item in seq for which item > val applies.
     None is returned if seq was empty or all items in seq were >= val.
     """
@@ -431,7 +481,8 @@ def norm_obs_clip(
     fixed_radius: int = 0,
     normalize_to_range: bool = False,
 ) -> np.ndarray:
-    """
+    """Normalize observation.
+
     This function returns the difference between min and max value of an observation
     :param obs: Observation that should be normalized
     :param clip_min: min value where observation will be clipped
@@ -457,6 +508,7 @@ def norm_obs_clip(
 def _split_node_into_feature_groups(
     node: Node,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Splits node into features."""
     data = np.zeros(6)
     distance = np.zeros(1)
     agent_data = np.zeros(4)
@@ -481,6 +533,7 @@ def _split_node_into_feature_groups(
 def _split_subtree_into_feature_groups(
     node: Node, current_tree_depth: int, max_tree_depth: int
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Split subtree."""
     if node == -np.inf:
         remaining_depth = max_tree_depth - current_tree_depth
         # reference:
@@ -511,9 +564,7 @@ def _split_subtree_into_feature_groups(
 def split_tree_into_feature_groups(
     tree: Node, max_tree_depth: int
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    This function splits the tree into three difference arrays of values
-    """
+    """This function splits the tree into three difference arrays."""
     data, distance, agent_data = _split_node_into_feature_groups(tree)
 
     for direction in TreeObsForRailEnv.tree_explored_actions_char:
@@ -530,9 +581,7 @@ def split_tree_into_feature_groups(
 def normalize_observation(
     observation: Node, tree_depth: int, observation_radius: int = 0
 ) -> np.ndarray:
-    """
-    This function normalizes the observation used by the RL algorithm
-    """
+    """This function normalizes the observation used by the RL algorithm."""
     if observation is None:
         return np.zeros(
             11 * sum(np.power(4, i) for i in range(tree_depth + 1)), dtype=np.float32
