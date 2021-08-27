@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from typing import Dict, Mapping, Optional, Sequence, Union
 
 import sonnet as snt
@@ -20,10 +21,8 @@ from acme.tf.networks.atari import DQNAtariNetwork
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
-from mava.components.tf.networks import epsilon_greedy
-
-# , epsilon_greedy_action_selector
 from mava.components.tf.networks.communication import CommunicationNetwork
+from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 from mava.utils.enums import ArchitectureType, Network
 
 
@@ -143,7 +142,8 @@ def make_default_networks(
 
         # epsilon greedy action selector
         q_networks[key] = q_network
-        action_selectors[key] = epsilon_greedy.EpsilonGreedy()
+
+        action_selectors[key] = EpsilonGreedy
 
     return {
         "q_networks": q_networks,

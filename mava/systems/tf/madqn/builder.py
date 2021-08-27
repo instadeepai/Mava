@@ -34,7 +34,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import execution, training
-from mava.wrappers import MADQNDetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -43,6 +43,7 @@ class MADQNConfig:
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
+        epsilon_start: initial epsilon value.
         epsilon_min: final minimum value for epsilon at the end of a decay schedule.
         epsilon_decay: the rate at which epislon decays.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
@@ -72,6 +73,7 @@ class MADQNConfig:
 
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
+    epsilon_start: float
     epsilon_decay: float
     agent_net_keys: Dict[str, str]
     target_update_period: int
@@ -328,6 +330,28 @@ class MADQNBuilder:
         # Check if we should use fingerprints
         fingerprint = True if self._replay_stabiliser_fn is not None else False
 
+        # If evaluator, use 0.0 for epsilon
+        if evaluator:
+            epsilon_start = 0.0
+            epsilon_min = 0.0
+            epsilon_decay = 0.0
+        else:
+            epsilon_start = self._config.epsilon_start
+            epsilon_min = self._config.epsilon_min
+            epsilon_decay = self._config.epsilon_decay
+
+        # Pass scheduler and initialize action selectors
+        action_selectors = {
+            network: action_selector_fn(
+                self._exploration_scheduler_fn(
+                    epsilon_start=epsilon_start,
+                    epsilon_min=epsilon_min,
+                    epsilon_decay=epsilon_decay,
+                )
+            )
+            for network, action_selector_fn in action_selectors.items()
+        }
+
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
@@ -374,12 +398,6 @@ class MADQNBuilder:
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
-        # Make epsilon scheduler
-        exploration_scheduler = self._exploration_scheduler_fn(
-            epsilon_min=self._config.epsilon_min,
-            epsilon_decay=self._config.epsilon_decay,
-        )
-
         # Check if we should use fingerprints
         fingerprint = True if self._replay_stabiliser_fn is not None else False
 
@@ -394,7 +412,6 @@ class MADQNBuilder:
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
-            exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             dataset=dataset,
             counter=counter,
@@ -405,6 +422,6 @@ class MADQNBuilder:
             checkpoint_minute_interval=self._config.checkpoint_minute_interval,
         )
 
-        trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore
+        trainer = DetailedTrainerStatistics(trainer)  # type:ignore
 
         return trainer

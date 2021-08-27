@@ -30,7 +30,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.vdn import execution, training
-from mava.wrappers import MADQNDetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -146,12 +146,6 @@ class VDNBuilder(MADQNBuilder):
         mixing_network = networks["mixing"]
         target_mixing_network = networks["target_mixing"]
 
-        # Make epsilon scheduler
-        exploration_scheduler = self._exploration_scheduler_fn(
-            epsilon_min=self._config.epsilon_min,
-            epsilon_decay=self._config.epsilon_decay,
-        )
-
         # Check if we should use fingerprints
         fingerprint = True if self._replay_stabiliser_fn is not None else False
 
@@ -168,7 +162,6 @@ class VDNBuilder(MADQNBuilder):
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
-            exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             dataset=dataset,
             counter=counter,
@@ -179,6 +172,6 @@ class VDNBuilder(MADQNBuilder):
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore
+        trainer = DetailedTrainerStatistics(trainer)  # type:ignore
 
         return trainer

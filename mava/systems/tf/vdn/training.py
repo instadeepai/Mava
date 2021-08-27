@@ -25,9 +25,6 @@ from trfl.indexing_ops import batched_index
 
 from mava import types as mava_types
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
-)
 from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.utils import training_utils as train_utils
 
@@ -54,7 +51,6 @@ class VDNTrainer(MADQNTrainer):
         discount: float,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
-        exploration_scheduler: LinearExplorationScheduler,
         communication_module: Optional[BaseCommunicationModule] = None,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
@@ -82,8 +78,6 @@ class VDNTrainer(MADQNTrainer):
                 Defaults to {}.
             checkpoint_minute_interval (int): The number of minutes to wait between
                 checkpoints.
-            exploration_scheduler (LinearExplorationScheduler): function specifying a
-                decaying scheduler for epsilon exploration.
             communication_module (BaseCommunicationModule): module for communication
                 between agents. Defaults to None.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -113,7 +107,6 @@ class VDNTrainer(MADQNTrainer):
             discount=discount,
             agent_net_keys=agent_net_keys,
             checkpoint_minute_interval=checkpoint_minute_interval,
-            exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
@@ -141,7 +134,7 @@ class VDNTrainer(MADQNTrainer):
         self._backward()
 
         # Log losses per agent
-        return {agent: {"q_value_loss": self.loss} for agent in self._agents}
+        return {agent: {"policy_loss": self.loss} for agent in self._agents}
 
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass

@@ -149,46 +149,6 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
                 self._network_loggers[network].write(network_running_statistics)
 
 
-class MADQNDetailedTrainerStatistics(DetailedTrainerStatistics):
-    """Custom DetailedTrainerStatistics class for exposing get_epsilon()"""
-
-    def __init__(
-        self,
-        trainer: mava.Trainer,
-        metrics: List[str] = ["policy_loss"],
-        summary_stats: List = ["mean", "max", "min", "var", "std"],
-    ) -> None:
-        super().__init__(trainer, metrics, summary_stats)
-
-    def get_trainer_steps(self) -> float:
-        return self._trainer.get_trainer_steps()  # type: ignore
-
-    def step(self) -> None:
-        # Run the learning step.
-        fetches = self._step()
-
-        if self._require_loggers:
-            self._create_loggers(list(fetches.keys()))
-            self._require_loggers = False
-
-        # compute statistics
-        self._compute_statistics(fetches)
-
-        timestamp = time.time()
-        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
-        self._timestamp = timestamp
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        if self._system_checkpointer:
-            train_utils.checkpoint_networks(self._system_checkpointer)
-
-        if self._logger:
-            self._logger.write(fetches)
-
-
 # TODO(Kale-ab): Is there a better way to do this?
 # Maybe using hooks or callbacks.
 class NetworkStatisticsBase(TrainerWrapperBase):

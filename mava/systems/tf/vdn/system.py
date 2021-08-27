@@ -54,6 +54,7 @@ class VDN(MADQN):
             LinearExplorationScheduler
         ] = LinearExplorationScheduler,
         epsilon_min: float = 0.05,
+        epsilon_start: float = 1,
         epsilon_decay: float = 1e-4,
         num_executors: int = 1,
         num_caches: int = 0,
@@ -216,6 +217,7 @@ class VDN(MADQN):
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
+                epsilon_start=epsilon_start,
                 agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,

@@ -33,7 +33,6 @@ except ModuleNotFoundError:
     pass
 from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
-    MADQNDetailedTrainerStatistics,
     NetworkStatisticsActorCritic,
     NetworkStatisticsMixing,
 )

@@ -33,7 +33,7 @@ class BaseExplorationScheduler:
         self._epsilon = epsilon_start
 
     @abc.abstractmethod
-    def decrement_epsilon(self) -> None:
+    def decrement_epsilon(self) -> float:
         """Decrement the epsilon decay value."""
 
     def get_epsilon(self) -> float:
@@ -59,16 +59,9 @@ class LinearExplorationScheduler(BaseExplorationScheduler):
             epsilon_decay,
         )
 
-    def decrement_epsilon(self) -> None:
-        if self._epsilon == self._epsilon_min:
-            return
-
-        elif self._epsilon < self._epsilon_min:
-            # Should only ever happen once.
-            self._epsilon = self._epsilon_min
-            return
-
-        self._epsilon -= self._epsilon_decay
+    def decrement_epsilon(self) -> float:
+        self._epsilon = max(self._epsilon_min, self._epsilon - self._epsilon_decay)
+        return self._epsilon
 
 
 class ExponentialExplorationScheduler(BaseExplorationScheduler):
@@ -87,13 +80,8 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
             epsilon_decay,
         )
 
-    def decrement_epsilon(self) -> None:
-        if self._epsilon == self._epsilon_min:
-            return
-
-        elif self._epsilon < self._epsilon_min:
-            # Should only ever happen once.
-            self._epsilon = self._epsilon_min
-            return
-
-        self._epsilon *= 1 - self._epsilon_decay
+    def decrement_epsilon(self) -> float:
+        self._epsilon = max(
+            self._epsilon_min, self._epsilon * (1 - self._epsilon_decay)
+        )
+        return self._epsilon
