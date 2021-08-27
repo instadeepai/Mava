@@ -155,13 +155,10 @@ class MADQNDetailedTrainerStatistics(DetailedTrainerStatistics):
     def __init__(
         self,
         trainer: mava.Trainer,
-        metrics: List[str] = ["q_value_loss"],
+        metrics: List[str] = ["policy_loss"],
         summary_stats: List = ["mean", "max", "min", "var", "std"],
     ) -> None:
         super().__init__(trainer, metrics, summary_stats)
-
-    def get_epsilon(self) -> float:
-        return self._trainer.get_epsilon()  # type: ignore
 
     def get_trainer_steps(self) -> float:
         return self._trainer.get_trainer_steps()  # type: ignore
@@ -187,9 +184,6 @@ class MADQNDetailedTrainerStatistics(DetailedTrainerStatistics):
 
         if self._system_checkpointer:
             train_utils.checkpoint_networks(self._system_checkpointer)
-
-        fetches["epsilon"] = self.get_epsilon()
-        self._trainer._decrement_epsilon()  # type: ignore
 
         if self._logger:
             self._logger.write(fetches)
@@ -474,7 +468,7 @@ class NetworkStatisticsMixing(NetworkStatisticsBase):
         self._backward()
 
         # Log losses per agent
-        return {agent: {"q_value_loss": self.loss} for agent in self._agents}
+        return {agent: {"policy_loss": self.loss} for agent in self._agents}
 
     def _backward(self) -> None:
         log_current_timestep = self._log_step()
