@@ -28,7 +28,7 @@ import reverb
 import tensorflow as tf
 import tree
 from acme import specs, types
-from acme.adders.reverb import utils
+from acme.adders.reverb import utils as acme_utils
 from acme.adders.reverb.episode import EpisodeAdder, _PaddingFn
 
 from mava.adders.reverb import base
@@ -95,8 +95,6 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
 
         super().add(action, next_timestep, next_extras)
 
-    # TODO(Kale-ab) Consider deprecating in future versions and using acme
-    # version of this function.
     def _write_last(self) -> None:
         if (
             self._padding_fn is not None
@@ -125,7 +123,9 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         trajectory = base.Trajectory(**trajectory)
 
         # Calculate the priority for this episode.
-        table_priorities = utils.calculate_priorities(self._priority_fns, trajectory)
+        table_priorities = acme_utils.calculate_priorities(
+            self._priority_fns, trajectory
+        )
 
         # Create a prioritized item for each table.
         for table_name, priority in table_priorities.items():
