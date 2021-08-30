@@ -70,6 +70,7 @@ class DIALConfig:
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
     epsilon_decay: float
+    epsilon_start: float
     agent_net_keys: Dict[str, str]
     target_update_period: int
     executor_variable_update_period: int
@@ -316,6 +317,28 @@ class DIALBuilder:
         # Check if we should use fingerprints
         fingerprint = True if self._replay_stabiliser_fn is not None else False
 
+        # If evaluator, use 0.0 for epsilon
+        if evaluator:
+            epsilon_start = 0.0
+            epsilon_min = 0.0
+            epsilon_decay = 0.0
+        else:
+            epsilon_start = self._config.epsilon_start
+            epsilon_min = self._config.epsilon_min
+            epsilon_decay = self._config.epsilon_decay
+
+        # Pass scheduler and initialize action selectors
+        action_selectors = {
+            network: action_selector_fn(
+                self._exploration_scheduler_fn(
+                    epsilon_start=epsilon_start,
+                    epsilon_min=epsilon_min,
+                    epsilon_decay=epsilon_decay,
+                )
+            )
+            for network, action_selector_fn in action_selectors.items()
+        }
+
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
@@ -360,12 +383,6 @@ class DIALBuilder:
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
-        # Make epsilon scheduler
-        exploration_scheduler = self._exploration_scheduler_fn(
-            epsilon_min=self._config.epsilon_min,
-            epsilon_decay=self._config.epsilon_decay,
-        )
-
         # Check if we should use fingerprints
         fingerprint = True if self._replay_stabiliser_fn is not None else False
 
@@ -380,7 +397,6 @@ class DIALBuilder:
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
-            exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             dataset=dataset,
             counter=counter,

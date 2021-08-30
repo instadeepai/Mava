@@ -67,6 +67,7 @@ class DIAL:
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
         epsilon_min: float = 0.05,
         epsilon_decay: float = 1e-3,
+        epsilon_start: float = 1,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -230,6 +231,7 @@ class DIAL:
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
+                epsilon_start=epsilon_start,
                 agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
@@ -251,7 +253,6 @@ class DIAL:
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             extra_specs=extra_specs,
-            exploration_scheduler_fn=exploration_scheduler_fn,
             replay_stabilisation_fn=replay_stabilisation_fn,
         )
 

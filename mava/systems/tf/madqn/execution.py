@@ -347,7 +347,6 @@ class MADQNRecurrentExecutor(RecurrentExecutor, DQNExecutor):
         observation: types.NestedTensor,
         state: types.NestedTensor,
         legal_actions: types.NestedTensor,
-        epsilon: tf.Tensor,
     ) -> types.NestedTensor:
         """Agent specific policy function
 
@@ -359,7 +358,6 @@ class MADQNRecurrentExecutor(RecurrentExecutor, DQNExecutor):
             message (types.NestedTensor): received agent messsage.
             legal_actions (types.NestedTensor): actions allowed to be taken at the
                 current observation.
-            epsilon (tf.Tensor): value for epsilon greedy action selection.
 
         Returns:
             types.NestedTensor: action and new recurrent hidden state
@@ -376,9 +374,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor, DQNExecutor):
         q_values, new_state = self._q_networks[agent_key](batched_observation, state)
 
         # select legal action
-        action = self._action_selectors[agent_key](
-            q_values, batched_legals, epsilon=epsilon
-        )
+        action = self._action_selectors[agent_key](q_values, batched_legals)
 
         return action, new_state
 

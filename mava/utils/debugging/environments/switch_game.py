@@ -52,6 +52,7 @@ class MultiAgentSwitchGame(gym.Env):
                 low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32
             )
 
+        self.agents = self.agent_ids
         self.possible_agents = self.agent_ids
 
         # environment parameters

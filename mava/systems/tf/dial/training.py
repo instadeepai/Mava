@@ -27,9 +27,6 @@ from acme.types import NestedArray
 from acme.utils import counting, loggers
 
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
-)
 from mava.systems.tf.madqn.training import MADQNRecurrentCommTrainer
 from mava.utils import training_utils as train_utils
 
@@ -55,7 +52,6 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         discount: float,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
-        exploration_scheduler: LinearExplorationScheduler,
         communication_module: BaseCommunicationModule,
         max_gradient_norm: float = None,
         fingerprint: bool = False,
@@ -80,8 +76,6 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
                 Defaults to {}.
             checkpoint_minute_interval (int): The number of minutes to wait between
                 checkpoints.
-            exploration_scheduler (LinearExplorationScheduler): function specifying a
-                decaying scheduler for epsilon exploration.
             communication_module (BaseCommunicationModule): module for communication
                 between agents.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -108,7 +102,6 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             discount=discount,
             agent_net_keys=agent_net_keys,
             checkpoint_minute_interval=checkpoint_minute_interval,
-            exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,
             counter=counter,
@@ -148,7 +141,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
 
         with tf.GradientTape(persistent=True) as tape:
             q_network_losses: Dict[str, NestedArray] = {
-                agent: {"q_value_loss": tf.zeros(())} for agent in self._agents
+                agent: {"policy_loss": tf.zeros(())} for agent in self._agents
             }
 
             state = {agent: core_state[agent][0] for agent in self._agents}
@@ -230,7 +223,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
 
                     loss = tf.reduce_mean(loss[t - 1 <= ep_end])
                     # loss = tf.reduce_mean(loss)
-                    q_network_losses[agent]["q_value_loss"] += loss
+                    q_network_losses[agent]["policy_loss"] += loss
 
         self._q_network_losses = q_network_losses
         self.tape = tape
