@@ -142,8 +142,8 @@ class QMIXTrainer(MADQNTrainer):
                     dest.assign(src)
 
             # NOTE These shouldn't really be in the agent for loop.
-            online_variables = self.get_mixing_vars("mixing")
-            target_variables = self.get_mixing_vars("target_mixing")
+            online_variables = [*self._mixing_network.variables]
+            target_variables = [*self._target_mixing_network.variables]
 
             # Make online -> target network update ops.
             for src, dest in zip(online_variables, target_variables):
@@ -286,13 +286,13 @@ class QMIXTrainer(MADQNTrainer):
         for agent in self._agents:
             agent_key = self._agent_net_keys[agent]
             # Update agent networks
-            variables = self._q_networks[agent_key].trainable_variables
+            variables = [*self._q_networks[agent_key].trainable_variables]
             gradients = self.tape.gradient(self.loss, variables)
             gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
             self._optimizers[agent_key].apply(gradients, variables)
 
         # Update mixing network
-        variables = self.get_mixing_trainable_vars("mixing")
+        variables = [*self._mixing_network.trainable_variables]
         gradients = self.tape.gradient(self.loss, variables)
 
         gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
@@ -300,6 +300,7 @@ class QMIXTrainer(MADQNTrainer):
 
         train_utils.safe_del(self, "tape")
 
+    # TODO(Kale-ab): Ini _system_network_variables
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         """get network variables
 
@@ -324,35 +325,3 @@ class QMIXTrainer(MADQNTrainer):
                     for key in self.unique_net_keys
                 }
         return variables
-
-    def get_mixing_trainable_vars(self, network: str = "mixing") -> List:
-        """get trainable mixing network variables
-
-        Args:
-            network (str, optional): mixing network name. Defaults to "mixing".
-
-        Returns:
-            List: network variables
-        """
-
-        mixing_trainable_vars = []
-        for var in self._mixing_network.trainable_variables:
-            if var.name.startswith(network):
-                mixing_trainable_vars.append(var)
-        return mixing_trainable_vars
-
-    def get_mixing_vars(self, network: str = "mixing") -> List:
-        """get all network variables, including target mixing variables.
-
-        Args:
-            network (str, optional): mixing network name. Defaults to "mixing".
-
-        Returns:
-            List: network variables
-        """
-
-        mixing_vars = []
-        for var in self._mixing_network.variables:
-            if var.name.startswith(network):
-                mixing_vars.append(var)
-        return mixing_vars

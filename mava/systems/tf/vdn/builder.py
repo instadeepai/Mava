@@ -140,9 +140,8 @@ class VDNBuilder(MADQNBuilder):
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
-        q_networks = networks["values"]
-        target_q_networks = networks["target_values"]
-
+        q_networks = networks["agent_networks"]["values"]
+        target_q_networks = networks["agent_networks"]["target_values"]
         mixing_network = networks["mixing"]
         target_mixing_network = networks["target_mixing"]
 

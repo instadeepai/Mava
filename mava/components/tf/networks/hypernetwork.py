@@ -23,7 +23,6 @@ from tensorflow import Tensor
 class HyperNetwork(snt.Module):
     def __init__(
         self,
-        agent_networks: Dict[str, snt.Module],
         qmix_hidden_dim: int,  # qmix_hidden_dim
         n_agents: int,
         num_hypernet_layers: int = 2,
@@ -31,7 +30,6 @@ class HyperNetwork(snt.Module):
     ):
         """Initializes the mixer.
         Args:
-            agent_networks: Networks which produce outputs for mixing network.
             qmix_hidden_dim: Mixing layers hidden dimensions.
                 i.e. What size the mixing network takes as input.
             num_hypernet_layers: Number of hypernetwork layers. Currently 1 or 2.
@@ -39,7 +37,6 @@ class HyperNetwork(snt.Module):
                 layer. Relevant for num_hypernet_layers > 1.
         """
         super(HyperNetwork, self).__init__()
-        self._agent_networks = agent_networks
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._n_agents = n_agents
