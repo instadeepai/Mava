@@ -15,6 +15,8 @@
 
 import abc
 
+import numpy as np
+
 
 class BaseExplorationScheduler:
     @abc.abstractmethod
@@ -83,5 +85,91 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
     def decrement_epsilon(self) -> float:
         self._epsilon = max(
             self._epsilon_min, self._epsilon * (1 - self._epsilon_decay)
+        )
+        return self._epsilon
+
+
+class BaseExplorationTimestepScheduler:
+    @abc.abstractmethod
+    def __init__(
+        self,
+        epsilon_start: float = 1.0,
+        epsilon_min: float = 0.05,
+        epsilon_decay_steps: int = None,
+    ):
+        """
+        Base class for decaying epsilon according to number of steps.
+        """
+        self._epsilon_start = epsilon_start
+        self._epsilon_min = epsilon_min
+        self._epsilon_decay_steps = epsilon_decay_steps
+        self._epsilon = epsilon_start
+
+    @abc.abstractmethod
+    def decrement_epsilon(self, time_t: int) -> float:
+        """Decrement the epsilon decay value."""
+
+    def get_epsilon(self) -> float:
+        return self._epsilon
+
+    def reset_epsilon(self) -> None:
+        self._epsilon = self._epsilon_start
+
+
+class LinearExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
+    def __init__(
+        self,
+        epsilon_decay_steps: int,
+        epsilon_start: float = 1.0,
+        epsilon_min: float = 0.05,
+    ):
+        """
+        Decays epsilon linearly to epsilon_min, in epsilon_decay_steps.
+        """
+        super(LinearExplorationTimestepScheduler, self).__init__(
+            epsilon_start,
+            epsilon_min,
+            epsilon_decay_steps,
+        )
+
+        self._delta = (
+            self._epsilon_start - self._epsilon_min
+        ) / self._epsilon_decay_steps
+
+    def decrement_epsilon(self, time_t: int) -> float:
+        self._epsilon = max(
+            self._epsilon_min, self._epsilon_start - self._delta * time_t
+        )
+        return self._epsilon
+
+
+# Adapted from
+# https://github.com/oxwhirl/pymarl/blob/master/src/components/epsilon_schedules.py
+class ExponentialExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
+    def __init__(
+        self,
+        epsilon_decay_steps: int,
+        epsilon_start: float = 1.0,
+        epsilon_min: float = 0.05,
+    ):
+        """
+        Decays epsilon exponentially to epsilon_min, in epsilon_decay_steps.
+        """
+        super(ExponentialExplorationTimestepScheduler, self).__init__(
+            epsilon_start,
+            epsilon_min,
+            epsilon_decay_steps,
+        )
+
+        self._exp_scaling = (
+            (-1) * self._epsilon_decay_steps / np.log(self._epsilon_min)
+            if self._epsilon_min > 0
+            else 1
+        )
+
+    def decrement_epsilon(self, time_t: int) -> float:
+        self._epsilon = min(
+            self._epsilon_start,
+            max(self._epsilon_min, np.exp(-time_t / self._exp_scaling)),
         )
         return self._epsilon

@@ -16,7 +16,7 @@
 # https://github.com/deepmind/acme/blob/master/acme/tf/networks/masked_epsilon_greedy.py
 
 """Adaptation of trfl epsilon_greedy with legal action masking."""
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 import sonnet as snt
@@ -25,6 +25,7 @@ import tensorflow_probability as tfp
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     BaseExplorationScheduler,
+    BaseExplorationTimestepScheduler,
 )
 
 
@@ -40,7 +41,9 @@ class EpsilonGreedy(snt.Module):
 
     def __init__(
         self,
-        exploration_scheduler: BaseExplorationScheduler,
+        exploration_scheduler: Union[
+            BaseExplorationScheduler, BaseExplorationTimestepScheduler
+        ],
         name: str = "EpsilonGreedy",
     ):
         """Initialize the action selector.
@@ -128,3 +131,7 @@ class EpsilonGreedy(snt.Module):
     def decrement_epsilon(self) -> None:
         """Decrement epsilon acording to schedule."""
         self._epsilon = self._exploration_scheduler.decrement_epsilon()
+
+    def decrement_epsilon_time_t(self, time_t: int) -> None:
+        """Decrement epsilon acording to time t."""
+        self._epsilon = self._exploration_scheduler.decrement_epsilon(time_t)

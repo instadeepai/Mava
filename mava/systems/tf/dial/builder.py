@@ -44,6 +44,8 @@ class DIALConfig:
             each agent in the system.
         epsilon_min: final minimum value for epsilon at the end of a decay schedule.
         epsilon_decay: the rate at which epislon decays.
+        epsilon_start:  initial epsilon value.
+        epsilon_decay_steps: number of steps that epsilon is decayed for.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
         target_update_period: number of learner steps to perform before updating
@@ -69,8 +71,9 @@ class DIALConfig:
 
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
-    epsilon_decay: float
+    epsilon_decay: Optional[float]
     epsilon_start: float
+    epsilon_decay_steps: Optional[int]
     agent_net_keys: Dict[str, str]
     target_update_period: int
     executor_variable_update_period: int

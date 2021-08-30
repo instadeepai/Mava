@@ -22,7 +22,7 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration import LinearExplorationTimestepScheduler
 from mava.systems.tf import qmix
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
@@ -64,7 +64,7 @@ def main(_: Any) -> None:
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
-    log_every = 10
+    log_every = 0
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
@@ -80,9 +80,9 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
+        exploration_scheduler_fn=LinearExplorationTimestepScheduler,
         epsilon_min=0.05,
-        epsilon_decay=3e-4,
+        epsilon_decay_steps=10000,
         max_replay_size=1000000,
         optimizer=snt.optimizers.RMSProp(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,

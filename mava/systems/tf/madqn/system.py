@@ -33,6 +33,10 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    BaseExplorationScheduler,
+    BaseExplorationTimestepScheduler,
+)
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
@@ -62,7 +66,8 @@ class MADQN:
         ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
         epsilon_min: float = 0.05,
-        epsilon_decay: float = 1e-4,
+        epsilon_decay: Optional[float] = None,
+        epsilon_decay_steps: Optional[int] = None,
         epsilon_start: float = 1,
         num_executors: int = 1,
         num_caches: int = 0,
@@ -126,6 +131,8 @@ class MADQN:
             epsilon_min (float, optional): final minimum epsilon value at the end of a
                 decaying schedule. Defaults to 0.05.
             epsilon_decay (float, optional): epsilon decay rate. Defaults to 1e-4.
+            epsilon_start:  initial epsilon value.
+            epsilon_decay_steps: number of steps that epsilon is decayed for.
             num_executors (int, optional): number of executor processes to run in
                 parallel. Defaults to 1.
             num_caches (int, optional): number of trainer node caches. Defaults to 0.
@@ -200,6 +207,22 @@ class MADQN:
                 time_delta=10,
             )
 
+        assert (
+            epsilon_decay_steps or epsilon_decay
+        ), "Either epsilon_decay_steps or epsilon_decay should have a value."
+
+        if epsilon_decay_steps:
+            assert issubclass(
+                exploration_scheduler_fn, BaseExplorationTimestepScheduler
+            ), """epsilon_decay_steps can only be used with with exploration functions
+            that implement BaseExplorationTimestepScheduler."""
+
+        if epsilon_decay:
+            assert issubclass(
+                exploration_scheduler_fn, BaseExplorationScheduler
+            ), """epsilon_decay can only be used with with exploration functions
+            that implement subclass of BaseExplorationScheduler"""
+
         self._architecture = architecture
         self._communication_module_fn = communication_module
         self._environment_factory = environment_factory
@@ -237,6 +260,7 @@ class MADQN:
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
+                epsilon_decay_steps=epsilon_decay_steps,
                 epsilon_start=epsilon_start,
                 agent_net_keys=self._agent_net_keys,
                 discount=discount,

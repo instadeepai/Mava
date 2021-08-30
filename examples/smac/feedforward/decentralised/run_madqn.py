@@ -23,7 +23,9 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationTimestepScheduler,
+)
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import smac_utils
@@ -76,9 +78,9 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
+        exploration_scheduler_fn=LinearExplorationTimestepScheduler,
         epsilon_min=0.05,
-        epsilon_decay=1e-5,
+        epsilon_decay_steps=50000,
         importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.SGD(learning_rate=1e-2),
         checkpoint_subpath=checkpoint_dir,

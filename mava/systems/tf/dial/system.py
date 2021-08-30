@@ -66,8 +66,9 @@ class DIAL:
         ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
         epsilon_min: float = 0.05,
-        epsilon_decay: float = 1e-3,
+        epsilon_decay: Optional[float] = None,
         epsilon_start: float = 1,
+        epsilon_decay_steps: Optional[int] = None,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -127,6 +128,8 @@ class DIAL:
             epsilon_min (float, optional): final minimum epsilon value at the end of a
                 decaying schedule. Defaults to 0.05.
             epsilon_decay (float, optional): epsilon decay rate. Defaults to 1e-3.
+            epsilon_start:  initial epsilon value.
+            epsilon_decay_steps: number of steps that epsilon is decayed for.
             num_executors (int, optional): number of executor processes to run in
                 parallel. Defaults to 1.
             num_caches (int, optional): number of trainer node caches. Defaults to 0.
@@ -231,6 +234,7 @@ class DIAL:
                 environment_spec=environment_spec,
                 epsilon_min=epsilon_min,
                 epsilon_decay=epsilon_decay,
+                epsilon_decay_steps=epsilon_decay_steps,
                 epsilon_start=epsilon_start,
                 agent_net_keys=self._agent_net_keys,
                 discount=discount,

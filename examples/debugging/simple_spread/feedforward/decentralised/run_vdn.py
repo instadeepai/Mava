@@ -22,7 +22,9 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration import (
+    ExponentialExplorationTimestepScheduler,
+)
 from mava.systems.tf import vdn
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
@@ -80,9 +82,10 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
+        exploration_scheduler_fn=ExponentialExplorationTimestepScheduler,
         epsilon_min=0.05,
-        epsilon_decay=3e-4,
+        epsilon_decay_steps=30000,
+        # epsilon_decay=1e-4,
         max_replay_size=1000000,
         optimizer=snt.optimizers.RMSProp(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,

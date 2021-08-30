@@ -110,6 +110,7 @@ class QMIXBuilder(MADQNBuilder):
             executor_fn=executor_fn,
             extra_specs=extra_specs,
             replay_stabilisation_fn=replay_stabilisation_fn,
+            exploration_scheduler_fn=exploration_scheduler_fn,
         )
         self._mixer = mixer
 

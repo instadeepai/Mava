@@ -402,6 +402,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             # Book-keeping.
             episode_steps += 1
 
+            if hasattr(self._executor, "on_after_action_selection"):
+                executor_steps = self._counter.get_counts().get("executor_steps", 0)
+                current_step_t = executor_steps + episode_steps
+                self._executor.on_after_action_selection(current_step_t)
+
             # If env returns empty dict at end of episode.
             if not rewards:
                 rewards = {

@@ -29,6 +29,7 @@ from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
+    BaseExplorationScheduler,
     LinearExplorationScheduler,
 )
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
@@ -44,6 +45,7 @@ class MADQNConfig:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
         epsilon_start: initial epsilon value.
+        epsilon_decay_steps: number of steps that epsilon is decayed for.
         epsilon_min: final minimum value for epsilon at the end of a decay schedule.
         epsilon_decay: the rate at which epislon decays.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
@@ -74,7 +76,8 @@ class MADQNConfig:
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
     epsilon_start: float
-    epsilon_decay: float
+    epsilon_decay: Optional[float]
+    epsilon_decay_steps: Optional[int]
     agent_net_keys: Dict[str, str]
     target_update_period: int
     executor_variable_update_period: int
@@ -335,10 +338,12 @@ class MADQNBuilder:
             epsilon_start = 0.0
             epsilon_min = 0.0
             epsilon_decay = 0.0
+            epsilon_decay_steps = self._config.epsilon_decay_steps
         else:
             epsilon_start = self._config.epsilon_start
             epsilon_min = self._config.epsilon_min
             epsilon_decay = self._config.epsilon_decay
+            epsilon_decay_steps = self._config.epsilon_decay_steps
 
         # Pass scheduler and initialize action selectors
         action_selectors = {
@@ -347,6 +352,14 @@ class MADQNBuilder:
                     epsilon_start=epsilon_start,
                     epsilon_min=epsilon_min,
                     epsilon_decay=epsilon_decay,
+                )
+            )
+            if issubclass(self._exploration_scheduler_fn, BaseExplorationScheduler)
+            else action_selector_fn(
+                self._exploration_scheduler_fn(
+                    epsilon_start=epsilon_start,
+                    epsilon_min=epsilon_min,
+                    epsilon_decay_steps=epsilon_decay_steps,
                 )
             )
             for network, action_selector_fn in action_selectors.items()

@@ -28,6 +28,9 @@ from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    BaseExplorationTimestepScheduler,
+)
 from mava.systems.tf.executors import (
     FeedForwardExecutor,
     RecurrentCommExecutor,
@@ -58,13 +61,23 @@ class DQNExecutor:
         else:
             return np.array(list(data))
 
-    def _decrement_epsilon(self) -> None:
+    def _decrement_epsilon(self, time_t: Optional[int]) -> None:
         """Decrements epsilon in action selectors."""
-
         {
-            action_selector.decrement_epsilon()
+            action_selector.decrement_epsilon_time_t(time_t)
+            if (
+                isinstance(
+                    action_selector._exploration_scheduler,
+                    BaseExplorationTimestepScheduler,
+                )
+                and time_t
+            )
+            else action_selector.decrement_epsilon()
             for action_selector in self._action_selectors.values()
         }
+
+    def on_after_action_selection(self, time_t) -> None:
+        self._decrement_epsilon(time_t)
 
     def get_stats(self) -> Dict:
         """Return extra stats to log.
@@ -262,13 +275,9 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor, DQNExecutor):
         Returns:
             Dict[str, types.NestedArray]: actions for all agents in the system.
         """
-
         actions = {}
         for agent, observation in observations.items():
             actions[agent] = self.select_action(agent, observation)
-
-        # Decrement epsilon
-        self._decrement_epsilon()
 
         # Return a numpy array with squeezed out batch dimension.
         return actions
@@ -420,8 +429,6 @@ class MADQNRecurrentExecutor(RecurrentExecutor, DQNExecutor):
         for agent, observation in observations.items():
             actions[agent] = self.select_action(agent, observation)
 
-        # Decrement epsilon
-        self._decrement_epsilon()
         # Return a numpy array with squeezed out batch dimension.
         return actions
 
@@ -569,9 +576,6 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor, DQNExecutor):
 
         for agent, observation in observations.items():
             actions[agent] = self.select_action(agent, observation)
-
-        # Decrement epsilon
-        self._decrement_epsilon()
 
         # Return a numpy array with squeezed out batch dimension.
         return actions
