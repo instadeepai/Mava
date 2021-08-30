@@ -17,7 +17,7 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Mapping, Sequence, Union
 
 import launchpad as lp
 import sonnet as snt
@@ -28,7 +28,7 @@ from acme import types
 from mava import specs as mava_specs
 from mava.components.tf import networks
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.components.tf.networks import epsilon_greedy_action_selector
+from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import smac_utils
@@ -64,15 +64,6 @@ def custom_recurrent_network(
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
-    def action_selector_fn(
-        q_values: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: Optional[tf.Variable] = None,
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
-
     q_networks = {}
     action_selectors = {}
     for key in specs.keys():
@@ -91,7 +82,7 @@ def custom_recurrent_network(
         )
 
         # epsilon greedy action selector
-        action_selector = action_selector_fn
+        action_selector = EpsilonGreedy
 
         q_networks[key] = q_network
         action_selectors[key] = action_selector
