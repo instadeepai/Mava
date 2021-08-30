@@ -31,7 +31,7 @@ from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.qmix import execution, training
-from mava.wrappers import MADQNDetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -109,7 +109,6 @@ class QMIXBuilder(MADQNBuilder):
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             extra_specs=extra_specs,
-            exploration_scheduler_fn=exploration_scheduler_fn,
             replay_stabilisation_fn=replay_stabilisation_fn,
         )
         self._mixer = mixer
@@ -152,12 +151,6 @@ class QMIXBuilder(MADQNBuilder):
         mixing_network = networks["mixing"]
         target_mixing_network = networks["target_mixing"]
 
-        # Make epsilon scheduler
-        exploration_scheduler = self._exploration_scheduler_fn(
-            epsilon_min=self._config.epsilon_min,
-            epsilon_decay=self._config.epsilon_decay,
-        )
-
         # Check if we should use fingerprints
         fingerprint = True if self._replay_stabiliser_fn is not None else False
 
@@ -174,7 +167,6 @@ class QMIXBuilder(MADQNBuilder):
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
-            exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             dataset=dataset,
             counter=counter,
@@ -185,6 +177,6 @@ class QMIXBuilder(MADQNBuilder):
             checkpoint_subpath=self._config.checkpoint_subpath,
         )
 
-        trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore
+        trainer = DetailedTrainerStatistics(trainer)  # type:ignore
 
         return trainer

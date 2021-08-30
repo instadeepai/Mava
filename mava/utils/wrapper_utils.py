@@ -38,7 +38,6 @@ def convert_dm_compatible_observations(
         a dm compatible observation.
     """
     observations: Dict[str, types.OLT] = {}
-
     for agent in possible_agents:
         # If we have a valid observation for this agent.
         if agent in observes:
@@ -58,7 +57,7 @@ def convert_dm_compatible_observations(
                     observation_spec[agent].legal_actions.shape,
                     dtype=observation_spec[agent].legal_actions.dtype,
                 )
-            # terminal = dones[agent]
+
         # If we have no observation, we need to use the default.
         else:
             observation = np.zeros(
@@ -73,7 +72,7 @@ def convert_dm_compatible_observations(
             terminal = dones[agent]
         else:
             terminal = env_done
-            # env_done
+
         observations[agent] = types.OLT(
             observation=observation,
             legal_actions=legals,

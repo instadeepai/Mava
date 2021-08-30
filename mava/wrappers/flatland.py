@@ -273,7 +273,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
 
     def observation_spec(self) -> Dict[str, OLT]:
         observation_specs = {}
-        for agent in self.agents:
+        for agent in self.possible_agents:
             observation_specs[agent] = OLT(
                 observation=tuple(
                     (
