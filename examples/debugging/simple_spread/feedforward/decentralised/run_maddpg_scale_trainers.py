@@ -83,25 +83,22 @@ def main(_: Any) -> None:
         num_executors=2,
         shared_weights=False,
         trainer_networks={
-            "trainer_0": ["agent_0"],
-            "trainer_1": ["agent_1"],
-            "trainer_2": ["agent_2"],
+            "trainer_0": ["network_0"],
+            "trainer_1": ["network_1"],
+            "trainer_2": ["network_2"],
         },
-        executor_samples=[["agent_0", "agent_1", "agent_2"]],
+        executor_samples=[["network_0", "network_1", "network_2"]],
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
     ).build()
 
-    # launch
-    gpu_id = -1
-    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
-    local_resources = {
-        "trainer": [],
-        "evaluator": PythonProcess(env=env_vars),
-        "executor": PythonProcess(env=env_vars),
-    }
+    # Ensure only trainer runs on gpu, while other processes run on cpu.
+    local_resources = lp_utils.to_device(
+        program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
+    )
+
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
