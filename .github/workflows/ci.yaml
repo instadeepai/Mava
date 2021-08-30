@@ -72,8 +72,6 @@ jobs:
       - name: Test with pytest and get code coverage
         run: |
           pytest  -n "$(grep -c ^processor /proc/cpuinfo)" tests --ignore-glob="*/*system_test.py"
-          # Running systems tests sequentially due to errors when running multiple lp instances at once.
-          pytest tests/systems
       - name: Check docstring code coverage
         run: |
           interrogate -c pyproject.toml
