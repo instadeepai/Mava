@@ -111,8 +111,7 @@ class ReverbParallelAdder(ReverbAdder):
             max_in_flight_items=max_in_flight_items,
             delta_encoded=delta_encoded,
             priority_fns=priority_fns,
-            # TODO(Kale-ab) Re-add this when using newer version of acme.
-            # get_signature_timeout_ms=get_signature_timeout_ms
+            get_signature_timeout_ms=get_signature_timeout_ms,
         )
         self._use_next_extras = use_next_extras
 

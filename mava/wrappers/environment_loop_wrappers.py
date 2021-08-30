@@ -22,7 +22,7 @@ import dm_env
 import matplotlib.pyplot as plt
 import numpy as np
 from acme.utils import counting, loggers, paths
-from acme.wrappers.video import _make_animation
+from acme.wrappers.video import make_animation
 
 try:
     from array2gif import write_gif
@@ -325,7 +325,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         plt.close("all")
 
     def _save_video(self, path: str) -> None:
-        video = _make_animation(self._frames, self._fps, self._figsize).to_html5_video()
+        video = make_animation(self._frames, self._fps, self._figsize).to_html5_video()
         with open(f"{path}.html", "w") as f:
             f.write(video)
 

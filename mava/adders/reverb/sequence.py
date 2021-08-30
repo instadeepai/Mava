@@ -28,7 +28,7 @@ import reverb
 import tensorflow as tf
 import tree
 from acme import specs
-from acme.adders.reverb import utils
+from acme.adders.reverb import utils as acme_utils
 from acme.adders.reverb.sequence import SequenceAdder
 from acme.types import NestedSpec
 
@@ -101,8 +101,6 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         self._sequence_length = sequence_length
         self._end_of_episode_behavior = end_of_episode_behavior
 
-    # TODO(Kale-ab) Consider deprecating in future versions and using acme
-    # version of this function.
     def _maybe_create_item(
         self, sequence_length: int, *, end_of_episode: bool = False, force: bool = False
     ) -> None:
@@ -128,7 +126,9 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         trajectory = base.Trajectory(**tree.map_structure(get_traj, history))
 
         # Compute priorities for the buffer.
-        table_priorities = utils.calculate_priorities(self._priority_fns, trajectory)
+        table_priorities = acme_utils.calculate_priorities(
+            self._priority_fns, trajectory
+        )
 
         # Create a prioritized item for each table.
         for table_name, priority in table_priorities.items():
