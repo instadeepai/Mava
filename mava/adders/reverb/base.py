@@ -90,26 +90,26 @@ def spec_like_to_tensor_spec(
 
 
 def get_trajectory_net_agents(
-    trajectory: Union[Trajectory, mava_types.Transition], entry_net_keys: Dict[str, str]
+    trajectory: Union[Trajectory, mava_types.Transition], traj_net_keys: Dict[str, str]
 ) -> Tuple[List, Dict[str, List]]:
-    """Returns a dictionary that maps network_keys to a list of agents using each
-    network key.
+    """Returns a dictionary that maps network_keys to a list of agents using that specific
+    network.
 
     Args:
-        trajectory (Union[Trajectory, mava_types.Transition]): Trajectory recorded by
+        trajectory: Episode experience recorded by
         the adders.
-        entry_net_keys (Dict[str, str]): The network_keys used by each entry.
+        traj_net_keys: The network_keys used by each agent in the trajectory.
     Returns:
-        agents (List): A sorted list of al the agent_keys.
-        trajectory_net_agents (Dict[str, List]): A dictionary that maps network_keys to
-        a list of agents using each network key.
+        agents: A sorted list of al the agent_keys.
+        agents_per_network: A dictionary that maps network_keys to
+        a list of agents using that specific network.
     """
     agents = sort_str_num(trajectory.actions.keys())
-    unique_nets = sort_str_num(set(entry_net_keys.values()))
-    trajectory_net_agents: Dict[str, List] = {key: [] for key in unique_nets}
+    unique_nets = sort_str_num(set(traj_net_keys.values()))
+    agents_per_network: Dict[str, List] = {key: [] for key in unique_nets}
     for agent in agents:
-        trajectory_net_agents[entry_net_keys[agent]].append(agent)
-    return agents, trajectory_net_agents
+        agents_per_network[traj_net_keys[agent]].append(agent)
+    return agents, agents_per_network
 
 
 class ReverbParallelAdder(ReverbAdder):
@@ -159,42 +159,77 @@ class ReverbParallelAdder(ReverbAdder):
         trajectory: Union[Trajectory, mava_types.Transition],
         table_priorities: Dict[str, Any],
     ) -> None:
-        # Get a dictionary of the transition nets and agents.
+        """Write an episode eperience (trajectory) to the reverb tables. Each
+        table represents experience used by each of the trainers. Therefore
+        this function dynamically determines to which table(s) to write
+        parts of the trajectory based on what networks where used by
+        the agents in the episode run.
+        Args:
+            trajectory: Trajectory to be
+                written to the reverb tables.
+            table_priorities: A dictionary that maps table names to priorities.
+        """
+
         if self._table_network_config:
-            entry_extras = trajectory.extras["network_int_keys"]
-            entry_net_keys = {}
+            # This if statement activates if the table_network_config
+            # is specified. If it is not the write_experience_to_tables
+            # function defaults back to just writing the entire
+            # trajectory to one default table.
+
+            # Get the networks use by each agent by
+            # converting the network_int_keys to strings.
+            traj_extras = trajectory.extras["network_int_keys"]
+            traj_net_keys = {}
             agents = sort_str_num(trajectory.actions.keys())
             for agent in agents:
-                arr = entry_extras[agent].numpy()
+                arr = traj_extras[agent].numpy()
                 if type(trajectory) == Step:
-                    entry_net_keys[agent] = self._int_to_nets[arr[0]]
+                    # Sequential adder case.
+                    traj_net_keys[agent] = self._int_to_nets[arr[0]]
                 else:
-                    entry_net_keys[agent] = self._int_to_nets[arr]
+                    # Transition adder case.
+                    traj_net_keys[agent] = self._int_to_nets[arr]
 
-            # Get the unique agents and mapping from net_keys to agents.
+            # Get a list of the agents and mapping from net_keys to all
+            # agents using that network.
             agents, trajectory_nets_agent = get_trajectory_net_agents(
-                trajectory=trajectory, entry_net_keys=entry_net_keys
+                trajectory=trajectory, traj_net_keys=traj_net_keys
             )
 
-        # Check if experience was used
-        created_item = False
+            # Flag to check if all experience was used
+            created_item = False
 
-        # If all the network entries of a trainer is in the data then add it to that
-        # trainer's data table.
-        for table, priority in table_priorities.items():
-            if self._table_network_config is None:
-                created_item = True
-                self._writer.create_item(
-                    table=table, priority=priority, trajectory=trajectory
-                )
-            else:
-                # Check if all the networks are in trans_nets_agent.
+            # In this loop we go through every table one by one.
+            # We check for each table if the experience contains
+            # the correct networks for that trainer. If it does
+            # we add to the table a subset of the trajectory's agents
+            # which only contains the networks combination that the
+            # trainer is interested in. Note that a table might
+            # find multiple copies of the correct network combination
+            # and therefore might write more than once to a table
+            # for a given experience. The table might also not
+            # write at all for a given trajectory. The created_item
+            # flag checks that atleast one table used some of the
+            # experience in the trajectory.
+            for table, priority in table_priorities.items():
+                # Copy the original trajectory net agents as we are going to pop
+                # form it for each table. Therefore each table starts with
+                # a fresh copy of all the agents and removes agents as it
+                # pushes the experience to its table.
                 trajectory_dict_copy = copy.deepcopy(trajectory_nets_agent)
 
                 # While the networks are in the data keep creating tables
                 # Each training example can therefore create multiple items
                 is_in_entry = True
                 while is_in_entry:
+                    # Go through all the networks in the table specification
+                    # and see if all the networks are still in the remaining
+                    # agents in the trajectory. Pop the agents from the
+                    # trajectory and add them to item_agents. If all the
+                    # networks was foudn item_agents will be written
+                    # to the table. The next time round these agents will
+                    # not be checked for again as they are already popped
+                    # from the trajectory copy.
                     item_agents = []
                     for net_key in self._table_network_config[table]:
                         if (
@@ -207,12 +242,18 @@ class ReverbParallelAdder(ReverbAdder):
                             break
 
                     if is_in_entry:
+                        # Write the subset of the trajectory experience to
+                        # the table. The below code creates a new Step/Transition
+                        # with only the agents with the correct network combination
+                        # in order. This new Step/Transition is then writtent to
+                        # the table.
                         created_item = True
 
                         # Create new empty transition
                         if type(trajectory) == Step:
+                            # Create a new sequence trajectory
                             soe = trajectory.start_of_episode  # type: ignore
-                            new_trans = Step(  # type: ignore
+                            new_trajectory = Step(  # type: ignore
                                 {},
                                 {},
                                 {},
@@ -221,58 +262,65 @@ class ReverbParallelAdder(ReverbAdder):
                                 extras={},
                             )
                         else:
-                            new_trans = mava_types.Transition(  # type: ignore
+                            # Create a new transition trajectory
+                            new_trajectory = mava_types.Transition(  # type: ignore
                                 {}, {}, {}, {}, {}, {}, {}
                             )
 
+                        # Initialise empty extras
                         for key in trajectory.extras.keys():
-                            new_trans.extras[key] = {}
+                            new_trajectory.extras[key] = {}
 
                             if type(trajectory) == mava_types.Transition:
-                                new_trans.next_extras[key] = {}  # type: ignore
+                                new_trajectory.next_extras[key] = {}  # type: ignore
 
+                        # Go through each of the agents in item_agents and add them
+                        # to the new trajectory in the correct spot based on their
+                        # networks.
                         for a_i in range(len(item_agents)):
+                            # Write the agent to the new trajectory.
                             cur_agent = item_agents[a_i]
                             want_agent = agents[a_i]
-                            new_trans.observations[
+                            new_trajectory.observations[
                                 want_agent
                             ] = trajectory.observations[cur_agent]
-                            new_trans.actions[want_agent] = trajectory.actions[
+                            new_trajectory.actions[want_agent] = trajectory.actions[
                                 cur_agent
                             ]
-                            new_trans.rewards[want_agent] = trajectory.rewards[
+                            new_trajectory.rewards[want_agent] = trajectory.rewards[
                                 cur_agent
                             ]
-                            new_trans.discounts[want_agent] = trajectory.discounts[
+                            new_trajectory.discounts[want_agent] = trajectory.discounts[
                                 cur_agent
                             ]
 
                             if type(trajectory) == mava_types.Transition:
-                                new_trans.next_observations[  # type: ignore
+                                new_trajectory.next_observations[  # type: ignore
                                     want_agent
                                 ] = trajectory.next_observations[  # type: ignore
                                     cur_agent
                                 ]  # type: ignore
-                            # Convert extras
+
+                            # Write this agent to the extras of the new trajectory.
                             for key in trajectory.extras.keys():
                                 if (
                                     type(trajectory.extras[key]) is dict
                                     and cur_agent in trajectory.extras[key]
                                 ):
-                                    new_trans.extras[key][
+                                    new_trajectory.extras[key][
                                         want_agent
                                     ] = trajectory.extras[key][cur_agent]
                                 else:
                                     # TODO: (dries) Only actually need to do this once
                                     # and not per agent. Maybe fix this in the future.
-                                    new_trans.extras[key] = trajectory.extras[key]
+                                    new_trajectory.extras[key] = trajectory.extras[key]
                                 if type(trajectory) == mava_types.Transition:
                                     ext = trajectory.next_extras[key]  # type: ignore
                                     if (
                                         type(ext) is dict  # type: ignore
                                         and cur_agent in ext  # type: ignore
                                     ):
-                                        new_trans.next_extras[key][  # type: ignore
+                                        new_trajectory.next_extras[key][  # type: ignore
                                             want_agent
                                         ] = trajectory.next_extras[  # type: ignore
                                             key
@@ -283,21 +331,33 @@ class ReverbParallelAdder(ReverbAdder):
                                         # TODO: (dries) Only actually need to
                                         # do this once and not per agent. Maybe
                                         # fix this in the future.
-                                        new_trans.next_extras[  # type: ignore
+                                        new_trajectory.next_extras[  # type: ignore
                                             key
                                         ] = trajectory.next_extras[  # type: ignore
                                             key
                                         ]  # type: ignore
 
+                        # Write the new_trajectory to the table.
                         self._writer.create_item(
-                            table=table, priority=priority, trajectory=new_trans
+                            table=table, priority=priority, trajectory=new_trajectory
                         )
-        self._writer.flush(self._max_in_flight_items)
-        if not created_item:
-            raise EOFError(
-                "This experience was not used by any trainer: ",
-                trajectory.actions.keys(),
+            if not created_item:
+                raise EOFError(
+                    "This experience was not used by any trainer: ",
+                    trajectory.actions.keys(),
+                )
+        else:
+            # Default setting (depreciate this) with only one table. In this setting
+            # we write the entire trajectory to that table.
+            table_items = list(table_priorities.items())
+            assert len(table_items) == 1
+            table, priority = table_items[0]
+            self._writer.create_item(
+                table=table, priority=priority, trajectory=trajectory
             )
+
+        # Flush the writer.
+        self._writer.flush(self._max_in_flight_items)
 
     def add_first(
         self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
