@@ -117,8 +117,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 Defaults to "~/mava/".
             learning_rate_schedule: dict with two functions (one for the policy and one
                 for the critic optimizer), that takes in a trainer step t and returns
-                the current learning rate, e.g. {"policy": policy_lr_schedule ,
-                "critic": critic_lr_schedule} .
+                the current learning rate.
         """
 
         super().__init__(
@@ -482,8 +481,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 Defaults to "~/mava/".
             learning_rate_schedule: dict with two functions (one for the policy and one
                 for the critic optimizer), that takes in a trainer step t and returns
-                the current learning rate, e.g. {"policy": policy_lr_schedule ,
-                "critic": critic_lr_schedule} .
+                the current learning rate.
         """
 
         super().__init__(

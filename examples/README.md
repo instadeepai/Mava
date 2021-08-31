@@ -15,7 +15,7 @@ We include a number of systems running on continuous control tasks.
 -   **MADDPG**:
     a MADDPG system running on the continuous action space simple_spread MPE environment.
     - *Feedforward*:
-        -  [decentralised](debugging/simple_spread/feedforward/decentralised/run_maddpg.py), [decentralised record agents](debugging/simple_spread/feedforward/decentralised/run_maddpg_record.py) (***Example recording agents acting in the environment***), [decentralised scaling](debugging/simple_spread/feedforward/decentralised/run_maddpg_scaling.py) (***Example scaling to 4 executors***), [decentralised custom loggers](debugging/simple_spread/feedforward/decentralised/run_maddpg_custom_logging.py) (***Example using custom logging***),
+        -  [decentralised](debugging/simple_spread/feedforward/decentralised/run_maddpg.py), [decentralised record agents](debugging/simple_spread/feedforward/decentralised/run_maddpg_record.py) (***Example recording agents acting in the environment***), [decentralised scaling](debugging/simple_spread/feedforward/decentralised/run_maddpg_scaling.py) (***Example scaling to 4 executors***), [decentralised custom loggers](debugging/simple_spread/feedforward/decentralised/run_maddpg_custom_logging.py) (***Example using custom logging***), [decentralised lr scheduling](debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py) (***Example using lr schedule***),
 [centralised](debugging/simple_spread/feedforward/centralised/run_maddpg.py), [networked](debugging/simple_spread/feedforward/networked/run_maddpg.py) (***Example using a fully-connected, networked architecture***), [networked with custom architecture](debugging/simple_spread/feedforward/networked/run_maddpg_custom_network.py) (***Example using a custom, sparse, networked architecture***) and [state_based](debugging/simple_spread/feedforward/state_based/run_maddpg.py) .
     - *Recurrent*
         - [decentralised](debugging/simple_spread/recurrent/decentralised/run_maddpg.py) and [state_based](debugging/simple_spread/recurrent/state_based/run_maddpg.py).
@@ -59,7 +59,7 @@ We also include a number of systems running on discrete action space environment
   -   **MADQN**:
       a MADQN system running on the discrete action space simple_spread MPE environment.
       - *Feedforward*
-        - [decentralised](debugging/simple_spread/feedforward/decentralised/run_madqn.py).
+        - [decentralised](debugging/simple_spread/feedforward/decentralised/run_madqn.py) and [decentralised lr scheduling](debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py) (***Example using lr schedule***).
       - *Recurrent*
         - [decentralised](debugging/simple_spread/recurrent/decentralised/run_madqn.py) and [decentralised with coms](debugging/simple_spread/recurrent/decentralised/run_madqn_with_coms.py) (***Example using a system with communication***).
 

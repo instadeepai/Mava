@@ -176,7 +176,9 @@ class VDN(MADQN):
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
             learning_rate_schedule: function that takes in a trainer step t and returns
-                the current learning rate.
+                the current learning rate. See
+                examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
+                for an example.
         """
 
         self._mixer = mixer

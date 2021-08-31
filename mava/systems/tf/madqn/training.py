@@ -507,10 +507,9 @@ class MADQNTrainer(mava.Trainer):
         Args:
             trainer_step : trainer step time t.
         """
-        if self._learning_rate_schedule:
-            lr = self._learning_rate_schedule(trainer_step)
-            for optimizer in self._optimizers.values():
-                optimizer.learning_rate = lr
+        train_utils.decay_lr_actor(
+            self._learning_rate_schedule, self._optimizers, trainer_step
+        )
 
 
 class MADQNRecurrentTrainer(MADQNTrainer):
@@ -709,7 +708,9 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
             learning_rate_schedule: function that takes in a trainer step t and returns
-                the current learning rate.
+                the current learning rate. See
+                examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
+                for an example.
         """
 
         super().__init__(

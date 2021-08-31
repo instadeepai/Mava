@@ -107,8 +107,7 @@ class MAPPOTrainer(mava.Trainer):
                 Defaults to "~/mava/".
             learning_rate_schedule: dict with two functions (one for the policy and one
                 for the critic optimizer), that takes in a trainer step t and returns
-                the current learning rate, e.g. {"policy": policy_lr_schedule ,
-                "critic": critic_lr_schedule} .
+                the current learning rate.
         """
 
         # Store agents.
@@ -501,14 +500,12 @@ class MAPPOTrainer(mava.Trainer):
         Args:
             trainer_step : trainer step time t.
         """
-        if self._learning_rate_schedule:
-            lr_policy = self._learning_rate_schedule["policy"](trainer_step)
-            for optimizer in self._policy_optimizers.values():
-                optimizer.learning_rate = lr_policy
-
-            lr_critic = self._learning_rate_schedule["critic"](trainer_step)
-            for optimizer in self._critic_optimizers.values():
-                optimizer.learning_rate = lr_critic
+        train_utils.decay_lr_actor_critic(
+            self._learning_rate_schedule,
+            self._policy_optimizers,
+            self._critic_optimizers,
+            trainer_step,
+        )
 
 
 class CentralisedMAPPOTrainer(MAPPOTrainer):

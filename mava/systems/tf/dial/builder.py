@@ -72,7 +72,10 @@ class DIALConfig:
         replay_table_name: string indicating what name to give the replay table.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         learning_rate_schedule: function that takes in a trainer step t and returns
-                the current learning rate."""
+                the current learning rate. See
+                examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
+                for an example.
+    """
 
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
