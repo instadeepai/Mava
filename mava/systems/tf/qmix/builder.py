@@ -39,6 +39,7 @@ from mava.wrappers import DetailedTrainerStatistics
 @dataclasses.dataclass
 class QMIXConfig(MADQNConfig):
     """Configuration options for the QMIX system.
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
@@ -66,7 +67,9 @@ class QMIXConfig(MADQNConfig):
             checkpoints.
         optimizer: type of optimizer to use for updating the parameters of models.
         replay_table_name: string indicating what name to give the replay table.
-        checkpoint_subpath: subdirectory specifying where to store checkpoints."""
+        checkpoint_subpath: subdirectory specifying where to store checkpoints.
+        learning_rate_schedule: function that takes in a trainer step t and returns
+                the current learning rate."""
 
 
 class QMIXBuilder(MADQNBuilder):
@@ -178,6 +181,7 @@ class QMIXBuilder(MADQNBuilder):
             checkpoint_minute_interval=self._config.checkpoint_minute_interval,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
+            learning_rate_schedule=self._config.learning_rate_schedule,
         )
 
         trainer = DetailedTrainerStatistics(trainer)  # type:ignore

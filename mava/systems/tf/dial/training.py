@@ -16,7 +16,7 @@
 
 """DIAL system trainer implementation."""
 
-from typing import Any, Dict, List, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import sonnet as snt
 import tensorflow as tf
@@ -59,6 +59,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        learning_rate_schedule: Optional[Callable[[int], None]] = None,
     ):
         """Initialise DIAL trainer for switch game
 
@@ -89,6 +90,8 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
+            learning_rate_schedule: function that takes in a trainer step t and returns
+                the current learning rate.
         """
 
         super().__init__(
@@ -109,6 +112,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             communication_module=communication_module,
+            learning_rate_schedule=learning_rate_schedule,
         )
 
     def _forward(self, inputs: Any) -> None:

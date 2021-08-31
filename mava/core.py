@@ -138,9 +138,13 @@ class Trainer(VariableSource, Worker, Saveable):
         """Run the update loop; typically an infinite loop which calls step."""
 
         iterator = range(num_steps) if num_steps is not None else itertools.count()
-
         for _ in iterator:
             self.step()
+            self.after_trainer_step()
+
+    def after_trainer_step(self) -> None:
+        """Function that gets executed after every trainer step."""
+        pass
 
     def save(self) -> T:
         raise NotImplementedError('Method "save" is not implemented.')

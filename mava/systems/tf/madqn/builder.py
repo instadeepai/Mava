@@ -41,6 +41,7 @@ from mava.wrappers import DetailedTrainerStatistics
 @dataclasses.dataclass
 class MADQNConfig:
     """Configuration options for the MADQN system.
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
@@ -71,7 +72,9 @@ class MADQNConfig:
             checkpoints.
         optimizer: type of optimizer to use for updating the parameters of models.
         replay_table_name: string indicating what name to give the replay table.
-        checkpoint_subpath: subdirectory specifying where to store checkpoints."""
+        checkpoint_subpath: subdirectory specifying where to store checkpoints.
+        learning_rate_schedule: function that takes in a trainer step t and returns
+                the current learning rate."""
 
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
@@ -98,6 +101,7 @@ class MADQNConfig:
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
+    learning_rate_schedule: Optional[Any] = None
 
 
 class MADQNBuilder:
@@ -346,10 +350,10 @@ class MADQNBuilder:
             epsilon_decay_steps = self._config.epsilon_decay_steps or 0
 
         # Pass scheduler and initialize action selectors
-        action_selectors = {}
+        action_selectors_return = {}
         for network, action_selector_fn in action_selectors.items():
             if issubclass(self._exploration_scheduler_fn, BaseExplorationScheduler):
-                action_selectors[network] = action_selector_fn(
+                action_selectors_return[network] = action_selector_fn(
                     self._exploration_scheduler_fn(
                         epsilon_start=epsilon_start,
                         epsilon_min=epsilon_min,
@@ -360,18 +364,23 @@ class MADQNBuilder:
                 self._exploration_scheduler_fn, BaseExplorationTimestepScheduler
             ):
                 assert epsilon_decay_steps is not None
-                action_selectors[network] = action_selector_fn(
+                action_selectors_return[network] = action_selector_fn(
                     self._exploration_scheduler_fn(
                         epsilon_start=epsilon_start,
                         epsilon_min=epsilon_min,
                         epsilon_decay_steps=epsilon_decay_steps,
                     )
                 )
+            else:
+                raise ValueError(
+                    f"Incorrect exploration_scheduler_fn: \
+                     {self._exploration_scheduler_fn}"
+                )
 
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
-            action_selectors=action_selectors,
+            action_selectors=action_selectors_return,
             agent_net_keys=agent_net_keys,
             variable_client=variable_client,
             adder=adder,
@@ -436,6 +445,7 @@ class MADQNBuilder:
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
             checkpoint_minute_interval=self._config.checkpoint_minute_interval,
+            learning_rate_schedule=self._config.learning_rate_schedule,
         )
 
         trainer = DetailedTrainerStatistics(trainer)  # type:ignore

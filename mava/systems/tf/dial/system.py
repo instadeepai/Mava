@@ -102,6 +102,7 @@ class DIAL:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        learning_rate_schedule: Optional[Callable[[int], None]] = None,
     ):
         """Initialise the system
 
@@ -186,7 +187,9 @@ class DIAL:
             train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
-            the evaluation loop. Defaults to {}.
+                the evaluation loop. Defaults to {}.
+            learning_rate_schedule: function that takes in a trainer step t and returns
+                the current learning rate.
         """
 
         if not environment_spec:
@@ -257,6 +260,7 @@ class DIAL:
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                learning_rate_schedule=learning_rate_schedule,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,

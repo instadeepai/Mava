@@ -15,7 +15,6 @@
 
 """QMIX system trainer implementation."""
 
-import time
 from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
@@ -150,31 +149,6 @@ class QMIXTrainer(MADQNTrainer):
                 dest.assign(src)
 
         self._num_steps.assign_add(1)
-
-    def step(self) -> None:
-        """trainer step to update the parameters of the agents in the system"""
-
-        # Run the learning step.
-        fetches = self._step()
-
-        # Compute elapsed time.
-        timestamp = time.time()
-        if self._timestamp:
-            elapsed_time = timestamp - self._timestamp
-        else:
-            elapsed_time = 0
-        self._timestamp = timestamp  # type: ignore
-
-        # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
-
-        # Checkpoint and attempt to write the logs.
-        if self._checkpoint:
-            train_utils.checkpoint_networks(self._system_checkpointer)
-
-        if self._logger:
-            self._logger.write(fetches)
 
     @tf.function
     def _step(

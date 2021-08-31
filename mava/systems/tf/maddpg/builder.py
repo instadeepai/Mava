@@ -41,6 +41,7 @@ DiscreteArray = dm_specs.DiscreteArray
 @dataclasses.dataclass
 class MADDPGConfig:
     """Configuration options for the MADDPG system.
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
@@ -71,7 +72,11 @@ class MADDPGConfig:
 
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
-        replay_table_name: string indicating what name to give the replay table."""
+        replay_table_name: string indicating what name to give the replay table.
+        learning_rate_schedule: dict with two functions (one for the policy and one
+                for the critic optimizer), that takes in a trainer step t and returns
+                the current learning rate, e.g. {"policy": policy_lr_schedule ,
+                "critic": critic_lr_schedule} ."""
 
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
@@ -97,6 +102,7 @@ class MADDPGConfig:
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    learning_rate_schedule: Optional[Any] = None
 
 
 class MADDPGBuilder:
@@ -407,6 +413,7 @@ class MADDPGBuilder:
             "checkpoint": self._config.checkpoint,
             "checkpoint_subpath": self._config.checkpoint_subpath,
             "checkpoint_minute_interval": self._config.checkpoint_minute_interval,
+            "learning_rate_schedule": self._config.learning_rate_schedule,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec

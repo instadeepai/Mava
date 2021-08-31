@@ -78,11 +78,18 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
+        # print(fetches)
+        # raise NotADirectoryError
+
         if self._system_checkpointer:
             train_utils.checkpoint_networks(self._system_checkpointer)
 
         if self._logger:
             self._logger.write(fetches)
+
+    def after_trainer_step(self) -> None:
+        if hasattr(self._trainer, "after_trainer_step"):
+            self._trainer.after_trainer_step()
 
 
 class DetailedTrainerStatistics(TrainerStatisticsBase):
@@ -140,11 +147,12 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
             for key, val in datum.items():
                 network_running_statistics: Dict[str, float] = {}
                 network_running_statistics[f"{network}_raw_{key}"] = val
-                self._networks_stats[network][key].push(val)
-                for stat in self._summary_stats:
-                    network_running_statistics[
-                        f"{network}_{stat}_{key}"
-                    ] = self._networks_stats[network][key].__getattribute__(stat)()
+                if key in self._networks_stats[network]:
+                    self._networks_stats[network][key].push(val)
+                    for stat in self._summary_stats:
+                        network_running_statistics[
+                            f"{network}_{stat}_{key}"
+                        ] = self._networks_stats[network][key].__getattribute__(stat)()
 
                 self._network_loggers[network].write(network_running_statistics)
 
@@ -323,6 +331,7 @@ class NetworkStatistics(NetworkStatisticsBase):
             log_gradients,
         )
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -410,6 +419,7 @@ class NetworkStatisticsMixing(NetworkStatisticsBase):
             log_gradients,
         )
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -500,6 +510,7 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             log_gradients,
         )
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:

@@ -17,7 +17,7 @@
 
 import copy
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import reverb
@@ -68,6 +68,7 @@ class MADQNTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
         communication_module: Optional[BaseCommunicationModule] = None,
+        learning_rate_schedule: Optional[Callable[[int], None]] = None,
     ):
         """Initialise MADQN trainer
 
@@ -104,6 +105,7 @@ class MADQNTrainer(mava.Trainer):
         self._agent_types = agent_types
         self._agent_net_keys = agent_net_keys
         self._checkpoint = checkpoint
+        self._learning_rate_schedule = learning_rate_schedule
 
         # Store online and target q-networks.
         self._q_networks = q_networks
@@ -124,7 +126,7 @@ class MADQNTrainer(mava.Trainer):
         self._fingerprint = fingerprint
 
         # Necessary to track when to update target networks.
-        self._num_steps = tf.Variable(0, dtype=tf.int32)
+        self._num_steps = tf.Variable(0, trainable=False)
         self._target_update_period = target_update_period
 
         # Create an iterator to go through the dataset.
@@ -313,6 +315,7 @@ class MADQNTrainer(mava.Trainer):
 
         return fetches, extras
 
+    @tf.function
     def _step(self) -> Dict:
         """Trainer forward and backward passes."""
 
@@ -485,6 +488,30 @@ class MADQNTrainer(mava.Trainer):
             }
         return variables
 
+    def after_trainer_step(self) -> None:
+        """Optionally decay lr after every training step."""
+        if self._learning_rate_schedule:
+            self._decay_lr(self._num_steps)
+            info: Dict[str, Dict[str, float]] = {}
+            for agent in self._agents:
+                info[agent] = {}
+                info[agent]["learning_rate"] = self._optimizers[
+                    self._agent_net_keys[agent]
+                ].learning_rate
+            if self._logger:
+                self._logger.write(info)
+
+    def _decay_lr(self, trainer_step: int) -> None:
+        """Decay lr.
+
+        Args:
+            trainer_step : trainer step time t.
+        """
+        if self._learning_rate_schedule:
+            lr = self._learning_rate_schedule(trainer_step)
+            for optimizer in self._optimizers.values():
+                optimizer.learning_rate = lr
+
 
 class MADQNRecurrentTrainer(MADQNTrainer):
     """Recurrent MADQN trainer.
@@ -650,6 +677,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        learning_rate_schedule: Optional[Callable[[int], None]] = None,
     ):
         """Initialise recurrent MADQN trainer with communication
 
@@ -680,6 +708,8 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
+            learning_rate_schedule: function that takes in a trainer step t and returns
+                the current learning rate.
         """
 
         super().__init__(
@@ -699,6 +729,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            learning_rate_schedule=learning_rate_schedule,
         )
 
         self._communication_module = communication_module

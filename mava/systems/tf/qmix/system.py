@@ -99,6 +99,7 @@ class QMIX(MADQN):
         qmix_hidden_dim: int = 32,
         num_hypernet_layers: int = 1,
         hypernet_hidden_dim: int = 32,
+        learning_rate_schedule: Optional[Callable[[int], None]] = None,
     ):
         """Initialise the system
 
@@ -191,6 +192,8 @@ class QMIX(MADQN):
                 Defaults to 1.
             hypernet_hidden_dim (int, optional): hypernetwork hidden dimension. Defaults
                 to 32.
+            learning_rate_schedule: function that takes in a trainer step t and returns
+                the current learning rate.
         """
 
         self._mixer = mixer
@@ -250,6 +253,7 @@ class QMIX(MADQN):
             epsilon_decay_steps=epsilon_decay_steps,
             epsilon_decay=epsilon_decay,
             exploration_scheduler_fn=exploration_scheduler_fn,
+            learning_rate_schedule=learning_rate_schedule,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
@@ -283,6 +287,7 @@ class QMIX(MADQN):
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                learning_rate_schedule=learning_rate_schedule,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
