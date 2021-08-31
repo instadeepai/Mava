@@ -35,7 +35,11 @@ from mava.components.tf.modules.communication import (
     BaseCommunicationModule,
     BroadcastedCommunication,
 )
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    BaseExplorationScheduler,
+    BaseExplorationTimestepScheduler,
+    LinearExplorationTimestepScheduler,
+)
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
@@ -61,9 +65,9 @@ class DIAL:
         trainer_fn: Type[training.MADQNRecurrentCommTrainer] = DIALSwitchTrainer,
         communication_module: Type[BaseCommunicationModule] = BroadcastedCommunication,
         executor_fn: Type[core.Executor] = DIALSwitchExecutor,
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
+        exploration_scheduler_fn: Union[
+            Type[BaseExplorationTimestepScheduler], Type[BaseExplorationScheduler]
+        ] = LinearExplorationTimestepScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
         epsilon_min: float = 0.05,
         epsilon_decay: Optional[float] = None,

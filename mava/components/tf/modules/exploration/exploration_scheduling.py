@@ -93,9 +93,9 @@ class BaseExplorationTimestepScheduler:
     @abc.abstractmethod
     def __init__(
         self,
+        epsilon_decay_steps: int,
         epsilon_start: float = 1.0,
         epsilon_min: float = 0.05,
-        epsilon_decay_steps: int = None,
     ):
         """
         Base class for decaying epsilon according to number of steps.
@@ -127,9 +127,9 @@ class LinearExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
         Decays epsilon linearly to epsilon_min, in epsilon_decay_steps.
         """
         super(LinearExplorationTimestepScheduler, self).__init__(
+            epsilon_decay_steps,
             epsilon_start,
             epsilon_min,
-            epsilon_decay_steps,
         )
 
         self._delta = (
@@ -156,9 +156,9 @@ class ExponentialExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
         Decays epsilon exponentially to epsilon_min, in epsilon_decay_steps.
         """
         super(ExponentialExplorationTimestepScheduler, self).__init__(
+            epsilon_decay_steps,
             epsilon_start,
             epsilon_min,
-            epsilon_decay_steps,
         )
 
         self._exp_scaling = (

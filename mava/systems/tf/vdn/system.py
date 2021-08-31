@@ -29,7 +29,11 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules import mixing
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    BaseExplorationScheduler,
+    BaseExplorationTimestepScheduler,
+    LinearExplorationTimestepScheduler,
+)
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.madqn.system import MADQN
@@ -50,9 +54,9 @@ class VDN(MADQN):
         trainer_fn: Type[training.VDNTrainer] = training.VDNTrainer,
         executor_fn: Type[core.Executor] = execution.VDNFeedForwardExecutor,
         mixer: Type[mixing.BaseMixingModule] = mixing.AdditiveMixing,
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
+        exploration_scheduler_fn: Union[
+            Type[BaseExplorationTimestepScheduler], Type[BaseExplorationScheduler]
+        ] = LinearExplorationTimestepScheduler,
         epsilon_decay_steps: Optional[int] = None,
         epsilon_min: float = 0.05,
         epsilon_start: float = 1,

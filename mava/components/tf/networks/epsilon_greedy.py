@@ -130,8 +130,10 @@ class EpsilonGreedy(snt.Module):
 
     def decrement_epsilon(self) -> None:
         """Decrement epsilon acording to schedule."""
-        self._epsilon = self._exploration_scheduler.decrement_epsilon()
+        self._epsilon = self._exploration_scheduler.decrement_epsilon()  # type: ignore
 
     def decrement_epsilon_time_t(self, time_t: int) -> None:
         """Decrement epsilon acording to time t."""
-        self._epsilon = self._exploration_scheduler.decrement_epsilon(time_t)
+        self._epsilon = self._exploration_scheduler.decrement_epsilon(
+            time_t
+        )  # type: ignore

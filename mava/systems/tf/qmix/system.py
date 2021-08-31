@@ -29,7 +29,11 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    BaseExplorationScheduler,
+    BaseExplorationTimestepScheduler,
+    LinearExplorationTimestepScheduler,
+)
 from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
@@ -53,9 +57,9 @@ class QMIX(MADQN):
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
         mixer: Type[MonotonicMixing] = MonotonicMixing,
         communication_module: Type[BaseCommunicationModule] = None,
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
+        exploration_scheduler_fn: Union[
+            Type[BaseExplorationTimestepScheduler], Type[BaseExplorationScheduler]
+        ] = LinearExplorationTimestepScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
         epsilon_min: float = 0.05,
         epsilon_decay: Optional[float] = None,

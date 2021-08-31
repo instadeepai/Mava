@@ -16,7 +16,7 @@
 """QMIX system builder implementation."""
 
 import dataclasses
-from typing import Any, Dict, Iterator, Optional, Type
+from typing import Any, Dict, Iterator, Optional, Type, Union
 
 import reverb
 import sonnet as snt
@@ -25,7 +25,9 @@ from acme.utils import counting
 from mava import core, types
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
+    BaseExplorationScheduler,
+    BaseExplorationTimestepScheduler,
+    LinearExplorationTimestepScheduler,
 )
 from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
@@ -77,9 +79,9 @@ class QMIXBuilder(MADQNBuilder):
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
         mixer: Type[MonotonicMixing] = MonotonicMixing,
         extra_specs: Dict[str, Any] = {},
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
+        exploration_scheduler_fn: Union[
+            Type[BaseExplorationTimestepScheduler], Type[BaseExplorationScheduler]
+        ] = LinearExplorationTimestepScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ) -> None:
         """Initialise the system.

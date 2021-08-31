@@ -22,9 +22,7 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationTimestepScheduler,
-)
+from mava.components.tf.modules.exploration import LinearExplorationTimestepScheduler
 from mava.systems.tf import qmix
 from mava.utils import lp_utils
 from mava.utils.environments import smac_utils

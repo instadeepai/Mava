@@ -30,7 +30,7 @@ from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     BaseExplorationScheduler,
-    LinearExplorationScheduler,
+    BaseExplorationTimestepScheduler,
 )
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf import executors
@@ -106,12 +106,12 @@ class MADQNBuilder:
     def __init__(
         self,
         config: MADQNConfig,
+        exploration_scheduler_fn: Union[
+            Type[BaseExplorationTimestepScheduler], Type[BaseExplorationScheduler]
+        ],
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ):
         """Initialise the system.
@@ -342,28 +342,31 @@ class MADQNBuilder:
         else:
             epsilon_start = self._config.epsilon_start
             epsilon_min = self._config.epsilon_min
-            epsilon_decay = self._config.epsilon_decay
-            epsilon_decay_steps = self._config.epsilon_decay_steps
+            epsilon_decay = self._config.epsilon_decay or 0.0
+            epsilon_decay_steps = self._config.epsilon_decay_steps or 0
 
         # Pass scheduler and initialize action selectors
-        action_selectors = {
-            network: action_selector_fn(
-                self._exploration_scheduler_fn(
-                    epsilon_start=epsilon_start,
-                    epsilon_min=epsilon_min,
-                    epsilon_decay=epsilon_decay,
+        action_selectors = {}
+        for network, action_selector_fn in action_selectors.items():
+            if issubclass(self._exploration_scheduler_fn, BaseExplorationScheduler):
+                action_selectors[network] = action_selector_fn(
+                    self._exploration_scheduler_fn(
+                        epsilon_start=epsilon_start,
+                        epsilon_min=epsilon_min,
+                        epsilon_decay=epsilon_decay,
+                    )
                 )
-            )
-            if issubclass(self._exploration_scheduler_fn, BaseExplorationScheduler)
-            else action_selector_fn(
-                self._exploration_scheduler_fn(
-                    epsilon_start=epsilon_start,
-                    epsilon_min=epsilon_min,
-                    epsilon_decay_steps=epsilon_decay_steps,
+            elif issubclass(
+                self._exploration_scheduler_fn, BaseExplorationTimestepScheduler
+            ):
+                assert epsilon_decay_steps is not None
+                action_selectors[network] = action_selector_fn(
+                    self._exploration_scheduler_fn(
+                        epsilon_start=epsilon_start,
+                        epsilon_min=epsilon_min,
+                        epsilon_decay_steps=epsilon_decay_steps,
+                    )
                 )
-            )
-            for network, action_selector_fn in action_selectors.items()
-        }
 
         # Create the executor which coordinates the actors.
         return self._executor_fn(

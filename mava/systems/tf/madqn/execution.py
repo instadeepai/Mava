@@ -76,7 +76,7 @@ class DQNExecutor:
             for action_selector in self._action_selectors.values()
         }
 
-    def on_after_action_selection(self, time_t) -> None:
+    def on_after_action_selection(self, time_t: int) -> None:
         self._decrement_epsilon(time_t)
 
     def get_stats(self) -> Dict:
