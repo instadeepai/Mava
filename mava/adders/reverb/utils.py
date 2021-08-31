@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Iterable, Optional, Union
+from typing import Iterable, Optional
 
 import tensorflow as tf
 import tree
@@ -42,41 +42,6 @@ def final_step_like(
         if next_extras
         else tree.map_structure(acme_utils.zeros_like, step.extras),
     )
-
-
-# TODO(Kale-ab): Deprecate this in newer versions of acme.
-def calculate_priorities(
-    priority_fns: base.PriorityFnMapping,
-    trajectory_or_transition: Union[base.Trajectory, types.Transition],
-) -> Dict[str, float]:
-    """Helper used to calculate the priority of a Trajectory or Transition.
-    This helper converts the leaves of the Trajectory or Transition from
-    `reverb.TrajectoryColumn` objects into numpy arrays. The converted Trajectory
-    or Transition is then passed into each of the functions in `priority_fns`.
-    Args:
-        priority_fns: a mapping from table names to priority functions (i.e. a
-        callable of type PriorityFn). The given function will be used to generate
-        the priority (a float) for the given table.
-        trajectory_or_transition: the trajectory or transition used to compute
-        priorities.
-    Returns:
-        A dictionary mapping from table names to the priority (a float) for the
-        given collection Trajectory or Transition.
-    """
-    if any([priority_fn is not None for priority_fn in priority_fns.values()]):
-
-        trajectory_or_transition = tree.map_structure(
-            lambda col: col.numpy(), trajectory_or_transition
-        )
-
-    return {
-        table: (
-            priority_fn(trajectory_or_transition)  # type: ignore
-            if priority_fn
-            else 1.0
-        )
-        for table, priority_fn in priority_fns.items()
-    }
 
 
 def trajectory_signature(
