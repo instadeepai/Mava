@@ -52,7 +52,7 @@ launchpad_requirements = [
 
 testing_formatting_requirements = [
     "pre-commit",
-    "mypy==0.812",
+    "mypy==0.910",
     "pytest-xdist",
     "flake8==3.9.1",
     "black==21.4b1",
