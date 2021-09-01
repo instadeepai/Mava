@@ -39,6 +39,7 @@ def convert_dm_compatible_observations(
     """
     observations: Dict[str, types.OLT] = {}
     for agent in possible_agents:
+
         # If we have a valid observation for this agent.
         if agent in observes:
             observation = observes[agent]
@@ -46,9 +47,14 @@ def convert_dm_compatible_observations(
                 legals = observation["action_mask"].astype(
                     observation_spec[agent].legal_actions.dtype
                 )
-                observation = observation["observation"].astype(
-                    observation_spec[agent].observation.dtype
-                )
+
+                # Environments like flatland can return tuples for observations
+                if isinstance(observation_spec[agent].observation, tuple):
+                    # Assuming tuples all have same type.
+                    observation_dtype = observation_spec[agent].observation[0].dtype
+                else:
+                    observation_dtype = observation_spec[agent].observation.dtype
+                observation = observation["observation"].astype(observation_dtype)
             else:
                 # TODO Handle legal actions better for continous envs,
                 # maybe have min and max for each action and clip the
@@ -60,10 +66,22 @@ def convert_dm_compatible_observations(
 
         # If we have no observation, we need to use the default.
         else:
-            observation = np.zeros(
-                observation_spec[agent].observation.shape,
-                dtype=observation_spec[agent].observation.dtype,
-            )
+            # Handle tuple observations
+            if isinstance(observation_spec[agent].observation, tuple):
+                observation_spec_list = []
+                for obs_spec in observation_spec[agent].observation:
+                    observation_spec_list.append(
+                        np.zeros(
+                            obs_spec.shape,
+                            dtype=obs_spec.dtype,
+                        )
+                    )
+                observation = tuple(observation_spec_list)
+            else:
+                observation = np.zeros(
+                    observation_spec[agent].observation.shape,
+                    dtype=observation_dtype,
+                )
             legals = np.ones(
                 observation_spec[agent].legal_actions.shape,
                 dtype=observation_spec[agent].legal_actions.dtype,

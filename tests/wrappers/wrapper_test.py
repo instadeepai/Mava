@@ -236,10 +236,10 @@ class TestEnvWrapper:
                 test_agents_observations[agent] = {
                     "observation": np.random.rand(
                         *wrapped_env.observation_spaces[agent].shape
-                    ),
+                    ).astype(np.float32),
                     "action_mask": np.random.randint(
                         2, size=wrapped_env.action_spaces[agent].shape
-                    ),
+                    ).astype(int),
                 }
             # Parallel env_types
             if env_spec.env_type == EnvType.Parallel:
