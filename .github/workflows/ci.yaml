@@ -68,7 +68,6 @@ jobs:
           flake8 . --count --exit-zero --statistics
       - name: Check types with mypy
         run: |
-          pip show mypy
           mypy . --exclude docs/
       - name: Test with pytest and get code coverage
         run: |

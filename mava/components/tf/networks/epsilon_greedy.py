@@ -16,6 +16,7 @@
 # https://github.com/deepmind/acme/blob/master/acme/tf/networks/masked_epsilon_greedy.py
 
 """Adaptation of trfl epsilon_greedy with legal action masking."""
+import typing
 from typing import Optional, Union
 
 import numpy as np
@@ -129,12 +130,13 @@ class EpsilonGreedy(snt.Module):
         """
         return self._epsilon
 
+    # mypy doesn't handle vars with multiple possible types well.
+    @typing.no_type_check
     def decrement_epsilon(self) -> None:
         """Decrement epsilon acording to schedule."""
-        self._epsilon = self._exploration_scheduler.decrement_epsilon()  # type: ignore
+        self._epsilon = self._exploration_scheduler.decrement_epsilon()
 
+    @typing.no_type_check
     def decrement_epsilon_time_t(self, time_t: int) -> None:
         """Decrement epsilon acording to time t."""
-        self._epsilon = self._exploration_scheduler.decrement_epsilon(
-            time_t  # type: ignore
-        )
+        self._epsilon = self._exploration_scheduler.decrement_epsilon(time_t)
