@@ -46,7 +46,7 @@ jobs:
 
           # openspiel
           pip install .[open_spiel]
-          pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode] --force-reinstall
+          pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
 
           # For atari envs
           sudo apt-get install unrar
@@ -57,7 +57,7 @@ jobs:
           pip uninstall -y enum34
 
           # SC2
-          pip install git+https://github.com/oxwhirl/smac.git --force-reinstall
+          pip install git+https://github.com/oxwhirl/smac.git
       - name: Format code
         run: |
           # Check code follows black formatting.
@@ -68,6 +68,7 @@ jobs:
           flake8 . --count --exit-zero --statistics
       - name: Check types with mypy
         run: |
+          pip show mypy
           mypy . --exclude docs/
       - name: Test with pytest and get code coverage
         run: |
