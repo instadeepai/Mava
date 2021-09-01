@@ -21,7 +21,11 @@ from typing import Any, List, Optional, Union
 import dm_env
 import numpy as np
 import supersuit
-from smac.env.pettingzoo import StarCraft2PZEnv
+
+try:
+    from smac.env.pettingzoo import StarCraft2PZEnv
+except ModuleNotFoundError:
+    pass
 from supersuit import black_death_v1
 
 from mava.wrappers import (
@@ -35,6 +39,14 @@ from mava.wrappers import (
 def atari_preprocessing(
     env: Union[ParallelEnvWrapper, SequentialEnvWrapper]
 ) -> Union[ParallelEnvWrapper, SequentialEnvWrapper]:
+    """Preprocess atari env.
+
+    Args:
+        env : a mava supported atari env.
+
+    Returns:
+        a wrapped mava env.
+    """
 
     # Preprocessing
     env = supersuit.max_observation_v0(env, 2)
