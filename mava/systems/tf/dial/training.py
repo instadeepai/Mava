@@ -90,8 +90,8 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
-            learning_rate_schedule: function that takes in a trainer step t and returns
-                the current learning rate. See
+            learning_rate_schedule: function/class that takes in a trainer step t and
+                returns the current learning rate. See
                 examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
                 for an example.
         """

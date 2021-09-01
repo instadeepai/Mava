@@ -192,8 +192,8 @@ class QMIX(MADQN):
                 Defaults to 1.
             hypernet_hidden_dim (int, optional): hypernetwork hidden dimension. Defaults
                 to 32.
-            learning_rate_schedule: function that takes in a trainer step t and returns
-                the current learning rate. See
+            learning_rate_schedule: function/class that takes in a trainer step t and
+                returns the current learning rate. See
                 examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
                 for an example.
         """

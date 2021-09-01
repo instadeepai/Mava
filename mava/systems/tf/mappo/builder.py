@@ -67,8 +67,8 @@ class MAPPOConfig:
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         replay_table_name: string indicating what name to give the replay table.
-        learning_rate_schedule: function that takes in a trainer step t and returns
-                the current learning rate. See
+        learning_rate_schedule: function/class that takes in a trainer step t and
+                returns the current learning rate. See
                 examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
                 for an example.
     """

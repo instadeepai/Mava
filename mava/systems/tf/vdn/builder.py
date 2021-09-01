@@ -67,8 +67,8 @@ class VDNConfig(MADQNConfig):
         optimizer: type of optimizer to use for updating the parameters of models.
         replay_table_name: string indicating what name to give the replay table.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
-        learning_rate_schedule: function that takes in a trainer step t and returns
-                the current learning rate. See
+        learning_rate_schedule: function/class that takes in a trainer step t and
+                returns the current learning rate. See
                 examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
                 for an example.
     """

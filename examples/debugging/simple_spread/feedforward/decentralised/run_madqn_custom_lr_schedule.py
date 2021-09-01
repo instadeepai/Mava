@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-"""Example running MADQN on debug MPE environments, using a LR schedule."""
+"""Example running MADQN on debug MPE environments, using a custom LR schedule."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -50,6 +50,22 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
+class SimpleLinearDecay:
+    """Simple custom linear lr decay"""
+
+    def __init__(self, start: float, min: float, delta: float = 1e-4):
+        self._min = tf.cast(min, float)
+        self._start = tf.cast(start, float)
+        self._delta = tf.cast(delta, float)
+
+    def __call__(self, trainer_timestep_t: int) -> tf.Tensor:
+        lr = max(
+            self._min,
+            self._start - self._delta * tf.cast(trainer_timestep_t, self._delta.dtype),
+        )
+        return tf.convert_to_tensor(lr, dtype=float)
+
+
 def main(_: Any) -> None:
 
     # Environment.
@@ -79,14 +95,8 @@ def main(_: Any) -> None:
     # LR schedule
     # learning_rate_schedule is a function/class that takes in a trainer timestep t
     # and return the current learning rate.
-    # LR that's lr for the first 10001 steps, lr * 0.1 for the next 1000 steps,
-    # and lr * 0.01 for any additional steps.
-    boundaries = [10000, 11000]
-    lr = 1e-2
-    values = [lr, lr * 0.1, lr * 0.01]
-    learning_rate_schedule = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
-        boundaries, values
-    )
+    lr_start = 0.1
+    learning_rate_schedule = SimpleLinearDecay(min=0.001, start=0.1)
 
     # distributed program
     program = madqn.MADQN(
@@ -98,7 +108,7 @@ def main(_: Any) -> None:
         epsilon_min=0.05,
         epsilon_decay=5e-4,
         importance_sampling_exponent=0.2,
-        optimizer=snt.optimizers.Adam(learning_rate=lr),
+        optimizer=snt.optimizers.Adam(learning_rate=lr_start),
         checkpoint_subpath=checkpoint_dir,
         learning_rate_schedule=learning_rate_schedule,
     ).build()

@@ -178,9 +178,9 @@ class MADDPG:
             connection_spec (Callable[[Dict[str, List[str]]], Dict[str, List[str]]],
                 optional): network topology specification for networked system
                 architectures. Defaults to None.
-            learning_rate_schedule: dict with two functions (one for the policy and one
-                for the critic optimizer), that takes in a trainer step t and returns
-                the current learning rate, e.g. {"policy": policy_lr_schedule ,
+            learning_rate_schedule: dict with two functions/classes (one for the policy
+                and one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate, e.g. {"policy": policy_lr_schedule ,
                 "critic": critic_lr_schedule}. See
                 examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
                 for an example.

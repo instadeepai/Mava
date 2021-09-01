@@ -74,7 +74,10 @@ def main(_: Any) -> None:
     )
 
     # LR schedule
-    # Format {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
+    # Format:
+    #    {"policy": policy_lr_schedule ,"critic": critic_lr_schedule},
+    # where policy_lr_schedule and critic_lr_schedule are functions/class that
+    # take in a trainer timestep t and return the current learning rate.
     # It is also possible to only schedule one of the lr as
     # follows {"policy": policy_lr_schedule }.
 
@@ -88,7 +91,7 @@ def main(_: Any) -> None:
         tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
     )
 
-    # Critic LR Schedule
+    # Critic LR Schedule - ExponentialDecay Schedule
     critic_initial_lr = 0.1
     critic_learning_rate_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
         critic_initial_lr, decay_steps=10000, decay_rate=0.96, staircase=True
