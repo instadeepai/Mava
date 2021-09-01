@@ -57,7 +57,7 @@ jobs:
           pip uninstall -y enum34
 
           # SC2
-          pip install git+https://github.com/oxwhirl/smac.git
+          pip install git+https://github.com/oxwhirl/smac.git --force-reinstall
       - name: Format code
         run: |
           # Check code follows black formatting.
