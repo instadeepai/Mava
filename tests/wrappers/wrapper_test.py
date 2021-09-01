@@ -141,10 +141,18 @@ class TestEnvWrapper:
         ):
             #  Get agent names from env and mock out data
             agents = wrapped_env.agents
-            test_agents_observations = {
-                agent: np.random.rand(*wrapped_env.observation_spaces[agent].shape)
-                for agent in agents
-            }
+            test_agents_observations = {}
+            for agent in agents:
+                observation_spec = wrapped_env.observation_spec()
+                if isinstance(observation_spec[agent].observation, tuple):
+                    # Using the first dim for mock observation
+                    observation_shape = observation_spec[agent].observation[0].shape
+                else:
+                    observation_shape = observation_spec[agent].observation.shape
+
+                test_agents_observations[agent] = np.random.rand(
+                    *observation_shape
+                ).astype(np.float32)
 
             # Parallel env_types
             if env_spec.env_type == EnvType.Parallel:
@@ -200,13 +208,32 @@ class TestEnvWrapper:
 
                 # We have empty OLT for all agents
                 for agent in wrapped_env.agents:
-                    np.testing.assert_array_equal(
-                        dm_env_timestep[agent].observation,
-                        np.zeros(
-                            wrapped_env.observation_spaces[agent].shape,
-                            dtype=wrapped_env.observation_spaces[agent].dtype,
-                        ),
-                    )
+                    observation_spec = wrapped_env.observation_spec()
+                    if isinstance(observation_spec[agent].observation, tuple):
+                        observation_spec_list = []
+                        for obs_spec in observation_spec[agent].observation:
+                            observation_spec_list.append(
+                                np.zeros(
+                                    obs_spec.shape,
+                                    dtype=obs_spec.dtype,
+                                )
+                            )
+
+                        for i, obs in enumerate(observation_spec_list):
+                            np.testing.assert_array_equal(
+                                dm_env_timestep[agent].observation[i],
+                                obs,
+                            )
+                    else:
+                        observation = np.zeros(
+                            observation_spec[agent].observation.shape,
+                            dtype=observation_spec[agent].observation.dtype,
+                        )
+
+                        np.testing.assert_array_equal(
+                            dm_env_timestep[agent].observation,
+                            observation,
+                        )
 
                     np.testing.assert_array_equal(
                         dm_env_timestep[agent].legal_actions,
@@ -232,11 +259,18 @@ class TestEnvWrapper:
             agents = wrapped_env.agents
             test_agents_observations = {}
             for agent in agents:
+                observation_spec = wrapped_env.observation_spec()
+                if isinstance(observation_spec[agent].observation, tuple):
+                    # Using the first dim for mock observation
+                    observation_shape = observation_spec[agent].observation[0].shape
+                else:
+                    observation_shape = observation_spec[agent].observation.shape
+
                 # TODO If cont action space masking is implemented - Update
                 test_agents_observations[agent] = {
-                    "observation": np.random.rand(
-                        *wrapped_env.observation_spaces[agent].shape
-                    ).astype(np.float32),
+                    "observation": np.random.rand(*observation_shape).astype(
+                        np.float32
+                    ),
                     "action_mask": np.random.randint(
                         2, size=wrapped_env.action_spaces[agent].shape
                     ).astype(int),

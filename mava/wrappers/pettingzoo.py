@@ -483,16 +483,16 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             rewards (Dict[str, float]): rewards per agent.
         """
         rewards_spec = self.reward_spec()
-        rewards = {}
+        rewards_return = {}
         for agent in self.possible_agents:
             if agent in rewards:
-                rewards[agent] = convert_np_type(
+                rewards_return[agent] = convert_np_type(
                     rewards_spec[agent].dtype, rewards[agent]
                 )
             # Default reward
             else:
-                rewards[agent] = convert_np_type(rewards_spec[agent].dtype, 0)
-        return rewards
+                rewards_return[agent] = convert_np_type(rewards_spec[agent].dtype, 0)
+        return rewards_return
 
     def _convert_observations(
         self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
