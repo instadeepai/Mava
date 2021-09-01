@@ -80,7 +80,7 @@ def convert_dm_compatible_observations(
             else:
                 observation = np.zeros(
                     observation_spec[agent].observation.shape,
-                    dtype=observation_dtype,
+                    dtype=observation_spec[agent].observation.dtype,
                 )
             legals = np.ones(
                 observation_spec[agent].legal_actions.shape,

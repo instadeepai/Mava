@@ -523,8 +523,10 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         observation_specs = {}
         for agent in self.possible_agents:
             if type(self._environment.observation_spaces[agent]) == spaces.Box:
-                observation = self._environment.observation_spaces[agent]
-                legal_actions = self._environment.action_spaces[agent]
+                observation = _convert_to_spec(
+                    self._environment.observation_spaces[agent]
+                )
+                legal_actions = _convert_to_spec(self._environment.action_spaces[agent])
             else:
                 # For env link SC2 with action mask spec
                 observation = _convert_to_spec(
