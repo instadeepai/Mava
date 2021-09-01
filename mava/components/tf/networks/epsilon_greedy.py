@@ -33,6 +33,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 # https://github.com/deepmind/acme/blob/master/acme/tf/networks/legal_actions.py
 class EpsilonGreedy(snt.Module):
     """Computes an epsilon-greedy distribution over actions.
+
     This policy does the following:
     - With probability 1 - epsilon, take the action corresponding to the highest
     action value, breaking ties uniformly at random.
@@ -135,5 +136,5 @@ class EpsilonGreedy(snt.Module):
     def decrement_epsilon_time_t(self, time_t: int) -> None:
         """Decrement epsilon acording to time t."""
         self._epsilon = self._exploration_scheduler.decrement_epsilon(
-            time_t
-        )  # type: ignore
+            time_t  # type: ignore
+        )
