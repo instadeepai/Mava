@@ -46,7 +46,7 @@ jobs:
 
           # openspiel
           pip install .[open_spiel]
-          pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
+          pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode] --force-reinstall
 
           # For atari envs
           sudo apt-get install unrar
