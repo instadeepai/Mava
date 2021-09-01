@@ -15,7 +15,7 @@
 
 """QMIX system trainer implementation."""
 
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import numpy as np
 import reverb
@@ -60,6 +60,7 @@ class QMIXTrainer(MADQNTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        learning_rate_schedule: Optional[Callable[[int], None]] = None,
     ) -> None:
         """Initialise QMIX trainer
 
@@ -93,6 +94,8 @@ class QMIXTrainer(MADQNTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
+            learning_rate_schedule: function/class that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         self._mixing_network = mixing_network
@@ -117,6 +120,7 @@ class QMIXTrainer(MADQNTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            learning_rate_schedule=learning_rate_schedule,
         )
 
         # Checkpoint the mixing networks

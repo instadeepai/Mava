@@ -85,6 +85,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}
 
+    @tf.function
     def _policy(
         self,
         agent: str,
