@@ -114,7 +114,7 @@ class VDN(MADQN):
                 additive or monotonic mixing. Defaults to mixing.AdditiveMixing.
             exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
                 function specifying a decaying scheduler for epsilon exploration.
-                Defaults to LinearExplorationScheduler.
+                Defaults to LinearExplorationTimestepScheduler.
             epsilon_min (float, optional): final minimum epsilon value at the end of a
                 decaying schedule. Defaults to 0.05.
             epsilon_start:  initial epsilon value.
@@ -176,9 +176,7 @@ class VDN(MADQN):
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
             learning_rate_schedule: function/class that takes in a trainer step t and
-                returns the current learning rate. See
-                examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
-                for an example.
+                returns the current learning rate.
         """
 
         self._mixer = mixer

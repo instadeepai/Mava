@@ -54,6 +54,7 @@ class TestMADQN:
             max_replay_size=1000,
             optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
+            epsilon_decay_steps=500,
         )
 
         program = system.build()
@@ -106,6 +107,7 @@ class TestMADQN:
             executor_fn=madqn.execution.MADQNRecurrentExecutor,
             sequence_length=4,
             period=4,
+            epsilon_decay_steps=500,
         )
 
         program = system.build()

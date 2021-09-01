@@ -57,6 +57,7 @@ class TestDial:
             checkpoint=False,
             sequence_length=3,
             period=3,
+            epsilon_decay_steps=500,
         )
 
         program = system.build()

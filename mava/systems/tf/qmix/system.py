@@ -124,7 +124,7 @@ class QMIX(MADQN):
                 None.
             exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
                 function specifying a decaying scheduler for epsilon exploration.
-                Defaults to LinearExplorationScheduler.
+                Defaults to LinearExplorationTimestepScheduler.
             replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
                 optional): replay buffer stabilisaiton function, e.g. fingerprints.
                 Defaults to None.
@@ -193,9 +193,7 @@ class QMIX(MADQN):
             hypernet_hidden_dim (int, optional): hypernetwork hidden dimension. Defaults
                 to 32.
             learning_rate_schedule: function/class that takes in a trainer step t and
-                returns the current learning rate. See
-                examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
-                for an example.
+                returns the current learning rate.
         """
 
         self._mixer = mixer

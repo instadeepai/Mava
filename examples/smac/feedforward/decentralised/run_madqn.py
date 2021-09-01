@@ -82,7 +82,9 @@ def main(_: Any) -> None:
         epsilon_min=0.05,
         epsilon_decay_steps=50000,
         importance_sampling_exponent=0.2,
-        optimizer=snt.optimizers.SGD(learning_rate=1e-2),
+        optimizer=snt.optimizers.RMSProp(
+            learning_rate=0.0005, epsilon=0.00001, decay=0.99
+        ),
         checkpoint_subpath=checkpoint_dir,
         batch_size=512,
         executor_variable_update_period=100,

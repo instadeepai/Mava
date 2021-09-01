@@ -99,6 +99,8 @@ class MADQNTrainer(mava.Trainer):
                 Defaults to "~/mava/".
             communication_module (BaseCommunicationModule): module for communication
                 between agents. Defaults to None.
+            learning_rate_schedule: function/class that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         self._agents = agents
@@ -507,7 +509,7 @@ class MADQNTrainer(mava.Trainer):
         Args:
             trainer_step : trainer step time t.
         """
-        train_utils.decay_lr_actor(
+        train_utils.decay_lr(
             self._learning_rate_schedule, self._optimizers, trainer_step
         )
 
@@ -537,6 +539,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
+        learning_rate_schedule: Optional[Callable[[int], None]] = None,
     ):
         """Initialise recurrent MADQN trainer
 
@@ -567,6 +570,8 @@ class MADQNRecurrentTrainer(MADQNTrainer):
                 Defaults to "~/mava/".
             communication_module (BaseCommunicationModule): module for communication
                 between agents. Defaults to None.
+            learning_rate_schedule: function/class that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         super().__init__(
@@ -586,6 +591,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             fingerprint=fingerprint,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            learning_rate_schedule=learning_rate_schedule,
         )
 
     def _forward(self, inputs: Any) -> None:
@@ -708,9 +714,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
             learning_rate_schedule: function/class that takes in a trainer step t and
-                returns the current learning rate. See
-                examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
-                for an example.
+                returns the current learning rate.
         """
 
         super().__init__(

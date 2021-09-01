@@ -54,6 +54,7 @@ class TestQmix:
             max_replay_size=1000,
             optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
+            epsilon_decay_steps=500,
         )
 
         program = system.build()

@@ -64,7 +64,7 @@ def main(_: Any) -> None:
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
-    log_every = 0
+    log_every = 10
     logger_factory = functools.partial(
         logger_utils.make_logger,
         directory=FLAGS.base_dir,
@@ -82,7 +82,7 @@ def main(_: Any) -> None:
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationTimestepScheduler,
         epsilon_min=0.05,
-        epsilon_decay_steps=10000,
+        epsilon_decay_steps=20000,
         max_replay_size=1000000,
         optimizer=snt.optimizers.RMSProp(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,

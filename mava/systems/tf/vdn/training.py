@@ -93,9 +93,7 @@ class VDNTrainer(MADQNTrainer):
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
             learning_rate_schedule: function/class that takes in a trainer step t and
-                returns the current learning rate. See
-                examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
-                for an example.
+                returns the current learning rate.
         """
 
         self._mixing_network = mixing_network

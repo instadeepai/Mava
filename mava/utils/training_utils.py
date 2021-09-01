@@ -29,30 +29,13 @@ def decay_lr_actor_critic(
             decay_lr(learning_rate_schedule["critic"], critic_optimizers, trainer_step)
 
 
-def decay_lr_actor(
-    learning_rate_schedule: Optional[Callable[[int], None]],
-    policy_optimizers: Dict,
-    trainer_step: int,
-) -> None:
-    """Function that decays lr rate in actor training.
-
-    Args:
-        learning_rate_schedule : function that returns a learning rate at training
-            time t.
-        policy_optimizers : policy optims.
-        trainer_step : training time t.
-    """
-    if learning_rate_schedule:
-        decay_lr(learning_rate_schedule, policy_optimizers, trainer_step)
-
-
 def decay_lr(
-    lr_schedule: Callable[[int], None], optimizers: Dict, trainer_step: int
+    lr_schedule: Optional[Callable[[int], None]], optimizers: Dict, trainer_step: int
 ) -> None:
     """Funtion that decays lr of optim.
 
     Args:
-        lr_schedule : lr schedule function.
+        lr_schedule : lr schedule function/callable.
         optimizer : optim to decay.
         trainer_step : training time t.
     """

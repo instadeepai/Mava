@@ -69,9 +69,7 @@ class QMIXConfig(MADQNConfig):
         replay_table_name: string indicating what name to give the replay table.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         learning_rate_schedule: function/class that takes in a trainer step t and
-                returns the current learning rate. See
-                examples/debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py
-                for an example.
+                returns the current learning rate.
     """
 
 
@@ -106,7 +104,7 @@ class QMIXBuilder(MADQNBuilder):
             extra_specs (Dict[str, Any], optional): defines the specifications of extra
                 information used by the system. Defaults to {}.
             exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
-                epsilon decay scheduler. Defaults to LinearExplorationScheduler.
+                epsilon decay scheduler. Defaults to LinearExplorationTimestepScheduler.
             replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
                 optional): optional function to stabilise experience replay. Defaults
                 to None.
