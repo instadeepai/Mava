@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MAPPO system executor implementation."""
-
-from typing import Any, Dict, Optional, Tuple
+"""MADDPG system executor implementation."""
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dm_env
 import numpy as np
@@ -23,16 +22,27 @@ import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
 from acme import types
+from acme.specs import EnvironmentSpec
+
+# Internal imports.
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
+from dm_env import specs
 
-from mava import adders, core
+from mava import adders
+from mava.systems.tf import executors
+from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
+Array = specs.Array
+BoundedArray = specs.BoundedArray
+DiscreteArray = specs.DiscreteArray
 tfd = tfp.distributions
 
+from mava.callbacks import Callback
 
-class MAPPOFeedForwardExecutor(core.Executor):
-    """A feed-forward executor.
+
+class OnlineSystemExecutor(mava.Executor, Callback):
+    """A generic feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system.
     """
 
@@ -57,18 +67,15 @@ class MAPPOFeedForwardExecutor(core.Executor):
         """
 
         # Store these for later use.
+        self._agent_net_keys = agent_net_keys
+        self._policy_networks = policy_networks
         self._adder = adder
         self._variable_client = variable_client
-        self._policy_networks = policy_networks
-        self._agent_net_keys = agent_net_keys
-        self._prev_log_probs: Dict[str, Any] = {}
 
     @tf.function
     def _policy(
-        self,
-        agent: str,
-        observation: types.NestedTensor,
-    ) -> Tuple[types.NestedTensor, types.NestedTensor]:
+        self, agent: str, observation: types.NestedTensor
+    ) -> types.NestedTensor:
         """Agent specific policy function
 
         Args:
@@ -77,32 +84,26 @@ class MAPPOFeedForwardExecutor(core.Executor):
                 environment.
 
         Returns:
-            Tuple[types.NestedTensor, types.NestedTensor]: log probabilities and action
+            types.NestedTensor: agent action
         """
 
-        # Index network either on agent type or on agent id.
-        network_key = self._agent_net_keys[agent]
-
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
-        observation = tf2_utils.add_batch_dim(observation.observation)
+        batched_observation = tf2_utils.add_batch_dim(observation)
+
+        # index network either on agent type or on agent id
+        agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
-        policy = self._policy_networks[network_key](observation)
+        policy = self._policy_networks[agent_key](batched_observation)
 
-        # Sample from the policy and compute the log likelihood.
-        action = policy.sample()
-        log_prob = policy.log_prob(action)
+        # Sample from the policy if it is stochastic.
+        action = policy.sample() if isinstance(policy, tfd.Distribution) else policy
 
-        # Cast for compatibility with reverb.
-        # sample() returns a 'int32', which is a problem.
-        if isinstance(policy, tfp.distributions.Categorical):
-            action = tf.cast(action, "int64")
-
-        return log_prob, action
+        return action
 
     def select_action(
         self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
+    ) -> Union[types.NestedArray, Tuple[types.NestedArray, types.NestedArray]]:
         """select an action for a single agent in the system
 
         Args:
@@ -111,44 +112,18 @@ class MAPPOFeedForwardExecutor(core.Executor):
                 environment.
 
         Returns:
-            types.NestedArray: agent action
+            Union[types.NestedArray, Tuple[types.NestedArray, types.NestedArray]]:
+                agent action.
         """
 
-        # Step the recurrent policy/value network forward
-        # given the current observation and state.
-        self._prev_log_probs[agent], action = self._policy(agent, observation)
+        # Pass the observation through the policy network.
+        action = self._policy(agent, observation.observation)
+
+        # TODO Mask actions here using observation.legal_actions
+        # What happens in discrete vs cont case
 
         # Return a numpy array with squeezed out batch dimension.
-        action = tf2_utils.to_numpy_squeeze(action)
-
-        # TODO(Kale-ab) : Remove. This is for debugging.
-        if np.isnan(action).any():
-            print(
-                f"Value error- Log Probs:{self._prev_log_probs[agent]} Action: {action} "  # noqa: E501
-            )
-
-        return action
-
-    def select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
-        """select the actions for all agents in the system
-
-        Args:
-           observations (Dict[str, types.NestedArray]): agent observations from the
-                environment.
-
-        Returns:
-            Dict[str, types.NestedArray]: actions and policies for all agents in
-                the system.
-        """
-
-        actions = {}
-        for agent, observation in observations.items():
-            action = self.select_action(agent, observation)
-            actions[agent] = action
-
-        return actions
+        return tf2_utils.to_numpy_squeeze(action)
 
     def observe_first(
         self,
@@ -165,7 +140,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         """
 
         if self._adder:
-            self._adder.add_first(timestep)
+            self._adder.add_first(timestep, extras)
 
     def observe(
         self,
@@ -183,14 +158,36 @@ class MAPPOFeedForwardExecutor(core.Executor):
                 information to record during the transition. Defaults to {}.
         """
 
-        if not self._adder:
-            return
+        if self._adder:
+            self._adder.add(actions, next_timestep, next_extras)
 
-        next_extras.update({"log_probs": self._prev_log_probs})
+    def select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> Union[
+        Dict[str, types.NestedArray],
+        Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
+    ]:
+        """select the actions for all agents in the system
 
-        next_extras = tf2_utils.to_numpy_squeeze(next_extras)
+        Args:
+            observations (Dict[str, types.NestedArray]): agent observations from the
+                environment.
 
-        self._adder.add(actions, next_timestep, next_extras)
+        Returns:
+            Union[ Dict[str, types.NestedArray], Tuple[Dict[str, types.NestedArray],
+                Dict[str, types.NestedArray]], ]: actions for all agents in the system.
+        """
+
+        actions = {}
+        for agent, observation in observations.items():
+            # Pass the observation through the policy network.
+            action = self._policy(agent, observation.observation)
+            # TODO Mask actions here using observation.legal_actions
+            # What happens in discrete vs cont case
+            actions[agent] = tf2_utils.to_numpy_squeeze(action)
+
+        # Return a numpy array with squeezed out batch dimension.
+        return actions
 
     def update(self, wait: bool = False) -> None:
         """update executor variables
