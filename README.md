@@ -191,6 +191,10 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     ./install_sc2.sh
     ```
+    Then set SC2PATH to the location of 3rdparty/StarCraftII, e.g. :
+    ```
+    export SC2PATH="/home/Documents/Code/3rdparty/StarCraftII"
+    ```
     Or optionally install through docker (*each build downloads and installs StarCraftII ~3.8G* ):
     ```bash
     make build
