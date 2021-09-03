@@ -20,6 +20,8 @@ Abstract base class used to build new callbacks.
 import abc
 from typing import Any, Dict, List, Optional, Type
 
+from mava.systems.building import BaseSystemBuilder
+
 
 class Callback(abc.ABC):
     """
@@ -31,110 +33,114 @@ class Callback(abc.ABC):
     # system builder hooks
     ######################
 
-    def on_building_init_start(self) -> None:
+    def on_building_init_start(self, builder: BaseSystemBuilder) -> None:
         """Called when the builder initialisation begins."""
         pass
 
-    def on_building_init_end(self) -> None:
+    def on_building_init_end(self, builder: BaseSystemBuilder) -> None:
         """Called when the builder initialisation ends."""
         pass
 
-    def on_building_make_replay_table_start(self) -> None:
+    def on_building_make_replay_table_start(self, builder: BaseSystemBuilder) -> None:
         """[description]"""
         pass
 
-    def on_building_adder_signature(self) -> None:
+    def on_building_adder_signature(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_rate_limiter(self) -> None:
+    def on_building_rate_limiter(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_tables(self) -> None:
+    def on_building_make_tables(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_replay_table_end(self) -> None:
+    def on_building_make_replay_table_end(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_dataset_iterator_start(self) -> None:
+    def on_building_make_dataset_iterator_start(
+        self, builder: BaseSystemBuilder
+    ) -> None:
         """[summary]"""
         pass
 
-    def on_building_dataset(self) -> None:
+    def on_building_dataset(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_dataset_iterator_end(self) -> None:
+    def on_building_make_dataset_iterator_end(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_adder_start(self) -> None:
+    def on_building_make_adder_start(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_adder_priority(self) -> None:
+    def on_building_adder_priority(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_adder(self) -> None:
+    def on_building_make_adder(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_tables(self) -> None:
+    def on_building_make_tables(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_replay_table_start(self) -> None:
+    def on_building_make_replay_table_start(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_variable_server_start(self) -> None:
+    def on_building_make_variable_server_start(
+        self, builder: BaseSystemBuilder
+    ) -> None:
         """[summary]"""
         pass
 
-    def on_building_variable_server(self) -> None:
+    def on_building_variable_server(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_variable_server_end(self) -> None:
+    def on_building_make_variable_server_end(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_executor_start(self) -> None:
+    def on_building_make_executor_start(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_variable_client(self) -> None:
+    def on_building_variable_client(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_executor(self) -> None:
+    def on_building_executor(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_executor_end(self) -> None:
+    def on_building_make_executor_end(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_trainer_start(self) -> None:
+    def on_building_make_trainer_start(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_variable_client(self) -> None:
+    def on_building_variable_client(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_trainer(self) -> None:
+    def on_building_trainer(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_trainer_statistics(self) -> None:
+    def on_building_trainer_statistics(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_make_trainer_end(self) -> None:
+    def on_building_make_trainer_end(self, builder: BaseSystemBuilder) -> None:
         """[summary]"""
         pass

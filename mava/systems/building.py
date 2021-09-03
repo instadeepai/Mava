@@ -38,6 +38,7 @@ from mava.systems.tf.variable_sources import VariableSource as MavaVariableSourc
 from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerStatistics
 from mava.callbacks import Callback
+from mava.systems.callback_hook import SystemCallbackHookMixin
 
 BoundedArray = dm_specs.BoundedArray
 DiscreteArray = dm_specs.DiscreteArray
@@ -167,13 +168,14 @@ class BaseSystemBuilder(abc.ABC):
         """
 
 
-class OnlineSystemBuilder(BaseSystemBuilder, Callback):
+class OnlineSystemBuilder(BaseSystemBuilder, SystemCallbackHookMixin):
     """Builder for systems which constructs individual components of the
     system."""
 
     def __init__(
         self,
         config: SystemConfig,
+        components: List[Callback] = [],
         extra_specs: Dict[str, Any] = {},
     ):
         """Initialise the system.
@@ -183,6 +185,8 @@ class OnlineSystemBuilder(BaseSystemBuilder, Callback):
             extra_specs (Dict[str, Any], optional): defines the specifications of extra
                 information used by the system. Defaults to {}.
         """
+        self.callbacks = components
+
         self.on_building_init_start(self)
 
         self._config = config
