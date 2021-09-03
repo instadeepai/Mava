@@ -21,8 +21,18 @@ from mava.systems.building import BaseSystemBuilder
 from mava.adders import reverb as reverb_adders
 
 
-class ParallelNStepTransitionAdder(Callback):
-    def on_building_adder_signature(self, builder: BaseSystemBuilder):
+class Adder(Callback):
+    def on_building_adder_signature(self, builder: BaseSystemBuilder) -> None:
+        """[summary]
+
+        Args:
+            builder (BaseSystemBuilder): [description]
+        """
+        pass
+
+
+class ParallelNStepTransitionAdder(Adder):
+    def on_building_adder_signature(self, builder: BaseSystemBuilder) -> None:
         def adder_sig_fn(
             env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
         ) -> Any:
@@ -30,16 +40,24 @@ class ParallelNStepTransitionAdder(Callback):
                 env_spec, extra_specs
             )
 
-        builder.adder_signature = adder_sig_fn
+        builder.adder_signature_fn = adder_sig_fn
 
 
-class ParallelSequenceAdder(Callback):
-    def on_building_adder_signature(self, builder: BaseSystemBuilder):
+class ParallelSequenceAdder(Adder):
+    def __init__(self, sequence_length: int = 20) -> None:
+        """[summary]
+
+        Args:
+            sequence_length (int, optional): [description]. Defaults to 20.
+        """
+        self.sequence_length = sequence_length
+
+    def on_building_adder_signature(self, builder: BaseSystemBuilder) -> None:
         def adder_sig_fn(
             env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
         ) -> Any:
             return reverb_adders.ParallelSequenceAdder.signature(
-                env_spec, self._config.sequence_length, extra_specs
+                env_spec, self.sequence_length, extra_specs
             )
 
         builder.adder_signature = adder_sig_fn
