@@ -16,48 +16,20 @@
 """MADDPG scaled system builder implementation."""
 
 import abc
-import copy
-import dataclasses
-from typing import Any, Dict, Iterator, List, Optional, Type, Union
+from typing import Any, Dict, Iterator, List, Optional
 
 import reverb
 import sonnet as snt
 import tensorflow as tf
-from acme import datasets
-from acme.specs import EnvironmentSpec
-from acme.tf import utils as tf2_utils
-from acme.utils import counting, loggers
 from dm_env import specs as dm_specs
 
 from mava import adders, core, specs, types
-from mava.adders import reverb as reverb_adders
-from mava.systems.tf import executors, variable_utils
-from mava.systems.tf.maddpg import training
-from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
-from mava.utils.sort_utils import sort_str_num
-from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerStatistics
 from mava.callbacks import Callback
 from mava.systems.callback_hook import SystemCallbackHookMixin
 
 BoundedArray = dm_specs.BoundedArray
 DiscreteArray = dm_specs.DiscreteArray
-
-# TODO (Arnu): decide what are the standard config parameters shared across all systems
-@dataclasses.dataclass
-class SystemConfig:
-    """Configuration options for a system.
-    Args:
-        environment_spec: description of the action and observation spaces etc. for
-            each agent in the system.
-        checkpoint: boolean to indicate whether to checkpoint models.
-        checkpoint_subpath: subdirectory specifying where to store checkpoints."""
-
-    environment_spec: specs.MAEnvironmentSpec
-    logger: loggers.Logger = None
-    counter: counting.Counter = None
-    checkpoint: bool = True
-    checkpoint_subpath: str = "~/mava/"
 
 
 class SystemBuilder(abc.ABC):
@@ -174,9 +146,7 @@ class OnlineSystemBuilder(SystemBuilder, SystemCallbackHookMixin):
 
     def __init__(
         self,
-        config: SystemConfig,
         components: List[Callback] = [],
-        extra_specs: Dict[str, Any] = {},
     ):
         """Initialise the system.
         Args:
@@ -188,9 +158,6 @@ class OnlineSystemBuilder(SystemBuilder, SystemCallbackHookMixin):
         self.callbacks = components
 
         self.on_building_init_start(self)
-
-        self._config = config
-        self._extra_specs = extra_specs
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
 
