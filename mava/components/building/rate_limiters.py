@@ -14,11 +14,12 @@
 # limitations under the License.
 
 """Commonly used rate limiter components for system builders"""
+
 import reverb
 
 from mava import specs
 from mava.callbacks import Callback
-from mava.systems.building import BaseSystemBuilder
+from mava.systems.building import SystemBuilder
 from mava.adders import reverb as reverb_adders
 
 
@@ -37,17 +38,17 @@ class RateLimiter(Callback):
         self.sample_per_insert = samples_per_insert
         self.min_replay_size = min_replay_size
 
-    def on_building_rate_limiter(self, builder: BaseSystemBuilder) -> None:
+    def on_building_rate_limiter(self, builder: SystemBuilder) -> None:
         """[summary]
 
         Args:
-            builder (BaseSystemBuilder): [description]
+            builder (SystemBuilder): [description]
         """
         pass
 
 
 class OffPolicyRateLimiter(RateLimiter):
-    def on_building_rate_limiter(self, builder: BaseSystemBuilder) -> None:
+    def on_building_rate_limiter(self, builder: SystemBuilder) -> None:
         if self.samples_per_insert is None:
             # We will take a samples_per_insert ratio of None to mean that there is
             # no limit, i.e. this only implies a min size limit.

@@ -46,7 +46,7 @@ DiscreteArray = dm_specs.DiscreteArray
 # TODO (Arnu): decide what are the standard config parameters shared across all systems
 @dataclasses.dataclass
 class SystemConfig:
-    """Configuration options for the MADDPG system.
+    """Configuration options for a system.
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
@@ -60,7 +60,7 @@ class SystemConfig:
     checkpoint_subpath: str = "~/mava/"
 
 
-class BaseSystemBuilder(abc.ABC):
+class SystemBuilder(abc.ABC):
     """Builder for systems which constructs individual components of the
     system."""
 
@@ -168,7 +168,7 @@ class BaseSystemBuilder(abc.ABC):
         """
 
 
-class OnlineSystemBuilder(BaseSystemBuilder, SystemCallbackHookMixin):
+class OnlineSystemBuilder(SystemBuilder, SystemCallbackHookMixin):
     """Builder for systems which constructs individual components of the
     system."""
 
@@ -280,11 +280,8 @@ class OnlineSystemBuilder(BaseSystemBuilder, SystemCallbackHookMixin):
         # make rate limiter
         self.on_building_make_adder(self)
 
-        # make tables
-        self.on_building_make_tables(self)
-
         # end of make make adder
-        self.on_building_make_replay_table_start(self)
+        self.on_building_make_adder_end(self)
 
         return self.adder
 
@@ -299,6 +296,8 @@ class OnlineSystemBuilder(BaseSystemBuilder, SystemCallbackHookMixin):
         Returns:
             variable_source (MavaVariableSource): A Mava variable source object.
         """
+        self._networks = networks
+
         # start of make variable server
         self.on_building_make_variable_server_start(self)
 
@@ -308,12 +307,12 @@ class OnlineSystemBuilder(BaseSystemBuilder, SystemCallbackHookMixin):
         # end of make variable server
         self.on_building_make_variable_server_end(self)
 
-        return self.variable_source
+        return self.variable_server
 
     def make_executor(
         self,
         networks: Dict[str, snt.Module],
-        executor_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[MavaVariableSource] = None,
     ) -> core.Executor:
@@ -331,7 +330,7 @@ class OnlineSystemBuilder(BaseSystemBuilder, SystemCallbackHookMixin):
                 of the system generating data by interacting the environment.
         """
         self._networks = networks
-        self._executor_networks = executor_networks
+        self._policy_networks = policy_networks
         self._adder = adder
         self._variable_source = variable_source
 
@@ -339,7 +338,7 @@ class OnlineSystemBuilder(BaseSystemBuilder, SystemCallbackHookMixin):
         self.on_building_make_executor_start(self)
 
         # make variable client
-        self.on_building_variable_client(self)
+        self.on_building_executor_variable_client(self)
 
         # make executor
         self.on_building_executor(self)
@@ -383,7 +382,7 @@ class OnlineSystemBuilder(BaseSystemBuilder, SystemCallbackHookMixin):
         self.on_building_make_trainer_start(self)
 
         # make variable client
-        self.on_building_variable_client(self)
+        self.on_building_trainer_variable_client(self)
 
         # make trainer
         self.on_building_trainer(self)

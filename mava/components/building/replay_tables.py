@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Commonly used replay table components for system builders"""
+
 import copy
 
 import reverb
@@ -21,7 +22,7 @@ from reverb import reverb_types
 
 from mava import specs
 from mava.callbacks import Callback
-from mava.systems.building import BaseSystemBuilder
+from mava.systems.building import SystemBuilder
 from mava.adders import reverb as reverb_adders
 from mava.utils.sort_utils import sort_str_num
 
@@ -60,11 +61,11 @@ class ReplayTables(Callback):
         self.max_times_sampled = max_times_sampled
         self.extensions = extensions
 
-    def on_building_make_tables(self, builder: BaseSystemBuilder):
+    def on_building_make_tables(self, builder: SystemBuilder):
         """[summary]
 
         Args:
-            builder (BaseSystemBuilder): [description]
+            builder (SystemBuilder): [description]
         """
         pass
 
@@ -94,7 +95,7 @@ class OffPolicyReplayTables(ReplayTables):
                 converted_spec[key] = self._covert_specs(spec[key], num_networks)
         return converted_spec
 
-    def on_building_make_tables(self, builder: BaseSystemBuilder):
+    def on_building_make_tables(self, builder: SystemBuilder):
         # Create table per trainer
         replay_tables = []
         for trainer_id in range(len(self.table_network_config.keys())):
