@@ -41,7 +41,19 @@ tfd = tfp.distributions
 from mava.callbacks import Callback
 
 
-class OnlineSystemExecutor(mava.Executor, Callback):
+class SystemExecutor(mava.Executor, Callback):
+    """[summary]
+
+    Args:
+        mava ([type]): [description]
+        Callback ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
+
+
+class OnlineSystemExecutor(SystemExecutor):
     """A generic feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system.
     """

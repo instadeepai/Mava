@@ -35,7 +35,12 @@ class Callback(abc.ABC):
     ######################
 
     def on_building_init_start(self, system: System, builder: SystemBuilder) -> None:
-        """Called when the builder initialisation begins."""
+        """[summary]
+
+        Args:
+            system (System): [description]
+            builder (SystemBuilder): [description]
+        """
         pass
 
     def on_building_init_end(self, system: System, builder: SystemBuilder) -> None:
@@ -175,5 +180,97 @@ class Callback(abc.ABC):
     def on_building_make_trainer_end(
         self, system: System, builder: SystemBuilder
     ) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_init_start(self, executor: SystemExecutor) -> None:
+        """[summary]
+
+        Args:
+            executor (SystemExecutor): [description]
+        """
+        pass
+
+    def on_execution_init_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_policy_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_policy_preprocess(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_policy_compute(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_policy_sample_action(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_policy_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_action_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_action(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_action_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe_first_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe_first(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe_first_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_actions_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_actions_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_update_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_update(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_update_end(self, executor: SystemExecutor) -> None:
         """[summary]"""
         pass
