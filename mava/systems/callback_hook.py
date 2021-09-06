@@ -143,3 +143,121 @@ class SystemCallbackHookMixin(ABC):
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_make_trainer_end(self, self.builder)
+
+    ########################
+    # system execution hooks
+    ########################
+
+    def on_execution_init_start(self) -> None:
+        """[summary]
+
+        Args:
+            executor (SystemExecutor): [description]
+        """
+        for callback in self.callbacks:
+            callback.on_execution_init_start(self, self.executor)
+
+    def on_execution_init_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_init_end(self, self.executor)
+
+    def on_execution_policy_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_policy_start(self, self.executor)
+
+    def on_execution_policy_preprocess(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_policy_preprocess(self, self.executor)
+
+    def on_execution_policy_compute(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_policy_compute(self, self.executor)
+
+    def on_execution_policy_sample_action(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_policy_sample_action(self, self.executor)
+
+    def on_execution_policy_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_policy_end(self, self.executor)
+
+    def on_execution_select_action_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_select_action_start(self, self.executor)
+
+    def on_execution_select_action(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_select_action(self, self.executor)
+
+    def on_execution_select_action_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_select_action_end(self, self.executor)
+
+    def on_execution_observe_first_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_observe_first_start(self, self.executor)
+
+    def on_execution_observe_first(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_observe_first(self, self.executor)
+
+    def on_execution_observe_first_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_observe_first_end(self, self.executor)
+
+    def on_execution_observe_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_observe_start(self, self.executor)
+
+    def on_execution_observe(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_observe(self, self.executor)
+
+    def on_execution_observe_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_observe_end(self, self.executor)
+
+    def on_execution_select_actions_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_select_actions_start(self, self.executor)
+
+    def on_execution_select_actions(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_select_actions(self, self.executor)
+
+    def on_execution_select_actions_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_select_actions_end(self, self.executor)
+
+    def on_execution_update_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_update_start(self, self.executor)
+
+    def on_execution_update(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_update(self, self.executor)
+
+    def on_execution_update_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_update_end(self, self.executor)

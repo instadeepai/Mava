@@ -158,6 +158,7 @@ class OnlineSystemBuilder(SystemBuilder, SystemCallbackHookMixin):
         self.callbacks = components
 
         self.on_building_init_start(self)
+
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
 
@@ -176,7 +177,7 @@ class OnlineSystemBuilder(SystemBuilder, SystemCallbackHookMixin):
         Returns:
             List[reverb.Table]: a list of data tables for inserting data.
         """
-        self._env_spec = environment_spec
+        self._environment_spec = environment_spec
 
         # start of make replay tables
         self.on_building_make_replay_table_start(self)

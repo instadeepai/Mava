@@ -16,15 +16,20 @@
 """Commonly used replay table components for system builders"""
 
 import copy
+from typing import Dict, List, Any
 
 import reverb
 from reverb import reverb_types
+from dm_env import specs as dm_specs
+from acme.specs import EnvironmentSpec
 
 from mava import specs
 from mava.callbacks import Callback
 from mava.systems.building import SystemBuilder
-from mava.adders import reverb as reverb_adders
 from mava.utils.sort_utils import sort_str_num
+
+BoundedArray = dm_specs.BoundedArray
+DiscreteArray = dm_specs.DiscreteArray
 
 
 class ReplayTables(Callback):
@@ -37,7 +42,6 @@ class ReplayTables(Callback):
         remover: reverb_types.SelectorType,
         max_size: int,
         max_times_sampled: int = 0,
-        extensions: Sequence[TableExtensionBase] = (),
     ):
         """[summary]
 
@@ -59,7 +63,6 @@ class ReplayTables(Callback):
         self.remover = remover
         self.max_size = max_size
         self.max_times_sampled = max_times_sampled
-        self.extensions = extensions
 
     def on_building_make_tables(self, builder: SystemBuilder):
         """[summary]
@@ -102,7 +105,7 @@ class OffPolicyReplayTables(ReplayTables):
             # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
             num_networks = len(self.table_network_config[f"trainer_{trainer_id}"])
-            env_spec = copy.deepcopy(builder._env_spec)
+            env_spec = copy.deepcopy(builder._environment_spec)
             env_spec._specs = self._covert_specs(env_spec._specs, num_networks)
 
             env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
@@ -127,3 +130,45 @@ class OffPolicyReplayTables(ReplayTables):
             )
 
         builder.replay_tables = replay_tables
+
+
+class DiscreteToBounded(Callback):
+    def _convert_discrete_to_bounded(
+        self, environment_spec: specs.MAEnvironmentSpec
+    ) -> specs.MAEnvironmentSpec:
+        """convert discrete action space to bounded continuous action space
+        Args:
+            environment_spec (specs.MAEnvironmentSpec): description of
+                the action, observation spaces etc. for each agent in the system.
+        Returns:
+            specs.MAEnvironmentSpec: updated environment spec.
+        """
+
+        env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
+        keys = env_adder_spec._keys
+        for key in keys:
+            agent_spec = env_adder_spec._specs[key]
+            if type(agent_spec.actions) == DiscreteArray:
+                num_actions = agent_spec.actions.num_values
+                minimum = [float("-inf")] * num_actions
+                maximum = [float("inf")] * num_actions
+                new_act_spec = BoundedArray(
+                    shape=(num_actions,),
+                    minimum=minimum,
+                    maximum=maximum,
+                    dtype="float32",
+                    name="actions",
+                )
+
+                env_adder_spec._specs[key] = EnvironmentSpec(
+                    observations=agent_spec.observations,
+                    actions=new_act_spec,
+                    rewards=agent_spec.rewards,
+                    discounts=agent_spec.discounts,
+                )
+        return env_adder_spec
+
+    def on_building_make_replay_table_start(self):
+        self._environment_spec = self._convert_discrete_to_bounded(
+            self._environment_spec
+        )

@@ -53,7 +53,7 @@ class SystemExecutor(mava.Executor, Callback):
     """
 
 
-class OnlineSystemExecutor(SystemExecutor):
+class OnlineSystemExecutor(SystemExecutor, SystemCallbackHookMixin):
     """A generic feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system.
     """
