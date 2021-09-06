@@ -66,11 +66,14 @@ class OnlineSystemExecutor(mava.Executor, Callback):
                 client to copy weights from the trainer. Defaults to None.
         """
 
-        # Store these for later use.
+        self.on_execution_init_start(self)
+
         self._agent_net_keys = agent_net_keys
         self._policy_networks = policy_networks
         self._adder = adder
         self._variable_client = variable_client
+
+        self.on_execution_init_end(self)
 
     @tf.function
     def _policy(
@@ -86,20 +89,20 @@ class OnlineSystemExecutor(mava.Executor, Callback):
         Returns:
             types.NestedTensor: agent action
         """
+        self._agent = agent
+        self._observation = observation
 
-        # Add a dummy batch dimension and as a side effect convert numpy to TF.
-        batched_observation = tf2_utils.add_batch_dim(observation)
+        self.on_execution_policy_start(self)
 
-        # index network either on agent type or on agent id
-        agent_key = self._agent_net_keys[agent]
+        self.on_execution_policy_preprocess(self)
 
-        # Compute the policy, conditioned on the observation.
-        policy = self._policy_networks[agent_key](batched_observation)
+        self.on_execution_policy_compute(self)
 
-        # Sample from the policy if it is stochastic.
-        action = policy.sample() if isinstance(policy, tfd.Distribution) else policy
+        self.on_execution_policy_sample_action(self)
 
-        return action
+        self.on_execution_policy_end(self)
+
+        return self.action_info
 
     def select_action(
         self, agent: str, observation: types.NestedArray
@@ -115,15 +118,16 @@ class OnlineSystemExecutor(mava.Executor, Callback):
             Union[types.NestedArray, Tuple[types.NestedArray, types.NestedArray]]:
                 agent action.
         """
+        self._agent = agent
+        self._observation = observation
 
-        # Pass the observation through the policy network.
-        action = self._policy(agent, observation.observation)
+        self.on_execution_select_action_start(self)
 
-        # TODO Mask actions here using observation.legal_actions
-        # What happens in discrete vs cont case
+        self.on_execution_select_action(self)
 
-        # Return a numpy array with squeezed out batch dimension.
-        return tf2_utils.to_numpy_squeeze(action)
+        self.on_execution_select_action_end(self)
+
+        return self.action
 
     def observe_first(
         self,
@@ -138,9 +142,14 @@ class OnlineSystemExecutor(mava.Executor, Callback):
             extras (Dict[str, types.NestedArray], optional): possible extra information
                 to record during the first step. Defaults to {}.
         """
+        self._timestep = timestep
+        self._extras = extras
 
-        if self._adder:
-            self._adder.add_first(timestep, extras)
+        self.on_execution_observe_first_start(self)
+
+        self.on_execution_observe_first(self)
+
+        self.on_execution_observe_first_end(self)
 
     def observe(
         self,
@@ -157,9 +166,15 @@ class OnlineSystemExecutor(mava.Executor, Callback):
             next_extras (Dict[str, types.NestedArray], optional): possible extra
                 information to record during the transition. Defaults to {}.
         """
+        self._actions = actions
+        self._next_timestep = next_timestep
+        self._next_extras = next_extras
 
-        if self._adder:
-            self._adder.add(actions, next_timestep, next_extras)
+        self.on_execution_observe_start(self)
+
+        self.on_execution_observe(self)
+
+        self.on_execution_observe_end(self)
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
@@ -177,25 +192,27 @@ class OnlineSystemExecutor(mava.Executor, Callback):
             Union[ Dict[str, types.NestedArray], Tuple[Dict[str, types.NestedArray],
                 Dict[str, types.NestedArray]], ]: actions for all agents in the system.
         """
+        self._observation = observations
 
-        actions = {}
-        for agent, observation in observations.items():
-            # Pass the observation through the policy network.
-            action = self._policy(agent, observation.observation)
-            # TODO Mask actions here using observation.legal_actions
-            # What happens in discrete vs cont case
-            actions[agent] = tf2_utils.to_numpy_squeeze(action)
+        self.on_execution_select_actions_start(self)
 
-        # Return a numpy array with squeezed out batch dimension.
-        return actions
+        self.on_execution_select_actions(self)
+
+        self.on_execution_select_actions_end(self)
+
+        return self.actions_info
 
     def update(self, wait: bool = False) -> None:
         """update executor variables
 
-        Args:
+        Args
             wait (bool, optional): whether to stall the executor's request for new
                 variables. Defaults to False.
         """
+        self._wait = wait
 
-        if self._variable_client:
-            self._variable_client.update(wait)
+        self.on_execution_update_start(self)
+
+        self.on_execution_update(self)
+
+        self.on_execution_update_end(self)

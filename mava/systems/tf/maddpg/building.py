@@ -21,7 +21,7 @@ from acme.specs import EnvironmentSpec
 from dm_env import specs as dm_specs
 
 from mava import specs
-from mava.systems.building import SystemBuilder
+from mava.systems.building import OnlineSystemBuilder
 from mava.components import building
 
 BoundedArray = dm_specs.BoundedArray
