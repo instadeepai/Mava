@@ -19,9 +19,9 @@
 import typing
 from typing import Optional, Union
 
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
+import tensorflow.compat.v1 as tfv1
 import tensorflow_probability as tfp
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
@@ -79,48 +79,50 @@ class EpsilonGreedy(snt.Module):
         Returns:
             a sampled action from tf distribution representing the policy.
         """
+        epsilon = self._epsilon
+        with tfv1.name_scope("epsilon_greedy", values=[action_values, epsilon]):
 
-        if legal_actions_mask is None:
+            # Convert inputs to Tensors if they aren't already.
+            action_values = tfv1.convert_to_tensor(action_values)
+
+            if epsilon is not None:
+                epsilon = tfv1.convert_to_tensor(epsilon, dtype=action_values.dtype)
+            else:
+                epsilon = 0
+
+            # convert mask to float
+            legal_actions_mask = tfv1.cast(legal_actions_mask, dtype=tf.float32)
+
             # We compute the action space dynamically.
-            num_actions = tf.cast(tf.shape(action_values)[-1], action_values.dtype)
+            num_actions = tfv1.cast(tfv1.shape(action_values)[-1], action_values.dtype)
 
             # Dithering action distribution.
-            dither_probs = 1 / num_actions * tf.ones_like(action_values)
-        else:
-            legal_actions_mask = tf.cast(legal_actions_mask, dtype=tf.float32)
+            if legal_actions_mask is None:
+                dither_probs = 1 / num_actions * tfv1.ones_like(action_values)
+            else:
+                dither_probs = (
+                    1
+                    / tfv1.reduce_sum(legal_actions_mask, axis=-1, keepdims=True)
+                    * legal_actions_mask
+                )
 
-            # Dithering action distribution.
-            dither_probs = (
-                1
-                / tf.reduce_sum(legal_actions_mask, axis=-1, keepdims=True)
+            # Greedy action distribution, breaking ties uniformly at random.
+            max_value = tfv1.reduce_max(action_values, axis=-1, keepdims=True)
+            greedy_probs = tfv1.cast(
+                tfv1.equal(action_values, max_value), action_values.dtype
+            )
+            greedy_probs /= (
+                tfv1.reduce_sum(greedy_probs, axis=-1, keepdims=True)
                 * legal_actions_mask
             )
 
-        masked_action_values = tf.where(
-            tf.equal(legal_actions_mask, 1),
-            action_values,
-            tf.fill(tf.shape(action_values), -np.inf),
-        )
+            # Epsilon-greedy action distribution.
+            probs = epsilon * dither_probs + (1 - epsilon) * greedy_probs
 
-        # Greedy action distribution, breaking ties uniformly at random.
-        # Max value considers only valid/masked action values
-        max_value = tf.reduce_max(masked_action_values, axis=-1, keepdims=True)
-        greedy_probs = tf.cast(
-            tf.equal(masked_action_values, max_value),
-            action_values.dtype,
-        )
-        greedy_probs /= tf.reduce_sum(greedy_probs, axis=-1, keepdims=True)
+            # Make the policy object.
+            policy = tfp.distributions.Categorical(probs=probs)
 
-        # Epsilon-greedy action distribution.
-        probs = self._epsilon * dither_probs + (1 - self._epsilon) * greedy_probs
-
-        # Make the policy object.
-        policy = tfp.distributions.Categorical(probs=probs)
-
-        # Return sampled action.
-        action = tf.cast(policy.sample(), "int64")
-
-        return action
+        return tf.cast(policy.sample(), "int64")
 
     def get_epsilon(self) -> float:
         """Return current epsilon.
