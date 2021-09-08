@@ -132,11 +132,8 @@ class MADQNBuilder:
                 Defaults to execution.MADQNFeedForwardExecutor.
             extra_specs (Dict[str, Any], optional): defines the specifications of extra
                 information used by the system. Defaults to {}.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
-                epsilon decay scheduler. Defaults to LinearExplorationTimestepScheduler.
-            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
-                optional): optional function to stabilise experience replay. Defaults
-                to None.
+            exploration_scheduler_fn : epsilon decay scheduler.
+            replay_stabilisation_fn : optional function to stabilise experience replay.
         """
 
         self._config = config
@@ -339,9 +336,10 @@ class MADQNBuilder:
         fingerprint = True if self._replay_stabiliser_fn is not None else False
 
         # If evaluator, use 0.0 for epsilon
+        # TODO Temp change
         if evaluator:
-            epsilon_start = 0.0
-            epsilon_min = 0.0
+            epsilon_start = 1e-10
+            epsilon_min = 1e-10
             epsilon_decay = 0.0
             epsilon_decay_steps = self._config.epsilon_decay_steps
         else:
