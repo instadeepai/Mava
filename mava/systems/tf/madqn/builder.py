@@ -338,8 +338,8 @@ class MADQNBuilder:
         # If evaluator, use 0.0 for epsilon
         # TODO Temp change
         if evaluator:
-            epsilon_start = 1e-10
-            epsilon_min = 1e-10
+            epsilon_start = 0.0
+            epsilon_min = 0.0
             epsilon_decay = 0.0
             epsilon_decay_steps = self._config.epsilon_decay_steps
         else:
