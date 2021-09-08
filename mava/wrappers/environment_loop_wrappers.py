@@ -179,13 +179,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         for agent, reward in rewards.items():
-            # agent_running_statistics: Dict[str, float] = {}
             self._agents_stats[agent]["reward"].push(reward)
-            # for stat in self._summary_stats:
-            #     agent_running_statistics[
-            #         f"{agent}_{stat}_step_reward"
-            #     ] = self._agents_stats[agent]["reward"].__getattribute__(stat)()
-            # self._agent_loggers[agent].write(agent_running_statistics)
 
     def _compute_episode_statistics(
         self,
