@@ -69,7 +69,9 @@ class MADDPG:
         trainer_networks: Union[
             Dict[str, List], enums.Trainer
         ] = enums.Trainer.single_trainer,
-        network_sample_sets: List = [],
+        network_sampling_setup: Union[
+            List, enums.NetworkSampler
+        ] = enums.NetworkSampler.fixed_agent_networks,
         shared_weights: bool = True,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
@@ -127,11 +129,11 @@ class MADDPG:
                 Defaults to None.
             trainer_networks (Dict[str, List[snt.Module]], optional): networks each
                 trainer trains on. Defaults to {}.
-            network_sample_sets (List, optional): List of networks that are randomly
+            network_sampling_setup (List, optional): List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
                 Defaults to [].
             shared_weights (bool, optional): whether agents should share weights or not.
-                When network_sample_sets are provided the value of shared_weights is
+                When network_sampling_setup are provided the value of shared_weights is
                 ignored. Defaults to True.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
@@ -203,41 +205,67 @@ class MADDPG:
                 time_delta=10,
             )
 
-        # Setup agent networks and executor sampler
+        # Setup agent networks and network sampling setup
         agents = sort_str_num(environment_spec.get_agent_ids())
-        self._network_sample_sets = network_sample_sets
-        if not network_sample_sets:
-            # if no executor samples provided, use shared_weights to determine setup
-            self._agent_net_keys = {
-                agent: agent.split("_")[0] if shared_weights else agent
-                for agent in agents
-            }
-            self._network_sample_sets = [
-                [
-                    self._agent_net_keys[key]
-                    for key in sort_str_num(self._agent_net_keys.keys())
+        self._network_sampling_setup = network_sampling_setup
+
+        [["network_0", "network_1", "network_2"]]
+
+        if type(network_sampling_setup) is not list:
+            if network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
+                # if no network_sampling_setup is fixed, use shared_weights to
+                # determine setup
+                self._agent_net_keys = {
+                    agent: agent.split("_")[0] if shared_weights else agent
+                    for agent in agents
+                }
+                self._network_sampling_setup = [
+                    [
+                        self._agent_net_keys[key]
+                        for key in sort_str_num(self._agent_net_keys.keys())
+                    ]
                 ]
-            ]
+            elif network_sampling_setup == enums.NetworkSampler.random_policy_per_agent:
+                """Create N network policies, where N is the number of agents. Randomly
+                select policies from this sets for each agent at the start of a
+                episode. This sampling is done with replacement so the same policy
+                can be selected for more than one agent for a given episode."""
+                if shared_weights:
+                    raise ValueError(
+                        "Shared weights cannot be used with random policy per agent"
+                    )
+                self._agent_net_keys = {agent: agent for agent in agents}
+                self._network_sampling_setup = [
+                    [
+                        [self._agent_net_keys[key]]
+                        for key in sort_str_num(self._agent_net_keys.keys())
+                    ]
+                ]
+            else:
+                raise ValueError(
+                    "network_sampling_setup must be a dict or fixed_agent_networks"
+                )
+
         else:
-            # if executor samples provided, use network_sample_sets to determine setup
+            # if a dictionary is provided, use network_sampling_setup to determine setup
             _, self._agent_net_keys = sample_new_agent_keys(
                 agents,
-                self._network_sample_sets,
+                self._network_sampling_setup,  # type: ignore
             )
 
         # Check that the environment and agent_net_keys has the same amount of agents
-        sample_length = len(self._network_sample_sets[0])
+        sample_length = len(self._network_sampling_setup[0])  # type: ignore
         assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
 
         # Check if the samples are of the same length and that they perfectly fit
         # into the total number of agents
         assert len(self._agent_net_keys.keys()) % sample_length == 0
-        for i in range(1, len(self._network_sample_sets)):
-            assert len(self._network_sample_sets[i]) == sample_length
+        for i in range(1, len(self._network_sampling_setup)):  # type: ignore
+            assert len(self._network_sampling_setup[i]) == sample_length  # type: ignore
 
         # Get all the unique agent network keys
         all_samples = []
-        for sample in self._network_sample_sets:
+        for sample in self._network_sampling_setup:  # type: ignore
             all_samples.extend(sample)
         unique_net_keys = list(sort_str_num(list(set(all_samples))))
 
@@ -276,7 +304,7 @@ class MADDPG:
         for t_id in range(len(self._trainer_networks.keys())):
             most_matches = 0
             trainer_nets = self._trainer_networks[f"trainer_{t_id}"]
-            for sample in self._network_sample_sets:
+            for sample in self._network_sampling_setup:  # type: ignore
                 matches = 0
                 for entry in sample:
                     if entry in trainer_nets:
@@ -323,7 +351,7 @@ class MADDPG:
                 trainer_networks=self._trainer_networks,
                 table_network_config=table_network_config,
                 num_executors=num_executors,
-                network_sample_sets=self._network_sample_sets,
+                network_sampling_setup=self._network_sampling_setup,  # type: ignore
                 net_to_ints=net_to_ints,
                 unique_net_keys=unique_net_keys,
                 discount=discount,

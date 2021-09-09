@@ -82,12 +82,7 @@ def main(_: Any) -> None:
         num_executors=2,
         shared_weights=False,
         trainer_networks=enums.Trainer.one_trainer_per_network,
-        # Here network_sample_sets indicate how the executor should sample
-        # networks for the agents. I this case only one set of networks provided:
-        # ["network_0", "network_1", "network_2"]. Therefore the executor
-        # samples this and assigns agent_0 to network_0, agent_1 to
-        # network_1 and agent_2 to network_2.
-        network_sample_sets=[["network_0", "network_1", "network_2"]],
+        network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,

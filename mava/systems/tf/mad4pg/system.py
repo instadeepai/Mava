@@ -53,7 +53,9 @@ class MAD4PG(MADDPG):
         trainer_networks: Union[
             Dict[str, List], enums.Trainer
         ] = enums.Trainer.single_trainer,
-        network_sample_sets: List = [],
+        network_sampling_setup: Union[
+            List, enums.NetworkSampler
+        ] = enums.NetworkSampler.fixed_agent_networks,
         shared_weights: bool = True,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -87,33 +89,31 @@ class MAD4PG(MADDPG):
         """Initialise the system
 
         Args:
-            environment_factory (Callable[[bool], dm_env.Environment]): function to
+            environment_factory: function to
                 instantiate an environment.
-            network_factory (Callable[[acme_specs.BoundedArray],
-                Dict[str, snt.Module]]): function to instantiate system networks.
-            logger_factory (Callable[[str], MavaLogger], optional): function to
+            network_factory: function to instantiate system networks.
+            logger_factory: function to
                 instantiate a system logger. Defaults to None.
-            architecture (Type[ DecentralisedQValueActorCritic ], optional):
+            architecture:
                 system architecture, e.g. decentralised or centralised. Defaults to
                 DecentralisedQValueActorCritic.
-            trainer_fn (Union[ Type[training.MAD4PGBaseTrainer],
-                Type[training.MAD4PGBaseRecurrentTrainer], ], optional): training type
+            trainer_fn: training type
                 associated with executor and architecture, e.g. centralised training.
                 Defaults to training.MAD4PGDecentralisedTrainer.
-            executor_fn (Type[core.Executor], optional): executor type, e.g.
+            executor_fn: executor type, e.g.
                 feedforward or recurrent. Defaults to MADDPGFeedForwardExecutor.
-            num_executors (int, optional): number of executor processes to run in
+            num_executors: number of executor processes to run in
                 parallel. Defaults to 1.
             environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
             trainer_networks (Dict[str, List[snt.Module]], optional): networks each
                 trainer trains on. Defaults to {}.
-            network_sample_sets (List, optional): List of networks that are randomly
+            network_sampling_setup (List, optional): List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
                 Defaults to [].
             shared_weights (bool, optional): whether agents should share weights or not.
-                When network_sample_sets are provided the value of shared_weights is
+                When network_sampling_setup are provided the value of shared_weights is
                 ignored. Defaults to True.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
@@ -177,7 +177,7 @@ class MAD4PG(MADDPG):
             num_executors=num_executors,
             environment_spec=environment_spec,
             trainer_networks=trainer_networks,
-            network_sample_sets=network_sample_sets,
+            network_sampling_setup=network_sampling_setup,
             shared_weights=shared_weights,
             discount=discount,
             batch_size=batch_size,
