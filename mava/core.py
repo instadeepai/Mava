@@ -140,7 +140,7 @@ class Trainer(VariableSource, Worker, Saveable):
         iterator = range(num_steps) if num_steps is not None else itertools.count()
         for _ in iterator:
             self.step()
-            self.after_trainer_step()
+            # self.after_trainer_step()
 
     def after_trainer_step(self) -> None:
         """Function that gets executed after every trainer step."""
