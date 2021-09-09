@@ -26,3 +26,8 @@ class Network(Enum):
     mlp = 1
     atari_dqn_network = 2
     coms_network = 3
+
+
+class Trainer(Enum):
+    single_trainer = 1
+    one_trainer_per_network = 2

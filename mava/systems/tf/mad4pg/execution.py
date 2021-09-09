@@ -39,7 +39,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         net_to_ints: Dict[str, int],
-        executor_samples: List,
+        network_sample_sets: List,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -66,7 +66,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
             variable_client=variable_client,
             counts=counts,
             agent_net_keys=agent_net_keys,
-            executor_samples=executor_samples,
+            network_sample_sets=network_sample_sets,
             net_to_ints=net_to_ints,
         )
 
@@ -81,7 +81,7 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
-        executor_samples: List,
+        network_sample_sets: List,
         net_to_ints: Dict[str, int],
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
@@ -109,6 +109,6 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
             variable_client=variable_client,
             counts=counts,
             agent_net_keys=agent_net_keys,
-            executor_samples=executor_samples,
+            network_sample_sets=network_sample_sets,
             net_to_ints=net_to_ints,
         )

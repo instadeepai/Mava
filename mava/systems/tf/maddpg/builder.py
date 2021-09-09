@@ -83,7 +83,7 @@ class MADDPGConfig:
     agent_net_keys: Dict[str, str]
     trainer_networks: Dict[str, List]
     table_network_config: Dict[str, List]
-    executor_samples: List
+    network_sample_sets: List
     net_to_ints: Dict[str, int]
     unique_net_keys: List[str]
     checkpoint_minute_interval: int
@@ -469,7 +469,7 @@ class MADDPGBuilder:
             net_to_ints=self._config.net_to_ints,
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
-            executor_samples=self._config.executor_samples,
+            network_sample_sets=self._config.network_sample_sets,
             variable_client=variable_client,
             adder=adder,
         )

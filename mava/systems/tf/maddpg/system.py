@@ -43,6 +43,7 @@ from mava.systems.tf.maddpg.execution import (
     sample_new_agent_keys,
 )
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils import enums
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import DetailedPerAgentStatistics
@@ -65,8 +66,10 @@ class MADDPG:
         ] = training.MADDPGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
-        trainer_networks: Dict[str, List] = {},
-        executor_samples: List = [],
+        trainer_networks: Union[
+            Dict[str, List], enums.Trainer
+        ] = enums.Trainer.single_trainer,
+        network_sample_sets: List = [],
         shared_weights: bool = True,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
@@ -124,11 +127,11 @@ class MADDPG:
                 Defaults to None.
             trainer_networks (Dict[str, List[snt.Module]], optional): networks each
                 trainer trains on. Defaults to {}.
-            executor_samples (List, optional): List of networks that are randomly
+            network_sample_sets (List, optional): List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
                 Defaults to [].
             shared_weights (bool, optional): whether agents should share weights or not.
-                When executor_samples are provided the value of shared_weights is
+                When network_sample_sets are provided the value of shared_weights is
                 ignored. Defaults to True.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
@@ -202,50 +205,58 @@ class MADDPG:
 
         # Setup agent networks and executor sampler
         agents = sort_str_num(environment_spec.get_agent_ids())
-        self._executor_samples = executor_samples
-        if not executor_samples:
+        self._network_sample_sets = network_sample_sets
+        if not network_sample_sets:
             # if no executor samples provided, use shared_weights to determine setup
             self._agent_net_keys = {
                 agent: agent.split("_")[0] if shared_weights else agent
                 for agent in agents
             }
-            self._executor_samples = [
+            self._network_sample_sets = [
                 [
                     self._agent_net_keys[key]
                     for key in sort_str_num(self._agent_net_keys.keys())
                 ]
             ]
         else:
-            # if executor samples provided, use executor_samples to determine setup
+            # if executor samples provided, use network_sample_sets to determine setup
             _, self._agent_net_keys = sample_new_agent_keys(
                 agents,
-                self._executor_samples,
+                self._network_sample_sets,
             )
 
         # Check that the environment and agent_net_keys has the same amount of agents
-        sample_length = len(self._executor_samples[0])
+        sample_length = len(self._network_sample_sets[0])
         assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
 
         # Check if the samples are of the same length and that they perfectly fit
         # into the total number of agents
         assert len(self._agent_net_keys.keys()) % sample_length == 0
-        for i in range(1, len(self._executor_samples)):
-            assert len(self._executor_samples[i]) == sample_length
+        for i in range(1, len(self._network_sample_sets)):
+            assert len(self._network_sample_sets[i]) == sample_length
 
         # Get all the unique agent network keys
         all_samples = []
-        for sample in self._executor_samples:
+        for sample in self._network_sample_sets:
             all_samples.extend(sample)
-        unique_net_keys = sort_str_num(list(set(all_samples)))
+        unique_net_keys = list(sort_str_num(list(set(all_samples))))
 
         # Create mapping from ints to networks
         net_to_ints = {net_key: i for i, net_key in enumerate(unique_net_keys)}
 
         # Setup trainer_networks
-        if not trainer_networks:
-            self._trainer_networks = {"trainer_0": list(unique_net_keys)}
-        else:
-            self._trainer_networks = trainer_networks
+        if type(trainer_networks) is not dict:
+            if trainer_networks == enums.Trainer.single_trainer:
+                self._trainer_networks = {"trainer_0": unique_net_keys}
+            elif trainer_networks == enums.Trainer.one_trainer_per_network:
+                self._trainer_networks = {
+                    f"trainer_{i}": unique_net_keys[i]
+                    for i in range(len(unique_net_keys))
+                }
+            else:
+                raise ValueError(
+                    "trainer_networks does not support this enums setting."
+                )
 
         # Get all the unique trainer network keys
         all_trainer_net_keys = []
@@ -265,7 +276,7 @@ class MADDPG:
         for t_id in range(len(self._trainer_networks.keys())):
             most_matches = 0
             trainer_nets = self._trainer_networks[f"trainer_{t_id}"]
-            for sample in self._executor_samples:
+            for sample in self._network_sample_sets:
                 matches = 0
                 for entry in sample:
                     if entry in trainer_nets:
@@ -312,7 +323,7 @@ class MADDPG:
                 trainer_networks=self._trainer_networks,
                 table_network_config=table_network_config,
                 num_executors=num_executors,
-                executor_samples=self._executor_samples,
+                network_sample_sets=self._network_sample_sets,
                 net_to_ints=net_to_ints,
                 unique_net_keys=unique_net_keys,
                 discount=discount,

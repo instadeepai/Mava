@@ -49,7 +49,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
-        executor_samples: List,
+        network_sample_sets: List,
         net_to_ints: Dict[str, int],
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
@@ -72,7 +72,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
 
         # Store these for later use.
         self._agent_specs = agent_specs
-        self._executor_samples = executor_samples
+        self._network_sample_sets = network_sample_sets
         self._counts = counts
         self._network_int_keys_extras: Dict[str, np.array] = {}
         self._net_to_ints = net_to_ints
@@ -183,7 +183,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         agents = sort_str_num(list(self._agent_net_keys.keys()))
         self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
             agents,
-            self._executor_samples,
+            self._network_sample_sets,
             self._net_to_ints,
         )
 
@@ -231,7 +231,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         net_to_ints: Dict[str, int],
-        executor_samples: List,
+        network_sample_sets: List,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -257,7 +257,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
 
         # Store these for later use.
         self._agent_specs = agent_specs
-        self._executor_samples = executor_samples
+        self._network_sample_sets = network_sample_sets
         self._counts = counts
         self._net_to_ints = net_to_ints
         self._network_int_keys_extras: Dict[str, np.array] = {}
@@ -385,7 +385,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         agents = sort_str_num(list(self._agent_net_keys.keys()))
         self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
             agents,
-            self._executor_samples,
+            self._network_sample_sets,
             self._net_to_ints,
         )
 

@@ -28,6 +28,7 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf.mad4pg import training
 from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.maddpg.system import MADDPG
+from mava.utils import enums
 from mava.utils.loggers import MavaLogger
 
 
@@ -49,8 +50,10 @@ class MAD4PG(MADDPG):
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
-        trainer_networks: Dict[str, List] = {},
-        executor_samples: List = [],
+        trainer_networks: Union[
+            Dict[str, List], enums.Trainer
+        ] = enums.Trainer.single_trainer,
+        network_sample_sets: List = [],
         shared_weights: bool = True,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -106,11 +109,11 @@ class MAD4PG(MADDPG):
                 Defaults to None.
             trainer_networks (Dict[str, List[snt.Module]], optional): networks each
                 trainer trains on. Defaults to {}.
-            executor_samples (List, optional): List of networks that are randomly
+            network_sample_sets (List, optional): List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
                 Defaults to [].
             shared_weights (bool, optional): whether agents should share weights or not.
-                When executor_samples are provided the value of shared_weights is
+                When network_sample_sets are provided the value of shared_weights is
                 ignored. Defaults to True.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
@@ -174,7 +177,7 @@ class MAD4PG(MADDPG):
             num_executors=num_executors,
             environment_spec=environment_spec,
             trainer_networks=trainer_networks,
-            executor_samples=executor_samples,
+            network_sample_sets=network_sample_sets,
             shared_weights=shared_weights,
             discount=discount,
             batch_size=batch_size,

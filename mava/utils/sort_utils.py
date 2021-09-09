@@ -25,14 +25,14 @@ def sort_str_num(str_num: Any) -> List[Any]:
 
 def sample_new_agent_keys(
     agents: List,
-    executor_samples: List,
+    network_sample_sets: List,
     net_to_ints: Dict[str, int] = None,
 ) -> Tuple[Dict[str, np.array], Dict[str, np.array]]:
     save_net_keys = {}
     agent_net_keys = {}
     agent_slots = copy.copy(agents)
     while len(agent_slots) > 0:
-        sample = executor_samples[randint(len(executor_samples))]
+        sample = network_sample_sets[randint(len(network_sample_sets))]
         for net_key in sample:
             agent = agent_slots.pop(0)
             agent_net_keys[agent] = net_key
