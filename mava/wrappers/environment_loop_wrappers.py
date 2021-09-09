@@ -189,18 +189,12 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                 f"{agent}_episode_return"
             )
             self._agents_stats[agent]["reward"] = RunningStatistics(
-                f"{agent}_episode_reward"
+                f"{agent}_step_reward"
             )
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         for agent, reward in rewards.items():
-            agent_running_statistics: Dict[str, float] = {}
             self._agents_stats[agent]["reward"].push(reward)
-            for stat in self._summary_stats:
-                agent_running_statistics[
-                    f"{agent}_{stat}_step_reward"
-                ] = self._agents_stats[agent]["reward"].__getattribute__(stat)()
-            self._agent_loggers[agent].write(agent_running_statistics)
 
     def _compute_episode_statistics(
         self,
@@ -226,17 +220,24 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                     f"_{metric}_stats"
                 ).__getattribute__(stat)()
 
+        self._running_statistics.update({"episode_length": episode_steps})
+        self._running_statistics.update(counts)
+
+        # Write per agent statistics
         for agent, agent_return in episode_returns.items():
             agent_running_statistics: Dict[str, float] = {}
             self._agents_stats[agent]["return"].push(agent_return)
             for stat in self._summary_stats:
+                # Episode return
                 agent_running_statistics[f"{agent}_{stat}_return"] = self._agents_stats[
                     agent
                 ]["return"].__getattribute__(stat)()
-            self._agent_loggers[agent].write(agent_running_statistics)
 
-        self._running_statistics.update({"episode_length": episode_steps})
-        self._running_statistics.update(counts)
+                # Step rewards
+                agent_running_statistics[
+                    f"{agent}_{stat}_step_reward"
+                ] = self._agents_stats[agent]["reward"].__getattribute__(stat)()
+            self._agent_loggers[agent].write(agent_running_statistics)
 
         # # Log extra env stats, e.g. for smac.
         # extra_stats = getattr(self._environment_loop._environment, "get_stats", None)

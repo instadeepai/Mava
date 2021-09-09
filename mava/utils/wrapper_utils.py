@@ -233,6 +233,7 @@ class RunningStatistics:
     a specific quantity.
     """
 
+    # The queue_size is used to estimate a moving mean and variance value.
     def __init__(self, label: str, queue_size: int = 100) -> None:
 
         self.queue: collections.deque = collections.deque(maxlen=queue_size)
