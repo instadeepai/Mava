@@ -49,9 +49,15 @@ class MADDPGConfig:
             each agent in the system.
         policy_optimizer: optimizer(s) for updating policy networks.
         critic_optimizer: optimizer for updating critic networks.
-        agent_net_keys: (dict, optional): specifies what network each agent uses.
-            Defaults to {}.
-        checkpoint_minute_interval (int): The number of minutes to wait between
+        num_executors: number of parallel executors to use.
+        agent_net_keys: specifies what network each agent uses.
+        trainer_networks: networks each trainer trains on.
+        table_network_config: Networks each table (trainer) expects.
+        network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+        net_keys_to_ids: mapping from net_key to network id.
+        unique_net_keys: list of unique net_keys.
+        checkpoint_minute_interval: The number of minutes to wait between
             checkpoints.
         discount: discount to use for TD updates.
         batch_size: batch size for updates.
@@ -71,7 +77,7 @@ class MADDPGConfig:
         max_gradient_norm: value to specify the maximum clipping value for the gradient
             norm during optimization.
         sigma: Gaussian sigma parameter.
-
+        logger: logger to use.
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         replay_table_name: string indicating what name to give the replay table."""
@@ -84,7 +90,7 @@ class MADDPGConfig:
     trainer_networks: Dict[str, List]
     table_network_config: Dict[str, List]
     network_sampling_setup: List
-    net_to_ints: Dict[str, int]
+    net_keys_to_ids: Dict[str, int]
     unique_net_keys: List[str]
     checkpoint_minute_interval: int
     discount: float = 0.99
@@ -126,17 +132,14 @@ class MADDPGBuilder:
     ):
         """Initialise the system.
         Args:
-            config (MADDPGConfig): system configuration specifying hyperparameters and
+            config: system configuration specifying hyperparameters and
                 additional information for constructing the system.
-            trainer_fn (Union[ Type[training.MADDPGBaseTrainer],
-                Type[training.MADDPGBaseRecurrentTrainer], ], optional): Trainer
-                function, of a correpsonding type to work with the selected system
-                architecture. Defaults to training.MADDPGDecentralisedTrainer.
-            executor_fn (Type[core.Executor], optional): Executor function, of a
-                corresponding type to work with the selected system architecture.
-                Defaults to MADDPGFeedForwardExecutor.
-            extra_specs (Dict[str, Any], optional): defines the specifications of extra
-                information used by the system. Defaults to {}.
+            trainer_fn: Trainer function, of a correpsonding type to work with
+                the selected system architecture.
+            executor_fn: Executor function, of a corresponding type to work with
+                the selected system architecture.
+            extra_specs: defines the specifications of extra
+                information used by the system.
         """
 
         self._config = config
@@ -151,10 +154,10 @@ class MADDPGBuilder:
     ) -> specs.MAEnvironmentSpec:
         """convert discrete action space to bounded continuous action space
         Args:
-            environment_spec (specs.MAEnvironmentSpec): description of
+            environment_spec: description of
                 the action, observation spaces etc. for each agent in the system.
         Returns:
-            specs.MAEnvironmentSpec: updated environment spec.
+            updated environment spec.
         """
 
         env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
@@ -202,12 +205,12 @@ class MADDPGBuilder:
     ) -> List[reverb.Table]:
         """ "Create tables to insert data into.
         Args:
-            environment_spec (specs.MAEnvironmentSpec): description of the action and
+            environment_spec: description of the action and
                 observation spaces etc. for each agent in the system.
         Raises:
             NotImplementedError: unknown executor type.
         Returns:
-            List[reverb.Table]: a list of data tables for inserting data.
+            a list of data tables for inserting data.
         """
 
         # Select adder
@@ -290,12 +293,12 @@ class MADDPGBuilder:
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for training/updating the system.
         Args:
-            replay_client (reverb.Client): Reverb Client which points to the
+            replay_client: Reverb Client which points to the
                 replay server.
         Returns:
             [type]: dataset iterator.
         Yields:
-            Iterator[reverb.ReplaySample]: data samples from the dataset.
+            data samples from the dataset.
         """
 
         sequence_length = (
@@ -320,12 +323,12 @@ class MADDPGBuilder:
     ) -> Optional[adders.ParallelAdder]:
         """Create an adder which records data generated by the executor/environment.
         Args:
-            replay_client (reverb.Client): Reverb Client which points to the
+            replay_client: Reverb Client which points to the
                 replay server.
         Raises:
             NotImplementedError: unknown executor type.
         Returns:
-            Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
+            adder which sends data to a replay buffer.
         """
         # Create custom priority functons for the adder
         priority_fns = {
@@ -361,10 +364,10 @@ class MADDPGBuilder:
     ) -> Dict[str, tf.Variable]:
         """Create counter variables.
         Args:
-            variables (Dict[str, snt.Variable]): dictionary with variable_source
+            variables: dictionary with variable_source
             variables in.
         Returns:
-            variables (Dict[str, snt.Variable]): dictionary with variable_source
+            variables: dictionary with variable_source
             variables in.
         """
         variables["trainer_steps"] = tf.Variable(0, dtype=tf.int32)
@@ -381,10 +384,10 @@ class MADDPGBuilder:
     ) -> MavaVariableSource:
         """Create the variable server.
         Args:
-            networks (Dict[str, Dict[str, snt.Module]]): dictionary with the
+            networks: dictionary with the
             system's networks in.
         Returns:
-            variable_source (MavaVariableSource): A Mava variable source object.
+            variable_source: A Mava variable source object.
         """
         # Create variables
         variables = {}
@@ -417,14 +420,15 @@ class MADDPGBuilder:
     ) -> core.Executor:
         """Create an executor instance.
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            networks: dictionary with the system's networks in.
+            policy_networks: policy networks for each agent in
                 the system.
-            adder (Optional[adders.ParallelAdder], optional): adder to send data to
+            adder: adder to send data to
                 a replay buffer. Defaults to None.
-            variable_source (Optional[core.VariableSource], optional): variables server.
+            variable_source: variables server.
                 Defaults to None.
         Returns:
-            core.Executor: system executor, a collection of agents making up the part
+            system executor, a collection of agents making up the part
                 of the system generating data by interacting the environment.
         """
         # Create policy variables
@@ -466,7 +470,7 @@ class MADDPGBuilder:
         return self._executor_fn(
             policy_networks=policy_networks,
             counts=counts,
-            net_to_ints=self._config.net_to_ints,
+            net_keys_to_ids=self._config.net_keys_to_ids,
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
             network_sampling_setup=self._config.network_sampling_setup,
@@ -486,17 +490,17 @@ class MADDPGBuilder:
     ) -> core.Trainer:
         """Create a trainer instance.
         Args:
-            networks (Dict[str, Dict[str, snt.Module]]): system networks.
-            dataset (Iterator[reverb.ReplaySample]): dataset iterator to feed data to
+            networks: system networks.
+            dataset: dataset iterator to feed data to
                 the trainer networks.
-            counter (Optional[counting.Counter], optional): a Counter which allows for
-                recording of counts, e.g. trainer steps. Defaults to None.
-            logger (Optional[types.NestedLogger], optional): Logger object for logging
-                metadata. Defaults to None.
-            connection_spec (Dict[str, List[str]], optional): connection topology used
+            variable_source: Source with variables in.
+            trainer_networks: Set of unique network keys to train on..
+            trainer_table_entry: List of networks per agent to train on.
+            logger: Logger object for logging  metadata.
+            connection_spec: connection topology used
                 for networked system architectures. Defaults to None.
         Returns:
-            core.Trainer: system trainer, that uses the collected data from the
+            system trainer, that uses the collected data from the
                 executors to update the parameters of the agent networks in the system.
         """
         # This assumes agents are sort_str_num in the other methods

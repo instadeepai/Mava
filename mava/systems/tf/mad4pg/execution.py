@@ -38,8 +38,8 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
-        net_to_ints: Dict[str, int],
         network_sampling_setup: List,
+        net_keys_to_ids: Dict[str, int],
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -47,16 +47,20 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
 
         """Initialise the system executor
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            policy_networks: policy networks for each agent in
                 the system.
-            agent_specs (Dict[str, EnvironmentSpec]): agent observation and action
+            agent_specs: agent observation and action
                 space specifications.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+            agent_net_keys: specifies what network each agent uses.
+            network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+            net_keys_to_ids: Specifies a mapping from network keys to their integer id.
+            adder: adder which sends data
                 to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+            counts: Count values used to record excutor episode and steps.
+            variable_client:
                 client to copy weights from the trainer. Defaults to None.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
+
         """
 
         super().__init__(
@@ -67,7 +71,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
             counts=counts,
             agent_net_keys=agent_net_keys,
             network_sampling_setup=network_sampling_setup,
-            net_to_ints=net_to_ints,
+            net_keys_to_ids=net_keys_to_ids,
         )
 
 
@@ -82,24 +86,28 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
-        net_to_ints: Dict[str, int],
+        net_keys_to_ids: Dict[str, int],
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
         """Initialise the system executor
-
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            policy_networks: policy networks for each agent in
                 the system.
-            agent_specs (Dict[str, EnvironmentSpec]): agent observation and action
+            agent_specs: agent observation and action
                 space specifications.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+            agent_net_keys: specifies what network each agent uses.
+            network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+            net_keys_to_ids: Specifies a mapping from network keys to their integer id.
+            adder: adder which sends data
                 to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+            counts: Count values used to record excutor episode and steps.
+            variable_client:
                 client to copy weights from the trainer. Defaults to None.
+            store_recurrent_state: boolean to store the recurrent
+                network hidden state. Defaults to True.
         """
 
         super().__init__(
@@ -110,5 +118,5 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
             counts=counts,
             agent_net_keys=agent_net_keys,
             network_sampling_setup=network_sampling_setup,
-            net_to_ints=net_to_ints,
+            net_keys_to_ids=net_keys_to_ids,
         )

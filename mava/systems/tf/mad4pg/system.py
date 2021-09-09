@@ -93,78 +93,65 @@ class MAD4PG(MADDPG):
                 instantiate an environment.
             network_factory: function to instantiate system networks.
             logger_factory: function to
-                instantiate a system logger. Defaults to None.
+                instantiate a system logger.
             architecture:
-                system architecture, e.g. decentralised or centralised. Defaults to
-                DecentralisedQValueActorCritic.
+                system architecture, e.g. decentralised or centralised.
             trainer_fn: training type
                 associated with executor and architecture, e.g. centralised training.
-                Defaults to training.MAD4PGDecentralisedTrainer.
             executor_fn: executor type, e.g.
-                feedforward or recurrent. Defaults to MADDPGFeedForwardExecutor.
+                feedforward or recurrent.
             num_executors: number of executor processes to run in
-                parallel. Defaults to 1.
-            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
+                parallel..
+            environment_spec: description of
                 the action, observation spaces etc. for each agent in the system.
-                Defaults to None.
-            trainer_networks (Dict[str, List[snt.Module]], optional): networks each
-                trainer trains on. Defaults to {}.
-            network_sampling_setup (List, optional): List of networks that are randomly
+            trainer_networks: networks each trainer trains on.
+            network_sampling_setup: List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
-                Defaults to [].
-            shared_weights (bool, optional): whether agents should share weights or not.
+            shared_weights: whether agents should share weights or not.
                 When network_sampling_setup are provided the value of shared_weights is
-                ignored. Defaults to True.
-            discount (float, optional): discount factor to use for TD updates. Defaults
-                to 0.99.
-            batch_size (int, optional): sample batch size for updates. Defaults to 256.
-            prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
-            target_averaging (bool, optional): whether to use polyak averaging for
-                target network updates. Defaults to False.
-            target_update_period (int, optional): number of steps before target
-                networks are updated. Defaults to 100.
-            target_update_rate (Optional[float], optional): update rate when using
-                averaging. Defaults toNone.
-            executor_variable_update_period (int, optional): number of steps before
-                updating executor variables from the variable source. Defaults to 1000.
-            min_replay_size (int, optional): minimum replay size before updating.
-                Defaults to 1000.
-            max_replay_size (int, optional): maximum replay size. Defaults to 1000000.
-            samples_per_insert (Optional[float], optional): number of samples to take
-                from replay for every insert that is made. Defaults to 32.0.
-            policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
-                optional): optimizer(s) for updating policy networks Defaults to
-                snt.optimizers.Adam(learning_rate=1e-4).
-            critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
-                networks Defaults to snt.optimizers.Adam(learning_rate=1e-4).
-            n_step (int, optional): number of steps to include prior to boostrapping.
-                Defaults to 5.
-            sequence_length (int, optional): recurrent sequence rollout length. Defaults
-                to 20.
-            period (int, optional): Consecutive starting points for overlapping
-                rollouts across a sequence. Defaults to 20.
-            bootstrap_n (int, optional): Used to determine the spacing between
+                ignored.
+            discount: discount factor to use for TD updates.
+            batch_size: sample batch size for updates.
+            prefetch_size: size to prefetch from replay.
+            target_averaging: whether to use polyak averaging for
+                target network updates.
+            target_update_period: number of steps before target
+                networks are updated.
+            target_update_rate: update rate when using
+                averaging.
+            executor_variable_update_period: number of steps before
+                updating executor variables from the variable source.
+            min_replay_size: minimum replay size before updating.
+            max_replay_size: maximum replay size.
+            samples_per_insert: number of samples to take
+                from replay for every insert that is made.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic
+                networks.
+            n_step: number of steps to include prior to boostrapping.
+            sequence_length: recurrent sequence rollout length.
+            period: Consecutive starting points for overlapping
+                rollouts across a sequence.
+            bootstrap_n: Used to determine the spacing between
                 q_value/value estimation for bootstrapping. Should be less
                 than sequence_length.
-            sigma (float, optional): Gaussian sigma parameter. Defaults to 0.3.
-            max_gradient_norm (float, optional): maximum allowed norm for gradients
-                before clipping is applied. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint models. Defaults to
-                False.
-            checkpoint_minute_interval (int): The number of minutes to wait between
+            sigma: Gaussian sigma parameter.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            checkpoint: whether to checkpoint models.
+            checkpoint_minute_interval: The number of minutes to wait between
                 checkpoints.
-            checkpoint_subpath (str, optional): subdirectory specifying where to store
-                checkpoints. Defaults to "~/mava/".
-            logger_config (Dict, optional): additional configuration settings for the
-                logger factory. Defaults to {}.
-            train_loop_fn (Callable, optional): function to instantiate a train loop.
-                Defaults to ParallelEnvironmentLoop.
-            eval_loop_fn (Callable, optional): function to instantiate an evaluation
-                loop. Defaults to ParallelEnvironmentLoop.
-            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
-                to the training loop. Defaults to {}.
-            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
-            the evaluation loop. Defaults to {}.
+            checkpoint_subpath: subdirectory specifying where to store
+                checkpoints.
+            logger_config: additional configuration settings for the
+                logger factory.
+            train_loop_fn: function to instantiate a train loop.
+            eval_loop_fn: function to instantiate an evaluation
+                loop.
+            train_loop_fn_kwargs: possible keyword arguments to send
+                to the training loop.
+            eval_loop_fn_kwargs: possible keyword arguments to send to
+            the evaluation loop.
         """
 
         super().__init__(

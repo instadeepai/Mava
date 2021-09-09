@@ -26,7 +26,7 @@ def sort_str_num(str_num: Any) -> List[Any]:
 def sample_new_agent_keys(
     agents: List,
     network_sampling_setup: List,
-    net_to_ints: Dict[str, int] = None,
+    net_keys_to_ids: Dict[str, int] = None,
 ) -> Tuple[Dict[str, np.array], Dict[str, np.array]]:
     save_net_keys = {}
     agent_net_keys = {}
@@ -36,7 +36,9 @@ def sample_new_agent_keys(
         for net_key in sample:
             agent = agent_slots.pop(0)
             agent_net_keys[agent] = net_key
-            if net_to_ints:
-                save_net_keys[agent] = np.array(net_to_ints[net_key], dtype=np.int32)
+            if net_keys_to_ids:
+                save_net_keys[agent] = np.array(
+                    net_keys_to_ids[net_key], dtype=np.int32
+                )
 
     return save_net_keys, agent_net_keys
