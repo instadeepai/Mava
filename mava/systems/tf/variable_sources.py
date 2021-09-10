@@ -39,6 +39,7 @@ class VariableSource:
 
             # Create checkpointer
             subdir = os.path.join("variable_source")
+            self._checkpoint_time_interval = checkpoint_minute_interval
             self._system_checkpointer = tf2_savers.Checkpointer(
                 time_delta_minutes=checkpoint_minute_interval,
                 directory=checkpoint_subpath,
@@ -121,7 +122,9 @@ class VariableSource:
         """
         # Checkpoints every 5 minutes
         while True:
-            time.sleep(5 * 60)
+            # Add 1 extra second just to make sure that the checkpointer
+            # is ready to save.
+            time.sleep(self._checkpoint_time_interval * 60 + 1)
             if self._system_checkpointer:
                 self._system_checkpointer.save()
                 print("Updated variables checkpoint.")
