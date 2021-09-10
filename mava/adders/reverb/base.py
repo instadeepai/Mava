@@ -90,7 +90,8 @@ def spec_like_to_tensor_spec(
 
 
 def get_trajectory_net_agents(
-    trajectory: Union[Trajectory, mava_types.Transition], traj_net_keys: Dict[str, str]
+    trajectory: Union[Trajectory, mava_types.Transition],
+    trajectory_net_keys: Dict[str, str],
 ) -> Tuple[List, Dict[str, List]]:
     """Returns a dictionary that maps network_keys to a list of agents using that specific
     network.
@@ -98,17 +99,17 @@ def get_trajectory_net_agents(
     Args:
         trajectory: Episode experience recorded by
         the adders.
-        traj_net_keys: The network_keys used by each agent in the trajectory.
+        trajectory_net_keys: The network_keys used by each agent in the trajectory.
     Returns:
         agents: A sorted list of all the agent_keys.
         agents_per_network: A dictionary that maps network_keys to
         a list of agents using that specific network.
     """
     agents = sort_str_num(trajectory.actions.keys())
-    unique_nets = sort_str_num(set(traj_net_keys.values()))
+    unique_nets = sort_str_num(set(trajectory_net_keys.values()))
     agents_per_network: Dict[str, List] = {key: [] for key in unique_nets}
     for agent in agents:
-        agents_per_network[traj_net_keys[agent]].append(agent)
+        agents_per_network[trajectory_net_keys[agent]].append(agent)
     return agents, agents_per_network
 
 
@@ -178,21 +179,21 @@ class ReverbParallelAdder(ReverbAdder):
             # Get the networks use by each agent by
             # converting the network_int_keys to strings.
             traj_extras = trajectory.extras["network_int_keys"]
-            traj_net_keys = {}
+            trajectory_net_keys = {}
             agents = sort_str_num(trajectory.actions.keys())
             for agent in agents:
                 arr = traj_extras[agent].numpy()
                 if type(trajectory) == Step:
                     # Sequential adder case.
-                    traj_net_keys[agent] = self._net_ids_to_keys[arr[0]]
+                    trajectory_net_keys[agent] = self._net_ids_to_keys[arr[0]]
                 else:
                     # Transition adder case.
-                    traj_net_keys[agent] = self._net_ids_to_keys[arr]
+                    trajectory_net_keys[agent] = self._net_ids_to_keys[arr]
 
             # Get a list of the agents and mapping from net_keys to all
             # agents using that network.
             agents, trajectory_nets_agent = get_trajectory_net_agents(
-                trajectory=trajectory, traj_net_keys=traj_net_keys
+                trajectory=trajectory, trajectory_net_keys=trajectory_net_keys
             )
 
             # Flag to check if all experience was used
