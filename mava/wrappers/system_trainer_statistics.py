@@ -78,9 +78,6 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         counts = self._counter.increment(steps=1, walltime=elapsed_time)
         fetches.update(counts)
 
-        # print(fetches)
-        # raise NotADirectoryError
-
         if self._system_checkpointer:
             train_utils.checkpoint_networks(self._system_checkpointer)
 

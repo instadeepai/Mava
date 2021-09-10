@@ -36,6 +36,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import execution, training
+from mava.utils.builder_utils import initialize_epsilon_schedulers
 
 
 @dataclasses.dataclass
@@ -340,27 +341,14 @@ class DIALBuilder:
             epsilon_decay_steps = self._config.epsilon_decay_steps or 0
 
         # Pass scheduler and initialize action selectors
-        action_selectors_return = {}
-        for network, action_selector_fn in action_selectors.items():
-            if issubclass(self._exploration_scheduler_fn, BaseExplorationScheduler):
-                action_selectors_return[network] = action_selector_fn(
-                    self._exploration_scheduler_fn(
-                        epsilon_start=epsilon_start,
-                        epsilon_min=epsilon_min,
-                        epsilon_decay=epsilon_decay,
-                    )
-                )
-            elif issubclass(
-                self._exploration_scheduler_fn, BaseExplorationTimestepScheduler
-            ):
-                assert epsilon_decay_steps is not None
-                action_selectors_return[network] = action_selector_fn(
-                    self._exploration_scheduler_fn(
-                        epsilon_start=epsilon_start,
-                        epsilon_min=epsilon_min,
-                        epsilon_decay_steps=epsilon_decay_steps,
-                    )
-                )
+        action_selectors_return = initialize_epsilon_schedulers(
+            exploration_scheduler_fn=self._exploration_scheduler_fn,
+            action_selectors=action_selectors,
+            epsilon_start=epsilon_start,
+            epsilon_min=epsilon_min,
+            epsilon_decay=epsilon_decay,
+            epsilon_decay_steps=epsilon_decay_steps,
+        )
 
         # Create the executor which coordinates the actors.
         return self._executor_fn(
