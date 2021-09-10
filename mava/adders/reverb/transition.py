@@ -102,7 +102,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             (s_t, a_t, r_t, d_t, s_t+1, e_t).
           discount: Discount factor to apply. This corresponds to the
             agent's discount in the class docstring.
-          net_ids_to_keys: A list of network keys. By indexing this list with the 
+          net_ids_to_keys: A list of network keys. By indexing this list with the
           network_id the corresponding network key will be returned.
           table_network_config: A dictionary mapping table names to lists of
             network names.
