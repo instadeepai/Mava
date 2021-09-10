@@ -190,15 +190,13 @@ class MADDPG:
         agents = sort_str_num(environment_spec.get_agent_ids())
         self._network_sampling_setup = network_sampling_setup
 
-        [["network_0", "network_1", "network_2"]]
-
         if type(network_sampling_setup) is not list:
             if network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
                 # if no network_sampling_setup is fixed, use shared_weights to
                 # determine setup
                 self._agent_net_keys = {
-                    agent: agent.split("_")[0] if shared_weights else agent
-                    for agent in agents
+                    agent: "network_0" if shared_weights else f"network_{i}"
+                    for i, agent in enumerate(agents)
                 }
                 self._network_sampling_setup = [
                     [
@@ -206,7 +204,7 @@ class MADDPG:
                         for key in sort_str_num(self._agent_net_keys.keys())
                     ]
                 ]
-            elif network_sampling_setup == enums.NetworkSampler.random_policy_per_agent:
+            elif network_sampling_setup == enums.NetworkSampler.random_agent_networks:
                 """Create N network policies, where N is the number of agents. Randomly
                 select policies from this sets for each agent at the start of a
                 episode. This sampling is done with replacement so the same policy
@@ -215,7 +213,9 @@ class MADDPG:
                     raise ValueError(
                         "Shared weights cannot be used with random policy per agent"
                     )
-                self._agent_net_keys = {agent: agent for agent in agents}
+                self._agent_net_keys = {
+                    agents[i]: f"network_{i}" for i in range(len(agents))
+                }
                 self._network_sampling_setup = [
                     [
                         [self._agent_net_keys[key]]
@@ -259,7 +259,7 @@ class MADDPG:
                 self._trainer_networks = {"trainer_0": unique_net_keys}
             elif trainer_networks == enums.Trainer.one_trainer_per_network:
                 self._trainer_networks = {
-                    f"trainer_{i}": unique_net_keys[i]
+                    f"trainer_{i}": [unique_net_keys[i]]
                     for i in range(len(unique_net_keys))
                 }
             else:

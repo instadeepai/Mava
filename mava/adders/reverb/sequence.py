@@ -50,7 +50,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         client: reverb.Client,
         sequence_length: int,
         period: int,
-        int_to_nets: List[str] = None,
+        net_ids_to_keys: List[str] = None,
         table_network_config: Dict[str, List] = None,
         *,
         delta_encoded: bool = False,
@@ -67,7 +67,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
           period: The period with which we add sequences. If less than
             sequence_length, overlapping sequences are added. If equal to
             sequence_length, sequences are exactly non-overlapping.
-          int_to_nets: A list of network names to convert from integers to
+          net_ids_to_keys: A list of network names to convert from integers to
             strings.
           table_network_config: A dictionary mapping table names to lists of
             network names.
@@ -103,7 +103,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         )
 
         self._period = period
-        self._int_to_nets = int_to_nets
+        self._net_ids_to_keys = net_ids_to_keys
         self._sequence_length = sequence_length
         self._end_of_episode_behavior = end_of_episode_behavior
         self._table_network_config = table_network_config

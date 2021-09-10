@@ -341,7 +341,7 @@ class MADDPGBuilder:
             adder = reverb_adders.ParallelNStepTransitionAdder(
                 priority_fns=priority_fns,
                 client=replay_client,
-                int_to_nets=self._config.unique_net_keys,
+                net_ids_to_keys=self._config.unique_net_keys,
                 n_step=self._config.n_step,
                 table_network_config=self._config.table_network_config,
                 discount=self._config.discount,
@@ -350,7 +350,7 @@ class MADDPGBuilder:
             adder = reverb_adders.ParallelSequenceAdder(
                 priority_fns=priority_fns,
                 client=replay_client,
-                int_to_nets=self._config.unique_net_keys,
+                net_ids_to_keys=self._config.unique_net_keys,
                 sequence_length=self._config.sequence_length,
                 table_network_config=self._config.table_network_config,
                 period=self._config.period,

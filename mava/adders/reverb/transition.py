@@ -86,7 +86,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         client: reverb.Client,
         n_step: int,
         discount: float,
-        int_to_nets: List[str] = None,
+        net_ids_to_keys: List[str] = None,
         table_network_config: Dict[str, List] = None,
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
@@ -102,8 +102,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             (s_t, a_t, r_t, d_t, s_t+1, e_t).
           discount: Discount factor to apply. This corresponds to the
             agent's discount in the class docstring.
-          int_to_nets: A list of network names to convert from integers to
-            strings.
+          net_ids_to_keys: A list of network keys. By indexing this list with the 
+          network_id the corresponding network key will be returned.
           table_network_config: A dictionary mapping table names to lists of
             network names.
           priority_fns: See docstring for BaseAdder.
@@ -114,7 +114,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # Makes the additional discount a float32, which means that it will be
         # upcast if rewards/discounts are float64 and left alone otherwise.
         self.n_step = n_step
-        self._int_to_nets = int_to_nets
+        self._net_ids_to_keys = net_ids_to_keys
         self._discount = tree.map_structure(np.float32, discount)
         self._first_idx = 0
         self._last_idx = 0

@@ -184,10 +184,10 @@ class ReverbParallelAdder(ReverbAdder):
                 arr = traj_extras[agent].numpy()
                 if type(trajectory) == Step:
                     # Sequential adder case.
-                    traj_net_keys[agent] = self._int_to_nets[arr[0]]
+                    traj_net_keys[agent] = self._net_ids_to_keys[arr[0]]
                 else:
                     # Transition adder case.
-                    traj_net_keys[agent] = self._int_to_nets[arr]
+                    traj_net_keys[agent] = self._net_ids_to_keys[arr]
 
             # Get a list of the agents and mapping from net_keys to all
             # agents using that network.
@@ -221,14 +221,17 @@ class ReverbParallelAdder(ReverbAdder):
                 # Each training example can therefore create multiple items
                 is_in_entry = True
                 while is_in_entry:
-                    # Go through all the networks in the table specification
-                    # and see if all the networks are still in the remaining
-                    # agents in the trajectory. Pop the agents from the
-                    # trajectory and add them to item_agents. If all the
+                    # Go through all the networks in the table specification.
+                    # Now check if every network in this table specification is used
+                    # atleast once by the remaining agents in the trajectory.
+                    # Pop the agents from the trajectory, that uses the required
+                    # networks and add them to item_agents. If all the
                     # networks was found item_agents will be written
-                    # to the table. The next time round these agents will
-                    # not be checked for again as they are already popped
-                    # from the trajectory copy.
+                    # to the table. So basically we try to find a group of
+                    # agents that matches the network specification of the table.
+                    # We do this until the table cannot find a match in the remaining
+                    # agents and therefore exists the and gives another table a chance
+                    # to find a matches.
                     item_agents = []
                     for net_key in self._table_network_config[table]:
                         if (

@@ -39,7 +39,7 @@ class Trainer(Enum):
 class NetworkSampler(Enum):
     fixed_agent_networks = 1
     """This option keeps the network used by each agent fixed."""
-    random_policy_per_agent = 2
+    random_agent_networks = 2
     """Create N network policies, where N is the number of agents. Randomly
     select policies from this sets for each agent at the start of a
     episode. This sampling is done with replacement so the same policy
