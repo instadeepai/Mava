@@ -159,7 +159,7 @@ class ReverbParallelAdder(ReverbAdder):
         trajectory: Union[Trajectory, mava_types.Transition],
         table_priorities: Dict[str, Any],
     ) -> None:
-        """Write an episode eperience (trajectory) to the reverb tables. Each
+        """Write an episode experience (trajectory) to the reverb tables. Each
         table represents experience used by each of the trainers. Therefore
         this function dynamically determines to which table(s) to write
         parts of the trajectory based on what networks where used by
