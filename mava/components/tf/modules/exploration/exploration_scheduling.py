@@ -33,29 +33,9 @@ class BaseExplorationScheduler:
         self._epsilon_decay = tf.Variable(epsilon_decay, trainable=False)
         self._epsilon = epsilon_start
 
-        # _reached_min is used to improve efficiency.
-        self._reached_min = False
-
-    def decrement_epsilon(self) -> float:
-        """Decrement epsilon or return current epsilon.
-
-        Returns:
-            current epsilon value.
-        """
-        # If we have reached the minimum value, don't do a min/max
-        # operation, just return epsilon.
-        if self._reached_min:
-            return self._epsilon
-
-        self._decrement_epsilon()
-
-        self._reached_min = self._epsilon == self._epsilon_min
-
-        return self._epsilon
-
     @abc.abstractmethod
-    def _decrement_epsilon(self) -> None:
-        """Internal method to decrement/update epsilon."""
+    def decrement_epsilon(self) -> tf.Tensor:
+        """Decrement epsilon and return updated epsilon."""
 
     def get_epsilon(self) -> float:
         """Get epsilon value.
@@ -77,19 +57,23 @@ class LinearExplorationScheduler(BaseExplorationScheduler):
         epsilon_min: float = 0.05,
         epsilon_decay: float = 1e-4,
     ):
-        """
-        Decays epsilon linearly to epsilon_min.
-        """
+        """Decays epsilon linearly to epsilon_min."""
         super(LinearExplorationScheduler, self).__init__(
             epsilon_start,
             epsilon_min,
             epsilon_decay,
         )
 
-    def _decrement_epsilon(self) -> None:
+    def decrement_epsilon(self) -> tf.Tensor:
+        """Decrement/update epsilon.
+
+        Returns:
+            current epsilon value.
+        """
         self._epsilon = tf.maximum(
             self._epsilon_min, self._epsilon - self._epsilon_decay
         )
+        return self._epsilon
 
 
 class ExponentialExplorationScheduler(BaseExplorationScheduler):
@@ -106,7 +90,7 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
             epsilon_decay,
         )
 
-    def _decrement_epsilon(self) -> None:
+    def decrement_epsilon(self) -> tf.Tensor:
         """Decrement/update epsilon.
 
         Returns:
@@ -115,6 +99,7 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
         self._epsilon = tf.maximum(
             self._epsilon_min, self._epsilon * (1 - self._epsilon_decay)
         )
+        return self._epsilon
 
 
 class BaseExplorationTimestepScheduler:
@@ -131,29 +116,9 @@ class BaseExplorationTimestepScheduler:
         self._epsilon_decay_steps = tf.Variable(epsilon_decay_steps, trainable=False)
         self._epsilon = epsilon_start
 
-        # _reached_min is used to improve efficiency.
-        self._reached_min = False
-
-    def decrement_epsilon(self, time_t: int) -> float:
-        """Decrement epsilon or return current epsilon.
-
-        Returns:
-            current epsilon value.
-        """
-        # If we have reached the minimum value, don't do a min/max
-        # operation, just return epsilon.
-        if self._reached_min:
-            return self._epsilon
-
-        self._decrement_epsilon(time_t)
-
-        self._reached_min = self._epsilon == self._epsilon_min
-
-        return self._epsilon
-
     @abc.abstractmethod
-    def _decrement_epsilon(self, time_t: int) -> None:
-        """Internal method to decrement/update epsilon."""
+    def decrement_epsilon(self, time_t: int) -> None:
+        """Decrement epsilon and return updated epsilon."""
 
     def get_epsilon(self) -> float:
         """Get epsilon value.
@@ -186,15 +151,16 @@ class LinearExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
             self._epsilon_decay_steps, tf.float32
         )
 
-    def _decrement_epsilon(self, time_t: int) -> None:
+    def decrement_epsilon(self, time_t: int) -> tf.Tensor:
         """Decrement/update epsilon.
 
-        Returns:
-            current epsilon value.
+        Args:
+            time_t : executor timestep.
         """
         self._epsilon = tf.maximum(
             self._epsilon_min, self._epsilon_start - self._delta * time_t
         )
+        return self._epsilon
 
 
 # Adapted from
@@ -219,36 +185,42 @@ class ExponentialExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
             else 1
         )
 
-    def _decrement_epsilon(self, time_t: int) -> None:
+    def decrement_epsilon(self, time_t: int) -> tf.Tensor:
         """Decrement/update epsilon.
 
-        Returns:
-            current epsilon value.
+        Args:
+            time_t : executor timestep.
         """
         self._epsilon = tf.minimum(
             self._epsilon_start,
             tf.maximum(self._epsilon_min, np.exp(-time_t / self._exp_scaling)),
         )
+        return self._epsilon
 
 
 class ConstantScheduler:
     """Simple scheduler that returns a constant value."""
 
-    def __init__(self, epsilon_start: float) -> None:
-        self._epsilon_start = tf.Variable(epsilon_start, trainable=False)
+    def __init__(self, epsilon: float) -> None:
+        """Constructors constant scheduler.
 
-    def get_epsilon(self) -> float:
+        Args:
+            epsilon : the constant eps value to be used.
+        """
+        self._epsilon = tf.constant(epsilon)
+
+    def get_epsilon(self) -> tf.Tensor:
         """Returns constant epsilon.
 
         Returns:
             constant epsilon.
         """
-        return self._epsilon_start
+        return self._epsilon
 
-    def decrement_epsilon(self) -> float:
+    def decrement_epsilon(self) -> tf.Tensor:
         """Return constant epsilon.
 
         Returns:
             constant epsilon.
         """
-        return self._epsilon_start
+        return self._epsilon

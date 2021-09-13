@@ -60,7 +60,7 @@ def initialize_epsilon_schedulers(
         # If eps start and min are the same, it is more efficient to use
         # ConstantScheduler
         if epsilon_start == epsilon_min:
-            scheduler = ConstantScheduler(epsilon_start=epsilon_start)
+            scheduler = ConstantScheduler(epsilon=epsilon_start)
 
         elif issubclass(exploration_scheduler_fn, BaseExplorationScheduler):
             assert epsilon_decay is not None
