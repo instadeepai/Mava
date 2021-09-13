@@ -16,40 +16,7 @@
 import abc
 
 import numpy as np
-
-
-def faster_max(x: float, y: float) -> float:
-    """Max function faster than Max(), since Max() does type checks.
-
-
-    Args:
-        x : var 1.
-        y : var 2.
-
-    Returns:
-        laegest number between x and y.
-    """
-    if x > y:
-        return x
-    else:
-        return y
-
-
-def faster_min(x: float, y: float) -> float:
-    """Min function faster than Min(), since Min() does type checks.
-
-
-    Args:
-        x : var 1.
-        y : var 2.
-
-    Returns:
-        smallest number between x and y.
-    """
-    if x < y:
-        return x
-    else:
-        return y
+import tensorflow as tf
 
 
 class BaseExplorationScheduler:
@@ -61,9 +28,9 @@ class BaseExplorationScheduler:
         epsilon_decay: float = 1e-4,
     ):
         """Base class for decaying epsilon by schedule."""
-        self._epsilon_start = epsilon_start
-        self._epsilon_min = epsilon_min
-        self._epsilon_decay = epsilon_decay
+        self._epsilon_start = tf.Variable(epsilon_start, trainable=False)
+        self._epsilon_min = tf.Variable(epsilon_min, trainable=False)
+        self._epsilon_decay = tf.Variable(epsilon_decay, trainable=False)
         self._epsilon = epsilon_start
 
         # _reached_min is used to improve efficiency.
@@ -120,7 +87,7 @@ class LinearExplorationScheduler(BaseExplorationScheduler):
         )
 
     def _decrement_epsilon(self) -> None:
-        self._epsilon = faster_max(
+        self._epsilon = tf.maximum(
             self._epsilon_min, self._epsilon - self._epsilon_decay
         )
 
@@ -145,7 +112,7 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
         Returns:
             current epsilon value.
         """
-        self._epsilon = faster_max(
+        self._epsilon = tf.maximum(
             self._epsilon_min, self._epsilon * (1 - self._epsilon_decay)
         )
 
@@ -159,9 +126,9 @@ class BaseExplorationTimestepScheduler:
         epsilon_min: float = 0.05,
     ):
         """Base class for decaying epsilon according to number of steps."""
-        self._epsilon_start = epsilon_start
-        self._epsilon_min = epsilon_min
-        self._epsilon_decay_steps = epsilon_decay_steps
+        self._epsilon_start = tf.Variable(epsilon_start, trainable=False)
+        self._epsilon_min = tf.Variable(epsilon_min, trainable=False)
+        self._epsilon_decay_steps = tf.Variable(epsilon_decay_steps, trainable=False)
         self._epsilon = epsilon_start
 
         # _reached_min is used to improve efficiency.
@@ -215,9 +182,9 @@ class LinearExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
             epsilon_min,
         )
 
-        self._delta = (
-            self._epsilon_start - self._epsilon_min
-        ) / self._epsilon_decay_steps
+        self._delta = (self._epsilon_start - self._epsilon_min) / tf.cast(
+            self._epsilon_decay_steps, tf.float32
+        )
 
     def _decrement_epsilon(self, time_t: int) -> None:
         """Decrement/update epsilon.
@@ -225,7 +192,7 @@ class LinearExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
         Returns:
             current epsilon value.
         """
-        self._epsilon = faster_max(
+        self._epsilon = tf.maximum(
             self._epsilon_min, self._epsilon_start - self._delta * time_t
         )
 
@@ -258,9 +225,9 @@ class ExponentialExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
         Returns:
             current epsilon value.
         """
-        self._epsilon = faster_min(
+        self._epsilon = tf.minimum(
             self._epsilon_start,
-            faster_max(self._epsilon_min, np.exp(-time_t / self._exp_scaling)),
+            tf.maximum(self._epsilon_min, np.exp(-time_t / self._exp_scaling)),
         )
 
 
