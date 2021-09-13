@@ -128,19 +128,19 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
         self._running_statistics.update({"episode_length": episode_steps})
         self._running_statistics.update(counts)
 
-        # Log extra env stats, e.g. for smac.
-        extra_env_stats = getattr(
-            self._environment_loop._environment, "get_stats", None
-        )
-        if callable(extra_env_stats):
-            self._running_statistics.update(
-                self._environment_loop._environment.get_stats()
-            )
+        # # Log extra env stats, e.g. for smac.
+        # extra_env_stats = getattr(
+        #     self._environment_loop._environment, "get_stats", None
+        # )
+        # if callable(extra_env_stats):
+        #     self._running_statistics.update(
+        #         self._environment_loop._environment.get_stats()
+        #     )
 
-        # Log extra executor stats, e.g. epsilon for madqn
-        extra_executor_stats = getattr(self._executor, "get_stats", None)
-        if extra_executor_stats:
-            self._running_statistics.update(self._executor.get_stats())
+        # # Log extra executor stats, e.g. epsilon for madqn
+        # extra_executor_stats = getattr(self._executor, "get_stats", None)
+        # if extra_executor_stats:
+        #     self._running_statistics.update(self._executor.get_stats())
 
 
 class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
@@ -239,17 +239,17 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                 ] = self._agents_stats[agent]["reward"].__getattribute__(stat)()
             self._agent_loggers[agent].write(agent_running_statistics)
 
-        # Log extra env stats, e.g. for smac.
-        extra_stats = getattr(self._environment_loop._environment, "get_stats", None)
-        if callable(extra_stats):
-            self._running_statistics.update(
-                self._environment_loop._environment.get_stats()
-            )
+        # # Log extra env stats, e.g. for smac.
+        # extra_stats = getattr(self._environment_loop._environment, "get_stats", None)
+        # if callable(extra_stats):
+        #     self._running_statistics.update(
+        #         self._environment_loop._environment.get_stats()
+        #     )
 
-        # Log extra executor stats, e.g. epsilon for madqn
-        extra_executor_stats = getattr(self._executor, "get_stats", None)
-        if extra_executor_stats:
-            self._running_statistics.update(self._executor.get_stats())
+        # # Log extra executor stats, e.g. epsilon for madqn
+        # extra_executor_stats = getattr(self._executor, "get_stats", None)
+        # if extra_executor_stats:
+        #     self._running_statistics.update(self._executor.get_stats())
 
 
 class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
