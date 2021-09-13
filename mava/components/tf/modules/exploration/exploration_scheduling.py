@@ -235,7 +235,7 @@ class ConstantScheduler:
     """Simple scheduler that returns a constant value."""
 
     def __init__(self, epsilon_start: float) -> None:
-        self._epsilon_start = epsilon_start
+        self._epsilon_start = tf.Variable(epsilon_start, trainable=False)
 
     def get_epsilon(self) -> float:
         """Returns constant epsilon.
