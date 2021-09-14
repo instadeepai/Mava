@@ -103,6 +103,7 @@ class MADDPG:
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         connection_spec: Callable[[Dict[str, List[str]]], Dict[str, List[str]]] = None,
+        termination_condition: Optional[Dict[str, int]] = None,
     ):
         """Initialise the system
         Args:
@@ -181,6 +182,12 @@ class MADDPG:
                 to the training loop.
             eval_loop_fn_kwargs: possible keyword arguments to send to
             the evaluation loop.
+            termination_condition: An optional terminal condition can be
+                provided that stops the program once the condition is
+                satisfied. Available options include specifying maximum
+                values for trainer_steps, trainer_walltime, evaluator_steps,
+                evaluator_episodes, executor_episodes or executor_steps.
+                E.g. termination_condition = {'trainer_steps': 100000}.
         """
 
         if not environment_spec:
@@ -369,6 +376,7 @@ class MADDPG:
                 critic_optimizer=critic_optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                termination_condition=termination_condition,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,

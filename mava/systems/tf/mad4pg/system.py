@@ -85,6 +85,7 @@ class MAD4PG(MADDPG):
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        termination_condition: Optional[Dict[str, int]] = None,
     ):
         """Initialise the system
 
@@ -163,6 +164,12 @@ class MAD4PG(MADDPG):
                 to the training loop.
             eval_loop_fn_kwargs: possible keyword arguments to send to
             the evaluation loop.
+            termination_condition: An optional terminal condition can be
+                provided that stops the program once the condition is
+                satisfied. Available options include specifying maximum
+                values for trainer_steps, trainer_walltime, evaluator_steps,
+                evaluator_episodes, executor_episodes or executor_steps.
+                E.g. termination_condition = {'trainer_steps': 100000}.
         """
 
         super().__init__(
@@ -203,4 +210,5 @@ class MAD4PG(MADDPG):
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
             target_averaging=target_averaging,
             target_update_rate=target_update_rate,
+            termination_condition=termination_condition,
         )
