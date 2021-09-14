@@ -28,16 +28,16 @@ class BaseExplorationScheduler:
         epsilon_decay: float = 1e-4,
     ):
         """Base class for decaying epsilon by schedule."""
-        self._epsilon_start = tf.Variable(epsilon_start, trainable=False)
-        self._epsilon_min = tf.Variable(epsilon_min, trainable=False)
-        self._epsilon_decay = tf.Variable(epsilon_decay, trainable=False)
+        self._epsilon_start = epsilon_start
+        self._epsilon_min = epsilon_min
+        self._epsilon_decay = epsilon_decay
         self._epsilon = epsilon_start
 
     @abc.abstractmethod
-    def decrement_epsilon(self) -> tf.Tensor:
+    def decrement_epsilon(self) -> np.float32:
         """Decrement epsilon and return updated epsilon."""
 
-    def get_epsilon(self) -> float:
+    def get_epsilon(self) -> np.float32:
         """Get epsilon value.
 
         Returns:
@@ -64,15 +64,13 @@ class LinearExplorationScheduler(BaseExplorationScheduler):
             epsilon_decay,
         )
 
-    def decrement_epsilon(self) -> tf.Tensor:
+    def decrement_epsilon(self) -> np.float32:
         """Decrement/update epsilon.
 
         Returns:
             current epsilon value.
         """
-        self._epsilon = tf.maximum(
-            self._epsilon_min, self._epsilon - self._epsilon_decay
-        )
+        self._epsilon = max(self._epsilon_min, self._epsilon - self._epsilon_decay)
         return self._epsilon
 
 
@@ -90,13 +88,13 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
             epsilon_decay,
         )
 
-    def decrement_epsilon(self) -> tf.Tensor:
+    def decrement_epsilon(self) -> np.float32:
         """Decrement/update epsilon.
 
         Returns:
             current epsilon value.
         """
-        self._epsilon = tf.maximum(
+        self._epsilon = max(
             self._epsilon_min, self._epsilon * (1 - self._epsilon_decay)
         )
         return self._epsilon
@@ -111,9 +109,9 @@ class BaseExplorationTimestepScheduler:
         epsilon_min: float = 0.05,
     ):
         """Base class for decaying epsilon according to number of steps."""
-        self._epsilon_start = tf.Variable(epsilon_start, trainable=False)
-        self._epsilon_min = tf.Variable(epsilon_min, trainable=False)
-        self._epsilon_decay_steps = tf.Variable(epsilon_decay_steps, trainable=False)
+        self._epsilon_start = epsilon_start
+        self._epsilon_min = epsilon_min
+        self._epsilon_decay_steps = epsilon_decay_steps
         self._epsilon = epsilon_start
 
     @abc.abstractmethod
@@ -147,17 +145,17 @@ class LinearExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
             epsilon_min,
         )
 
-        self._delta = (self._epsilon_start - self._epsilon_min) / tf.cast(
-            self._epsilon_decay_steps, tf.float32
-        )
+        self._delta = (
+            self._epsilon_start - self._epsilon_min
+        ) / self._epsilon_decay_steps
 
-    def decrement_epsilon(self, time_t: int) -> tf.Tensor:
+    def decrement_epsilon(self, time_t: int) -> np.float32:
         """Decrement/update epsilon.
 
         Args:
             time_t : executor timestep.
         """
-        self._epsilon = tf.maximum(
+        self._epsilon = max(
             self._epsilon_min, self._epsilon_start - self._delta * time_t
         )
         return self._epsilon
@@ -185,15 +183,15 @@ class ExponentialExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
             else 1
         )
 
-    def decrement_epsilon(self, time_t: int) -> tf.Tensor:
+    def decrement_epsilon(self, time_t: int) -> np.float32:
         """Decrement/update epsilon.
 
         Args:
             time_t : executor timestep.
         """
-        self._epsilon = tf.minimum(
+        self._epsilon = min(
             self._epsilon_start,
-            tf.maximum(self._epsilon_min, np.exp(-time_t / self._exp_scaling)),
+            max(self._epsilon_min, np.exp(-time_t / self._exp_scaling)),
         )
         return self._epsilon
 
@@ -209,7 +207,7 @@ class ConstantScheduler:
         """
         self._epsilon = tf.constant(epsilon)
 
-    def get_epsilon(self) -> tf.Tensor:
+    def get_epsilon(self) -> np.float32:
         """Returns constant epsilon.
 
         Returns:
@@ -217,7 +215,7 @@ class ConstantScheduler:
         """
         return self._epsilon
 
-    def decrement_epsilon(self) -> tf.Tensor:
+    def decrement_epsilon(self) -> np.float32:
         """Return constant epsilon.
 
         Returns:
