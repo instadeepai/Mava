@@ -344,6 +344,9 @@ class ReverbParallelAdder(ReverbAdder):
                         self._writer.create_item(
                             table=table, priority=priority, trajectory=new_trajectory
                         )
+
+                        # Flush the writer.
+                        self._writer.flush(self._max_in_flight_items)
             if not created_item:
                 raise EOFError(
                     "This experience was not used by any trainer: ",
@@ -359,8 +362,8 @@ class ReverbParallelAdder(ReverbAdder):
                 table=table, priority=priority, trajectory=trajectory
             )
 
-        # Flush the writer.
-        self._writer.flush(self._max_in_flight_items)
+            # Flush the writer.
+            self._writer.flush(self._max_in_flight_items)
 
     def add_first(
         self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}

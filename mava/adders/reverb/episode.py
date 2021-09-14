@@ -130,6 +130,7 @@ class ParallelEpisodeAdder(EpisodeAdder, ReverbParallelAdder):
         # Create a prioritized item for each table.
         for table_name, priority in table_priorities.items():
             self._writer.create_item(table_name, priority, trajectory)
+            # Flush the writer.
             self._writer.flush(self._max_in_flight_items)
 
     @classmethod
