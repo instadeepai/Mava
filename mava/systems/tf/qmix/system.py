@@ -64,7 +64,7 @@ class QMIX(MADQN):
         epsilon_min: float = 0.05,
         epsilon_decay: Optional[float] = None,
         epsilon_decay_steps: Optional[int] = None,
-        epsilon_start: float = 1,
+        epsilon_start: float = 1.0,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,

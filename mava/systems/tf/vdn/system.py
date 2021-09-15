@@ -59,7 +59,7 @@ class VDN(MADQN):
         ] = LinearExplorationTimestepScheduler,
         epsilon_decay_steps: Optional[int] = None,
         epsilon_min: float = 0.05,
-        epsilon_start: float = 1,
+        epsilon_start: float = 1.0,
         epsilon_decay: Optional[float] = None,
         num_executors: int = 1,
         num_caches: int = 0,
