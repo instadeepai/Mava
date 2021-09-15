@@ -71,18 +71,18 @@ class TestNetworkAgentKeys:
             "agent_2": "agent",
         }
 
-        if system == mad4pg:
-            networks = system.make_default_networks(  # type: ignore
-                environment_spec=environment_spec,  # type: ignore
-                agent_net_keys=agent_net_keys,
-                vmin=-150,
-                vmax=150,
-            )
-        else:
-            networks = system.make_default_networks(  # type: ignore
-                environment_spec=environment_spec,  # type: ignore
-                agent_net_keys=agent_net_keys,
-            )
+        params = dict(
+            environment_spec=environment_spec,
+            agent_net_keys=agent_net_keys,
+            vmin=-150 if system == mad4pg else None,
+            vmax=150 if system == mad4pg else None,
+        )
+
+        # Filter out None params
+        params = {k: v for k, v in params.items() if v is not None}
+
+        # Than pass params
+        networks = system.make_default_networks(**params)
 
         for key in networks.keys():
             assert (

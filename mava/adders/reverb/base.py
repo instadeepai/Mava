@@ -352,12 +352,10 @@ class ReverbParallelAdder(ReverbAdder):
         else:
             # Default setting (deprecate this) with only one table. In this setting
             # we write the entire trajectory to that table.
-            table_items = list(table_priorities.items())
-            assert len(table_items) == 1
-            table, priority = table_items[0]
-            self._writer.create_item(
-                table=table, priority=priority, trajectory=trajectory
-            )
+            for table_name, priority in table_priorities.items():
+                self._writer.create_item(
+                    table=table_name, priority=priority, trajectory=trajectory
+                )
 
         # Flush the writer.
         self._writer.flush(self._max_in_flight_items)
