@@ -274,7 +274,7 @@ class MADDPG:
         # Setup trainer_networks
         if type(trainer_networks) is not dict:
             if trainer_networks == enums.Trainer.single_trainer:
-                self._trainer_networks = {"trainer_0": unique_net_keys}
+                self._trainer_networks = {"trainer": unique_net_keys}
             elif trainer_networks == enums.Trainer.one_trainer_per_network:
                 self._trainer_networks = {
                     f"trainer_{i}": [unique_net_keys[i]]
@@ -302,9 +302,9 @@ class MADDPG:
 
         # Setup table_network_config
         table_network_config = {}
-        for t_id in range(len(self._trainer_networks.keys())):
+        for trainer_key in self._trainer_networks.keys():
             most_matches = 0
-            trainer_nets = self._trainer_networks[f"trainer_{t_id}"]
+            trainer_nets = self._trainer_networks[trainer_key]
             for sample in self._network_sampling_setup:  # type: ignore
                 matches = 0
                 for entry in sample:
@@ -312,7 +312,7 @@ class MADDPG:
                         matches += 1
                 if most_matches < matches:
                     matches = most_matches
-                    table_network_config[f"trainer_{t_id}"] = sample
+                    table_network_config[trainer_key] = sample
 
         self._table_network_config = table_network_config
         self._architecture = architecture
@@ -583,20 +583,18 @@ class MADDPG:
         if self._logger_config and "trainer" in self._logger_config:
             trainer_logger_config = self._logger_config["trainer"]
         trainer_logger = self._logger_factory(  # type: ignore
-            f"trainer_{trainer_id}", **trainer_logger_config
+            trainer_id, **trainer_logger_config
         )
 
         # Create the system
         _, networks = self.create_system()
 
-        dataset = self._builder.make_dataset_iterator(
-            replay, f"{self._builder._config.replay_table_name}_{trainer_id}"
-        )
+        dataset = self._builder.make_dataset_iterator(replay, trainer_id)
 
         return self._builder.make_trainer(
             networks=networks,
-            trainer_networks=self._trainer_networks[f"trainer_{trainer_id}"],
-            trainer_table_entry=self._table_network_config[f"trainer_{trainer_id}"],
+            trainer_networks=self._trainer_networks[trainer_id],
+            trainer_table_entry=self._table_network_config[trainer_id],
             dataset=dataset,
             logger=trainer_logger,
             connection_spec=self._connection_spec,
@@ -620,7 +618,7 @@ class MADDPG:
 
         with program.group("trainer"):
             # Add executors which pull round-robin from our variable sources.
-            for trainer_id in range(len(self._trainer_networks.keys())):
+            for trainer_id in self._trainer_networks.keys():
                 program.add_node(
                     lp.CourierNode(self.trainer, trainer_id, replay, variable_server)
                 )

@@ -80,7 +80,6 @@ class MADDPGConfig:
         logger: logger to use.
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
-        replay_table_name: string indicating what name to give the replay table.
         termination_condition: An optional terminal condition can be provided
         that stops the program once the condition is satisfied. Available options
         include specifying maximum values for trainer_steps, trainer_walltime,
@@ -118,7 +117,6 @@ class MADDPGConfig:
     counter: counting.Counter = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
-    replay_table_name: str = "trainer"  # reverb_adders.DEFAULT_PRIORITY_TABLE
     termination_condition: Optional[Dict[str, int]] = None
 
 
@@ -263,10 +261,10 @@ class MADDPGBuilder:
 
         # Create table per trainer
         replay_tables = []
-        for t_i in range(len(self._config.table_network_config.keys())):
+        for table_key in self._config.table_network_config.keys():
             # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
-            num_networks = len(self._config.table_network_config[f"trainer_{t_i}"])
+            num_networks = len(self._config.table_network_config[table_key])
             env_spec = copy.deepcopy(env_adder_spec)
             env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
 
@@ -282,7 +280,7 @@ class MADDPGBuilder:
 
             replay_tables.append(
                 reverb.Table(
-                    name=f"{self._config.replay_table_name}_{t_i}",
+                    name=table_key,
                     sampler=reverb.selectors.Uniform(),
                     remover=reverb.selectors.Fifo(),
                     max_size=self._config.max_replay_size,
