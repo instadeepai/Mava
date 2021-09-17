@@ -182,7 +182,7 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
 
         # Update the variable source and the trainer
         # TODO (dries): Can this be simplified? Do an async set and get?
-        self._variable_client.set_and_wait()
+        self._variable_client.set_async()
         self._variable_client.get_async()
 
         fetches.update(self._counts)
