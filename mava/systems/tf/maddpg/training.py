@@ -500,8 +500,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         )
 
         # Update the variable source and the trainer
-        self._variable_client.set_async()
-        self._variable_client.get_async()
+        self._variable_client.set_and_get_async()
 
         raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
 
@@ -1400,9 +1399,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         )
 
         # Update the variable source and the trainer
-        # TODO (dries): Can this be simplified? Do an async set and get?
-        self._variable_client.set_async()
-        self._variable_client.get_async()
+        self._variable_client.set_and_get_async()
 
         raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
 

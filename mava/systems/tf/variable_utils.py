@@ -35,8 +35,7 @@ class VariableClient:
         variables: Dict[str, tf.Variable],
         get_keys: List[str] = None,
         set_keys: List[str] = None,
-        get_period: int = 1,
-        set_period: int = 1,
+        update_period: int = 1,
     ):
         """Initialise the variable server."""
         self._all_keys = sort_str_num(list(variables.keys()))
@@ -45,8 +44,8 @@ class VariableClient:
         self._variables: Dict[str, tf.Variable] = variables
         self._get_call_counter = 0
         self._set_call_counter = 0
-        self._get_update_period = get_period
-        self._set_update_period = set_period
+        self._set_get_call_counter = 0
+        self._update_period = update_period
         self._client = client
         self._request = lambda: client.get_variables(self._get_keys)
         self._request_all = lambda: client.get_variables(self._all_keys)
@@ -63,6 +62,9 @@ class VariableClient:
         self._executor = futures.ThreadPoolExecutor(max_workers=1)
         self._async_request = lambda: self._executor.submit(self._request)
         self._async_adjust = lambda: self._executor.submit(self._adjust)
+        self._asunc_adjust_and_request = lambda: self._executor.submit(
+            self._adjust_and_request
+        )
         self._async_add = lambda names, vars: self._executor.submit(  # type: ignore
             self._add(names, vars)  # type: ignore
         )
@@ -71,16 +73,24 @@ class VariableClient:
         # method that there is no pending/running request.
         self._get_future: Optional[futures.Future] = None
         self._set_future: Optional[futures.Future] = None
+        self._set_get_future: Optional[futures.Future] = None
         self._add_future: Optional[futures.Future] = None
+
+    def _adjust_and_request(self) -> None:
+        self._client.set_variables(
+            self._set_keys,
+            tf2_utils.to_numpy({key: self._variables[key] for key in self._set_keys}),
+        )
+        self._client.get_variables(self._get_keys)
 
     def get_async(self) -> None:
         """Asynchronously updates the get variables with the latest copy from source."""
 
         # Track the number of calls (we only update periodically).
-        if self._get_call_counter < self._get_update_period:
+        if self._get_call_counter < self._update_period:
             self._get_call_counter += 1
 
-        period_reached: bool = self._get_call_counter >= self._get_update_period
+        period_reached: bool = self._get_call_counter >= self._update_period
 
         if period_reached and self._get_future is None:
             # The update period has been reached and no request has been sent yet, so
@@ -98,10 +108,10 @@ class VariableClient:
     def set_async(self) -> None:
         """Asynchronously updates source with the set variables."""
         # Track the number of calls (we only update periodically).
-        if self._set_call_counter < self._set_update_period:
+        if self._set_call_counter < self._update_period:
             self._set_call_counter += 1
 
-        period_reached: bool = self._set_call_counter >= self._set_update_period
+        period_reached: bool = self._set_call_counter >= self._update_period
 
         if period_reached and self._set_future is None:  # type: ignore
             # The update period has been reached and no request has been sent yet, so
@@ -111,6 +121,24 @@ class VariableClient:
             return
         if self._set_future is not None and self._set_future.done():
             self._set_future = None  # type: ignore
+        return
+
+    def set_and_get_async(self) -> None:
+        """Asynchronously updates source and gets from source."""
+        # Track the number of calls (we only update periodically).
+        if self._set_get_call_counter < self._update_period:
+            self._set_get_call_counter += 1
+
+        period_reached: bool = self._set_get_call_counter >= self._update_period
+
+        if period_reached and self._set_get_future is None:  # type: ignore
+            # The update period has been reached and no request has been sent yet, so
+            # making an asynchronous request now.
+            self._set_get_future = self._asunc_adjust_and_request()  # type: ignore
+            self._set_get_call_counter = 0
+            return
+        if self._set_get_future is not None and self._set_get_future.done():
+            self._set_get_future = None  # type: ignore
         return
 
     def add_async(self, names: List[str], vars: Dict[str, Any]) -> None:

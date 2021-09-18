@@ -464,8 +464,7 @@ class MADDPGBuilder:
                 client=variable_source,
                 variables=variables,
                 get_keys=get_keys,
-                get_period=self._config.executor_variable_update_period,
-                set_period=self._config.executor_variable_update_period,
+                update_period=self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -552,8 +551,7 @@ class MADDPGBuilder:
             variables=variables,
             get_keys=get_keys,
             set_keys=set_keys,
-            get_period=10,
-            set_period=10,
+            update_period=10,
         )
 
         # Get all the initial variables
