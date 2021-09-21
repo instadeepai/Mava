@@ -155,7 +155,7 @@ class VariableClient:
             else:
                 for name in names:
                     self._async_add_buffer[name] += vars[name]
-                self._add_future = self._async_add(
+                self._add_future = self._async_add(  # type: ignore
                     names, self._async_add_buffer
                 )  # type: ignore
                 self._async_add_buffer = {}
