@@ -16,14 +16,15 @@
 """MAPPO system builder implementation."""
 
 import dataclasses
-from typing import Dict, Iterator, List, Optional, Type, Union
+import copy
+from typing import Dict, Iterator, List, Optional, Type, Union, Any
+import tensorflow as tf
 
 import reverb
 import sonnet as snt
-import tensorflow as tf
-from acme import datasets
-from acme import types as acme_types
 from acme.tf import utils as tf2_utils
+from acme import datasets
+from acme.specs import EnvironmentSpec
 from acme.tf import variable_utils
 from acme.utils import counting
 
@@ -98,6 +99,7 @@ class MAPPOBuilder:
         config: MAPPOConfig,
         trainer_fn: Type[training.MAPPOTrainer] = training.MAPPOTrainer,
         executor_fn: Type[core.Executor] = execution.MAPPOFeedForwardExecutor,
+        extra_specs: Dict[str, Any] = {}
     ):
         """Initialise the system.
 
@@ -117,6 +119,35 @@ class MAPPOBuilder:
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
+        self._extras_specs = extra_specs
+
+    def add_log_prob_to_spec(
+        self, environment_spec: specs.MAEnvironmentSpec
+    ) -> specs.MAEnvironmentSpec:
+        """convert discrete action space to bounded continuous action space
+        Args:
+            environment_spec (specs.MAEnvironmentSpec): description of
+                the action, observation spaces etc. for each agent in the system.
+        Returns:
+            specs.MAEnvironmentSpec: updated environment spec.
+        """
+
+        env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
+        keys = env_adder_spec._keys
+        for key in keys:
+            agent_spec = env_adder_spec._specs[key]
+            new_act_spec = {"actions": agent_spec.actions}
+            
+            # Make dummy log_probs
+            new_act_spec["log_probs"] = tf2_utils.squeeze_batch_dim(tf.ones(shape=(1,), dtype=tf.float32))      
+
+            env_adder_spec._specs[key] = EnvironmentSpec(
+                observations=agent_spec.observations,
+                actions=new_act_spec,
+                rewards=agent_spec.rewards,
+                discounts=agent_spec.discounts,
+            )
+        return env_adder_spec
 
     def make_replay_tables(
         self,
@@ -132,23 +163,18 @@ class MAPPOBuilder:
             List[reverb.Table]: a list of data tables for inserting data.
         """
 
-        agent_specs = environment_spec.get_agent_specs()
-        extras_spec: Dict[str, Dict[str, acme_types.NestedArray]] = {"log_probs": {}}
-
-        for agent, spec in agent_specs.items():
-            # Make dummy log_probs
-            extras_spec["log_probs"][agent] = tf.ones(shape=(1,), dtype=tf.float32)
-
-        # Squeeze the batch dim.
-        extras_spec = tf2_utils.squeeze_batch_dim(extras_spec)
+        # Create system architecture with target networks.
+        adder_env_spec = self._builder.add_log_prob_to_spec(
+            environment_spec
+        )
 
         replay_table = reverb.Table.queue(
             name=self._config.replay_table_name,
             max_size=self._config.max_queue_size,
             signature=reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec,
+                adder_env_spec,
                 sequence_length=self._config.sequence_length,
-                extras_spec=extras_spec,
+                extras_spec=self._extras_specs,
             ),
         )
 
@@ -200,7 +226,7 @@ class MAPPOBuilder:
             client=replay_client,
             period=self._config.sequence_period,
             sequence_length=self._config.sequence_length,
-            use_next_extras=False,
+            use_next_extras=True,
         )
 
     def make_executor(

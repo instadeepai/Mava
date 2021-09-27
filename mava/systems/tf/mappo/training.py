@@ -18,6 +18,7 @@
 import copy
 import os
 import time
+import tree
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 import numpy as np
@@ -55,10 +56,10 @@ class MAPPOTrainer(mava.Trainer):
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
-        discount: float = 0.99,
-        lambda_gae: float = 1.0,
-        entropy_cost: float = 0.0,
-        baseline_cost: float = 1.0,
+        discount: float = 0.999,
+        lambda_gae: float = 1.0, # Question (dries): What is this used for?
+        entropy_cost: float = 0.01,
+        baseline_cost: float = 0.5,
         clipping_epsilon: float = 0.2,
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
@@ -286,11 +287,15 @@ class MAPPOTrainer(mava.Trainer):
             data.extras,
         )
 
+        if 'core_state' in extras: 
+            core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
+
         # transform observation using observation networks
         observations_trans = self._transform_observations(observations)
 
         # Get log_probs.
-        log_probs = extras["log_probs"]
+        actions  = actions["actions"]
+        behaviour_logits = actions["log_probs"]
 
         # Store losses.
         policy_losses: Dict[str, Any] = {}
@@ -299,15 +304,15 @@ class MAPPOTrainer(mava.Trainer):
         with tf.GradientTape(persistent=True) as tape:
             for agent in self._agents:
 
-                action, reward, discount, behaviour_log_prob = (
+                action, reward, discount, behaviour_logits = (
                     actions[agent],
                     rewards[agent],
                     discounts[agent],
-                    log_probs[agent],
+                    behaviour_logits[agent],
                 )
 
                 actor_observation = observations_trans[agent]
-                critic_observation = self._get_critic_feed(observations_trans, agent)
+                critic_observation = self._get_critic_feed(observations_trans, extras, agent)
 
                 # Chop off final timestep for bootstrapping value
                 reward = reward[:-1]
@@ -326,13 +331,28 @@ class MAPPOTrainer(mava.Trainer):
                 critic_observation = snt.merge_leading_dims(
                     critic_observation, num_dims=2
                 )
-                policy = policy_network(actor_observation)
-                values = critic_network(critic_observation)
 
-                # Reshape the outputs.
-                policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
-                values = tf.reshape(values, dims, name="value")
+                if 'core_state' in extras: 
+                    # Unroll current policy over actor_observation.
+                    (logits, values), _ = snt.static_unroll(self._actor_critic_network, actor_observation,
+                                              core_state)
+                    policy = tfd.Categorical(logits=logits[:-1])
+                    policy_log_prob = policy.log_prob(actions)
+                    # Entropy regulariser.
+                    entropy_loss = trfl.policy_entropy_loss(policy).loss
+                else:
+                    policy = policy_network(actor_observation)
+                    values = critic_network(critic_observation)
+                    # Reshape the outputs.
+                    policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
+                    values = tf.reshape(values, dims, name="value")
+                    policy_log_prob = policy.log_prob(action)
 
+                     # Entropy regularization. Only implemented for categorical dist.
+                    policy_entropy = tf.reduce_mean(policy.entropy())
+                    entropy_loss = -self._entropy_cost * policy_entropy
+                 # Compute importance sampling weights: current policy / behavior policy.
+                
                 # Values along the sequence T.
                 bootstrap_value = values[-1]
                 state_values = values[:-1]
@@ -354,7 +374,9 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 # Compute importance sampling weights: current policy / behavior policy.
-                log_rhos = policy.log_prob(action) - behaviour_log_prob
+                behaviour_log_prob = tfd.Categorical(logits=behaviour_logits[:-1])
+                
+                log_rhos = policy_log_prob - behaviour_log_prob
                 importance_ratio = tf.exp(log_rhos)[:-1]
                 clipped_importance_ratio = tf.clip_by_value(
                     importance_ratio,
@@ -375,19 +397,12 @@ class MAPPOTrainer(mava.Trainer):
                     name="PolicyGradientLoss",
                 )
 
-                # Entropy regularization. Only implemented for categorical dist.
-                try:
-                    policy_entropy = tf.reduce_mean(policy.entropy())
-                except NotImplementedError:
-                    policy_entropy = tf.convert_to_tensor(0.0)
-
-                entropy_loss = -self._entropy_cost * policy_entropy
-
-                # Combine weighted sum of actor & entropy regularization.
+                # Combine weighted sum of actor & entropy regularization. 
                 policy_loss = policy_gradient_loss + entropy_loss
 
-                policy_losses[agent] = policy_loss
-                critic_losses[agent] = critic_loss
+                # Multiply by discounts to not train on padded data.
+                policy_losses[agent] = policy_loss*discount
+                critic_losses[agent] = critic_loss*discount
 
         self.policy_losses = policy_losses
         self.critic_losses = critic_losses
@@ -489,10 +504,10 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
-        discount: float = 0.99,
+        discount: float = 0.999,
         lambda_gae: float = 1.0,
-        entropy_cost: float = 0.0,
-        baseline_cost: float = 1.0,
+        entropy_cost: float = 0.01,
+        baseline_cost: float = 0.5,
         clipping_epsilon: float = 0.2,
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
@@ -527,9 +542,71 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
     def _get_critic_feed(
         self,
         observations_trans: Dict[str, np.ndarray],
+        extras: Dict[str, np.ndarray],
         agent: str,
     ) -> tf.Tensor:
         # Centralised based
         observation_feed = tf.stack([x for x in observations_trans.values()], 2)
+
+        return observation_feed
+
+class StateBasedMAPPOTrainer(MAPPOTrainer):
+    """MAPPO trainer for a centralised architecture."""
+
+    def __init__(
+        self,
+        agents: List[Any],
+        agent_types: List[str],
+        observation_networks: Dict[str, snt.Module],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        dataset: tf.data.Dataset,
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
+        discount: float = 0.999,
+        lambda_gae: float = 1.0,
+        entropy_cost: float = 0.01,
+        baseline_cost: float = 0.5,
+        clipping_epsilon: float = 0.2,
+        max_gradient_norm: Optional[float] = None,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = False,
+        checkpoint_subpath: str = "Checkpoints",
+    ):
+
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            observation_networks=observation_networks,
+            dataset=dataset,
+            agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            discount=discount,
+            lambda_gae=lambda_gae,
+            entropy_cost=entropy_cost,
+            baseline_cost=baseline_cost,
+            clipping_epsilon=clipping_epsilon,
+            max_gradient_norm=max_gradient_norm,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+        )
+
+    def _get_critic_feed(
+        self,
+        observations_trans: Dict[str, np.ndarray],
+        extras: Dict[str, np.ndarray],
+        agent: str,
+    ) -> tf.Tensor:
+        # State based
+        observation_feed = extras["env_state"]
 
         return observation_feed

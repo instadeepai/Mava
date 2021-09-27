@@ -25,6 +25,7 @@ import reverb
 import sonnet as snt
 from acme import specs as acme_specs
 from acme.utils import counting, loggers
+from acme.tf import utils as tf2_utils
 
 import mava
 from mava import core
@@ -195,6 +196,11 @@ class MAPPO:
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
         self._checkpoint_minute_interval = checkpoint_minute_interval
 
+        if issubclass(executor_fn, execution.MAPPOFeedForwardExecutor):
+            extra_specs = self._get_extra_specs()
+        else:
+            extra_specs = {}
+
         self._builder = builder.MAPPOBuilder(
             config=builder.MAPPOConfig(
                 environment_spec=environment_spec,
@@ -218,7 +224,29 @@ class MAPPO:
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
+            extra_specs=extra_specs,
         )
+    
+    def _get_extra_specs(self) -> Any:
+        """helper to establish specs for extra information
+        Returns:
+            Dict[str, Any]: dictionary containing extra specs
+        """
+
+        agents = self._environment_spec.get_agent_ids()
+        core_state_specs = {}
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
+        )
+        for agent in agents:
+            agent_type = agent.split("_")[0]
+            core_state_specs[agent] = (
+                tf2_utils.squeeze_batch_dim(
+                    networks["policies"][agent_type].initial_state(1)
+                ),
+            )
+        return {"core_states": core_state_specs}
 
     def replay(self) -> Any:
         """Replay data storage.
