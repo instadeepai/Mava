@@ -297,8 +297,8 @@ class MAPPOTrainer(mava.Trainer):
             data.extras,
         )
 
-        if 'core_state' in extras: 
-            core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
+        if 'core_states' in extras: 
+            core_states = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
 
         # transform observation using observation networks
         observations_trans = self._transform_observations(observations)
@@ -334,28 +334,38 @@ class MAPPOTrainer(mava.Trainer):
                 critic_network = self._critic_networks[agent_key]
 
                 # Reshape inputs.
-                dims = actor_observation.shape[:2]
-                actor_observation = snt.merge_leading_dims(
-                    actor_observation, num_dims=2
-                )
-                critic_observation = snt.merge_leading_dims(
-                    critic_observation, num_dims=2
+                critic_observation, dims = train_utils.combine_dim(
+                    critic_observation
                 )
 
-                if 'core_state' in extras: 
+
+                if 'core_states' in extras: 
                     # Unroll current policy over actor_observation.
-                    (logits, values), _ = snt.static_unroll(self._actor_critic_network, actor_observation,
-                                              core_state)
+                    # policy, _ = snt.static_unroll(policy_network, actor_observation,
+                    #                           core_states)
+
+                    transposed_obs = tf2_utils.batch_to_sequence(actor_observation)
+                    outputs, updated_states = snt.static_unroll(
+                        policy_network,
+                        transposed_obs,
+                        core_states,
+                    )
+
+                    outputs = tf2_utils.batch_to_sequence(outputs)
+
+                    print("outputs: ", outputs)
+                    exit()
+
                     policy = tfd.Categorical(logits=logits[:-1])
                     policy_log_prob = policy.log_prob(actions)
                     # Entropy regulariser.
                     entropy_loss = trfl.policy_entropy_loss(policy).loss
                 else:
                     policy = policy_network(actor_observation)
-                    values = critic_network(critic_observation)
+                    
                     # Reshape the outputs.
                     policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
-                    values = tf.reshape(values, dims, name="value")
+                    
                     policy_log_prob = policy.log_prob(action)
 
                      # Entropy regularization. Only implemented for categorical dist.
@@ -363,6 +373,9 @@ class MAPPOTrainer(mava.Trainer):
                     entropy_loss = -self._entropy_cost * policy_entropy
                  # Compute importance sampling weights: current policy / behavior policy.
                 
+                values = critic_network(critic_observation)
+                values = tf.reshape(values, dims, name="value")
+
                 # Values along the sequence T.
                 bootstrap_value = values[-1]
                 state_values = values[:-1]
@@ -621,6 +634,6 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
         agent: str,
     ) -> tf.Tensor:
         # State based
-        observation_feed = extras["env_states"]
+        observation_feed = extras["env_states"][agent]
 
         return observation_feed
