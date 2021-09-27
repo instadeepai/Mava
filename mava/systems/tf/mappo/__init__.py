@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.systems.tf.mappo.execution import MAPPOFeedForwardExecutor
+from mava.systems.tf.mappo.execution import MAPPOFeedForwardExecutor, MAPPORecurrentExecutor
 from mava.systems.tf.mappo.networks import make_default_networks
 from mava.systems.tf.mappo.system import MAPPO
-from mava.systems.tf.mappo.training import CentralisedMAPPOTrainer, MAPPOTrainer
+from mava.systems.tf.mappo.training import CentralisedMAPPOTrainer, MAPPOTrainer, StateBasedMAPPOTrainer

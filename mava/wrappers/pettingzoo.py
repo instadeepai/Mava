@@ -23,7 +23,11 @@ import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from pettingzoo.utils.env import AECEnv, ParallelEnv
-from supersuit import black_death_v1
+
+try:
+    from supersuit import black_death_v1
+except ImportError:
+    black_death_v1 = None
 
 from mava import types
 from mava.utils.wrapper_utils import (

@@ -164,7 +164,7 @@ class MAPPOBuilder:
         """
 
         # Create system architecture with target networks.
-        adder_env_spec = self._builder.add_log_prob_to_spec(
+        adder_env_spec = self.add_log_prob_to_spec(
             environment_spec
         )
 
@@ -283,6 +283,7 @@ class MAPPOBuilder:
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
+        can_sample: Any,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
     ) -> core.Trainer:
@@ -314,6 +315,7 @@ class MAPPOBuilder:
         trainer = self._trainer_fn(
             agents=agents,
             agent_types=agent_types,
+            can_sample=can_sample,
             observation_networks=observation_networks,
             policy_networks=policy_networks,
             critic_networks=critic_networks,

@@ -57,7 +57,6 @@ class MAPPOFeedForwardExecutor(core.Executor):
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
         """
-
         # Store these for later use.
         self._adder = adder
         self._variable_client = variable_client
@@ -165,7 +164,6 @@ class MAPPOFeedForwardExecutor(core.Executor):
             extras (Dict[str, types.NestedArray], optional): possible extra information
                 to record during the first step. Defaults to {}.
         """
-
         if self._adder:
             self._adder.add_first(timestep)
 
@@ -205,7 +203,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         if self._variable_client:
             self._variable_client.update(wait)
 
-class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
+class MAPPORecurrentExecutor(executors.RecurrentExecutor):
     """A recurrent executor for MADDPG.
     An executor based on a recurrent policy for each agent in the system.
     """
@@ -228,7 +226,6 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
         """
-
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,
@@ -275,8 +272,8 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
 
         # Cast for compatibility with reverb.
         # sample() returns a 'int32', which is a problem.
-        if isinstance(policy, tfp.distributions.Categorical):
-            action = tf.cast(action, "int64")
+        # if isinstance(policy, tfp.distributions.Categorical):
+        #     action = tf.cast(action, "int64")
         
         return action, log_prob, new_state
 

@@ -48,6 +48,7 @@ class MAPPOTrainer(mava.Trainer):
         self,
         agents: List[Any],
         agent_types: List[str],
+        can_sample: Any,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
@@ -111,6 +112,9 @@ class MAPPOTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._checkpoint = checkpoint
+        
+        # Can sample
+        self._can_sample = can_sample
 
         # Store agent_net_keys.
         self._agent_net_keys = agent_net_keys
@@ -224,7 +228,7 @@ class MAPPOTrainer(mava.Trainer):
         return observation_feed
 
     def _transform_observations(
-        self, observation: Dict[str, np.ndarray]
+        self, observations: Dict[str, np.ndarray]
     ) -> Dict[str, np.ndarray]:
         """apply the observation networks to the raw observations from the dataset
 
@@ -239,12 +243,18 @@ class MAPPOTrainer(mava.Trainer):
         observation_trans = {}
         for agent in self._agents:
             agent_key = self._agent_net_keys[agent]
-            observation_trans[agent] = self._observation_networks[agent_key](
-                observation[agent].observation
+
+            reshaped_obs, dims = train_utils.combine_dim(
+                observations[agent].observation
+            )
+
+            observation_trans[agent] = train_utils.extract_dim(
+                self._observation_networks[agent_key](reshaped_obs), dims
             )
         return observation_trans
 
-    @tf.function
+    print("Add this back in. But this breaks the next(itter check) as and infinite number of pulls are allowed now. Fix it.")
+    # @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -279,7 +289,7 @@ class MAPPOTrainer(mava.Trainer):
         data = tf2_utils.batch_to_sequence(inputs.data)
 
         # Unpack input data as follows:
-        observations, actions, rewards, discounts, extras = (
+        observations, actions_data, rewards, discounts, extras = (
             data.observations,
             data.actions,
             data.rewards,
@@ -294,8 +304,8 @@ class MAPPOTrainer(mava.Trainer):
         observations_trans = self._transform_observations(observations)
 
         # Get log_probs.
-        actions  = actions["actions"]
-        behaviour_logits = actions["log_probs"]
+        actions  = {agent: actions_data[agent]["actions"] for agent in actions_data.keys()}
+        behaviour_logits  = {agent: actions_data[agent]["log_probs"] for agent in actions_data.keys()}
 
         # Store losses.
         policy_losses: Dict[str, Any] = {}
@@ -496,6 +506,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         self,
         agents: List[Any],
         agent_types: List[str],
+        can_sample: Any,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
@@ -519,6 +530,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
+            can_sample=can_sample,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             observation_networks=observation_networks,
@@ -557,6 +569,7 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
         self,
         agents: List[Any],
         agent_types: List[str],
+        can_sample: Any,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
@@ -580,6 +593,7 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
+            can_sample=can_sample,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             observation_networks=observation_networks,
@@ -607,6 +621,6 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
         agent: str,
     ) -> tf.Tensor:
         # State based
-        observation_feed = extras["env_state"]
+        observation_feed = extras["env_states"]
 
         return observation_feed

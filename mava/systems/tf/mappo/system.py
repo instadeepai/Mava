@@ -69,9 +69,9 @@ class MAPPO:
         baseline_cost: float = 0.5,
         max_gradient_norm: Optional[float] = None,
         max_queue_size: int = 100000,
-        batch_size: int = 256,
-        sequence_length: int = 10,
-        sequence_period: int = 5,
+        batch_size: int = 32,
+        sequence_length: int = 50,
+        sequence_period: int = 10,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -196,7 +196,7 @@ class MAPPO:
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
         self._checkpoint_minute_interval = checkpoint_minute_interval
 
-        if issubclass(executor_fn, execution.MAPPOFeedForwardExecutor):
+        if issubclass(executor_fn, execution.MAPPORecurrentExecutor):
             extra_specs = self._get_extra_specs()
         else:
             extra_specs = {}
@@ -240,10 +240,10 @@ class MAPPO:
             agent_net_keys=self._agent_net_keys,
         )
         for agent in agents:
-            agent_type = agent.split("_")[0]
+            net_keys = self._agent_net_keys[agent]
             core_state_specs[agent] = (
                 tf2_utils.squeeze_batch_dim(
-                    networks["policies"][agent_type].initial_state(1)
+                    networks["policies"][net_keys].initial_state(1)
                 ),
             )
         return {"core_states": core_state_specs}
@@ -327,7 +327,7 @@ class MAPPO:
         trainer_logger = self._logger_factory(  # type: ignore
             "trainer", **trainer_logger_config
         )
-
+        can_sample = None # lambda: replay.can_sample(self._builder._config.batch_size)
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
 
@@ -336,6 +336,7 @@ class MAPPO:
             dataset=dataset,
             counter=counter,
             logger=trainer_logger,
+            can_sample=can_sample,
         )
 
     def executor(

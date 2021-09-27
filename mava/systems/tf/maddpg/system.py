@@ -275,10 +275,10 @@ class MADDPG:
             agent_net_keys=self._agent_net_keys,
         )
         for agent in agents:
-            agent_type = agent.split("_")[0]
+            net_key = self._agent_net_keys[agent]
             core_state_specs[agent] = (
                 tf2_utils.squeeze_batch_dim(
-                    networks["policies"][agent_type].initial_state(1)
+                    networks["policies"][net_key].initial_state(1)
                 ),
             )
         return {"core_states": core_state_specs}
