@@ -183,6 +183,10 @@ class MAPPOFeedForwardExecutor(core.Executor):
                 information to record during the transition. Defaults to {}.
         """
 
+        raise NotImplementedError(
+            "Need to fix the FeedForward case to reflect the recurrent updates."
+        )
+
         if not self._adder:
             return
 
@@ -202,6 +206,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
 
         if self._variable_client:
             self._variable_client.update(wait)
+
 
 class MAPPORecurrentExecutor(executors.RecurrentExecutor):
     """A recurrent executor for MADDPG.
@@ -264,18 +269,18 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
         agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
-        policy, new_state = self._policy_networks[agent_key](batched_observation, state)
+        logits, new_state = self._policy_networks[agent_key](batched_observation, state)
 
         # Sample from the policy and compute the log likelihood.
-        action = policy.sample()
-        log_prob = policy.log_prob(action)
+        action = tfd.Categorical(logits).sample()
+        # action = tf2_utils.to_numpy_squeeze(action)
 
         # Cast for compatibility with reverb.
         # sample() returns a 'int32', which is a problem.
         # if isinstance(policy, tfp.distributions.Categorical):
         #     action = tf.cast(action, "int64")
-        
-        return action, log_prob, new_state
+
+        return action, logits, new_state
 
     def select_action(
         self, agent: str, observation: types.NestedArray

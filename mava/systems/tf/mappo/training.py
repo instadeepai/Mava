@@ -30,6 +30,7 @@ from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
 import mava
+from mava.adders.reverb.base import Trajectory
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 
@@ -58,7 +59,7 @@ class MAPPOTrainer(mava.Trainer):
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
         discount: float = 0.999,
-        lambda_gae: float = 1.0, # Question (dries): What is this used for?
+        lambda_gae: float = 1.0,  # Question (dries): What is this used for?
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
         clipping_epsilon: float = 0.2,
@@ -112,7 +113,7 @@ class MAPPOTrainer(mava.Trainer):
         self._agents = agents
         self._agent_types = agent_types
         self._checkpoint = checkpoint
-        
+
         # Can sample
         self._can_sample = can_sample
 
@@ -253,7 +254,9 @@ class MAPPOTrainer(mava.Trainer):
             )
         return observation_trans
 
-    print("Add this back in. But this breaks the next(itter check) as and infinite number of pulls are allowed now. Fix it.")
+    print(
+        "Add this back in. But this breaks the next(itter check) as and infinite number of pulls are allowed now. Fix it."
+    )
     # @tf.function
     def _step(
         self,
@@ -284,12 +287,11 @@ class MAPPOTrainer(mava.Trainer):
             inputs (Any): input data from the data table (transitions)
         """
 
-        # Convert to sequence data
-        # TODO(Kale-ab): Is this the recurrent trainer?
-        data = tf2_utils.batch_to_sequence(inputs.data)
+        data: Trajectory = inputs.data
 
         # Unpack input data as follows:
-        observations, actions_data, rewards, discounts, extras = (
+        data = tf2_utils.batch_to_sequence(inputs.data)
+        observations, actions, rewards, discounts, extras = (
             data.observations,
             data.actions,
             data.rewards,
@@ -297,15 +299,11 @@ class MAPPOTrainer(mava.Trainer):
             data.extras,
         )
 
-        if 'core_states' in extras: 
-            core_states = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
+        if "core_states" in extras:
+            core_states = tree.map_structure(lambda s: s[0], extras["core_states"])
 
         # transform observation using observation networks
         observations_trans = self._transform_observations(observations)
-
-        # Get log_probs.
-        actions  = {agent: actions_data[agent]["actions"] for agent in actions_data.keys()}
-        behaviour_logits  = {agent: actions_data[agent]["log_probs"] for agent in actions_data.keys()}
 
         # Store losses.
         policy_losses: Dict[str, Any] = {}
@@ -315,16 +313,19 @@ class MAPPOTrainer(mava.Trainer):
             for agent in self._agents:
 
                 action, reward, discount, behaviour_logits = (
-                    actions[agent],
+                    actions[agent]["actions"],
                     rewards[agent],
                     discounts[agent],
-                    behaviour_logits[agent],
+                    actions[agent]["logits"],
                 )
 
                 actor_observation = observations_trans[agent]
-                critic_observation = self._get_critic_feed(observations_trans, extras, agent)
+                critic_observation = self._get_critic_feed(
+                    observations_trans, extras, agent
+                )
 
                 # Chop off final timestep for bootstrapping value
+                action = action[:-1]
                 reward = reward[:-1]
                 discount = discount[:-1]
 
@@ -333,46 +334,32 @@ class MAPPOTrainer(mava.Trainer):
                 policy_network = self._policy_networks[agent_key]
                 critic_network = self._critic_networks[agent_key]
 
-                # Reshape inputs.
-                critic_observation, dims = train_utils.combine_dim(
-                    critic_observation
-                )
-
-
-                if 'core_states' in extras: 
+                if "core_states" in extras:
                     # Unroll current policy over actor_observation.
                     # policy, _ = snt.static_unroll(policy_network, actor_observation,
                     #                           core_states)
 
-                    transposed_obs = tf2_utils.batch_to_sequence(actor_observation)
-                    outputs, updated_states = snt.static_unroll(
+                    # transposed_obs = tf2_utils.batch_to_sequence(actor_observation)
+                    agent_core_state = core_states[agent][0]
+                    logits, updated_states = snt.static_unroll(
                         policy_network,
-                        transposed_obs,
-                        core_states,
+                        actor_observation,
+                        agent_core_state,
                     )
+                    # logits = tf2_utils.batch_to_sequence(logits)
 
-                    outputs = tf2_utils.batch_to_sequence(outputs)
-
-                    print("outputs: ", outputs)
-                    exit()
-
-                    policy = tfd.Categorical(logits=logits[:-1])
-                    policy_log_prob = policy.log_prob(actions)
-                    # Entropy regulariser.
-                    entropy_loss = trfl.policy_entropy_loss(policy).loss
                 else:
-                    policy = policy_network(actor_observation)
-                    
-                    # Reshape the outputs.
-                    policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
-                    
-                    policy_log_prob = policy.log_prob(action)
+                    logits = policy_network(actor_observation)
 
-                     # Entropy regularization. Only implemented for categorical dist.
-                    policy_entropy = tf.reduce_mean(policy.entropy())
-                    entropy_loss = -self._entropy_cost * policy_entropy
-                 # Compute importance sampling weights: current policy / behavior policy.
-                
+                    # Reshape the outputs.
+                    # policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
+
+                # Compute importance sampling weights: current policy / behavior policy.
+                pi_behaviour = tfd.Categorical(logits=behaviour_logits[:-1])
+                pi_target = tfd.Categorical(logits=logits[:-1])
+
+                # Calculate critic values.
+                critic_observation, dims = train_utils.combine_dim(critic_observation)
                 values = critic_network(critic_observation)
                 values = tf.reshape(values, dims, name="value")
 
@@ -384,7 +371,7 @@ class MAPPOTrainer(mava.Trainer):
                 td_loss, td_lambda_extra = trfl.td_lambda(
                     state_values=state_values,
                     rewards=reward,
-                    pcontinues=discount,
+                    pcontinues=discount,  # Question (dries): Why is self._discount not used. Why is discount not 0.0/1.0 but actually has discount values.
                     bootstrap_value=bootstrap_value,
                     lambda_=self._lambda_gae,
                     name="CriticLoss",
@@ -392,15 +379,13 @@ class MAPPOTrainer(mava.Trainer):
 
                 # Do not use the loss provided by td_lambda as they sum the losses over
                 # the sequence length rather than averaging them.
-                critic_loss = self._baseline_cost * tf.reduce_mean(
-                    tf.square(td_lambda_extra.temporal_differences), name="CriticLoss"
+                critic_loss = self._baseline_cost * tf.square(
+                    td_lambda_extra.temporal_differences
                 )
 
                 # Compute importance sampling weights: current policy / behavior policy.
-                behaviour_log_prob = tfd.Categorical(logits=behaviour_logits[:-1])
-                
-                log_rhos = policy_log_prob - behaviour_log_prob
-                importance_ratio = tf.exp(log_rhos)[:-1]
+                log_rhos = pi_target.log_prob(action) - pi_behaviour.log_prob(action)
+                importance_ratio = tf.exp(log_rhos)
                 clipped_importance_ratio = tf.clip_by_value(
                     importance_ratio,
                     1.0 - self._clipping_epsilon,
@@ -412,20 +397,23 @@ class MAPPOTrainer(mava.Trainer):
                 mean, variance = tf.nn.moments(gae, axes=[0, 1], keepdims=True)
                 normalized_gae = (gae - mean) / tf.sqrt(variance)
 
-                policy_gradient_loss = tf.reduce_mean(
-                    -tf.minimum(
-                        tf.multiply(importance_ratio, normalized_gae),
-                        tf.multiply(clipped_importance_ratio, normalized_gae),
-                    ),
+                policy_gradient_loss = -tf.minimum(
+                    tf.multiply(importance_ratio, normalized_gae),
+                    tf.multiply(clipped_importance_ratio, normalized_gae),
                     name="PolicyGradientLoss",
                 )
 
-                # Combine weighted sum of actor & entropy regularization. 
+                # Entropy regulariser.
+                entropy_loss = trfl.policy_entropy_loss(pi_target).loss
+
+                # Combine weighted sum of actor & entropy regularization.
                 policy_loss = policy_gradient_loss + entropy_loss
 
                 # Multiply by discounts to not train on padded data.
-                policy_losses[agent] = policy_loss*discount
-                critic_losses[agent] = critic_loss*discount
+                loss_mask = discount > 0.0
+                # TODO (dries): Is multiplication maybe better here? As assignment might not work with tf.function?
+                policy_losses[agent] = tf.reduce_mean(policy_loss[loss_mask])
+                critic_losses[agent] = tf.reduce_mean(critic_loss[loss_mask])
 
         self.policy_losses = policy_losses
         self.critic_losses = critic_losses
@@ -574,6 +562,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         observation_feed = tf.stack([x for x in observations_trans.values()], 2)
 
         return observation_feed
+
 
 class StateBasedMAPPOTrainer(MAPPOTrainer):
     """MAPPO trainer for a centralised architecture."""

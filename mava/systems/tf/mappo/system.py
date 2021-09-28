@@ -62,8 +62,8 @@ class MAPPO:
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=5e-4),
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-5),
-        discount: float = 0.99,
-        lambda_gae: float = 0.99,
+        discount: float = 0.999,
+        lambda_gae: float = 1.0,
         clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
@@ -226,7 +226,7 @@ class MAPPO:
             executor_fn=executor_fn,
             extra_specs=extra_specs,
         )
-    
+
     def _get_extra_specs(self) -> Any:
         """helper to establish specs for extra information
         Returns:
@@ -327,7 +327,7 @@ class MAPPO:
         trainer_logger = self._logger_factory(  # type: ignore
             "trainer", **trainer_logger_config
         )
-        can_sample = None # lambda: replay.can_sample(self._builder._config.batch_size)
+        can_sample = None  # lambda: replay.can_sample(self._builder._config.batch_size)
         dataset = self._builder.make_dataset_iterator(replay)
         counter = counting.Counter(counter, "trainer")
 

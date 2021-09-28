@@ -99,7 +99,7 @@ class MAPPOBuilder:
         config: MAPPOConfig,
         trainer_fn: Type[training.MAPPOTrainer] = training.MAPPOTrainer,
         executor_fn: Type[core.Executor] = execution.MAPPOFeedForwardExecutor,
-        extra_specs: Dict[str, Any] = {}
+        extra_specs: Dict[str, Any] = {},
     ):
         """Initialise the system.
 
@@ -121,7 +121,7 @@ class MAPPOBuilder:
         self._executor_fn = executor_fn
         self._extras_specs = extra_specs
 
-    def add_log_prob_to_spec(
+    def add_logits_to_spec(
         self, environment_spec: specs.MAEnvironmentSpec
     ) -> specs.MAEnvironmentSpec:
         """convert discrete action space to bounded continuous action space
@@ -137,9 +137,11 @@ class MAPPOBuilder:
         for key in keys:
             agent_spec = env_adder_spec._specs[key]
             new_act_spec = {"actions": agent_spec.actions}
-            
-            # Make dummy log_probs
-            new_act_spec["log_probs"] = tf2_utils.squeeze_batch_dim(tf.ones(shape=(1,), dtype=tf.float32))      
+
+            # Make dummy logits
+            new_act_spec["logits"] = tf.ones(
+                shape=(agent_spec.actions.num_values), dtype=tf.float32
+            )
 
             env_adder_spec._specs[key] = EnvironmentSpec(
                 observations=agent_spec.observations,
@@ -164,9 +166,7 @@ class MAPPOBuilder:
         """
 
         # Create system architecture with target networks.
-        adder_env_spec = self.add_log_prob_to_spec(
-            environment_spec
-        )
+        adder_env_spec = self.add_logits_to_spec(environment_spec)
 
         replay_table = reverb.Table.queue(
             name=self._config.replay_table_name,

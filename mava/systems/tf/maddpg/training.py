@@ -1146,8 +1146,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         for agent in self._agents:
             agent_key = self._agent_net_keys[agent]
 
-            print("Observation: ", observations[agent].observation)
-            exit()
             reshaped_obs, dims = train_utils.combine_dim(
                 observations[agent].observation
             )
