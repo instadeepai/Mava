@@ -885,8 +885,8 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # State based
-        o_tm1_feed = e_tm1["s_t"]
-        o_t_feed = e_t["s_t"]
+        o_tm1_feed = e_tm1["env_states"]
+        o_t_feed = e_t["env_states"]
         a_tm1_feed = tf.stack([a_tm1[agent] for agent in self._agents], 1)
         a_t_feed = tf.stack([a_t[agent] for agent in self._agents], 1)
 
@@ -1744,8 +1744,8 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
         # State based
-        obs_trans_feed = extras["s_t"]
-        target_obs_trans_feed = extras["s_t"]
+        obs_trans_feed = extras["env_states"]
+        target_obs_trans_feed = extras["env_states"]
         actions_feed = tf.stack([actions[agent] for agent in self._agents], -1)
         target_actions_feed = tf.stack(
             [target_actions[agent] for agent in self._agents], -1

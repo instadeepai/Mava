@@ -278,7 +278,7 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
         # Cast for compatibility with reverb.
         # sample() returns a 'int32', which is a problem.
         # if isinstance(policy, tfp.distributions.Categorical):
-        #     action = tf.cast(action, "int64")
+        action = tf.cast(action, "int64")
 
         return action, logits, new_state
 

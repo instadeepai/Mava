@@ -24,8 +24,8 @@ import launchpad as lp
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
-from acme.utils import counting, loggers
 from acme.tf import utils as tf2_utils
+from acme.utils import counting, loggers
 
 import mava
 from mava import core
@@ -303,7 +303,6 @@ class MAPPO:
         Returns:
             mava.core.Trainer: system trainer.
         """
-
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
             environment_spec=self._environment_spec,

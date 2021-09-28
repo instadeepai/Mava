@@ -18,13 +18,13 @@
 import copy
 import os
 import time
-import tree
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tree
 import trfl
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
@@ -254,10 +254,7 @@ class MAPPOTrainer(mava.Trainer):
             )
         return observation_trans
 
-    print(
-        "Add this back in. But this breaks the next(itter check) as and infinite number of pulls are allowed now. Fix it."
-    )
-    # @tf.function
+    # Warning (dries): Do not place a tf.function here. It breaks the itterator.
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -269,18 +266,20 @@ class MAPPOTrainer(mava.Trainer):
 
         # Get data from replay.
         inputs = next(self._iterator)
+        self.forward_backward(inputs)
 
-        self._forward(inputs)
-
-        self._backward()
-
+    @tf.function
+    def forward_backward(self, inputs: Any):
+        self._forward_pass(inputs)
+        self._backward_pass()
         # Log losses per agent
         return train_utils.map_losses_per_agent_ac(
             self.critic_losses, self.policy_losses
         )
 
     # Forward pass that calculates loss.
-    def _forward(self, inputs: Any) -> None:
+    # This name is changed from _backward to make sure the trainer wrappers are not overwriting the _step function.
+    def _forward_pass(self, inputs: Any) -> None:
         """Trainer forward pass
 
         Args:
@@ -420,7 +419,8 @@ class MAPPOTrainer(mava.Trainer):
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
-    def _backward(self) -> None:
+    # This name is changed from _backward to make sure the trainer wrappers are not overwriting the _step function.
+    def _backward_pass(self) -> None:
         """Trainer backward pass updating network parameters"""
 
         # Calculate the gradients and update the networks
@@ -623,6 +623,7 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
         agent: str,
     ) -> tf.Tensor:
         # State based
-        observation_feed = extras["env_states"][agent]
-
-        return observation_feed
+        if type(extras["env_states"]) == dict:
+            return extras["env_states"][agent]
+        else:
+            return extras["env_states"]

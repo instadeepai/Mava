@@ -63,7 +63,7 @@ class MonotonicMixing(BaseMixingModule):
     def _create_mixing_layer(self, name: str = "mixing") -> snt.Module:
         """Modify and return system architecture given mixing structure."""
         state_specs = self._environment_spec.get_extra_specs()
-        state_specs = state_specs["s_t"]
+        state_specs = state_specs["env_states"]
 
         q_value_dim = tf.TensorSpec(self._n_agents)
 

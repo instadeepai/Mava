@@ -24,6 +24,7 @@ from dm_env import specs
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
+from mava.utils.enums import ArchitectureType
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
@@ -40,6 +41,7 @@ def make_default_networks(
         256,
     ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
+    archecture_type=ArchitectureType.feedforward,
     seed: Optional[int] = None,
 ) -> Dict[str, snt.Module]:
     """Default networks for mappo.
@@ -67,6 +69,21 @@ def make_default_networks(
     specs = environment_spec.get_agent_specs()
     specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
 
+    # Set Policy function and layer size
+    # Default size per arch type.
+    if archecture_type == ArchitectureType.feedforward:
+        if not policy_networks_layer_sizes:
+            policy_networks_layer_sizes = (
+                256,
+                256,
+                256,
+            )
+        policy_network_func = snt.Sequential
+    elif archecture_type == ArchitectureType.recurrent:
+        if not policy_networks_layer_sizes:
+            policy_networks_layer_sizes = (128, 128)
+        policy_network_func = snt.DeepRNN
+
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
             key: policy_networks_layer_sizes for key in specs.keys()
@@ -87,20 +104,36 @@ def make_default_networks(
         # Note: The discrete case must be placed first as it inherits from BoundedArray.
         if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discrete
             num_actions = specs[key].actions.num_values
-            policy_network = snt.Sequential(
-                [
+
+            if archecture_type == ArchitectureType.feedforward:
+                policy_layers = [
                     networks.LayerNormMLP(
                         tuple(policy_networks_layer_sizes[key]) + (num_actions,),
                         activate_final=False,
                         seed=seed,
                     ),
-                    tf.keras.layers.Lambda(
-                        lambda logits: tfp.distributions.Categorical(logits=logits)
+                ]
+            elif archecture_type == ArchitectureType.recurrent:
+                policy_layers = [
+                    networks.LayerNormMLP(
+                        policy_networks_layer_sizes[key][:-1],
+                        activate_final=True,
+                        seed=seed,
+                    ),
+                    snt.LSTM(policy_networks_layer_sizes[key][-1]),
+                    networks.LayerNormMLP(
+                        (num_actions,),
+                        activate_final=False,
+                        seed=seed,
                     ),
                 ]
-            )
+
+            policy_network = policy_network_func(policy_layers)
+
         elif isinstance(specs[key].actions, dm_env.specs.BoundedArray):  # continuous
             num_actions = np.prod(specs[key].actions.shape, dtype=int)
+            # No recurrent setting implemented yet.
+            assert archecture_type == ArchitectureType.feedforward
             policy_network = snt.Sequential(
                 [
                     networks.LayerNormMLP(

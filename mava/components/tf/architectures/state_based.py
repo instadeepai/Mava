@@ -24,9 +24,9 @@ from acme import specs as acme_specs
 
 from mava import specs as mava_specs
 from mava.components.tf.architectures.decentralised import (
-    DecentralisedValueActorCritic,
     DecentralisedPolicyActor,
     DecentralisedQValueActorCritic,
+    DecentralisedValueActorCritic,
 )
 
 
@@ -56,7 +56,7 @@ class StateBasedPolicyActor(DecentralisedPolicyActor):
         agents_by_type = self._env_spec.get_agents_by_type()
 
         for agent_type, agents in agents_by_type.items():
-            actor_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
+            actor_state_shape = self._env_spec.get_extra_specs()["env_states"].shape
             obs_specs_per_type[agent_type] = tf.TensorSpec(
                 shape=actor_state_shape,
                 dtype=tf.dtypes.float32,
@@ -99,7 +99,7 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
 
         # Create one critic per agent. Each critic gets
         # absolute state information of the environment.
-        critic_state_shape = self._env_spec.get_extra_specs()["s_t"].shape
+        critic_state_shape = self._env_spec.get_extra_specs()["env_states"].shape
         critic_obs_spec = tf.TensorSpec(
             shape=critic_state_shape,
             dtype=tf.dtypes.float32,
@@ -148,9 +148,8 @@ class StateBasedQValueActorCritic(  # type: ignore
             agent_net_keys=agent_net_keys,
         )
 
-class StateBasedValueActorCritic(  # type: ignore
-    DecentralisedValueActorCritic
-):
+
+class StateBasedValueActorCritic(DecentralisedValueActorCritic):  # type: ignore
     """Multi-agent actor critic architecture where both actor policies
     and critics use environment state information"""
 
@@ -170,14 +169,19 @@ class StateBasedValueActorCritic(  # type: ignore
             critic_networks=critic_networks,
             agent_net_keys=agent_net_keys,
         )
+
     def _get_critic_specs(
         self,
     ) -> Tuple[Dict[str, acme_specs.Array], Dict[str, acme_specs.Array]]:
         # Create one critic per agent. Each critic gets
         # absolute state information of the environment.
-        critic_env_state_spec = list(
-            self._env_spec.get_extra_specs()["env_states"].values()
-        )[0]
+
+        critic_env_state_spec = self._env_spec.get_extra_specs()["env_states"]
+        if type(critic_env_state_spec) == dict:
+            critic_env_state_spec = list(critic_env_state_spec.values())[0]
+
+        if type(critic_env_state_spec) != list:
+            critic_env_state_spec = [critic_env_state_spec]
 
         critic_obs_spec = []
         for spec in critic_env_state_spec:

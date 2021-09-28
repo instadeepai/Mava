@@ -239,8 +239,8 @@ class QMIXTrainer(MADQNTrainer):
             trans.next_extras,
         )
 
-        s_tm1 = e_tm1["s_t"]
-        s_t = e_t["s_t"]
+        s_tm1 = e_tm1["env_states"]
+        s_t = e_t["env_states"]
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:

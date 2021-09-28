@@ -15,16 +15,16 @@
 
 """MAPPO system builder implementation."""
 
-import dataclasses
 import copy
-from typing import Dict, Iterator, List, Optional, Type, Union, Any
-import tensorflow as tf
+import dataclasses
+from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import reverb
 import sonnet as snt
-from acme.tf import utils as tf2_utils
+import tensorflow as tf
 from acme import datasets
 from acme.specs import EnvironmentSpec
+from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils
 from acme.utils import counting
 
@@ -198,10 +198,19 @@ class MAPPOBuilder:
         """
 
         # Create tensorflow dataset to interface with reverb
-        dataset = datasets.make_reverb_dataset(
+        # dataset = datasets.make_reverb_dataset(
+        #     server_address=replay_client.server_address,
+        #     batch_size=self._config.batch_size,
+        # )
+
+        dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=replay_client.server_address,
-            batch_size=self._config.batch_size,
-        )
+            table=self._config.replay_table_name,
+            max_in_flight_samples_per_worker=1,
+        ).batch(
+            self._config.batch_size, drop_remainder=True
+        )  # .prefetch(self._config.prefetch_size)
+        # .as_numpy_iterator()
 
         return iter(dataset)
 

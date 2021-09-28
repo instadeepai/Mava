@@ -120,7 +120,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         # dm_env timestep
         timestep = parameterized_restart(rewards, self._discounts, observations)
 
-        return timestep, {"s_t": state}
+        return timestep, {"env_states": state}
 
     def step(self, actions: Dict[str, np.ndarray]) -> Tuple[dm_env.TimeStep, np.array]:
         """Returns observations from ready agents.
@@ -189,7 +189,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
         self.reward = rewards
 
-        return timestep, {"s_t": state}
+        return timestep, {"env_states": state}
 
     def env_done(self) -> bool:
         """
@@ -247,7 +247,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         state = self._environment.get_state()
         # TODO (dries): What should the real bounds be of the state spec?
         return {
-            "s_t": specs.BoundedArray(
+            "env_states": specs.BoundedArray(
                 state.shape, np.float32, minimum=float("-inf"), maximum=float("inf")
             )
         }
