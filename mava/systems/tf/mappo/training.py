@@ -266,7 +266,9 @@ class MAPPOTrainer(mava.Trainer):
 
         # Get data from replay.
         inputs = next(self._iterator)
-        self.forward_backward(inputs)
+
+        # Do a forward and backwards pass using tf.function.
+        return self.forward_backward(inputs)
 
     @tf.function
     def forward_backward(self, inputs: Any):
@@ -310,15 +312,14 @@ class MAPPOTrainer(mava.Trainer):
 
         with tf.GradientTape(persistent=True) as tape:
             for agent in self._agents:
-
-                action, reward, discount, behaviour_logits = (
+                action, reward, discount, behaviour_logits, actor_observation = (
                     actions[agent]["actions"],
                     rewards[agent],
                     discounts[agent],
                     actions[agent]["logits"],
+                    observations_trans[agent],
                 )
 
-                actor_observation = observations_trans[agent]
                 critic_observation = self._get_critic_feed(
                     observations_trans, extras, agent
                 )
@@ -359,8 +360,7 @@ class MAPPOTrainer(mava.Trainer):
 
                 # Calculate critic values.
                 critic_observation, dims = train_utils.combine_dim(critic_observation)
-                values = critic_network(critic_observation)
-                values = tf.reshape(values, dims, name="value")
+                values = tf.reshape(critic_network(critic_observation), dims)
 
                 # Values along the sequence T.
                 bootstrap_value = values[-1]
@@ -393,12 +393,14 @@ class MAPPOTrainer(mava.Trainer):
 
                 # Generalized Advantage Estimation
                 gae = tf.stop_gradient(td_lambda_extra.temporal_differences)
-                mean, variance = tf.nn.moments(gae, axes=[0, 1], keepdims=True)
-                normalized_gae = (gae - mean) / tf.sqrt(variance)
+
+                # Note (dries): Maybe add this in again? But this might be breaking training.
+                # mean, variance = tf.nn.moments(gae, axes=[0, 1], keepdims=True)
+                # normalized_gae = (gae - mean) / tf.sqrt(variance)
 
                 policy_gradient_loss = -tf.minimum(
-                    tf.multiply(importance_ratio, normalized_gae),
-                    tf.multiply(clipped_importance_ratio, normalized_gae),
+                    tf.multiply(importance_ratio, gae),
+                    tf.multiply(clipped_importance_ratio, gae),
                     name="PolicyGradientLoss",
                 )
 

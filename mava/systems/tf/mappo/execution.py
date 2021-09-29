@@ -304,7 +304,7 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
             self._states[agent] = self._policy_networks[agent_key].initia_state(1)
 
         # Step the recurrent policy forward given the current observation and state.
-        action, log_prob, new_state = self._policy(
+        action, logits, new_state = self._policy(
             agent, observation.observation, self._states[agent]
         )
 
@@ -313,8 +313,8 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
 
         # Return a numpy array with squeezed out batch dimension.
         action = tf2_utils.to_numpy_squeeze(action)
-        log_prob = tf2_utils.to_numpy_squeeze(log_prob)
-        return action, log_prob
+        logits = tf2_utils.to_numpy_squeeze(logits)
+        return action, logits
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
@@ -330,6 +330,7 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
                 actions and policies for all agents in the system.
         """
 
+        # TODO (dries): Add this to a function and add tf.function here.
         actions = {}
         log_probs = {}
         for agent, observation in observations.items():
