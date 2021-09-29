@@ -47,8 +47,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-print("Dries change this back to ~/mava.")
-flags.DEFINE_string("base_dir", "/home/mava_logs", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
