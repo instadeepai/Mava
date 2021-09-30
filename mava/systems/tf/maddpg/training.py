@@ -492,6 +492,8 @@ class MADDPGBaseTrainer(mava.Trainer):
         elapsed_time = timestamp - self._timestamp if self._timestamp else 0
         self._timestamp = timestamp
 
+        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
+
         # Update our counts and record it.
         # TODO (dries): Can this be simplified? Only one set and one get?
         self._variable_client.add_async(
@@ -501,8 +503,6 @@ class MADDPGBaseTrainer(mava.Trainer):
 
         # Update the variable source and the trainer
         self._variable_client.set_and_get_async()
-
-        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
 
         # Checkpoint and attempt to write the logs.
         if self._checkpoint:
@@ -1183,7 +1183,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
+        inputs: reverb.ReplaySample = next(self._iterator)
 
         self._forward(inputs)
 
@@ -1391,6 +1391,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         elapsed_time = timestamp - self._timestamp if self._timestamp else 0
         self._timestamp = timestamp
 
+        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
+
         # Update our counts and record it.
         # TODO (dries): Can this be simplified? Only one set and one get?
         self._variable_client.add_async(
@@ -1400,8 +1402,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
         # Update the variable source and the trainer
         self._variable_client.set_and_get_async()
-
-        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
 
         # Checkpoint and attempt to write the logs.
         if self._checkpoint:
