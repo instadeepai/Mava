@@ -192,6 +192,10 @@ class StateBasedValueActorCritic(DecentralisedValueActorCritic):  # type: ignore
                 )
             )
 
+        # TODO (dries): Fix this
+        assert len(critic_obs_spec) == 1
+        critic_obs_spec = critic_obs_spec[0]
+
         critic_obs_specs = {}
         for agent_key in self._agents:
             # Get observation spec for critic.

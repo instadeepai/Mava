@@ -270,7 +270,8 @@ class MAPPOTrainer(mava.Trainer):
         # Do a forward and backwards pass using tf.function.
         return self.forward_backward(inputs)
 
-    @tf.function
+    print("Add this tf.function in again!")
+    # @tf.function
     def forward_backward(self, inputs: Any):
         self._forward_pass(inputs)
         self._backward_pass()
@@ -336,32 +337,33 @@ class MAPPOTrainer(mava.Trainer):
 
                 if "core_states" in extras:
                     # Unroll current policy over actor_observation.
-                    # policy, _ = snt.static_unroll(policy_network, actor_observation,
-                    #                           core_states)
-
-                    # transposed_obs = tf2_utils.batch_to_sequence(actor_observation)
                     agent_core_state = core_states[agent][0]
+                    # Question (dries): Maybe we can save training time by
+                    # only unroll the LSTM part and doing a batch forward
+                    # pass for the feedforward part of the policy?
                     logits, updated_states = snt.static_unroll(
                         policy_network,
                         actor_observation,
                         agent_core_state,
                     )
-                    # logits = tf2_utils.batch_to_sequence(logits)
-
                 else:
-                    logits = policy_network(actor_observation)
-
-                    # Reshape the outputs.
-                    # policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
+                    # Pass observations through the feedforward policy
+                    actor_observation, dims = train_utils.combine_dim(actor_observation)
+                    logits = train_utils.extract_dim(
+                        policy_network(actor_observation), dims
+                    )
 
                 # Compute importance sampling weights: current policy / behavior policy.
                 pi_behaviour = tfd.Categorical(logits=behaviour_logits[:-1])
                 pi_target = tfd.Categorical(logits=logits[:-1])
 
                 # Calculate critic values.
-                critic_observation, dims = train_utils.combine_dim(critic_observation)
-                values = tf.reshape(critic_network(critic_observation), dims)
-
+                dims = critic_observation.shape[:2]
+                critic_observation = tf.reshape(
+                    critic_observation, (dims[0] * dims[1], -1)
+                )
+                critic_output = critic_network(critic_observation)
+                values = tf.reshape(critic_output, dims)
                 # Values along the sequence T.
                 bootstrap_value = values[-1]
                 state_values = values[:-1]
@@ -413,8 +415,10 @@ class MAPPOTrainer(mava.Trainer):
                 # Multiply by discounts to not train on padded data.
                 loss_mask = discount > 0.0
                 # TODO (dries): Is multiplication maybe better here? As assignment might not work with tf.function?
-                policy_losses[agent] = tf.reduce_mean(policy_loss[loss_mask])
-                critic_losses[agent] = tf.reduce_mean(critic_loss[loss_mask])
+                pol_loss = policy_loss[loss_mask]
+                crit_loss = critic_loss[loss_mask]
+                policy_losses[agent] = tf.reduce_mean(pol_loss)
+                critic_losses[agent] = tf.reduce_mean(crit_loss)
 
         self.policy_losses = policy_losses
         self.critic_losses = critic_losses

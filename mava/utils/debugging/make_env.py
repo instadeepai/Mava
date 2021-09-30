@@ -22,7 +22,11 @@ from .environment import MultiAgentEnv
 
 
 def make_debugging_env(
-    scenario_name: str, action_space: Space, num_agents: int, seed: Optional[int] = None
+    scenario_name: str,
+    action_space: Space,
+    num_agents: int,
+    recurrent_test: bool,
+    seed: Optional[int] = None,
 ) -> MultiAgentEnv:
     """
     Creates a MultiAgentEnv object as env. This can be used similar to a gym
@@ -40,7 +44,7 @@ def make_debugging_env(
     """
 
     # load scenario from script
-    scenario = scenarios.load(scenario_name).Scenario()
+    scenario = scenarios.load(scenario_name).Scenario(recurrent_test=recurrent_test)
     if seed:
         scenario.seed(seed)
 

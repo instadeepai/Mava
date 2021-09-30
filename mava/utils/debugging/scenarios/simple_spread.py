@@ -24,9 +24,10 @@ from mava.utils.debugging.scenario import BaseScenario
 
 
 class Scenario(BaseScenario):
-    def __init__(self) -> None:
+    def __init__(self, recurrent_test) -> None:
         super().__init__()
         self.np_rnd = np.random.RandomState()
+        self.recurrent_test = recurrent_test
 
     def make_world(self, num_agents: int) -> World:
         world = World()
@@ -102,7 +103,11 @@ class Scenario(BaseScenario):
 
     def observation(self, agent: Agent, a_i: int, world: World) -> np.array:
         # get the position of the agent's target landmark
-        target_landmark = world.landmarks[a_i].state.p_pos - agent.state.p_pos
+        if world.current_step < 5 or not self.recurrent_test:
+            target_landmark = world.landmarks[a_i].state.p_pos - agent.state.p_pos
+        else:
+            # Only provide the target landmark initially if testing agent memory.
+            target_landmark = [0.0, 0.0]
 
         # Get the other agent and landmark positions
         other_agents_pos = []
@@ -111,10 +116,14 @@ class Scenario(BaseScenario):
             if other_agent is agent:
                 continue
             other_agents_pos.append(other_agent.state.p_pos - agent.state.p_pos)
-            other_landmarks_pos.append(
-                world.landmarks[i].state.p_pos - agent.state.p_pos
-            )
 
+            if world.current_step == 0 or not self.recurrent_test:
+                other_landmarks_pos.append(
+                    world.landmarks[i].state.p_pos - agent.state.p_pos
+                )
+            else:
+                # Only provide the target landmark initially if testing agent memory.
+                other_landmarks_pos.append([0.0, 0.0])
         return np.concatenate(
             [agent.state.p_vel]
             + [agent.state.p_pos]
