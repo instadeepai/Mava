@@ -70,7 +70,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -102,8 +101,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 network.
             variable_client: The client used to manage the variables.
             counts: step counter object.
-            num_steps: Use to track the number of steps before the target networks
-                are updated.
             agent_net_keys: specifies what network each agent uses.
             max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied.
@@ -130,7 +127,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             target_observation_networks=target_observation_networks,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             agent_net_keys=agent_net_keys,
             max_gradient_norm=max_gradient_norm,
             logger=logger,
@@ -247,7 +243,6 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -274,7 +269,6 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
 
@@ -300,7 +294,6 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -327,7 +320,6 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
 
@@ -353,7 +345,6 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -380,7 +371,6 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
 
@@ -409,7 +399,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -443,8 +432,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 network.
             variable_client: The client used to manage the variables.
             counts: step counter object.
-            num_steps: Use to track the number of steps before the target networks
-                are updated.
             agent_net_keys: specifies what network each agent uses.
             max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied.
@@ -473,7 +460,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -641,7 +627,6 @@ class MAD4PGDecentralisedRecurrentTrainer(
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -669,7 +654,6 @@ class MAD4PGDecentralisedRecurrentTrainer(
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -698,7 +682,6 @@ class MAD4PGCentralisedRecurrentTrainer(
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -726,7 +709,6 @@ class MAD4PGCentralisedRecurrentTrainer(
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -755,7 +737,6 @@ class MAD4PGStateBasedRecurrentTrainer(
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -783,6 +764,5 @@ class MAD4PGStateBasedRecurrentTrainer(
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
