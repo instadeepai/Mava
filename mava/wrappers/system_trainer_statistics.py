@@ -160,7 +160,6 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
     def step(self) -> None:
         # Run the learning step.
         fetches = self._step()
-
         if self._require_loggers:
             self._create_loggers(list(fetches.keys()))
             self._require_loggers = False
@@ -174,13 +173,12 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
         self._timestamp: float = timestamp
 
         # Update our counts and record it.
-        print("self._counts: ", self._counts)
-        exit()
         self._variable_client.add_async(
             ["trainer_steps", "trainer_walltime"],
             {"trainer_steps": 1, "trainer_walltime": elapsed_time},
         )
-        # Update the variable source and the trainer
+
+        # Set and get the latest variables
         self._variable_client.set_and_get_async()
 
         fetches.update(self._counts)

@@ -66,7 +66,6 @@ class MADDPGBaseTrainer(mava.Trainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -98,8 +97,6 @@ class MADDPGBaseTrainer(mava.Trainer):
                 network.
             variable_client: The client used to manage the variables.
             counts: step counter object.
-            num_steps: Use to track the number of steps before the target networks
-                are updated.
             agent_net_keys: specifies what network each agent uses.
             max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied.
@@ -142,7 +139,7 @@ class MADDPGBaseTrainer(mava.Trainer):
             self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
-        self._num_steps = num_steps
+        self._num_steps = 0
         self._target_averaging = target_averaging
         self._target_update_period = target_update_period
         self._target_update_rate = target_update_rate
@@ -220,7 +217,7 @@ class MADDPGBaseTrainer(mava.Trainer):
                 if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                     for src, dest in zip(online_variables, target_variables):
                         dest.assign(src)
-        self._num_steps.assign_add(1)
+        self._num_steps += 1
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         """Depreciated method."""
@@ -534,7 +531,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -561,7 +557,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
 
@@ -587,7 +582,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -614,7 +608,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
     def _get_critic_feed(
@@ -680,7 +673,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -707,7 +699,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
         self._connection_spec = connection_spec
 
@@ -790,7 +781,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -817,7 +807,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
     def _get_critic_feed(
@@ -885,7 +874,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -918,8 +906,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 network.
             variable_client: The client used to manage the variables.
             counts: step counter object.
-            num_steps: Use to track the number of steps before the target networks
-                are updated.
             agent_net_keys: specifies what network each agent uses.
             max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied.
@@ -963,7 +949,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
-        self._num_steps = num_steps
+        self._num_steps = 0
         self._target_averaging = target_averaging
         self._target_update_period = target_update_period
         self._target_update_rate = target_update_rate
@@ -1042,7 +1028,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                     for src, dest in zip(online_variables, target_variables):
                         dest.assign(src)
-        self._num_steps.assign_add(1)
+        self._num_steps += 1
 
     def _transform_observations(
         self, observations: Dict[str, np.ndarray]
@@ -1177,7 +1163,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         Returns:
             losses
         """
-
         # Update the target networks
         self._update_target_networks()
 
@@ -1454,7 +1439,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -1482,7 +1466,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -1512,7 +1495,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -1540,7 +1522,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -1610,7 +1591,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -1638,7 +1618,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 

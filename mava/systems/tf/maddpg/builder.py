@@ -533,8 +533,6 @@ class MADDPGBuilder:
                     get_keys.append(f"{net_key}_{net_type_key}")
 
         variables = self.create_counter_variables(variables)
-        num_steps = variables["trainer_steps"]
-
         count_names = [
             "trainer_steps",
             "trainer_walltime",
@@ -583,7 +581,6 @@ class MADDPGBuilder:
             "variable_client": variable_client,
             "dataset": dataset,
             "counts": counts,
-            "num_steps": num_steps,
             "logger": logger,
         }
         if connection_spec:
