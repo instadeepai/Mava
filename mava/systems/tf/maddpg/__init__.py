@@ -29,4 +29,5 @@ from mava.systems.tf.maddpg.training import (
     MADDPGNetworkedTrainer,
     MADDPGStateBasedRecurrentTrainer,
     MADDPGStateBasedTrainer,
+    MADDPGStateBasedDecentralActionRecurrentTrainer
 )

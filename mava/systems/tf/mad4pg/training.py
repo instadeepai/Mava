@@ -38,6 +38,7 @@ from mava.systems.tf.maddpg.training import (
     MADDPGDecentralisedTrainer,
     MADDPGStateBasedRecurrentTrainer,
     MADDPGStateBasedTrainer,
+    MADDPGStateBasedDecentralActionRecurrentTrainer,
 )
 from mava.utils import training_utils as train_utils
 
@@ -755,6 +756,64 @@ class MAD4PGCentralisedRecurrentTrainer(
 
 class MAD4PGStateBasedRecurrentTrainer(
     MAD4PGBaseRecurrentTrainer, MADDPGStateBasedRecurrentTrainer
+):
+    """Recurrent MAD4PG trainer for a state-based architecture."""
+
+    def __init__(
+        self,
+        agents: List[str],
+        agent_types: List[str],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        target_policy_networks: Dict[str, snt.Module],
+        target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: snt.Optimizer,
+        discount: float,
+        target_averaging: bool,
+        target_update_period: int,
+        target_update_rate: float,
+        dataset: tf.data.Dataset,
+        observation_networks: Dict[str, snt.Module],
+        target_observation_networks: Dict[str, snt.Module],
+        agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
+        max_gradient_norm: float = None,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
+        bootstrap_n: int = 10,
+    ):
+
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            target_policy_networks=target_policy_networks,
+            target_critic_networks=target_critic_networks,
+            discount=discount,
+            target_averaging=target_averaging,
+            target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
+            dataset=dataset,
+            observation_networks=observation_networks,
+            target_observation_networks=target_observation_networks,
+            agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            max_gradient_norm=max_gradient_norm,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+            bootstrap_n=bootstrap_n,
+        )
+
+class MAD4PGStateBasedDecentralActionRecurrentTrainer(
+    MAD4PGBaseRecurrentTrainer, MADDPGStateBasedDecentralActionRecurrentTrainer
 ):
     """Recurrent MAD4PG trainer for a state-based architecture."""
 

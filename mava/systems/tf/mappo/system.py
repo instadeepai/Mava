@@ -70,7 +70,7 @@ class MAPPO:
         max_gradient_norm: Optional[float] = None,
         max_queue_size: int = 100000,
         batch_size: int = 32,
-        sequence_length: int = 50,
+        sequence_length: int = 20,
         sequence_period: int = 10,
         max_executor_steps: int = None,
         checkpoint: bool = True,

@@ -1123,7 +1123,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                     for src, dest in zip(online_variables, target_variables):
                         dest.assign(src)
-            self._num_steps.assign_add(1)
+        self._num_steps.assign_add(1)
 
     def _transform_observations(
         self, observations: Dict[str, np.ndarray]
@@ -1746,6 +1746,11 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         # State based
         obs_trans_feed = extras["env_states"]
         target_obs_trans_feed = extras["env_states"]
+        if type(obs_trans_feed) == dict:
+            obs_trans_feed = obs_trans_feed[agent]
+            target_obs_trans_feed = target_obs_trans_feed[agent]
+
+        
         actions_feed = tf.stack([actions[agent] for agent in self._agents], -1)
         target_actions_feed = tf.stack(
             [target_actions[agent] for agent in self._agents], -1
@@ -1769,4 +1774,89 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dpg_actions_feed = tf.squeeze(
             tf.stack([dpg_actions_feed[agent] for agent in self._agents], -1)
         )
+        return dpg_actions_feed
+
+class MADDPGStateBasedDecentralActionRecurrentTrainer(MADDPGBaseRecurrentTrainer):
+    """Recurrent MADDPG trainer for a state-based architecture.
+    This is the trainer component of a MADDPG system. IE it takes a dataset as input
+    and implements update functionality to learn from this dataset.
+    """
+
+    def __init__(
+        self,
+        agents: List[str],
+        agent_types: List[str],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        target_policy_networks: Dict[str, snt.Module],
+        target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: snt.Optimizer,
+        discount: float,
+        target_averaging: bool,
+        target_update_period: int,
+        target_update_rate: float,
+        dataset: tf.data.Dataset,
+        observation_networks: Dict[str, snt.Module],
+        target_observation_networks: Dict[str, snt.Module],
+        agent_net_keys: Dict[str, str],
+        checkpoint_minute_interval: int,
+        max_gradient_norm: float = None,
+        counter: counting.Counter = None,
+        logger: loggers.Logger = None,
+        checkpoint: bool = True,
+        checkpoint_subpath: str = "~/mava/",
+        bootstrap_n: int = 10,
+    ):
+
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            target_policy_networks=target_policy_networks,
+            target_critic_networks=target_critic_networks,
+            discount=discount,
+            target_averaging=target_averaging,
+            target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
+            dataset=dataset,
+            observation_networks=observation_networks,
+            target_observation_networks=target_observation_networks,
+            agent_net_keys=agent_net_keys,
+            checkpoint_minute_interval=checkpoint_minute_interval,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            max_gradient_norm=max_gradient_norm,
+            counter=counter,
+            logger=logger,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+            bootstrap_n=bootstrap_n,
+        )
+
+    def _get_critic_feed(
+        self,
+        obs_trans: Dict[str, np.ndarray],
+        target_obs_trans: Dict[str, np.ndarray],
+        actions: Dict[str, np.ndarray],
+        target_actions: Dict[str, np.ndarray],
+        extras: Dict[str, np.ndarray],
+        agent: str,
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        # State based
+        obs_trans_feed = extras["env_states"][agent]
+        target_obs_trans_feed = extras["env_states"][agent]
+        actions_feed = actions[agent]
+        target_actions_feed = target_actions[agent]
+        return obs_trans_feed, target_obs_trans_feed, actions_feed, target_actions_feed
+
+    def _get_dpg_feed(
+        self,
+        target_actions: Dict[str, np.ndarray],
+        dpg_actions: np.ndarray,
+        agent: str,
+    ) -> tf.Tensor:
+        # Decentralised DPG
+        dpg_actions_feed = dpg_actions
         return dpg_actions_feed

@@ -41,4 +41,5 @@ from mava.components.tf.architectures.state_based import (
     StateBasedValueActorCritic,
     StateBasedQValueActorCritic,
     StateBasedQValueCritic,
+    StateBasedQValueDecentralActionCritic,
 )

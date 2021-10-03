@@ -52,7 +52,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 def main(_: Any) -> None:
 
-    recurrent_test = True
+    recurrent_test = False
     recurrent_ppo = True
 
     # Environment.

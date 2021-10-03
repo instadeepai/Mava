@@ -270,8 +270,7 @@ class MAPPOTrainer(mava.Trainer):
         # Do a forward and backwards pass using tf.function.
         return self.forward_backward(inputs)
 
-    print("Add this tf.function in again!")
-    # @tf.function
+    @tf.function
     def forward_backward(self, inputs: Any):
         self._forward_pass(inputs)
         self._backward_pass()
@@ -415,10 +414,10 @@ class MAPPOTrainer(mava.Trainer):
                 # Multiply by discounts to not train on padded data.
                 loss_mask = discount > 0.0
                 # TODO (dries): Is multiplication maybe better here? As assignment might not work with tf.function?
-                pol_loss = policy_loss[loss_mask]
-                crit_loss = critic_loss[loss_mask]
-                policy_losses[agent] = tf.reduce_mean(pol_loss)
-                critic_losses[agent] = tf.reduce_mean(crit_loss)
+                policy_loss = policy_loss[loss_mask]
+                critic_loss = critic_loss[loss_mask]
+                policy_losses[agent] = tf.reduce_mean(policy_loss)
+                critic_losses[agent] = tf.reduce_mean(critic_loss)
 
         self.policy_losses = policy_losses
         self.critic_losses = critic_losses
