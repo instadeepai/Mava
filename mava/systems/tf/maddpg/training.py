@@ -203,8 +203,8 @@ class MADDPGBaseTrainer(mava.Trainer):
                     "target_policy": self._target_policy_networks[agent_key],
                     "target_critic": self._target_critic_networks[agent_key],
                     "target_observation": self._target_observation_networks[agent_key],
-                    "policy_optimizer": self._policy_optimizers,
-                    "critic_optimizer": self._critic_optimizers,
+                    "policy_optimizer": self._policy_optimizers[agent_key],
+                    "critic_optimizer": self._critic_optimizers[agent_key],
                     "num_steps": self._num_steps,
                 }
 
@@ -248,7 +248,7 @@ class MADDPGBaseTrainer(mava.Trainer):
                 if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                     for src, dest in zip(online_variables, target_variables):
                         dest.assign(src)
-            self._num_steps.assign_add(1)
+        self._num_steps.assign_add(1)
 
     def _transform_observations(
         self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
@@ -1750,7 +1750,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             obs_trans_feed = obs_trans_feed[agent]
             target_obs_trans_feed = target_obs_trans_feed[agent]
 
-        
+
         actions_feed = tf.stack([actions[agent] for agent in self._agents], -1)
         target_actions_feed = tf.stack(
             [target_actions[agent] for agent in self._agents], -1
