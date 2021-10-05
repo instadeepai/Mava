@@ -68,7 +68,7 @@ class MAPPO:
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
         max_gradient_norm: Optional[float] = None,
-        max_queue_size: int = 100000,
+        max_queue_size: int = 1000,
         batch_size: int = 32,
         sequence_length: int = 20,
         sequence_period: int = 10,
