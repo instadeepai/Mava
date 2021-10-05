@@ -17,12 +17,14 @@
 
 import dataclasses
 from typing import Any, Dict, List, Optional, Union
+from mava import components
 
 import reverb
 import sonnet as snt
 from acme.utils import counting, loggers
 
 from mava import specs
+from mava.systems.building import OnlineSystemBuilder
 from mava.components import building
 from mava.components.tf import building as tf_building
 
@@ -134,21 +136,30 @@ variable_server = tf_building.VariableServer(
     checkpoint_minute_interval=config.checkpoint_minute_interval,
 )
 
-# executor client
+# Executor client
 executor_client = tf_building.ExecutorVariableClient(
     executor_variable_update_period=config.executor_variable_update_period
 )
 
-# trainer client
+# Trainer client
 trainer_client = tf_building.TrainerVariableClient()
 
 # Executor
-excutor = building.Executor(
-    executor_fn=,
-    net_to_ints: Dict[str, int],
-    agent_specs: Dict[str, EnvironmentSpec],
-    agent_net_keys: Dict[str, str],
-    executor_samples: List[str],
-)
+excutor = building.Executor(executor_fn=executor_fn)
 
 # Trainer
+trainer = building.Trainer(trainer_fn=trainer_fn)
+
+# System
+system_components = [
+    table,
+    dataset,
+    adder,
+    variable_server,
+    executor_client,
+    trainer_client,
+    excutor,
+    trainer,
+]
+
+system_builder = OnlineSystemBuilder(components=system_components)

@@ -62,30 +62,16 @@ class OnlineSystemExecutor(SystemExecutor, SystemCallbackHookMixin):
 
     def __init__(
         self,
-        policy_networks: Dict[str, snt.Module],
-        agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
-        variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        components: List[Callback] = [],
     ):
-        """Initialise the system executor
+        """[summary]
 
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
-                the system.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
-                client to copy weights from the trainer. Defaults to None.
+            components (List[Callback], optional): [description]. Defaults to [].
         """
+        self.callbacks = components
 
         self.on_execution_init_start(self)
-
-        self._agent_net_keys = agent_net_keys
-        self._policy_networks = policy_networks
-        self._adder = adder
-        self._variable_client = variable_client
 
         self.on_execution_init_end(self)
 
