@@ -15,11 +15,12 @@
 
 """Execution components for system builders"""
 
-from typing import List, Dict
+from typing import List, Dict, Type
 
 from acme.specs import EnvironmentSpec
 
 from mava.callbacks import Callback
+from mava.systems.building import SystemBuilder
 
 
 class Executor(Callback):

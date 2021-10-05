@@ -20,6 +20,7 @@ from typing import List, Dict
 from acme.specs import EnvironmentSpec
 
 from mava.callbacks import Callback
+from mava.systems.building import SystemBuilder
 
 
 class Trainer(Callback):

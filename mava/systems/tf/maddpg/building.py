@@ -18,11 +18,13 @@
 import dataclasses
 from typing import Any, Dict, List, Optional, Union
 
+import reverb
 import sonnet as snt
 from acme.utils import counting, loggers
 
 from mava import specs
 from mava.components import building
+from mava.components.tf import building as tf_building
 
 
 @dataclasses.dataclass
@@ -96,5 +98,57 @@ class MADDPGConfig:
 
 # construct default system components
 ######################################
+config = MADDPGConfig
 
-# Make replay table and dataset
+# Replay table
+table = building.OffPolicyReplayTables(
+    name=config.replay_table_name,
+    sampler=reverb.selectors.Uniform(),
+    remover=reverb.selectors.Fifo(),
+    max_size=config.max_replay_size,
+    rate_limiter=building.OffPolicyRateLimiter(
+        samples_per_insert=config.samples_per_insert,
+        min_replay_size=config.min_replay_size,
+    ),
+    signature=building.ParallelSequenceAdderSignature(),
+)
+
+# Dataset
+dataset = building.DatasetIterator(
+    batch_size=config.batch_size,
+    prefetch_size=config.prefetch_size,
+)
+
+# Adder
+adder = building.ParallelNStepTransitionAdder(
+    net_to_ints=config.net_to_ints,
+    table_network_config=config.table_network_config,
+    n_step=config.n_step,
+    discount=config.discount,
+)
+
+# Variable server and clients
+variable_server = tf_building.VariableServer(
+    checkpoint=config.checkpoint,
+    checkpoint_subpath=config.checkpoint_subpath,
+    checkpoint_minute_interval=config.checkpoint_minute_interval,
+)
+
+# executor client
+executor_client = tf_building.ExecutorVariableClient(
+    executor_variable_update_period=config.executor_variable_update_period
+)
+
+# trainer client
+trainer_client = tf_building.TrainerVariableClient()
+
+# Executor
+excutor = building.Executor(
+    executor_fn=,
+    net_to_ints: Dict[str, int],
+    agent_specs: Dict[str, EnvironmentSpec],
+    agent_net_keys: Dict[str, str],
+    executor_samples: List[str],
+)
+
+# Trainer

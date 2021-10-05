@@ -84,8 +84,8 @@ class ParallelNStepTransitionAdder(Callback):
         self,
         net_to_ints: Dict[str, int],
         table_network_config: Dict[str, List],
-        n_step=self._config.n_step,
-        discount=self._config.discount,
+        n_step: int,
+        discount: float,
     ):
         super().__init__(net_to_ints, table_network_config)
 
@@ -110,8 +110,8 @@ class ParallelSequenceAdder(Callback):
         self,
         net_to_ints: Dict[str, int],
         table_network_config: Dict[str, List],
-        sequence_length=self._config.sequence_length,
-        period=self._config.period,
+        sequence_length: int,
+        period: int,
     ):
         super().__init__(net_to_ints, table_network_config)
 

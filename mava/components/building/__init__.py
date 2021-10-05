@@ -26,8 +26,4 @@ from mava.components.building.replay_tables import OffPolicyReplayTables
 from mava.components.building.dataset_iterators import DatasetIterator
 from mava.components.building.executors import Executor
 from mava.components.building.trainers import Trainer
-from mava.components.building.variable_source import (
-    TFVariableServer,
-    TFExecutorVariableClient,
-    TFTrainerVariableClient,
-)
+from mava.components.building.variable_source import VariableSource

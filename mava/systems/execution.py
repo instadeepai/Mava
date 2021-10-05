@@ -29,6 +29,7 @@ from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 from dm_env import specs
 
+import mava
 from mava import adders
 from mava.systems.tf import executors
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
@@ -39,6 +40,7 @@ DiscreteArray = specs.DiscreteArray
 tfd = tfp.distributions
 
 from mava.callbacks import Callback
+from mava.systems.callback_hook import SystemCallbackHookMixin
 
 
 class SystemExecutor(mava.Executor, Callback):

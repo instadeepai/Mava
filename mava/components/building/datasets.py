@@ -14,20 +14,17 @@
 # limitations under the License.
 
 """Commonly used dataset components for system builders"""
+from typing import Optional
 
 from acme import datasets
-from acme.adders import reverb as adders
 
-from mava import specs
 from mava.callbacks import Callback
 from mava.systems.building import SystemBuilder
-from mava.adders import reverb as reverb_adders
 
 
 class Iterator(Callback):
     def __init__(
         self,
-        server_address: str,
         batch_size: Optional[int] = None,
         prefetch_size: Optional[int] = None,
         num_parallel_calls: int = 12,
@@ -43,7 +40,6 @@ class Iterator(Callback):
             num_parallel_calls (int, optional): [description]. Defaults to 12.
             max_in_flight_samples_per_worker (Optional[int], optional): [description]. Defaults to None.
         """
-        self.server_address = server_address
         self.batch_size = batch_size
         self.prefetch_size = prefetch_size
         self.num_parallel_calls = num_parallel_calls
@@ -59,12 +55,14 @@ class Iterator(Callback):
 
 
 class DatasetIterator(Iterator):
-    def on_building_adder_signature(self, builder: SystemBuilder) -> None:
+    def on_building_dataset(self, builder: SystemBuilder) -> None:
         dataset = datasets.make_reverb_dataset(
             table=self._table_name,
             server_address=self._replay_client.server_address,
             batch_size=self.batch_size,
             prefetch_size=self.prefetch_size,
+            num_parallel_calls=self.num_parallel_calls,
+            max_in_flight_samples_per_worker=self.max_in_flight_samples_per_worker,
         )
 
         builder.dataset = iter(dataset)
