@@ -13,24 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG system executor implementation."""
-
-from mava.systems.execution import OnlineSystemExecutor
-from mava.components.tf import execution as tf_executing
-
-# construct default executor components
-######################################
-observer = tf_executing.OnlineObserver()
-preprocess = tf_executing.Batch()
-policy = tf_executing.DistributionPolicy()
-action_selection = tf_executing.OnlineActionSampling()
-
-# Executor components
-executor_components = [
-    observer,
-    preprocess,
-    policy,
-    action_selection,
-]
-
-system_executor = OnlineSystemExecutor(components=executor_components)
+from mava.components.tf.execution.observation import OnlineObserver
+from mava.components.tf.execution.preprocess import Batch
+from mava.components.tf.execution.policy import DistributionPolicy
+from mava.components.tf.execution.action_selection import OnlineActionSampling
+from mava.components.tf.execution.feedforward import FeedForwardExecutor
+from mava.components.tf.execution.update import OnlineUpdate
