@@ -77,7 +77,10 @@ class OnlineSystemExecutor(SystemExecutor, SystemCallbackHookMixin):
 
     @tf.function
     def _policy(
-        self, agent: str, observation: types.NestedTensor
+        self,
+        agent: str,
+        observation: types.NestedTensor,
+        state: types.NestedTensor = None,
     ) -> types.NestedTensor:
         """Agent specific policy function
 
@@ -91,6 +94,7 @@ class OnlineSystemExecutor(SystemExecutor, SystemCallbackHookMixin):
         """
         self._agent = agent
         self._observation = observation
+        self._state = state
 
         self.on_execution_policy_start(self)
 
