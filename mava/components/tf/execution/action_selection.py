@@ -29,8 +29,24 @@ class ActionSelector(Callback):
         """
         pass
 
+    def on_execution_select_action(self, executor: SystemExecutor) -> None:
+        """[summary]
 
-class ActionSampling(ActionSelector):
+        Args:
+            executor (SystemExecutor): [description]
+        """
+        pass
+
+    def on_execution_select_action(self, executor: SystemExecutor) -> None:
+        """[summary]
+
+        Args:
+            executor (SystemExecutor): [description]
+        """
+        pass
+
+
+class OnlineActionSampling(ActionSelector):
     def on_execution_policy_sample_action(self, executor: SystemExecutor) -> None:
 
         # Sample from the policy if it is stochastic.
@@ -44,3 +60,12 @@ class ActionSampling(ActionSelector):
         action = self._policy(self._agent, self._observation.observation)
 
         executor.action = tf2_utils.to_numpy_squeeze(action)
+
+    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
+
+        actions = {}
+        for agent, observation in self._observations.items():
+            action = self._policy(agent, observation.observation)
+            actions[agent] = tf2_utils.to_numpy_squeeze(action)
+
+        executor.actions = actions

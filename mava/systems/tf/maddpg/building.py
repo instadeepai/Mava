@@ -145,7 +145,7 @@ executor_client = tf_building.ExecutorVariableClient(
 trainer_client = tf_building.TrainerVariableClient()
 
 # Executor
-excutor = building.Executor(executor_fn=executor_fn)
+executor = building.Executor(executor_fn=executor_fn)
 
 # Trainer
 trainer = building.Trainer(trainer_fn=trainer_fn)
@@ -158,7 +158,7 @@ system_components = [
     variable_server,
     executor_client,
     trainer_client,
-    excutor,
+    executor,
     trainer,
 ]
 

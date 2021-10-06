@@ -35,3 +35,13 @@ class Observer(Callback):
             executor (SystemExecutor): [description]
         """
         pass
+
+
+class OnlineObserver(Observer):
+    def on_execution_observe_first(self, executor: SystemExecutor) -> None:
+        if self._adder:
+            self._adder.add_first(self._timestep, self._extras)
+
+    def on_execution_observe(self, executor: SystemExecutor) -> None:
+        if self._adder:
+            self._adder.add(self._actions, self._next_timestep, self._next_extras)

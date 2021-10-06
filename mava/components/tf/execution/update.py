@@ -27,3 +27,9 @@ class Update(Callback):
             executor (SystemExecutor): [description]
         """
         pass
+
+
+class OnlineUpdate(Update):
+    def on_execution_update(self, executor: SystemExecutor) -> None:
+        if self._variable_client:
+            self._variable_client.update(self._wait)
