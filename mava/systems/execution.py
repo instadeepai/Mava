@@ -14,25 +14,17 @@
 # limitations under the License.
 
 """MADDPG system executor implementation."""
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import dm_env
-import numpy as np
-import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
 from acme import types
-from acme.specs import EnvironmentSpec
 
 # Internal imports.
-from acme.tf import utils as tf2_utils
-from acme.tf import variable_utils as tf2_variable_utils
 from dm_env import specs
 
 import mava
-from mava import adders
-from mava.systems.tf import executors
-from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray

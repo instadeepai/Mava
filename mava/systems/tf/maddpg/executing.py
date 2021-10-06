@@ -19,7 +19,7 @@ from mava.systems.execution import OnlineSystemExecutor
 from mava.components.tf import execution as tf_executing
 
 # construct default executor components
-######################################
+#######################################
 observer = tf_executing.OnlineObserver()
 preprocess = tf_executing.Batch()
 policy = tf_executing.DistributionPolicy()

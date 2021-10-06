@@ -59,7 +59,10 @@ class OnlineActionSampling(ActionSelector):
         # Pass the observation through the policy network.
         action = self._policy(self._agent, self._observation.observation)
 
-        executor.action = tf2_utils.to_numpy_squeeze(action)
+        executor.action = action
+
+    def on_execution_select_action_end(self, executor: SystemExecutor) -> None:
+        executor.action = tf2_utils.to_numpy_squeeze(executor.action)
 
     def on_execution_select_actions(self, executor: SystemExecutor) -> None:
 
