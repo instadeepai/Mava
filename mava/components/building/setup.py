@@ -37,27 +37,15 @@ class Setup(Callback):
         self.config = config
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """[summary]
-
-        Args:
-            builder (SystemBuilder): [description]
-        """
+        """[summary]"""
         pass
 
     def on_building_init(self, builder: SystemBuilder) -> None:
-        """[summary]
-
-        Args:
-            builder (SystemBuilder): [description]
-        """
+        """[summary]"""
         pass
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
-        """[summary]
-
-        Args:
-            builder (SystemBuilder): [description]
-        """
+        """[summary]"""
         pass
 
 

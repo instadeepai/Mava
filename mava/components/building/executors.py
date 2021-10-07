@@ -15,7 +15,7 @@
 
 """Execution components for system builders"""
 
-from typing import List, Dict, Type
+from typing import Dict, Type, Any
 
 from acme.specs import EnvironmentSpec
 
@@ -23,86 +23,108 @@ from mava import core
 from mava.callbacks import Callback
 from mava.systems.building import SystemBuilder
 
-# self.on_building_executor_start(self)
-
-#         self.on_building_executor_logger(self)
-
-#         self.on_building_executor(self)
-
-#         self.on_building_executor_train_loop(self)
-
-#         self.on_building_executor_end(self)
-
-#         # Create the system
-#         behaviour_policy_networks, networks = self.create_system()
-
-#         # Create the executor.
-#         executor = self._builder.make_executor(
-#             networks=networks,
-#             policy_networks=behaviour_policy_networks,
-#             adder=self._builder.make_adder(replay),
-#             variable_source=variable_source,
-#         )
-
-#         # TODO (Arnu): figure out why factory function are giving type errors
-#         # Create the environment.
-#         environment = self._environment_factory(evaluation=False)  # type: ignore
-
-#         # Create executor logger
-#         executor_logger_config = {}
-#         if self._logger_config and "executor" in self._logger_config:
-#             executor_logger_config = self._logger_config["executor"]
-#         exec_logger = self._logger_factory(  # type: ignore
-#             f"executor_{executor_id}", **executor_logger_config
-#         )
-
-#         # Create the loop to connect environment and executor.
-#         train_loop = self._train_loop_fn(
-#             environment,
-#             executor,
-#             logger=exec_logger,
-#             **self._train_loop_fn_kwargs,
-#         )
-
-#         train_loop = DetailedPerAgentStatistics(train_loop)
-
 
 class Executor(Callback):
     def __init__(
         self,
-        executor_fn: Type[core.Executor],
-        net_to_ints: Dict[str, int],
-        agent_specs: Dict[str, EnvironmentSpec],
-        agent_net_keys: Dict[str, str],
-        executor_samples: List[str],
+        config: Dict[str, Any],
     ):
         """[summary]
 
         Args:
-            net_to_ints (Dict[str, int]): [description]
-            agent_specs (Dict[str, EnvironmentSpec]): [description]
-            agent_net_keys (Dict[str, str]): [description]
-            executor_samples (executor_samples): [description]
+            config (Dict[str, Any]): [description]
+            executor_fn (Type[core.Executor]): [description]
         """
-        self.executor_fn = executor_fn
-        self.net_to_ints = net_to_ints
-        self.agent_specs = agent_specs
-        self.agent_net_keys = agent_net_keys
-        self.executor_samples = executor_samples
+        self.config = config
 
-    def on_building_executor(self, builder: SystemBuilder):
-        """[summary]
+    def on_building_executor_start(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        builder._system_networks = self.create_system()
 
-        Args:
-            builder (SystemBuilder): [description]
-        """
-        builder.executor = self.executor_fn(
-            policy_networks=self._policy_networks,
-            counts=builder.counts,
-            net_to_ints=self.net_to_ints,
-            agent_specs=self.agent_specs,
-            agent_net_keys=self.agent_net_keys,
-            executor_samples=self.executor_samples,
-            variable_client=builder.variable_client,
-            adder=self._adder,
+    def on_building_executor_logger(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        # Create executor logger
+        executor_logger_config = {}
+        logger_config = self.config["system"]["logger_config"]
+        if logger_config and "executor" in logger_config:
+            executor_logger_config = logger_config["executor"]
+        exec_logger = builder._logger_factory(  # type: ignore
+            f"executor_{builder._executor_id}", **executor_logger_config
         )
+        builder._exec_logger = exec_logger
+
+    def on_building_executor(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+
+        # Create the executor.
+        executor = self._builder.make_executor(
+            networks=networks,
+            policy_networks=behaviour_policy_networks,
+            adder=self._builder.make_adder(replay),
+            variable_source=variable_source,
+        )
+
+        # Create policy variables
+        variables = {}
+        get_keys = []
+        for net_type_key in ["observations", "policies"]:
+            for net_key in networks[net_type_key].keys():
+                var_key = f"{net_key}_{net_type_key}"
+                variables[var_key] = networks[net_type_key][net_key].variables
+                get_keys.append(var_key)
+        variables = self.create_counter_variables(variables)
+
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        get_keys.extend(count_names)
+        counts = {name: variables[name] for name in count_names}
+
+        variable_client = None
+        if variable_source:
+            # Get new policy variables
+            variable_client = variable_utils.VariableClient(
+                client=variable_source,
+                variables=variables,
+                get_keys=get_keys,
+                update_period=self._config.executor_variable_update_period,
+            )
+
+            # Make sure not to use a random policy after checkpoint restoration by
+            # assigning variables before running the environment loop.
+            variable_client.get_and_wait()
+
+        builder.executor = self._executor_fn(
+            policy_networks=policy_networks,
+            counts=counts,
+            net_keys_to_ids=self._config.net_keys_to_ids,
+            agent_specs=self._config.environment_spec.get_agent_specs(),
+            agent_net_keys=self._config.agent_net_keys,
+            network_sampling_setup=self._config.network_sampling_setup,
+            variable_client=variable_client,
+            adder=adder,
+        )
+
+    def on_building_executor_train_loop(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        # TODO (Arnu): figure out why factory function are giving type errors
+        # Create the environment.
+        environment = self._environment_factory(evaluation=False)  # type: ignore
+
+        # Create the loop to connect environment and executor.
+        train_loop = self._train_loop_fn(
+            environment,
+            executor,
+            logger=exec_logger,
+            **self._train_loop_fn_kwargs,
+        )
+
+        train_loop = DetailedPerAgentStatistics(train_loop)
+
+    def on_building_executor_end(self, builder: SystemBuilder) -> None:
+        """[summary]"""
