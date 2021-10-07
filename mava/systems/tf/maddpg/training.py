@@ -1660,7 +1660,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         return dpg_actions_feed
 
 
-class MADDPGStateBasedDecentralActionRecurrentTrainer(MADDPGBaseRecurrentTrainer):
+class MADDPGStateBasedSingleActionCriticRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """Recurrent MADDPG trainer for a state-based architecture.
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.

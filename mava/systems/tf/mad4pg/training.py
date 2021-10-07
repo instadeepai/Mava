@@ -36,8 +36,8 @@ from mava.systems.tf.maddpg.training import (
     MADDPGCentralisedTrainer,
     MADDPGDecentralisedRecurrentTrainer,
     MADDPGDecentralisedTrainer,
-    MADDPGStateBasedDecentralActionRecurrentTrainer,
     MADDPGStateBasedRecurrentTrainer,
+    MADDPGStateBasedSingleActionCriticRecurrentTrainer,
     MADDPGStateBasedTrainer,
 )
 from mava.systems.tf.variable_utils import VariableClient
@@ -769,8 +769,8 @@ class MAD4PGStateBasedRecurrentTrainer(
         )
 
 
-class MAD4PGStateBasedDecentralActionRecurrentTrainer(
-    MAD4PGBaseRecurrentTrainer, MADDPGStateBasedDecentralActionRecurrentTrainer
+class MAD4PGStateBasedSingleActionCriticRecurrentTrainer(
+    MAD4PGBaseRecurrentTrainer, MADDPGStateBasedSingleActionCriticRecurrentTrainer
 ):
     """Recurrent MAD4PG trainer for a state-based architecture."""
 

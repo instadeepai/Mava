@@ -478,26 +478,6 @@ class NetworkStatistics(NetworkStatisticsBase):
             log_gradients,
         )
 
-    # @tf.function
-    # def _step(
-    #     self,
-    # ) -> Dict[str, Dict[str, Any]]:
-    #     # Update the target networks
-    #     # Trying not to assume off policy.
-    #     if hasattr(self, "_update_target_networks"):
-    #         self._update_target_networks()
-
-    #     # Get data from replay (dropping extras if any). Note there is no
-    #     # extra data here because we do not insert any into Reverb.
-    #     inputs = next(self._iterator)
-
-    #     self._forward(inputs)
-
-    #     self._backward()
-
-    #     # Log losses per agent
-    #     return self.policy_losses
-
     def _backward(self) -> None:
         policy_losses = self.policy_losses
         tape = self.tape
@@ -564,27 +544,6 @@ class NetworkStatisticsMixing(NetworkStatisticsBase):
             log_weights,
             log_gradients,
         )
-
-    # @tf.function
-    # def _step(
-    #     self,
-    # ) -> Dict[str, Dict[str, Any]]:
-
-    #     # Update the target networks
-    #     # Trying not to assume off policy.
-    #     if hasattr(self, "_update_target_networks"):
-    #         self._update_target_networks()
-
-    #     # Get data from replay (dropping extras if any). Note there is no
-    #     # extra data here because we do not insert any into Reverb.
-    #     inputs = next(self._iterator)
-
-    #     self._forward(inputs)
-
-    #     self._backward()
-
-    #     # Log losses per agent
-    #     return {agent: {"q_value_loss": self.loss} for agent in self._agents}
 
     def _backward(self) -> None:
         log_current_timestep = self._log_step()
@@ -655,29 +614,6 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             log_weights,
             log_gradients,
         )
-
-    # @tf.function
-    # def _step(
-    #     self,
-    # ) -> Dict[str, Dict[str, Any]]:
-
-    #     # Update the target networks
-    #     # Trying not to assume off policy.
-    #     if hasattr(self, "_update_target_networks"):
-    #         self._update_target_networks()
-
-    #     # Get data from replay (dropping extras if any). Note there is no
-    #     # extra data here because we do not insert any into Reverb.
-    #     inputs = next(self._iterator)
-
-    #     self._forward(inputs)
-
-    #     self._backward()
-
-    #     # Log losses per agent
-    #     return train_utils.map_losses_per_agent_ac(
-    #         self.critic_losses, self.policy_losses
-    #     )
 
     def _backward(self) -> None:
         # Calculate the gradients and update the networks
