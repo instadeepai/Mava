@@ -65,15 +65,19 @@ class VariableServer(VariableSource):
         self.checkpoint_subpath = checkpoint_subpath
         self.checkpoint_minute_interval = checkpoint_minute_interval
 
+    def on_building_variable_server_start(self, builder: SystemBuilder) -> None:
+        # Create the system
+        builder._networks = builder.system()
+
     def on_building_variable_server(self, builder: SystemBuilder) -> None:
         # Create variables
         variables = {}
         # Network variables
-        for net_type_key in self._networks.keys():
-            for net_key in self._networks[net_type_key].keys():
+        for net_type_key in builder._networks.keys():
+            for net_key in builder._networks[net_type_key].keys():
                 # Ensure obs and target networks are sonnet modules
                 variables[f"{net_key}_{net_type_key}"] = tf2_utils.to_sonnet_module(
-                    self._networks[net_type_key][net_key]
+                    builder._networks[net_type_key][net_key]
                 ).variables
 
         variables = self._create_tf_counter_variables(variables)
@@ -104,11 +108,11 @@ class ExecutorVariableClient(VariableSource):
         variables = {}
         get_keys = []
         for net_type_key in ["observations", "policies"]:
-            for net_key in self._networks[net_type_key].keys():
+            for net_key in builder._networks[net_type_key].keys():
                 var_key = f"{net_key}_{net_type_key}"
-                variables[var_key] = self._networks[net_type_key][net_key].variables
+                variables[var_key] = builder._networks[net_type_key][net_key].variables
                 get_keys.append(var_key)
-        variables = self.create_counter_variables(variables)
+        variables = builder.create_counter_variables(variables)
 
         count_names = [
             "trainer_steps",
@@ -122,10 +126,10 @@ class ExecutorVariableClient(VariableSource):
         counts = {name: variables[name] for name in count_names}
 
         variable_client = None
-        if self._variable_source:
+        if builder._variable_source:
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
-                client=self._variable_source,
+                client=builder._variable_source,
                 variables=variables,
                 get_keys=get_keys,
                 get_period=self.executor_variable_update_period,
@@ -147,12 +151,12 @@ class TrainerVariableClient(VariableSource):
         get_keys = []
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
-        for net_type_key in self._networks.keys():
-            for net_key in self._networks[net_type_key].keys():
-                variables[f"{net_key}_{net_type_key}"] = self._networks[net_type_key][
-                    net_key
-                ].variables
-                if net_key in set(self._trainer_networks):
+        for net_type_key in builder._networks.keys():
+            for net_key in builder._networks[net_type_key].keys():
+                variables[f"{net_key}_{net_type_key}"] = builder._networks[
+                    net_type_key
+                ][net_key].variables
+                if net_key in set(builder._trainer_networks):
                     set_keys.append(f"{net_key}_{net_type_key}")
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")
@@ -172,7 +176,7 @@ class TrainerVariableClient(VariableSource):
         counts = {name: variables[name] for name in count_names}
 
         variable_client = variable_utils.VariableClient(
-            client=self._variable_source,
+            client=builder._variable_source,
             variables=variables,
             get_keys=get_keys,
             set_keys=set_keys,

@@ -164,37 +164,37 @@ class OnlineSystemBuilder(SystemBuilder, SystemCallbackHookMixin):
 
         self.on_building_init_end(self)
 
-    def make_replay_tables(
-        self,
-        environment_spec: specs.MAEnvironmentSpec,
-    ) -> List[reverb.Table]:
-        """ "Create tables to insert data into.
-        Args:
-            environment_spec (specs.MAEnvironmentSpec): description of the action and
-                observation spaces etc. for each agent in the system.
-        Raises:
-            NotImplementedError: unknown executor type.
-        Returns:
-            List[reverb.Table]: a list of data tables for inserting data.
-        """
-        self._environment_spec = environment_spec
+    # def make_replay_tables(
+    #     self,
+    #     environment_spec: specs.MAEnvironmentSpec,
+    # ) -> List[reverb.Table]:
+    #     """ "Create tables to insert data into.
+    #     Args:
+    #         environment_spec (specs.MAEnvironmentSpec): description of the action and
+    #             observation spaces etc. for each agent in the system.
+    #     Raises:
+    #         NotImplementedError: unknown executor type.
+    #     Returns:
+    #         List[reverb.Table]: a list of data tables for inserting data.
+    #     """
+    #     self._environment_spec = environment_spec
 
-        # start of make replay tables
-        self.on_building_make_replay_table_start(self)
+    #     # start of make replay tables
+    #     self.on_building_make_replay_table_start(self)
 
-        # make adder signature
-        self.on_building_adder_signature(self)
+    #     # make adder signature
+    #     self.on_building_adder_signature(self)
 
-        # make rate limiter
-        self.on_building_rate_limiter(self)
+    #     # make rate limiter
+    #     self.on_building_rate_limiter(self)
 
-        # make tables
-        self.on_building_make_tables(self)
+    #     # make tables
+    #     self.on_building_make_tables(self)
 
-        # end of make replay tables
-        self.on_building_make_replay_table_end(self)
+    #     # end of make replay tables
+    #     self.on_building_make_replay_table_end(self)
 
-        return self.replay_tables
+    #     return self.replay_tables
 
     def make_dataset_iterator(
         self,
@@ -253,29 +253,29 @@ class OnlineSystemBuilder(SystemBuilder, SystemCallbackHookMixin):
 
         return self.adder
 
-    def make_variable_server(
-        self,
-        networks: Dict[str, Dict[str, snt.Module]],
-    ) -> MavaVariableSource:
-        """Create the variable server.
-        Args:
-            networks (Dict[str, Dict[str, snt.Module]]): dictionary with the
-            system's networks in.
-        Returns:
-            variable_source (MavaVariableSource): A Mava variable source object.
-        """
-        self._networks = networks
+    # def make_variable_server(
+    #     self,
+    #     networks: Dict[str, Dict[str, snt.Module]],
+    # ) -> MavaVariableSource:
+    #     """Create the variable server.
+    #     Args:
+    #         networks (Dict[str, Dict[str, snt.Module]]): dictionary with the
+    #         system's networks in.
+    #     Returns:
+    #         variable_source (MavaVariableSource): A Mava variable source object.
+    #     """
+    #     self._networks = networks
 
-        # start of make variable server
-        self.on_building_make_variable_server_start(self)
+    #     # start of make variable server
+    #     self.on_building_make_variable_server_start(self)
 
-        # make variable server
-        self.on_building_variable_server(self)
+    #     # make variable server
+    #     self.on_building_variable_server(self)
 
-        # end of make variable server
-        self.on_building_make_variable_server_end(self)
+    #     # end of make variable server
+    #     self.on_building_make_variable_server_end(self)
 
-        return self.variable_server
+    #     return self.variable_server
 
     def make_executor(
         self,
