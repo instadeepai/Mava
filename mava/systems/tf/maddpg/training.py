@@ -139,7 +139,7 @@ class MADDPGBaseTrainer(mava.Trainer):
             self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
-        self._num_steps = 0
+        self._num_steps = tf.Variable(0, dtype=tf.int32)
         self._target_averaging = target_averaging
         self._target_update_period = target_update_period
         self._target_update_rate = target_update_rate
@@ -217,7 +217,7 @@ class MADDPGBaseTrainer(mava.Trainer):
                 if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                     for src, dest in zip(online_variables, target_variables):
                         dest.assign(src)
-        self._num_steps += 1
+        self._num_steps.assign_add(1)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         """Depreciated method."""
@@ -949,7 +949,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
-        self._num_steps = 0
+        self._num_steps = tf.Variable(0, dtype=tf.int32)
         self._target_averaging = target_averaging
         self._target_update_period = target_update_period
         self._target_update_rate = target_update_rate
@@ -1028,7 +1028,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                     for src, dest in zip(online_variables, target_variables):
                         dest.assign(src)
-        self._num_steps += 1
+        self._num_steps.assign_add(1)
 
     def _transform_observations(
         self, observations: Dict[str, np.ndarray]
