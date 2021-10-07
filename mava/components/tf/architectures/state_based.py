@@ -148,7 +148,7 @@ class StateBasedQValueActorCritic(  # type: ignore
         )
 
 
-class StateBasedQValueDecentralActionCritic(DecentralisedQValueActorCritic):
+class StateBasedQValueSingleActionCritic(DecentralisedQValueActorCritic):
     """Multi-agent actor critic architecture with a critic using
     environment state information. For this state-based critic
     only one action gets fed in. This allows the critic
