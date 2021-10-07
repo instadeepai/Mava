@@ -25,18 +25,31 @@ def sort_str_num(str_num: Any) -> List[Any]:
 
 def sample_new_agent_keys(
     agents: List,
-    executor_samples: List,
-    net_to_ints: Dict[str, int] = None,
+    network_sampling_setup: List,
+    net_keys_to_ids: Dict[str, int] = None,
 ) -> Tuple[Dict[str, np.array], Dict[str, np.array]]:
+    """
+    Samples new agent networks using the network sampling setup.
+    Args:
+        agents: List of the agent keys.
+        network_sampling_setup: List of networks that are randomly
+            sampled from by the executors at the start of an environment run.
+            shared_weights: whether agents should share weights or not.
+        net_keys_to_ids: Dictionary mapping network keys to network ids.
+    Returns:
+        Tuple of dictionaries mapping network keys to ids.
+    """
     save_net_keys = {}
     agent_net_keys = {}
     agent_slots = copy.copy(agents)
     while len(agent_slots) > 0:
-        sample = executor_samples[randint(len(executor_samples))]
+        sample = network_sampling_setup[randint(len(network_sampling_setup))]
         for net_key in sample:
             agent = agent_slots.pop(0)
             agent_net_keys[agent] = net_key
-            if net_to_ints:
-                save_net_keys[agent] = np.array(net_to_ints[net_key], dtype=np.int32)
+            if net_keys_to_ids:
+                save_net_keys[agent] = np.array(
+                    net_keys_to_ids[net_key], dtype=np.int32
+                )
 
     return save_net_keys, agent_net_keys

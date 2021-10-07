@@ -90,7 +90,8 @@ def spec_like_to_tensor_spec(
 
 
 def get_trajectory_net_agents(
-    trajectory: Union[Trajectory, mava_types.Transition], traj_net_keys: Dict[str, str]
+    trajectory: Union[Trajectory, mava_types.Transition],
+    trajectory_net_keys: Dict[str, str],
 ) -> Tuple[List, Dict[str, List]]:
     """Returns a dictionary that maps network_keys to a list of agents using that specific
     network.
@@ -98,17 +99,17 @@ def get_trajectory_net_agents(
     Args:
         trajectory: Episode experience recorded by
         the adders.
-        traj_net_keys: The network_keys used by each agent in the trajectory.
+        trajectory_net_keys: The network_keys used by each agent in the trajectory.
     Returns:
-        agents: A sorted list of al the agent_keys.
+        agents: A sorted list of all the agent_keys.
         agents_per_network: A dictionary that maps network_keys to
         a list of agents using that specific network.
     """
     agents = sort_str_num(trajectory.actions.keys())
-    unique_nets = sort_str_num(set(traj_net_keys.values()))
+    unique_nets = sort_str_num(set(trajectory_net_keys.values()))
     agents_per_network: Dict[str, List] = {key: [] for key in unique_nets}
     for agent in agents:
-        agents_per_network[traj_net_keys[agent]].append(agent)
+        agents_per_network[trajectory_net_keys[agent]].append(agent)
     return agents, agents_per_network
 
 
@@ -158,7 +159,7 @@ class ReverbParallelAdder(ReverbAdder):
         trajectory: Union[Trajectory, mava_types.Transition],
         table_priorities: Dict[str, Any],
     ) -> None:
-        """Write an episode eperience (trajectory) to the reverb tables. Each
+        """Write an episode experience (trajectory) to the reverb tables. Each
         table represents experience used by each of the trainers. Therefore
         this function dynamically determines to which table(s) to write
         parts of the trajectory based on what networks where used by
@@ -178,21 +179,21 @@ class ReverbParallelAdder(ReverbAdder):
             # Get the networks use by each agent by
             # converting the network_int_keys to strings.
             traj_extras = trajectory.extras["network_int_keys"]
-            traj_net_keys = {}
+            trajectory_net_keys = {}
             agents = sort_str_num(trajectory.actions.keys())
             for agent in agents:
                 arr = traj_extras[agent].numpy()
                 if type(trajectory) == Step:
                     # Sequential adder case.
-                    traj_net_keys[agent] = self._int_to_nets[arr[0]]
+                    trajectory_net_keys[agent] = self._net_ids_to_keys[arr[0]]
                 else:
                     # Transition adder case.
-                    traj_net_keys[agent] = self._int_to_nets[arr]
+                    trajectory_net_keys[agent] = self._net_ids_to_keys[arr]
 
             # Get a list of the agents and mapping from net_keys to all
             # agents using that network.
             agents, trajectory_nets_agent = get_trajectory_net_agents(
-                trajectory=trajectory, traj_net_keys=traj_net_keys
+                trajectory=trajectory, trajectory_net_keys=trajectory_net_keys
             )
 
             # Flag to check if all experience was used
@@ -208,10 +209,10 @@ class ReverbParallelAdder(ReverbAdder):
             # and therefore might write more than once to a table
             # for a given experience. The table might also not
             # write at all for a given trajectory. The created_item
-            # flag checks that atleast one table used some of the
+            # flag checks that at least one table used some of the
             # experience in the trajectory.
             for table, priority in table_priorities.items():
-                # Copy the original trajectory net agents as we are going to pop
+                # Copy the original trajectory_nets_agent as we are going to pop
                 # form it for each table. Therefore each table starts with
                 # a fresh copy of all the agents and removes agents as it
                 # pushes the experience to its table.
@@ -221,14 +222,17 @@ class ReverbParallelAdder(ReverbAdder):
                 # Each training example can therefore create multiple items
                 is_in_entry = True
                 while is_in_entry:
-                    # Go through all the networks in the table specification
-                    # and see if all the networks are still in the remaining
-                    # agents in the trajectory. Pop the agents from the
-                    # trajectory and add them to item_agents. If all the
-                    # networks was foudn item_agents will be written
-                    # to the table. The next time round these agents will
-                    # not be checked for again as they are already popped
-                    # from the trajectory copy.
+                    # Go through all the networks in the table specification.
+                    # Now check if every network in this table specification is used
+                    # atleast once by the remaining agents in the trajectory.
+                    # Pop the agents from the trajectory, that uses the required
+                    # networks and add them to item_agents. If all the
+                    # networks was found item_agents will be written
+                    # to the table. So basically we try to find a group of
+                    # agents that matches the network specification of the table.
+                    # We do this until the table cannot find a match in the remaining
+                    # agents and therefore exists the and gives another table a chance
+                    # to find a matches.
                     item_agents = []
                     for net_key in self._table_network_config[table]:
                         if (
@@ -244,7 +248,7 @@ class ReverbParallelAdder(ReverbAdder):
                         # Write the subset of the trajectory experience to
                         # the table. The below code creates a new Step/Transition
                         # with only the agents with the correct network combination
-                        # in order. This new Step/Transition is then writtent to
+                        # in order. This new Step/Transition is then written to
                         # the table.
                         created_item = True
 
@@ -346,14 +350,12 @@ class ReverbParallelAdder(ReverbAdder):
                     trajectory.actions.keys(),
                 )
         else:
-            # Default setting (depreciate this) with only one table. In this setting
+            # Default setting (deprecate this) with only one table. In this setting
             # we write the entire trajectory to that table.
-            table_items = list(table_priorities.items())
-            assert len(table_items) == 1
-            table, priority = table_items[0]
-            self._writer.create_item(
-                table=table, priority=priority, trajectory=trajectory
-            )
+            for table_name, priority in table_priorities.items():
+                self._writer.create_item(
+                    table=table_name, priority=priority, trajectory=trajectory
+                )
 
         # Flush the writer.
         self._writer.flush(self._max_in_flight_items)

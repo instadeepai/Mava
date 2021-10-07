@@ -2,7 +2,9 @@ import os
 import time
 from typing import Any, Dict, Sequence, Union
 
+import launchpad as lp
 import numpy as np
+import tensorflow as tf
 from acme.tf import utils as tf2_utils
 
 from mava.systems.tf import savers as tf2_savers
@@ -15,6 +17,7 @@ class VariableSource:
         checkpoint: bool,
         checkpoint_subpath: str,
         checkpoint_minute_interval: int,
+        termination_condition: Dict = None,
     ) -> None:
         """Initialise the variable source
         Args:
@@ -28,6 +31,23 @@ class VariableSource:
         # Init the variable dictionary
         self.variables = variables
         self._system_checkpointer = None
+        self._checkpoint_minute_interval = checkpoint_minute_interval
+        self._last_checkpoint_time = time.time()
+        self._termination_condition = termination_condition
+
+        terminal_options = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        if self._termination_condition is not None:
+            assert len(self._termination_condition.keys()) == 1
+            terminal_key, _ = list(self._termination_condition.items())[0]
+            assert terminal_key in terminal_options
+
         if checkpoint:
             # Only save variables that are not empty.
             save_variables = {}
@@ -39,6 +59,7 @@ class VariableSource:
 
             # Create checkpointer
             subdir = os.path.join("variable_source")
+            self._checkpoint_time_interval = checkpoint_minute_interval
             self._system_checkpointer = tf2_savers.Checkpointer(
                 time_delta_minutes=checkpoint_minute_interval,
                 directory=checkpoint_subpath,
@@ -121,7 +142,32 @@ class VariableSource:
         """
         # Checkpoints every 5 minutes
         while True:
-            time.sleep(5 * 60)
-            if self._system_checkpointer:
+            # Wait 10 seconds before checking again
+            time.sleep(10)
+
+            # Add 1 extra second just to make sure that the checkpointer
+            # is ready to save.
+            if (
+                self._system_checkpointer
+                and self._last_checkpoint_time
+                + self._checkpoint_minute_interval * 60
+                + 1
+                < time.time()
+            ):
                 self._system_checkpointer.save()
                 print("Updated variables checkpoint.")
+
+            if self._termination_condition is not None:
+                terminal_key, terminal_count = list(
+                    self._termination_condition.items()
+                )[0]
+                current_count = float(self.variables[terminal_key])
+                if current_count >= terminal_count:
+                    tf.print(
+                        "StepsLimiter: Max",
+                        self.variables[terminal_key],
+                        "of",
+                        terminal_count,
+                        "reached, terminating.",
+                    )
+                    lp.stop()

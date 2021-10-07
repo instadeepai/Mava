@@ -66,47 +66,45 @@ class MADDPGBaseTrainer(mava.Trainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
         """Initialise MADDPG trainer
         Args:
-            agents (List[str]): agent ids, e.g. "agent_0".
-            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
                 the system.
-            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+            critic_networks: critic network(s), shared or for
                 each agent in the system.
-            target_policy_networks (Dict[str, snt.Module]): target policy networks.
-            target_critic_networks (Dict[str, snt.Module]): target critic networks.
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer:
                 optimizer(s) for updating policy networks.
-            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+            critic_optimizer:
                 optimizer for updating critic networks.
-            discount (float): discount factor for TD updates.
-            target_averaging (bool): whether to use polyak averaging for target network
+            discount: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
                 updates.
-            target_update_period (int): number of steps before target networks are
+            target_update_period: number of steps before target networks are
                 updated.
-            target_update_rate (float): update rate when using averaging.
-            dataset (tf.data.Dataset): training dataset.
-            observation_networks (Dict[str, snt.Module]): network for feature
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
                 extraction from raw observation.
-            target_observation_networks (Dict[str, snt.Module]): target observation
+            target_observation_networks: target observation
                 network.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
-            max_gradient_norm (float, optional): maximum allowed norm for gradients
-                before clipping is applied. Defaults to None.
-            counter (counting.Counter, optional): step counter object. Defaults to None.
-            logger (loggers.Logger, optional): logger object for logging trainer
-                statistics. Defaults to None.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
         """
 
         self._agents = agents
-        # self._agent_types = agent_types
         self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
 
@@ -141,7 +139,7 @@ class MADDPGBaseTrainer(mava.Trainer):
             self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
-        self._num_steps = num_steps
+        self._num_steps = tf.Variable(0, dtype=tf.int32)
         self._target_averaging = target_averaging
         self._target_update_period = target_update_period
         self._target_update_rate = target_update_rate
@@ -219,7 +217,7 @@ class MADDPGBaseTrainer(mava.Trainer):
                 if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                     for src, dest in zip(online_variables, target_variables):
                         dest.assign(src)
-            self._num_steps.assign_add(1)
+        self._num_steps.assign_add(1)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         """Depreciated method."""
@@ -231,11 +229,10 @@ class MADDPGBaseTrainer(mava.Trainer):
         """Transform the observatations using the observation networks of each agent."
 
         Args:
-            obs (Dict[str, np.ndarray]): observations at timestep t-1
-            next_obs (Dict[str, np.ndarray]): observations at timestep t
+            obs: observations at timestep t-1
+            next_obs: observations at timestep t
         Returns:
-            Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]: Transformed
-            observatations
+            Transformed observatations
         """
         o_tm1 = {}
         o_t = {}
@@ -265,18 +262,17 @@ class MADDPGBaseTrainer(mava.Trainer):
         """get data to feed to the agent critic network(s)
 
         Args:
-            o_tm1_trans (Dict[str, np.ndarray]): transformed (e.g. using observation
+            o_tm1_trans: transformed (e.g. using observation
                 network) observation at timestep t-1
-            o_t_trans (Dict[str, np.ndarray]): transformed observation at timestep t
-            a_tm1 (Dict[str, np.ndarray]): action at timestep t-1
-            a_t (Dict[str, np.ndarray]): action at timestep t
-            e_tm1 (Dict[str, np.ndarray]): extras at timestep t-1
-            e_t (Dict[str, np.array]): extras at timestep t
-            agent (str): agent id
+            o_t_trans: transformed observation at timestep t
+            a_tm1: action at timestep t-1
+            a_t: action at timestep t
+            e_tm1: extras at timestep t-1
+            e_t: extras at timestep t
+            agent: agent id
 
         Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: agent critic network
-                feeds
+            agent critic network feeds
         """
 
         # Decentralised critic
@@ -295,12 +291,12 @@ class MADDPGBaseTrainer(mava.Trainer):
         """get data to feed to the agent networks
 
         Args:
-            a_t (Dict[str, np.ndarray]): action at timestep t
-            dpg_a_t (np.ndarray): predicted action at timestep t
-            agent (str): agent id
+            a_t: action at timestep t
+            dpg_a_t: predicted action at timestep t
+            agent: agent id
 
         Returns:
-            tf.Tensor: agent policy network feed
+            agent policy network feed
         """
         # Decentralised DPG
         dpg_a_t_feed = dpg_a_t
@@ -310,10 +306,10 @@ class MADDPGBaseTrainer(mava.Trainer):
         """select actions using target policy networks
 
         Args:
-            next_obs (Dict[str, np.ndarray]): next agent observations.
+            next_obs: next agent observations.
 
         Returns:
-            Any: agent target actions
+            agent target actions
         """
         actions = {}
         for agent in self._agents:
@@ -329,7 +325,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         """Trainer forward and backward passes.
 
         Returns:
-            Dict[str, Dict[str, Any]]: losses
+            losses
         """
 
         # Update the target networks
@@ -351,7 +347,7 @@ class MADDPGBaseTrainer(mava.Trainer):
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
         Args:
-            inputs (Any): input data from the data table (transitions)
+            inputs: input data from the data table (transitions)
         """
 
         # Unpack input data as follows:
@@ -493,6 +489,8 @@ class MADDPGBaseTrainer(mava.Trainer):
         elapsed_time = timestamp - self._timestamp if self._timestamp else 0
         self._timestamp = timestamp
 
+        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
+
         # Update our counts and record it.
         # TODO (dries): Can this be simplified? Only one set and one get?
         self._variable_client.add_async(
@@ -501,10 +499,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         )
 
         # Update the variable source and the trainer
-        self._variable_client.set_and_wait()
-        self._variable_client.get_async()
-
-        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
+        self._variable_client.set_and_get_async()
 
         # Checkpoint and attempt to write the logs.
         if self._checkpoint:
@@ -521,7 +516,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -537,7 +531,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -546,7 +539,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -565,7 +557,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
 
@@ -576,7 +567,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -592,7 +582,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -601,7 +590,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -620,7 +608,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
     def _get_critic_feed(
@@ -671,7 +658,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         agents: List[str],
         agent_types: List[str],
         connection_spec: Dict[str, List[str]],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -687,7 +673,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -696,7 +681,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -715,7 +699,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
         self._connection_spec = connection_spec
 
@@ -783,7 +766,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -799,7 +781,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -808,7 +789,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -827,7 +807,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
     def _get_critic_feed(
@@ -880,7 +859,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -896,7 +874,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -904,45 +881,40 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     ):
         """Initialise Recurrent MADDPG trainer
         Args:
-            agents (List[str]): agent ids, e.g. "agent_0".
-            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
                 the system.
-            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+            critic_networks: critic network(s), shared or for
                 each agent in the system.
-            target_policy_networks (Dict[str, snt.Module]): target policy networks.
-            target_critic_networks (Dict[str, snt.Module]): target critic networks.
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer:
                 optimizer(s) for updating policy networks.
-            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
+            critic_optimizer:
                 optimizer for updating critic networks.
-            discount (float): discount factor for TD updates.
-            target_averaging (bool): whether to use polyak averaging for target network
+            discount: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
                 updates.
-            target_update_period (int): number of steps before target networks are
+            target_update_period: number of steps before target networks are
                 updated.
-            target_update_rate (float): update rate when using averaging.
-            dataset (tf.data.Dataset): training dataset.
-            observation_networks (Dict[str, snt.Module]): network for feature
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
                 extraction from raw observation.
-            target_observation_networks (Dict[str, snt.Module]): target observation
+            target_observation_networks: target observation
                 network.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
-            max_gradient_norm (float, optional): maximum allowed norm for gradients
-                before clipping is applied. Defaults to None.
-            counter (counting.Counter, optional): step counter object. Defaults to None.
-            logger (loggers.Logger, optional): logger object for logging trainer
-                statistics. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
-                True.
-            bootstrap_n (int, optional): specifies what bootstrap step to use for the
-            critics.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
         """
         self._bootstrap_n = bootstrap_n
 
         self._agents = agents
-        # self._agent_types = agent_types
         self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
 
@@ -977,7 +949,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
-        self._num_steps = num_steps
+        self._num_steps = tf.Variable(0, dtype=tf.int32)
         self._target_averaging = target_averaging
         self._target_update_period = target_update_period
         self._target_update_rate = target_update_rate
@@ -1056,17 +1028,17 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 if tf.math.mod(self._num_steps, self._target_update_period) == 0:
                     for src, dest in zip(online_variables, target_variables):
                         dest.assign(src)
-            self._num_steps.assign_add(1)
+        self._num_steps.assign_add(1)
 
     def _transform_observations(
         self, observations: Dict[str, np.ndarray]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """apply the observation networks to the raw observations from the dataset
         Args:
-            obs (Dict[str, np.ndarray]): raw agent observations
-            next_obs (Dict[str, np.ndarray]): raw next observations
+            obs: raw agent observations
+            next_obs: raw next observations
         Returns:
-            Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]: transformed
+            transformed
                 observations (features)
         """
 
@@ -1110,16 +1082,16 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         """get data to feed to the agent critic network(s)
         Args:
-            o_tm1_trans (Dict[str, np.ndarray]): transformed (e.g. using observation
+            o_tm1_trans: transformed (e.g. using observation
                 network) observation at timestep t-1
-            o_t_trans (Dict[str, np.ndarray]): transformed observation at timestep t
-            a_tm1 (Dict[str, np.ndarray]): action at timestep t-1
-            a_t (Dict[str, np.ndarray]): action at timestep t
-            e_tm1 (Dict[str, np.ndarray]): extras at timestep t-1
-            e_t (Dict[str, np.array]): extras at timestep t
-            agent (str): agent id
+            o_t_trans: transformed observation at timestep t
+            a_tm1: action at timestep t-1
+            a_t: action at timestep t
+            e_tm1: extras at timestep t-1
+            e_t: extras at timestep t
+            agent: agent id
         Returns:
-            Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]: agent critic network
+            agent critic network
                 feeds
         """
 
@@ -1138,9 +1110,9 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     ) -> tf.Tensor:
         """get data to feed to the agent networks
         Args:
-            a_t (Dict[str, np.ndarray]): action at timestep t
-            dpg_a_t (np.ndarray): predicted action at timestep t
-            agent (str): agent id
+            a_t: action at timestep t
+            dpg_a_t: predicted action at timestep t
+            agent: agent id
         Returns:
             tf.Tensor: agent policy network feed
         """
@@ -1156,9 +1128,9 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     ) -> Any:
         """select actions using target policy networks
         Args:
-            target_obs_trans (Dict[str, np.ndarray]): agent transformed target
+            target_obs_trans: agent transformed target
                 observations.
-            target_core_state (Dict[str, np.ndarray]): target recurrent network state
+            target_core_state: target recurrent network state
         Returns:
             Any: agent target actions
         """
@@ -1189,15 +1161,14 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     ) -> Dict[str, Dict[str, Any]]:
         """Trainer forward and backward passes.
         Returns:
-            Dict[str, Dict[str, Any]]: losses
+            losses
         """
-
         # Update the target networks
         self._update_target_networks()
 
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
+        inputs: reverb.ReplaySample = next(self._iterator)
 
         self._forward(inputs)
 
@@ -1212,7 +1183,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
         Args:
-            inputs (Any): input data from the data table (transitions)
+            inputs: input data from the data table (transitions)
         """
 
         data: Trajectory = inputs.data
@@ -1405,6 +1376,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         elapsed_time = timestamp - self._timestamp if self._timestamp else 0
         self._timestamp = timestamp
 
+        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
+
         # Update our counts and record it.
         # TODO (dries): Can this be simplified? Only one set and one get?
         self._variable_client.add_async(
@@ -1413,11 +1386,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         )
 
         # Update the variable source and the trainer
-        # TODO (dries): Can this be simplified? Do an async set and get?
-        self._variable_client.set_and_wait()
-        self._variable_client.get_async()
-
-        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
+        self._variable_client.set_and_get_async()
 
         # Checkpoint and attempt to write the logs.
         if self._checkpoint:
@@ -1429,9 +1398,9 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
         """get network variables
         Args:
-            names (Sequence[str]): network names
+            names: network names
         Returns:
-            Dict[str, Dict[str, np.ndarray]]: network variables
+            network variables
         """
 
         variables: Dict[str, Dict[str, np.ndarray]] = {}
@@ -1455,7 +1424,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -1471,7 +1439,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -1481,7 +1448,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -1500,7 +1466,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -1515,7 +1480,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -1531,7 +1495,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -1541,7 +1504,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -1560,7 +1522,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -1615,7 +1576,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         self,
         agents: List[str],
         agent_types: List[str],
-        # trainer_net_config: List[str],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         target_policy_networks: Dict[str, snt.Module],
@@ -1631,7 +1591,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -1641,7 +1600,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         super().__init__(
             agents=agents,
             agent_types=agent_types,
-            # trainer_net_config=trainer_net_config,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
@@ -1660,7 +1618,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -1700,4 +1657,86 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dpg_actions_feed = tf.squeeze(
             tf.stack([dpg_actions_feed[agent] for agent in self._agents], -1)
         )
+        return dpg_actions_feed
+
+
+class MADDPGStateBasedSingleActionCriticRecurrentTrainer(MADDPGBaseRecurrentTrainer):
+    """Recurrent MADDPG trainer for a state-based architecture.
+    This is the trainer component of a MADDPG system. IE it takes a dataset as input
+    and implements update functionality to learn from this dataset.
+    """
+
+    def __init__(
+        self,
+        agents: List[str],
+        agent_types: List[str],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        target_policy_networks: Dict[str, snt.Module],
+        target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        discount: float,
+        target_averaging: bool,
+        target_update_period: int,
+        target_update_rate: float,
+        dataset: tf.data.Dataset,
+        observation_networks: Dict[str, snt.Module],
+        target_observation_networks: Dict[str, snt.Module],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
+        agent_net_keys: Dict[str, str],
+        max_gradient_norm: float = None,
+        logger: loggers.Logger = None,
+        bootstrap_n: int = 10,
+    ):
+
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            target_policy_networks=target_policy_networks,
+            target_critic_networks=target_critic_networks,
+            discount=discount,
+            target_averaging=target_averaging,
+            target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
+            dataset=dataset,
+            observation_networks=observation_networks,
+            target_observation_networks=target_observation_networks,
+            agent_net_keys=agent_net_keys,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            max_gradient_norm=max_gradient_norm,
+            logger=logger,
+            variable_client=variable_client,
+            counts=counts,
+            bootstrap_n=bootstrap_n,
+        )
+
+    def _get_critic_feed(
+        self,
+        obs_trans: Dict[str, np.ndarray],
+        target_obs_trans: Dict[str, np.ndarray],
+        actions: Dict[str, np.ndarray],
+        target_actions: Dict[str, np.ndarray],
+        extras: Dict[str, np.ndarray],
+        agent: str,
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        # State based
+        obs_trans_feed = extras["env_states"][agent]
+        target_obs_trans_feed = extras["env_states"][agent]
+        actions_feed = actions[agent]
+        target_actions_feed = target_actions[agent]
+        return obs_trans_feed, target_obs_trans_feed, actions_feed, target_actions_feed
+
+    def _get_dpg_feed(
+        self,
+        target_actions: Dict[str, np.ndarray],
+        dpg_actions: np.ndarray,
+        agent: str,
+    ) -> tf.Tensor:
+        # Decentralised DPG
+        dpg_actions_feed = dpg_actions
         return dpg_actions_feed

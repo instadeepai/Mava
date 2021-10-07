@@ -160,7 +160,6 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
     def step(self) -> None:
         # Run the learning step.
         fetches = self._step()
-
         if self._require_loggers:
             self._create_loggers(list(fetches.keys()))
             self._require_loggers = False
@@ -174,16 +173,13 @@ class ScaledTrainerStatisticsBase(TrainerWrapperBase):
         self._timestamp: float = timestamp
 
         # Update our counts and record it.
-        # TODO (dries): Can this be simplified? Only one set and one get?
         self._variable_client.add_async(
             ["trainer_steps", "trainer_walltime"],
             {"trainer_steps": 1, "trainer_walltime": elapsed_time},
         )
 
-        # Update the variable source and the trainer
-        # TODO (dries): Can this be simplified? Do an async set and get?
-        self._variable_client.set_and_wait()
-        self._variable_client.get_async()
+        # Set and get the latest variables
+        self._variable_client.set_and_get_async()
 
         fetches.update(self._counts)
 
@@ -339,7 +335,6 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         if hasattr(self, "_counts"):
             return bool(
                 self._counts
-                and self._counts
                 and self._counts.get("steps")
                 and self._counts.get("steps") % self.log_interval == 0
             )
@@ -483,27 +478,6 @@ class NetworkStatistics(NetworkStatisticsBase):
             log_gradients,
         )
 
-    @tf.function
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-
-        # Update the target networks
-        # Trying not to assume off policy.
-        if hasattr(self, "_update_target_networks"):
-            self._update_target_networks()
-
-        # Get data from replay (dropping extras if any). Note there is no
-        # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
-
-        self._forward(inputs)
-
-        self._backward()
-
-        # Log losses per agent
-        return self.policy_losses
-
     def _backward(self) -> None:
         policy_losses = self.policy_losses
         tape = self.tape
@@ -570,27 +544,6 @@ class NetworkStatisticsMixing(NetworkStatisticsBase):
             log_weights,
             log_gradients,
         )
-
-    @tf.function
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-
-        # Update the target networks
-        # Trying not to assume off policy.
-        if hasattr(self, "_update_target_networks"):
-            self._update_target_networks()
-
-        # Get data from replay (dropping extras if any). Note there is no
-        # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
-
-        self._forward(inputs)
-
-        self._backward()
-
-        # Log losses per agent
-        return {agent: {"q_value_loss": self.loss} for agent in self._agents}
 
     def _backward(self) -> None:
         log_current_timestep = self._log_step()
@@ -660,29 +613,6 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             log_interval,
             log_weights,
             log_gradients,
-        )
-
-    @tf.function
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-
-        # Update the target networks
-        # Trying not to assume off policy.
-        if hasattr(self, "_update_target_networks"):
-            self._update_target_networks()
-
-        # Get data from replay (dropping extras if any). Note there is no
-        # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
-
-        self._forward(inputs)
-
-        self._backward()
-
-        # Log losses per agent
-        return train_utils.map_losses_per_agent_ac(
-            self.critic_losses, self.policy_losses
         )
 
     def _backward(self) -> None:
