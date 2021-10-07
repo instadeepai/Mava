@@ -23,6 +23,49 @@ from mava import core
 from mava.callbacks import Callback
 from mava.systems.building import SystemBuilder
 
+# self.on_building_executor_start(self)
+
+#         self.on_building_executor_logger(self)
+
+#         self.on_building_executor(self)
+
+#         self.on_building_executor_train_loop(self)
+
+#         self.on_building_executor_end(self)
+
+#         # Create the system
+#         behaviour_policy_networks, networks = self.create_system()
+
+#         # Create the executor.
+#         executor = self._builder.make_executor(
+#             networks=networks,
+#             policy_networks=behaviour_policy_networks,
+#             adder=self._builder.make_adder(replay),
+#             variable_source=variable_source,
+#         )
+
+#         # TODO (Arnu): figure out why factory function are giving type errors
+#         # Create the environment.
+#         environment = self._environment_factory(evaluation=False)  # type: ignore
+
+#         # Create executor logger
+#         executor_logger_config = {}
+#         if self._logger_config and "executor" in self._logger_config:
+#             executor_logger_config = self._logger_config["executor"]
+#         exec_logger = self._logger_factory(  # type: ignore
+#             f"executor_{executor_id}", **executor_logger_config
+#         )
+
+#         # Create the loop to connect environment and executor.
+#         train_loop = self._train_loop_fn(
+#             environment,
+#             executor,
+#             logger=exec_logger,
+#             **self._train_loop_fn_kwargs,
+#         )
+
+#         train_loop = DetailedPerAgentStatistics(train_loop)
+
 
 class Executor(Callback):
     def __init__(
