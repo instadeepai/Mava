@@ -15,13 +15,12 @@
 
 """Execution components for system builders"""
 
-from typing import Dict, Type, Any
+from typing import Dict, Any
 
-from acme.specs import EnvironmentSpec
-
-from mava import core
+from mava.systems.tf import variable_utils
 from mava.callbacks import Callback
 from mava.systems.building import SystemBuilder
+from mava.wrappers import DetailedPerAgentStatistics
 
 
 class Executor(Callback):
@@ -56,21 +55,15 @@ class Executor(Callback):
     def on_building_executor(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
-        # Create the executor.
-        executor = self._builder.make_executor(
-            networks=networks,
-            policy_networks=behaviour_policy_networks,
-            adder=self._builder.make_adder(replay),
-            variable_source=variable_source,
-        )
-
         # Create policy variables
         variables = {}
         get_keys = []
         for net_type_key in ["observations", "policies"]:
-            for net_key in networks[net_type_key].keys():
+            for net_key in builder._system_networks[net_type_key].keys():
                 var_key = f"{net_key}_{net_type_key}"
-                variables[var_key] = networks[net_type_key][net_key].variables
+                variables[var_key] = builder._system_networks[net_type_key][
+                    net_key
+                ].variables
                 get_keys.append(var_key)
         variables = self.create_counter_variables(variables)
 
@@ -86,10 +79,10 @@ class Executor(Callback):
         counts = {name: variables[name] for name in count_names}
 
         variable_client = None
-        if variable_source:
+        if builder._variable_source:
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
-                client=variable_source,
+                client=builder._variable_source,
                 variables=variables,
                 get_keys=get_keys,
                 update_period=self._config.executor_variable_update_period,
@@ -99,7 +92,9 @@ class Executor(Callback):
             # assigning variables before running the environment loop.
             variable_client.get_and_wait()
 
-        builder.executor = self._executor_fn(
+        adder = builder.adder(builder._replay_client)
+
+        builder._executor = self._executor_fn(
             policy_networks=policy_networks,
             counts=counts,
             net_keys_to_ids=self._config.net_keys_to_ids,
@@ -112,15 +107,13 @@ class Executor(Callback):
 
     def on_building_executor_train_loop(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        # TODO (Arnu): figure out why factory function are giving type errors
-        # Create the environment.
         environment = self._environment_factory(evaluation=False)  # type: ignore
 
         # Create the loop to connect environment and executor.
         train_loop = self._train_loop_fn(
             environment,
-            executor,
-            logger=exec_logger,
+            builder._executor,
+            logger=builder._exec_logger,
             **self._train_loop_fn_kwargs,
         )
 

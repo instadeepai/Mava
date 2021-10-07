@@ -170,7 +170,7 @@ class System:
     def executor(
         self,
         executor_id: str,
-        replay: reverb.Client,
+        replay_client: reverb.Client,
         variable_source: acme.VariableSource,
     ) -> mava.ParallelEnvironmentLoop:
         """System executor
@@ -185,7 +185,7 @@ class System:
         """
 
         self._executor_id = executor_id
-        self._replay = replay
+        self._replay_client = replay_client
         self._variable_source = variable_source
 
         self.on_building_executor_start(self)
@@ -213,6 +213,18 @@ class System:
             Any: environment-executor evaluation loop instance for evaluating the
                 performance of a system.
         """
+
+        self._variable_source = variable_source
+
+        self.on_building_evaluator_start(self)
+
+        self.on_building_evaluator_logger(self)
+
+        self.on_building_evaluator(self)
+
+        self.on_building_evaluator_eval_loop(self)
+
+        self.on_building_evaluator_end(self)
 
         # Create the system
         behaviour_policy_networks, networks = self.create_system()
