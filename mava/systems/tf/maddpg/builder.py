@@ -76,7 +76,6 @@ class MADDPGConfig:
         period: consecutive starting points for overlapping rollouts across a sequence.
         max_gradient_norm: value to specify the maximum clipping value for the gradient
             norm during optimization.
-        sigma: Gaussian sigma parameter.
         logger: logger to use.
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
@@ -119,7 +118,6 @@ class MADDPGConfig:
     period: int = 20
     bootstrap_n: int = 10
     max_gradient_norm: Optional[float] = None
-    sigma: float = 0.3
     logger: loggers.Logger = None
     counter: counting.Counter = None
     checkpoint: bool = True
@@ -545,8 +543,6 @@ class MADDPGBuilder:
                     get_keys.append(f"{net_key}_{net_type_key}")
 
         variables = self.create_counter_variables(variables)
-        num_steps = variables["trainer_steps"]
-
         count_names = [
             "trainer_steps",
             "trainer_walltime",
@@ -595,7 +591,6 @@ class MADDPGBuilder:
             "variable_client": variable_client,
             "dataset": dataset,
             "counts": counts,
-            "num_steps": num_steps,
             "logger": logger,
         }
         if connection_spec:

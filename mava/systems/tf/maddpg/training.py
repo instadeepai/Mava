@@ -66,7 +66,6 @@ class MADDPGBaseTrainer(mava.Trainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -98,8 +97,6 @@ class MADDPGBaseTrainer(mava.Trainer):
                 network.
             variable_client: The client used to manage the variables.
             counts: step counter object.
-            num_steps: Use to track the number of steps before the target networks
-                are updated.
             agent_net_keys: specifies what network each agent uses.
             max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied.
@@ -142,7 +139,7 @@ class MADDPGBaseTrainer(mava.Trainer):
             self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
-        self._num_steps = num_steps
+        self._num_steps = tf.Variable(0, dtype=tf.int32)
         self._target_averaging = target_averaging
         self._target_update_period = target_update_period
         self._target_update_rate = target_update_rate
@@ -492,6 +489,8 @@ class MADDPGBaseTrainer(mava.Trainer):
         elapsed_time = timestamp - self._timestamp if self._timestamp else 0
         self._timestamp = timestamp
 
+        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
+
         # Update our counts and record it.
         # TODO (dries): Can this be simplified? Only one set and one get?
         self._variable_client.add_async(
@@ -501,8 +500,6 @@ class MADDPGBaseTrainer(mava.Trainer):
 
         # Update the variable source and the trainer
         self._variable_client.set_and_get_async()
-
-        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
 
         # Checkpoint and attempt to write the logs.
         if self._checkpoint:
@@ -534,7 +531,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -561,7 +557,6 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
 
@@ -587,7 +582,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -614,7 +608,6 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
     def _get_critic_feed(
@@ -680,7 +673,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -707,7 +699,6 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
         self._connection_spec = connection_spec
 
@@ -790,7 +781,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: int,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -817,7 +807,6 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
         )
 
     def _get_critic_feed(
@@ -885,7 +874,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -918,8 +906,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 network.
             variable_client: The client used to manage the variables.
             counts: step counter object.
-            num_steps: Use to track the number of steps before the target networks
-                are updated.
             agent_net_keys: specifies what network each agent uses.
             max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied.
@@ -963,7 +949,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             self._max_gradient_norm = tf.convert_to_tensor(1e10)
 
         # Necessary to track when to update target networks.
-        self._num_steps = num_steps
+        self._num_steps = tf.Variable(0, dtype=tf.int32)
         self._target_averaging = target_averaging
         self._target_update_period = target_update_period
         self._target_update_rate = target_update_rate
@@ -1177,13 +1163,12 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         Returns:
             losses
         """
-
         # Update the target networks
         self._update_target_networks()
 
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
+        inputs: reverb.ReplaySample = next(self._iterator)
 
         self._forward(inputs)
 
@@ -1391,6 +1376,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         elapsed_time = timestamp - self._timestamp if self._timestamp else 0
         self._timestamp = timestamp
 
+        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
+
         # Update our counts and record it.
         # TODO (dries): Can this be simplified? Only one set and one get?
         self._variable_client.add_async(
@@ -1400,8 +1387,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
         # Update the variable source and the trainer
         self._variable_client.set_and_get_async()
-
-        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
 
         # Checkpoint and attempt to write the logs.
         if self._checkpoint:
@@ -1454,7 +1439,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -1482,7 +1466,6 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -1512,7 +1495,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -1540,7 +1522,6 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -1610,7 +1591,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         target_observation_networks: Dict[str, snt.Module],
         variable_client: VariableClient,
         counts: Dict[str, Any],
-        num_steps: tf.Variable,
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
@@ -1638,7 +1618,6 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
-            num_steps=num_steps,
             bootstrap_n=bootstrap_n,
         )
 
@@ -1678,4 +1657,86 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         dpg_actions_feed = tf.squeeze(
             tf.stack([dpg_actions_feed[agent] for agent in self._agents], -1)
         )
+        return dpg_actions_feed
+
+
+class MADDPGStateBasedSingleActionCriticRecurrentTrainer(MADDPGBaseRecurrentTrainer):
+    """Recurrent MADDPG trainer for a state-based architecture.
+    This is the trainer component of a MADDPG system. IE it takes a dataset as input
+    and implements update functionality to learn from this dataset.
+    """
+
+    def __init__(
+        self,
+        agents: List[str],
+        agent_types: List[str],
+        policy_networks: Dict[str, snt.Module],
+        critic_networks: Dict[str, snt.Module],
+        target_policy_networks: Dict[str, snt.Module],
+        target_critic_networks: Dict[str, snt.Module],
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        discount: float,
+        target_averaging: bool,
+        target_update_period: int,
+        target_update_rate: float,
+        dataset: tf.data.Dataset,
+        observation_networks: Dict[str, snt.Module],
+        target_observation_networks: Dict[str, snt.Module],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
+        agent_net_keys: Dict[str, str],
+        max_gradient_norm: float = None,
+        logger: loggers.Logger = None,
+        bootstrap_n: int = 10,
+    ):
+
+        super().__init__(
+            agents=agents,
+            agent_types=agent_types,
+            policy_networks=policy_networks,
+            critic_networks=critic_networks,
+            target_policy_networks=target_policy_networks,
+            target_critic_networks=target_critic_networks,
+            discount=discount,
+            target_averaging=target_averaging,
+            target_update_period=target_update_period,
+            target_update_rate=target_update_rate,
+            dataset=dataset,
+            observation_networks=observation_networks,
+            target_observation_networks=target_observation_networks,
+            agent_net_keys=agent_net_keys,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
+            max_gradient_norm=max_gradient_norm,
+            logger=logger,
+            variable_client=variable_client,
+            counts=counts,
+            bootstrap_n=bootstrap_n,
+        )
+
+    def _get_critic_feed(
+        self,
+        obs_trans: Dict[str, np.ndarray],
+        target_obs_trans: Dict[str, np.ndarray],
+        actions: Dict[str, np.ndarray],
+        target_actions: Dict[str, np.ndarray],
+        extras: Dict[str, np.ndarray],
+        agent: str,
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        # State based
+        obs_trans_feed = extras["env_states"][agent]
+        target_obs_trans_feed = extras["env_states"][agent]
+        actions_feed = actions[agent]
+        target_actions_feed = target_actions[agent]
+        return obs_trans_feed, target_obs_trans_feed, actions_feed, target_actions_feed
+
+    def _get_dpg_feed(
+        self,
+        target_actions: Dict[str, np.ndarray],
+        dpg_actions: np.ndarray,
+        agent: str,
+    ) -> tf.Tensor:
+        # Decentralised DPG
+        dpg_actions_feed = dpg_actions
         return dpg_actions_feed

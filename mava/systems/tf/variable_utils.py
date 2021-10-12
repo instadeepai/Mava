@@ -82,7 +82,7 @@ class VariableClient:
             self._set_keys,
             tf2_utils.to_numpy({key: self._variables[key] for key in self._set_keys}),
         )
-        self._client.get_variables(self._get_keys)
+        self._copy(self._client.get_variables(self._get_keys))
 
     def get_async(self) -> None:
         """Asynchronously updates the get variables with the latest copy from source."""
@@ -129,7 +129,6 @@ class VariableClient:
         # Track the number of calls (we only update periodically).
         if self._set_get_call_counter < self._update_period:
             self._set_get_call_counter += 1
-
         period_reached: bool = self._set_get_call_counter >= self._update_period
 
         if period_reached and self._set_get_future is None:  # type: ignore
@@ -155,7 +154,7 @@ class VariableClient:
             else:
                 for name in names:
                     self._async_add_buffer[name] += vars[name]
-                self._add_future = self._async_add(
+                self._add_future = self._async_add(  # type: ignore
                     names, self._async_add_buffer
                 )  # type: ignore
                 self._async_add_buffer = {}

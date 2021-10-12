@@ -92,7 +92,6 @@ class MADDPG:
         sequence_length: int = 20,
         period: int = 20,
         bootstrap_n: int = 10,
-        sigma: float = 0.3,
         max_gradient_norm: float = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -166,7 +165,6 @@ class MADDPG:
             bootstrap_n: Used to determine the spacing between
                 q_value/value estimation for bootstrapping. Should be less
                 than sequence_length.
-            sigma: Gaussian sigma parameter.
             max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied.
             checkpoint: whether to checkpoint models.
@@ -377,7 +375,6 @@ class MADDPG:
                 sequence_length=sequence_length,
                 period=period,
                 bootstrap_n=bootstrap_n,
-                sigma=sigma,
                 max_gradient_norm=max_gradient_norm,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
