@@ -1,9 +1,41 @@
 import os
-from typing import Any, Dict, Iterable, Sequence
+from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 
 import sonnet as snt
 import tensorflow as tf
 import trfl
+
+
+def check_count_condition(condition: Optional[dict]) -> Tuple:
+    """Checks if condition is valid. These conditions are used for termination
+    or to run evaluators in intervals.
+
+    Args:
+        condition : a dict with a key referring to the name of a condition and the
+        value referring to count of the condition that needs to be reached.
+        e.g. {"executor_episodes": 100}
+
+    Returns:
+        the condition key and count.
+    """
+
+    valid_options = [
+        "trainer_steps",
+        "trainer_walltime",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    ]
+
+    condition_key, condition_count = None, None
+    if condition is not None:
+        assert len(condition) == 1
+        condition_key, condition_count = list(condition.items())[0]
+        assert condition_key in valid_options
+        assert condition_count > 0
+
+    return condition_key, condition_count
 
 
 # Checkpoint the networks.

@@ -40,6 +40,7 @@ from mava.wrappers import MADQNDetailedTrainerStatistics
 @dataclasses.dataclass
 class MADQNConfig:
     """Configuration options for the MADQN system.
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
@@ -298,7 +299,7 @@ class MADQNBuilder:
             communication_module (BaseCommunicationModule): module for enabling
                 communication protocols between agents. Defaults to None.
             evaluator (bool, optional): boolean indicator if the executor is used for
-                for evaluation only. Defaults to False.
+                for evaluation only.
 
         Returns:
             core.Executor: system executor, a collection of agents making up the part

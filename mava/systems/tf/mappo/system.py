@@ -431,6 +431,7 @@ class MAPPO:
         executor = self._builder.make_executor(
             policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
+            evaluator=True,
         )
 
         # Make the environment.

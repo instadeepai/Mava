@@ -208,17 +208,20 @@ class MAPPOBuilder:
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
+        evaluator: bool = False,
     ) -> core.Executor:
 
         """Create an executor instance.
 
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            policy_networks: policy networks for each agent in
                 the system.
-            adder (Optional[adders.ParallelAdder], optional): adder to send data to
+            adder : adder to send data to
                 a replay buffer. Defaults to None.
             variable_source (Optional[core.VariableSource], optional): variables server.
                 Defaults to None.
+            evaluator: boolean indicator if the executor is used for
+                for evaluation only.
 
         Returns:
             core.Executor: system executor, a collection of agents making up the part
@@ -251,6 +254,7 @@ class MAPPOBuilder:
             agent_net_keys=self._config.agent_net_keys,
             variable_client=variable_client,
             adder=adder,
+            evaluator=evaluator,
         )
 
     def make_trainer(

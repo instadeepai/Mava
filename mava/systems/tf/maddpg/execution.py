@@ -51,9 +51,11 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
         net_keys_to_ids: Dict[str, int],
+        evaluator: bool,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        interval: Optional[dict] = None,
     ):
 
         """Initialise the system executor
@@ -80,6 +82,8 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self._counts = counts
         self._network_int_keys_extras: Dict[str, np.array] = {}
         self._net_keys_to_ids = net_keys_to_ids
+        self._evaluator = evaluator
+        self._interval = interval
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,

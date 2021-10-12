@@ -25,6 +25,7 @@ from acme.utils import counting, loggers
 
 import mava
 from mava.types import Action
+from mava.utils.training_utils import check_count_condition
 from mava.utils.wrapper_utils import (
     SeqTimestepDict,
     convert_seq_timestep_and_actions_to_parallel,
@@ -321,6 +322,11 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._should_update = should_update
         self._running_statistics: Dict[str, float] = {}
 
+        # print(self._executor)
+        # print(self._executor._evaluator)
+        # print(self._executor._interval)
+        # raise NotADirectoryError()
+
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_actions(timestep.observation)
 
@@ -337,6 +343,36 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         start_time: float,
     ) -> None:
         pass
+
+    def get_counts(self) -> Any:
+        if hasattr(self._executor, "_counts"):
+            counts = self._executor._counts
+        else:
+            counts = self._counter._counts
+        return counts
+
+    def record_counts(self, episode_steps: int) -> Any:
+        # Record counts.
+        if hasattr(self._executor, "_counts"):
+            loop_type = "evaluator" if self._executor._evaluator else "executor"
+
+            if hasattr(self._executor, "_variable_client"):
+                self._executor._variable_client.add_async(
+                    [f"{loop_type}_episodes", f"{loop_type}_steps"],
+                    {
+                        f"{loop_type}_episodes": 1,
+                        f"{loop_type}_steps": episode_steps,
+                    },
+                )
+            else:
+                self._executor._counts[f"{loop_type}_episodes"] += 1
+                self._executor._counts[f"{loop_type}_steps"] += episode_steps
+
+            counts = self._executor._counts
+        else:
+            counts = self._counter.increment(episodes=1, steps=episode_steps)
+
+        return counts
 
     def run_episode(self) -> loggers.LoggingData:
         """Run one episode.
@@ -422,27 +458,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         if self._get_running_stats():
             return self._get_running_stats()
         else:
-            # Record counts.
-            if hasattr(self._executor, "_counts"):
-                loop_type = "executor"
-                if "_" not in self._loop_label:
-                    loop_type = "evaluator"
 
-                if hasattr(self._executor, "_variable_client"):
-                    self._executor._variable_client.add_async(
-                        [f"{loop_type}_episodes", f"{loop_type}_steps"],
-                        {
-                            f"{loop_type}_episodes": 1,
-                            f"{loop_type}_steps": episode_steps,
-                        },
-                    )
-                else:
-                    self._executor._counts[f"{loop_type}_episodes"] += 1
-                    self._executor._counts[f"{loop_type}_steps"] += episode_steps
-
-                counts = self._executor._counts
-            else:
-                counts = self._counter.increment(episodes=1, steps=episode_steps)
+            counts = self.record_counts(episode_steps)
 
             # Collect the results and combine with counts.
             steps_per_second = episode_steps / (time.time() - start_time)
@@ -452,7 +469,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 "steps_per_second": steps_per_second,
             }
             result.update(counts)
-
             return result
 
     def run(
@@ -481,10 +497,36 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 num_steps is not None and step_count >= num_steps
             )
 
+        def should_run_loop(interval: Optional[dict]) -> bool:
+            """Check if the eval loop should run in current step.
+
+            Args:
+                interval : dict containing interval key and count.
+
+            Returns:
+                a bool indicatings if eval should run.
+            """
+            if interval:
+                eval_interval_key, eval_interval_count = check_count_condition(interval)
+                # +1 since we start counting at 0
+                should_run_loop = (
+                    (self.get_counts().get(eval_interval_key) + 1) % eval_interval_count
+                ) == 0
+            else:
+                should_run_loop = True
+            return should_run_loop
+
         episode_count, step_count = 0, 0
         while not should_terminate(episode_count, step_count):
-            result = self.run_episode()
-            episode_count += 1
-            step_count += result["episode_length"]
-            # Log the given results.
-            self._logger.write(result)
+            #  Currently, we only use intervals for eval loops
+            interval = self._executor._interval if self._executor._evaluator else None
+            while should_run_loop(interval):
+                result = self.run_episode()
+                episode_count += 1
+                step_count += result["episode_length"]
+                # Log the given results.
+                self._logger.write(result)
+
+            # We need to get the latest counts if we are using eval intervals.
+            if interval:
+                self._executor.update()

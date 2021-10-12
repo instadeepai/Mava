@@ -81,10 +81,17 @@ class MADDPGConfig:
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         termination_condition: An optional terminal condition can be provided
-        that stops the program once the condition is satisfied. Available options
-        include specifying maximum values for trainer_steps, trainer_walltime,
-        evaluator_steps, evaluator_episodes, executor_episodes or executor_steps.
-        E.g. termination_condition = {'trainer_steps': 100000}."""
+            that stops the program once the condition is satisfied. Available options
+            include specifying maximum values for trainer_steps, trainer_walltime,
+            evaluator_steps, evaluator_episodes, executor_episodes or executor_steps.
+            E.g. termination_condition = {'trainer_steps': 100000}.
+        evaluator_interval: An optional condition that is used to
+            evaluate/test system performance after [evaluator_interval]
+            condition has been met. If None, evaluation will
+            happen at every timestep.
+            E.g. to evaluate a system after every 1000 executor episodes,
+            evaluator_interval = {"executor_episodes": 100}.
+    """
 
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
@@ -118,6 +125,7 @@ class MADDPGConfig:
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     termination_condition: Optional[Dict[str, int]] = None
+    evaluator_interval: Optional[dict] = None
 
 
 class MADDPGBuilder:
@@ -417,11 +425,11 @@ class MADDPGBuilder:
 
     def make_executor(
         self,
-        # executor_id: str,
         networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[MavaVariableSource] = None,
+        evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -432,6 +440,8 @@ class MADDPGBuilder:
                 a replay buffer. Defaults to None.
             variable_source: variables server.
                 Defaults to None.
+            evaluator: boolean indicator if the executor is used for
+                for evaluation only.
         Returns:
             system executor, a collection of agents making up the part
                 of the system generating data by interacting the environment.
@@ -481,6 +491,8 @@ class MADDPGBuilder:
             network_sampling_setup=self._config.network_sampling_setup,
             variable_client=variable_client,
             adder=adder,
+            evaluator=evaluator,
+            interval=self._config.evaluator_interval if evaluator else None,
         )
 
     def make_trainer(
