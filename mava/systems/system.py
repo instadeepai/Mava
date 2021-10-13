@@ -160,18 +160,6 @@ class System:
 
         self.on_building_system_end(self)
 
-        # Create system architecture with target networks.
-        # adder_env_spec = self._builder.convert_discrete_to_bounded(
-        #     self._environment_spec
-        # )
-
-        # net_spec_keys is only implemented for the Decentralised architectures
-        # if (
-        #     self._architecture == DecentralisedValueActorCritic
-        #     or self._architecture == DecentralisedQValueActorCritic
-        # ):
-        #     architecture_config["net_spec_keys"] = self._net_spec_keys
-
         return self.system_networks
 
     def variable_server(self) -> MavaVariableSource:
@@ -260,7 +248,6 @@ class System:
         trainer_id: str,
         replay_client: reverb.Client,
         variable_source: MavaVariableSource,
-        # counter: counting.Counter,
     ) -> mava.core.Trainer:
         """System trainer
         Args:
@@ -286,26 +273,27 @@ class System:
 
         return self.trainer
 
-    def build(self, name: str = "maddpg") -> Any:
+    def build(self) -> Any:
         """Build the distributed system as a graph program.
         Args:
             name (str, optional): system name. Defaults to "maddpg".
         Returns:
             Any: graph program for distributed system training.
         """
+        name = self.config.system_name
         program = lp.Program(name=name)
 
         with program.group("replay"):
-            replay = program.add_node(lp.ReverbNode(self.replay))
+            tables = program.add_node(lp.ReverbNode(self.tables))
 
         with program.group("variable_server"):
             variable_server = program.add_node(lp.CourierNode(self.variable_server))
 
         with program.group("trainer"):
             # Add executors which pull round-robin from our variable sources.
-            for trainer_id in range(len(self._trainer_networks.keys())):
+            for trainer_id in range(len(self.config.trainer_networks.keys())):
                 program.add_node(
-                    lp.CourierNode(self.trainer, trainer_id, replay, variable_server)
+                    lp.CourierNode(self.trainer, trainer_id, tables, variable_server)
                 )
 
         with program.group("evaluator"):
@@ -315,7 +303,7 @@ class System:
             # Add executors which pull round-robin from our variable sources.
             for executor_id in range(self._num_exectors):
                 program.add_node(
-                    lp.CourierNode(self.executor, executor_id, replay, variable_server)
+                    lp.CourierNode(self.executor, executor_id, tables, variable_server)
                 )
 
         return program
