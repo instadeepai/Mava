@@ -196,33 +196,33 @@ class OnlineSystemBuilder(SystemBuilder, SystemCallbackHookMixin):
 
     #     return self.replay_tables
 
-    def make_dataset_iterator(
-        self,
-        replay_client: reverb.Client,
-        table_name: str,
-    ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for training/updating the system.
-        Args:
-            replay_client (reverb.Client): Reverb Client which points to the
-                replay server.
-        Returns:
-            [type]: dataset iterator.
-        Yields:
-            Iterator[reverb.ReplaySample]: data samples from the dataset.
-        """
-        self._replay_client = replay_client
-        self._table_name = table_name
+    # def make_dataset_iterator(
+    #     self,
+    #     replay_client: reverb.Client,
+    #     table_name: str,
+    # ) -> Iterator[reverb.ReplaySample]:
+    #     """Create a dataset iterator to use for training/updating the system.
+    #     Args:
+    #         replay_client (reverb.Client): Reverb Client which points to the
+    #             replay server.
+    #     Returns:
+    #         [type]: dataset iterator.
+    #     Yields:
+    #         Iterator[reverb.ReplaySample]: data samples from the dataset.
+    #     """
+    #     self._replay_client = replay_client
+    #     self._table_name = table_name
 
-        # start of make dataset iterator
-        self.on_building_make_dataset_iterator_start(self)
+    #     # start of make dataset iterator
+    #     self.on_building_make_dataset_iterator_start(self)
 
-        # make dataset
-        self.on_building_dataset(self)
+    #     # make dataset
+    #     self.on_building_dataset(self)
 
-        # end of make dataset iterator
-        self.on_building_make_dataset_iterator_end(self)
+    #     # end of make dataset iterator
+    #     self.on_building_make_dataset_iterator_end(self)
 
-        return self.dataset
+    #     return self.dataset
 
     # def make_adder(
     #     self,
@@ -277,88 +277,88 @@ class OnlineSystemBuilder(SystemBuilder, SystemCallbackHookMixin):
 
     #     return self.variable_server
 
-    def make_executor(
-        self,
-        networks: Dict[str, snt.Module],
-        policy_networks: Dict[str, snt.Module],
-        adder: Optional[adders.ParallelAdder] = None,
-        variable_source: Optional[MavaVariableSource] = None,
-    ) -> core.Executor:
-        """Create an executor instance.
-        Args:
-            networks (Dict[str, snt.Module]): system networks.
-            executor_networks (Dict[str, snt.Module]): executor networks for each agent in
-                the system.
-            adder (Optional[adders.ParallelAdder], optional): adder to send data to
-                a replay buffer. Defaults to None.
-            variable_source (Optional[core.VariableSource], optional): variables server.
-                Defaults to None.
-        Returns:
-            core.Executor: system executor, a collection of agents making up the part
-                of the system generating data by interacting the environment.
-        """
-        self._networks = networks
-        self._policy_networks = policy_networks
-        self._adder = adder
-        self._variable_source = variable_source
+    # def make_executor(
+    #     self,
+    #     networks: Dict[str, snt.Module],
+    #     policy_networks: Dict[str, snt.Module],
+    #     adder: Optional[adders.ParallelAdder] = None,
+    #     variable_source: Optional[MavaVariableSource] = None,
+    # ) -> core.Executor:
+    #     """Create an executor instance.
+    #     Args:
+    #         networks (Dict[str, snt.Module]): system networks.
+    #         executor_networks (Dict[str, snt.Module]): executor networks for each agent in
+    #             the system.
+    #         adder (Optional[adders.ParallelAdder], optional): adder to send data to
+    #             a replay buffer. Defaults to None.
+    #         variable_source (Optional[core.VariableSource], optional): variables server.
+    #             Defaults to None.
+    #     Returns:
+    #         core.Executor: system executor, a collection of agents making up the part
+    #             of the system generating data by interacting the environment.
+    #     """
+    #     self._networks = networks
+    #     self._policy_networks = policy_networks
+    #     self._adder = adder
+    #     self._variable_source = variable_source
 
-        # start of make executor
-        self.on_building_make_executor_start(self)
+    #     # start of make executor
+    #     self.on_building_make_executor_start(self)
 
-        # make variable client
-        self.on_building_executor_variable_client(self)
+    #     # make variable client
+    #     self.on_building_executor_variable_client(self)
 
-        # make executor
-        self.on_building_executor(self)
+    #     # make executor
+    #     self.on_building_executor(self)
 
-        # end of make executor
-        self.on_building_make_executor_end(self)
+    #     # end of make executor
+    #     self.on_building_make_executor_end(self)
 
-        return self.executor
+    #     return self.executor
 
-    def make_trainer(
-        self,
-        networks: Dict[str, Dict[str, snt.Module]],
-        dataset: Iterator[reverb.ReplaySample],
-        variable_source: MavaVariableSource,
-        trainer_networks: List[Any],
-        trainer_table_entry: List[Any],
-        logger: Optional[types.NestedLogger] = None,
-    ) -> core.Trainer:
-        """Create a trainer instance.
-        Args:
-            networks (Dict[str, Dict[str, snt.Module]]): system networks.
-            dataset (Iterator[reverb.ReplaySample]): dataset iterator to feed data to
-                the trainer networks.
-            variable_source (MavaVariableSource): centralised variable source object.
-            trainer_networks (List[Any]): list of networks to train.
-            trainer_table_entry (List[Any]): tables associated with trainable networks.
-            logger (Optional[types.NestedLogger], optional): Logger object for logging
-                metadata. Defaults to None.
-        Returns:
-            core.Trainer: system trainer, that uses the collected data from the
-                executors to update the parameters of the agent networks in the system.
-        """
-        self._networks = networks
-        self._dataset = dataset
-        self._variable_source = variable_source
-        self._trainer_networks = trainer_networks
-        self._trainer_table_entry = trainer_table_entry
-        self._logger = logger
+    # def make_trainer(
+    #     self,
+    #     networks: Dict[str, Dict[str, snt.Module]],
+    #     dataset: Iterator[reverb.ReplaySample],
+    #     variable_source: MavaVariableSource,
+    #     trainer_networks: List[Any],
+    #     trainer_table_entry: List[Any],
+    #     logger: Optional[types.NestedLogger] = None,
+    # ) -> core.Trainer:
+    #     """Create a trainer instance.
+    #     Args:
+    #         networks (Dict[str, Dict[str, snt.Module]]): system networks.
+    #         dataset (Iterator[reverb.ReplaySample]): dataset iterator to feed data to
+    #             the trainer networks.
+    #         variable_source (MavaVariableSource): centralised variable source object.
+    #         trainer_networks (List[Any]): list of networks to train.
+    #         trainer_table_entry (List[Any]): tables associated with trainable networks.
+    #         logger (Optional[types.NestedLogger], optional): Logger object for logging
+    #             metadata. Defaults to None.
+    #     Returns:
+    #         core.Trainer: system trainer, that uses the collected data from the
+    #             executors to update the parameters of the agent networks in the system.
+    #     """
+    #     self._networks = networks
+    #     self._dataset = dataset
+    #     self._variable_source = variable_source
+    #     self._trainer_networks = trainer_networks
+    #     self._trainer_table_entry = trainer_table_entry
+    #     self._logger = logger
 
-        # start of make trainer
-        self.on_building_make_trainer_start(self)
+    #     # start of make trainer
+    #     self.on_building_make_trainer_start(self)
 
-        # make variable client
-        self.on_building_trainer_variable_client(self)
+    #     # make variable client
+    #     self.on_building_trainer_variable_client(self)
 
-        # make trainer
-        self.on_building_trainer(self)
+    #     # make trainer
+    #     self.on_building_trainer(self)
 
-        # make statistics tracker
-        self.on_building_trainer_statistics(self)
+    #     # make statistics tracker
+    #     self.on_building_trainer_statistics(self)
 
-        # end of make trainer
-        self.on_building_make_trainer_end(self)
+    #     # end of make trainer
+    #     self.on_building_make_trainer_end(self)
 
-        return self.trainer
+    #     return self.trainer

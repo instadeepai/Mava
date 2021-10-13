@@ -119,7 +119,7 @@ class Executor(Callback):
             **builder._train_loop_fn_kwargs,
         )
 
-        train_loop = DetailedPerAgentStatistics(train_loop)
+        builder.train_loop = DetailedPerAgentStatistics(train_loop)
 
     def on_building_executor_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
@@ -209,7 +209,7 @@ class Evaluator(Executor):
             **builder._eval_loop_fn_kwargs,
         )
 
-        eval_loop = DetailedPerAgentStatistics(eval_loop)
+        builder.eval_loop = DetailedPerAgentStatistics(eval_loop)
 
     def on_building_evaluator_end(self, builder: SystemBuilder) -> None:
         """[summary]"""

@@ -15,13 +15,13 @@
 
 """MADDPG system implementation."""
 
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional, Iterator
 
 import acme
 import launchpad as lp
 import reverb
 import sonnet as snt
-from acme.utils import loggers
+from acme import datasets
 
 
 import mava
@@ -29,7 +29,6 @@ from mava import adders
 from mava.callbacks.base import Callback
 
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
-from mava.wrappers import DetailedPerAgentStatistics
 
 
 class System:
@@ -88,6 +87,34 @@ class System:
         self.on_building_tables_end(self)
 
         return self.tables
+
+    def dataset(
+        self,
+        replay_client: reverb.Client,
+        table_name: str,
+    ) -> Iterator[reverb.ReplaySample]:
+        """Create a dataset iterator to use for training/updating the system.
+        Args:
+            replay_client (reverb.Client): Reverb Client which points to the
+                replay server.
+        Returns:
+            [type]: dataset iterator.
+        Yields:
+            Iterator[reverb.ReplaySample]: data samples from the dataset.
+        """
+        self._replay_client = replay_client
+        self._table_name = table_name
+
+        # start of make dataset iterator
+        self.on_building_make_dataset_iterator_start(self)
+
+        # make dataset
+        self.on_building_dataset(self)
+
+        # end of make dataset iterator
+        self.on_building_make_dataset_iterator_end(self)
+
+        return self.dataset
 
     def adder(
         self,
@@ -257,30 +284,7 @@ class System:
 
         self.on_building_evaluator_end(self)
 
-        # create logger
-        trainer_logger_config = {}
-        if self._logger_config and "trainer" in self._logger_config:
-            trainer_logger_config = self._logger_config["trainer"]
-        trainer_logger = self._logger_factory(  # type: ignore
-            f"trainer_{trainer_id}", **trainer_logger_config
-        )
-
-        # Create the system
-        _, networks = self.create_system()
-
-        dataset = self._builder.make_dataset_iterator(
-            replay, f"{self._builder._config.replay_table_name}_{trainer_id}"
-        )
-
-        return self._builder.make_trainer(
-            # trainer_id=trainer_id,
-            networks=networks,
-            trainer_networks=self._trainer_networks[f"trainer_{trainer_id}"],
-            trainer_table_entry=self._table_network_config[f"trainer_{trainer_id}"],
-            dataset=dataset,
-            logger=trainer_logger,
-            variable_source=variable_source,
-        )
+        return self.trainer
 
     def build(self, name: str = "maddpg") -> Any:
         """Build the distributed system as a graph program.

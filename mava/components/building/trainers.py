@@ -40,8 +40,7 @@ class Trainer(Callback):
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        # Create executor logger
-        # create logger
+        # create trainer logger
         trainer_logger_config = {}
         if builder._logger_config and "trainer" in builder._logger_config:
             trainer_logger_config = builder._logger_config["trainer"]
@@ -151,6 +150,8 @@ class Trainer(Callback):
         trainer = ScaledDetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]
         )
+
+        builder.trainer = trainer
 
     def on_building_trainer_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
