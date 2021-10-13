@@ -37,6 +37,16 @@ def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
 
     return logged_losses
 
+# Map critic and polic losses to dict, grouped by agent.
+def map_losses_per_agent_q(q_value_losses: Dict) -> Dict:
+    logged_losses: Dict[str, Dict[str, Any]] = {}
+    for agent in q_value_losses.keys():
+        logged_losses[agent] = {
+            "q_value_loss": q_value_losses[agent],
+        }
+
+    return logged_losses
+
 
 def combine_dim(tensor: tf.Tensor) -> tf.Tensor:
     dims = tensor.shape[:2]
