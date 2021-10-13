@@ -226,44 +226,12 @@ class System:
 
         self.on_building_evaluator_end(self)
 
-        # Create the system
-        behaviour_policy_networks, networks = self.create_system()
-
-        # Create the agent.
-        executor = self._builder.make_executor(
-            # executor_id="evaluator",
-            networks=networks,
-            policy_networks=behaviour_policy_networks,
-            variable_source=variable_source,
-        )
-
-        # Make the environment.
-        environment = self._environment_factory(evaluation=True)  # type: ignore
-
-        # Create logger and counter.
-        evaluator_logger_config = {}
-        if self._logger_config and "evaluator" in self._logger_config:
-            evaluator_logger_config = self._logger_config["evaluator"]
-        eval_logger = self._logger_factory(  # type: ignore
-            "evaluator", **evaluator_logger_config
-        )
-
-        # Create the run loop and return it.
-        # Create the loop to connect environment and executor.
-        eval_loop = self._eval_loop_fn(
-            environment,
-            executor,
-            logger=eval_logger,
-            **self._eval_loop_fn_kwargs,
-        )
-
-        eval_loop = DetailedPerAgentStatistics(eval_loop)
-        return eval_loop
+        return self.eval_loop
 
     def trainer(
         self,
         trainer_id: str,
-        replay: reverb.Client,
+        replay_client: reverb.Client,
         variable_source: MavaVariableSource,
         # counter: counting.Counter,
     ) -> mava.core.Trainer:
@@ -274,6 +242,20 @@ class System:
         Returns:
             mava.core.Trainer: system trainer.
         """
+
+        self._trainer_id = trainer_id
+        self._replay_client = replay_client
+        self._variable_source = variable_source
+
+        self.on_building_evaluator_start(self)
+
+        self.on_building_evaluator_logger(self)
+
+        self.on_building_evaluator(self)
+
+        self.on_building_evaluator_eval_loop(self)
+
+        self.on_building_evaluator_end(self)
 
         # create logger
         trainer_logger_config = {}
