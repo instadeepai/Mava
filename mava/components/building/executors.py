@@ -38,22 +38,23 @@ class Executor(Callback):
 
     def on_building_executor_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        builder._system_networks = self.create_system()
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
         # Create executor logger
         executor_logger_config = {}
-        logger_config = self.config["system"]["logger_config"]
-        if logger_config and "executor" in logger_config:
-            executor_logger_config = logger_config["executor"]
-        exec_logger = builder._logger_factory(  # type: ignore
+        if self._logger_config and "executor" in self._logger_config:
+            executor_logger_config = self._logger_config["executor"]
+        exec_logger = self._logger_factory(  # type: ignore
             f"executor_{builder._executor_id}", **executor_logger_config
         )
         builder._exec_logger = exec_logger
 
     def on_building_executor(self, builder: SystemBuilder) -> None:
         """[summary]"""
+
+        # create system
+        builder._system_networks = self.create_system()
 
         # Create policy variables
         variables = {}
@@ -94,8 +95,9 @@ class Executor(Callback):
 
         adder = builder.adder(builder._replay_client)
 
+        # TODO(Arnu): executor_fn needs standardisation
         builder._executor = self._executor_fn(
-            policy_networks=policy_networks,
+            policy_networks=builder._system_networks,
             counts=counts,
             net_keys_to_ids=self._config.net_keys_to_ids,
             agent_specs=self._config.environment_spec.get_agent_specs(),
@@ -120,4 +122,94 @@ class Executor(Callback):
         train_loop = DetailedPerAgentStatistics(train_loop)
 
     def on_building_executor_end(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+
+
+class Evaluator(Executor):
+    def on_building_evaluator_start(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+
+    def on_building_evaluator_logger(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        # Create eval logger.
+        evaluator_logger_config = {}
+        if self._logger_config and "evaluator" in self._logger_config:
+            evaluator_logger_config = self._logger_config["evaluator"]
+        eval_logger = self._logger_factory(  # type: ignore
+            "evaluator", **evaluator_logger_config
+        )
+        builder._eval_logger = eval_logger
+
+    def on_building_evaluator(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+
+        # create system
+        builder._system_networks = self.create_system()
+
+        # Create policy variables
+        variables = {}
+        get_keys = []
+        for net_type_key in ["observations", "policies"]:
+            for net_key in builder._system_networks[net_type_key].keys():
+                var_key = f"{net_key}_{net_type_key}"
+                variables[var_key] = builder._system_networks[net_type_key][
+                    net_key
+                ].variables
+                get_keys.append(var_key)
+        variables = self.create_counter_variables(variables)
+
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        get_keys.extend(count_names)
+        counts = {name: variables[name] for name in count_names}
+
+        variable_client = None
+        if builder._variable_source:
+            # Get new policy variables
+            variable_client = variable_utils.VariableClient(
+                client=builder._variable_source,
+                variables=variables,
+                get_keys=get_keys,
+                update_period=self._config.executor_variable_update_period,
+            )
+
+            # Make sure not to use a random policy after checkpoint restoration by
+            # assigning variables before running the environment loop.
+            variable_client.get_and_wait()
+
+        adder = builder.adder(builder._replay_client)
+
+        # TODO(Arnu): executor_fn needs standardisation
+        builder._evaluator = self._executor_fn(
+            policy_networks=builder._system_networks,
+            counts=counts,
+            net_keys_to_ids=self._config.net_keys_to_ids,
+            agent_specs=self._config.environment_spec.get_agent_specs(),
+            agent_net_keys=self._config.agent_net_keys,
+            network_sampling_setup=self._config.network_sampling_setup,
+            variable_client=variable_client,
+            adder=adder,
+        )
+
+    def on_building_evaluator_eval_loop(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        environment = self._environment_factory(evaluation=False)  # type: ignore
+
+        # Create the loop to connect environment and executor.
+        eval_loop = builder._eval_loop_fn(
+            environment,
+            builder._evaluator,
+            logger=builder._eval_logger,
+            **self._eval_loop_fn_kwargs,
+        )
+
+        eval_loop = DetailedPerAgentStatistics(eval_loop)
+
+    def on_building_evaluator_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
