@@ -24,17 +24,7 @@ from mava.callbacks import Callback
 from mava.systems.execution import SystemExecutor
 
 
-class FeedForwardExecutor(Callback):
-    def on_execution_init_start(self, executor: SystemExecutor) -> None:
-        """[summary]
-
-        Args:
-            executor (SystemExecutor): [description]
-        """
-        pass
-
-
-class OnlineFeedForwardExecutor(FeedForwardExecutor):
+class Executor(Callback):
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],
