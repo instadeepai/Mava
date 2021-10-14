@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG system implementation."""
+"""Mava system implementation."""
 
 from typing import Any, Dict, List, Tuple, Optional, Iterator
 
@@ -21,17 +21,17 @@ import acme
 import launchpad as lp
 import reverb
 import sonnet as snt
-from acme import datasets
 
 
 import mava
 from mava import adders
-from mava.callbacks.base import Callback
-
+from mava.core import SystemBuilder
+from mava.callbacks import Callback
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.systems.callback_hook import SystemCallbackHookMixin
 
 
-class System:
+class System(SystemBuilder, SystemCallbackHookMixin):
     """MARL system."""
 
     def __init__(
