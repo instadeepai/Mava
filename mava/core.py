@@ -14,50 +14,38 @@
 # limitations under the License.
 
 
-"""Core Mava interfaces.
-This file specifies and documents the notions of `Executor` and `Trainer`
-similar to the `Actor` and `Learner` in Acme.
-"""
+"""Core Mava interfaces."""
 
 import abc
-import itertools
-from typing import Dict, Generic, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Dict, Optional, Tuple, TypeVar, Union, Any, Iterator, List
 
-import acme
 import dm_env
+import reverb
+import numpy as np
+import sonnet as snt
 from acme import types
 
-T = TypeVar("T")
-
-import abc
-from typing import Any, Dict, Iterator, List, Optional
-
-import reverb
-import sonnet as snt
-
-
+import mava
 from mava import adders, types
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 
+T = TypeVar("T")
+
 
 class SystemExecutor(abc.ABC):
-    """[summary]"""
+    """Abstract system executor object."""
+
+    @abc.abstractmethod
+    def _policy(
+        self, agent: str, observation: types.NestedTensor
+    ) -> types.NestedTensor:
+        """Agent specific policy function"""
 
     @abc.abstractmethod
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> Union[types.NestedArray, Tuple[types.NestedArray, types.NestedArray]]:
-        """select an action for a single agent in the system
-
-        Args:
-            agent (str): agent id.
-            observation (types.NestedArray): observation tensor received from the
-                environment.
-
-        Returns:
-            Union[types.NestedArray, Tuple[types.NestedArray, types.NestedArray]]:
-                agent action.
-        """
+        """select an action for a single agent in the system"""
 
     @abc.abstractmethod
     def observe_first(
@@ -65,14 +53,7 @@ class SystemExecutor(abc.ABC):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record first observed timestep from the environment
-
-        Args:
-            timestep (dm_env.TimeStep): data emitted by an environment at first step of
-                interaction.
-            extras (Dict[str, types.NestedArray], optional): possible extra information
-                to record during the first step. Defaults to {}.
-        """
+        """record first observed timestep from the environment"""
 
     @abc.abstractmethod
     def observe(
@@ -81,15 +62,7 @@ class SystemExecutor(abc.ABC):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record observed timestep from the environment
-
-        Args:
-            actions (Dict[str, types.NestedArray]): system agents' actions.
-            next_timestep (dm_env.TimeStep): data emitted by an environment during
-                interaction.
-            next_extras (Dict[str, types.NestedArray], optional): possible extra
-                information to record during the transition. Defaults to {}.
-        """
+        """record observed timestep from the environment"""
 
     @abc.abstractmethod
     def select_actions(
@@ -98,116 +71,60 @@ class SystemExecutor(abc.ABC):
         Dict[str, types.NestedArray],
         Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
     ]:
-        """select the actions for all agents in the system
-
-        Args:
-            observations (Dict[str, types.NestedArray]): agent observations from the
-                environment.
-
-        Returns:
-            Union[ Dict[str, types.NestedArray], Tuple[Dict[str, types.NestedArray],
-                Dict[str, types.NestedArray]], ]: actions for all agents in the system.
-        """
+        """select the actions for all agents in the system"""
 
     @abc.abstractmethod
     def update(self, wait: bool = False) -> None:
-        """update executor variables
-
-        Args
-            wait (bool, optional): whether to stall the executor's request for new
-                variables. Defaults to False.
-        """
+        """update executor variables"""
 
 
-class VariableSource(abc.ABC):
-    """Abstract source of variables.
-    Objects which implement this interface provide a source of variables, returned
-    as a collection of (nested) numpy arrays. Generally this will be used to
-    provide variables to some learned policy/etc.
-    """
+class SystemTrainer(abc.ABC):
+    """Abstract system trainer object."""
 
     @abc.abstractmethod
-    def get_variables(
-        self, names: Sequence[str]
-    ) -> Dict[str, Dict[str, types.NestedArray]]:
-        """Return the named variables as a collection of (nested) numpy arrays.
-        Args:
-        names: args where each name is a string identifying a predefined subset of
-            the variables.
-        Returns:
-        A list of (nested) numpy arrays `variables` such that `variables[i]`
-        corresponds to the collection named by `names[i]`.
-        """
-
-
-class Worker(abc.ABC):
-    """An interface for (potentially) distributed workers."""
+    def _update_target_networks(self) -> None:
+        """Sync the target network parameters with the latest online network
+        parameters"""
 
     @abc.abstractmethod
-    def run(self) -> None:
-        """Runs the worker."""
-
-
-class Saveable(abc.ABC, Generic[T]):
-    """An interface for saveable objects."""
+    def _transform_observations(
+        self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
+    ) -> Any:
+        """Transform the observations using the observation networks of each agent."""
 
     @abc.abstractmethod
-    def save(self) -> T:
-        """Returns the state from the object to be saved."""
+    def _get_feed(
+        self,
+        transitions: Dict[str, Dict[str, np.ndarray]],
+        agent: str,
+    ) -> Any:
+        """get data to feed to the agent networks"""
 
     @abc.abstractmethod
-    def restore(self, state: T) -> None:
-        """Given the state, restores the object."""
+    def _step(self) -> Dict:
+        """Trainer forward and backward passes."""
 
+    @abc.abstractmethod
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
+        """Trainer forward pass"""
 
-class SystemTrainer(VariableSource, Worker, Saveable):
-    """Abstract learner object.
-    This corresponds to an object which implements a learning loop. A single step
-    of learning should be implemented via the `step` method and this step
-    is generally interacted with via the `run` method which runs update
-    continuously.
-    All objects implementing this interface should also be able to take in an
-    external dataset (see acme.datasets) and run updates using data from this
-    dataset. This can be accomplished by explicitly running `learner.step()`
-    inside a for/while loop or by using the `learner.run()` convenience function.
-    Data will be read from this dataset asynchronously and this is primarily
-    useful when the dataset is filled by an external process.
-    """
+    @abc.abstractmethod
+    def _backward(self) -> None:
+        """Trainer backward pass updating network parameters"""
 
     @abc.abstractmethod
     def step(self) -> None:
-        """Perform an update step of the learner's parameters."""
-
-    def run(self, num_steps: Optional[int] = None) -> None:
-        """Run the update loop; typically an infinite loop which calls step."""
-
-        iterator = range(num_steps) if num_steps is not None else itertools.count()
-
-        for _ in iterator:
-            self.step()
-
-    def save(self) -> T:
-        raise NotImplementedError('Method "save" is not implemented.')
-
-    def restore(self, state: T) -> None:
-        raise NotImplementedError('Method "restore" is not implemented.')
+        """trainer step to update the parameters of the agents in the system"""
 
 
 class SystemBuilder(abc.ABC):
-    """Builder for systems which constructs individual components of the
-    system."""
+    """Abstract system builder object."""
 
     @abc.abstractmethod
     def tables(
         self,
     ) -> List[reverb.Table]:
-        """ "Create tables to insert data into.
-        Args:
-            environment_spec (specs.MAEnvironmentSpec): description of the action and
-                observation spaces etc. for each agent in the system.
-        Returns:
-            List[reverb.Table]: a list of data tables for inserting data.
-        """
+        """Create tables to insert data into."""
 
     @abc.abstractmethod
     def dataset(
@@ -215,79 +132,42 @@ class SystemBuilder(abc.ABC):
         replay_client: reverb.Client,
         table_name: str,
     ) -> Iterator[reverb.ReplaySample]:
-        """Create a dataset iterator to use for training/updating the system.
-        Args:
-            replay_client (reverb.Client): Reverb Client which points to the
-                replay server.
-        Returns:
-            [type]: dataset iterator.
-        Yields:
-            Iterator[reverb.ReplaySample]: data samples from the dataset.
-        """
+        """Create a dataset iterator to use for training/updating the system."""
 
     @abc.abstractmethod
     def adder(
         self,
         replay_client: reverb.Client,
     ) -> Optional[adders.ParallelAdder]:
-        """Create an adder which records data generated by the executor/environment.
-        Args:
-            replay_client (reverb.Client): Reverb Client which points to the
-                replay server.
-        Returns:
-            Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
-        """
+        """Create an adder which records data generated by the executor/environment."""
 
     @abc.abstractmethod
     def system(
         self,
     ) -> Tuple[Dict[str, Dict[str, snt.Module]], Dict[str, Dict[str, snt.Module]]]:
-        """[summary]
-
-        Returns:
-            Tuple[Dict[str, Dict[str, snt.Module]], Dict[str, Dict[str, snt.Module]]]: [description]
-        """
+        """[summary]"""
 
     @abc.abstractmethod
-    def make_variable_server(
+    def variable_server(
         self,
     ) -> MavaVariableSource:
-        """Create the variable server.
-        Returns:
-            variable_source (MavaVariableSource): A Mava variable source object.
-        """
+        """Create the variable server."""
 
     @abc.abstractmethod
     def executor(
         self,
         executor_id: str,
         replay_client: reverb.Client,
-        variable_source: acme.VariableSource,
+        variable_source: MavaVariableSource,
     ) -> mava.ParallelEnvironmentLoop:
-        """[summary]
-
-        Args:
-            executor_id (str): [description]
-            replay_client (reverb.Client): [description]
-            variable_source (acme.VariableSource): [description]
-
-        Returns:
-            mava.ParallelEnvironmentLoop: [description]
-        """
+        """[summary]"""
 
     @abc.abstractmethod
     def evaluator(
         self,
-        variable_source: acme.VariableSource,
+        variable_source: MavaVariableSource,
     ) -> Any:
-        """[summary]
-
-        Args:
-            variable_source (acme.VariableSource): [description]
-
-        Returns:
-            Any: [description]
-        """
+        """[summary]"""
 
     @abc.abstractmethod
     def trainer(
@@ -295,22 +175,9 @@ class SystemBuilder(abc.ABC):
         trainer_id: str,
         replay_client: reverb.Client,
         variable_source: MavaVariableSource,
-    ) -> mava.core.Trainer:
-        """[summary]
-
-        Args:
-            trainer_id (str): [description]
-            replay_client (reverb.Client): [description]
-            variable_source (MavaVariableSource): [description]
-
-        Returns:
-            mava.core.Trainer: [description]
-        """
+    ) -> SystemTrainer:
+        """[summary]"""
 
     @abc.abstractmethod
     def distributor(self) -> Any:
-        """[summary]
-
-        Returns:
-            Any: [description]
-        """
+        """[summary]"""

@@ -36,31 +36,16 @@ from mava.adders.reverb.base import Trajectory
 from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
 from mava.systems.tf.variable_utils import VariableClient
 from mava.utils import training_utils as train_utils
-from mava.utils.sort_utils import sort_str_num
 
 train_utils.set_growing_gpu_memory()
 
+from mava.core import SystemTrainer
 from mava.callbacks import Callback
 from mava.systems.callback_hook import SystemCallbackHookMixin
 
 
-class SystemTrainer(mava.Trainer, Callback):
-    """[summary]
-
-    Args:
-        mava ([type]): [description]
-        Callback ([type]): [description]
-
-    Returns:
-        [type]: [description]
-    """
-
-
-class OnlineSystemTrainer(SystemTrainer, SystemCallbackHookMixin):
-    """MADDPG trainer.
-    This is the trainer component of a MADDPG system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
-    """
+class Trainer(SystemTrainer, SystemCallbackHookMixin):
+    """MARL trainer"""
 
     def __init__(
         self,
@@ -75,6 +60,34 @@ class OnlineSystemTrainer(SystemTrainer, SystemCallbackHookMixin):
 
         self.on_training_init_start(self)
 
+        self.on_training_init(self)
+
         self.on_training_init_end(self)
 
-    # To be completed...
+    def _update_target_networks(self) -> None:
+        """Sync the target network parameters with the latest online network
+        parameters"""
+
+    def _transform_observations(
+        self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+        """Transform the observatations using the observation networks of each agent."""
+
+    def _get_feed(
+        self,
+        transitions: Dict[str, Dict[str, np.ndarray]],
+        agent: str,
+    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+        """get data to feed to the agent networks"""
+
+    def _step(self) -> Dict:
+        """Trainer forward and backward passes."""
+
+    def _forward(self, inputs: reverb.ReplaySample) -> None:
+        """Trainer forward pass"""
+
+    def _backward(self) -> None:
+        """Trainer backward pass updating network parameters"""
+
+    def step(self) -> None:
+        """trainer step to update the parameters of the agents in the system"""

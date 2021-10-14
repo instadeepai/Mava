@@ -20,34 +20,19 @@ import dm_env
 import tensorflow as tf
 import tensorflow_probability as tfp
 from acme import types
-
-# Internal imports.
 from dm_env import specs
-
-import mava
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
 tfd = tfp.distributions
 
+from mava.core import SystemExecutor
 from mava.callbacks import Callback
 from mava.systems.callback_hook import SystemCallbackHookMixin
 
 
-class SystemExecutor(mava.Executor, Callback):
-    """[summary]
-
-    Args:
-        mava ([type]): [description]
-        Callback ([type]): [description]
-
-    Returns:
-        [type]: [description]
-    """
-
-
-class OnlineSystemExecutor(SystemExecutor, SystemCallbackHookMixin):
+class Executor(SystemExecutor, SystemCallbackHookMixin):
     """A generic feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system.
     """
@@ -64,6 +49,8 @@ class OnlineSystemExecutor(SystemExecutor, SystemCallbackHookMixin):
         self.callbacks = components
 
         self.on_execution_init_start(self)
+
+        self.on_execution_init(self)
 
         self.on_execution_init_end(self)
 
