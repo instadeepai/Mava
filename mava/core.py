@@ -38,39 +38,41 @@ import sonnet as snt
 
 from mava import adders, types
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
-from mava.callbacks import Callback
 
 
-class Executor(acme.Actor):
-    """Interface for a system that can execute agent policies.
-    This interface defines an API for a System to interact with an EnvironmentLoop
-    (see mava.environment_loop), e.g. a simple RL loop where each step is of the
-    form:
-      # Make the first observation.
-      timestep = env.reset()
-      system.observe_first(timestep.observation)
-      # Take a step and observe.
-      action = system.select_actions(timestep.observation)
-      next_timestep = env.step(action)
-      actor.observe(action, next_timestep)
-      # Update the actor policy/parameters.
-      system.update()
-    """
+class SystemExecutor(abc.ABC):
+    """[summary]"""
 
     @abc.abstractmethod
     def select_action(
         self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
-        """Samples from the policy and returns an action."""
+    ) -> Union[types.NestedArray, Tuple[types.NestedArray, types.NestedArray]]:
+        """select an action for a single agent in the system
+
+        Args:
+            agent (str): agent id.
+            observation (types.NestedArray): observation tensor received from the
+                environment.
+
+        Returns:
+            Union[types.NestedArray, Tuple[types.NestedArray, types.NestedArray]]:
+                agent action.
+        """
 
     @abc.abstractmethod
-    def select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Union[
-        Dict[str, types.NestedArray],
-        Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
-    ]:
-        """Samples from the policy and returns an action for each agent."""
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
+        """record first observed timestep from the environment
+
+        Args:
+            timestep (dm_env.TimeStep): data emitted by an environment at first step of
+                interaction.
+            extras (Dict[str, types.NestedArray], optional): possible extra information
+                to record during the first step. Defaults to {}.
+        """
 
     @abc.abstractmethod
     def observe(
@@ -79,10 +81,41 @@ class Executor(acme.Actor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """Make an observation of timestep data from parallel environment.
+        """record observed timestep from the environment
+
         Args:
-        action: action taken in the environment.
-        next_timestep: timestep produced by the environment given the action.
+            actions (Dict[str, types.NestedArray]): system agents' actions.
+            next_timestep (dm_env.TimeStep): data emitted by an environment during
+                interaction.
+            next_extras (Dict[str, types.NestedArray], optional): possible extra
+                information to record during the transition. Defaults to {}.
+        """
+
+    @abc.abstractmethod
+    def select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> Union[
+        Dict[str, types.NestedArray],
+        Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
+    ]:
+        """select the actions for all agents in the system
+
+        Args:
+            observations (Dict[str, types.NestedArray]): agent observations from the
+                environment.
+
+        Returns:
+            Union[ Dict[str, types.NestedArray], Tuple[Dict[str, types.NestedArray],
+                Dict[str, types.NestedArray]], ]: actions for all agents in the system.
+        """
+
+    @abc.abstractmethod
+    def update(self, wait: bool = False) -> None:
+        """update executor variables
+
+        Args
+            wait (bool, optional): whether to stall the executor's request for new
+                variables. Defaults to False.
         """
 
 
@@ -127,7 +160,7 @@ class Saveable(abc.ABC, Generic[T]):
         """Given the state, restores the object."""
 
 
-class Trainer(VariableSource, Worker, Saveable):
+class SystemTrainer(VariableSource, Worker, Saveable):
     """Abstract learner object.
     This corresponds to an object which implements a learning loop. A single step
     of learning should be implemented via the `step` method and this step
