@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional, Tuple
 import acme
 import dm_env
 import numpy as np
+import tensorflow as tf
 from acme.utils import counting, loggers
 
 import mava
@@ -322,10 +323,8 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._should_update = should_update
         self._running_statistics: Dict[str, float] = {}
 
-        # print(self._executor)
-        # print(self._executor._evaluator)
-        # print(self._executor._interval)
-        # raise NotADirectoryError()
+        # We need this to schedule evaluation/test runs
+        self._last_evaluator_run_t = -1
 
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
         return self._executor.select_actions(timestep.observation)
@@ -348,7 +347,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         if hasattr(self._executor, "_counts"):
             counts = self._executor._counts
         else:
-            counts = self._counter._counts
+            counts = self._counter.get_counts()
         return counts
 
     def record_counts(self, episode_steps: int) -> Any:
@@ -497,30 +496,42 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 num_steps is not None and step_count >= num_steps
             )
 
-        def should_run_loop(interval: Optional[dict]) -> bool:
+        def should_run_loop(eval_condtion: Tuple) -> bool:
             """Check if the eval loop should run in current step.
 
             Args:
-                interval : dict containing interval key and count.
+                eval_condtion : tuple containing interval key and count.
 
             Returns:
                 a bool indicatings if eval should run.
             """
-            if interval:
-                eval_interval_key, eval_interval_count = check_count_condition(interval)
-                # +1 since we start counting at 0
+            should_run_loop = False
+            eval_interval_key, eval_interval_count = eval_condtion
+            counts = self.get_counts()
+            if counts:
+                count = counts.get(eval_interval_key)
+                # We run eval loops around every eval_interval_count (not exactly every
+                # eval_interval_count due to latency in getting updated counts).
                 should_run_loop = (
-                    (self.get_counts().get(eval_interval_key) + 1) % eval_interval_count
-                ) == 0
-            else:
-                should_run_loop = True
+                    (count - self._last_evaluator_run_t) / eval_interval_count
+                ) >= 1.0
+                if should_run_loop:
+                    if tf.is_tensor(count):
+                        count = count.numpy()
+                    self._last_evaluator_run_t = count
             return should_run_loop
 
         episode_count, step_count = 0, 0
+
+        # Currently, we only use intervals for eval loops.
+        environment_loop_schedule = (
+            self._executor._evaluator and self._executor._interval
+        )
+        if environment_loop_schedule:
+            eval_condtion = check_count_condition(self._executor._interval)
+
         while not should_terminate(episode_count, step_count):
-            #  Currently, we only use intervals for eval loops
-            interval = self._executor._interval if self._executor._evaluator else None
-            while should_run_loop(interval):
+            if (not environment_loop_schedule) or should_run_loop(eval_condtion):
                 result = self.run_episode()
                 episode_count += 1
                 step_count += result["episode_length"]
@@ -528,5 +539,5 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 self._logger.write(result)
 
             # We need to get the latest counts if we are using eval intervals.
-            if interval:
+            if environment_loop_schedule:
                 self._executor.update()

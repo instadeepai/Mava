@@ -53,6 +53,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         communication_module: Optional[BaseCommunicationModule] = None,
         fingerprint: bool = False,
         evaluator: bool = False,
+        interval: Optional[dict] = None,
     ):
         """Initialise the system executor
 
@@ -74,6 +75,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
                 stabilise experience replay. Defaults to False.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
+            interval:
+                interval that evaluations are run at.
         """
 
         # Store these for later use.
@@ -85,6 +88,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         self._agent_net_keys = agent_net_keys
         self._fingerprint = fingerprint
         self._evaluator = evaluator
+        self._interval = interval
 
     @tf.function
     def _policy(

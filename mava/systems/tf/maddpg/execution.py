@@ -73,7 +73,8 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             counts: Count values used to record excutor episode and steps.
             variable_client:
                 client to copy weights from the trainer. Defaults to None.
-
+            interval:
+                interval that evaluations are run at.
         """
 
         # Store these for later use.
