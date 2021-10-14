@@ -273,7 +273,7 @@ class System:
 
         return self.trainer
 
-    def build(self) -> Any:
+    def distributor(self) -> Any:
         """Build the distributed system as a graph program.
         Args:
             name (str, optional): system name. Defaults to "maddpg".
@@ -281,29 +281,20 @@ class System:
             Any: graph program for distributed system training.
         """
         name = self.config.system_name
-        program = lp.Program(name=name)
+        self.program = lp.Program(name=name)
 
-        with program.group("replay"):
-            tables = program.add_node(lp.ReverbNode(self.tables))
+        self.on_building_distributor_start(self)
 
-        with program.group("variable_server"):
-            variable_server = program.add_node(lp.CourierNode(self.variable_server))
+        self.on_building_distributor_tables(self)
 
-        with program.group("trainer"):
-            # Add executors which pull round-robin from our variable sources.
-            for trainer_id in range(len(self.config.trainer_networks.keys())):
-                program.add_node(
-                    lp.CourierNode(self.trainer, trainer_id, tables, variable_server)
-                )
+        self.on_building_distributor_variable_server(self)
 
-        with program.group("evaluator"):
-            program.add_node(lp.CourierNode(self.evaluator, variable_server))
+        self.on_building_distributor_trainer(self)
 
-        with program.group("executor"):
-            # Add executors which pull round-robin from our variable sources.
-            for executor_id in range(self._num_exectors):
-                program.add_node(
-                    lp.CourierNode(self.executor, executor_id, tables, variable_server)
-                )
+        self.on_building_distributor_evaluator(self)
 
-        return program
+        self.on_building_distributor_executor(self)
+
+        self.on_building_distributor_end(self)
+
+        return self.program
