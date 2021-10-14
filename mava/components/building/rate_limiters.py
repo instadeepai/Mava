@@ -15,12 +15,12 @@
 
 """Commonly used rate limiter components for system builders"""
 
+from typing import Optional
+
 import reverb
 
-from mava import specs
 from mava.callbacks import Callback
 from mava.systems.building import SystemBuilder
-from mava.adders import reverb as reverb_adders
 
 
 class RateLimiter(Callback):

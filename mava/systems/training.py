@@ -18,9 +18,9 @@
 
 from typing import Dict, List, Tuple
 
-import numpy as np
 import reverb
 
+from mava import types
 from mava.core import SystemTrainer
 from mava.callbacks import Callback
 from mava.systems.callback_hook import SystemCallbackHookMixin
@@ -63,9 +63,9 @@ class Trainer(SystemTrainer, SystemCallbackHookMixin):
         self.on_training_update_target_networks_end(self)
 
     def _transform_observations(
-        self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
+        self, obs: Dict[str, types.NestedArray], next_obs: Dict[str, types.NestedArray]
     ) -> Tuple:
-        """Transform the observatations using the observation networks of each agent."""
+        """Transform the observations using the observation networks of each agent."""
 
         self._obs = obs
         self._next_obs = next_obs
@@ -80,7 +80,7 @@ class Trainer(SystemTrainer, SystemCallbackHookMixin):
 
     def _get_feed(
         self,
-        transition: Dict[str, Dict[str, np.ndarray]],
+        transition: Dict[str, Dict[str, types.NestedArray]],
         agent: str,
     ) -> Tuple:
         """get data to feed to the agent networks"""

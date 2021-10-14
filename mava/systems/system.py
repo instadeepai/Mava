@@ -17,11 +17,8 @@
 
 from typing import Any, Dict, List, Tuple, Optional, Iterator
 
-import acme
 import launchpad as lp
 import reverb
-import sonnet as snt
-
 
 import mava
 from mava import adders
@@ -61,15 +58,7 @@ class System(SystemBuilder, SystemCallbackHookMixin):
         self.on_building_init_end(self)
 
     def tables(self) -> List[reverb.Table]:
-        """ "Create tables to insert data into.
-        Args:
-            environment_spec (specs.MAEnvironmentSpec): description of the action and
-                observation spaces etc. for each agent in the system.
-        Raises:
-            NotImplementedError: unknown executor type.
-        Returns:
-            List[reverb.Table]: a list of data tables for inserting data.
-        """
+        """ "Create tables to insert data into."""
 
         # start of make replay tables
         self.on_building_tables_start(self)
@@ -147,7 +136,7 @@ class System(SystemBuilder, SystemCallbackHookMixin):
 
     def system(
         self,
-    ) -> Tuple[Dict[str, Dict[str, snt.Module]], Dict[str, Dict[str, snt.Module]]]:
+    ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
         """Initialise the system variables from the network factory."""
 
         self.on_building_system_start(self)
@@ -165,7 +154,7 @@ class System(SystemBuilder, SystemCallbackHookMixin):
     def variable_server(self) -> MavaVariableSource:
         """Create the variable server.
         Args:
-            networks (Dict[str, Dict[str, snt.Module]]): dictionary with the
+            networks (Dict[str, Dict[str, Any]]): dictionary with the
             system's networks in.
         Returns:
             variable_source (MavaVariableSource): A Mava variable source object.
@@ -186,7 +175,7 @@ class System(SystemBuilder, SystemCallbackHookMixin):
         self,
         executor_id: str,
         replay_client: reverb.Client,
-        variable_source: acme.VariableSource,
+        variable_source: MavaVariableSource,
     ) -> mava.ParallelEnvironmentLoop:
         """System executor
         Args:
@@ -217,7 +206,7 @@ class System(SystemBuilder, SystemCallbackHookMixin):
 
     def evaluator(
         self,
-        variable_source: acme.VariableSource,
+        variable_source: MavaVariableSource,
     ) -> Any:
         """System evaluator (an executor process not connected to a dataset)
         Args:

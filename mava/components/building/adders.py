@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Commonly used adder components for system builders"""
+
 from typing import Dict, Any, List
 
 from mava import specs
@@ -80,7 +81,7 @@ class Adder(Callback):
         pass
 
 
-class ParallelNStepTransitionAdder(Callback):
+class ParallelNStepTransitionAdder(Adder):
     def __init__(
         self,
         net_to_ints: Dict[str, int],
@@ -106,7 +107,7 @@ class ParallelNStepTransitionAdder(Callback):
         builder.adder = adder
 
 
-class ParallelSequenceAdder(Callback):
+class ParallelSequenceAdder(Adder):
     def __init__(
         self,
         net_to_ints: Dict[str, int],

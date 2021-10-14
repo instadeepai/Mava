@@ -17,16 +17,8 @@
 from typing import Dict, List, Tuple, Union
 
 import dm_env
-import tensorflow as tf
-import tensorflow_probability as tfp
-from acme import types
-from dm_env import specs
 
-Array = specs.Array
-BoundedArray = specs.BoundedArray
-DiscreteArray = specs.DiscreteArray
-tfd = tfp.distributions
-
+from mava import types
 from mava.core import SystemExecutor
 from mava.callbacks import Callback
 from mava.systems.callback_hook import SystemCallbackHookMixin
@@ -54,22 +46,21 @@ class Executor(SystemExecutor, SystemCallbackHookMixin):
 
         self.on_execution_init_end(self)
 
-    @tf.function
     def _policy(
         self,
         agent: str,
-        observation: types.NestedTensor,
-        state: types.NestedTensor = None,
-    ) -> types.NestedTensor:
+        observation: types.NestedArray,
+        state: types.NestedArray = None,
+    ) -> types.NestedArray:
         """Agent specific policy function
 
         Args:
             agent (str): agent id
-            observation (types.NestedTensor): observation tensor received from the
+            observation (types.NestedArray): observation tensor received from the
                 environment.
 
         Returns:
-            types.NestedTensor: agent action
+            types.NestedArray: agent action
         """
         self._agent = agent
         self._observation = observation

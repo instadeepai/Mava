@@ -127,7 +127,7 @@ class MultiTrainer(Default):
         unique_net_keys = sort_str_num(list(set(all_samples)))
 
         # Create mapping from ints to networks
-        net_to_ints = {net_key: i for i, net_key in enumerate(unique_net_keys)}
+        builder._net_to_ints = {net_key: i for i, net_key in enumerate(unique_net_keys)}
 
         # Setup trainer_networks
         if not builder._system_config["trainer_networks"]:
