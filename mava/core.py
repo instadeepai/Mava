@@ -95,7 +95,7 @@ class SystemTrainer(abc.ABC):
     @abc.abstractmethod
     def _get_feed(
         self,
-        transitions: Dict[str, Dict[str, np.ndarray]],
+        transition: Dict[str, Dict[str, np.ndarray]],
         agent: str,
     ) -> Any:
         """get data to feed to the agent networks"""

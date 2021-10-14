@@ -16,28 +16,10 @@
 
 """MADDPG trainer implementation."""
 
-import copy
-import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Tuple
 
 import numpy as np
 import reverb
-import sonnet as snt
-import tensorflow as tf
-import tree
-import trfl
-from acme.tf import losses
-from acme.tf import utils as tf2_utils
-from acme.utils import loggers
-
-import mava
-from mava import types as mava_types
-from mava.adders.reverb.base import Trajectory
-from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
-from mava.systems.tf.variable_utils import VariableClient
-from mava.utils import training_utils as train_utils
-
-train_utils.set_growing_gpu_memory()
 
 from mava.core import SystemTrainer
 from mava.callbacks import Callback
@@ -68,26 +50,106 @@ class Trainer(SystemTrainer, SystemCallbackHookMixin):
         """Sync the target network parameters with the latest online network
         parameters"""
 
+        self.on_training_update_target_networks_start(self)
+
+        # for key in self.unique_net_keys:
+
+        #     self.on_training_update_target_networks_get_variables(self, key)
+
+        #     self.on_training_update_target_networks_update(self, key)
+
+        self.on_training_update_target_networks(self)
+
+        self.on_training_update_target_networks_end(self)
+
     def _transform_observations(
         self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
-    ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+    ) -> Tuple:
         """Transform the observatations using the observation networks of each agent."""
+
+        self._obs = obs
+        self._next_obs = next_obs
+
+        self.on_training_transform_observations_start(self)
+
+        self.on_training_transform_observations(self)
+
+        self.on_training_transform_observations_end(self)
+
+        self.transformed_observations
 
     def _get_feed(
         self,
-        transitions: Dict[str, Dict[str, np.ndarray]],
+        transition: Dict[str, Dict[str, np.ndarray]],
         agent: str,
-    ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+    ) -> Tuple:
         """get data to feed to the agent networks"""
+
+        self._transition = transition
+        self._agent = agent
+
+        self.on_training_get_feed_start(self)
+
+        self.on_training_get_feed(self)
+
+        self.on_training_get_feed_end(self)
+
+        self.feed
 
     def _step(self) -> Dict:
         """Trainer forward and backward passes."""
 
+        self.on_training__step_start(self)
+
+        self.on_training__step_update_target_networks(self)
+
+        self.on_training__step_sample_batch(self)
+
+        self.on_training__step_forward(self)
+
+        self.on_training__step_backward(self)
+
+        self.on_training__step_log(self)
+
+        self.on_training__step_end(self)
+
+        self.loss
+
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass"""
+
+        self.on_training_forward_start(self)
+
+        # self.on_training_forward_get_transitions(self)
+
+        # with tf.GradientTape(persistent=True) as tape:
+
+        #     self.on_training_forward_gradient_tape_start(self)
+
+        #     for agent in self._trainer_agent_list:
+
+        #         self.on_training_forward_agent_loop_start(self, agent)
+
+        #         self.on_training_forward_agent_loop_get_feed(self, agent)
+
+        self.on_training_forward(self)
+
+        self.on_training_forward_end(self)
 
     def _backward(self) -> None:
         """Trainer backward pass updating network parameters"""
 
+        self.on_training_backward_start(self)
+
+        self.on_training_backward(self)
+
+        self.on_training_backward_end(self)
+
     def step(self) -> None:
         """trainer step to update the parameters of the agents in the system"""
+
+        self.on_training_step_start(self)
+
+        self.on_training_step(self)
+
+        self.on_training_step_end(self)
