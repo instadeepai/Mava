@@ -68,7 +68,7 @@ jobs:
           flake8 . --count --exit-zero --statistics
       - name: Check types with mypy
         run: |
-          mypy . --exclude docs/
+          mypy . --exclude docs/ --no-incremental
       - name: Test with pytest and get code coverage
         run: |
           pytest  -n "$(grep -c ^processor /proc/cpuinfo)" tests --ignore-glob="*/*system_test.py"
