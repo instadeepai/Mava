@@ -52,18 +52,19 @@ launchpad_requirements = [
 
 testing_formatting_requirements = [
     "pre-commit",
-    "mypy==0.812",
+    "mypy==0.910",
     "pytest-xdist",
     "flake8==3.9.1",
     "black==21.4b1",
     "pytest-cov",
     "interrogate",
     "pydocstyle",
+    "types-six",
 ]
 
 record_episode_requirements = ["array2gif"]
 
-flatland_requirements = ["flatland-rl"]
+flatland_requirements = ["flatland-rl==2.2.2"]
 open_spiel_requirements = ["open_spiel"]
 
 long_description = """Mava is a library for building multi-agent reinforcement
