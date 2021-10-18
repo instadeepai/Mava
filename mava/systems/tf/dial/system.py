@@ -454,6 +454,7 @@ class DIAL:
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
             trainer=trainer,
+            evaluator=False,
         )
 
         # Create the environment.

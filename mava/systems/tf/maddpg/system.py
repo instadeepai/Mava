@@ -493,6 +493,7 @@ class MADDPG:
             policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
+            evaluator=False,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors

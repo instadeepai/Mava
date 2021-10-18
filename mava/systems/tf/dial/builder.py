@@ -329,6 +329,7 @@ class DIALBuilder:
             communication_module=communication_module,
             evaluator=evaluator,
             fingerprint=fingerprint,
+            interval=self._config.evaluator_interval if evaluator else None,
         )
 
     def make_trainer(
