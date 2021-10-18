@@ -75,8 +75,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
                 stabilise experience replay. Defaults to False.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
-            interval:
-                interval that evaluations are run at.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
@@ -324,8 +323,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
                 stabilise experience replay. Defaults to False.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
-            interval:
-                interval that evaluations are run at.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
@@ -483,6 +481,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
                 stabilise experience replay. Defaults to False.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
