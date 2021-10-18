@@ -23,62 +23,52 @@ try:
         Substrate,
     )
     from ml_collections import config_dict  # type: ignore
+
+    from mava.wrappers.meltingpot import MeltingpotEnvWrapper
 except ModuleNotFoundError:
     Scenario = Any
     Substrate = Any
 
 
 class EnvironmentFactory:
-    def __init__(
-        self, substrate: str = None, scenario: str = None, mode: str = "substrate"
-    ):
+    def __init__(self, substrate: str = None, scenario: str = None):
         """Initializes the env factory object
 
         Args:
             substrate (str, optional): what substrate to use. Defaults to None.
             scenario (str, optional): what scenario to use. Defaults to None.
-            mode (str, optional): what mode to use either 'scenario' or 'substrate'.
-            Defaults to "substrate".
         """
-        assert mode in [
-            "substrate",
-            "scenario",
-        ], f"mode can either be 'substrate' or 'scenario' not {mode}"
-        if mode == "substrate":
-            substrates = [*AVAILABLE_SUBSTRATES, "all"]
+        assert (substrate is None) or (
+            scenario is None
+        ), "substrate or scenario must be specified"
+        assert not (
+            substrate is not None and scenario is not None
+        ), "Cannot specify both substrate and scenario"
+
+        if substrate is not None:
+            substrates = [*AVAILABLE_SUBSTRATES]
             assert (
                 substrate in substrates
             ), f"substrate cannot be f{substrate}, use any of {substrates}"
-
-            if substrate == "all":
-                self.available_substrates = AVAILABLE_SUBSTRATES
-            else:
-                self.available_substrates = [substrate]
+            self._substrate_name = substrate
             self._env_fn = self._substrate
 
-        if mode == "scenario":
-            scenarios = [*[k for k in AVAILABLE_SCENARIOS], "all"]
+        elif scenario is not None:
+            scenarios = [*[k for k in AVAILABLE_SCENARIOS]]
             assert (
                 scenario in scenarios
             ), f"substrate cannot be f{substrate}, use any of {scenarios}"
-            if scenario == "all":
-                self.available_scenarios = AVAILABLE_SCENARIOS
-            else:
-                self.available_scenarios = [scenario]
+            self._scenario_name = scenario
             self._env_fn = self._scenario
 
     def _substrate(self) -> Substrate:
         """Return a substrate as an environment
 
         Returns:
-            [Substrate]: A substrate or None
+            [Substrate]: A substrate
         """
-        if self.available_substrates:
-            name = self.available_substrates.pop()
-            env = load_substrate(name)
-            return env
-        else:
-            return None
+        env = load_substrate(self._substrate_name)
+        return MeltingpotEnvWrapper(env)
 
     def _scenario(self) -> Scenario:
         """Return a scenario as an environment
@@ -86,12 +76,9 @@ class EnvironmentFactory:
         Returns:
             [Scenario]: A scenario or None
         """
-        if self.available_scenarios:
-            name = self.available_scenarios.pop()
-            env = load_scenario(name)
-            return env
-        else:
-            return None
+
+        env = load_scenario(self._scenario_name)
+        return MeltingpotEnvWrapper(env)
 
     def __call__(self, evaluation: bool = False) -> Union[Substrate, Scenario]:
         """Creates an environment

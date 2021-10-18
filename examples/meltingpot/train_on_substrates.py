@@ -48,7 +48,7 @@ def main(_: Any) -> None:
         _ (Any): ...
     """
     # Environment.
-    environment_factory = EnvironmentFactory(FLAGS.substrate, mode="substrate")
+    environment_factory = EnvironmentFactory(substrate=FLAGS.substrate)
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)

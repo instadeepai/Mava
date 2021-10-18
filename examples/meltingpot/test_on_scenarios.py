@@ -49,7 +49,7 @@ def main(_: Any) -> None:
     """
 
     # Environment.
-    environment_factory = EnvironmentFactory(scenario=FLAGS.scenario, mode="scenario")
+    environment_factory = EnvironmentFactory(scenario=FLAGS.scenario)
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)

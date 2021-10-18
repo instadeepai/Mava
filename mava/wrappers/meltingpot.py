@@ -15,7 +15,7 @@
 
 """Wraps a PettingZoo MARL environment to be used as a dm_env environment."""
 import os
-from typing import Any, Dict, List, Union
+from typing import Any, Callable, Dict, List, Union
 
 import dm_env
 import numpy as np
@@ -34,24 +34,49 @@ except ModuleNotFoundError:
     Substrate = Any
 
 
+def obs_preprocessor(observation: Dict[str, NestedArray]) -> np.ndarray:
+    """Converts the observation to a single array
+
+    Meltingpot observations come as Dictionary of Arrays
+
+    Args:
+        observation (Dict[str, np.ndarray]): Observation from environment
+
+    Returns:
+        np.ndarray: Processed observation
+    """
+    return np.array(observation["RGB"] / 255, np.float32)
+
+
 class MeltingpotEnvWrapper(ParallelEnvWrapper):
     """Environment wrapper for Melting pot."""
 
     def __init__(
         self,
         environment: Union[Substrate, Scenario],
+        preprocessor: Callable[[Dict[str, NestedArray]], np.ndarray] = obs_preprocessor,
     ):
         """Constructor for Melting pot wrapper.
 
         Args:
             environment (Substrate or Scenario): Melting pot substrate or scenario.
+            preprocessor (Callable[[Dict[str, NestedArray]], np.ndarray]): function that
+             transforms an observation to a single array
         """
         self._environment = environment
         self._reset_next_step = True
         self._env_done = False
-        self._num_agents = len(self._environment.action_spec)
+        self._num_agents = len(self._environment.action_spec())
         self._env_image: np.ndarray = None
         self._screen = None
+        self._preprocessor = preprocessor
+
+        # individual agent obervation
+        _, _, _, obs = self._environment.reset()
+        ob = self._preprocessor(obs[0])
+        self._ob_spec = specs.Array(
+            shape=ob.shape, dtype=ob.dtype, name="indv_agent_ob"
+        )
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the env.
@@ -62,7 +87,7 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
         timestep = self._environment.reset()
         self._reset_next_step = False
-        self._step_type = timestep.steptype
+        self._step_type = timestep.step_type
 
         self._obtain_env_image(timestep)
 
@@ -95,10 +120,12 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         Returns:
             types.OLT: observation, legal actions, and terminal
         """
-        legal_actions = np.ones([num_values], dtype=np.float32)
+        legal_actions = np.ones([num_values], dtype=np.int32)
         terminal = np.asarray([is_terminal], dtype=np.float32)
         return types.OLT(
-            observation=observation, legal_actions=legal_actions, terminal=terminal
+            observation=self._preprocessor(observation),
+            legal_actions=legal_actions,
+            terminal=terminal,
         )
 
     def _to_dict_observation(
@@ -261,8 +288,13 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
             types.Observation: spec for environment.
         """
         observation_spec = self._environment.observation_spec()
+        action_spec = self._environment.action_spec()
         return {
-            f"agent_{i}": types.OLT(observation=spec[i], legal_actions=0, terminal=0)
+            f"agent_{i}": types.OLT(
+                observation=self._ob_spec,
+                legal_actions=action_spec[i],
+                terminal=specs.Array((1,), np.float32),
+            )
             for i, spec in enumerate(observation_spec)
         }
 
@@ -291,7 +323,23 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
             Dict[str, specs.BoundedArray]: spec for discounts.
         """
         discount_spec = self._environment.discount_spec()
-        return {f"agent_{i}": spec for i, spec in enumerate(discount_spec)}
+        return {
+            f"agent_{i}": specs.BoundedArray(
+                (),
+                np.float32,
+                minimum=int(discount_spec.minimum),
+                maximum=int(discount_spec.minimum),
+            )
+            for i in range(self._num_agents)
+        }
+
+    def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        """Extra data spec.
+
+        Returns:
+            Dict[str, specs.BoundedArray]: spec for extra data.
+        """
+        return {}
 
     @property
     def agents(self) -> List:
