@@ -86,6 +86,7 @@ class VDN(MADQN):
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        evaluator_interval: Optional[dict] = None,
     ):
         """Initialise the system
 
@@ -166,6 +167,12 @@ class VDN(MADQN):
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         self._mixer = mixer
@@ -204,6 +211,7 @@ class VDN(MADQN):
             eval_loop_fn=eval_loop_fn,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
             logger_config=logger_config,
+            evaluator_interval=evaluator_interval,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
@@ -235,6 +243,7 @@ class VDN(MADQN):
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                evaluator_interval=evaluator_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,

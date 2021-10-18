@@ -85,6 +85,7 @@ class MAD4PG(MADDPG):
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         termination_condition: Optional[Dict[str, int]] = None,
+        evaluator_interval: Optional[dict] = None,
     ):
         """Initialise the system
 
@@ -168,6 +169,12 @@ class MAD4PG(MADDPG):
                 values for trainer_steps, trainer_walltime, evaluator_steps,
                 evaluator_episodes, executor_episodes or executor_steps.
                 E.g. termination_condition = {'trainer_steps': 100000}.
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         super().__init__(
@@ -208,4 +215,5 @@ class MAD4PG(MADDPG):
             target_averaging=target_averaging,
             target_update_rate=target_update_rate,
             termination_condition=termination_condition,
+            evaluator_interval=evaluator_interval,
         )

@@ -8,6 +8,7 @@ from __future__ import division
 
 import os
 import sys
+import typing
 from typing import Any, Dict, List, Tuple
 
 import six
@@ -349,7 +350,8 @@ class Viewer(object):
     def add_onetime(self, geom: Geom) -> None:
         self.onetime_geoms.append(geom)
 
-    def render(self, return_rgb_array: bool = False) -> np.array:
+    @typing.no_type_check
+    def render(self, return_rgb_array: bool = False) -> np.ndarray:
         glClearColor(1, 1, 1, 1)
         self.window.clear()
         self.window.switch_to()
@@ -421,13 +423,13 @@ class Viewer(object):
         self.add_onetime(geom)
         return geom
 
-    def get_array(self) -> np.array:
+    def get_array(self) -> np.ndarray:
         self.window.flip()
         image_data = (
             pyglet.image.get_buffer_manager().get_color_buffer().get_image_data()
         )
         self.window.flip()
-        arr = np.fromstring(image_data.data, dtype=np.uint8, sep="")
+        arr = np.fromstring(image_data.data, dtype=np.uint8, sep="")  # type:ignore
         arr = arr.reshape((self.height, self.width, 4))
         return arr[::-1, :, 0:3]
 
@@ -456,7 +458,7 @@ class SimpleImageViewer(object):
         self.isopen = False
         self.display = display
 
-    def imshow(self, arr: np.array) -> None:
+    def imshow(self, arr: np.ndarray) -> None:
         if self.window is None:
             height, width, channels = arr.shape
             self.window = pyglet.window.Window(

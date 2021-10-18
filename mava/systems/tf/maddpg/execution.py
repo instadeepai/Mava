@@ -73,15 +73,14 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             counts: Count values used to record excutor episode and steps.
             variable_client:
                 client to copy weights from the trainer. Defaults to None.
-            interval:
-                interval that evaluations are run at.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
         self._agent_specs = agent_specs
         self._network_sampling_setup = network_sampling_setup
         self._counts = counts
-        self._network_int_keys_extras: Dict[str, np.array] = {}
+        self._network_int_keys_extras: Dict[str, np.ndarray] = {}
         self._net_keys_to_ids = net_keys_to_ids
         self._evaluator = evaluator
         self._interval = interval
@@ -267,7 +266,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self._network_sampling_setup = network_sampling_setup
         self._counts = counts
         self._net_keys_to_ids = net_keys_to_ids
-        self._network_int_keys_extras: Dict[str, np.array] = {}
+        self._network_int_keys_extras: Dict[str, np.ndarray] = {}
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,

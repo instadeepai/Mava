@@ -30,6 +30,7 @@ from acme.utils import counting, loggers
 
 import mava
 from mava.systems.tf import savers as tf2_savers
+from mava.types import OLT
 from mava.utils import training_utils as train_utils
 from mava.utils.sort_utils import sort_str_num
 
@@ -224,7 +225,7 @@ class MAPPOTrainer(mava.Trainer):
         return observation_feed
 
     def _transform_observations(
-        self, observation: Dict[str, np.ndarray]
+        self, observation: Dict[str, OLT]
     ) -> Dict[str, np.ndarray]:
         """apply the observation networks to the raw observations from the dataset
 

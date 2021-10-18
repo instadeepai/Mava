@@ -46,6 +46,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         trainer: MADQNTrainer = None,
         fingerprint: bool = False,
         evaluator: bool = False,
+        interval: Optional[dict] = None,
     ):
         """Initialise the system executor
 
@@ -69,6 +70,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
                 stabilise experience replay. Defaults to False.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
@@ -84,6 +86,9 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
 
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}
+
+        self._evaluator = evaluator
+        self._interval = interval
 
     def _policy(
         self,

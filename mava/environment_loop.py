@@ -21,7 +21,6 @@ from typing import Any, Dict, Optional, Tuple
 import acme
 import dm_env
 import numpy as np
-import tensorflow as tf
 from acme.utils import counting, loggers
 
 import mava
@@ -69,10 +68,10 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         self.num_agents = self._environment.num_agents
 
         # keeps track of previous actions and timesteps
-        self._prev_action: Dict[str, Action] = {
+        self._prev_action: Dict[str, Optional[Action]] = {
             a: None for a in self._environment.possible_agents
         }
-        self._prev_timestep: Dict[str, dm_env.TimeStep] = {
+        self._prev_timestep: Dict[str, Optional[dm_env.TimeStep]] = {
             a: None for a in self._environment.possible_agents
         }
         self._agent_action_timestep: Dict[str, Tuple[Action, dm_env.TimeStep]] = {}
@@ -147,7 +146,10 @@ class SequentialEnvironmentLoop(acme.core.Worker):
 
         # save action, timestep pairs for current agent
         timestep = self._set_step_type(timestep, self._step_type[agent])
-        self._agent_action_timestep[agent] = (self._prev_action[agent], timestep)
+        self._agent_action_timestep[agent] = (
+            self._prev_action[agent],
+            timestep,
+        )  # type: ignore
 
         self._prev_timestep[agent] = timestep
 
@@ -178,7 +180,10 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         for _ in range(self.num_agents):
             agent = self._environment.current_agent
             timestep = self._set_step_type(timestep, dm_env.StepType.LAST)
-            self._agent_action_timestep[agent] = (self._prev_action[agent], timestep)
+            self._agent_action_timestep[agent] = (
+                self._prev_action[agent],
+                timestep,
+            )  # type: ignore
 
             timestep = self._environment.step(
                 generate_zeros_from_spec(self._environment.action_spec()[agent])
@@ -437,13 +442,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             # Book-keeping.
             episode_steps += 1
 
-            # If env returns empty dict at end of episode.
-            if not rewards:
-                rewards = {
-                    agent: generate_zeros_from_spec(spec)
-                    for agent, spec in self._environment.reward_spec().items()
-                }
-
             self._compute_step_statistics(rewards)
 
             for agent, reward in rewards.items():
@@ -516,9 +514,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                     (count - self._last_evaluator_run_t) / eval_interval_count
                 ) >= 1.0
                 if should_run_loop:
-                    if tf.is_tensor(count):
-                        count = count.numpy()
-                    self._last_evaluator_run_t = count
+                    self._last_evaluator_run_t = int(count)
             return should_run_loop
 
         episode_count, step_count = 0, 0

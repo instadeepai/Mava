@@ -67,6 +67,7 @@ class MAPPOConfig:
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         replay_table_name: string indicating what name to give the replay table.
+        evaluator_interval: intervals that evaluator are run at.
     """
 
     environment_spec: specs.EnvironmentSpec
@@ -88,6 +89,7 @@ class MAPPOConfig:
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    evaluator_interval: Optional[dict] = None
 
 
 class MAPPOBuilder:
@@ -255,6 +257,7 @@ class MAPPOBuilder:
             variable_client=variable_client,
             adder=adder,
             evaluator=evaluator,
+            interval=self._config.evaluator_interval if evaluator else None,
         )
 
     def make_trainer(

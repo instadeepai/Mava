@@ -1,7 +1,7 @@
 # Adapted from https://github.com/openai/multiagent-particle-envs.
 # TODO (dries): Try using this class directly from PettingZoo and delete this file.
-
-from typing import List, Union
+import typing
+from typing import List, Optional, Union
 
 import numpy as np
 
@@ -10,9 +10,9 @@ import numpy as np
 class EntityState(object):
     def __init__(self) -> None:
         # physical position
-        self.p_pos: np.array = None
+        self.p_pos: Optional[np.ndarray] = None
         # physical velocity
-        self.p_vel: np.array = None
+        self.p_vel: Optional[np.ndarray] = None
 
 
 # state of agents (including communication and internal/mental state)
@@ -25,7 +25,7 @@ class AgentState(EntityState):
 class Action(object):
     def __init__(self) -> None:
         # physical action
-        self.u: np.array = None
+        self.u: Optional[np.ndarray] = None
 
 
 # properties and state of physical world entity
@@ -129,6 +129,7 @@ class World(object):
         self.integrate_state(p_force)
 
     # gather agent action forces
+    @typing.no_type_check
     def apply_action_force(self) -> List[float]:
         # set applied forces
         p_force = []
@@ -161,6 +162,7 @@ class World(object):
         return p_force
 
     # integrate physical state
+    @typing.no_type_check
     def integrate_state(self, p_force: List[float]) -> None:
         for i, entity in enumerate(self.entities):
             if not entity.movable:
@@ -184,6 +186,7 @@ class World(object):
             entity.state.p_pos += entity.state.p_vel * self.dt
 
     # get collision forces for any contact between two entities
+    @typing.no_type_check
     def get_collision_force(
         self, entity_a: Entity, entity_b: Entity
     ) -> List[Union[float, None]]:

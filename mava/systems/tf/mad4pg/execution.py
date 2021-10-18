@@ -40,6 +40,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
         net_keys_to_ids: Dict[str, int],
+        evaluator: bool,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
@@ -72,6 +73,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
             agent_net_keys=agent_net_keys,
             network_sampling_setup=network_sampling_setup,
             net_keys_to_ids=net_keys_to_ids,
+            evaluator=evaluator,
         )
 
 

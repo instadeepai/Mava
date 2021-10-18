@@ -34,7 +34,7 @@ class OLT(NamedTuple):
 
 NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
 
-SingleAgentAction = Union[int, float, np.array]
+SingleAgentAction = Union[int, float, np.ndarray]
 Action = Union[SingleAgentAction, Dict[str, SingleAgentAction]]
 
 SingleAgentReward = Union[int, float]

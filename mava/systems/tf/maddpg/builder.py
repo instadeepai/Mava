@@ -86,10 +86,7 @@ class MADDPGConfig:
             E.g. termination_condition = {'trainer_steps': 100000}.
         evaluator_interval: An optional condition that is used to
             evaluate/test system performance after [evaluator_interval]
-            condition has been met. If None, evaluation will
-            happen at every timestep.
-            E.g. to evaluate a system after every 1000 executor episodes,
-            evaluator_interval = {"executor_episodes": 100}.
+            condition has been met.
     """
 
     environment_spec: specs.MAEnvironmentSpec

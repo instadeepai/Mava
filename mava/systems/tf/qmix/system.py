@@ -93,6 +93,7 @@ class QMIX(MADQN):
         qmix_hidden_dim: int = 32,
         num_hypernet_layers: int = 1,
         hypernet_hidden_dim: int = 32,
+        evaluator_interval: Optional[dict] = None,
     ):
         """Initialise the system
 
@@ -183,6 +184,12 @@ class QMIX(MADQN):
                 Defaults to 1.
             hypernet_hidden_dim (int, optional): hypernetwork hidden dimension. Defaults
                 to 32.
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         self._mixer = mixer
@@ -242,6 +249,7 @@ class QMIX(MADQN):
             eval_loop_fn=eval_loop_fn,
             train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
+            evaluator_interval=evaluator_interval,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
@@ -273,6 +281,7 @@ class QMIX(MADQN):
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                evaluator_interval=evaluator_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,

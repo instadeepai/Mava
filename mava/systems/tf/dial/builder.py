@@ -65,7 +65,9 @@ class DIALConfig:
         checkpoint: boolean to indicate whether to checkpoint models.
         optimizer: type of optimizer to use for updating the parameters of models.
         replay_table_name: string indicating what name to give the replay table.
-        checkpoint_subpath: subdirectory specifying where to store checkpoints."""
+        checkpoint_subpath: subdirectory specifying where to store checkpoints.
+        evaluator_interval: intervals that evaluator are run at.
+    """
 
     environment_spec: specs.MAEnvironmentSpec
     epsilon_min: float
@@ -88,6 +90,7 @@ class DIALConfig:
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
+    evaluator_interval: Optional[dict] = None
 
 
 class DIALBuilder:
