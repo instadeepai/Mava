@@ -181,11 +181,11 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
             )
             observation = observe
 
-        if observation and observation.dtype == np.int8:
+        if observation is not None and observation.dtype == np.int8:
             observation = np.dtype(np.float32).type(  # type: ignore
                 observation
             )  # observation is not expected to be int8
-        if legals and legals.dtype == np.int8:
+        if legals is not None and legals.dtype == np.int8:
             legals = np.dtype(np.int64).type(legals)  # type: ignore
 
         observation_olt = types.OLT(
