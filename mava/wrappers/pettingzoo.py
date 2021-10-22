@@ -528,7 +528,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
                 )
                 legal_actions = _convert_to_spec(self._environment.action_spaces[agent])
             else:
-                # For env link SC2 with action mask spec
+                # For env like SC2 with action mask spec
                 observation = _convert_to_spec(
                     self._environment.observation_spaces[agent]["observation"]
                 )
