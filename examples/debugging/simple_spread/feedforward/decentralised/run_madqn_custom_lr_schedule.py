@@ -93,10 +93,10 @@ def main(_: Any) -> None:
     )
 
     # LR schedule
-    # learning_rate_schedule is a function/class that takes in a trainer timestep t
+    # learning_rate_scheduler_fn is a function/class that takes in a trainer timestep t
     # and return the current learning rate.
     lr_start = 0.1
-    learning_rate_schedule = SimpleLinearDecay(min=0.001, start=0.1)
+    learning_rate_scheduler_fn = SimpleLinearDecay(min=0.001, start=0.1)
 
     # distributed program
     program = madqn.MADQN(
@@ -110,7 +110,7 @@ def main(_: Any) -> None:
         importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=lr_start),
         checkpoint_subpath=checkpoint_dir,
-        learning_rate_schedule=learning_rate_schedule,
+        learning_rate_scheduler_fn=learning_rate_scheduler_fn,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

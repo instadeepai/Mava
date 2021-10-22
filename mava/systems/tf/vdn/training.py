@@ -58,7 +58,7 @@ class VDNTrainer(MADQNTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Callable[[int], None]] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
     ) -> None:
         """Initialise VDN trainer
 
@@ -92,8 +92,8 @@ class VDNTrainer(MADQNTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
-            learning_rate_schedule: function/class that takes in a trainer step t and
-                returns the current learning rate.
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
         """
 
         self._mixing_network = mixing_network
@@ -117,7 +117,7 @@ class VDNTrainer(MADQNTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     @tf.function

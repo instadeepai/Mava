@@ -80,7 +80,7 @@ class MAPPO:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the system
 
@@ -155,10 +155,11 @@ class MAPPO:
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
-            learning_rate_schedule: dict with two functions/classes (one for the policy
-                and one for the critic optimizer), that takes in a trainer step t and
-                returns the current learning rate, e.g. {"policy": policy_lr_schedule ,
-                "critic": critic_lr_schedule}. See
+            learning_rate_scheduler_fn: dict with two functions/classes (one for the
+                policy and one for the critic optimizer), that takes in a trainer
+                step t and returns the current learning rate,
+                e.g. {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
+                See
                 examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
                 for an example.
         """
@@ -222,7 +223,7 @@ class MAPPO:
                 critic_optimizer=critic_optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
-                learning_rate_schedule=learning_rate_schedule,
+                learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,

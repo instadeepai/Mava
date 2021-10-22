@@ -81,7 +81,7 @@ class MAD4PG(MADDPG):
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the system
 
@@ -161,10 +161,11 @@ class MAD4PG(MADDPG):
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
-            learning_rate_schedule: dict with two functions/classes (one for the policy
-                and one for the critic optimizer), that takes in a trainer step t and
-                returns the current learning rate, e.g. {"policy": policy_lr_schedule ,
-                "critic": critic_lr_schedule}. See
+            learning_rate_scheduler_fn: dict with two functions/classes (one for the
+                policy and one for the critic optimizer), that takes in a trainer
+                step t and returns the current learning rate,
+                e.g. {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
+                See
                 examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
                 for an example.
         """
@@ -208,5 +209,5 @@ class MAD4PG(MADDPG):
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
             target_averaging=target_averaging,
             target_update_rate=target_update_rate,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )

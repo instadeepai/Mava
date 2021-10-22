@@ -87,13 +87,13 @@ def main(_: Any) -> None:
     boundaries = [10000, 11000]
     policy_initial_lr = 0.1
     values = [policy_initial_lr, 0.01, 0.001]
-    policy_learning_rate_schedule = (
+    policy_learning_rate_scheduler_fn = (
         tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
     )
 
     # Critic LR Schedule - ExponentialDecay Schedule
     critic_initial_lr = 0.1
-    critic_learning_rate_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+    critic_learning_rate_scheduler_fn = tf.keras.optimizers.schedules.ExponentialDecay(
         critic_initial_lr, decay_steps=10000, decay_rate=0.96, staircase=True
     )
 
@@ -107,9 +107,9 @@ def main(_: Any) -> None:
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
-        learning_rate_schedule={
-            "policy": policy_learning_rate_schedule,
-            "critic": critic_learning_rate_schedule,
+        learning_rate_scheduler_fn={
+            "policy": policy_learning_rate_scheduler_fn,
+            "critic": critic_learning_rate_scheduler_fn,
         },
     ).build()
 

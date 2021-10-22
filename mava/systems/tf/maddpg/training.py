@@ -71,7 +71,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise MADDPG trainer
 
@@ -112,16 +112,16 @@ class MADDPGBaseTrainer(mava.Trainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
-            learning_rate_schedule: dict with two functions (one for the policy and one
-                for the critic optimizer), that takes in a trainer step t and returns
-                the current learning rate.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         self._agents = agents
         self._agent_types = agent_types
         self._agent_net_keys = agent_net_keys
         self._checkpoint = checkpoint
-        self._learning_rate_schedule = learning_rate_schedule
+        self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
 
         # Store online and target networks.
         self._policy_networks = policy_networks
@@ -562,7 +562,7 @@ class MADDPGBaseTrainer(mava.Trainer):
 
     def after_trainer_step(self) -> None:
         """Optionally decay lr after every training step."""
-        if self._learning_rate_schedule:
+        if self._learning_rate_scheduler_fn:
             self._decay_lr(self._num_steps)
             info: Dict[str, Dict[str, float]] = {}
             for agent in self._agents:
@@ -583,7 +583,7 @@ class MADDPGBaseTrainer(mava.Trainer):
             trainer_step : trainer step time t.
         """
         train_utils.decay_lr_actor_critic(
-            self._learning_rate_schedule,
+            self._learning_rate_scheduler_fn,
             self._policy_optimizers,
             self._critic_optimizers,
             trainer_step,
@@ -617,7 +617,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -643,7 +643,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -674,7 +674,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -700,7 +700,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _get_critic_feed(
@@ -771,7 +771,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -797,7 +797,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
         self._connection_spec = connection_spec
@@ -886,7 +886,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -912,7 +912,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _get_critic_feed(
@@ -986,7 +986,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise Recurrent MADDPG trainer
 
@@ -1027,9 +1027,9 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
-            learning_rate_schedule: dict with two functions (one for the policy and one
-                for the critic optimizer), that takes in a trainer step t and returns
-                the current learning rate.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         self._agents = agents
@@ -1037,7 +1037,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._agent_net_keys = agent_net_keys
         self._checkpoint = checkpoint
         self._bootstrap_n = bootstrap_n
-        self._learning_rate_schedule = learning_rate_schedule
+        self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
 
         # Store online and target networks.
         self._policy_networks = policy_networks
@@ -1562,7 +1562,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
     def after_trainer_step(self) -> None:
         """Optionally decay lr after every training step."""
-        if self._learning_rate_schedule:
+        if self._learning_rate_scheduler_fn:
             self._decay_lr(self._num_steps)
             info: Dict[str, Dict[str, float]] = {}
             for agent in self._agents:
@@ -1583,7 +1583,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             trainer_step : trainer step time t.
         """
         train_utils.decay_lr_actor_critic(
-            self._learning_rate_schedule,
+            self._learning_rate_scheduler_fn,
             self._policy_optimizers,
             self._critic_optimizers,
             trainer_step,
@@ -1621,7 +1621,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -1648,7 +1648,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             bootstrap_n=bootstrap_n,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -1683,7 +1683,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -1710,7 +1710,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             bootstrap_n=bootstrap_n,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _get_critic_feed(
@@ -1785,7 +1785,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -1812,7 +1812,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             bootstrap_n=bootstrap_n,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _get_critic_feed(

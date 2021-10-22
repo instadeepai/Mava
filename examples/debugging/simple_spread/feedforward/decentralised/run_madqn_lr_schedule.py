@@ -77,14 +77,14 @@ def main(_: Any) -> None:
     )
 
     # LR schedule
-    # learning_rate_schedule is a function/class that takes in a trainer timestep t
+    # learning_rate_scheduler_fn is a function/class that takes in a trainer timestep t
     # and return the current learning rate.
     # LR that's lr for the first 10001 steps, lr * 0.1 for the next 1000 steps,
     # and lr * 0.01 for any additional steps.
     boundaries = [10000, 11000]
     lr = 1e-2
     values = [lr, lr * 0.1, lr * 0.01]
-    learning_rate_schedule = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
+    learning_rate_scheduler_fn = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
         boundaries, values
     )
 
@@ -100,7 +100,7 @@ def main(_: Any) -> None:
         importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=lr),
         checkpoint_subpath=checkpoint_dir,
-        learning_rate_schedule=learning_rate_schedule,
+        learning_rate_scheduler_fn=learning_rate_scheduler_fn,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

@@ -7,7 +7,7 @@ import trfl
 
 
 def decay_lr_actor_critic(
-    learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]],
+    learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]],
     policy_optimizers: Dict,
     critic_optimizers: Dict,
     trainer_step: int,
@@ -15,18 +15,22 @@ def decay_lr_actor_critic(
     """Function that decays lr rate in actor critic training.
 
     Args:
-        learning_rate_schedule : dict of functions (for policy and critic networks),
+        learning_rate_scheduler_fn : dict of functions (for policy and critic networks),
             that return a learning rate at training time t.
         policy_optimizers : policy optims.
         critic_optimizers : critic optims.
         trainer_step : training time t.
     """
-    if learning_rate_schedule:
-        if learning_rate_schedule["policy"]:
-            decay_lr(learning_rate_schedule["policy"], policy_optimizers, trainer_step)
+    if learning_rate_scheduler_fn:
+        if learning_rate_scheduler_fn["policy"]:
+            decay_lr(
+                learning_rate_scheduler_fn["policy"], policy_optimizers, trainer_step
+            )
 
-        if learning_rate_schedule["critic"]:
-            decay_lr(learning_rate_schedule["critic"], critic_optimizers, trainer_step)
+        if learning_rate_scheduler_fn["critic"]:
+            decay_lr(
+                learning_rate_scheduler_fn["critic"], critic_optimizers, trainer_step
+            )
 
 
 def decay_lr(

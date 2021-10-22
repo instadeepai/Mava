@@ -74,7 +74,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise MAD4PG trainer
 
@@ -115,9 +115,9 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
-            learning_rate_schedule: dict with two functions (one for the policy and one
-                for the critic optimizer), that takes in a trainer step t and returns
-                the current learning rate.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         super().__init__(
@@ -143,7 +143,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     # Forward pass that calculates loss.
@@ -263,7 +263,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -289,7 +289,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -320,7 +320,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -346,7 +346,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -377,7 +377,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -403,7 +403,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -438,7 +438,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise Recurrent MAD4PG trainer
 
@@ -479,9 +479,9 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
-            learning_rate_schedule: dict with two functions (one for the policy and one
-                for the critic optimizer), that takes in a trainer step t and returns
-                the current learning rate.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         super().__init__(
@@ -508,7 +508,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             bootstrap_n=bootstrap_n,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     # Forward pass that calculates loss.
@@ -681,7 +681,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -708,7 +708,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             bootstrap_n=bootstrap_n,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -742,7 +742,7 @@ class MAD4PGCentralisedRecurrentTrainer(
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -769,7 +769,7 @@ class MAD4PGCentralisedRecurrentTrainer(
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             bootstrap_n=bootstrap_n,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -803,7 +803,7 @@ class MAD4PGStateBasedRecurrentTrainer(
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         bootstrap_n: int = 10,
-        learning_rate_schedule: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -830,5 +830,5 @@ class MAD4PGStateBasedRecurrentTrainer(
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             bootstrap_n=bootstrap_n,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )

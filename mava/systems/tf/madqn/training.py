@@ -68,7 +68,7 @@ class MADQNTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
         communication_module: Optional[BaseCommunicationModule] = None,
-        learning_rate_schedule: Optional[Callable[[int], None]] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
     ):
         """Initialise MADQN trainer
 
@@ -99,15 +99,15 @@ class MADQNTrainer(mava.Trainer):
                 Defaults to "~/mava/".
             communication_module (BaseCommunicationModule): module for communication
                 between agents. Defaults to None.
-            learning_rate_schedule: function/class that takes in a trainer step t and
-                returns the current learning rate.
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
         """
 
         self._agents = agents
         self._agent_types = agent_types
         self._agent_net_keys = agent_net_keys
         self._checkpoint = checkpoint
-        self._learning_rate_schedule = learning_rate_schedule
+        self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
 
         # Store online and target q-networks.
         self._q_networks = q_networks
@@ -492,7 +492,7 @@ class MADQNTrainer(mava.Trainer):
 
     def after_trainer_step(self) -> None:
         """Optionally decay lr after every training step."""
-        if self._learning_rate_schedule:
+        if self._learning_rate_scheduler_fn:
             self._decay_lr(self._num_steps)
             info: Dict[str, Dict[str, float]] = {}
             for agent in self._agents:
@@ -510,7 +510,7 @@ class MADQNTrainer(mava.Trainer):
             trainer_step : trainer step time t.
         """
         train_utils.decay_lr(
-            self._learning_rate_schedule, self._optimizers, trainer_step
+            self._learning_rate_scheduler_fn, self._optimizers, trainer_step
         )
 
 
@@ -539,7 +539,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
-        learning_rate_schedule: Optional[Callable[[int], None]] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
     ):
         """Initialise recurrent MADQN trainer
 
@@ -570,8 +570,8 @@ class MADQNRecurrentTrainer(MADQNTrainer):
                 Defaults to "~/mava/".
             communication_module (BaseCommunicationModule): module for communication
                 between agents. Defaults to None.
-            learning_rate_schedule: function/class that takes in a trainer step t and
-                returns the current learning rate.
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
         """
 
         super().__init__(
@@ -591,7 +591,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             fingerprint=fingerprint,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _forward(self, inputs: Any) -> None:
@@ -682,7 +682,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_schedule: Optional[Callable[[int], None]] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
     ):
         """Initialise recurrent MADQN trainer with communication
 
@@ -713,8 +713,8 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
-            learning_rate_schedule: function/class that takes in a trainer step t and
-                returns the current learning rate.
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
         """
 
         super().__init__(
@@ -734,7 +734,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
-            learning_rate_schedule=learning_rate_schedule,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
         self._communication_module = communication_module
