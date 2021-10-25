@@ -67,6 +67,7 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         self._reset_next_step = True
         self._env_done = False
         self._num_agents = len(self._environment.action_spec())
+        self._num_actions = self._environment.action_spec()[0].num_values
         self._env_image: np.ndarray = None
         self._screen = None
         self._preprocessor = preprocessor
@@ -87,22 +88,18 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
         timestep = self._environment.reset()
         self._reset_next_step = False
-        self._step_type = timestep.step_type
 
-        self._obtain_env_image(timestep)
+        self._set_env_image()
 
         return self._refine_timestep(timestep)
 
-    def _set_env_image(self, timestep: dm_env.TimeStep) -> None:
+    def _set_env_image(self) -> None:
         """Sets an image of the environment from a timestep
 
         The image is from the observation key 'WORLD.RGB'
 
-        Args:
-            timestep (dm_env.TimeStep): timestep from the meltinpot env
-
         """
-        self._env_image = timestep.observation[0]["WORLD.RGB"]
+        self._env_image = self._environment.observation()["WORLD.RGB"]
 
     def _to_olt(
         self, observation: Dict[str, NestedArray], num_values: int, is_terminal: bool
@@ -161,14 +158,16 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         Returns:
             Dict[str, NestedArray]: Dictionary of reward
         """
-        return {f"agent_{i}": rew for i, rew in enumerate(rewards)}
+        return {
+            f"agent_{i}": np.dtype("float32").type(rew) for i, rew in enumerate(rewards)
+        }
 
     def _to_dict_discounts(
         self, discounts: List[NestedArray]
     ) -> Dict[str, NestedArray]:
         """List of dicounts to Dict of discounts
 
-        Transforms a list of discounts into a dictionary of dixcounts with keys
+        Transforms a list of discounts into a dictionary of discounts with keys
         corresponding to the agent ids
 
         Args:
@@ -177,7 +176,10 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         Returns:
             Dict[str, NestedArray]: Dictionary of discounts
         """
-        return {f"agent_{i}": disc for i, disc in enumerate(discounts)}
+        return {
+            f"agent_{i}": np.dtype("float32").type(disc)
+            for i, disc in enumerate(discounts)
+        }
 
     def _refine_timestep(self, timestep: dm_env.TimeStep) -> dm_env.TimeStep:
         """Converts a melting pot timestep into one compatiple with Mava
@@ -194,12 +196,10 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
             dm_env.TimeStep: a timestep compatible with Mava
         """
         is_terminal = timestep.last()
-        timestep.observation = self._to_dict_observation(
-            timestep.observation, is_terminal
-        )
-        timestep.reward = self._to_rewards(timestep.reward)
-        timestep.discount = self._to_discounts(timestep.discount)
-        return timestep
+        observation = self._to_dict_observation(timestep.observation, is_terminal)
+        reward = self._to_dict_rewards(timestep.reward)
+        discount = self._to_dict_discounts([timestep.discount] * self._num_agents)
+        return dm_env.TimeStep(timestep.step_type, reward, discount, observation)
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps in env.
@@ -216,7 +216,7 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
         actions_ = [actions[f"agent_{i}"] for i in range(self._num_agents)]
         timestep = self._environment.step(actions_)
-        self._set_env_image(timestep)
+        self._set_env_image()
         timestep = self._refine_timestep(timestep)
 
         if timestep.last():
@@ -288,11 +288,10 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
             types.Observation: spec for environment.
         """
         observation_spec = self._environment.observation_spec()
-        action_spec = self._environment.action_spec()
         return {
             f"agent_{i}": types.OLT(
                 observation=self._ob_spec,
-                legal_actions=action_spec[i],
+                legal_actions=specs.Array((self._num_actions,), np.int32),
                 terminal=specs.Array((1,), np.float32),
             )
             for i, spec in enumerate(observation_spec)
@@ -305,7 +304,10 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
             Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]: spec for actions.
         """
         action_spec = self._environment.action_spec()
-        return {f"agent_{i}": spec for i, spec in enumerate(action_spec)}
+        return {
+            f"agent_{i}": specs.DiscreteArray(spec.num_values, np.int64)
+            for i, spec in enumerate(action_spec)
+        }
 
     def reward_spec(self) -> Dict[str, specs.Array]:
         """Reward spec.
@@ -313,8 +315,9 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         Returns:
             Dict[str, specs.Array]: spec for rewards.
         """
-        reward_spec = self._environment.reward_spec()
-        return {f"agent_{i}": spec for i, spec in enumerate(reward_spec)}
+        return {
+            f"agent_{i}": specs.Array((), np.float32) for i in range(self._num_agents)
+        }
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
         """Discount spec.
