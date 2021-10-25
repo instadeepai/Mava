@@ -13,7 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running feedforward MADDPG on debug MPE environments."""
+"""Example running feedforward MADDPG on debug MPE environments.
+NB: Using multiple trainers with non-shared weights is still in its
+    experimental phase of development. This feature will become faster and
+    more stable in future Mava updates."""
 
 import functools
 from datetime import datetime
@@ -75,6 +78,9 @@ def main(_: Any) -> None:
     )
 
     # distributed program
+    """NB: Using multiple trainers with non-shared weights is still in its
+    experimental phase of development. This feature will become faster and
+    more stable in future Mava updates."""
     program = maddpg.MADDPG(
         environment_factory=environment_factory,
         network_factory=network_factory,

@@ -52,6 +52,9 @@ from mava.wrappers import DetailedPerAgentStatistics
 class MADDPG:
     """MADDPG system."""
 
+    """TODO: Implement faster adders to speed up training times when
+    using multiple trainers with non-shared weights."""
+
     def __init__(  # noqa
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
