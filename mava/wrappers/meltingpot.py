@@ -249,7 +249,7 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
             os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
             if self._screen is None:
                 pygame.init()
-                self._screen = pygame.display.set_mode(
+                self._screen = pygame.display.set_mode(  # type: ignore
                     (screen_width * scale, screen_height * scale)
                 )
             image = np.transpose(image, (1, 0, 2))  # PyGame is column major!
