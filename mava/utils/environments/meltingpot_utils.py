@@ -34,6 +34,8 @@ class EnvironmentFactory:
     def __init__(self, substrate: str = None, scenario: str = None):
         """Initializes the env factory object
 
+        sets the substrate/scenario using the available ones in meltingpot
+
         Args:
             substrate (str, optional): what substrate to use. Defaults to None.
             scenario (str, optional): what scenario to use. Defaults to None.
@@ -62,7 +64,7 @@ class EnvironmentFactory:
             self._env_fn = self._scenario
 
     def _substrate(self) -> Substrate:
-        """Return a substrate as an environment
+        """Returns a substrate as an environment
 
         Returns:
             [Substrate]: A substrate
@@ -71,7 +73,7 @@ class EnvironmentFactory:
         return MeltingpotEnvWrapper(env)
 
     def _scenario(self) -> Scenario:
-        """Return a scenario as an environment
+        """Returns a scenario as an environment
 
         Returns:
             [Scenario]: A scenario or None
@@ -84,7 +86,7 @@ class EnvironmentFactory:
         """Creates an environment
 
         Returns:
-            [type]: The created environment
+            (Union[Substrate, Scenario]): The created environment
         """
         env = self._env_fn()  # type: ignore
         return env

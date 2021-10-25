@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Wraps a PettingZoo MARL environment to be used as a dm_env environment."""
+"""Wraps a meltingpot environment to be used as a dm_env environment in mava."""
 import os
 from typing import Any, Callable, Dict, List, Union
 
