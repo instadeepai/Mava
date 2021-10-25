@@ -155,3 +155,6 @@ mava/workspace.code-workspace
 mava_testing
 .devcontainer/devcontainer.json
 3rdparty
+
+# PyCharm
+.idea/
