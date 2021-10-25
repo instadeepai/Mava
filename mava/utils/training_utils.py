@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, Iterable, Sequence
+from typing import Any, Dict, Iterable, List, Sequence, Tuple, Union
 
 import sonnet as snt
 import tensorflow as tf
@@ -29,8 +29,7 @@ def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
         len(critic_losses) == len(policy_losses)
     ), "Invalid System Checkpointer."
     logged_losses: Dict[str, Dict[str, Any]] = {}
-    agents = policy_losses.keys()
-    for agent in agents:
+    for agent in policy_losses.keys():
         logged_losses[agent] = {
             "critic_loss": critic_losses[agent],
             "policy_loss": policy_losses[agent],
@@ -39,13 +38,24 @@ def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
     return logged_losses
 
 
-def combine_dim(tensor: tf.Tensor) -> tf.Tensor:
-    dims = tensor.shape[:2]
-    return snt.merge_leading_dims(tensor, num_dims=2), dims
+def combine_dim(inputs: Union[tf.Tensor, List, Tuple]) -> tf.Tensor:
+    if isinstance(inputs, tf.Tensor):
+        dims = inputs.shape[:2]
+        return snt.merge_leading_dims(inputs, num_dims=2), dims
+    else:
+        dims = None
+        return_list = []
+        for tensor in inputs:
+            comb_one, dims = combine_dim(tensor)
+            return_list.append(comb_one)
+        return return_list, dims
 
 
-def extract_dim(tensor: tf.Tensor, dims: tf.Tensor) -> tf.Tensor:
-    return tf.reshape(tensor, [dims[0], dims[1], -1])
+def extract_dim(inputs: Union[tf.Tensor, List, Tuple], dims: tf.Tensor) -> tf.Tensor:
+    if isinstance(inputs, tf.Tensor):
+        return tf.reshape(inputs, [dims[0], dims[1], -1])
+    else:
+        return [extract_dim(tensor, dims) for tensor in inputs]
 
 
 # Require correct tensor ranks---as long as we have shape information

@@ -26,3 +26,21 @@ class Network(Enum):
     mlp = 1
     atari_dqn_network = 2
     coms_network = 3
+
+
+class Trainer(Enum):
+    single_trainer = 1
+    """Only create one trainer that trains all the networks."""
+    one_trainer_per_network = 2
+    """Create one trainer per network. Therefore each trainer is
+    dedicated to training only one network."""
+
+
+class NetworkSampler(Enum):
+    fixed_agent_networks = 1
+    """This option keeps the network used by each agent fixed."""
+    random_agent_networks = 2
+    """Create N network policies, where N is the number of agents. Randomly
+    select policies from this sets for each agent at the start of a
+    episode. This sampling is done with replacement so the same policy
+    can be selected for more than one agent for a given episode."""
