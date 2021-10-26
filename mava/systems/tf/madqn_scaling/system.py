@@ -31,7 +31,7 @@ from dm_env import specs
 import mava
 from mava import core
 from mava import specs as mava_specs
-from mava.components.tf.architectures import (
+from mava.systems.tf.madqn_scaling.architecture import (
     DecentralisedValueActor,
 )
 from mava.components.tf.modules.exploration.exploration_scheduling import LinearExplorationScheduler, BaseExplorationScheduler
