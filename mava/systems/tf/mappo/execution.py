@@ -15,7 +15,7 @@
 
 """MAPPO system executor implementation."""
 
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import dm_env
 import numpy as np
@@ -27,8 +27,9 @@ from acme.specs import EnvironmentSpec
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
-from mava import adders, core
+from mava import adders
 from mava.systems.tf import executors
+from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
 tfd = tfp.distributions
 
@@ -41,8 +42,12 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],
+        agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
+        network_sampling_setup: List,
+        net_keys_to_ids: Dict[str, int],
         adder: Optional[adders.ParallelAdder] = None,
+        counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
         """Initialise the system executor
@@ -56,6 +61,11 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
         """
+        self._agent_specs = agent_specs
+        self._network_sampling_setup = network_sampling_setup
+        self._counts = counts
+        self._network_int_keys_extras: Dict[str, np.array] = {}
+        self._net_keys_to_ids = net_keys_to_ids
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,
@@ -68,7 +78,7 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
         self,
         agent: str,
         observation: types.NestedTensor,
-    ) -> Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
+    ) -> Tuple[types.NestedTensor, types.NestedTensor]:
         """Agent specific policy function
 
         Args:
@@ -149,11 +159,37 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
             actions[agent], logits[agent] = self.select_action(agent, observation)
         return actions, logits
 
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
+        """record first observed timestep from the environment
+        Args:
+            timestep: data emitted by an environment at first step of
+                interaction.
+            extras: possible extra information
+                to record during the first step. Defaults to {}.
+        """
+        if not self._adder:
+            return
+
+        "Select new networks from the sampler at the start of each episode."
+        agents = sort_str_num(list(self._agent_net_keys.keys()))
+        self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+            agents,
+            self._network_sampling_setup,
+            self._net_keys_to_ids,
+        )
+
+        extras["network_int_keys"] = self._network_int_keys_extras
+        self._adder.add_first(timestep, extras)
+
     def observe(
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """record observed timestep from the environment
 
@@ -167,15 +203,21 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
 
         if not self._adder:
             return
-        actions, logits = actions
+        actions, logits = actions  # type: ignore
 
-        adder_actions = {}
+        adder_actions: Dict[str, Any] = {}
         for agent in actions.keys():
             adder_actions[agent] = {}
             adder_actions[agent]["actions"] = actions[agent]
-            adder_actions[agent]["logits"] = logits[agent]
+            adder_actions[agent]["logits"] = logits[agent]  # type: ignore
 
+        next_extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add(adder_actions, next_timestep, next_extras)  # type: ignore
+
+    def update(self, wait: bool = False) -> None:
+        """Update the policy variables."""
+        if self._variable_client:
+            self._variable_client.get_async()
 
 
 class MAPPORecurrentExecutor(executors.RecurrentExecutor):
@@ -186,8 +228,12 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
     def __init__(
         self,
         policy_networks: Dict[str, snt.Module],
+        agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
+        network_sampling_setup: List,
+        net_keys_to_ids: Dict[str, int],
         adder: Optional[adders.ParallelAdder] = None,
+        counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
         """Initialise the system executor
@@ -201,6 +247,11 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
         """
+        self._agent_specs = agent_specs
+        self._network_sampling_setup = network_sampling_setup
+        self._counts = counts
+        self._net_keys_to_ids = net_keys_to_ids
+        self._network_int_keys_extras: Dict[str, np.array] = {}
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,
@@ -307,11 +358,50 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
             actions[agent], logits[agent] = self.select_action(agent, observation)
         return actions, logits
 
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
+        """record first observed timestep from the environment
+
+        Args:
+            timestep: data emitted by an environment at first step of
+                interaction.
+            extras: possible extra information
+                to record during the first step.
+        """
+
+        # Re-initialize the RNN state.
+        for agent, _ in timestep.observation.items():
+            # index network either on agent type or on agent id
+            agent_key = self._agent_net_keys[agent]
+            self._states[agent] = self._policy_networks[agent_key].initial_state(1)
+
+        if not self._adder:
+            return
+
+        # Sample new agent_net_keys.
+        agents = sort_str_num(list(self._agent_net_keys.keys()))
+        self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+            agents,
+            self._network_sampling_setup,
+            self._net_keys_to_ids,
+        )
+
+        numpy_states = {
+            agent: tf2_utils.to_numpy_squeeze(_state)
+            for agent, _state in self._states.items()
+        }
+        extras.update({"core_states": numpy_states})
+        extras["network_int_keys"] = self._network_int_keys_extras
+        self._adder.add_first(timestep, extras)
+
     def observe(
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """record observed timestep from the environment
 
@@ -325,20 +415,23 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
 
         if not self._adder:
             return
-        actions, logits = actions
+        actions, logits = actions  # type: ignore
 
-        adder_actions = {}
+        adder_actions: Dict[str, Any] = {}
         for agent in actions.keys():
             adder_actions[agent] = {}
             adder_actions[agent]["actions"] = actions[agent]
-            adder_actions[agent]["logits"] = logits[agent]
+            adder_actions[agent]["logits"] = logits[agent]  # type: ignore
 
         numpy_states = {
             agent: tf2_utils.to_numpy_squeeze(_state)
             for agent, _state in self._states.items()
         }
-        if next_extras:
-            next_extras.update({"core_states": numpy_states})
-            self._adder.add(adder_actions, next_timestep, next_extras)  # type: ignore
-        else:
-            self._adder.add(adder_actions, next_timestep, numpy_states)  # type: ignore
+        next_extras.update({"core_states": numpy_states})
+        next_extras["network_int_keys"] = self._network_int_keys_extras
+        self._adder.add(adder_actions, next_timestep, next_extras)  # type: ignore
+
+    def update(self, wait: bool = False) -> None:
+        """Update the policy variables."""
+        if self._variable_client:
+            self._variable_client.get_async()

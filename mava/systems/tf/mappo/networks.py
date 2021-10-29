@@ -18,7 +18,6 @@ import dm_env
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-import tensorflow_probability as tfp
 from acme.tf import utils as tf2_utils
 from dm_env import specs
 
@@ -35,13 +34,14 @@ DiscreteArray = specs.DiscreteArray
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
+    net_spec_keys: Dict[str, str] = {},
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
         256,
         256,
         256,
     ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
-    archecture_type=ArchitectureType.feedforward,
+    archecture_type: ArchitectureType = ArchitectureType.feedforward,
     seed: Optional[int] = None,
 ) -> Dict[str, snt.Module]:
     """Default networks for mappo.
@@ -51,6 +51,7 @@ def make_default_networks(
             observation spaces etc. for each agent in the system.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
+        net_spec_keys: specifies the specs of each network.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of policy networks. Defaults to (256, 256, 256).
         critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
@@ -67,7 +68,10 @@ def make_default_networks(
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
-    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+    if not net_spec_keys:
+        specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+    else:
+        specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
     # Set Policy function and layer size
     # Default size per arch type.

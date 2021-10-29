@@ -22,16 +22,16 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union
 import reverb
 import sonnet as snt
 import tensorflow as tf
-from acme import datasets
 from acme.specs import EnvironmentSpec
 from acme.tf import utils as tf2_utils
-from acme.tf import variable_utils
-from acme.utils import counting
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
+from mava.systems.tf import variable_utils
 from mava.systems.tf.mappo import execution, training
-from mava.wrappers import DetailedTrainerStatistics
+from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils.sort_utils import sort_str_num
+from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerStatistics
 
 
 @dataclasses.dataclass
@@ -68,12 +68,23 @@ class MAPPOConfig:
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         replay_table_name: string indicating what name to give the replay table.
+        termination_condition: An optional terminal condition can be provided
+        that stops the program once the condition is satisfied. Available options
+        include specifying maximum values for trainer_steps, trainer_walltime,
+        evaluator_steps, evaluator_episodes, executor_episodes or executor_steps.
+        E.g. termination_condition = {'trainer_steps': 100000}.
     """
 
     environment_spec: specs.EnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
+    num_executors: int
     agent_net_keys: Dict[str, str]
+    trainer_networks: Dict[str, List]
+    table_network_config: Dict[str, List]
+    network_sampling_setup: List
+    net_keys_to_ids: Dict[str, int]
+    unique_net_keys: List[str]
     checkpoint_minute_interval: int
     sequence_length: int = 10
     sequence_period: int = 5
@@ -89,6 +100,7 @@ class MAPPOConfig:
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    termination_condition: Optional[Dict[str, int]] = None
 
 
 class MAPPOBuilder:
@@ -116,10 +128,9 @@ class MAPPOBuilder:
 
         self._config = config
         self._agents = self._config.environment_spec.get_agent_ids()
-        self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
-        self._extras_specs = extra_specs
+        self._extra_specs = extra_specs
 
     def add_logits_to_spec(
         self, environment_spec: specs.MAEnvironmentSpec
@@ -151,6 +162,21 @@ class MAPPOBuilder:
             )
         return env_adder_spec
 
+    def covert_specs(self, spec: Dict[str, Any], num_networks: int) -> Dict[str, Any]:
+        if type(spec) is not dict:
+            return spec
+
+        agents = sort_str_num(self._config.agent_net_keys.keys())[:num_networks]
+        converted_spec: Dict[str, Any] = {}
+        if agents[0] in spec.keys():
+            for agent in agents:
+                converted_spec[agent] = spec[agent]
+        else:
+            # For the extras
+            for key in spec.keys():
+                converted_spec[key] = self.covert_specs(spec[key], num_networks)
+        return converted_spec
+
     def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
@@ -168,21 +194,43 @@ class MAPPOBuilder:
         # Create system architecture with target networks.
         adder_env_spec = self.add_logits_to_spec(environment_spec)
 
-        replay_table = reverb.Table.queue(
-            name=self._config.replay_table_name,
-            max_size=self._config.max_queue_size,
-            signature=reverb_adders.ParallelSequenceAdder.signature(
-                adder_env_spec,
-                sequence_length=self._config.sequence_length,
-                extras_spec=self._extras_specs,
-            ),
-        )
+        # Create table per trainer
+        replay_tables = []
+        for table_key in self._config.table_network_config.keys():
+            # TODO (dries): Clean the below coverter code up.
+            # Convert a Mava spec
+            num_networks = len(self._config.table_network_config[table_key])
+            env_spec = copy.deepcopy(adder_env_spec)
+            env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
 
-        return [replay_table]
+            env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
+            if env_spec.extra_specs is not None:
+                env_spec.extra_specs = self.covert_specs(
+                    env_spec.extra_specs, num_networks
+                )
+            extra_specs = self.covert_specs(
+                self._extra_specs,
+                num_networks,
+            )
+
+            replay_tables.append(
+                reverb.Table.queue(
+                    name=table_key,
+                    max_size=self._config.max_queue_size,
+                    signature=reverb_adders.ParallelSequenceAdder.signature(
+                        env_spec,
+                        sequence_length=self._config.sequence_length,
+                        extras_spec=extra_specs,
+                    ),
+                )
+            )
+
+        return replay_tables
 
     def make_dataset_iterator(
         self,
         replay_client: reverb.Client,
+        table_name: str,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for training/updating the system.
 
@@ -205,7 +253,7 @@ class MAPPOBuilder:
 
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=replay_client.server_address,
-            table=self._config.replay_table_name,
+            table=table_name,
             max_in_flight_samples_per_worker=1,
         ).batch(
             self._config.batch_size, drop_remainder=True
@@ -231,59 +279,138 @@ class MAPPOBuilder:
             Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
         """
 
+        # Create custom priority functons for the adder
+        priority_fns = {
+            table_key: lambda x: 1.0
+            for table_key in self._config.table_network_config.keys()
+        }
+
         return reverb_adders.ParallelSequenceAdder(
+            priority_fns=priority_fns,
             client=replay_client,
-            period=self._config.sequence_period,
+            net_ids_to_keys=self._config.unique_net_keys,
+            table_network_config=self._config.table_network_config,
             sequence_length=self._config.sequence_length,
+            period=self._config.sequence_period,
             use_next_extras=True,
         )
 
+    def create_counter_variables(
+        self, variables: Dict[str, tf.Variable]
+    ) -> Dict[str, tf.Variable]:
+        """Create counter variables.
+        Args:
+            variables: dictionary with variable_source
+            variables in.
+        Returns:
+            variables: dictionary with variable_source
+            variables in.
+        """
+        variables["trainer_steps"] = tf.Variable(0, dtype=tf.int32)
+        variables["trainer_walltime"] = tf.Variable(0, dtype=tf.float32)
+        variables["evaluator_steps"] = tf.Variable(0, dtype=tf.int32)
+        variables["evaluator_episodes"] = tf.Variable(0, dtype=tf.int32)
+        variables["executor_episodes"] = tf.Variable(0, dtype=tf.int32)
+        variables["executor_steps"] = tf.Variable(0, dtype=tf.int32)
+        return variables
+
+    def make_variable_server(
+        self,
+        networks: Dict[str, Dict[str, snt.Module]],
+    ) -> MavaVariableSource:
+        """Create the variable server.
+        Args:
+            networks: dictionary with the
+            system's networks in.
+        Returns:
+            variable_source: A Mava variable source object.
+        """
+        # Create variables
+        variables = {}
+        # Network variables
+        for net_type_key in networks.keys():
+            for net_key in networks[net_type_key].keys():
+                # Ensure obs and target networks are sonnet modules
+                variables[f"{net_key}_{net_type_key}"] = tf2_utils.to_sonnet_module(
+                    networks[net_type_key][net_key]
+                ).variables
+
+        variables = self.create_counter_variables(variables)
+
+        # Create variable source
+        variable_source = MavaVariableSource(
+            variables,
+            self._config.checkpoint,
+            self._config.checkpoint_subpath,
+            self._config.checkpoint_minute_interval,
+            self._config.termination_condition,
+        )
+        return variable_source
+
     def make_executor(
         self,
+        # executor_id: str,
+        networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
-        variable_source: Optional[core.VariableSource] = None,
+        variable_source: Optional[MavaVariableSource] = None,
     ) -> core.Executor:
-
         """Create an executor instance.
-
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            networks: dictionary with the system's networks in.
+            policy_networks: policy networks for each agent in
                 the system.
-            adder (Optional[adders.ParallelAdder], optional): adder to send data to
+            adder: adder to send data to
                 a replay buffer. Defaults to None.
-            variable_source (Optional[core.VariableSource], optional): variables server.
+            variable_source: variables server.
                 Defaults to None.
-
         Returns:
-            core.Executor: system executor, a collection of agents making up the part
+            system executor, a collection of agents making up the part
                 of the system generating data by interacting the environment.
         """
+        # Create policy variables
+        variables = {}
+        get_keys = []
+        for net_type_key in ["observations", "policies"]:
+            for net_key in networks[net_type_key].keys():
+                var_key = f"{net_key}_{net_type_key}"
+                variables[var_key] = networks[net_type_key][net_key].variables
+                get_keys.append(var_key)
+        variables = self.create_counter_variables(variables)
+
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        get_keys.extend(count_names)
+        counts = {name: variables[name] for name in count_names}
 
         variable_client = None
         if variable_source:
-            # Create policy variables.
-            variables = {
-                network_key: policy_networks[network_key].variables
-                for network_key in policy_networks
-            }
-
-            # Get new policy variables.
-            # TODO Should the variable update period be in the MAPPO config?
+            # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
-                variables={"policy": variables},
+                variables=variables,
+                get_keys=get_keys,
                 update_period=self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
-            variable_client.update_and_wait()
+            variable_client.get_and_wait()
 
-        # Create the executor which defines how agents take actions.
+        # Create the actor which defines how we take actions.
         return self._executor_fn(
             policy_networks=policy_networks,
+            counts=counts,
+            net_keys_to_ids=self._config.net_keys_to_ids,
+            agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
+            network_sampling_setup=self._config.network_sampling_setup,
             variable_client=variable_client,
             adder=adder,
         )
@@ -292,60 +419,104 @@ class MAPPOBuilder:
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        can_sample: Any,
-        counter: Optional[counting.Counter] = None,
+        variable_source: MavaVariableSource,
+        trainer_networks: List[Any],
+        trainer_table_entry: List[Any],
         logger: Optional[types.NestedLogger] = None,
+        connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
         """Create a trainer instance.
-
         Args:
-            networks (Dict[str, Dict[str, snt.Module]]): system networks.
-            dataset (Iterator[reverb.ReplaySample]): dataset iterator to feed data to
+            networks: system networks.
+            dataset: dataset iterator to feed data to
                 the trainer networks.
-            counter (Optional[counting.Counter], optional): a Counter which allows for
-                recording of counts, e.g. trainer steps. Defaults to None.
-            logger (Optional[types.NestedLogger], optional): Logger object for logging
-                metadata. Defaults to None.
-
+            variable_source: Source with variables in.
+            trainer_networks: Set of unique network keys to train on..
+            trainer_table_entry: List of networks per agent to train on.
+            logger: Logger object for logging  metadata.
+            connection_spec: connection topology used
+                for networked system architectures. Defaults to None.
         Returns:
-            core.Trainer: system trainer, that uses the collected data from the
+            system trainer, that uses the collected data from the
                 executors to update the parameters of the agent networks in the system.
         """
+        # This assumes agents are sort_str_num in the other methods
+        max_gradient_norm = self._config.max_gradient_norm
 
-        agents = self._agents
-        agent_types = self._agent_types
-        agent_net_keys = self._config.agent_net_keys
+        # Create variable client
+        variables = {}
+        set_keys = []
+        get_keys = []
+        # TODO (dries): Only add the networks this trainer is working with.
+        # Not all of them.
+        for net_type_key in networks.keys():
+            for net_key in networks[net_type_key].keys():
+                variables[f"{net_key}_{net_type_key}"] = networks[net_type_key][
+                    net_key
+                ].variables
+                if net_key in set(trainer_networks):
+                    set_keys.append(f"{net_key}_{net_type_key}")
+                else:
+                    get_keys.append(f"{net_key}_{net_type_key}")
 
-        observation_networks = networks["observations"]
-        policy_networks = networks["policies"]
-        critic_networks = networks["critics"]
+        variables = self.create_counter_variables(variables)
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        get_keys.extend(count_names)
+        counts = {name: variables[name] for name in count_names}
 
-        # The learner updates the parameters (and initializes them).
-        trainer = self._trainer_fn(
-            agents=agents,
-            agent_types=agent_types,
-            can_sample=can_sample,
-            observation_networks=observation_networks,
-            policy_networks=policy_networks,
-            critic_networks=critic_networks,
-            dataset=dataset,
-            agent_net_keys=agent_net_keys,
-            critic_optimizer=self._config.critic_optimizer,
-            policy_optimizer=self._config.policy_optimizer,
-            discount=self._config.discount,
-            lambda_gae=self._config.lambda_gae,
-            entropy_cost=self._config.entropy_cost,
-            baseline_cost=self._config.baseline_cost,
-            clipping_epsilon=self._config.clipping_epsilon,
-            max_gradient_norm=self._config.max_gradient_norm,
-            counter=counter,
-            logger=logger,
-            checkpoint_minute_interval=self._config.checkpoint_minute_interval,
-            checkpoint=self._config.checkpoint,
-            checkpoint_subpath=self._config.checkpoint_subpath,
+        variable_client = variable_utils.VariableClient(
+            client=variable_source,
+            variables=variables,
+            get_keys=get_keys,
+            set_keys=set_keys,
+            update_period=10,
         )
 
-        trainer = DetailedTrainerStatistics(  # type: ignore
+        # Get all the initial variables
+        variable_client.get_all_and_wait()
+
+        # Convert network keys for the trainer.
+        trainer_agents = self._agents[: len(trainer_table_entry)]
+        trainer_agent_net_keys = {
+            agent: trainer_table_entry[a_i] for a_i, agent in enumerate(trainer_agents)
+        }
+
+        trainer_config: Dict[str, Any] = {
+            "agents": trainer_agents,
+            "policy_networks": networks["policies"],
+            "critic_networks": networks["critics"],
+            "observation_networks": networks["observations"],
+            "agent_net_keys": trainer_agent_net_keys,
+            "policy_optimizer": self._config.policy_optimizer,
+            "critic_optimizer": self._config.critic_optimizer,
+            "max_gradient_norm": max_gradient_norm,
+            "discount": self._config.discount,
+            "variable_client": variable_client,
+            "dataset": dataset,
+            "counts": counts,
+            "logger": logger,
+            "lambda_gae": self._config.lambda_gae,
+            "entropy_cost": self._config.entropy_cost,
+            "baseline_cost": self._config.baseline_cost,
+            "clipping_epsilon": self._config.clipping_epsilon,
+        }
+
+        # The learner updates the parameters (and initializes them).
+        trainer = self._trainer_fn(**trainer_config)
+
+        # NB If using both NetworkStatistics and TrainerStatistics, order is important.
+        # NetworkStatistics needs to appear before TrainerStatistics.
+        # TODO(Kale-ab/Arnu): need to fix wrapper type issues
+        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
+
+        trainer = ScaledDetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]
         )
 

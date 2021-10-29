@@ -215,7 +215,7 @@ class StateBasedValueActorCritic(DecentralisedValueActorCritic):  # type: ignore
         for agent_key in self._agents:
             # Get observation spec for critic.
             critic_obs_specs[agent_key] = critic_obs_spec
-        return critic_obs_specs, None
+        return critic_obs_specs, None  # type: ignore
 
 
 class StateBasedQValueSingleActionCritic(DecentralisedQValueActorCritic):

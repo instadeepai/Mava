@@ -24,7 +24,7 @@ from mava.utils.debugging.scenario import BaseScenario
 
 
 class Scenario(BaseScenario):
-    def __init__(self, recurrent_test) -> None:
+    def __init__(self, recurrent_test: bool) -> None:
         super().__init__()
         self.np_rnd = np.random.RandomState()
         self.recurrent_test = recurrent_test

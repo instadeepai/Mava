@@ -16,7 +16,6 @@
 """MAPPO system trainer implementation."""
 
 import copy
-import os
 import time
 from typing import Any, Dict, List, Optional, Sequence, Union
 
@@ -31,7 +30,7 @@ from acme.utils import counting, loggers
 
 import mava
 from mava.adders.reverb.base import Trajectory
-from mava.systems.tf import savers as tf2_savers
+from mava.systems.tf.variable_utils import VariableClient
 from mava.utils import training_utils as train_utils
 from mava.utils.sort_utils import sort_str_num
 
@@ -49,16 +48,15 @@ class MAPPOTrainer(mava.Trainer):
     def __init__(
         self,
         agents: List[Any],
-        agent_types: List[str],
-        can_sample: Any,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         discount: float = 0.999,
         lambda_gae: float = 1.0,  # Question (dries): What is this used for?
         entropy_cost: float = 0.01,
@@ -67,14 +65,11 @@ class MAPPOTrainer(mava.Trainer):
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = False,
-        checkpoint_subpath: str = "~/mava/",
     ):
         """Initialise MAPPO trainer
 
         Args:
             agents (List[str]): agent ids, e.g. "agent_0".
-            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
             policy_networks (Dict[str, snt.Module]): policy networks for each agent in
                 the system.
             critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
@@ -84,10 +79,10 @@ class MAPPOTrainer(mava.Trainer):
                 optimizer(s) for updating policy networks.
             critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
                 optimizer for updating critic networks.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            checkpoint_minute_interval (int): The number of minutes to wait between
-                checkpoints.
             discount (float, optional): discount factor for TD updates. Defaults
                 to 0.99.
             lambda_gae (float, optional): scalar determining the mix of bootstrapping
@@ -104,22 +99,19 @@ class MAPPOTrainer(mava.Trainer):
             counter (counting.Counter, optional): step counter object. Defaults to None.
             logger (loggers.Logger, optional): logger object for logging trainer
                 statistics. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
-                True.
-            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
-                Defaults to "~/mava/".
         """
 
         # Store agents.
         self._agents = agents
-        self._agent_types = agent_types
-        self._checkpoint = checkpoint
-
-        # Can sample
-        self._can_sample = can_sample
 
         # Store agent_net_keys.
         self._agent_net_keys = agent_net_keys
+
+        # Setup the variable client
+        self._variable_client = variable_client
+
+        # Setup counts
+        self._counts = counts
 
         # Store networks.
         self._observation_networks = observation_networks
@@ -181,28 +173,6 @@ class MAPPOTrainer(mava.Trainer):
         self._counter = counter or counting.Counter()
         self._logger = logger or loggers.make_default_logger("trainer")
 
-        # Create checkpointer
-        self._system_checkpointer = {}
-        if checkpoint:
-            for agent_key in self.unique_net_keys:
-                objects_to_save = {
-                    "counter": self._counter,
-                    "policy": self._policy_networks[agent_key],
-                    "critic": self._critic_networks[agent_key],
-                    "observation": self._observation_networks[agent_key],
-                    "policy_optimizer": self._policy_optimizers,
-                    "critic_optimizer": self._critic_optimizers,
-                }
-
-                subdir = os.path.join("trainer", agent_key)
-                checkpointer = tf2_savers.Checkpointer(
-                    time_delta_minutes=checkpoint_minute_interval,
-                    directory=checkpoint_subpath,
-                    objects_to_save=objects_to_save,
-                    subdirectory=subdir,
-                )
-                self._system_checkpointer[agent_key] = checkpointer
-
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.
@@ -211,6 +181,7 @@ class MAPPOTrainer(mava.Trainer):
     def _get_critic_feed(
         self,
         observations_trans: Dict[str, np.ndarray],
+        extras: Dict[str, np.ndarray],
         agent: str,
     ) -> tf.Tensor:
         """Get critic feed.
@@ -218,6 +189,8 @@ class MAPPOTrainer(mava.Trainer):
         Args:
             observations_trans (Dict[str, np.ndarray]): transformed (e.g. using
                 observation network) raw agent observation.
+            extras: Extra information. E.g. the environment state can be included
+            here.
             agent (str): agent id.
 
         Returns:
@@ -272,7 +245,7 @@ class MAPPOTrainer(mava.Trainer):
         return self.forward_backward(inputs)
 
     @tf.function
-    def forward_backward(self, inputs: Any):
+    def forward_backward(self, inputs: Any) -> Dict[str, Dict[str, Any]]:
         self._forward_pass(inputs)
         self._backward_pass()
         # Log losses per agent
@@ -281,7 +254,8 @@ class MAPPOTrainer(mava.Trainer):
         )
 
     # Forward pass that calculates loss.
-    # This name is changed from _backward to make sure the trainer wrappers are not overwriting the _step function.
+    # This name is changed from _backward to make sure the trainer
+    # wrappers are not overwriting the _step function.
     def _forward_pass(self, inputs: Any) -> None:
         """Trainer forward pass
 
@@ -372,7 +346,9 @@ class MAPPOTrainer(mava.Trainer):
                 td_loss, td_lambda_extra = trfl.td_lambda(
                     state_values=state_values,
                     rewards=reward,
-                    pcontinues=discount,  # Question (dries): Why is self._discount not used. Why is discount not 0.0/1.0 but actually has discount values.
+                    pcontinues=discount,  # Question (dries): Why is self._discount
+                    # not used. Why is discount not 0.0/1.0 but actually has
+                    # discount values.
                     bootstrap_value=bootstrap_value,
                     lambda_=self._lambda_gae,
                     name="CriticLoss",
@@ -396,8 +372,9 @@ class MAPPOTrainer(mava.Trainer):
                 # Generalized Advantage Estimation
                 gae = tf.stop_gradient(td_lambda_extra.temporal_differences)
 
-                # Note (dries): Maybe add this in again? But this might be breaking training.
-                # mean, variance = tf.nn.moments(gae, axes=[0, 1], keepdims=True)
+                # Note (dries): Maybe add this in again? But this might be breaking
+                # training. mean, variance = tf.nn.moments(gae, axes=[0, 1],
+                # keepdims=True)
                 # normalized_gae = (gae - mean) / tf.sqrt(variance)
 
                 policy_gradient_loss = -tf.minimum(
@@ -414,7 +391,8 @@ class MAPPOTrainer(mava.Trainer):
 
                 # Multiply by discounts to not train on padded data.
                 loss_mask = discount > 0.0
-                # TODO (dries): Is multiplication maybe better here? As assignment might not work with tf.function?
+                # TODO (dries): Is multiplication maybe better here? As assignment
+                # might not work with tf.function?
                 policy_loss = policy_loss[loss_mask]
                 critic_loss = critic_loss[loss_mask]
                 policy_losses[agent] = tf.reduce_mean(policy_loss)
@@ -425,7 +403,8 @@ class MAPPOTrainer(mava.Trainer):
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
-    # This name is changed from _backward to make sure the trainer wrappers are not overwriting the _step function.
+    # This name is changed from _backward to make sure the trainer wrappers are not
+    # overwriting the _step function.
     def _backward_pass(self) -> None:
         """Trainer backward pass updating network parameters"""
 
@@ -474,9 +453,17 @@ class MAPPOTrainer(mava.Trainer):
         elapsed_time = timestamp - self._timestamp if self._timestamp else 0
         self._timestamp = timestamp
 
+        raise ValueError("This step should not be used. Use a trainer wrapper.")
+
         # Update our counts and record it.
-        counts = self._counter.increment(steps=1, walltime=elapsed_time)
-        fetches.update(counts)
+        # TODO (dries): Can this be simplified? Only one set and one get?
+        self._variable_client.add_async(
+            ["trainer_steps", "trainer_walltime"],
+            {"trainer_steps": 1, "trainer_walltime": elapsed_time},
+        )
+
+        # Update the variable source and the trainer
+        self._variable_client.set_and_get_async()
 
         # Checkpoint and attempt to write the logs.
         if self._checkpoint:
@@ -512,16 +499,15 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
     def __init__(
         self,
         agents: List[Any],
-        agent_types: List[str],
-        can_sample: Any,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        variable_client: VariableClient,
+        counts: Dict[str, Any],
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         discount: float = 0.999,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.01,
@@ -530,22 +516,19 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = False,
-        checkpoint_subpath: str = "Checkpoints",
     ):
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
-            can_sample=can_sample,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             observation_networks=observation_networks,
             dataset=dataset,
             agent_net_keys=agent_net_keys,
-            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
+            variable_client=variable_client,
+            counts=counts,
             discount=discount,
             lambda_gae=lambda_gae,
             entropy_cost=entropy_cost,
@@ -554,8 +537,6 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(
@@ -579,16 +560,15 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
     def __init__(
         self,
         agents: List[Any],
-        agent_types: List[str],
-        can_sample: Any,
         observation_networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        counts: Dict[str, Any],
+        variable_client: VariableClient,
         agent_net_keys: Dict[str, str],
-        checkpoint_minute_interval: int,
         discount: float = 0.999,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.01,
@@ -597,22 +577,19 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
-        checkpoint: bool = False,
-        checkpoint_subpath: str = "Checkpoints",
     ):
 
         super().__init__(
             agents=agents,
-            agent_types=agent_types,
-            can_sample=can_sample,
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             observation_networks=observation_networks,
             dataset=dataset,
             agent_net_keys=agent_net_keys,
-            checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
+            variable_client=variable_client,
+            counts=counts,
             discount=discount,
             lambda_gae=lambda_gae,
             entropy_cost=entropy_cost,
@@ -621,8 +598,6 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
-            checkpoint=checkpoint,
-            checkpoint_subpath=checkpoint_subpath,
         )
 
     def _get_critic_feed(

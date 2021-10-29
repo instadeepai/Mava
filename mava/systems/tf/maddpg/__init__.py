@@ -29,7 +29,7 @@ from mava.systems.tf.maddpg.training import (
     MADDPGDecentralisedRecurrentTrainer,
     MADDPGDecentralisedTrainer,
     MADDPGNetworkedTrainer,
-    MADDPGStateBasedDecentralActionRecurrentTrainer,
     MADDPGStateBasedRecurrentTrainer,
+    MADDPGStateBasedSingleActionCriticRecurrentTrainer,
     MADDPGStateBasedTrainer,
 )
