@@ -38,8 +38,8 @@ from mava.components.tf.architectures.networked import (
 )
 from mava.components.tf.architectures.state_based import (
     StateBasedPolicyActor,
-    StateBasedValueActorCritic,
     StateBasedQValueActorCritic,
     StateBasedQValueCritic,
-    StateBasedQValueDecentralActionCritic,
+    StateBasedQValueSingleActionCritic,
+    StateBasedValueActorCritic,
 )

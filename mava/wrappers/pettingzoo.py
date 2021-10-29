@@ -30,6 +30,7 @@ except ImportError:
     black_death_v1 = None
 
 from mava import types
+from mava.utils.sort_utils import sort_str_num
 from mava.utils.wrapper_utils import (
     apply_env_wrapper_preprocessers,
     convert_dm_compatible_observations,
@@ -203,7 +204,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
             self._environment.unwrapped.agents = corrected_names
             self._environment.possible_agents = corrected_names
             self._environment.agents = corrected_names
-            previous_names = list(self.observation_spaces.keys())
+            previous_names = sort_str_num(list(self.observation_spaces.keys()))
 
             for corrected_name, prev_name in zip(corrected_names, previous_names):
                 self.observation_spaces[corrected_name] = self.observation_spaces[

@@ -313,14 +313,14 @@ class RecurrentExecutor(core.Executor):
     def observe_first(
         self,
         timestep: dm_env.TimeStep,
-        extras: Optional[Dict[str, types.NestedArray]] = {},
+        extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """record first observed timestep from the environment
 
         Args:
             timestep (dm_env.TimeStep): data emitted by an environment at first step of
                 interaction.
-            extras (Dict[str, types.NestedArray], optional): possible extra information
+            extras (Dict[str, types.NestedArray]): possible extra information
                 to record during the first step. Defaults to {}.
         """
 
@@ -346,7 +346,7 @@ class RecurrentExecutor(core.Executor):
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """record observed timestep from the environment
 
@@ -354,7 +354,7 @@ class RecurrentExecutor(core.Executor):
             actions (Dict[str, types.NestedArray]): system agents' actions.
             next_timestep (dm_env.TimeStep): data emitted by an environment during
                 interaction.
-            next_extras (Dict[str, types.NestedArray], optional): possible extra
+            next_extras (Dict[str, types.NestedArray]): possible extra
                 information to record during the transition. Defaults to {}.
         """
 

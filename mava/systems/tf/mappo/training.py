@@ -33,6 +33,7 @@ import mava
 from mava.adders.reverb.base import Trajectory
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
+from mava.utils.sort_utils import sort_str_num
 
 train_utils.set_growing_gpu_memory()
 
@@ -125,7 +126,7 @@ class MAPPOTrainer(mava.Trainer):
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
 
-        self.unique_net_keys = set(self._agent_net_keys.values())
+        self.unique_net_keys = sort_str_num(policy_networks.keys())
 
         # Create optimizers for different agent types.
         if not isinstance(policy_optimizer, dict):
@@ -564,7 +565,10 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         agent: str,
     ) -> tf.Tensor:
         # Centralised based
-        observation_feed = tf.stack([x for x in observations_trans.values()], 2)
+
+        observation_feed = tf.stack(
+            [observations_trans[agent] for agent in self._agents], 2
+        )
 
         return observation_feed
 

@@ -26,7 +26,8 @@ from mava.systems.tf.mad4pg.training import (
     MAD4PGCentralisedTrainer,
     MAD4PGDecentralisedRecurrentTrainer,
     MAD4PGDecentralisedTrainer,
-    MAD4PGStateBasedRecurrentTrainer,
-    MAD4PGStateBasedTrainer,
     MAD4PGStateBasedDecentralActionRecurrentTrainer,
+    MAD4PGStateBasedRecurrentTrainer,
+    MAD4PGStateBasedSingleActionCriticRecurrentTrainer,
+    MAD4PGStateBasedTrainer,
 )

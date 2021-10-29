@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, Iterable, Sequence, Union, List, Tuple
+from typing import Any, Dict, Iterable, List, Sequence, Tuple, Union
 
 import sonnet as snt
 import tensorflow as tf
@@ -29,8 +29,7 @@ def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
         len(critic_losses) == len(policy_losses)
     ), "Invalid System Checkpointer."
     logged_losses: Dict[str, Dict[str, Any]] = {}
-    agents = policy_losses.keys()
-    for agent in agents:
+    for agent in policy_losses.keys():
         logged_losses[agent] = {
             "critic_loss": critic_losses[agent],
             "policy_loss": policy_losses[agent],

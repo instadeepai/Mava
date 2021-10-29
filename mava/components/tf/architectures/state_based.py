@@ -105,7 +105,7 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
 
         if type(critic_env_state_spec) != list:
             critic_env_state_spec = [critic_env_state_spec]
-            
+
         critic_obs_spec = []
         for spec in critic_env_state_spec:
             critic_obs_spec.append(
@@ -118,7 +118,6 @@ class StateBasedQValueCritic(DecentralisedQValueActorCritic):
         # TODO (dries): Fix this
         assert len(critic_obs_spec) == 1
         critic_obs_spec = critic_obs_spec[0]
-
 
         for agent_type, agents in agents_by_type.items():
             critic_act_shape = list(
@@ -218,7 +217,8 @@ class StateBasedValueActorCritic(DecentralisedValueActorCritic):  # type: ignore
             critic_obs_specs[agent_key] = critic_obs_spec
         return critic_obs_specs, None
 
-class StateBasedQValueDecentralActionCritic(DecentralisedQValueActorCritic):
+
+class StateBasedQValueSingleActionCritic(DecentralisedQValueActorCritic):
     """Multi-agent actor critic architecture with a critic using
     environment state information. For this state-based critic
     only one action gets fed in. This allows the critic
