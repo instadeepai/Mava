@@ -35,6 +35,9 @@ from mava.utils.loggers import MavaLogger
 class MAD4PG(MADDPG):
     """MAD4PG system."""
 
+    """TODO: Implement faster adders to speed up training times when
+    using multiple trainers with non-shared weights."""
+
     def __init__(
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
