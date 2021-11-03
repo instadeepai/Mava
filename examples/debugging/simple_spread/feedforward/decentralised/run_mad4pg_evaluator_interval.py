@@ -99,7 +99,7 @@ def main(_: Any) -> None:
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
-        # terminal="current_terminal",
+        terminal="current_terminal",
         local_resources=local_resources,
     )
 
