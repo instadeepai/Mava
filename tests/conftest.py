@@ -343,10 +343,10 @@ class Helpers:
         if env_spec.env_type == EnvType.Parallel:
             for agent in agents:
                 npt.assert_almost_equal(
-                    observations[agent].observation.mean(), 0, decimal=2
+                    observations[agent].observation.mean(), 0, decimal=2  # type: ignore
                 )
                 npt.assert_almost_equal(
-                    observations[agent].observation.std(), 1, decimal=2
+                    observations[agent].observation.std(), 1, decimal=2  # type: ignore
                 )
 
         elif env_spec.env_type == EnvType.Sequential:

@@ -41,7 +41,7 @@ SingleAgentReward = Union[int, float]
 Reward = Union[SingleAgentReward, Dict[str, SingleAgentReward]]
 Discount = Reward
 
-Observation = Union[OLT, Dict[str, OLT]]
+Observation = Union[OLT, Dict[str, OLT], Dict[str, np.ndarray]]
 
 
 class Transition(NamedTuple):
