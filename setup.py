@@ -64,7 +64,7 @@ testing_formatting_requirements = [
 
 record_episode_requirements = ["array2gif"]
 
-flatland_requirements = ["pyparsing==3.0.3", "flatland-rl==2.2.2"]
+flatland_requirements = ["flatland-rl==2.2.2"]
 open_spiel_requirements = ["open_spiel"]
 
 long_description = """Mava is a library for building multi-agent reinforcement

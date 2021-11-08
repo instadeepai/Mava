@@ -40,6 +40,12 @@ ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 COPY . /home/app/mava
 RUN python -m pip uninstall -y enum34
 RUN python -m pip install --upgrade pip
+
+# pyparsing is required as a prerequisite to the flatland install.
+# The actual package installation order does not seem to correlate
+# with the order of packages in flatland_requirements (system.py).
+# Therefore the package is manually installed here.
+RUN pip install pyparsing==3.0.3
 RUN python -m pip install -e .[flatland]
 RUN python -m pip install -e .[open_spiel]
 RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting,record_episode]
