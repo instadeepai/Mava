@@ -67,27 +67,6 @@ class DIALConfig(MADQNConfig):
                 and returns the current learning rate.
     """
 
-    # environment_spec: specs.MAEnvironmentSpec
-    # agent_net_keys: Dict[str, str]
-    # target_update_period: int
-    # executor_variable_update_period: int
-    # max_gradient_norm: Optional[float]
-    # min_replay_size: int
-    # max_replay_size: int
-    # samples_per_insert: Optional[float]
-    # prefetch_size: int
-    # batch_size: int
-    # n_step: int
-    # sequence_length: int
-    # period: int
-    # discount: float
-    # checkpoint_minute_interval: int
-    # checkpoint: bool
-    # optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
-    # replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
-    # checkpoint_subpath: str = "~/mava/"
-    # learning_rate_scheduler_fn: Optional[Any] = None
-
 
 class DIALBuilder(MADQNBuilder):
     """Builder for DIAL which constructs individual components of the system."""
@@ -187,6 +166,7 @@ class DIALBuilder(MADQNBuilder):
         communication_module: BaseCommunicationModule,  # type: ignore
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
+        replay_client: Optional[reverb.TFClient] = None,
     ) -> core.Trainer:
         """Create a trainer instance.
 
@@ -200,6 +180,8 @@ class DIALBuilder(MADQNBuilder):
                 recording of counts, e.g. trainer steps. Defaults to None.
             logger (Optional[types.NestedLogger], optional): Logger object for logging
                 metadata.. Defaults to None.
+            replay_client (reverb.TFClient): Used for importance sampling.
+                Not implemented yet.
 
         Returns:
             core.Trainer: system trainer, that uses the collected data from the
@@ -211,4 +193,5 @@ class DIALBuilder(MADQNBuilder):
             communication_module=communication_module,
             counter=counter,
             logger=logger,
+            replay_client=replay_client,
         )
