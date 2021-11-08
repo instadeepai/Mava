@@ -186,7 +186,7 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```
     and navigate to `http://127.0.0.1:6006/`.
 
-3. Install multi-agent Starcraft 2 environment [Optional]:
+3. <a name="smac"></a> Install multi-agent Starcraft 2 environment [Optional]:
     To install the environment, please run the provided bash script, which is a slightly modified version of the script found [here][pymarl].
     ```bash
     ./install_sc2.sh
@@ -245,29 +245,32 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```bash
     pip install id-mava[envs]
     ```
-6.  **NB**: For Flatland, OpenSpiel and SMAC environments, installations have to be done separately. Flatland can be installed using:
+6.  **NB**: For Flatland, OpenSpiel and SMAC environments, installations have to be done separately.
+    - Flatland can be installed using:
 
-    ```bash
-    pip install id-mava[flatland]
-    ```
-    and for OpenSpiel, after ensuring that the right cmake and clang versions are installed as specified [here](https://github.com/deepmind/open_spiel/blob/master/docs/install.md):
-    ```bash
-    pip install id-mava[open_spiel]
-    ```
-    For StarCraft II installation, this must be installed separately according to your operating system.
-    To install the StarCraft II ML environment and associated packages, please follow the instructions on [PySC2](https://github.com/deepmind/pysc2) to install the StarCraft II game files.
-    Please ensure you have the required game maps (for both PySC2 and SMAC) extracted in the StarCraft II maps directory.
-    Once this is done you can install the packages for the single agent case (PySC2) and the multi-agent case (SMAC).
+        ```bash
+        pip install id-mava[flatland]
+        ```
+        and for OpenSpiel, after ensuring that the right cmake and clang versions are installed as specified [here](https://github.com/deepmind/open_spiel/blob/master/docs/install.md):
+        ```bash
+        pip install id-mava[open_spiel]
+        ```
 
-    ```bash
-    pip install pysc2
-    pip install git+https://github.com/oxwhirl/smac.git
-    ```
-7.  For the 2D RoboCup environment, a local install has only been tested using the Ubuntu 18.04 operating system.
-    The installation can be performed by running the RoboCup bash script while inside the Mava
-    python virtual environment.
-    ```bash
-    ./install_robocup.sh
+    - For StarCraft II:
+
+        Please follow these [steps](#smac).
+
+    - For the 2D RoboCup environment:
+
+        A local install has only been tested using the Ubuntu 18.04 operating system.
+        The installation can be performed by running the RoboCup bash script while inside the Mava
+        python virtual environment.
+
+        ```bash
+        ./install_robocup.sh
+        ```
+
+
 We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functionality such as the use of Atari environments, environment wrappers, gpu support and agent episode recording.
 
 ## Debugging
