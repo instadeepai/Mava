@@ -40,7 +40,6 @@ ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 COPY . /home/app/mava
 RUN python -m pip uninstall -y enum34
 RUN python -m pip install --upgrade pip
-RUN pip install pyparsing==3.0.3
 RUN python -m pip install -e .[flatland]
 RUN python -m pip install -e .[open_spiel]
 RUN python -m pip install -e .[tf,envs,reverb,launchpad,testing_formatting,record_episode]
