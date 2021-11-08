@@ -142,7 +142,7 @@ def make_default_networks(
 
         q_networks[key] = q_network
         action_selectors[key] = EpsilonGreedy
-        
+
     return {
         "q_networks": q_networks,
         "action_selectors": action_selectors,

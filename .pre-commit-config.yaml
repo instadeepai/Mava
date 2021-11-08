@@ -73,4 +73,3 @@ repos:
         name: Checking docstring code coverage.
         args: ["--config=pyproject.toml","mava"]
         pass_filenames: false
-
