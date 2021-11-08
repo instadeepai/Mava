@@ -523,7 +523,7 @@ class MADQN:
         counter: counting.Counter,
         trainer: training.MADQNTrainer,
     ) -> Any:
-        """System evaluator (an executor process not connected to a dataset). # noqa: D402
+        """System evaluator (an executor process not connected to a dataset).
 
         Args:
             variable_source : variable server for updating
