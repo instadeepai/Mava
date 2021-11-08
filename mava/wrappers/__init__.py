@@ -35,4 +35,5 @@ from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
     NetworkStatisticsActorCritic,
     NetworkStatisticsMixing,
+    ScaledDetailedTrainerStatistics,
 )

@@ -20,9 +20,8 @@
 
 This implements adders which add sequences or partial trajectories.
 """
-
 import operator
-from typing import Optional
+from typing import Dict, List, Optional
 
 import reverb
 import tensorflow as tf
@@ -51,6 +50,8 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         client: reverb.Client,
         sequence_length: int,
         period: int,
+        net_ids_to_keys: List[str] = None,
+        table_network_config: Dict[str, List] = None,
         *,
         delta_encoded: bool = False,
         priority_fns: Optional[base.PriorityFnMapping] = None,
@@ -66,6 +67,10 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
           period: The period with which we add sequences. If less than
             sequence_length, overlapping sequences are added. If equal to
             sequence_length, sequences are exactly non-overlapping.
+          net_ids_to_keys: A list of network names to convert from integers to
+            strings.
+          table_network_config: A dictionary mapping table names to lists of
+            network names.
           delta_encoded: If `True` (False by default) enables delta encoding, see
             `Client` for more information.
           priority_fns: See docstring for BaseAdder.
@@ -98,8 +103,10 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         )
 
         self._period = period
+        self._net_ids_to_keys = net_ids_to_keys
         self._sequence_length = sequence_length
         self._end_of_episode_behavior = end_of_episode_behavior
+        self._table_network_config = table_network_config
 
     def _maybe_create_item(
         self, sequence_length: int, *, end_of_episode: bool = False, force: bool = False
@@ -130,10 +137,8 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
             self._priority_fns, trajectory
         )
 
-        # Create a prioritized item for each table.
-        for table_name, priority in table_priorities.items():
-            self._writer.create_item(table_name, priority, trajectory)
-            self._writer.flush(self._max_in_flight_items)
+        # Add the experience to the trainer tables in the correct form.
+        self.write_experience_to_tables(trajectory, table_priorities)
 
     @classmethod
     def signature(

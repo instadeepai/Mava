@@ -15,7 +15,7 @@
 
 """MAD4PG system implementation."""
 
-from typing import Callable, Dict, Optional, Type, Union
+from typing import Callable, Dict, List, Optional, Type, Union
 
 import dm_env
 import sonnet as snt
@@ -28,11 +28,15 @@ from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf.mad4pg import training
 from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
 from mava.systems.tf.maddpg.system import MADDPG
+from mava.utils import enums
 from mava.utils.loggers import MavaLogger
 
 
 class MAD4PG(MADDPG):
     """MAD4PG system."""
+
+    """TODO: Implement faster adders to speed up training times when
+    using multiple trainers with non-shared weights."""
 
     def __init__(
         self,
@@ -48,10 +52,14 @@ class MAD4PG(MADDPG):
         ] = training.MAD4PGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
-        num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
+        trainer_networks: Union[
+            Dict[str, List], enums.Trainer
+        ] = enums.Trainer.single_trainer,
+        network_sampling_setup: Union[
+            List, enums.NetworkSampler
+        ] = enums.NetworkSampler.fixed_agent_networks,
         shared_weights: bool = True,
-        agent_net_keys: Dict[str, str] = {},
         discount: float = 0.99,
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -70,9 +78,7 @@ class MAD4PG(MADDPG):
         sequence_length: int = 20,
         period: int = 20,
         bootstrap_n: int = 10,
-        sigma: float = 0.3,
         max_gradient_norm: float = None,
-        max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_minute_interval: int = 5,
         checkpoint_subpath: str = "~/mava/",
@@ -82,72 +88,72 @@ class MAD4PG(MADDPG):
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
+        termination_condition: Optional[Dict[str, int]] = None,
     ):
         """Initialise the system
 
         Args:
-            environment_factory (Callable[[bool], dm_env.Environment]): function to
+            environment_factory: function to
                 instantiate an environment.
-            network_factory (Callable[[acme_specs.BoundedArray],
-                Dict[str, snt.Module]]): function to instantiate system networks.
-            logger_factory (Callable[[str], MavaLogger], optional): function to
-                instantiate a system logger. Defaults to None.
-            architecture (Type[ DecentralisedQValueActorCritic ], optional):
-                system architecture, e.g. decentralised or centralised. Defaults to
-                DecentralisedQValueActorCritic.
-            trainer_fn (Union[ Type[training.MAD4PGBaseTrainer],
-                Type[training.MAD4PGBaseRecurrentTrainer], ], optional): training type
+            network_factory: function to instantiate system networks.
+            logger_factory: function to
+                instantiate a system logger.
+            architecture:
+                system architecture, e.g. decentralised or centralised.
+            trainer_fn: training type
                 associated with executor and architecture, e.g. centralised training.
-                Defaults to training.MAD4PGDecentralisedTrainer.
-            executor_fn (Type[core.Executor], optional): executor type, e.g.
-                feedforward or recurrent. Defaults to MADDPGFeedForwardExecutor.
-            num_executors (int, optional): number of executor processes to run in
-                parallel. Defaults to 1.
-            num_caches (int, optional): number of trainer node caches. Defaults to 0.
-            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
+            executor_fn: executor type, e.g.
+                feedforward or recurrent.
+            num_executors: number of executor processes to run in
+                parallel..
+            environment_spec: description of
                 the action, observation spaces etc. for each agent in the system.
-                Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
-            discount (float, optional): discount factor to use for TD updates. Defaults
-                to 0.99.
-            batch_size (int, optional): sample batch size for updates. Defaults to 256.
-            prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
-            target_averaging (bool, optional): whether to use polyak averaging for
-                target network updates. Defaults to False.
-            target_update_period (int, optional): number of steps before target
-                networks are updated. Defaults to 100.
-            target_update_rate (Optional[float], optional): update rate when using
-                averaging. Defaults toNone.
-            executor_variable_update_period (int, optional): number of steps before
-                updating executor variables from the variable source. Defaults to 1000.
-            min_replay_size (int, optional): minimum replay size before updating.
-                Defaults to 1000.
-            max_replay_size (int, optional): maximum replay size. Defaults to 1000000.
-            samples_per_insert (Optional[float], optional): number of samples to take
-                from replay for every insert that is made. Defaults to 32.0.
-            policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
-                optional): optimizer(s) for updating policy networks Defaults to
-                snt.optimizers.Adam(learning_rate=1e-4).
-            critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
-                networks Defaults to snt.optimizers.Adam(learning_rate=1e-4).
-            n_step (int, optional): number of steps to include prior to boostrapping.
-                Defaults to 5.
-            sequence_length (int, optional): recurrent sequence rollout length. Defaults
-                to 20.
-            period (int, optional): Consecutive starting points for overlapping
-                rollouts across a sequence. Defaults to 20.
-            bootstrap_n (int, optional): Used to determine the spacing between
+            trainer_networks: networks each trainer trains on.
+            network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+                enums.NetworkSampler settings:
+                fixed_agent_networks: Keeps the networks
+                used by each agent fixed throughout training.
+                random_agent_networks: Creates N network policies, where N is the
+                number of agents. Randomly select policies from this sets for each
+                agent at the start of a episode. This sampling is done with
+                replacement so the same policy can be selected for more than one
+                agent for a given episode.
+                Custom list: Alternatively one can specify a custom nested list,
+                with network keys in, that will be used by the executors at
+                the start of each episode to sample networks for each agent.
+            shared_weights: whether agents should share weights or not.
+                When network_sampling_setup are provided the value of shared_weights is
+                ignored.
+            discount: discount factor to use for TD updates.
+            batch_size: sample batch size for updates.
+            prefetch_size: size to prefetch from replay.
+            target_averaging: whether to use polyak averaging for
+                target network updates.
+            target_update_period: number of steps before target
+                networks are updated.
+            target_update_rate: update rate when using
+                averaging.
+            executor_variable_update_period: number of steps before
+                updating executor variables from the variable source.
+            min_replay_size: minimum replay size before updating.
+            max_replay_size: maximum replay size.
+            samples_per_insert: number of samples to take
+                from replay for every insert that is made.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic
+                networks.
+            n_step: number of steps to include prior to boostrapping.
+            sequence_length: recurrent sequence rollout length.
+            period: Consecutive starting points for overlapping
+                rollouts across a sequence.
+            bootstrap_n: Used to determine the spacing between
                 q_value/value estimation for bootstrapping. Should be less
                 than sequence_length.
-            sigma (float, optional): Gaussian sigma parameter. Defaults to 0.3.
-            max_gradient_norm (float, optional): maximum allowed norm for gradients
-                before clipping is applied. Defaults to None.
-            max_executor_steps (int, optional): maximum number of steps and executor
-                can in an episode. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint models. Defaults to
-                False.
-            checkpoint_minute_interval (int): The number of minutes to wait between
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            checkpoint: whether to checkpoint models.
+            checkpoint_minute_interval: The number of minutes to wait between
                 checkpoints.
             checkpoint_subpath (str, optional): subdirectory specifying where to store
                 checkpoints. Defaults to "~/mava/".
@@ -168,6 +174,12 @@ class MAD4PG(MADDPG):
                 See
                 examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
                 for an example.
+            termination_condition: An optional terminal condition can be
+                provided that stops the program once the condition is
+                satisfied. Available options include specifying maximum
+                values for trainer_steps, trainer_walltime, evaluator_steps,
+                evaluator_episodes, executor_episodes or executor_steps.
+                E.g. termination_condition = {'trainer_steps': 100000}.
         """
 
         super().__init__(
@@ -178,10 +190,10 @@ class MAD4PG(MADDPG):
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             num_executors=num_executors,
-            num_caches=num_caches,
             environment_spec=environment_spec,
+            trainer_networks=trainer_networks,
+            network_sampling_setup=network_sampling_setup,
             shared_weights=shared_weights,
-            agent_net_keys=agent_net_keys,
             discount=discount,
             batch_size=batch_size,
             prefetch_size=prefetch_size,
@@ -196,9 +208,7 @@ class MAD4PG(MADDPG):
             sequence_length=sequence_length,
             bootstrap_n=bootstrap_n,
             period=period,
-            sigma=sigma,
             max_gradient_norm=max_gradient_norm,
-            max_executor_steps=max_executor_steps,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             checkpoint_minute_interval=checkpoint_minute_interval,
@@ -210,4 +220,5 @@ class MAD4PG(MADDPG):
             target_averaging=target_averaging,
             target_update_rate=target_update_rate,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+            termination_condition=termination_condition,
         )

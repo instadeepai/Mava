@@ -113,7 +113,22 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
         mean_episode_return = np.mean(np.array(list(episode_returns.values())))
 
         # Record counts.
-        counts = self._counter.increment(episodes=1, steps=episode_steps)
+        if hasattr(self._executor, "_counts"):
+            loop_type = "executor"
+            if "_" not in self._loop_label:
+                loop_type = "evaluator"
+            if hasattr(self._executor, "_variable_client"):
+                self._executor._variable_client.add_async(
+                    [f"{loop_type}_episodes", f"{loop_type}_steps"],
+                    {f"{loop_type}_episodes": 1, f"{loop_type}_steps": episode_steps},
+                )
+            else:
+                self._executor._counts[f"{loop_type}_episodes"] += 1
+                self._executor._counts[f"{loop_type}_steps"] += episode_steps
+
+            counts = self._executor._counts
+        else:
+            counts = self._counter.increment(episodes=1, steps=episode_steps)
 
         self._episode_length_stats.push(episode_steps)
         self._episode_return_stats.push(mean_episode_return)
@@ -156,7 +171,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         super().__init__(environment_loop)
 
         # get loop logger data
-        loop_label = self._logger._label
+        self._loop_label = self._logger._label
         base_dir = self._logger._directory
         (
             to_terminal,
@@ -174,7 +189,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
         # statistics dictionary
         for agent in self._environment.possible_agents:
-            agent_label = loop_label + "_" + agent
+            agent_label = self._loop_label + "_" + agent
             self._agent_loggers[agent] = Logger(
                 label=agent_label,
                 directory=base_dir,
@@ -208,8 +223,22 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         mean_episode_return = np.mean(np.array(list(episode_returns.values())))
 
         # Record counts.
-        counts = self._counter.increment(episodes=1, steps=episode_steps)
+        if hasattr(self._executor, "_counts"):
+            loop_type = "executor"
+            if "_" not in self._loop_label:
+                loop_type = "evaluator"
+            if hasattr(self._executor, "_variable_client"):
+                self._executor._variable_client.add_async(
+                    [f"{loop_type}_episodes", f"{loop_type}_steps"],
+                    {f"{loop_type}_episodes": 1, f"{loop_type}_steps": episode_steps},
+                )
+            else:
+                self._executor._counts[f"{loop_type}_episodes"] += 1
+                self._executor._counts[f"{loop_type}_steps"] += episode_steps
 
+            counts = self._executor._counts
+        else:
+            counts = self._counter.increment(episodes=1, steps=episode_steps)
         self._episode_length_stats.push(episode_steps)
         self._episode_return_stats.push(mean_episode_return)
         self._steps_per_second_stats.push(steps_per_second)
@@ -325,7 +354,10 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
 
     def _append_frame(self) -> None:
         """Appends a frame to the sequence of frames."""
-        counts = self._counter.get_counts()
+        if hasattr(self._executor, "_counts"):
+            counts = self._executor._counts
+        else:
+            counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
         if counter and (counter % self._record_every == 0):
             self._frames.append(self._retrieve_render())
@@ -337,7 +369,10 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         return timestep
 
     def _write_frames(self) -> None:
-        counts = self._counter.get_counts()
+        if hasattr(self._executor, "_counts"):
+            counts = self._executor._counts
+        else:
+            counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
         path = f"{self._path}/{self._filename}_{counter}_eval_episode"
         try:

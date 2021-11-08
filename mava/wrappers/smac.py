@@ -41,16 +41,13 @@ from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
 class SMACEnvWrapper(ParallelEnvWrapper):
     """Wraps a StarCraft II MARL environment (SMAC) as a Mava Parallel environment.
-
     Based on RLlib & Pettingzoo wrapper provided by SMAC.
-
     Args:
         ParallelEnvWrapper ([type]): [description]
     """
 
     def __init__(self, environment: "StarCraft2Env") -> None:
         """Create a new multi-agent StarCraft env compatible with Mava.
-
         Args:
             environment (StarCraft2Env): Arguments to pass to the underlying
                 smac.env.starcraft.StarCraft2Env instance.
@@ -61,7 +58,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def _get_agents(self) -> List:
         """Function that returns agent names and ids.
-
         Returns:
             List: list containing agents in format {agent_name}_{agent_id}.
         """
@@ -84,10 +80,8 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def _observe_all(self, obs_list: List) -> Dict:
         """Function that combibnes all agent observations into a single dict.
-
         Args:
             obs_list (List): list of all agent observations.
-
         Returns:
             Dict: dict containing agent observations and action masks.
         """
@@ -103,7 +97,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
         """Resets the env and returns observations from ready agents.
-
         Returns:
             obs (dict): New observations for each ready agent.
         """
@@ -170,10 +163,8 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def step(self, actions: Dict[str, np.ndarray]) -> Tuple[dm_env.TimeStep, np.array]:
         """Returns observations from ready agents.
-
         The returns are dicts mapping from agent_id strings to values. The
         number of agents in the env can vary over time.
-
         Returns
         -------
             obs (dict): New observations for each ready agent.
@@ -230,7 +221,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def env_done(self) -> bool:
         """Returns a bool indicating if all agents in env are done.
-
         Returns:
             bool: Bool indicating if all agents are done.
         """
@@ -240,11 +230,9 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
     ) -> types.Observation:
         """Converts observations to correct Mava format.
-
         Args:
             observes (Dict[str, np.ndarray]): Dict containing agent observations.
             dones (Dict[str, bool]): Dict indicating which agents are done.
-
         Returns:
             types.Observation: Correct format observations (OLT).
         """
@@ -268,7 +256,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def observation_spec(self) -> types.Observation:
         """Function returns observation spec (format) of the env.
-
         Returns:
             types.Observation: Observation spec.
         """
@@ -287,7 +274,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def action_spec(self) -> Dict[str, specs.DiscreteArray]:
         """Function returns action spec (format) of the env.
-
         Returns:
             Dict[str, specs.DiscreteArray]: action spec.
         """
@@ -298,7 +284,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def reward_spec(self) -> Dict[str, specs.Array]:
         """Function returns reward spec (format) of the env.
-
         Returns:
             Dict[str, specs.Array]: reward spec.
         """
@@ -306,7 +291,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
         """Function returns discount spec (format) of the env.
-
         Returns:
             Dict[str, specs.BoundedArray]: discount spec.
         """
@@ -317,7 +301,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         """Function returns extra spec (format) of the env.
-
         Returns:
             Dict[str, specs.BoundedArray]: extra spec.
         """
@@ -331,7 +314,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
 
     def seed(self, random_seed: int) -> None:
         """Function to seed the environment.
-
         Args:
             random_seed (int): random seed used when seeding the env.
         """
@@ -342,7 +324,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
     @property
     def agents(self) -> List:
         """Returns active/not done agents in the env.
-
         Returns:
             List: active agents in the env.
         """
@@ -351,7 +332,6 @@ class SMACEnvWrapper(ParallelEnvWrapper):
     @property
     def possible_agents(self) -> List:
         """Returns all posible agents in the env.
-
         Returns:
             List: all possible agents in the env.
         """

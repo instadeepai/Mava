@@ -316,8 +316,7 @@ class MADQNBuilder:
         if variable_source:
             # Create policy variables
             variables = {
-                net_key: q_networks[net_key].variables
-                for net_key in set(agent_net_keys.values())
+                net_key: q_networks[net_key].variables for net_key in q_networks.keys()
             }
             # Get new policy variables
             variable_client = variable_utils.VariableClient(

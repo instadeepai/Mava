@@ -35,6 +35,7 @@ from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
+from mava.utils.sort_utils import sort_str_num
 
 train_utils.set_growing_gpu_memory()
 
@@ -150,7 +151,7 @@ class MADQNTrainer(mava.Trainer):
             assert isinstance(self._replay_client, reverb.Client)
 
         # Dictionary with network keys for each agent.
-        self.unique_net_keys = set(self._agent_net_keys.values())
+        self.unique_net_keys = sort_str_num(self._q_networks.keys())
 
         # Create optimizers for different agent types.
         if not isinstance(optimizer, dict):
@@ -362,11 +363,11 @@ class MADQNTrainer(mava.Trainer):
         trans = mava_types.Transition(*inputs.data)
 
         o_tm1, o_t, a_tm1, r_t, d_t, e_tm1, e_t = (
-            trans.observation,
-            trans.next_observation,
-            trans.action,
-            trans.reward,
-            trans.discount,
+            trans.observations,
+            trans.next_observations,
+            trans.actions,
+            trans.rewards,
+            trans.discounts,
             trans.extras,
             trans.next_extras,
         )

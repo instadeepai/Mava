@@ -58,7 +58,10 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        mad4pg.make_default_networks, archecture_type=ArchitectureType.recurrent
+        mad4pg.make_default_networks,
+        vmin=-10,
+        vmax=50,
+        archecture_type=ArchitectureType.recurrent,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.

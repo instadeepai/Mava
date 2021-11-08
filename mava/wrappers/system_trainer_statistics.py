@@ -154,6 +154,154 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
                 self._network_loggers[network].write(network_running_statistics)
 
 
+class ScaledTrainerStatisticsBase(TrainerWrapperBase):
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+    ) -> None:
+        super().__init__(trainer)
+        self._require_loggers = True
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+        if self._require_loggers:
+            self._create_loggers(list(fetches.keys()))
+            self._require_loggers = False
+
+        # compute statistics
+        self._compute_statistics(fetches)
+
+        # Compute elapsed time.
+        timestamp = time.time()
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp: float = timestamp
+
+        # Update our counts and record it.
+        self._variable_client.add_async(
+            ["trainer_steps", "trainer_walltime"],
+            {"trainer_steps": 1, "trainer_walltime": elapsed_time},
+        )
+
+        # Set and get the latest variables
+        self._variable_client.set_and_get_async()
+
+        fetches.update(self._counts)
+
+        if self._logger:
+            self._logger.write(fetches)
+
+
+class ScaledDetailedTrainerStatistics(ScaledTrainerStatisticsBase):
+    """A trainer class that logs episode stats."""
+
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+        metrics: List[str] = ["policy_loss"],
+        summary_stats: List = ["mean", "max", "min", "var", "std"],
+    ) -> None:
+        super().__init__(trainer)
+
+        self._metrics = metrics
+        self._summary_stats = summary_stats
+
+    def _create_loggers(self, keys: List[str]) -> None:
+
+        # get system logger data
+        trainer_label = self._logger._label
+        base_dir = self._logger._directory
+        (
+            to_terminal,
+            to_csv,
+            to_tensorboard,
+            time_delta,
+            print_fn,
+            time_stamp,
+        ) = self._logger._logger_info
+
+        self._network_running_statistics: Dict[str, Dict[str, float]] = {}
+        self._networks_stats: Dict[str, Dict[str, RunningStatistics]] = {
+            key: {} for key in keys
+        }
+        self._network_loggers: Dict[str, loggers.Logger] = {}
+
+        # statistics dictionary
+        for key in keys:
+            network_label = trainer_label + "_" + key
+            self._network_loggers[key] = Logger(
+                label=network_label,
+                directory=base_dir,
+                to_terminal=to_terminal,
+                to_csv=to_csv,
+                to_tensorboard=to_tensorboard,
+                time_delta=0,
+                print_fn=print_fn,
+                time_stamp=time_stamp,
+            )
+            for metric in self._metrics:
+                self._networks_stats[key][metric] = RunningStatistics(f"{key}_{metric}")
+
+    def _compute_statistics(self, data: Dict[str, Dict[str, float]]) -> None:
+        for network, datum in data.items():
+            for key, val in datum.items():
+                network_running_statistics: Dict[str, float] = {}
+                network_running_statistics[f"{network}_raw_{key}"] = val
+                self._networks_stats[network][key].push(val)
+                for stat in self._summary_stats:
+                    network_running_statistics[
+                        f"{network}_{stat}_{key}"
+                    ] = self._networks_stats[network][key].__getattribute__(stat)()
+
+                self._network_loggers[network].write(network_running_statistics)
+
+
+class MADQNDetailedTrainerStatistics(DetailedTrainerStatistics):
+    """Custom DetailedTrainerStatistics class for exposing get_epsilon()"""
+
+    def __init__(
+        self,
+        trainer: mava.Trainer,
+        metrics: List[str] = ["q_value_loss"],
+        summary_stats: List = ["mean", "max", "min", "var", "std"],
+    ) -> None:
+        super().__init__(trainer, metrics, summary_stats)
+
+    def get_epsilon(self) -> float:
+        return self._trainer.get_epsilon()  # type: ignore
+
+    def get_trainer_steps(self) -> float:
+        return self._trainer.get_trainer_steps()  # type: ignore
+
+    def step(self) -> None:
+        # Run the learning step.
+        fetches = self._step()
+
+        if self._require_loggers:
+            self._create_loggers(list(fetches.keys()))
+            self._require_loggers = False
+
+        # compute statistics
+        self._compute_statistics(fetches)
+
+        timestamp = time.time()
+        elapsed_time = timestamp - self._timestamp if self._timestamp else 0
+        self._timestamp = timestamp
+
+        # Update our counts and record it.
+        counts = self._counter.increment(steps=1, walltime=elapsed_time)
+        fetches.update(counts)
+
+        if self._system_checkpointer:
+            train_utils.checkpoint_networks(self._system_checkpointer)
+
+        fetches["epsilon"] = self.get_epsilon()
+        self._trainer._decrement_epsilon()  # type: ignore
+
+        if self._logger:
+            self._logger.write(fetches)
+
+
 # TODO(Kale-ab): Is there a better way to do this?
 # Maybe using hooks or callbacks.
 class NetworkStatisticsBase(TrainerWrapperBase):
@@ -189,12 +337,19 @@ class NetworkStatisticsBase(TrainerWrapperBase):
         ), "Nothing is selected to be logged."
 
     def _log_step(self) -> bool:
-        return bool(
-            self._counter
-            and self._counter._counts
-            and self._counter._counts.get("steps")
-            and self._counter._counts.get("steps") % self.log_interval == 0
-        )
+        if hasattr(self, "_counts"):
+            return bool(
+                self._counts
+                and self._counts.get("steps")
+                and self._counts.get("steps") % self.log_interval == 0
+            )
+        else:
+            return bool(
+                self._counter
+                and self._counter._counts
+                and self._counter._counts.get("steps")
+                and self._counter._counts.get("steps") % self.log_interval == 0
+            )
 
     def _create_loggers(self, keys: List[str]) -> None:
         trainer_label = self._logger._label
@@ -328,27 +483,6 @@ class NetworkStatistics(NetworkStatisticsBase):
             log_gradients,
         )
 
-    @tf.function
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-
-        # Update the target networks
-        # Trying not to assume off policy.
-        if hasattr(self, "_update_target_networks"):
-            self._update_target_networks()
-
-        # Get data from replay (dropping extras if any). Note there is no
-        # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
-
-        self._forward(inputs)
-
-        self._backward()
-
-        # Log losses per agent
-        return self.policy_losses
-
     def _backward(self) -> None:
         policy_losses = self.policy_losses
         tape = self.tape
@@ -415,27 +549,6 @@ class NetworkStatisticsMixing(NetworkStatisticsBase):
             log_weights,
             log_gradients,
         )
-
-    @tf.function
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-
-        # Update the target networks
-        # Trying not to assume off policy.
-        if hasattr(self, "_update_target_networks"):
-            self._update_target_networks()
-
-        # Get data from replay (dropping extras if any). Note there is no
-        # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
-
-        self._forward(inputs)
-
-        self._backward()
-
-        # Log losses per agent
-        return {agent: {"policy_loss": self.loss} for agent in self._agents}
 
     def _backward(self) -> None:
         log_current_timestep = self._log_step()
@@ -507,29 +620,6 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
             log_gradients,
         )
 
-    @tf.function
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-
-        # Update the target networks
-        # Trying not to assume off policy.
-        if hasattr(self, "_update_target_networks"):
-            self._update_target_networks()
-
-        # Get data from replay (dropping extras if any). Note there is no
-        # extra data here because we do not insert any into Reverb.
-        inputs = next(self._iterator)
-
-        self._forward(inputs)
-
-        self._backward()
-
-        # Log losses per agent
-        return train_utils.map_losses_per_agent_ac(
-            self.critic_losses, self.policy_losses
-        )
-
     def _backward(self) -> None:
         # Calculate the gradients and update the networks
         policy_losses = self.policy_losses
@@ -537,7 +627,13 @@ class NetworkStatisticsActorCritic(NetworkStatisticsBase):
         tape = self.tape
         log_current_timestep = self._log_step()
 
-        for agent in self._agents:
+        # Check if self._trainer_agent_list exists. Otherwise use self._agents
+        agents = (
+            self._trainer_agent_list
+            if hasattr(self, "_trainer_agent_list")
+            else self._agents
+        )
+        for agent in agents:
             agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.

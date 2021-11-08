@@ -35,6 +35,7 @@ from gym.spaces import Discrete
 from gym.spaces.box import Box
 
 from mava.types import OLT, Observation
+from mava.utils.sort_utils import sort_str_num
 from mava.utils.wrapper_utils import (
     convert_dm_compatible_observations,
     convert_np_type,
@@ -252,7 +253,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         for agent, obs in observes.items():
             agent_id = get_agent_id(agent)
             agent_info = np.array(
-                [info[k][agent] for k in info.keys()], dtype=np.float32
+                [info[k][agent] for k in sort_str_num(info.keys())], dtype=np.float32
             )
             obs = (obs, agent_info) if self._include_agent_info else obs
             observations[agent_id] = obs
