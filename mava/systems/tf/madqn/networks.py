@@ -36,7 +36,6 @@ def make_default_networks(
     fingerprints: bool = False,
     message_size: Optional[int] = None,
     seed: Optional[int] = None,
-    shared_epsion: Optional[bool] = True,
 ) -> Mapping[str, types.TensorTransformation]:
     """Default networks for madqn.
 
@@ -143,15 +142,7 @@ def make_default_networks(
 
         q_networks[key] = q_network
         action_selectors[key] = EpsilonGreedy
-        # epsilon greedy action selector
-        # if shared_epsion:
-        #     action_selectors[key] = EpsilonGreedy
-
-    # Different epsilon per agent
-    # if not shared_epsion:
-    # for key in environment_spec.get_agent_ids():
-    #     action_selectors[key] = EpsilonGreedy
-
+        
     return {
         "q_networks": q_networks,
         "action_selectors": action_selectors,
