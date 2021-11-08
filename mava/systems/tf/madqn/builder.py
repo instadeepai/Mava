@@ -31,6 +31,7 @@ from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     BaseExplorationScheduler,
     BaseExplorationTimestepScheduler,
+    ConstantScheduler,
 )
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf import executors
@@ -46,10 +47,6 @@ class MADQNConfig:
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
-        epsilon_start: initial epsilon value.
-        epsilon_decay_steps: number of steps that epsilon is decayed for.
-        epsilon_min: final minimum value for epsilon at the end of a decay schedule.
-        epsilon_decay: the rate at which epislon decays.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         target_update_period: number of learner steps to perform before updating
@@ -79,10 +76,6 @@ class MADQNConfig:
     """
 
     environment_spec: specs.MAEnvironmentSpec
-    epsilon_min: float
-    epsilon_start: float
-    epsilon_decay: Optional[float]
-    epsilon_decay_steps: Optional[int]
     agent_net_keys: Dict[str, str]
     target_update_period: int
     executor_variable_update_period: int
@@ -112,9 +105,6 @@ class MADQNBuilder:
     def __init__(
         self,
         config: MADQNConfig,
-        exploration_scheduler_fn: Union[
-            Type[BaseExplorationTimestepScheduler], Type[BaseExplorationScheduler]
-        ],
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
@@ -133,7 +123,6 @@ class MADQNBuilder:
                 Defaults to execution.MADQNFeedForwardExecutor.
             extra_specs (Dict[str, Any], optional): defines the specifications of extra
                 information used by the system. Defaults to {}.
-            exploration_scheduler_fn : epsilon decay scheduler.
             replay_stabilisation_fn : optional function to stabilise experience replay.
         """
 
@@ -144,7 +133,6 @@ class MADQNBuilder:
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
-        self._exploration_scheduler_fn = exploration_scheduler_fn
         self._replay_stabiliser_fn = replay_stabilisation_fn
 
     def make_replay_tables(
@@ -284,6 +272,14 @@ class MADQNBuilder:
         self,
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, Any],
+        exploration_schedules: Dict[
+            str,
+            Union[
+                BaseExplorationTimestepScheduler,
+                BaseExplorationScheduler,
+                ConstantScheduler,
+            ],
+        ],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
         trainer: Optional[training.MADQNTrainer] = None,
@@ -297,6 +293,7 @@ class MADQNBuilder:
                 system.
             action_selectors (Dict[str, Any]): policy action selector method, e.g.
                 epsilon greedy.
+            exploration_schedules: epsilon decay scheduler per agent.
             adder (Optional[adders.ParallelAdder], optional): adder to send data to
                 a replay buffer. Defaults to None.
             variable_source (Optional[core.VariableSource], optional): variables server.
@@ -336,32 +333,15 @@ class MADQNBuilder:
         # Check if we should use fingerprints
         fingerprint = True if self._replay_stabiliser_fn is not None else False
 
-        # If evaluator, use 0.0 for epsilon
-        if evaluator:
-            epsilon_start = 0.0
-            epsilon_min = 0.0
-            epsilon_decay = 0.0
-            epsilon_decay_steps = self._config.epsilon_decay_steps
-        else:
-            epsilon_start = self._config.epsilon_start
-            epsilon_min = self._config.epsilon_min
-            epsilon_decay = self._config.epsilon_decay or 0.0
-            epsilon_decay_steps = self._config.epsilon_decay_steps or 0
-
         # Pass scheduler and initialize action selectors
-        action_selectors_return = initialize_epsilon_schedulers(
-            exploration_scheduler_fn=self._exploration_scheduler_fn,
-            action_selectors=action_selectors,
-            epsilon_start=epsilon_start,
-            epsilon_min=epsilon_min,
-            epsilon_decay=epsilon_decay,
-            epsilon_decay_steps=epsilon_decay_steps,
+        action_selectors_with_scheduler = initialize_epsilon_schedulers(
+            exploration_schedules, action_selectors, agent_net_keys
         )
 
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
-            action_selectors=action_selectors_return,
+            action_selectors=action_selectors_with_scheduler,
             agent_net_keys=agent_net_keys,
             variable_client=variable_client,
             adder=adder,

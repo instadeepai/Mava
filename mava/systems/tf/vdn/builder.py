@@ -16,7 +16,7 @@
 """VDN system builder implementation."""
 
 import dataclasses
-from typing import Any, Dict, Iterator, Optional, Type, Union
+from typing import Any, Dict, Iterator, Optional, Type
 
 import reverb
 import sonnet as snt
@@ -24,11 +24,6 @@ from acme.utils import counting
 
 from mava import core, types
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    BaseExplorationScheduler,
-    BaseExplorationTimestepScheduler,
-    LinearExplorationTimestepScheduler,
-)
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.vdn import execution, training
@@ -81,9 +76,6 @@ class VDNBuilder(MADQNBuilder):
         trainer_fn: Type[training.VDNTrainer] = training.VDNTrainer,
         executor_fn: Type[core.Executor] = execution.VDNFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
-        exploration_scheduler_fn: Union[
-            Type[BaseExplorationTimestepScheduler], Type[BaseExplorationScheduler]
-        ] = LinearExplorationTimestepScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ) -> None:
         """Initialise the system.
@@ -99,8 +91,6 @@ class VDNBuilder(MADQNBuilder):
                 Defaults to execution.VDNFeedForwardExecutor.
             extra_specs (Dict[str, Any], optional): defines the specifications of extra
                 information used by the system. Defaults to {}.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
-                epsilon decay scheduler. Defaults to LinearExplorationTimestepScheduler.
             replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
                 optional): optional function to stabilise experience replay. Defaults
                 to None.
@@ -110,7 +100,6 @@ class VDNBuilder(MADQNBuilder):
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             extra_specs=extra_specs,
-            exploration_scheduler_fn=exploration_scheduler_fn,
             replay_stabilisation_fn=replay_stabilisation_fn,
         )
 

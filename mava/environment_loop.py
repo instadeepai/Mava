@@ -322,9 +322,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
         self._running_statistics: Dict[str, float] = {}
 
     def _get_actions(self, timestep: dm_env.TimeStep) -> Any:
-        actions = self._executor.select_actions(timestep.observation)
-        self._logger.write({"actions": actions})
-        return actions
+        return self._executor.select_actions(timestep.observation)
 
     def _get_running_stats(self) -> Dict:
         return self._running_statistics

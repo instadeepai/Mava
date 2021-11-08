@@ -82,9 +82,9 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=ExponentialExplorationTimestepScheduler,
-        epsilon_min=0.05,
-        epsilon_decay_steps=20000,
+        exploration_scheduler_fn=ExponentialExplorationTimestepScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=20000
+        ),
         max_replay_size=1000000,
         optimizer=snt.optimizers.RMSProp(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,

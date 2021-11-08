@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running QMIX on SMAC environments."""
+
+"""Example running MADQN on debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -22,17 +23,22 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.exploration import LinearExplorationTimestepScheduler
-from mava.systems.tf import qmix
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments import smac_utils
+from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "map_name",
-    "3m",
-    "Starcraft 2 micromanagement map name (str).",
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "discrete",
+    "Environment action space type (str).",
 )
 
 flags.DEFINE_string(
@@ -44,15 +50,18 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
+
     # Environment.
     environment_factory = functools.partial(
-        smac_utils.make_environment, map_name=FLAGS.map_name
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
     )
 
     # Networks.
-    network_factory = lp_utils.partial_kwargs(qmix.make_default_networks)
+    network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir.
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
@@ -66,33 +75,50 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
+    # Different eps per agent
+    exploration_scheduler_fn = {
+        "executor_0": {
+            "agent_0": LinearExplorationScheduler(
+                epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-4
+            ),
+            "agent_1": LinearExplorationScheduler(
+                epsilon_start=1.0, epsilon_min=0.06, epsilon_decay=2e-4
+            ),
+            "agent_2": LinearExplorationScheduler(
+                epsilon_start=1.0, epsilon_min=0.07, epsilon_decay=3e-4
+            ),
+        },
+        "executor_1": {
+            "agent_0": LinearExplorationScheduler(
+                epsilon_start=1.0, epsilon_min=0.08, epsilon_decay=4e-4
+            ),
+            "agent_1": LinearExplorationScheduler(
+                epsilon_start=1.0, epsilon_min=0.09, epsilon_decay=5e-4
+            ),
+            "agent_2": LinearExplorationScheduler(
+                epsilon_start=1.0, epsilon_min=0.10, epsilon_decay=6e-4
+            ),
+        },
+    }
+
     # distributed program
-    program = qmix.QMIX(
+    program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=1,
-        exploration_scheduler_fn=LinearExplorationTimestepScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=50000
-        ),
-        max_replay_size=1000000,
-        optimizer=snt.optimizers.RMSProp(
-            learning_rate=0.0005, epsilon=0.00001, decay=0.99
-        ),
+        num_executors=2,
+        exploration_scheduler_fn=exploration_scheduler_fn,
+        importance_sampling_exponent=0.2,
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        batch_size=512,
-        qmix_hidden_dim=32,
-        num_hypernet_layers=1,
-        hypernet_hidden_dim=32,
-        executor_variable_update_period=100,
-        target_update_period=200,
-        max_gradient_norm=10.0,
     ).build()
 
-    # launch
+    # Ensure only trainer runs on gpu, while other processes run on cpu.
     local_resources = lp_utils.to_device(
         program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )
+
+    # Launch.
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,

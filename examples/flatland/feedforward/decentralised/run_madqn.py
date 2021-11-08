@@ -92,9 +92,9 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.05,
-        epsilon_decay=1e-4,
+        exploration_scheduler_fn=LinearExplorationScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-4
+        ),
         importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,

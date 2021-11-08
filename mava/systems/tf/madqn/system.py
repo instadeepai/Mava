@@ -16,7 +16,7 @@
 """MADQN system implementation."""
 
 import functools
-from typing import Any, Callable, Dict, Optional, Type, Union
+from typing import Any, Callable, Dict, Mapping, Optional, Type, Union
 
 import acme
 import dm_env
@@ -33,15 +33,14 @@ from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
-    BaseExplorationScheduler,
-    BaseExplorationTimestepScheduler,
-    LinearExplorationTimestepScheduler,
+    ConstantScheduler,
 )
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
+from mava.types import EpsilonScheduler
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
@@ -54,6 +53,11 @@ class MADQN:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        exploration_scheduler_fn: Union[
+            EpsilonScheduler,
+            Mapping[str, EpsilonScheduler],
+            Mapping[str, Mapping[str, EpsilonScheduler]],
+        ],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Union[
@@ -61,14 +65,7 @@ class MADQN:
         ] = training.MADQNTrainer,
         communication_module: Type[BaseCommunicationModule] = None,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
-        exploration_scheduler_fn: Union[
-            Type[BaseExplorationTimestepScheduler], Type[BaseExplorationScheduler]
-        ] = LinearExplorationTimestepScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
-        epsilon_min: float = 0.05,
-        epsilon_decay: Optional[float] = None,
-        epsilon_decay_steps: Optional[int] = None,
-        epsilon_start: float = 1.0,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -123,17 +120,18 @@ class MADQN:
             executor_fn (Type[core.Executor], optional): executor type, e.g.
                 feedforward or recurrent. Defaults to
                 execution.MADQNFeedForwardExecutor.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
+            exploration_scheduler_fn :
                 function specifying a decaying scheduler for epsilon exploration.
-                Defaults to LinearExplorationTimestepScheduler.
+                This can be
+                    1. The same across all agents & executors,
+                        e.g. LinearExplorationTimestepScheduler(...),
+                    2. Or at an executor level,
+                        e.g. see examples/debugging/simple_spread/feedforward/decentralised/run_madqn_different_epsilon_per_agent.py  # noqa: E501
+                    3. Or at an agent level (same across all executors),
+                        e.g. { "agent_0": LinearExplorationTimestepScheduler(...),"agent_1": LinearExplorationTimestepScheduler(...))}.  # noqa: E501
             replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
                 optional): replay buffer stabilisaiton function, e.g. fingerprints.
                 Defaults to None.
-            epsilon_min (float, optional): final minimum epsilon value at the end of a
-                decaying schedule. Defaults to 0.05.
-            epsilon_decay (float, optional): epsilon decay rate. Defaults to 1e-4.
-            epsilon_start:  initial epsilon value.
-            epsilon_decay_steps: number of steps that epsilon is decayed for.
             num_executors (int, optional): number of executor processes to run in
                 parallel. Defaults to 1.
             num_caches (int, optional): number of trainer node caches. Defaults to 0.
@@ -210,22 +208,6 @@ class MADQN:
                 time_delta=10,
             )
 
-        assert (
-            epsilon_decay_steps or epsilon_decay
-        ), "Either epsilon_decay_steps or epsilon_decay should have a value."
-
-        if epsilon_decay_steps:
-            assert issubclass(
-                exploration_scheduler_fn, BaseExplorationTimestepScheduler
-            ), """epsilon_decay_steps can only be used with with exploration functions
-            that implement BaseExplorationTimestepScheduler."""
-
-        if epsilon_decay:
-            assert issubclass(
-                exploration_scheduler_fn, BaseExplorationScheduler
-            ), """epsilon_decay can only be used with with exploration functions
-            that implement subclass of BaseExplorationScheduler"""
-
         self._architecture = architecture
         self._communication_module_fn = communication_module
         self._environment_factory = environment_factory
@@ -258,13 +240,39 @@ class MADQN:
         else:
             extra_specs = {}
 
+        # Setup epsilon schedules
+        # If we receive a single schedule, we use that for all agents.
+        if not isinstance(exploration_scheduler_fn, dict):
+            self._exploration_scheduler_fn: Dict = {}
+            for executor_id in range(self._num_exectors):
+                executor = f"executor_{executor_id}"
+                self._exploration_scheduler_fn[executor] = {}
+                for agent in environment_spec.get_agent_ids():
+                    self._exploration_scheduler_fn[executor][
+                        agent
+                    ] = exploration_scheduler_fn
+        else:
+            # Using an executor level config
+            if all(key.startswith("executor") for key in exploration_scheduler_fn):
+                self._exploration_scheduler_fn = exploration_scheduler_fn
+
+            # Using an agent level config - assume all executor have the same config.
+            elif all(key.startswith("agent") for key in exploration_scheduler_fn):
+                for executor_id in range(self._num_exectors):
+                    self._exploration_scheduler_fn[
+                        executor_id
+                    ] = exploration_scheduler_fn
+
+            else:
+                raise ValueError(
+                    "Unknown exploration_scheduler_fn, please pass a callable or a dict"
+                    + " with an agent or executor"
+                    + f" level config: {exploration_scheduler_fn}"
+                )
+
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
                 environment_spec=environment_spec,
-                epsilon_min=epsilon_min,
-                epsilon_decay=epsilon_decay,
-                epsilon_decay_steps=epsilon_decay_steps,
-                epsilon_start=epsilon_start,
                 agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
@@ -289,7 +297,6 @@ class MADQN:
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             extra_specs=extra_specs,
-            exploration_scheduler_fn=exploration_scheduler_fn,
             replay_stabilisation_fn=replay_stabilisation_fn,
         )
 
@@ -440,7 +447,9 @@ class MADQN:
         replay: reverb.Client,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        trainer: Optional[training.MADQNTrainer] = None,
+        trainer: Optional[
+            Union[training.MADQNTrainer, training.MADQNRecurrentTrainer]
+        ] = None,
     ) -> mava.ParallelEnvironmentLoop:
         """System executor
 
@@ -495,6 +504,9 @@ class MADQN:
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
             trainer=trainer,
+            exploration_schedules=self._exploration_scheduler_fn[
+                f"executor_{executor_id}"
+            ],
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -583,6 +595,10 @@ class MADQN:
             communication_module=communication_module,
             trainer=trainer,
             evaluator=True,
+            exploration_schedules={
+                agent: ConstantScheduler(epsilon=0.0)
+                for agent in self._environment_spec.get_agent_ids()
+            },
         )
 
         # Make the environment.

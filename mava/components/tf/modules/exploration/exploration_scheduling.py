@@ -27,7 +27,13 @@ class BaseExplorationScheduler:
         epsilon_min: float = 0.05,
         epsilon_decay: float = 1e-4,
     ):
-        """Base class for decaying epsilon by schedule."""
+        """Base class for decaying epsilon by schedule.
+
+        Args:
+            epsilon_start : initial epsilon value.
+            epsilon_min : final epsilon value.
+            epsilon_decay : epsilon decay rate, i.e. the decay per executor step.
+        """
         self._epsilon_start = epsilon_start
         self._epsilon_min = epsilon_min
         self._epsilon_decay = epsilon_decay
@@ -108,7 +114,14 @@ class BaseExplorationTimestepScheduler:
         epsilon_start: float = 1.0,
         epsilon_min: float = 0.05,
     ):
-        """Base class for decaying epsilon according to number of steps."""
+        """Base class for decaying epsilon according to number of steps.
+
+        Args:
+            epsilon_decay_steps : number of executor steps that epsilon is decayed for.
+            epsilon_start : initial epsilon value..
+            epsilon_min : final epsilon value.
+        """
+
         self._epsilon_start = epsilon_start
         self._epsilon_min = epsilon_min
         self._epsilon_decay_steps = epsilon_decay_steps

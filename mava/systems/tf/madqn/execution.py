@@ -176,7 +176,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor, DQNExecutor):
         else:
             q_values = self._q_networks[agent_net_key](batched_observation)
 
-        action = self._action_selectors[agent_net_key](
+        # print(self._action_selectors)
+        action = self._action_selectors[agent](
             action_values=q_values, legal_actions_mask=batched_legals
         )
 
