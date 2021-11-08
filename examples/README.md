@@ -59,7 +59,7 @@ We also include a number of systems running on discrete action space environment
   -   **MADQN**:
       a MADQN system running on the discrete action space simple_spread MPE environment.
       - *Feedforward*
-        - [decentralised](debugging/simple_spread/feedforward/decentralised/run_madqn.py), [decentralised lr scheduling](debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py) (***Example using lr schedule***) and [decentralised custom lr scheduling](debugging/simple_spread/feedforward/decentralised/run_madqn_custom_lr_schedule.py) (***Example using custom lr schedule***).
+        - [decentralised](debugging/simple_spread/feedforward/decentralised/run_madqn.py), [decentralised lr scheduling](debugging/simple_spread/feedforward/decentralised/run_madqn_lr_schedule.py) (***Example using lr schedule***), [decentralised custom lr scheduling](debugging/simple_spread/feedforward/decentralised/run_madqn_custom_lr_schedule.py) (***Example using custom lr schedule***) and [decentralised custom epsilon decay scheduling](debugging/simple_spread/feedforward/decentralised/run_madqn_configurable_epsilon.py) (***Example using configurable epsilon scheduling***).
       - *Recurrent*
         - [decentralised](debugging/simple_spread/recurrent/decentralised/run_madqn.py) and [decentralised with coms](debugging/simple_spread/recurrent/decentralised/run_madqn_with_coms.py) (***Example using a system with communication***).
 

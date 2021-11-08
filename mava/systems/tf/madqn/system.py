@@ -99,99 +99,79 @@ class MADQN:
         eval_loop_fn_kwargs: Dict = {},
         learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
     ):
-        """Initialise the system
+        """Initialise the madqn system.
 
         Args:
-            environment_factory (Callable[[bool], dm_env.Environment]): function to
+            environment_factory : function to
                 instantiate an environment.
-            network_factory (Callable[[acme_specs.BoundedArray],
-                Dict[str, snt.Module]]): function to instantiate system networks.
-            logger_factory (Callable[[str], MavaLogger], optional): function to
-                instantiate a system logger. Defaults to None.
-            architecture (Type[DecentralisedValueActor], optional): system architecture,
-                e.g. decentralised or centralised. Defaults to DecentralisedValueActor.
-            trainer_fn (Union[ Type[training.MADQNTrainer],
-                Type[training.MADQNRecurrentTrainer] ], optional): training type
-                associated with executor and architecture, e.g. centralised training.
-                Defaults to training.MADQNTrainer.
-            communication_module (Type[BaseCommunicationModule], optional):
-                module for enabling communication protocols between agents. Defaults to
-                None.
-            executor_fn (Type[core.Executor], optional): executor type, e.g.
-                feedforward or recurrent. Defaults to
-                execution.MADQNFeedForwardExecutor.
-            exploration_scheduler_fn :
-                function specifying a decaying scheduler for epsilon exploration.
+            network_factory : function to instantiate system networks.
+            exploration_scheduler_fn : function specifying a decaying scheduler for epsilon exploration.
                 This can be
                     1. The same across all agents & executors,
                         e.g. LinearExplorationTimestepScheduler(...),
                     2. Or at an executor level,
-                        e.g. see examples/debugging/simple_spread/feedforward/decentralised/run_madqn_different_epsilon_per_agent.py  # noqa: E501
+                        e.g. see examples/debugging/simple_spread/feedforward/decentralised/run_madqn_configurable_epsilon.py  # noqa: E501
                     3. Or at an agent level (same across all executors),
                         e.g. { "agent_0": LinearExplorationTimestepScheduler(...),"agent_1": LinearExplorationTimestepScheduler(...))}.  # noqa: E501
-            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
-                optional): replay buffer stabilisaiton function, e.g. fingerprints.
-                Defaults to None.
-            num_executors (int, optional): number of executor processes to run in
-                parallel. Defaults to 1.
-            num_caches (int, optional): number of trainer node caches. Defaults to 0.
-            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
-                the action, observation spaces etc. for each agent in the system.
-                Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                When agent_net_keys are provided the value of shared_weights is ignored.
-                Defaults to True.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
-            batch_size (int, optional): sample batch size for updates. Defaults to 256.
-            prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
-            min_replay_size (int, optional): minimum replay size before updating.
-                Defaults to 1000.
-            max_replay_size (int, optional): maximum replay size. Defaults to 1000000.
-            samples_per_insert (Optional[float], optional): number of samples to take
-                from replay for every insert that is made. Defaults to 32.0.
-            n_step (int, optional): number of steps to include prior to boostrapping.
-                Defaults to 5.
-            sequence_length (int, optional): recurrent sequence rollout length. Defaults
-                to 20.
-            importance_sampling_exponent (float, optional): value of importance sampling
-                exponent (usually around 0.2). If None, importance sampling is not used.
-            max_priority_weight (float): Required if importance_sampling_exponent
-                is not None. Defaults to 0.9. Used to scale the maximum priority of
-                reverb samples.
-            period (int, optional): consecutive starting points for overlapping
-                rollouts across a sequence. Defaults to 20.
-            max_gradient_norm (float, optional): maximum allowed norm for gradients
-                before clipping is applied. Defaults to None.
-            discount (float, optional): discount factor to use for TD updates. Defaults
-                to 0.99.
-            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]], optional):
-                type of optimizer to use to update network parameters. Defaults to
-                snt.optimizers.Adam( learning_rate=1e-4 ).
-            target_update_period (int, optional): number of steps before target
-                networks are updated. Defaults to 100.
-            executor_variable_update_period (int, optional): number of steps before
-                updating executor variables from the variable source. Defaults to 1000.
-            max_executor_steps (int, optional): maximum number of steps and executor
-                can in an episode. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint models. Defaults to
-                False.
-            checkpoint_subpath (str, optional): subdirectory specifying where to store
-                checkpoints. Defaults to "~/mava/".
-            checkpoint_minute_interval (int): The number of minutes to wait between
+            logger_factory : function to
+                instantiate a system logger.
+            architecture : system architecture,
+                e.g. decentralised ,centralised or networked.
+            trainer_fn :  training type
+                associated with executor and architecture, e.g. centralised training.
+            communication_module :  module for enabling communication protocols between agents.
+            executor_fn : executor type, e.g.
+                feedforward or recurrent.
+            replay_stabilisation_fn : replay buffer stabilisaiton function, e.g. fingerprints.
+            num_executors : number of executor processes to run in
+                parallel.
+            num_caches : number of trainer node caches.
+            environment_spec : escription of
+                the action, observation spaces etc.
+            shared_weights :  whether agents should share weights or not.
+            agent_net_keys : specifies what network each agent uses.
+            batch_size : sample batch size for updates.
+            prefetch_size : size to prefetch from replay.
+            min_replay_size : minimum replay size before updating.
+            max_replay_size : maximum replay size.
+            samples_per_insert : number of samples to take
+                from replay for every insert that is made.
+            n_step : number of steps to include prior to boostrapping.
+            sequence_length : recurrent sequence rollout length.
+            importance_sampling_exponent : value of importance sampling
+                exponent (usually around 0.2).
+            max_priority_weight : Required if importance_sampling_exponent
+                is not None.
+            period : consecutive starting points for overlapping
+                rollouts across a sequence.
+            max_gradient_norm : maximum allowed norm for gradients
+                before clipping is applied.
+            discount : discount factor to use for TD updates.
+            optimizer : type of optimizer to use to update network parameters.
+            target_update_period : number of steps before target
+                networks are updated.
+            executor_variable_update_period : number of steps before
+                updating executor variables from the variable source.
+            max_executor_steps : maximum number of steps and executor
+                can in an episode.
+            checkpoint : whether to checkpoint models.
+            checkpoint_subpath : subdirectory specifying where to store
                 checkpoints.
-            logger_config (Dict, optional): additional configuration settings for the
-                logger factory. Defaults to {}.
-            train_loop_fn (Callable, optional): function to instantiate a train loop.
-                Defaults to ParallelEnvironmentLoop.
-            eval_loop_fn (Callable, optional): function to instantiate an evaluation
-                loop. Defaults to ParallelEnvironmentLoop.
-            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
-                to the training loop. Defaults to {}.
-            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
-                the evaluation loop. Defaults to {}.
-            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+            checkpoint_minute_interval : The number of minutes to wait between
+                checkpoints.
+            logger_config : additional configuration settings for the
+                logger factory.
+            train_loop_fn : function to instantiate a train loop.
+            eval_loop_fn : function to instantiate a eval loop.
+            train_loop_fn_kwargs : possible keyword arguments to send
+                to the training loop.
+            eval_loop_fn_kwargs :possible keyword arguments to send to
+                the evaluation loop.
+            learning_rate_scheduler_fn : function/class that takes in a trainer step t
                 and returns the current learning rate.
+
+        Raises:
+            ValueError: [description]
         """
 
         if not environment_spec:
@@ -301,10 +281,10 @@ class MADQN:
         )
 
     def _get_extra_specs(self) -> Any:
-        """helper to establish specs for extra information
+        """Helper to establish specs for extra information.
 
         Returns:
-            Dict[str, Any]: dictionary containing extra specs
+            dictionary containing extra specs
         """
 
         agents = self._environment_spec.get_agent_ids()
@@ -543,17 +523,16 @@ class MADQN:
         counter: counting.Counter,
         trainer: training.MADQNTrainer,
     ) -> Any:
-        """System evaluator (an executor process not connected to a dataset)
+        """System evaluator (an executor process not connected to a dataset). # noqa: D402
 
         Args:
-            variable_source (acme.VariableSource): variable server for updating
+            variable_source : variable server for updating
                 network variables.
-            counter (counting.Counter): step counter object.
-            trainer (Optional[training.MADQNRecurrentCommTrainer], optional):
-                system trainer. Defaults to None.
+            counter : step counter object.
+            trainer : system trainer.
 
         Returns:
-            Any: environment-executor evaluation loop instance for evaluating the
+            environment-executor evaluation loop instance for evaluating the
                 performance of a system.
         """
 

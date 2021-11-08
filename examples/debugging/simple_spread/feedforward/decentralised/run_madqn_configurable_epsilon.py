@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-"""Example running MADQN on debug MPE environments."""
+"""Example running MADQN on debug MPE environments, with configurable epsilon decay."""
 import functools
 from datetime import datetime
 from typing import Any
