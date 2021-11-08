@@ -10,7 +10,6 @@
 #   blacken-docs: Checks docs follow black format standard.
 #   pydocstyle: Checking docstring style.
 #   interrogate: Checks docstring code coverage.
-#   pylint: Checks code duplication
 
 default_stages: ["commit", "push"]
 repos:
@@ -75,9 +74,3 @@ repos:
         args: ["--config=pyproject.toml","mava"]
         pass_filenames: false
 
-  - repo: https://github.com/pycqa/pylint
-    rev: v2.10.2
-    hooks:
-    -   id: pylint
-        name: Check code duplication
-        args: ["--disable=all","--enable=duplicate-code"]

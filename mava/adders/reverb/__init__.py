@@ -15,7 +15,6 @@
 
 """Adders for Reverb replay buffers."""
 
-# pylint: disable=unused-import
 
 from mava.adders.reverb.base import (
     DEFAULT_PRIORITY_TABLE,
