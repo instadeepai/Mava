@@ -176,7 +176,6 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor, DQNExecutor):
         else:
             q_values = self._q_networks[agent_net_key](batched_observation)
 
-        # print(self._action_selectors)
         action = self._action_selectors[agent](
             action_values=q_values, legal_actions_mask=batched_legals
         )
@@ -384,7 +383,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor, DQNExecutor):
         q_values, new_state = self._q_networks[agent_key](batched_observation, state)
 
         # select legal action
-        action = self._action_selectors[agent_key](q_values, batched_legals)
+        action = self._action_selectors[agent](q_values, batched_legals)
 
         return action, new_state
 
@@ -528,7 +527,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor, DQNExecutor):
         )
 
         # select legal action
-        action = self._action_selectors[agent_key](q_values, batched_legals)
+        action = self._action_selectors[agent](q_values, batched_legals)
 
         return (action, m_values), new_state
 
