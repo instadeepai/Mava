@@ -93,6 +93,7 @@ class QMIX(MADQN):
         num_hypernet_layers: int = 1,
         hypernet_hidden_dim: int = 32,
         learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
+        seed: Optional[int] = None,
     ):
         """Initialise the system
 
@@ -182,6 +183,7 @@ class QMIX(MADQN):
                 to 32.
             learning_rate_scheduler_fn: function/class that takes in a trainer step t
                 and returns the current learning rate.
+            seed: seed for reproducible sampling (for epsilon greedy action selection).
         """
 
         self._mixer = mixer
@@ -226,6 +228,7 @@ class QMIX(MADQN):
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
             exploration_scheduler_fn=exploration_scheduler_fn,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+            seed=seed,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):

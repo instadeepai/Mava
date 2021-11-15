@@ -87,6 +87,7 @@ class VDN(MADQN):
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
+        seed: Optional[int] = None,
     ):
         """Initialise the system
 
@@ -166,6 +167,7 @@ class VDN(MADQN):
                 the evaluation loop. Defaults to {}.
             learning_rate_scheduler_fn: function/class that takes in a trainer step t
                 and returns the current learning rate.
+            seed: seed for reproducible sampling (for epsilon greedy action selection).
         """
 
         self._mixer = mixer
@@ -200,6 +202,7 @@ class VDN(MADQN):
             logger_config=logger_config,
             exploration_scheduler_fn=exploration_scheduler_fn,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+            seed=seed,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):

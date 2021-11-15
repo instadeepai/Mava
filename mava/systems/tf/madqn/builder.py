@@ -285,6 +285,7 @@ class MADQNBuilder:
         trainer: Optional[training.MADQNTrainer] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
         evaluator: bool = False,
+        seed: Optional[int] = None,
     ) -> core.Executor:
         """Create an executor instance.
 
@@ -304,6 +305,7 @@ class MADQNBuilder:
                 communication protocols between agents. Defaults to None.
             evaluator (bool, optional): boolean indicator if the executor is used for
                 for evaluation only. Defaults to False.
+            seed: seed for reproducible sampling.
 
         Returns:
             core.Executor: system executor, a collection of agents making up the part
@@ -334,7 +336,7 @@ class MADQNBuilder:
 
         # Pass scheduler and initialize action selectors
         action_selectors_with_scheduler = initialize_epsilon_schedulers(
-            exploration_schedules, action_selectors, agent_net_keys
+            exploration_schedules, action_selectors, agent_net_keys, seed=seed
         )
 
         # Create the executor which coordinates the actors.

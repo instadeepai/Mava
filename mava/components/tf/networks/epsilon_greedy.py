@@ -47,12 +47,14 @@ class EpsilonGreedy(snt.Module):
             BaseExplorationScheduler, BaseExplorationTimestepScheduler
         ],
         name: str = "EpsilonGreedy",
+        seed: Optional[int] = None,
     ):
         """Initialize the action selector.
 
         Args:
             exploration_scheduler : scheduler for epsilon.
             name : sonnet module name.
+            seed: seed for reproducible sampling.
         """
 
         super().__init__(name=name)
@@ -60,6 +62,7 @@ class EpsilonGreedy(snt.Module):
         self._epsilon = tf.Variable(
             self._exploration_scheduler.get_epsilon(), trainable=False
         )
+        self._seed = seed
 
     def __call__(
         self,
@@ -118,8 +121,12 @@ class EpsilonGreedy(snt.Module):
         # Make the policy object.
         policy = tfp.distributions.Categorical(probs=probs)
 
+        if self._seed:
+            action = policy.sample(seed=self._seed)
+        else:
+            action = policy.sample()
         # Return sampled action.
-        return tf.cast(policy.sample(), "int64")
+        return tf.cast(action, "int64")
 
     def get_epsilon(self) -> float:
         """Return current epsilon.

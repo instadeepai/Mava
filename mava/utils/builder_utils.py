@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Callable, Dict, Union
+from typing import Callable, Dict, Optional, Union
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     BaseExplorationScheduler,
@@ -32,6 +32,7 @@ def initialize_epsilon_schedulers(
     ],
     action_selectors: Dict[str, Callable],
     agent_net_keys: Dict[str, str],
+    seed: Optional[int] = None,
 ) -> Dict:
     """Function that initializes action selectors.
 
@@ -42,6 +43,7 @@ def initialize_epsilon_schedulers(
         agent_net_keys: specifies what network each agent uses.
         evaluator: boolean indicator if the executor is used for
             for evaluation only.
+        seed: seed for reproducible sampling.
 
     Returns:
         dict with initialized action selectors with schedules.
@@ -52,7 +54,7 @@ def initialize_epsilon_schedulers(
         schedule = exploration_schedules[agent]
         network_for_agent = agent_net_keys[agent]
         action_selectors_with_scheduler[agent] = action_selectors[network_for_agent](
-            schedule
+            schedule, seed=seed
         )
 
     return action_selectors_with_scheduler

@@ -94,6 +94,7 @@ class DIAL(MADQN):
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
+        seed: Optional[int] = None,
     ):
         """Initialise the system
 
@@ -176,6 +177,7 @@ class DIAL(MADQN):
                 the evaluation loop. Defaults to {}.
             learning_rate_scheduler_fn: function/class that takes in a trainer step t
                 and returns the current learning rate.
+            seed: seed for reproducible sampling (for epsilon greedy action selection).
         """
 
         super(DIAL, self).__init__(
@@ -215,6 +217,7 @@ class DIAL(MADQN):
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
             exploration_scheduler_fn=exploration_scheduler_fn,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+            seed=seed,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):

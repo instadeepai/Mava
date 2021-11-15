@@ -98,6 +98,7 @@ class MADQN:
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
+        seed: Optional[int] = None,
     ):
         """Initialise the madqn system.
 
@@ -169,6 +170,7 @@ class MADQN:
                 the evaluation loop.
             learning_rate_scheduler_fn : function/class that takes in a trainer step t
                 and returns the current learning rate.
+            seed: seed for reproducible sampling (used for epsilon greedy action selection).
 
         Raises:
             ValueError: [description]
@@ -214,6 +216,7 @@ class MADQN:
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
         self._checkpoint_minute_interval = checkpoint_minute_interval
+        self._seed = seed
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
@@ -487,6 +490,7 @@ class MADQN:
             exploration_schedules=self._exploration_scheduler_fn[
                 f"executor_{executor_id}"
             ],
+            seed=self._seed,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -578,6 +582,7 @@ class MADQN:
                 agent: ConstantScheduler(epsilon=0.0)
                 for agent in self._environment_spec.get_agent_ids()
             },
+            seed=self._seed,
         )
 
         # Make the environment.
