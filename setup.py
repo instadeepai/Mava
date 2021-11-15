@@ -26,14 +26,14 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb~=0.4.0",
+    "dm-reverb~=0.6.0",
     "jax",
     "jaxlib",
 ]
 
 tf_requirements = [
-    "tensorflow~=2.6.0",
-    "tensorflow_probability~=0.13.0",
+    "tensorflow~=2.7.0",
+    "tensorflow_probability~=0.14.1",
     "dm-sonnet",
     "trfl",
 ]
@@ -46,9 +46,7 @@ env_requirements = [
     "pysc2",
 ]
 
-launchpad_requirements = [
-    "dm-launchpad-nightly",
-]
+launchpad_requirements = ["dm-launchpad==0.3.2"]
 
 testing_formatting_requirements = [
     "pre-commit",
