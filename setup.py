@@ -32,7 +32,7 @@ reverb_requirements = [
 ]
 
 tf_requirements = [
-    "tensorflow~=2.7.0",
+    "tensorflow>=2.6.0,<2.8.0",
     "tensorflow_probability~=0.14.1",
     "dm-sonnet",
     "trfl",
@@ -46,7 +46,7 @@ env_requirements = [
     "pysc2",
 ]
 
-launchpad_requirements = ["dm-launchpad==0.3.2"]
+launchpad_requirements = ["dm-launchpad~=0.3.2"]
 
 testing_formatting_requirements = [
     "pre-commit",
