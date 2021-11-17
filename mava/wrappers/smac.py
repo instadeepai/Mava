@@ -26,9 +26,9 @@ from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym import spaces
 from gym.spaces import Box, Discrete
-from pettingzoo.utils.env import ParallelEnv
 
 try:
+    from pettingzoo.utils.env import ParallelEnv
     from smac.env import StarCraft2Env
 except ModuleNotFoundError:
     pass
@@ -338,7 +338,7 @@ class SMACEnvWrapper(ParallelEnvWrapper):
         return self._possible_agents
 
     @property
-    def environment(self) -> ParallelEnv:
+    def environment(self) -> "ParallelEnv":
         """Returns the wrapped environment."""
         return self._environment
 

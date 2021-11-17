@@ -38,10 +38,10 @@ tf_requirements = [
     "trfl",
 ]
 
-env_requirements = [
+pettingzoo_requirements = [
     "pettingzoo~=1.13.1",
     "multi_agent_ale_py",
-    "supersuit==2.6.6",
+    "supersuit==3.3.1",
     "pygame",
     "pysc2",
 ]
@@ -49,6 +49,7 @@ env_requirements = [
 launchpad_requirements = ["dm-launchpad~=0.3.2"]
 
 testing_formatting_requirements = [
+    "pytest==6.2.4",
     "pre-commit",
     "mypy==0.910",
     "pytest-xdist",
@@ -101,10 +102,11 @@ setup(
         "matplotlib",
         "dataclasses",
         "Box2D",
+        "gym",
     ],
     extras_require={
         "tf": tf_requirements,
-        "envs": env_requirements,
+        "pz": pettingzoo_requirements,
         "flatland": flatland_requirements,
         "open_spiel": open_spiel_requirements,
         "reverb": reverb_requirements,

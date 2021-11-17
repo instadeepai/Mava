@@ -23,12 +23,16 @@ import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym import spaces
-from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 try:
-    from supersuit import black_death_v1
+    from pettingzoo.utils.env import AECEnv, ParallelEnv
+except ModuleNotFoundError:
+    pass
+
+try:
+    from supersuit import black_death_v2
 except ImportError:
-    black_death_v1 = None
+    black_death_v2 = None
 
 from mava import types
 from mava.utils.sort_utils import sort_str_num
@@ -44,10 +48,10 @@ from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     def __init__(
         self,
-        environment: AECEnv,
+        environment: "AECEnv",
         env_preprocess_wrappers: Optional[List] = [
             # (env_preprocessor, dict_with_preprocessor_params)
-            (black_death_v1, None),
+            (black_death_v2, None),
         ],
     ):
         """Constructor for sequential PZ wrapper.
@@ -55,7 +59,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         Args:
             environment (AECEnv): sequential PZ env.
             env_preprocess_wrappers (Optional[List], optional): Wrappers
-                that preprocess envs. Defaults to [ (black_death_v1, None), ].
+                that preprocess envs. Defaults to [ (black_death_v2, None), ].
         """
         self._environment = environment
         self._reset_next_step = True
@@ -318,7 +322,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         return self._environment.possible_agents
 
     @property
-    def environment(self) -> AECEnv:
+    def environment(self) -> "AECEnv":
         """Returns the wrapped environment.
 
         Returns:
@@ -364,11 +368,11 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
     def __init__(
         self,
-        environment: ParallelEnv,
+        environment: "ParallelEnv",
         return_state_info: bool = False,
         env_preprocess_wrappers: Optional[List] = [
             # (env_preprocessor, dict_with_preprocessor_params)
-            (black_death_v1, None),
+            (black_death_v2, None),
         ],
     ):
         """Constructor for parallel PZ wrapper.
@@ -376,7 +380,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         Args:
             environment (ParallelEnv): parallel PZ env.
             env_preprocess_wrappers (Optional[List], optional): Wrappers
-                that preprocess envs. Defaults to [ (black_death_v1, None), ].
+                that preprocess envs. Defaults to [ (black_death_v2, None), ].
         """
         self._environment = environment
         self._reset_next_step = True
@@ -636,7 +640,11 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         """
         if hasattr(self._environment, "get_stats"):
             return self._environment.get_stats()
-        elif hasattr(self._environment.unwrapped.env, "get_stats"):
+        elif (
+            hasattr(self._environment, "unwrapped")
+            and hasattr(self._environment.unwrapped, "env")
+            and hasattr(self._environment.unwrapped.env, "get_stats")
+        ):
             return self._environment.unwrapped.env.get_stats()
         else:
             return None
@@ -660,7 +668,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         return self._environment.possible_agents
 
     @property
-    def environment(self) -> ParallelEnv:
+    def environment(self) -> "ParallelEnv":
         """Returns the wrapped environment.
 
         Returns:

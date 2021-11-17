@@ -270,7 +270,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
         # Log extra env stats, e.g. for smac.
         extra_stats = getattr(self._environment_loop._environment, "get_stats", None)
-        if callable(extra_stats):
+        if callable(extra_stats) and self._environment_loop._environment.get_stats():
             self._running_statistics.update(
                 self._environment_loop._environment.get_stats()
             )

@@ -17,41 +17,44 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
 
-from mava.wrappers.flatland import FlatlandEnvWrapper
-
 try:
     from flatland.envs.rail_env import RailEnv
-except ModuleNotFoundError:
+
+    from mava.wrappers.flatland import FlatlandEnvWrapper
+
+    _has_flatland = True
+except (ModuleNotFoundError, ImportError):
+    _has_flatland = False
     pass
 
+if _has_flatland:
 
-def load_flatland_env(env_config: Dict[str, Any]) -> RailEnv:
-    """Loads a flatland environment given a config dict. Also, the possible agents in the
-    environment are set"""
+    def load_flatland_env(env_config: Dict[str, Any]) -> RailEnv:
+        """Loads a flatland environment given a config dict. Also, the possible agents in the
+        environment are set"""
 
-    env = RailEnv(**env_config)
-    env.possible_agents = env.agents[:]
+        env = RailEnv(**env_config)
+        env.possible_agents = env.agents[:]
 
-    return env
+        return env
 
+    def flatland_env_factory(
+        evaluation: bool = False,
+        env_config: Dict[str, Any] = {},
+        preprocessor: Callable[
+            [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
+        ] = None,
+        include_agent_info: bool = False,
+        random_seed: Optional[int] = None,
+    ) -> FlatlandEnvWrapper:
+        """Loads a flatand environment and wraps it using the flatland wrapper"""
 
-def flatland_env_factory(
-    evaluation: bool = False,
-    env_config: Dict[str, Any] = {},
-    preprocessor: Callable[
-        [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
-    ] = None,
-    include_agent_info: bool = False,
-    random_seed: Optional[int] = None,
-) -> FlatlandEnvWrapper:
-    """Loads a flatand environment and wraps it using the flatland wrapper"""
+        del evaluation  # since it has same behaviour for both train and eval
 
-    del evaluation  # since it has same behaviour for both train and eval
+        env = load_flatland_env(env_config)
+        wrapped_env = FlatlandEnvWrapper(env, preprocessor, include_agent_info)
 
-    env = load_flatland_env(env_config)
-    wrapped_env = FlatlandEnvWrapper(env, preprocessor, include_agent_info)
+        if random_seed and hasattr(wrapped_env, "seed"):
+            wrapped_env.seed(random_seed)
 
-    if random_seed and hasattr(wrapped_env, "seed"):
-        wrapped_env.seed(random_seed)
-
-    return wrapped_env
+        return wrapped_env

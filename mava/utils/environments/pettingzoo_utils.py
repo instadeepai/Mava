@@ -26,7 +26,7 @@ try:
     from smac.env.pettingzoo import StarCraft2PZEnv
 except ModuleNotFoundError:
     pass
-from supersuit import black_death_v1
+from supersuit import black_death_v2
 
 from mava.wrappers import (
     ParallelEnvWrapper,
@@ -77,7 +77,7 @@ def make_environment(
     env_type: str = "parallel",
     env_class: str = "mpe",
     env_name: str = "simple_spread_v2",
-    env_preprocess_wrappers: Optional[List] = [(black_death_v1, None)],
+    env_preprocess_wrappers: Optional[List] = [(black_death_v2, None)],
     random_seed: Optional[int] = None,
     **kwargs: Any,
 ) -> dm_env.Environment:
