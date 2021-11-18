@@ -32,7 +32,7 @@ except ModuleNotFoundError:
 try:
     from supersuit import black_death_v2
 except ImportError:
-    black_death_v2 = None
+    pass
 
 from mava import types
 from mava.utils.sort_utils import sort_str_num
@@ -49,17 +49,14 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
     def __init__(
         self,
         environment: "AECEnv",
-        env_preprocess_wrappers: Optional[List] = [
-            # (env_preprocessor, dict_with_preprocessor_params)
-            (black_death_v2, None),
-        ],
+        env_preprocess_wrappers: Optional[List] = None,
     ):
         """Constructor for sequential PZ wrapper.
 
         Args:
             environment (AECEnv): sequential PZ env.
             env_preprocess_wrappers (Optional[List], optional): Wrappers
-                that preprocess envs. Defaults to [ (black_death_v2, None), ].
+                that preprocess envs. Format (env_preprocessor, dict_with_preprocessor_params).
         """
         self._environment = environment
         self._reset_next_step = True
@@ -370,17 +367,14 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         self,
         environment: "ParallelEnv",
         return_state_info: bool = False,
-        env_preprocess_wrappers: Optional[List] = [
-            # (env_preprocessor, dict_with_preprocessor_params)
-            (black_death_v2, None),
-        ],
+        env_preprocess_wrappers: Optional[List] = None,
     ):
         """Constructor for parallel PZ wrapper.
 
         Args:
             environment (ParallelEnv): parallel PZ env.
             env_preprocess_wrappers (Optional[List], optional): Wrappers
-                that preprocess envs. Defaults to [ (black_death_v2, None), ].
+                that preprocess envs. Format (env_preprocessor, dict_with_preprocessor_params).
         """
         self._environment = environment
         self._reset_next_step = True
