@@ -423,7 +423,26 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             return self._get_running_stats()
         else:
             # Record counts.
-            counts = self._counter.increment(episodes=1, steps=episode_steps)
+            if hasattr(self._executor, "_counts"):
+                loop_type = "executor"
+                if "_" not in self._loop_label:
+                    loop_type = "evaluator"
+
+                if hasattr(self._executor, "_variable_client"):
+                    self._executor._variable_client.add_async(
+                        [f"{loop_type}_episodes", f"{loop_type}_steps"],
+                        {
+                            f"{loop_type}_episodes": 1,
+                            f"{loop_type}_steps": episode_steps,
+                        },
+                    )
+                else:
+                    self._executor._counts[f"{loop_type}_episodes"] += 1
+                    self._executor._counts[f"{loop_type}_steps"] += episode_steps
+
+                counts = self._executor._counts
+            else:
+                counts = self._counter.increment(episodes=1, steps=episode_steps)
 
             # Collect the results and combine with counts.
             steps_per_second = episode_steps / (time.time() - start_time)

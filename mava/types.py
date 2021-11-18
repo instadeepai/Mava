@@ -47,10 +47,10 @@ Observation = Union[OLT, Dict[str, OLT]]
 class Transition(NamedTuple):
     """Container for a transition."""
 
-    observation: NestedArray
-    action: NestedArray
-    reward: NestedArray
-    discount: NestedArray
-    next_observation: NestedArray
+    observations: NestedArray
+    actions: NestedArray
+    rewards: NestedArray
+    discounts: NestedArray
+    next_observations: NestedArray
     extras: NestedArray = ()
     next_extras: NestedArray = ()

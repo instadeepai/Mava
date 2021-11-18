@@ -34,6 +34,7 @@ DiscreteArray = specs.DiscreteArray
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
+    net_spec_keys: Dict[str, str] = {},
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     sigma: float = 0.3,
@@ -46,29 +47,26 @@ def make_default_networks(
     """Default networks for maddpg.
 
     Args:
-        environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
+        environment_spec: description of the action and
             observation spaces etc. for each agent in the system.
-        agent_net_keys: (dict, optional): specifies what network each agent uses.
-            Defaults to {}.
-        policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
-            size of policy networks.
-        critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
-            size of critic networks. Defaults to (512, 512, 256).
-        sigma (float, optional): hyperparameters used to add Gaussian noise for
-            simple exploration. Defaults to 0.3.
-        archecture_type (ArchitectureType, optional): archecture used for
-            agent networks. Can be feedforward or recurrent. Defaults to
-            ArchitectureType.feedforward.
-        vmin (float, optional): hyperparameters for the distributional critic in mad4pg.
-            Only for mad4pg.
-        vmax (float, optional): hyperparameters for the distributional critic in mad4pg.
-            Only for mad4pg.
-        num_atoms (int, optional):  hyperparameters for the distributional critic in
-            mad4pg. Only for mad4pg.
-        seed (int, optional): random seed for network initialization.
+        agent_net_keys: specifies what network each agent uses.
+        vmin: hyperparameters for the distributional critic in mad4pg.
+        vmax: hyperparameters for the distributional critic in mad4pg.
+        net_spec_keys: specifies the specs of each network.
+        policy_networks_layer_sizes: size of policy networks.
+        critic_networks_layer_sizes: size of critic networks.
+        sigma: hyperparameters used to add Gaussian noise
+            for simple exploration. Defaults to 0.3.
+        archecture_type: archecture used
+            for agent networks. Can be feedforward or recurrent.
+            Defaults to ArchitectureType.feedforward.
+
+        num_atoms:  hyperparameters for the distributional critic in
+            mad4pg.
+        seed: random seed for network initialization.
 
     Returns:
-        Mapping[str, types.TensorTransformation]: returned agent networks.
+        returned agent networks.
     """
     # Set Policy function and layer size
     # Default size per arch type.
@@ -91,7 +89,10 @@ def make_default_networks(
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
-    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+    if not net_spec_keys:
+        specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+    else:
+        specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
@@ -112,6 +113,7 @@ def make_default_networks(
         agent_act_spec = specs[key].actions
         if type(agent_act_spec) == DiscreteArray:
             num_actions = agent_act_spec.num_values
+            # Question (dries): Why is the minimum -1 and not 0?
             minimum = [-1.0] * num_actions
             maximum = [1.0] * num_actions
             agent_act_spec = BoundedArray(

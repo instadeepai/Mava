@@ -70,10 +70,19 @@ class TestNetworkAgentKeys:
             "agent_1": "agent",
             "agent_2": "agent",
         }
-        networks = system.make_default_networks(  # type: ignore
-            environment_spec=environment_spec,  # type: ignore
+
+        params = dict(
+            environment_spec=environment_spec,
             agent_net_keys=agent_net_keys,
+            vmin=-150 if system == mad4pg else None,
+            vmax=150 if system == mad4pg else None,
         )
+
+        # Filter out None params
+        params = {k: v for k, v in params.items() if v is not None}
+
+        # Than pass params
+        networks = system.make_default_networks(**params)
 
         for key in networks.keys():
             assert (
@@ -101,10 +110,19 @@ class TestNetworkAgentKeys:
             "agent_1": "agent_1",
             "agent_2": "agent_2",
         }
-        networks = system.make_default_networks(  # type: ignore
-            environment_spec=environment_spec,  # type: ignore
-            agent_net_keys=agent_net_keys,
-        )
+
+        if system == mad4pg:
+            networks = system.make_default_networks(  # type: ignore
+                environment_spec=environment_spec,  # type: ignore
+                agent_net_keys=agent_net_keys,
+                vmin=-150,
+                vmax=150,
+            )
+        else:
+            networks = system.make_default_networks(  # type: ignore
+                environment_spec=environment_spec,  # type: ignore
+                agent_net_keys=agent_net_keys,
+            )
         for key in networks.keys():
             assert ["agent_0", "agent_1", "agent_2"] == list(
                 networks[key].keys()
@@ -134,11 +152,20 @@ class TestNetworkAgentKeys:
             "agent_2": "agent",
         }
 
-        networks = system.make_default_networks(
-            environment_spec=environment_spec,
-            agent_net_keys=agent_net_keys,
-            seed=test_seed,
-        )
+        if system == mad4pg:
+            networks = system.make_default_networks(
+                environment_spec=environment_spec,
+                agent_net_keys=agent_net_keys,
+                vmin=-150,
+                vmax=150,
+                seed=test_seed,
+            )
+        else:
+            networks = system.make_default_networks(
+                environment_spec=environment_spec,
+                agent_net_keys=agent_net_keys,
+                seed=test_seed,
+            )
 
         for key in networks:
             for agent in networks[key]:

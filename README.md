@@ -68,7 +68,7 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [OpenSpiel][openspiel]
 
 
-For details on how to add your own environment, see [here](https://github.com/instadeepai/Mava/tree/feature/add_env_readme/mava/wrappers#readme).
+For details on how to add your own environment, see [here](https://github.com/instadeepai/Mava/blob/develop/mava/wrappers/README.md).
 
 |<img  src="docs/images/multiw_animation.gif" width="1300px"/> | <img src="docs/images/sc2_animation.gif" width="1500px"/>  | <img src="docs/images/flatland.gif" />  |
 |:---:|:---:|:---:|

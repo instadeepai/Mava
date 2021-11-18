@@ -163,11 +163,11 @@ class VDNTrainer(MADQNTrainer):
         trans = mava_types.Transition(*inputs.data)
 
         o_tm1, o_t, a_tm1, r_t, d_t, _, _ = (
-            trans.observation,
-            trans.next_observation,
-            trans.action,
-            trans.reward,
-            trans.discount,
+            trans.observations,
+            trans.next_observations,
+            trans.actions,
+            trans.rewards,
+            trans.discounts,
             trans.extras,
             trans.next_extras,
         )

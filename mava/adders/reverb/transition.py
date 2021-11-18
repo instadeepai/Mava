@@ -22,7 +22,7 @@ This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
-from typing import Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 import reverb
@@ -86,6 +86,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         client: reverb.Client,
         n_step: int,
         discount: float,
+        net_ids_to_keys: List[str] = None,
+        table_network_config: Dict[str, List] = None,
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
         max_in_flight_items: int = 5,
@@ -100,6 +102,10 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             (s_t, a_t, r_t, d_t, s_t+1, e_t).
           discount: Discount factor to apply. This corresponds to the
             agent's discount in the class docstring.
+          net_ids_to_keys: A list of network keys. By indexing this list with the
+          network_id the corresponding network key will be returned.
+          table_network_config: A dictionary mapping table names to lists of
+            network names.
           priority_fns: See docstring for BaseAdder.
 
         Raises:
@@ -108,9 +114,11 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # Makes the additional discount a float32, which means that it will be
         # upcast if rewards/discounts are float64 and left alone otherwise.
         self.n_step = n_step
+        self._net_ids_to_keys = net_ids_to_keys
         self._discount = tree.map_structure(np.float32, discount)
         self._first_idx = 0
         self._last_idx = 0
+        self._table_network_config = table_network_config
 
         ReverbParallelAdder.__init__(
             self,
@@ -181,12 +189,12 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             lambda x: x[-1], (history["n_step_return"], history["total_discount"])
         )
         transition = mava_types.Transition(
-            observation=s,
+            observations=s,
             extras=e,
-            action=a,
-            reward=n_step_return,
-            discount=total_discount,
-            next_observation=s_,
+            actions=a,
+            rewards=n_step_return,
+            discounts=total_discount,
+            next_observations=s_,
             next_extras=e_,
         )
 
@@ -195,12 +203,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             self._priority_fns, transition
         )
 
-        # Insert the transition into replay along with its priority.
-        for table, priority in table_priorities.items():
-            self._writer.create_item(
-                table=table, priority=priority, trajectory=transition
-            )
-        self._writer.flush(self._max_in_flight_items)
+        # Add the experience to the trainer tables in the correct form.
+        self.write_experience_to_tables(transition, table_priorities)
 
     @classmethod
     def signature(
@@ -254,12 +258,12 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             step_discount_specs[agent] = step_discounts_spec
 
         transition_spec = types.Transition(
-            observation=obs_specs,
-            action=act_specs,
+            observations=obs_specs,
+            next_observations=obs_specs,
+            actions=act_specs,
+            rewards=reward_specs,
+            discounts=step_discount_specs,
             extras=extras_spec,
-            reward=reward_specs,
-            discount=step_discount_specs,
-            next_observation=obs_specs,
             next_extras=extras_spec,
         )
 

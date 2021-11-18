@@ -179,7 +179,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
 
     def create_behaviour_policy(self) -> Dict[str, snt.Module]:
         behaviour_policy_networks: Dict[str, snt.Module] = {}
-        for net_key in set(self._agent_net_keys.values()):
+        for net_key in self._policy_networks.keys():
             snt_module = type(self._policy_networks[net_key])
             behaviour_policy_networks[net_key] = snt_module(
                 [
@@ -206,6 +206,7 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
+        net_spec_keys: Dict[str, str] = {},
     ):
         self._env_spec = environment_spec
         self._agents = self._env_spec.get_agent_ids()  # All agend ids
@@ -217,8 +218,19 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         self._policy_networks = policy_networks
         self._critic_networks = critic_networks
         self._agent_net_keys = agent_net_keys
+        self._net_keys = self._policy_networks.keys()
         self._n_agents = len(self._agents)
         self._embed_specs: Dict[str, Any] = {}
+
+        if not net_spec_keys:
+            # Check if the agents use all the networks.
+            assert len(self._policy_networks.keys()) == len(
+                set(self._agent_net_keys.values())
+            )
+            net_spec_keys = {
+                self._agent_net_keys[agent]: agent for agent in self._agents
+            }
+        self._net_spec_keys = net_spec_keys
 
         self._create_target_networks()
 
@@ -249,26 +261,23 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         actor_obs_specs = self._get_actor_specs()
 
         # create policy variables for each agent
-        # TODO (dries): This can be futher simplified by only initialising
-        # each network once. Not per agent. Some care should be taken
-        # with emb_spec though.
-        for agent_key in self._agents:
+        for net_key in self._net_keys:
+            agent_key = self._net_spec_keys[net_key]
             obs_spec = actor_obs_specs[agent_key]
-            agent_net_key = self._agent_net_keys[agent_key]
             emb_spec = tf2_utils.create_variables(
-                self._observation_networks[agent_net_key], [obs_spec]
+                self._observation_networks[net_key], [obs_spec]
             )
             self._embed_specs[agent_key] = emb_spec
 
             # Create variables.
-            tf2_utils.create_variables(self._policy_networks[agent_net_key], [emb_spec])
+            tf2_utils.create_variables(self._policy_networks[net_key], [emb_spec])
 
             # create target network variables
             tf2_utils.create_variables(
-                self._target_policy_networks[agent_net_key], [emb_spec]
+                self._target_policy_networks[net_key], [emb_spec]
             )
             tf2_utils.create_variables(
-                self._target_observation_networks[agent_net_key], [obs_spec]
+                self._target_observation_networks[net_key], [obs_spec]
             )
 
         actor_networks: Dict[str, Dict[str, snt.Module]] = {
@@ -285,20 +294,18 @@ class DecentralisedValueActorCritic(BaseActorCritic):
         embed_specs, _ = self._get_critic_specs()
 
         # create critics
-        for agent_key in self._agents:
+        for net_key in self._net_keys:
+            agent_key = self._net_spec_keys[net_key]
 
             # get specs
             emb_spec = embed_specs[agent_key]
 
-            # Get the agent's network key
-            agent_net_key = self._agent_net_keys[agent_key]
-
             # Create variables.
-            tf2_utils.create_variables(self._critic_networks[agent_net_key], [emb_spec])
+            tf2_utils.create_variables(self._critic_networks[net_key], [emb_spec])
 
             # create target network variables
             tf2_utils.create_variables(
-                self._target_critic_networks[agent_net_key], [emb_spec]
+                self._target_critic_networks[net_key], [emb_spec]
             )
 
         critic_networks: Dict[str, Dict[str, snt.Module]] = {
@@ -309,12 +316,12 @@ class DecentralisedValueActorCritic(BaseActorCritic):
 
     def create_behaviour_policy(self) -> Dict[str, snt.Module]:
         behaviour_policy_networks: Dict[str, snt.Module] = {}
-        for agent_net_key in set(self._agent_net_keys.values()):
-            snt_module = type(self._policy_networks[agent_net_key])
-            behaviour_policy_networks[agent_net_key] = snt_module(
+        for net_key in self._net_keys:
+            snt_module = type(self._policy_networks[net_key])
+            behaviour_policy_networks[net_key] = snt_module(
                 [
-                    self._observation_networks[agent_net_key],
-                    self._policy_networks[agent_net_key],
+                    self._observation_networks[net_key],
+                    self._policy_networks[net_key],
                 ]
             )
         return behaviour_policy_networks
@@ -336,6 +343,7 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
         policy_networks: Dict[str, snt.Module],
         critic_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
+        net_spec_keys: Dict[str, str] = {},
     ):
         super().__init__(
             environment_spec=environment_spec,
@@ -343,6 +351,7 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
             policy_networks=policy_networks,
             critic_networks=critic_networks,
             agent_net_keys=agent_net_keys,
+            net_spec_keys=net_spec_keys,
         )
 
     def _get_critic_specs(
@@ -359,23 +368,21 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
         embed_specs, act_specs = self._get_critic_specs()
 
         # create critics
-        for agent_key in self._agents:
+        for net_key in self._net_keys:
+            agent_key = self._net_spec_keys[net_key]
 
             # get specs
             emb_spec = embed_specs[agent_key]
             act_spec = act_specs[agent_key]
 
-            # Get the agent's network key
-            agent_net_key = self._agent_net_keys[agent_key]
-
             # Create variables.
             tf2_utils.create_variables(
-                self._critic_networks[agent_net_key], [emb_spec, act_spec]
+                self._critic_networks[net_key], [emb_spec, act_spec]
             )
 
             # create target network variables
             tf2_utils.create_variables(
-                self._target_critic_networks[agent_net_key], [emb_spec, act_spec]
+                self._target_critic_networks[net_key], [emb_spec, act_spec]
             )
 
         critic_networks: Dict[str, Dict[str, snt.Module]] = {
