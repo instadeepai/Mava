@@ -35,20 +35,19 @@ source mava_testing/bin/activate
 # Fix module 'enum' has no attribute 'IntFlag' for py3.6
 pip uninstall -y enum34
 
-# For smac
-apt-get -y install git
-pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
+pip install .[testing_formatting]
+# Check code follows black formatting.
+black --check .
+# stop the build if there are Python syntax errors or undefined names
+flake8 .  --count --select=E9,F63,F7,F82 --show-source --statistics
+# exit-zero treats all errors as warnings.
+flake8 . --count --exit-zero --statistics
 
-# For atari envs
-apt-get install unrar
-pip install autorom
-AutoROM -v
+# Check types.
+mypy --exclude '(docs|build)/$' .
 
-N_CPU=$(grep -c ^processor /proc/cpuinfo)
-
-# Run all unit tests (non integration tests).
-pytest -n "${N_CPU}" tests --ignore-glob="*/*system_test.py"
-
+# Check docstring code coverage.
+interrogate -c pyproject.toml
 # Clean-up.
 deactivate
 rm -rf mava_testing/
