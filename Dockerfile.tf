@@ -43,14 +43,11 @@ RUN AutoROM -v
 FROM tf-core AS sc2
 ## Install SC2 game
 RUN apt-get install -y wget
-RUN ./bash_scripts/install_sc2.sh
-ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 ## Install smac environment
 RUN apt-get -y install git
 RUN pip install .[sc2]
-# RUN pip install pysc2
-# RUN python -m pip uninstall -y enum34
-# RUN python -m pip install git+https://github.com/oxwhirl/smac.git
+RUN ./bash_scripts/install_sc2.sh
+ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 ##########################################################
 
 ##########################################################
@@ -70,9 +67,3 @@ RUN ./bash_scripts/install_robocup.sh
 FROM tf-core AS openspiel
 RUN pip install .[open_spiel]
 ##########################################################
-
-# ##########################################################
-# ## Test Image with all envrionments
-# FROM tf-core AS tests
-# RUN ./bash_scripts/tests.sh
-# ##########################################################
