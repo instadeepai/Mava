@@ -96,6 +96,7 @@ class MADQNConfig:
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
+    evaluator_interval: Optional[dict] = None
     learning_rate_scheduler_fn: Optional[Any] = None
 
 
@@ -350,6 +351,7 @@ class MADQNBuilder:
             communication_module=communication_module,
             evaluator=evaluator,
             fingerprint=fingerprint,
+            interval=self._config.evaluator_interval if evaluator else None,
         )
 
     def make_trainer(

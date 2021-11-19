@@ -93,6 +93,7 @@ class DIAL(MADQN):
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        evaluator_interval: Optional[dict] = None,
         learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
         seed: Optional[int] = None,
     ):
@@ -178,6 +179,11 @@ class DIAL(MADQN):
             learning_rate_scheduler_fn: function/class that takes in a trainer step t
                 and returns the current learning rate.
             seed: seed for reproducible sampling (for epsilon greedy action selection).
+            evaluator_interval: An optional condition that is used to evaluate/test
+                system performance after [evaluator_interval] condition has been met.
+                If None, evaluation will happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         super(DIAL, self).__init__(
@@ -248,6 +254,7 @@ class DIAL(MADQN):
                 learning_rate_scheduler_fn=learning_rate_scheduler_fn,
                 importance_sampling_exponent=importance_sampling_exponent,
                 max_priority_weight=max_priority_weight,
+                evaluator_interval=evaluator_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -315,7 +322,9 @@ class DIAL(MADQN):
         """
 
         return super().evaluator(
-            variable_source=variable_source, counter=counter, trainer=trainer
+            variable_source=variable_source,
+            counter=counter,
+            trainer=trainer,
         )
 
     def build(self, name: str = "dial") -> Any:

@@ -318,7 +318,10 @@ class RunningMeanStd(object):
         self.update_from_moments(batch_mean, batch_var, batch_count)
 
     def update_from_moments(
-        self, batch_mean: np.ndarray, batch_var: np.ndarray, batch_count: int
+        self,
+        batch_mean: np.ndarray,
+        batch_var: np.ndarray,
+        batch_count: int,
     ) -> None:
         delta = batch_mean - self.mean
         tot_count = self.count + batch_count

@@ -229,7 +229,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         pass
 
     def _transform_observations(
-        self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
+        self, obs: Dict[str, mava_types.OLT], next_obs: Dict[str, mava_types.OLT]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """Transform the observatations using the observation networks of each agent."
 
@@ -261,7 +261,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
         e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
+        e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         """get data to feed to the agent critic network(s)
@@ -655,7 +655,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
         e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
+        e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
@@ -749,7 +749,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
         e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
+        e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
@@ -858,7 +858,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
         e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
+        e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
@@ -1078,7 +1078,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._num_steps.assign_add(1)
 
     def _transform_observations(
-        self, observations: Dict[str, np.ndarray]
+        self, observations: Dict[str, mava_types.OLT]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """apply the observation networks to the raw observations from the dataset
         Args:

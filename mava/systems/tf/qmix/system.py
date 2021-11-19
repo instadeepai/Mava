@@ -94,6 +94,7 @@ class QMIX(MADQN):
         hypernet_hidden_dim: int = 32,
         learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
         seed: Optional[int] = None,
+        evaluator_interval: Optional[dict] = None,
     ):
         """Initialise the system
 
@@ -184,6 +185,12 @@ class QMIX(MADQN):
             learning_rate_scheduler_fn: function/class that takes in a trainer step t
                 and returns the current learning rate.
             seed: seed for reproducible sampling (for epsilon greedy action selection).
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         self._mixer = mixer
@@ -226,6 +233,7 @@ class QMIX(MADQN):
             eval_loop_fn=eval_loop_fn,
             train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
+            evaluator_interval=evaluator_interval,
             exploration_scheduler_fn=exploration_scheduler_fn,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             seed=seed,
@@ -258,6 +266,7 @@ class QMIX(MADQN):
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                evaluator_interval=evaluator_interval,
                 learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             ),
             trainer_fn=trainer_fn,

@@ -67,6 +67,7 @@ class MAPPOConfig:
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         replay_table_name: string indicating what name to give the replay table.
+        evaluator_interval: intervals that evaluator are run at.
         learning_rate_scheduler_fn: function/class that takes in a trainer step t
                 and returns the current learning rate.
     """
@@ -91,6 +92,7 @@ class MAPPOConfig:
     checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     learning_rate_scheduler_fn: Optional[Any] = None
+    evaluator_interval: Optional[dict] = None
 
 
 class MAPPOBuilder:
@@ -211,17 +213,20 @@ class MAPPOBuilder:
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
+        evaluator: bool = False,
     ) -> core.Executor:
 
         """Create an executor instance.
 
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            policy_networks: policy networks for each agent in
                 the system.
-            adder (Optional[adders.ParallelAdder], optional): adder to send data to
+            adder : adder to send data to
                 a replay buffer. Defaults to None.
             variable_source (Optional[core.VariableSource], optional): variables server.
                 Defaults to None.
+            evaluator: boolean indicator if the executor is used for
+                for evaluation only.
 
         Returns:
             core.Executor: system executor, a collection of agents making up the part
@@ -254,6 +259,8 @@ class MAPPOBuilder:
             agent_net_keys=self._config.agent_net_keys,
             variable_client=variable_client,
             adder=adder,
+            evaluator=evaluator,
+            interval=self._config.evaluator_interval if evaluator else None,
         )
 
     def make_trainer(

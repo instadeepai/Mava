@@ -97,6 +97,7 @@ class MADQN:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        evaluator_interval: Optional[dict] = None,
         learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
         seed: Optional[int] = None,
     ):
@@ -171,9 +172,15 @@ class MADQN:
             learning_rate_scheduler_fn : function/class that takes in a trainer step t
                 and returns the current learning rate.
             seed: seed for reproducible sampling (used for epsilon greedy action selection).
-
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         Raises:
             ValueError: [description]
+
         """
 
         if not environment_spec:
@@ -217,6 +224,7 @@ class MADQN:
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
         self._checkpoint_minute_interval = checkpoint_minute_interval
         self._seed = seed
+        self._evaluator_interval = evaluator_interval
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
@@ -275,6 +283,7 @@ class MADQN:
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                evaluator_interval=evaluator_interval,
                 learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             ),
             trainer_fn=trainer_fn,
@@ -487,6 +496,7 @@ class MADQN:
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
             trainer=trainer,
+            evaluator=False,
             exploration_schedules=self._exploration_scheduler_fn[
                 f"executor_{executor_id}"
             ],

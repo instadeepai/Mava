@@ -154,7 +154,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         return self._environment.agent_iter(max_iter)
 
     def _convert_observation(
-        self, agent: str, observe: Union[dict, np.ndarray], done: bool
+        self, agent: str, observe: Union[Dict, np.ndarray], done: bool
     ) -> types.OLT:
         """Convert PettingZoo observation so it's dm_env compatible.
 
@@ -167,31 +167,32 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
             types.OLT: dm olt.
         """
 
-        legals: np.ndarray = None
-        observation: np.ndarray = None
+        legals: Optional[np.ndarray] = None
+        observation: Optional[np.ndarray] = None
 
         if isinstance(observe, dict) and "action_mask" in observe:
             legals = observe["action_mask"]
             observation = observe["observation"]
-        else:
+        elif isinstance(observe, np.ndarray):
             legals = np.ones(
                 self._environment.action_spaces[agent].shape,
                 dtype=self._environment.action_spaces[agent].dtype,
             )
             observation = observe
-        if observation.dtype == np.int8:
-            observation = np.dtype(np.float32).type(
+
+        if observation is not None and observation.dtype == np.int8:
+            observation = np.dtype(np.float32).type(  # type: ignore
                 observation
             )  # observation is not expected to be int8
-        if legals.dtype == np.int8:
-            legals = np.dtype(np.int64).type(legals)
+        if legals is not None and legals.dtype == np.int8:
+            legals = np.dtype(np.int64).type(legals)  # type: ignore
 
-        observation = types.OLT(
+        observation_olt = types.OLT(
             observation=observation,
             legal_actions=legals,
             terminal=np.asarray([done], dtype=np.float32),
         )
-        return observation
+        return observation_olt
 
     # TODO improve this function.
     def correct_agent_name(self) -> None:

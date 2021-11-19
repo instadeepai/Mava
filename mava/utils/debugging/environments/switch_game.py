@@ -62,7 +62,7 @@ class MultiAgentSwitchGame(gym.Env):
     def step(
         self, action_n: Dict[str, int]
     ) -> Tuple[
-        Dict[str, Union[np.array, Any]],
+        Dict[str, Union[np.ndarray, Any]],
         Union[dict, Dict[str, Union[float, Any]]],
         Dict[str, Any],
         Dict[str, dict],
@@ -76,7 +76,9 @@ class MultiAgentSwitchGame(gym.Env):
 
         # advance world state
         self.agent_history.append(self.selected_agent)
-        self.seen_all = np.unique(self.agent_history).shape[0] == self.num_agents
+        self.seen_all = (
+            np.unique(self.agent_history).shape[0] == self.num_agents  # type:ignore
+        )
         if action_n[selected_agent_id] == 1:
             self.env_done = True
             self.tell = True
@@ -99,7 +101,7 @@ class MultiAgentSwitchGame(gym.Env):
 
         return obs_n, reward_n, done_n, {}
 
-    def reset(self) -> Dict[str, np.array]:
+    def reset(self) -> Dict[str, np.ndarray]:
         # reset world
         self.agent_history: List[int] = []
         self.n_seen = 0
@@ -107,7 +109,7 @@ class MultiAgentSwitchGame(gym.Env):
         self.tell = False
 
         self._agent_order = np.array([0])
-        while len(np.unique(self._agent_order)) < self.num_agents:
+        while len(np.unique(self._agent_order)) < self.num_agents:  # type:ignore
             self._agent_order = np.random.randint(0, self.num_agents, (self.max_time,))
 
         self.selected_agent = self._agent_order[0]
@@ -124,7 +126,7 @@ class MultiAgentSwitchGame(gym.Env):
         return {}
 
     # get observation for a particular agent
-    def _get_obs(self, a_i: int, agent_id: str) -> np.array:
+    def _get_obs(self, a_i: int, agent_id: str) -> np.ndarray:
         selected = 1.0 if a_i == self.selected_agent else 0.0
         return np.array([selected, a_i], dtype=np.float32)
 
@@ -134,7 +136,7 @@ class MultiAgentSwitchGame(gym.Env):
         return self.env_done
 
     # get reward for a particular agent
-    def _get_reward(self, a_i: int, agent_id: str) -> float:
+    def _get_reward(self, a_i: int, agent_id: str) -> np.ndarray:
         if not self.env_done:
             return np.array(0.0, dtype=np.float32)
         return (

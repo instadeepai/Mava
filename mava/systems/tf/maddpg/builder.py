@@ -91,7 +91,11 @@ class MADDPGConfig:
                 e.g. {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
                 See
                 examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
-                for an example."""
+                for an example.
+        evaluator_interval: An optional condition that is used to
+            evaluate/test system performance after [evaluator_interval]
+            condition has been met.
+    """
 
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
@@ -124,6 +128,7 @@ class MADDPGConfig:
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     termination_condition: Optional[Dict[str, int]] = None
+    evaluator_interval: Optional[dict] = None
     learning_rate_scheduler_fn: Optional[Any] = None
 
 
@@ -424,11 +429,11 @@ class MADDPGBuilder:
 
     def make_executor(
         self,
-        # executor_id: str,
         networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[MavaVariableSource] = None,
+        evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -439,6 +444,8 @@ class MADDPGBuilder:
                 a replay buffer. Defaults to None.
             variable_source: variables server.
                 Defaults to None.
+            evaluator: boolean indicator if the executor is used for
+                for evaluation only.
         Returns:
             system executor, a collection of agents making up the part
                 of the system generating data by interacting the environment.
@@ -488,6 +495,8 @@ class MADDPGBuilder:
             network_sampling_setup=self._config.network_sampling_setup,
             variable_client=variable_client,
             adder=adder,
+            evaluator=evaluator,
+            interval=self._config.evaluator_interval if evaluator else None,
         )
 
     def make_trainer(

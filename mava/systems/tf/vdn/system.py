@@ -86,6 +86,7 @@ class VDN(MADQN):
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        evaluator_interval: Optional[dict] = None,
         learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
         seed: Optional[int] = None,
     ):
@@ -168,6 +169,12 @@ class VDN(MADQN):
             learning_rate_scheduler_fn: function/class that takes in a trainer step t
                 and returns the current learning rate.
             seed: seed for reproducible sampling (for epsilon greedy action selection).
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         self._mixer = mixer
@@ -203,6 +210,7 @@ class VDN(MADQN):
             exploration_scheduler_fn=exploration_scheduler_fn,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             seed=seed,
+            evaluator_interval=evaluator_interval,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
@@ -232,6 +240,7 @@ class VDN(MADQN):
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                evaluator_interval=evaluator_interval,
                 learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             ),
             trainer_fn=trainer_fn,

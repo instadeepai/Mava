@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Dict, Tuple
 
 import dm_env
 import gym
@@ -36,7 +36,7 @@ class RoboCupWrapper(SpecWrapper):
 
         super().__init__(environment.num_players)
 
-    def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
+    def reset(self) -> Tuple[dm_env.TimeStep, Dict[str, np.ndarray]]:
         """Resets the episode."""
         self._reset_next_step = False
         raw_obs, _, state = self._environment.reset()
@@ -45,7 +45,9 @@ class RoboCupWrapper(SpecWrapper):
         timestep = dm_env.restart(proc_obs)
         return timestep, {"env_state": proccessed_state}
 
-    def step(self, nn_actions: types.NestedArray) -> Tuple[dm_env.TimeStep, np.array]:
+    def step(
+        self, nn_actions: types.NestedArray
+    ) -> Tuple[dm_env.TimeStep, Dict[str, np.ndarray]]:
         """Steps the environment."""
         if self._reset_next_step:
             return self.reset()

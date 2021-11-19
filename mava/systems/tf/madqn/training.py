@@ -245,8 +245,8 @@ class MADQNTrainer(mava.Trainer):
 
     def _get_feed(
         self,
-        o_tm1_trans: Dict[str, np.ndarray],
-        o_t_trans: Dict[str, np.ndarray],
+        o_tm1_trans: Dict[str, mava_types.OLT],
+        o_t_trans: Dict[str, mava_types.OLT],
         a_tm1: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:

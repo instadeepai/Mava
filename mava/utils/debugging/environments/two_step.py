@@ -50,7 +50,7 @@ class TwoStepEnv(gym.Env):
 
     def reset(
         self,
-    ) -> Tuple[Dict[str, Union[np.array, Any]], Dict[str, Any]]:
+    ) -> Tuple[Dict[str, Union[np.ndarray, Any]], Dict[str, Any]]:
         self.state = 0
         self.reward_n = {
             "agent_0": np.array(0.0, dtype=np.float32),
@@ -67,7 +67,7 @@ class TwoStepEnv(gym.Env):
     def step(
         self, action_n: Dict[str, int]
     ) -> Tuple[
-        Dict[str, Union[np.array, Any]],
+        Dict[str, Union[np.ndarray, Any]],
         Union[dict, Dict[str, Union[float, Any]]],
         Dict[str, Any],
         Dict[str, Any],

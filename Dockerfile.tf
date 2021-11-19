@@ -16,6 +16,8 @@ ENV TF_CPP_MIN_LOG_LEVEL=3
 COPY . /home/app/mava
 RUN python -m pip uninstall -y enum34
 RUN python -m pip install --upgrade pip
+# For box2d
+RUN apt-get install swig -y
 ## Install core dependencies.
 RUN python -m pip install -e .[tf,reverb,launchpad]
 ## Optional install for screen recording.
