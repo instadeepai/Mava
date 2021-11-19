@@ -21,7 +21,7 @@ set -x
 python --version
 
 # Set up a virtual environment.
-apt install -y python3-venv
+apt-get install -y python3-venv
 python -m venv mava_testing
 source mava_testing/bin/activate
 
