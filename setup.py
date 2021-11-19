@@ -54,7 +54,7 @@ testing_formatting_requirements = [
     "pre-commit",
     "mypy==0.910",
     "pytest-xdist",
-    "flake8==4.0.1",
+    "flake8==3.8.2",
     "black==21.4b1",
     "pytest-cov",
     "interrogate",
@@ -102,7 +102,7 @@ setup(
         "pillow",
         "matplotlib",
         "dataclasses",
-        "Box2D",
+        "box2d-py",
         "gym",
     ],
     extras_require={

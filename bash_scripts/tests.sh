@@ -38,9 +38,6 @@ pip uninstall -y enum34
 # For smac
 apt-get -y install git
 
-# For box2d
-apt-get install swig -y
-
 # Install depedencies
 pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
 
