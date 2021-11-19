@@ -29,10 +29,6 @@ try:
 except ModuleNotFoundError:
     pass
 
-try:
-    from supersuit import black_death_v2
-except ImportError:
-    pass
 
 from mava import types
 from mava.utils.sort_utils import sort_str_num
@@ -56,7 +52,8 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         Args:
             environment (AECEnv): sequential PZ env.
             env_preprocess_wrappers (Optional[List], optional): Wrappers
-                that preprocess envs. Format (env_preprocessor, dict_with_preprocessor_params).
+                that preprocess envs.
+                Format (env_preprocessor, dict_with_preprocessor_params).
         """
         self._environment = environment
         self._reset_next_step = True
@@ -374,7 +371,8 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
         Args:
             environment (ParallelEnv): parallel PZ env.
             env_preprocess_wrappers (Optional[List], optional): Wrappers
-                that preprocess envs. Format (env_preprocessor, dict_with_preprocessor_params).
+                that preprocess envs.
+                Format (env_preprocessor, dict_with_preprocessor_params).
         """
         self._environment = environment
         self._reset_next_step = True

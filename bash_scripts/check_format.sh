@@ -35,6 +35,9 @@ source mava_testing/bin/activate
 # Fix module 'enum' has no attribute 'IntFlag' for py3.6
 pip uninstall -y enum34
 
+# For box2d
+apt-get install swig -y
+
 pip install .[testing_formatting]
 # Check code follows black formatting.
 black --check .
@@ -44,7 +47,7 @@ flake8 mava  --count --select=E9,F63,F7,F82 --ignore=C901 --show-source --statis
 flake8 mava --count --exit-zero --statistics
 
 # Check types.
-mypy --exclude '(docs|build)/$' .
+mypy mava
 
 # Check docstring code coverage.
 interrogate -c pyproject.toml
