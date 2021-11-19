@@ -21,6 +21,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Format code
         run: |
+          # Fix module 'enum' has no attribute 'IntFlag' for py3.6
+          pip uninstall -y enum34
           pip install .[testing_formatting]
           # Check code follows black formatting.
           black --check .
