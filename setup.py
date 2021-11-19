@@ -104,7 +104,6 @@ setup(
         "dataclasses",
         "Box2D",
         "gym",
-        "swig",
     ],
     extras_require={
         "tf": tf_requirements,
