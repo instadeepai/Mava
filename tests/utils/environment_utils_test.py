@@ -18,21 +18,26 @@ import numpy as np
 import pytest
 
 from mava.utils.environments import debugging_utils, pettingzoo_utils, smac_utils
-from mava.utils.environments.flatland_utils import flatland_env_factory
 
 try:
     from flatland.envs.observations import TreeObsForRailEnv
     from flatland.envs.rail_generators import sparse_rail_generator
     from flatland.envs.schedule_generators import sparse_schedule_generator
-except ModuleNotFoundError:
+
+    from mava.utils.environments.flatland_utils import flatland_env_factory
+
+    _has_flatland = True
+except (ModuleNotFoundError, ImportError):
+    _has_flatland = False
     pass
 
-rail_gen_cfg: Dict = {
-    "max_num_cities": 4,
-    "max_rails_between_cities": 2,
-    "max_rails_in_city": 3,
-    "grid_mode": True,
-}
+if _has_flatland:
+    rail_gen_cfg: Dict = {
+        "max_num_cities": 4,
+        "max_rails_between_cities": 2,
+        "max_rails_in_city": 3,
+        "grid_mode": True,
+    }
 
 
 @pytest.mark.parametrize(
@@ -53,7 +58,9 @@ rail_gen_cfg: Dict = {
                     "obs_builder_object": TreeObsForRailEnv(max_depth=2),
                 }
             },
-        ),
+        )
+        if _has_flatland
+        else None,
         # This requires install sc2 and setting SC2Path,
         # we don't do this for the tests on CI, only when testing locally,
         # so commented out.
@@ -67,6 +74,9 @@ class TestEnvUtils:
         Args:
             env_factory (Any): env factory.
         """
+        if env is None:
+            pytest.skip()
+
         test_seed = 42
         env_factory, env_params = env
 
@@ -98,12 +108,16 @@ class TestEnvUtils:
         Args:
             env_factory (Any): env factory.
         """
+        if env is None:
+            pytest.skip()
+
         env_factory, env_params = env
 
         # This test doesn't work with flatland and SC2, since FL uses
         # a default seed (1) and SC2 (5), even when a seed is not provided.
         if (
-            env_factory == flatland_env_factory
+            _has_flatland
+            and env_factory == flatland_env_factory
             or env_factory == smac_utils.make_environment
         ):
             pytest.skip("Skipping no seed test for flatland and SC2.")
@@ -136,13 +150,15 @@ class TestEnvUtils:
         Args:
             env_factory (Any): env factory.
         """
+        if env is None:
+            pytest.skip()
         env_factory, env_params = env
         test_seed1 = 42
         test_seed2 = 43
 
         # This test doesn't work with flatland, since FL seeds
         # at ini for SparseRailGen .
-        if env_factory == flatland_env_factory:
+        if _has_flatland and env_factory == flatland_env_factory:
             pytest.skip("Skipping diff seed test for flatland.")
 
         wrapped_env = env_factory(random_seed=test_seed1, **env_params)

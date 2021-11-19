@@ -27,28 +27,29 @@ except (ModuleNotFoundError, ImportError):
     _has_flatland = False
     pass
 
-if _has_flatland:
 
-    def load_flatland_env(env_config: Dict[str, Any]) -> RailEnv:
-        """Loads a flatland environment given a config dict. Also, the possible agents in the
-        environment are set"""
-
+def load_flatland_env(env_config: Dict[str, Any]) -> "RailEnv":
+    """Loads a flatland environment given a config dict. Also, the possible agents in the
+    environment are set"""
+    if _has_flatland:
         env = RailEnv(**env_config)
         env.possible_agents = env.agents[:]
+    else:
+        raise Exception("Flatland is not installed.")
+    return env
 
-        return env
 
-    def flatland_env_factory(
-        evaluation: bool = False,
-        env_config: Dict[str, Any] = {},
-        preprocessor: Callable[
-            [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
-        ] = None,
-        include_agent_info: bool = False,
-        random_seed: Optional[int] = None,
-    ) -> FlatlandEnvWrapper:
-        """Loads a flatand environment and wraps it using the flatland wrapper"""
-
+def flatland_env_factory(
+    evaluation: bool = False,
+    env_config: Dict[str, Any] = {},
+    preprocessor: Callable[
+        [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
+    ] = None,
+    include_agent_info: bool = False,
+    random_seed: Optional[int] = None,
+) -> "FlatlandEnvWrapper":
+    """Loads a flatand environment and wraps it using the flatland wrapper"""
+    if _has_flatland:
         del evaluation  # since it has same behaviour for both train and eval
 
         env = load_flatland_env(env_config)
@@ -56,5 +57,6 @@ if _has_flatland:
 
         if random_seed and hasattr(wrapped_env, "seed"):
             wrapped_env.seed(random_seed)
-
-        return wrapped_env
+    else:
+        raise Exception("Flatland is not installed.")
+    return wrapped_env

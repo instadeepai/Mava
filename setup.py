@@ -32,7 +32,7 @@ reverb_requirements = [
 ]
 
 tf_requirements = [
-    "tensorflow>=2.6.0,<2.8.0",
+    "tensorflow~=2.7.0",
     "tensorflow_probability~=0.14.1",
     "dm-sonnet",
     "trfl",
@@ -48,6 +48,7 @@ pettingzoo_requirements = [
 
 launchpad_requirements = ["dm-launchpad~=0.3.2"]
 
+smac_requirements = ["pysc2", "SMAC @ git+https://github.com/oxwhirl/smac.git"]
 testing_formatting_requirements = [
     "pytest==6.2.4",
     "pre-commit",
@@ -113,6 +114,8 @@ setup(
         "launchpad": launchpad_requirements,
         "testing_formatting": testing_formatting_requirements,
         "record_episode": record_episode_requirements,
+        "sc2": smac_requirements,
+        "envs": pettingzoo_requirements + open_spiel_requirements + smac_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

@@ -21,14 +21,15 @@ except ModuleNotFoundError:
     _has_open_spiel = False
     pass
 
-if _has_open_spiel:
 
-    def load_open_spiel_env(game_name: str) -> "rl_environment.Environment":
-        """Loads an open spiel environment given a game name Also, the possible agents in the
-        environment are set"""
-
+def load_open_spiel_env(game_name: str) -> "rl_environment.Environment":
+    """Loads an open spiel environment given a game name Also, the possible agents in the
+    environment are set"""
+    if _has_open_spiel:
         env = rl_environment.Environment(game_name)
         env.agents = [f"player_{i}" for i in range(env.num_players)]
         env.possible_agents = env.agents[:]
+    else:
+        raise Exception("Openspiel is not installed.")
 
-        return env
+    return env

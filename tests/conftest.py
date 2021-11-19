@@ -27,18 +27,28 @@ try:
     from flatland.envs.observations import TreeObsForRailEnv
     from flatland.envs.rail_generators import sparse_rail_generator
     from flatland.envs.schedule_generators import sparse_schedule_generator
+
+    _has_flatland = True
+except ModuleNotFoundError:
+    _has_flatland = False
+try:
+    from pettingzoo.utils.env import AECEnv, ParallelEnv
 except ModuleNotFoundError:
     pass
-from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
 from mava.types import Observation, Reward
-from mava.utils.environments.flatland_utils import load_flatland_env
-from mava.utils.environments.open_spiel_utils import load_open_spiel_env
+
+try:
+    if _has_flatland:
+        from mava.utils.environments.flatland_utils import load_flatland_env
+        from mava.wrappers.flatland import FlatlandEnvWrapper
+    from mava.utils.environments.open_spiel_utils import load_open_spiel_env
+    from mava.wrappers.open_spiel import OpenSpielSequentialWrapper
+except ImportError:
+    pass
 from mava.utils.wrapper_utils import convert_np_type
-from mava.wrappers.flatland import FlatlandEnvWrapper
-from mava.wrappers.open_spiel import OpenSpielSequentialWrapper
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
@@ -51,23 +61,24 @@ from tests.mocks import (
     SequentialMADiscreteEnvironment,
 )
 
-# flatland environment config
-rail_gen_cfg: Dict = {
-    "max_num_cities": 4,
-    "max_rails_between_cities": 2,
-    "max_rails_in_city": 3,
-    "grid_mode": True,
-    "seed": 42,
-}
+if _has_flatland:
+    # flatland environment config
+    rail_gen_cfg: Dict = {
+        "max_num_cities": 4,
+        "max_rails_between_cities": 2,
+        "max_rails_in_city": 3,
+        "grid_mode": True,
+        "seed": 42,
+    }
 
-flatland_env_config: Dict = {
-    "number_of_agents": 2,
-    "width": 25,
-    "height": 25,
-    "rail_generator": sparse_rail_generator(**rail_gen_cfg),
-    "schedule_generator": sparse_schedule_generator(),
-    "obs_builder_object": TreeObsForRailEnv(max_depth=2),
-}
+    flatland_env_config: Dict = {
+        "number_of_agents": 2,
+        "width": 25,
+        "height": 25,
+        "rail_generator": sparse_rail_generator(**rail_gen_cfg),
+        "schedule_generator": sparse_schedule_generator(),
+        "obs_builder_object": TreeObsForRailEnv(max_depth=2),
+    }
 
 
 """
@@ -219,7 +230,6 @@ class Helpers:
             wrapper_func = Helpers.get_wrapper_function(env_spec)
             wrapped_env = wrapper_func(env, **kwargs)
             specs = Helpers.get_pz_env_spec(wrapped_env)._specs
-        wrapped_env.reset()  # type : ignore
         return wrapped_env, specs
 
     # Returns a petting zoo environment spec.

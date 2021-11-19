@@ -17,11 +17,7 @@
     sudo apt-get install ffmpeg libsm6 libxext6  -y
     ```
 
-3. **Optional**: To install [CUDA toolkit](https://docs.nvidia.com/cuda/) for NVIDIA GPU support, download [here](https://anaconda.org/anaconda/cudatoolkit). Alternatively, for anaconda users:
-
-    ```bash
-    conda install -c anaconda cudatoolkit
-    ```
+3. **Optional**: For GPU support (**only required outside of docker**), follow NVIDIA's cuda download [instructions](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html) or download cudatoolkit through [anaconda](https://anaconda.org/anaconda/cudatoolkit).
 
 4. **Optional**: To log episodes in video/gif format, using the `Monitor` wrapper.
 - Install `xvfb` to run a headless/fake screen and `ffmpeg` to record video.

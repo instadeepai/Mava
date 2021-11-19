@@ -373,7 +373,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
             counts = self._executor._counts
         else:
             counts = self._counter.get_counts()
-        counter = counts.get(self._counter_str)
+        counter = int(counts.get(self._counter_str))
         path = f"{self._path}/{self._filename}_{counter}_eval_episode"
         try:
             if self._format == "video":

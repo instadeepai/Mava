@@ -21,7 +21,10 @@ import dm_env
 
 try:
     from smac.env import StarCraft2Env
+
+    _has_smac = True
 except ModuleNotFoundError:
+    _has_smac = False
     pass
 from mava.wrappers import SMACEnvWrapper  # type:ignore
 
@@ -29,10 +32,11 @@ from mava.wrappers import SMACEnvWrapper  # type:ignore
 def load_smac_env(env_config: Dict[str, Any]) -> "StarCraft2Env":
     """Loads a smac environment given a config dict. Also, the possible agents in the
     environment are set"""
-
-    env = StarCraft2Env(**env_config)
-    env.possible_agents = list(range(env.n_agents))
-
+    if _has_smac:
+        env = StarCraft2Env(**env_config)
+        env.possible_agents = list(range(env.n_agents))
+    else:
+        raise Exception("Smac is not installed.")
     return env
 
 
@@ -50,11 +54,13 @@ def make_environment(
     Returns:
         A starcraft 2 smac environment wrapped as a DeepMind environment.
     """
-    del evaluation
+    if _has_smac:
+        del evaluation
 
-    env = StarCraft2Env(map_name=map_name, seed=random_seed, **kwargs)
+        env = StarCraft2Env(map_name=map_name, seed=random_seed, **kwargs)
 
-    # wrap starcraft 2 environment
-    environment = SMACEnvWrapper(env)
-
+        # wrap starcraft 2 environment
+        environment = SMACEnvWrapper(env)
+    else:
+        raise Exception("Smac is not installed.")
     return environment

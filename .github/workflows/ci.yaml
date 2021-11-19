@@ -19,47 +19,9 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          export PIP_DEFAULT_TIMEOUT=100
-          # Ensure encoding consistency
-          export LC_ALL=en_US.UTF-8
-          export LANG=en_US.UTF-8
-
-          # Updates
-          pip uninstall -y enum34
-          pip install --upgrade pip setuptools
-          sudo apt-get update
-
-          ## Open CV and Headless screen.
-          sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
-
-          ## To install smac below
-          sudo apt-get install git -y
-
-          ## To install open_spiel below
-          sudo apt-get install clang -y
-
-          # Mava dependencies
-          pip install .
-          pip install .[flatland]
-
-          # openspiel
-          pip install .[open_spiel]
-          pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
-
-          # For atari envs
-          sudo apt-get install unrar
-          pip install autorom
-          AutoROM -v
-
-          ## Fix module 'enum' has no attribute 'IntFlag'
-          pip uninstall -y enum34
-
-          # SC2
-          pip install git+https://github.com/oxwhirl/smac.git
       - name: Format code
         run: |
+          pip install .[testing_formatting]
           # Check code follows black formatting.
           black --check .
           # stop the build if there are Python syntax errors or undefined names
@@ -71,7 +33,7 @@ jobs:
           mypy --exclude '(docs|build)/$' .
       - name: Test with pytest and get code coverage
         run: |
-          pytest  -n "$(grep -c ^processor /proc/cpuinfo)" tests --ignore-glob="*/*system_test.py"
+          ./bash_scripts/run_tests.sh
       - name: Check docstring code coverage
         run: |
           interrogate -c pyproject.toml

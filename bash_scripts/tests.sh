@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 # Bash settings: fail on any error and display all commands being run.
 set -e
 set -x
@@ -22,21 +21,26 @@ set -x
 python --version
 
 # Set up a virtual environment.
+apt install -y python3-venv
 python -m venv mava_testing
 source mava_testing/bin/activate
 
 # Install dependencies.
 pip install --upgrade pip setuptools
 pip --version
+# For smac
+apt-get -y install git
 pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
+
+# For atari envs
+apt-get install unrar
+pip install autorom
+AutoROM -v
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
-# Run static type-checking.
-mypy mava
-
-# Run all tests.
-pytest -n "${N_CPU}" tests
+# Run all unit tests (non integration tests).
+pytest -n "${N_CPU}" tests --ignore-glob="*/*system_test.py"
 
 # Clean-up.
 deactivate
