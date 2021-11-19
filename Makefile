@@ -59,6 +59,9 @@ bash:
 run-tests:
 	$(DOCKER_RUN) /bin/bash bash_scripts/tests.sh
 
+run-integration-tests:
+	$(DOCKER_RUN) /bin/bash bash_scripts/tests.sh true
+
 push:
 	docker login
 	-docker push $(IMAGE)

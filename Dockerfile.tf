@@ -33,7 +33,7 @@ RUN python -m pip install -e .[pz]
 # PettingZoo Atari envs
 RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6  -y
-RUN apt-get install unrar
+RUN apt-get install unrar-free
 RUN python -m pip install autorom
 RUN AutoROM -v
 ##########################################################

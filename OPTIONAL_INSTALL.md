@@ -5,9 +5,9 @@
    ```
    Then follow the on-screen instructions.
 
-   You might also need to download unrar:
+   You might also need to download unrar-free:
    ```
-   sudo apt-get install unrar
+   sudo apt-get install unrar-free
    ```
 
 

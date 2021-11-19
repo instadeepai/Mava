@@ -17,6 +17,8 @@
 set -e
 set -x
 
+integration=$1
+
 # Update
 apt-get update
 
@@ -38,6 +40,9 @@ pip uninstall -y enum34
 # For smac
 apt-get -y install git
 
+# For box2d
+apt-get install swig -y
+
 # Install depedencies
 pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
 
@@ -48,8 +53,13 @@ AutoROM -v
 
 N_CPU=$(grep -c ^processor /proc/cpuinfo)
 
-# Run all unit tests (non integration tests).
-pytest -n "${N_CPU}" tests --ignore-glob="*/*system_test.py"
+if [ "$integration" = "true" ]; then \
+    # Run all tests
+    pytest -n "${N_CPU}" tests ;
+else
+    # Run all unit tests (non integration tests).
+    pytest -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
+fi
 
 # Clean-up.
 deactivate
