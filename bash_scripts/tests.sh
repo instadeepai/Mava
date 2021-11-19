@@ -40,7 +40,7 @@ apt-get -y install git
 pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
 
 # For atari envs
-apt-get install unrar
+apt-get install unrar-free
 pip install autorom
 AutoROM -v
 
