@@ -11,8 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
+      fail-fast: false
       matrix:
-        docker-image: ["python:3.7", "python:3.8", "python:3.9"]
+        docker-image: ["python:3.6","python:3.7","python:3.8"]
     steps:
     - name: Checkout mava
       uses: actions/checkout@v2
