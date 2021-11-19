@@ -33,7 +33,7 @@ jobs:
           mypy --exclude '(docs|build)/$' .
       - name: Test with pytest and get code coverage
         run: |
-          ./bash_scripts/run_tests.sh
+          ./bash_scripts/tests.sh
       - name: Check docstring code coverage
         run: |
           interrogate -c pyproject.toml
