@@ -21,7 +21,8 @@ set -x
 python --version
 
 # Set up a virtual environment.
-apt-get install -y python3-venv
+apt-get install sudo -y
+sudo apt-get install -y python3-venv
 python -m venv mava_testing
 source mava_testing/bin/activate
 
@@ -29,11 +30,11 @@ source mava_testing/bin/activate
 pip install --upgrade pip setuptools
 pip --version
 # For smac
-apt-get -y install git
+sudo apt-get -y install git
 pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
 
 # For atari envs
-apt-get install unrar
+sudo apt-get install unrar
 pip install autorom
 AutoROM -v
 
