@@ -8,7 +8,7 @@ on:
 
 jobs:
   test-ubuntu:
-    runs-on: onprem
+    runs-on: self-hosted
     timeout-minutes: 45
     strategy:
       matrix:
