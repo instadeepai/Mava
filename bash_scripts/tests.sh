@@ -24,8 +24,7 @@ python --version
 pip uninstall -y enum34
 
 # Set up a virtual environment.
-apt-get install sudo -y
-sudo apt-get install -y python3-venv
+apt-get install -y python3-venv
 python -m venv mava_testing
 source mava_testing/bin/activate
 
@@ -34,11 +33,11 @@ pip install --upgrade pip setuptools
 pip --version
 
 # For smac
-sudo apt-get -y install git
+apt-get -y install git
 pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
 
 # For atari envs
-sudo apt-get install unrar
+apt-get install unrar
 pip install autorom
 AutoROM -v
 
