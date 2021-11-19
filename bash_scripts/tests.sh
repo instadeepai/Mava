@@ -20,14 +20,16 @@ set -x
 # Python must be 3.6 or higher.
 python --version
 
-# Set up a virtual environment.
-apt-get install -y python3-venv
-python -m venv mava_testing
-source mava_testing/bin/activate
-
 # Install dependencies.
 pip install --upgrade pip setuptools
 pip --version
+
+# Set up a virtual environment.
+pip install virtualenv
+python -m venv mava_testing
+source mava_testing/bin/activate
+
+
 
 # Fix module 'enum' has no attribute 'IntFlag' for py3.6
 pip uninstall -y enum34
