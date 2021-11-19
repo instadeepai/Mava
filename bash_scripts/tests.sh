@@ -26,10 +26,8 @@ pip --version
 
 # Set up a virtual environment.
 pip install virtualenv
-python -m venv mava_testing
+virtualenv mava_testing
 source mava_testing/bin/activate
-
-
 
 # Fix module 'enum' has no attribute 'IntFlag' for py3.6
 pip uninstall -y enum34
