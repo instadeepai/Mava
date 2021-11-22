@@ -31,6 +31,9 @@ jobs:
           pip install --upgrade pip setuptools
           sudo apt-get update
 
+          # flatland fix
+          pip install pyparsing==3.0.3
+
           ## Open CV and Headless screen.
           sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
 
