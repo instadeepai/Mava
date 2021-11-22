@@ -37,12 +37,9 @@ except ModuleNotFoundError:
 
 def obs_preprocessor(observation: Dict[str, NestedArray]) -> np.ndarray:
     """Converts the observation to a single array
-
     Meltingpot observations come as Dictionary of Arrays
-
     Args:
         observation (Dict[str, np.ndarray]): Observation from environment
-
     Returns:
         np.ndarray: Processed observation
     """
@@ -58,7 +55,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         preprocessor: Callable[[Dict[str, NestedArray]], np.ndarray] = obs_preprocessor,
     ):
         """Constructor for Melting pot wrapper.
-
         Args:
             environment (Substrate or Scenario): Melting pot substrate or scenario.
             preprocessor (Callable[[Dict[str, NestedArray]], np.ndarray]): function that
@@ -69,7 +65,7 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         self._env_done = False
         self._num_agents = len(self._environment.action_spec())
         self._num_actions = self._environment.action_spec()[0].num_values
-        self._env_image: np.ndarray = None
+        self._env_image: Optional[np.ndarray] = None
         self._screen = None
         self._preprocessor = preprocessor
 
@@ -82,7 +78,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def reset(self) -> dm_env.TimeStep:
         """Resets the env.
-
         Returns:
             dm_env.TimeStep: dm timestep.
         """
@@ -96,9 +91,7 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def _set_env_image(self) -> None:
         """Sets an image of the environment from a timestep
-
         The image is from the observation key 'WORLD.RGB'
-
         """
         self._env_image = self._environment.observation()["WORLD.RGB"]
 
@@ -106,15 +99,12 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         self, observation: Dict[str, NestedArray], num_values: int, is_terminal: bool
     ) -> types.OLT:
         """Createa an OLT from a observation.
-
         It just computes the legal actions and terminal. All actions are legal and
         terminal is determined with timestep.last()
-
         Args:
             observation (TimeStep): the observation
             num_values (int): the number of actions
             is_terminal (bool): whether its a terminal observation
-
         Returns:
             types.OLT: observation, legal actions, and terminal
         """
@@ -130,15 +120,12 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         self, observation: List[Dict[str, NestedArray]], is_terminal: bool
     ) -> Dict[str, types.OLT]:
         """Observation list to dict
-
         Transforms a list of observations into a dictionary of observations
         with keys corresponding to the agent ids
-
         Args:
             observation (List[Dict[str, NestedArray]]): List observation
             is_terminal (bool): whether the observations corresponds to a
              terminal timestep
-
         Returns:
             Dict[str, types.OLT]: Dictionary of observations
         """
@@ -149,13 +136,10 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def _to_dict_rewards(self, rewards: List[NestedArray]) -> Dict[str, NestedArray]:
         """List of rewards to Dict of rewards
-
         Transforms a list of rewards to a dictionary of rewards with keys corresponding
         to the agent ids
-
         Args:
             rewards (List[NestedArray]): List of rewards
-
         Returns:
             Dict[str, NestedArray]: Dictionary of reward
         """
@@ -167,13 +151,10 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
         self, discounts: List[NestedArray]
     ) -> Dict[str, NestedArray]:
         """List of dicounts to Dict of discounts
-
         Transforms a list of discounts into a dictionary of discounts with keys
         corresponding to the agent ids
-
         Args:
             discounts (List[NestedArray]): List of discounts
-
         Returns:
             Dict[str, NestedArray]: Dictionary of discounts
         """
@@ -184,15 +165,12 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def _refine_timestep(self, timestep: dm_env.TimeStep) -> dm_env.TimeStep:
         """Converts a melting pot timestep into one compatiple with Mava
-
         The difference between the timestep from melting pot and that of Mava is
         that for the observation, reward, and discount, mava expects dictionaries
         with keys corresponding to the agent ids while melting pot simply uses a
         list for this.
-
         Args:
             timestep (dm_env.TimeStep): a timestep from melting pot
-
         Returns:
             dm_env.TimeStep: a timestep compatible with Mava
         """
@@ -204,10 +182,8 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps in env.
-
         Args:
             actions (Dict[str, np.ndarray]): actions per agent.
-
         Returns:
             dm_env.TimeStep: dm timestep
         """
@@ -276,7 +252,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def env_done(self) -> bool:
         """Check if env is done.
-
         Returns:
             bool: bool indicating if env is done.
         """
@@ -285,7 +260,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def observation_spec(self) -> types.Observation:
         """Observation spec.
-
         Returns:
             types.Observation: spec for environment.
         """
@@ -301,7 +275,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def action_spec(self) -> Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]:
         """Action spec.
-
         Returns:
             Dict[str, Union[specs.DiscreteArray, specs.BoundedArray]]: spec for actions.
         """
@@ -313,7 +286,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def reward_spec(self) -> Dict[str, specs.Array]:
         """Reward spec.
-
         Returns:
             Dict[str, specs.Array]: spec for rewards.
         """
@@ -323,7 +295,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
         """Discount spec.
-
         Returns:
             Dict[str, specs.BoundedArray]: spec for discounts.
         """
@@ -340,7 +311,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         """Extra data spec.
-
         Returns:
             Dict[str, specs.BoundedArray]: spec for extra data.
         """
@@ -349,7 +319,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
     @property
     def agents(self) -> List:
         """Agents still alive in env (not done).
-
         Returns:
             List: alive agents in env.
         """
@@ -358,7 +327,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
     @property
     def possible_agents(self) -> List:
         """All possible agents in env.
-
         Returns:
             List: all possible agents in env.
         """
@@ -367,7 +335,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
     @property
     def environment(self) -> Union[Substrate, Scenario]:
         """Returns the wrapped environment.
-
         Returns:
             ParallelEnv: parallel env.
         """
@@ -376,7 +343,6 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
     @property
     def current_agent(self) -> Any:
         """Current active agent.
-
         Returns:
             Any: current agent.
         """
@@ -384,10 +350,8 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def __getattr__(self, name: str) -> Any:
         """Expose any other attributes of the underlying environment.
-
         Args:
             name (str): attribute.
-
         Returns:
             Any: return attribute from env or underlying env.
         """
