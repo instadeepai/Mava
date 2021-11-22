@@ -348,14 +348,14 @@ class ParallelEnvironmentLoop(acme.core.Worker):
     ) -> None:
         pass
 
-    def get_counts(self) -> Any:
+    def get_counts(self) -> counting.Counter:
         if hasattr(self._executor, "_counts"):
             counts = self._executor._counts
         else:
             counts = self._counter.get_counts()
         return counts
 
-    def record_counts(self, episode_steps: int) -> Any:
+    def record_counts(self, episode_steps: int) -> counting.Counter:
         # Record counts.
         if hasattr(self._executor, "_counts"):
             loop_type = "evaluator" if self._executor._evaluator else "executor"
