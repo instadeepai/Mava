@@ -161,7 +161,7 @@ All modules in Mava aim to work in this way.
 
 ## Installation
 
-We have tested `mava` on Python 3.6, 3.7 and 3.8.
+We have tested `mava` on Python 3.7, 3.8 and 3.9.
 
 ### Docker (**Recommended**)
 
@@ -182,10 +182,16 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     ```
     make build version=pz
     ```
-    - SMAC: The StarCraft Multi-Agent Challenge Environments (*each build downloads and installs StarCraftII ~3.8G* ):
-    ```
-    make build version=sc2
-    ```
+    - SMAC: The StarCraft Multi-Agent Challenge Environments :
+
+        Install StarCraft II using a bash script, which is a slightly modified version of the script found [here][pymarl]:
+        ```
+        ./bash_scripts/install_sc2.sh
+        ```
+        Build Image
+        ```
+        make build version=sc2
+        ```
     - Flatland:
     ```
     make build version=flatland
@@ -236,7 +242,7 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     pip install --upgrade pip setuptools
     ```
 
-    1.1  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset , Tensorflow and [Launchpad](https://github.com/deepmind/launchpad) - for distributed agent support :
+2.  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset , Tensorflow and [Launchpad](https://github.com/deepmind/launchpad) - for distributed agent support :
 
     ```bash
     pip install id-mava[tf,reverb,launchpad]
@@ -272,14 +278,14 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
 
     - StarCraft II:
 
-    To install the environment, please run the provided bash script, which is a slightly modified version of the script found [here][pymarl].
-    ```bash
-    ./bash_scripts/install_sc2.sh
-    ```
-    Then set SC2PATH to the location of 3rdparty/StarCraftII, e.g. :
-    ```
-    export SC2PATH="/home/Documents/Code/3rdparty/StarCraftII"
-    ```
+        Install StarCraft II:
+        ```bash
+        ./bash_scripts/install_sc2.sh
+        ```
+        Then set SC2PATH to the location of 3rdparty/StarCraftII, e.g. :
+        ```
+        export SC2PATH="/home/Documents/Code/Mava/3rdparty/StarCraftII"
+        ```
 
 3. Run an example:
     ```
