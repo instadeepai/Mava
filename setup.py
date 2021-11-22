@@ -47,7 +47,7 @@ env_requirements = [
 ]
 
 launchpad_requirements = [
-    "dm-launchpad~=0.3.2",
+    "dm-launchpad~=0.3.1",
 ]
 
 testing_formatting_requirements = [
