@@ -58,7 +58,7 @@ if [ "$integration" = "true" ]; then \
     pytest -n "${N_CPU}" tests ;
 else
     # Run all unit tests (non integration tests).
-    pytest -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
+    pytest --durations=10 -n "${N_CPU}" tests --ignore-glob="*/*system_test.py" ;
 fi
 
 # Clean-up.

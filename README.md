@@ -179,9 +179,10 @@ We have tested `mava` on Python 3.7, 3.8 and 3.9.
 
     1.2 For **optional** environments:
     - PettingZoo:
-    ```
-    make build version=pz
-    ```
+        ```
+        make build version=pz
+        ```
+
     - SMAC: The StarCraft Multi-Agent Challenge Environments :
 
         Install StarCraft II using a bash script, which is a slightly modified version of the script found [here][pymarl]:
@@ -192,18 +193,29 @@ We have tested `mava` on Python 3.7, 3.8 and 3.9.
         ```
         make build version=sc2
         ```
+
     - Flatland:
-    ```
-    make build version=flatland
-    ```
+        ```
+        make build version=flatland
+        ```
     - 2D RoboCup environment
-    ```
-    make build version=robocup
-    ```
+        ```
+        make build version=robocup
+        ```
     - Openspiel
-    ```
-    make build version=openspiel
-    ```
+        ```
+        make build version=openspiel
+        ```
+    - MeltingPot
+
+        Download MeltingPot:
+        ```bash
+        git clone -b main https://github.com/deepmind/meltingpot
+        ```
+
+        ```bash
+        make build version=meltingpot
+        ```
 
     To allow for agent recordings, where agents evaluations are recorded and these recordings are stored in a `/recordings` folder:
     ```
@@ -242,49 +254,51 @@ We have tested `mava` on Python 3.7, 3.8 and 3.9.
     pip install --upgrade pip setuptools
     ```
 
-2.  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset , Tensorflow and [Launchpad](https://github.com/deepmind/launchpad) - for distributed agent support :
+    1.1  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset , Tensorflow and [Launchpad](https://github.com/deepmind/launchpad) - for distributed agent support :
 
-    Install swig for box2d
+    - Install swig for box2d:
+
     ```bash
     sudo apt-get install swig -y
     ```
 
-    Install core dependencies:
+    - Install core dependencies:
     ```bash
     pip install id-mava[tf,reverb,launchpad]
     ```
 
-    Or for the latest version of mava from source (**you can do this for all pip install commands below for the latest depedencies**):
+    - Or for the latest version of mava from source (**you can do this for all pip install commands below for the latest depedencies**):
+
     ```bash
     pip install git+https://github.com/instadeepai/Mava[tf,reverb,launchpad]
     ```
 
     1.2 For **optional** environments:
     - PettingZoo:
-    ```
-    pip install id-mava[pz]
-    ```
+        ```
+        pip install id-mava[pz]
+        ```
     - Flatland:
-    ```
-    pip install id-mava[flatland]
-    ```
-    - Openspiel
-    ```
-    pip install id-mava[open_spiel]
-    ```
+        ```
+        pip install id-mava[flatland]
+        ```
+    - Openspiel:
+        ```
+        pip install id-mava[open_spiel]
+        ```
     - 2D RoboCup environment:
 
-    A local install has only been tested using the Ubuntu 18.04 operating system.
-    The installation can be performed by running the RoboCup bash script while inside the Mava
-    python virtual environment.
+        A local install has only been tested using the Ubuntu 18.04 operating system.
+        The installation can be performed by running the RoboCup bash script while inside the Mava
+        python virtual environment.
 
-    ```bash
-    ./bash_scripts/install_robocup.sh
-    ```
+        ```bash
+        ./bash_scripts/install_robocup.sh
+        ```
 
     - StarCraft II:
 
-        Install StarCraft II:
+        First install StarCraft II
         ```bash
         ./bash_scripts/install_sc2.sh
         ```
@@ -293,7 +307,26 @@ We have tested `mava` on Python 3.7, 3.8 and 3.9.
         export SC2PATH="/home/Documents/Code/Mava/3rdparty/StarCraftII"
         ```
 
-3. Run an example:
+    - MeltingPot:
+
+        Download MeltingPot:
+        ```bash
+        git clone -b main https://github.com/deepmind/meltingpot
+        ```
+
+        Install MeltingPot:
+        ```bash
+        ./bash_scripts/install_meltingpot.sh
+        ```
+
+        Add MeltingPot to your python path:
+        ```bash
+        export PYTHONPATH="${PYTHONPATH}:${PWD}/meltingpot"
+        ```
+
+        If this fails, follow instructions [here](https://github.com/deepmind/meltingpot#installation).
+
+2. Run an example:
     ```
     python dir/to/example/example.py
     ```

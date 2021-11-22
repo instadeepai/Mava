@@ -1,13 +1,13 @@
-
-
-
-# Mava core tf image
+##########################################################
+# Core Mava-TF image
 FROM tensorflow/tensorflow:2.7.0-gpu as tf-core
+# Location of mava folder
+ARG folder=/home/app/mava
 # Flag to record agents
 ARG record
 RUN apt-get -y --fix-missing update
 ## working directory
-WORKDIR /home/app/mava
+WORKDIR ${folder}
 # Tensorflow gpu config.
 ENV TF_FORCE_GPU_ALLOW_GROWTH=true
 ENV CUDA_DEVICE_ORDER=PCI_BUS_ID
@@ -67,4 +67,13 @@ RUN ./bash_scripts/install_robocup.sh
 ## OpenSpiel Image
 FROM tf-core AS openspiel
 RUN pip install .[open_spiel]
+##########################################################
+
+##########################################################
+# MeltingPot Image
+FROM tf-core AS meltingpot
+# Install meltingpot
+RUN ./bash_scripts/install_meltingpot.sh
+# Add meltingpot to python path
+ENV PYTHONPATH "${PYTHONPATH}:${folder}/meltingpot"
 ##########################################################
