@@ -15,7 +15,7 @@
 
 """Wraps a meltingpot environment to be used as a dm_env environment in mava."""
 import os
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import dm_env
 import numpy as np
@@ -27,6 +27,7 @@ from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
 try:
     import pygame  # type: ignore
+
     from meltingpot.python.scenario import Scenario  # type: ignore
     from meltingpot.python.substrate import Substrate  # type: ignore
 except ModuleNotFoundError:
@@ -227,42 +228,43 @@ class MeltingpotEnvWrapper(ParallelEnvWrapper):
 
     def render(
         self, mode: str = "human", screen_width: int = 800, screen_height: int = 600
-    ) -> np.ndarray:
+    ) -> Optional[np.ndarray]:
         """Renders the environment in a pygame window or returns an image
-
         Args:
             mode (str, optional): mode for the display either rgb_array or human.
             Defaults to "human".
             screen_width (int, optional): the screen width. Defaults to 800.
             screen_height (int, optional): the screen height. Defaults to 600.
-
         Raises:
             ValueError: for invalid mode
-
         Returns:
             [np.ndarray]: an image array for mode, rgb_array
         """
-        image = self._env_image
-        height, width, _ = image.shape
-        scale = min(screen_height // height, screen_width // width)
-        if mode == "human":
-            os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
-            if self._screen is None:
-                pygame.init()
-                self._screen = pygame.display.set_mode(  # type: ignore
-                    (screen_width * scale, screen_height * scale)
+        if self._env_image:
+            image = self._env_image
+            height, width, _ = image.shape
+            scale = min(screen_height // height, screen_width // width)
+            if mode == "human":
+                os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
+                if self._screen is None:
+                    pygame.init()
+                    self._screen = pygame.display.set_mode(  # type: ignore
+                        (screen_width * scale, screen_height * scale)
+                    )
+                image = np.transpose(image, (1, 0, 2))  # PyGame is column major!
+                surface = pygame.surfarray.make_surface(image)
+                rect = surface.get_rect()
+                surf = pygame.transform.scale(
+                    surface, (rect[2] * scale, rect[3] * scale)
                 )
-            image = np.transpose(image, (1, 0, 2))  # PyGame is column major!
-            surface = pygame.surfarray.make_surface(image)
-            rect = surface.get_rect()
-            surf = pygame.transform.scale(surface, (rect[2] * scale, rect[3] * scale))
-            self._screen.blit(surf, dest=(0, 0))  # type: ignore
-            pygame.display.update()
-
-        elif mode == "rgb_array":
-            return image
-        else:
-            raise ValueError("bad value for render mode")
+                self._screen.blit(surf, dest=(0, 0))  # type: ignore
+                pygame.display.update()
+                return None
+            elif mode == "rgb_array":
+                return image
+            else:
+                raise ValueError("bad value for render mode")
+        return None
 
     def close(self) -> None:
         """Closes the rendering screen"""
