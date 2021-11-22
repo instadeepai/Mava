@@ -17,7 +17,7 @@ from typing import Any, Dict
 import numpy as np
 import pytest
 
-from mava.utils.environments import debugging_utils, pettingzoo_utils, smac_utils
+from mava.utils.environments import debugging_utils, pettingzoo_utils
 
 try:
     from flatland.envs.observations import TreeObsForRailEnv
@@ -61,10 +61,6 @@ if _has_flatland:
         )
         if _has_flatland
         else None,
-        # This requires install sc2 and setting SC2Path,
-        # we don't do this for the tests on CI, only when testing locally,
-        # so commented out.
-        # (smac_utils.make_environment,{})
     ],
 )
 class TestEnvUtils:
@@ -115,11 +111,7 @@ class TestEnvUtils:
 
         # This test doesn't work with flatland and SC2, since FL uses
         # a default seed (1) and SC2 (5), even when a seed is not provided.
-        if (
-            _has_flatland
-            and env_factory == flatland_env_factory
-            or env_factory == smac_utils.make_environment
-        ):
+        if _has_flatland and env_factory == flatland_env_factory:
             pytest.skip("Skipping no seed test for flatland and SC2.")
 
         wrapped_env = env_factory(**env_params)
@@ -174,15 +166,6 @@ class TestEnvUtils:
             timestep2, _ = reset_result2
         else:
             timestep2 = reset_result2
-
-        # The random seed used in SC2 doesn't necessarily result
-        # in diff observations. According to doc, the seed results in slight randomness.
-        # Therefore for SC2, we test the seed is set correctly,
-        # not that the obs are different.
-        if env_factory == smac_utils.make_environment:
-            assert wrapped_env._environment._seed == test_seed1
-            assert wrapped_env2._environment._seed == test_seed2
-            return
 
         for agent in wrapped_env.agents:
             assert not np.array_equal(
