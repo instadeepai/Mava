@@ -11,6 +11,25 @@ class NodeType:
 
 
 class launcher:
+    """
+    # This mava launcher can be used to easily switch between single or distributed computation.
+
+    # Example code:
+    # program = launcher(single_process=False, nodes_on_gpu=["trainer"], name="Football")
+
+    # replay = program.add(builder.make_replay_tables, node_type=NodeType.reverb, name="replay")
+
+    # trainer = program.add(builder.make_trainer, replay, node_type=NodeType.corrier, name="trainer")
+    
+    # executors = [program.add(builder.make_executor, [replay, trainer],
+    #             node_type=NodeType.corrier, name="trainer") for _ in range(num_workers)]
+
+    # variable_server = program.add(builder.make_coordinator, [trainer, executors],
+    #             node_type=NodeType.corrier, name="coordinator")
+
+    # program.launch()
+    """
+
     def __init__(
         self, single_process: bool, nodes_on_gpu: List = [], name: str = "System"
     ) -> None:
