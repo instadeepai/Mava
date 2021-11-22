@@ -33,6 +33,7 @@ jobs:
 
           # flatland temp fix
           pip install pyparsing==2.4.7
+          pip install wheel
 
           ## Open CV and Headless screen.
           sudo apt-get install ffmpeg libsm6 libxext6 xvfb  -y
