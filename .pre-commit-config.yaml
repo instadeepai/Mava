@@ -53,6 +53,14 @@ repos:
         exclude: ^docs/
         args: [--config-file=mypy.ini]
 
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v1.2.0
+    hooks:
+      - id: conventional-pre-commit
+        stages:
+          - commit-msg
+
+
   - repo: https://github.com/asottile/blacken-docs
     rev: v1.8.0
     hooks:
