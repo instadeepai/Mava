@@ -123,6 +123,7 @@ class DIALBuilder(MADQNBuilder):
         variable_source: Optional[core.VariableSource] = None,
         trainer: Optional[training.MADQNRecurrentCommTrainer] = None,
         evaluator: bool = False,
+        seed: Optional[int] = None,
     ) -> core.Executor:
         """Create an executor instance.
 
@@ -142,6 +143,7 @@ class DIALBuilder(MADQNBuilder):
                 system trainer. Defaults to None.
             evaluator (bool, optional): boolean indicator if the executor is used for
                 for evaluation only. Defaults to False.
+            seed: seed for reproducible sampling.
 
         Returns:
             core.Executor: system executor, a collection of agents making up the part
@@ -157,6 +159,7 @@ class DIALBuilder(MADQNBuilder):
             variable_source=variable_source,
             trainer=trainer,
             evaluator=evaluator,
+            seed=seed,
         )
 
     def make_trainer(  # type: ignore[override]

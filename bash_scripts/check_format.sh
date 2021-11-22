@@ -50,7 +50,7 @@ flake8 mava --count --exit-zero --statistics
 mypy mava
 
 # Check docstring code coverage.
-interrogate -c pyproject.toml
+interrogate -c pyproject.toml mava
 # Clean-up.
 deactivate
 rm -rf mava_testing/
