@@ -544,7 +544,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
             self.possible_agents,
         )
 
-    def observation_spec(self) -> types.Observation:
+    def observation_spec(self) -> Dict[str, types.OLT]:
         """Observation spec.
 
         Returns:

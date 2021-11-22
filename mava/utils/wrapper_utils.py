@@ -27,10 +27,10 @@ SeqTimestepDict = TypedDict(
 def convert_dm_compatible_observations(
     observes: Dict[str, np.ndarray],
     dones: Dict[str, bool],
-    observation_spec: types.Observation,
+    observation_spec: Dict[str, types.OLT],
     env_done: bool,
     possible_agents: List,
-) -> types.Observation:
+) -> Dict[str, types.OLT]:
     """Convert Parallel observation so it's dm_env compatible.
 
     Args:
@@ -82,7 +82,7 @@ def convert_dm_compatible_observations(
                             dtype=obs_spec.dtype,
                         )
                     )
-                observation = tuple(observation_spec_list)
+                observation = tuple(observation_spec_list)  # type: ignore
             else:
                 observation = np.zeros(
                     observation_spec[agent].observation.shape,

@@ -449,13 +449,6 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 current_step_t = total_steps_before_current_episode + episode_steps
                 self._executor.after_action_selection(current_step_t)
 
-            # If env returns empty dict at end of episode.
-            if not rewards:
-                rewards = {
-                    agent: generate_zeros_from_spec(spec)
-                    for agent, spec in self._environment.reward_spec().items()
-                }
-
             self._compute_step_statistics(rewards)
 
             for agent, reward in rewards.items():

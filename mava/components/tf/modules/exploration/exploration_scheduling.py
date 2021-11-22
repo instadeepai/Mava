@@ -40,10 +40,10 @@ class BaseExplorationScheduler:
         self._epsilon = epsilon_start
 
     @abc.abstractmethod
-    def decrement_epsilon(self) -> np.float32:
+    def decrement_epsilon(self) -> float:
         """Decrement epsilon and return updated epsilon."""
 
-    def get_epsilon(self) -> np.float32:
+    def get_epsilon(self) -> float:
         """Get epsilon value.
 
         Returns:
@@ -70,7 +70,7 @@ class LinearExplorationScheduler(BaseExplorationScheduler):
             epsilon_decay,
         )
 
-    def decrement_epsilon(self) -> np.float32:
+    def decrement_epsilon(self) -> float:
         """Decrement/update epsilon.
 
         Returns:
@@ -94,7 +94,7 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
             epsilon_decay,
         )
 
-    def decrement_epsilon(self) -> np.float32:
+    def decrement_epsilon(self) -> float:
         """Decrement/update epsilon.
 
         Returns:
@@ -128,7 +128,7 @@ class BaseExplorationTimestepScheduler:
         self._epsilon = epsilon_start
 
     @abc.abstractmethod
-    def decrement_epsilon(self, time_t: int) -> None:
+    def decrement_epsilon(self, time_t: int) -> float:
         """Decrement epsilon and return updated epsilon."""
 
     def get_epsilon(self) -> float:
@@ -162,7 +162,7 @@ class LinearExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
             self._epsilon_start - self._epsilon_min
         ) / self._epsilon_decay_steps
 
-    def decrement_epsilon(self, time_t: int) -> np.float32:
+    def decrement_epsilon(self, time_t: int) -> float:
         """Decrement/update epsilon.
 
         Args:
@@ -196,7 +196,7 @@ class ExponentialExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
             else 1
         )
 
-    def decrement_epsilon(self, time_t: int) -> np.float32:
+    def decrement_epsilon(self, time_t: int) -> float:
         """Decrement/update epsilon.
 
         Args:
@@ -220,7 +220,7 @@ class ConstantScheduler:
         """
         self._epsilon = tf.constant(epsilon)
 
-    def get_epsilon(self) -> np.float32:
+    def get_epsilon(self) -> float:
         """Returns constant epsilon.
 
         Returns:
@@ -228,7 +228,7 @@ class ConstantScheduler:
         """
         return self._epsilon
 
-    def decrement_epsilon(self) -> np.float32:
+    def decrement_epsilon(self) -> float:
         """Return constant epsilon.
 
         Returns:

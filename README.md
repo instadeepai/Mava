@@ -244,6 +244,12 @@ We have tested `mava` on Python 3.7, 3.8 and 3.9.
 
 2.  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset , Tensorflow and [Launchpad](https://github.com/deepmind/launchpad) - for distributed agent support :
 
+    Install swig for box2d
+    ```bash
+    sudo apt-get install swig -y
+    ```
+
+    Install core dependencies:
     ```bash
     pip install id-mava[tf,reverb,launchpad]
     ```
