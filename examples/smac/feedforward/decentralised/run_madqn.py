@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADQN on multi-agent Starcraft 2 (SMAC) environment."""
 
 import functools
 from datetime import datetime
@@ -28,7 +27,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 )
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments import smac_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -47,10 +46,10 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-
+    """Example running MADQN on multi-agent Starcraft 2 (SMAC) environment."""
     # environment
     environment_factory = functools.partial(
-        smac_utils.make_environment, map_name=FLAGS.map_name
+        pettingzoo_utils.make_environment, env_class="smac", env_name=FLAGS.map_name
     )
 
     # Networks.

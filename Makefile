@@ -42,7 +42,7 @@ endif
 IMAGE = $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 # make file commands
 build:
-	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE) -f Dockerfile.tf --target $(DOCKER_IMAGE_TAG)  --build-arg record=$(record) --progress=plain .
+	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE) -f Dockerfile.tf --target $(DOCKER_IMAGE_TAG)  --build-arg record=$(record) .
 
 run:
 	$(DOCKER_RUN) python $(example) --base_dir /home/app/mava/logs/
@@ -61,6 +61,9 @@ run-tests:
 
 run-integration-tests:
 	$(DOCKER_RUN) /bin/bash bash_scripts/tests.sh true
+
+run-checks:
+	$(DOCKER_RUN) /bin/bash bash_scripts/check_format.sh
 
 push:
 	docker login

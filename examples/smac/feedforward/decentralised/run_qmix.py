@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running QMIX on SMAC environments."""
+
 import functools
 from datetime import datetime
 from typing import Any
@@ -25,7 +25,7 @@ from absl import app, flags
 from mava.components.tf.modules.exploration import LinearExplorationTimestepScheduler
 from mava.systems.tf import qmix
 from mava.utils import lp_utils
-from mava.utils.environments import smac_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -44,9 +44,10 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
+    """Example running QMIX on SMAC environments."""
     # Environment.
     environment_factory = functools.partial(
-        smac_utils.make_environment, map_name=FLAGS.map_name
+        pettingzoo_utils.make_environment, env_class="smac", env_name=FLAGS.map_name
     )
 
     # Networks.

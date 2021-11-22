@@ -43,12 +43,11 @@ RUN AutoROM -v
 ##########################################################
 # SMAC image
 FROM tf-core AS sc2
-## Install SC2 game
-RUN apt-get install -y wget
 ## Install smac environment
 RUN apt-get -y install git
 RUN pip install .[sc2]
-RUN ./bash_scripts/install_sc2.sh
+# We use the pz wrapper for smac
+RUN pip install .[pz]
 ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 ##########################################################
 

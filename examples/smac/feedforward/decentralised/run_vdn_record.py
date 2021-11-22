@@ -13,10 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Example running VDN on multi-agent Starcraft 2 (SMAC) environment,
-while recording agents.
-"""
 
 import functools
 from datetime import datetime
@@ -29,7 +25,7 @@ from absl import app, flags
 from mava.components.tf.modules.exploration import LinearExplorationTimestepScheduler
 from mava.systems.tf import vdn
 from mava.utils import lp_utils
-from mava.utils.environments import smac_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 from mava.wrappers.environment_loop_wrappers import MonitorParallelEnvironmentLoop
 
@@ -49,10 +45,10 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-
+    """Example running VDN on SMAC,while recording agents."""
     # environment
     environment_factory = functools.partial(
-        smac_utils.make_environment, map_name=FLAGS.map_name
+        pettingzoo_utils.make_environment, env_class="smac", env_name=FLAGS.map_name
     )
 
     # Networks.
