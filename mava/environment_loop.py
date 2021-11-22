@@ -147,9 +147,9 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         # save action, timestep pairs for current agent
         timestep = self._set_step_type(timestep, self._step_type[agent])
         self._agent_action_timestep[agent] = (
-            self._prev_action[agent],
+            self._prev_action[agent],  # type: ignore
             timestep,
-        )  # type: ignore
+        )
 
         self._prev_timestep[agent] = timestep
 
@@ -181,9 +181,9 @@ class SequentialEnvironmentLoop(acme.core.Worker):
             agent = self._environment.current_agent
             timestep = self._set_step_type(timestep, dm_env.StepType.LAST)
             self._agent_action_timestep[agent] = (
-                self._prev_action[agent],
+                self._prev_action[agent],  # type: ignore
                 timestep,
-            )  # type: ignore
+            )
 
             timestep = self._environment.step(
                 generate_zeros_from_spec(self._environment.action_spec()[agent])
