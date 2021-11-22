@@ -96,10 +96,6 @@ class TestEnvPreprocessWrapper:
         # Parallel env_types
         if env_spec.env_type == EnvType.Parallel:
             StandardizeObservation = StandardizeObservationParallel
-            # StandardizeObservation = parallel_wrapper_fn(
-            # StandardizeObservationSequential
-            # )
-            # StandardizeObservation = StandardizeObservationSequential
 
         # Sequential env_types
         elif env_spec.env_type == EnvType.Sequential:
@@ -112,9 +108,6 @@ class TestEnvPreprocessWrapper:
                 (StandardizeObservation, None),
             ],
         )
-        # if env_spec.env_type == EnvType.Parallel:
-        #     wrapped_env = to_parallel(StandardizeObservation(wrapped_env))
-        #     # wrapped_env = to_parallel(wrapped_env)
 
         _ = wrapped_env.reset()
 
