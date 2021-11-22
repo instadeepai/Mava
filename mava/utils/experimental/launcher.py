@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Union
 
 import launchpad as lp
 
@@ -24,7 +24,7 @@ class launcher:
         self,
         node_fn: Any,
         arguments: Any = [],
-        node_type: Any = NodeType.corrier,
+        node_type: Union[lp.ReverbNode, lp.CourierNode] = NodeType.corrier,
         name: str = "Node",
     ) -> Any:
         # Create a list of arguments
