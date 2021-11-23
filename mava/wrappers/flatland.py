@@ -15,7 +15,6 @@
 
 """Wraps a Flatland MARL environment to be used as a dm_env environment."""
 
-
 import types as tp
 from functools import partial
 from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
@@ -127,7 +126,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             self._environment,
             agent_render_variant=AgentRenderVariant.ONE_STEP_BEHIND,
             show_debug=False,
-            screen_height=600,  # Adjust these parameters to fit your resolution
+            screen_height=800,  # Adjust these parameters to fit your resolution
             screen_width=800,
         )  # Adjust these parameters to fit your resolution
 
@@ -220,13 +219,21 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         if self.env_done():
             self._step_type = dm_env.StepType.LAST
             self._reset_next_step = True
+            discounts = {
+                agent: convert_np_type(
+                    self.discount_spec()[agent].dtype, 0
+                )  # Zero discount on final step
+                for agent in self.possible_agents
+            }
+            # TODO (Claude) zero discount!
         else:
             self._step_type = dm_env.StepType.MID
+            discounts = self._discounts  # discount == 1
 
         return dm_env.TimeStep(
             observation=observations,
             reward=rewards,
-            discount=self._discounts,
+            discount=discounts,
             step_type=self._step_type,
         )
 
@@ -371,6 +378,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     @property
     def num_agents(self) -> int:
         """Returns the number of trains/agents in the flatland environment"""
+        print(self._environment.number_of_agents)
         return int(self._environment.number_of_agents)
 
     def __getattr__(self, name: str) -> Any:
