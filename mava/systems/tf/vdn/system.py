@@ -29,11 +29,11 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules import mixing
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.madqn.system import MADQN
 from mava.systems.tf.vdn import builder, execution, training
+from mava.types import EpsilonScheduler
 from mava.utils.loggers import MavaLogger, logger_utils
 
 
@@ -45,16 +45,16 @@ class VDN(MADQN):
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        exploration_scheduler_fn: Union[
+            EpsilonScheduler,
+            Dict[str, EpsilonScheduler],
+            Dict[str, Dict[str, EpsilonScheduler]],
+        ],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.VDNTrainer] = training.VDNTrainer,
         executor_fn: Type[core.Executor] = execution.VDNFeedForwardExecutor,
         mixer: Type[mixing.BaseMixingModule] = mixing.AdditiveMixing,
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
-        epsilon_min: float = 0.05,
-        epsilon_decay: float = 1e-4,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -86,6 +86,9 @@ class VDN(MADQN):
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        evaluator_interval: Optional[dict] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
+        seed: Optional[int] = None,
     ):
         """Initialise the system
 
@@ -107,10 +110,7 @@ class VDN(MADQN):
                 additive or monotonic mixing. Defaults to mixing.AdditiveMixing.
             exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
                 function specifying a decaying scheduler for epsilon exploration.
-                Defaults to LinearExplorationScheduler.
-            epsilon_min (float, optional): final minimum epsilon value at the end of a
-                decaying schedule. Defaults to 0.05.
-            epsilon_decay (float, optional): epsilon decay rate. Defaults to 1e-4.
+                See mava/systems/tf/madqn/system.py for details.
             num_executors (int, optional): number of executor processes to run in
                 parallel. Defaults to 1.
             num_caches (int, optional): number of trainer node caches. Defaults to 0.
@@ -166,15 +166,18 @@ class VDN(MADQN):
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
+            seed: seed for reproducible sampling (for epsilon greedy action selection).
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         self._mixer = mixer
-
-        if not environment_spec:
-            environment_spec = mava_specs.MAEnvironmentSpec(
-                environment_factory(evaluation=False)  # type:ignore
-            )
-        self._environment_spec = environment_spec
 
         # set default logger if no logger provided
         if not logger_factory:
@@ -204,6 +207,10 @@ class VDN(MADQN):
             eval_loop_fn=eval_loop_fn,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
             logger_config=logger_config,
+            exploration_scheduler_fn=exploration_scheduler_fn,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+            seed=seed,
+            evaluator_interval=evaluator_interval,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
@@ -213,9 +220,7 @@ class VDN(MADQN):
 
         self._builder = builder.VDNBuilder(
             builder.VDNConfig(
-                environment_spec=environment_spec,
-                epsilon_min=epsilon_min,
-                epsilon_decay=epsilon_decay,
+                environment_spec=self._environment_spec,
                 agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
@@ -235,11 +240,12 @@ class VDN(MADQN):
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                evaluator_interval=evaluator_interval,
+                learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             extra_specs=extra_specs,
-            exploration_scheduler_fn=exploration_scheduler_fn,
         )
 
     def trainer(

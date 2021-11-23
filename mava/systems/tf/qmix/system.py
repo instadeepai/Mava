@@ -15,7 +15,6 @@
 
 """QMIX system implementation."""
 
-import functools
 from typing import Any, Callable, Dict, Optional, Type, Union
 
 import dm_env
@@ -29,14 +28,14 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.modules.mixing import MonotonicMixing
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.madqn.system import MADQN
 from mava.systems.tf.qmix import builder, execution, training
-from mava.utils.loggers import MavaLogger, logger_utils
+from mava.types import EpsilonScheduler
+from mava.utils.loggers import MavaLogger
 
 
 # TODO Implement recurrent QMIX
@@ -47,18 +46,18 @@ class QMIX(MADQN):
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        exploration_scheduler_fn: Union[
+            EpsilonScheduler,
+            Dict[str, EpsilonScheduler],
+            Dict[str, Dict[str, EpsilonScheduler]],
+        ],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.QMIXTrainer] = training.QMIXTrainer,
         executor_fn: Type[core.Executor] = execution.QMIXFeedForwardExecutor,
         mixer: Type[MonotonicMixing] = MonotonicMixing,
         communication_module: Type[BaseCommunicationModule] = None,
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
-        epsilon_min: float = 0.05,
-        epsilon_decay: float = 1e-4,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -93,6 +92,9 @@ class QMIX(MADQN):
         qmix_hidden_dim: int = 32,
         num_hypernet_layers: int = 1,
         hypernet_hidden_dim: int = 32,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
+        seed: Optional[int] = None,
+        evaluator_interval: Optional[dict] = None,
     ):
         """Initialise the system
 
@@ -117,13 +119,10 @@ class QMIX(MADQN):
                 None.
             exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
                 function specifying a decaying scheduler for epsilon exploration.
-                Defaults to LinearExplorationScheduler.
+                See mava/systems/tf/madqn/system.py for details.
             replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
                 optional): replay buffer stabilisaiton function, e.g. fingerprints.
                 Defaults to None.
-            epsilon_min (float, optional): final minimum epsilon value at the end of a
-                decaying schedule. Defaults to 0.05.
-            epsilon_decay (float, optional): epsilon decay rate. Defaults to 1e-4.
             num_executors (int, optional): number of executor processes to run in
                 parallel. Defaults to 1.
             num_caches (int, optional): number of trainer node caches. Defaults to 0.
@@ -183,26 +182,21 @@ class QMIX(MADQN):
                 Defaults to 1.
             hypernet_hidden_dim (int, optional): hypernetwork hidden dimension. Defaults
                 to 32.
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
+            seed: seed for reproducible sampling (for epsilon greedy action selection).
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         self._mixer = mixer
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
         self._hypernet_hidden_dim = hypernet_hidden_dim
-
-        if not environment_spec:
-            environment_spec = mava_specs.MAEnvironmentSpec(
-                environment_factory(evaluation=False)  # type:ignore
-            )
-
-        # set default logger if no logger provided
-        if not logger_factory:
-            logger_factory = functools.partial(
-                logger_utils.make_logger,
-                directory="~/mava",
-                to_terminal=True,
-                time_delta=10,
-            )
 
         super(QMIX, self).__init__(
             environment_factory=environment_factory,
@@ -212,10 +206,7 @@ class QMIX(MADQN):
             trainer_fn=trainer_fn,
             communication_module=communication_module,
             executor_fn=executor_fn,
-            exploration_scheduler_fn=exploration_scheduler_fn,
             replay_stabilisation_fn=replay_stabilisation_fn,
-            epsilon_min=epsilon_min,
-            epsilon_decay=epsilon_decay,
             num_executors=num_executors,
             num_caches=num_caches,
             environment_spec=environment_spec,
@@ -242,6 +233,10 @@ class QMIX(MADQN):
             eval_loop_fn=eval_loop_fn,
             train_loop_fn_kwargs=train_loop_fn_kwargs,
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
+            evaluator_interval=evaluator_interval,
+            exploration_scheduler_fn=exploration_scheduler_fn,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+            seed=seed,
         )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
@@ -251,9 +246,7 @@ class QMIX(MADQN):
 
         self._builder = builder.QMIXBuilder(
             builder.QMIXConfig(
-                environment_spec=environment_spec,
-                epsilon_min=epsilon_min,
-                epsilon_decay=epsilon_decay,
+                environment_spec=self._environment_spec,
                 agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
@@ -273,11 +266,12 @@ class QMIX(MADQN):
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                evaluator_interval=evaluator_interval,
+                learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             extra_specs=extra_specs,
-            exploration_scheduler_fn=exploration_scheduler_fn,
             replay_stabilisation_fn=replay_stabilisation_fn,
             mixer=mixer,
         )

@@ -23,8 +23,8 @@ from mava.wrappers.debugging_envs import DebuggingEnvWrapper
 
 
 def get_good_simple_spread_action(
-    agent_id: int, obs: np.array, environment: DebuggingEnvWrapper
-) -> Union[int, np.array]:
+    agent_id: int, obs: np.ndarray, environment: DebuggingEnvWrapper
+) -> Union[int, np.ndarray]:
     import gym
 
     diff = np.array(obs[5:7])

@@ -17,7 +17,7 @@
 
 import copy
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import reverb
@@ -33,9 +33,6 @@ import mava
 from mava import types as mava_types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
-)
 from mava.systems.tf import savers as tf2_savers
 from mava.utils import training_utils as train_utils
 from mava.utils.sort_utils import sort_str_num
@@ -61,7 +58,6 @@ class MADQNTrainer(mava.Trainer):
         discount: float,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
-        exploration_scheduler: LinearExplorationScheduler,
         max_gradient_norm: float = None,
         importance_sampling_exponent: Optional[float] = None,
         replay_client: Optional[reverb.TFClient] = None,
@@ -73,6 +69,7 @@ class MADQNTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
         replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE,
         communication_module: Optional[BaseCommunicationModule] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
     ):
         """Initialise MADQN trainer
 
@@ -90,8 +87,6 @@ class MADQNTrainer(mava.Trainer):
                 Defaults to {}.
             checkpoint_minute_interval (int): The number of minutes to wait between
                 checkpoints.
-            exploration_scheduler (LinearExplorationScheduler): function specifying a
-                decaying scheduler for epsilon exploration.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             fingerprint (bool, optional): whether to apply replay stabilisation using
@@ -105,12 +100,15 @@ class MADQNTrainer(mava.Trainer):
                 Defaults to "~/mava/".
             communication_module (BaseCommunicationModule): module for communication
                 between agents. Defaults to None.
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
         """
 
         self._agents = agents
         self._agent_types = agent_types
         self._agent_net_keys = agent_net_keys
         self._checkpoint = checkpoint
+        self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
 
         # Store online and target q-networks.
         self._q_networks = q_networks
@@ -131,14 +129,11 @@ class MADQNTrainer(mava.Trainer):
         self._fingerprint = fingerprint
 
         # Necessary to track when to update target networks.
-        self._num_steps = tf.Variable(0, dtype=tf.int32)
+        self._num_steps = tf.Variable(0, trainable=False)
         self._target_update_period = target_update_period
 
         # Create an iterator to go through the dataset.
         self._iterator = dataset
-
-        # Store the exploration scheduler
-        self._exploration_scheduler = exploration_scheduler
 
         # Importance sampling hyper-parameters
         self._max_priority_weight = max_priority_weight
@@ -206,15 +201,6 @@ class MADQNTrainer(mava.Trainer):
 
         self._timestamp: Optional[float] = None
 
-    def get_epsilon(self) -> float:
-        """get the current value for the exploration parameter epsilon
-
-        Returns:
-            float: epsilon parameter value
-        """
-
-        return self._exploration_scheduler.get_epsilon()
-
     def get_trainer_steps(self) -> float:
         """get trainer step count
 
@@ -223,11 +209,6 @@ class MADQNTrainer(mava.Trainer):
         """
 
         return self._num_steps.numpy()
-
-    def _decrement_epsilon(self) -> None:
-        """Decay epsilon exploration value"""
-
-        self._exploration_scheduler.decrement_epsilon()
 
     def _update_target_networks(self) -> None:
         """Sync the target network parameters with the latest online network
@@ -264,8 +245,8 @@ class MADQNTrainer(mava.Trainer):
 
     def _get_feed(
         self,
-        o_tm1_trans: Dict[str, np.ndarray],
-        o_t_trans: Dict[str, np.ndarray],
+        o_tm1_trans: Dict[str, mava_types.OLT],
+        o_t_trans: Dict[str, mava_types.OLT],
         a_tm1: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
@@ -312,11 +293,6 @@ class MADQNTrainer(mava.Trainer):
         if self._checkpoint:
             train_utils.checkpoint_networks(self._system_checkpointer)
 
-        # Log and decrement epsilon
-        epsilon = self.get_epsilon()
-        fetches["epsilon"] = epsilon
-        self._decrement_epsilon()
-
         if self._logger:
             self._logger.write(fetches)
 
@@ -342,6 +318,7 @@ class MADQNTrainer(mava.Trainer):
 
         return fetches, extras
 
+    @tf.function
     def _step(self) -> Dict:
         """Trainer forward and backward passes."""
 
@@ -356,7 +333,7 @@ class MADQNTrainer(mava.Trainer):
         if self._importance_sampling_exponent is not None:
             self._update_sample_priorities(extras["keys"], extras["priorities"])
 
-        # Log losses and epsilon
+        # Log losses
         return fetches
 
     def _forward(self, inputs: reverb.ReplaySample) -> None:
@@ -460,7 +437,7 @@ class MADQNTrainer(mava.Trainer):
                     )
 
                 loss = tf.reduce_mean(loss)
-                q_network_losses[agent] = {"q_value_loss": loss}
+                q_network_losses[agent] = {"policy_loss": loss}
 
         # Store losses and tape
         self._q_network_losses = q_network_losses
@@ -514,6 +491,29 @@ class MADQNTrainer(mava.Trainer):
             }
         return variables
 
+    def after_trainer_step(self) -> None:
+        """Optionally decay lr after every training step."""
+        if self._learning_rate_scheduler_fn:
+            self._decay_lr(self._num_steps)
+            info: Dict[str, Dict[str, float]] = {}
+            for agent in self._agents:
+                info[agent] = {}
+                info[agent]["learning_rate"] = self._optimizers[
+                    self._agent_net_keys[agent]
+                ].learning_rate
+            if self._logger:
+                self._logger.write(info)
+
+    def _decay_lr(self, trainer_step: int) -> None:
+        """Decay lr.
+
+        Args:
+            trainer_step : trainer step time t.
+        """
+        train_utils.decay_lr(
+            self._learning_rate_scheduler_fn, self._optimizers, trainer_step
+        )
+
 
 class MADQNRecurrentTrainer(MADQNTrainer):
     """Recurrent MADQN trainer.
@@ -533,7 +533,6 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         discount: float,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
-        exploration_scheduler: LinearExplorationScheduler,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
@@ -541,6 +540,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         communication_module: Optional[BaseCommunicationModule] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
     ):
         """Initialise recurrent MADQN trainer
 
@@ -558,8 +558,6 @@ class MADQNRecurrentTrainer(MADQNTrainer):
                 Defaults to {}.
             checkpoint_minute_interval (int): The number of minutes to wait between
                 checkpoints.
-            exploration_scheduler (LinearExplorationScheduler): function specifying a
-                decaying scheduler for epsilon exploration.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter (counting.Counter, optional): step counter object. Defaults to None.
@@ -573,6 +571,8 @@ class MADQNRecurrentTrainer(MADQNTrainer):
                 Defaults to "~/mava/".
             communication_module (BaseCommunicationModule): module for communication
                 between agents. Defaults to None.
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
         """
 
         super().__init__(
@@ -586,13 +586,13 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             discount=discount,
             agent_net_keys=agent_net_keys,
             checkpoint_minute_interval=checkpoint_minute_interval,
-            exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
             fingerprint=fingerprint,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _forward(self, inputs: Any) -> None:
@@ -641,7 +641,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
                     core_state[agent][0],
                 )
 
-                q_network_losses[agent] = {"q_value_loss": tf.zeros(())}
+                q_network_losses[agent] = {"policy_loss": tf.zeros(())}
                 for t in range(1, q.shape[0]):
                     loss, _ = trfl.qlearning(
                         q[t - 1],
@@ -652,7 +652,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
                     )
 
                     loss = tf.reduce_mean(loss)
-                    q_network_losses[agent]["q_value_loss"] += loss
+                    q_network_losses[agent]["policy_loss"] += loss
 
         self._q_network_losses = q_network_losses
         self.tape = tape
@@ -676,7 +676,6 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         discount: float,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
-        exploration_scheduler: LinearExplorationScheduler,
         communication_module: BaseCommunicationModule,
         max_gradient_norm: float = None,
         fingerprint: bool = False,
@@ -684,6 +683,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
     ):
         """Initialise recurrent MADQN trainer with communication
 
@@ -701,8 +701,6 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
                 Defaults to {}.
             checkpoint_minute_interval (int): The number of minutes to wait between
                 checkpoints.
-            exploration_scheduler (LinearExplorationScheduler): function specifying a
-                decaying scheduler for epsilon exploration.
             communication_module (BaseCommunicationModule): module for communication
                 between agents.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -716,6 +714,8 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
         """
 
         super().__init__(
@@ -729,13 +729,13 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             discount=discount,
             agent_net_keys=agent_net_keys,
             checkpoint_minute_interval=checkpoint_minute_interval,
-            exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,
             counter=counter,
             logger=logger,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
         self._communication_module = communication_module
@@ -771,7 +771,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
 
         with tf.GradientTape(persistent=True) as tape:
             q_network_losses: Dict[str, NestedArray] = {
-                agent: {"q_value_loss": tf.zeros(())} for agent in self._agents
+                agent: {"policy_loss": tf.zeros(())} for agent in self._agents
             }
 
             T = actions[self._agents[0]].shape[0]
@@ -833,7 +833,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
                     )
 
                     loss = tf.reduce_mean(loss)
-                    q_network_losses[agent]["q_value_loss"] += loss
+                    q_network_losses[agent]["policy_loss"] += loss
 
         self._q_network_losses = q_network_losses
         self.tape = tape

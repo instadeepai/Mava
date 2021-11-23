@@ -44,6 +44,3 @@ sudo ldconfig && \
     apt install -y libboost-filesystem1.65.1 libboost-system1.65.1 libboost-program-options-dev tmux
 
 sudo apt-get install -y libqt5widgets5
-# RUN pip install hydra-core
-
-# ENV PYTHONPATH '/home'

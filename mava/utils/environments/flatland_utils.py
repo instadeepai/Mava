@@ -110,7 +110,7 @@ def flatland_env_factory(
 ) -> FlatlandEnvWrapper:
     """Loads a flatand environment and wraps it using the flatland wrapper"""
 
-    del evaluation  # since it has same behaviour for both training and evaluation
+    del evaluation  # since it has same behaviour for both train and eval
 
     env = create_rail_env_with_tree_obs(**env_config)
     wrapped_env = FlatlandEnvWrapper(env, preprocessor, include_agent_info)
@@ -118,4 +118,8 @@ def flatland_env_factory(
     if random_seed and hasattr(wrapped_env, "seed"):
         wrapped_env.seed(random_seed)
 
+        if random_seed and hasattr(wrapped_env, "seed"):
+            wrapped_env.seed(random_seed)
+    else:
+        raise Exception("Flatland is not installed.")
     return wrapped_env

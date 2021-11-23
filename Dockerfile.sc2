@@ -1,7 +1,0 @@
-FROM mava:latest
-
-# Install SC2 game
-RUN apt-get install -y wget
-RUN ./install_sc2.sh
-
-EXPOSE 6006

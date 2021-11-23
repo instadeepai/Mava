@@ -27,18 +27,28 @@ try:
     from flatland.envs.observations import TreeObsForRailEnv
     from flatland.envs.rail_generators import sparse_rail_generator
     from flatland.envs.schedule_generators import sparse_schedule_generator
+
+    from mava.utils.environments.flatland_utils import load_flatland_env
+    from mava.wrappers.flatland import FlatlandEnvWrapper
+
+    _has_flatland = True
+except ModuleNotFoundError:
+    _has_flatland = False
+try:
+    from pettingzoo.utils.env import AECEnv, ParallelEnv
 except ModuleNotFoundError:
     pass
-from pettingzoo.utils.env import AECEnv, ParallelEnv
 
 from mava import specs as mava_specs
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop
 from mava.types import Observation, Reward
-from mava.utils.environments.flatland_utils import load_flatland_env
-from mava.utils.environments.open_spiel_utils import load_open_spiel_env
+
+try:
+    from mava.utils.environments.open_spiel_utils import load_open_spiel_env
+    from mava.wrappers.open_spiel import OpenSpielSequentialWrapper
+except ImportError:
+    pass
 from mava.utils.wrapper_utils import convert_np_type
-from mava.wrappers.flatland import FlatlandEnvWrapper
-from mava.wrappers.open_spiel import OpenSpielSequentialWrapper
 from mava.wrappers.pettingzoo import (
     PettingZooAECEnvWrapper,
     PettingZooParallelEnvWrapper,
@@ -51,23 +61,24 @@ from tests.mocks import (
     SequentialMADiscreteEnvironment,
 )
 
-# flatland environment config
-rail_gen_cfg: Dict = {
-    "max_num_cities": 4,
-    "max_rails_between_cities": 2,
-    "max_rails_in_city": 3,
-    "grid_mode": True,
-    "seed": 42,
-}
+if _has_flatland:
+    # flatland environment config
+    rail_gen_cfg: Dict = {
+        "max_num_cities": 4,
+        "max_rails_between_cities": 2,
+        "max_rails_in_city": 3,
+        "grid_mode": True,
+        "seed": 42,
+    }
 
-flatland_env_config: Dict = {
-    "number_of_agents": 2,
-    "width": 25,
-    "height": 25,
-    "rail_generator": sparse_rail_generator(**rail_gen_cfg),
-    "schedule_generator": sparse_schedule_generator(),
-    "obs_builder_object": TreeObsForRailEnv(max_depth=2),
-}
+    flatland_env_config: Dict = {
+        "number_of_agents": 2,
+        "width": 25,
+        "height": 25,
+        "rail_generator": sparse_rail_generator(**rail_gen_cfg),
+        "schedule_generator": sparse_schedule_generator(),
+        "obs_builder_object": TreeObsForRailEnv(max_depth=2),
+    }
 
 
 """
@@ -78,14 +89,31 @@ Helpers contains re-usable test functions.
 
 
 class Helpers:
-    # Check all props are not none
     @staticmethod
     def verify_all_props_not_none(props_which_should_not_be_none: list) -> bool:
+        """Check all props are not none
+
+        Args:
+            props_which_should_not_be_none : vars which should have a value.
+
+        Returns:
+            bool indicating if vars are not none.
+        """
         return all(prop is not None for prop in props_which_should_not_be_none)
 
-    # Return an env - currently Pettingzoo envs.
     @staticmethod
     def get_env(env_spec: EnvSpec) -> Union[AECEnv, ParallelEnv]:
+        """Return an env based on an env spec.
+
+        Args:
+            env_spec : decription of env.
+
+        Raises:
+            Exception: No appropriate env found.
+
+        Returns:
+            an envrionment.
+        """
         env = None
         if env_spec.env_source == EnvSource.PettingZoo:
             mod = importlib.import_module(env_spec.env_name)
@@ -102,11 +130,21 @@ class Helpers:
         env.reset()  # type:ignore
         return env
 
-    # Returns a wrapper function.
     @staticmethod
     def get_wrapper_function(
         env_spec: EnvSpec,
     ) -> dm_env.Environment:
+        """Returns a wrapper function.
+
+        Args:
+            env_spec : decription of env.
+
+        Raises:
+            Exception: No env wrapper found.
+
+        Returns:
+             an envrionment wrapper.
+        """
         wrapper: dm_env.Environment = None
         if env_spec.env_source == EnvSource.PettingZoo:
             if env_spec.env_type == EnvType.Parallel:
@@ -121,11 +159,21 @@ class Helpers:
             raise Exception("Env_spec is not valid.")
         return wrapper
 
-    # Returns an env loop.
     @staticmethod
     def get_env_loop(
         env_spec: EnvSpec,
     ) -> acme.core.Worker:
+        """Returns an env loop.
+
+        Args:
+            env_spec : decription of env.
+
+        Raises:
+            Exception: Unable to find env loop.
+
+        Returns:
+            env loop.
+        """
         env_loop = None
         if env_spec.env_type == EnvType.Parallel:
             env_loop = ParallelEnvironmentLoop
@@ -134,9 +182,6 @@ class Helpers:
         else:
             raise Exception("Env_spec is not valid.")
         return env_loop
-
-    """Function that retrieves a mocked env, based on
-    env_spec."""
 
     @staticmethod
     def get_mocked_env(
@@ -147,12 +192,17 @@ class Helpers:
         ParallelMAContinuousEnvironment,
         SequentialMAContinuousEnvironment,
     ]:
-        env = None
-        if not hasattr(env_spec, "env_name"):
-            raise Exception("No env_name passed in.")
+        """Function that retrieves a mocked env.
 
-        if not hasattr(env_spec, "env_type"):
-            raise Exception("No env_type passed in.")
+        Args:
+            env_spec : decription of env.
+
+        Raises:
+            Exception: no valid env found.
+
+        Returns:
+            a mocked environment.
+        """
         env_name = env_spec.env_name
 
         if env_name is MockedEnvironments.Mocked_Dicrete:
@@ -196,6 +246,14 @@ class Helpers:
     def is_mocked_env(
         env_name: str,
     ) -> bool:
+        """Returns bool indicating if env is mocked or not.
+
+        Args:
+            env_spec : decription of env.
+
+        Returns:
+            bool indicating if env is mocked or not.
+        """
         mock = False
         if (
             env_name is MockedEnvironments.Mocked_Continous
@@ -204,12 +262,18 @@ class Helpers:
             mock = True
         return mock
 
-    # Returns a wrapped env and specs
     @staticmethod
     def get_wrapped_env(
         env_spec: EnvSpec, **kwargs: Any
     ) -> Tuple[dm_env.Environment, acme.specs.EnvironmentSpec]:
+        """Returns a wrapped env and specs.
 
+        Args:
+            env_spec : decription of env.
+
+        Returns:
+            a wrapped env and specs.
+        """
         specs = None
         if Helpers.is_mocked_env(env_spec.env_name):
             wrapped_env = Helpers.get_mocked_env(env_spec)
@@ -219,20 +283,32 @@ class Helpers:
             wrapper_func = Helpers.get_wrapper_function(env_spec)
             wrapped_env = wrapper_func(env, **kwargs)
             specs = Helpers.get_pz_env_spec(wrapped_env)._specs
-        wrapped_env.reset()  # type : ignore
         return wrapped_env, specs
 
-    # Returns a petting zoo environment spec.
+    #
     @staticmethod
     def get_pz_env_spec(environment: dm_env.Environment) -> dm_env.Environment:
+        """Returns a petting zoo environment spec.
+
+        Args:
+            environment : an env.
+
+        Returns:
+            a petting zoo environment spec.
+        """
         return mava_specs.MAEnvironmentSpec(environment)
 
-    # Seeds action space
     @staticmethod
     def seed_action_space(
         env_wrapper: Union[PettingZooAECEnvWrapper, PettingZooParallelEnvWrapper],
         random_seed: int,
     ) -> None:
+        """Seeds action space.
+
+        Args:
+            env_wrapper : an env wrapper.
+            random_seed : random seed to be used.
+        """
         [
             env_wrapper.action_spaces[agent].seed(random_seed)
             for agent in env_wrapper.agents
@@ -240,6 +316,15 @@ class Helpers:
 
     @staticmethod
     def compare_dicts(dictA: Dict, dictB: Dict) -> bool:
+        """Function that check if two dicts are equal.
+
+        Args:
+            dictA : dict A.
+            dictB : dict B.
+
+        Returns:
+            bool indicating if dicts are equal or not.
+        """
         typesA = [type(k) for k in dictA.values()]
         typesB = [type(k) for k in dictB.values()]
 
@@ -247,6 +332,11 @@ class Helpers:
 
     @staticmethod
     def assert_valid_episode(episode_result: Dict) -> None:
+        """Function that checks if a valid episode was run.
+
+        Args:
+            episode_result : result dict from an episode.
+        """
         assert (
             episode_result["episode_length"] > 0
             and episode_result["mean_episode_return"] is not None
@@ -261,6 +351,13 @@ class Helpers:
         dm_env_timestep: dm_env.TimeStep,
         env_spec: EnvSpec,
     ) -> None:
+        """Assert env are reset correctly.
+
+        Args:
+            wrapped_env : wrapped env.
+            dm_env_timestep : timestep.
+            env_spec : env spec.
+        """
         if env_spec.env_type == EnvType.Parallel:
             rewards_spec = wrapped_env.reward_spec()
             expected_rewards = {
@@ -308,6 +405,15 @@ class Helpers:
         min: int = 0,
         max: int = 1,
     ) -> None:
+        """Verify observations are normalized.
+
+        Args:
+            observations : env obs.
+            agents : env agents.
+            env_spec : env spec.
+            min : min for normalization.
+            max : max for normalization.
+        """
         if env_spec.env_type == EnvType.Parallel:
             for agent in agents:
                 assert (
@@ -327,6 +433,15 @@ class Helpers:
     def verify_reward_is_normalized(
         rewards: Reward, agents: List, env_spec: EnvSpec, min: int = 0, max: int = 1
     ) -> None:
+        """Verify reward is normalized.
+
+        Args:
+            rewards : rewards.
+            agents : env agents.
+            env_spec : env spec.
+            min : min for normalization.
+            max : max for normalization.
+        """
         if env_spec.env_type == EnvType.Parallel:
             for agent in agents:
                 assert (
@@ -340,13 +455,20 @@ class Helpers:
     def verify_observations_are_standardized(
         observations: Observation, agents: List, env_spec: EnvSpec
     ) -> None:
+        """Verify obs are standardized.
+
+        Args:
+            observations : env observations.
+            agents : env agents.
+            env_spec : env spec.
+        """
         if env_spec.env_type == EnvType.Parallel:
             for agent in agents:
                 npt.assert_almost_equal(
-                    observations[agent].observation.mean(), 0, decimal=2
+                    observations[agent].observation.mean(), 0, decimal=2  # type: ignore
                 )
                 npt.assert_almost_equal(
-                    observations[agent].observation.std(), 1, decimal=2
+                    observations[agent].observation.std(), 1, decimal=2  # type: ignore
                 )
 
         elif env_spec.env_type == EnvType.Sequential:
@@ -359,10 +481,20 @@ class Helpers:
 
     @staticmethod
     def mock_done() -> bool:
+        """Mock env being done.
+
+        Returns:
+            returns true.
+        """
         return True
 
 
 @typing.no_type_check
 @pytest.fixture
 def helpers() -> Helpers:
+    """Return helper class.
+
+    Returns:
+        helpers class.
+    """
     return Helpers

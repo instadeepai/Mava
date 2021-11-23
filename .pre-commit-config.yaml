@@ -41,7 +41,7 @@ repos:
       - id: isort
 
   - repo: https://gitlab.com/pycqa/flake8
-    rev: 3.9.1
+    rev: 3.8.2
     hooks:
       - id: flake8
         additional_dependencies: [flake8-isort]
@@ -52,6 +52,14 @@ repos:
       - id: mypy
         exclude: ^docs/
         args: [--config-file=mypy.ini]
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v1.2.0
+    hooks:
+      - id: conventional-pre-commit
+        stages:
+          - commit-msg
+
 
   - repo: https://github.com/asottile/blacken-docs
     rev: v1.8.0

@@ -17,12 +17,10 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 import gym
 import numpy as np
-from pettingzoo.utils.wrappers import OrderEnforcingWrapper as PettingzooWrapper
-from supersuit.aec_wrappers import ObservationWrapper as SequentialObservationWrapper
-from supersuit.parallel_wrappers import ObservationWrapper as ParallelObservationWrapper
-from supersuit.parallel_wrappers import ParallelWraper as ParallelEnvPettingZoo
+from pettingzoo.utils import BaseParallelWraper
+from supersuit.utils.base_aec_wrapper import BaseWrapper
 
-from mava.types import Observation, Reward
+from mava.types import Action, Observation, Reward
 from mava.utils.wrapper_utils import RunningMeanStd
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
@@ -145,15 +143,13 @@ class StandardizeObservation:
         return (observation - unbiased_mean) / (unbiased_std + 1e-8)
 
 
-class StandardizeObservationSequential(
-    SequentialObservationWrapper, StandardizeObservation
-):
+class StandardizeObservationSequential(BaseWrapper, StandardizeObservation):
     """Standardize Obs in Sequential Env"""
 
     def __init__(
         self, env: PettingZooEnv, load_params: Dict = None, alpha: float = 0.999
     ) -> None:
-        SequentialObservationWrapper.__init__(self, env)
+        BaseWrapper.__init__(self, env)
         StandardizeObservation.__init__(self, env, load_params, alpha)
 
     def _modify_observation(self, agent: str, observation: Observation) -> Observation:
@@ -162,22 +158,17 @@ class StandardizeObservationSequential(
         )
         return self._get_updated_observation(agent, observation)
 
-    def _check_wrapper_params(self) -> None:
-        return
-
-    def _modify_spaces(self) -> None:
-        return
+    def _modify_action(self, agent: str, action: Action) -> Action:
+        return action
 
 
-class StandardizeObservationParallel(
-    ParallelObservationWrapper, StandardizeObservation
-):
+class StandardizeObservationParallel(BaseParallelWraper, StandardizeObservation):
     """Standardize Obs in Parallel Env"""
 
     def __init__(
         self, env: PettingZooEnv, load_params: Dict = None, alpha: float = 0.999
     ) -> None:
-        ParallelObservationWrapper.__init__(self, env)
+        BaseParallelWraper.__init__(self, env)
         StandardizeObservation.__init__(self, env, load_params, alpha)
 
     def _modify_observation(self, agent: str, observation: Observation) -> Observation:
@@ -186,11 +177,21 @@ class StandardizeObservationParallel(
         )
         return self._get_updated_observation(agent, observation)
 
-    def _check_wrapper_params(self) -> None:
-        return
+    def _modify_action(self, action: Action) -> Action:
+        return action
 
-    def _modify_spaces(self) -> None:
-        return
+    def reset(self) -> Dict:
+        obss = super().reset()
+        return {
+            agent: self._modify_observation(agent, obs) for agent, obs in obss.items()
+        }
+
+    def step(self, actions: Action) -> Any:
+        obss, rew, done, info = super().step(actions)
+        obss = {
+            agent: self._modify_observation(agent, obs) for agent, obs in obss.items()
+        }
+        return obss, rew, done, info
 
 
 class StandardizeReward:
@@ -276,7 +277,7 @@ class StandardizeReward:
         return reward
 
 
-class StandardizeRewardSequential(PettingzooWrapper, StandardizeReward):
+class StandardizeRewardSequential(BaseWrapper, StandardizeReward):
     def __init__(
         self,
         env: SequentialEnvWrapper,
@@ -285,7 +286,7 @@ class StandardizeRewardSequential(PettingzooWrapper, StandardizeReward):
         upper_bound: float = 10.0,
         alpha: float = 0.999,
     ) -> None:
-        PettingzooWrapper.__init__(self, env)
+        BaseWrapper.__init__(self, env)
         StandardizeReward.__init__(
             self, env, load_params, lower_bound, upper_bound, alpha
         )
@@ -314,9 +315,15 @@ class StandardizeRewardSequential(PettingzooWrapper, StandardizeReward):
         self._cumulative_rewards = self.__cumulative_rewards
         self._accumulate_rewards()
 
+    def _modify_observation(self, agent: str, observation: Observation) -> Observation:
+        return observation
+
+    def _modify_action(self, agent: str, action: Action) -> Action:
+        return action
+
 
 class StandardizeRewardParallel(
-    ParallelEnvPettingZoo,
+    BaseParallelWraper,
     StandardizeReward,
 ):
     def __init__(
@@ -327,7 +334,7 @@ class StandardizeRewardParallel(
         upper_bound: float = 10.0,
         alpha: float = 0.999,
     ) -> None:
-        ParallelEnvPettingZoo.__init__(self, env)
+        BaseParallelWraper.__init__(self, env)
         StandardizeReward.__init__(
             self, env, load_params, lower_bound, upper_bound, alpha
         )
@@ -347,3 +354,9 @@ class StandardizeRewardParallel(
             agent: self._get_updated_reward(agent, rew) for agent, rew in rew.items()
         }
         return obs, rew, done, info
+
+    def _modify_observation(self, observation: Observation) -> Observation:
+        return observation
+
+    def _modify_action(self, action: Action) -> Action:
+        return action

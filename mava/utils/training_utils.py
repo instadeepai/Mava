@@ -1,9 +1,84 @@
 import os
-from typing import Any, Dict, Iterable, List, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import sonnet as snt
 import tensorflow as tf
 import trfl
+
+
+def decay_lr_actor_critic(
+    learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]],
+    policy_optimizers: Dict,
+    critic_optimizers: Dict,
+    trainer_step: int,
+) -> None:
+    """Function that decays lr rate in actor critic training.
+
+    Args:
+        learning_rate_scheduler_fn : dict of functions (for policy and critic networks),
+            that return a learning rate at training time t.
+        policy_optimizers : policy optims.
+        critic_optimizers : critic optims.
+        trainer_step : training time t.
+    """
+    if learning_rate_scheduler_fn:
+        if learning_rate_scheduler_fn["policy"]:
+            decay_lr(
+                learning_rate_scheduler_fn["policy"], policy_optimizers, trainer_step
+            )
+
+        if learning_rate_scheduler_fn["critic"]:
+            decay_lr(
+                learning_rate_scheduler_fn["critic"], critic_optimizers, trainer_step
+            )
+
+
+def decay_lr(
+    lr_schedule: Optional[Callable[[int], None]], optimizers: Dict, trainer_step: int
+) -> None:
+    """Funtion that decays lr of optim.
+
+    Args:
+        lr_schedule : lr schedule function/callable.
+        optimizer : optim to decay.
+        trainer_step : training time t.
+    """
+    if lr_schedule and callable(lr_schedule):
+        lr = lr_schedule(trainer_step)
+        for optimizer in optimizers.values():
+            optimizer.learning_rate = lr
+
+
+def check_count_condition(condition: Optional[dict]) -> Tuple:
+    """Checks if condition is valid. These conditions are used for termination
+    or to run evaluators in intervals.
+
+    Args:
+        condition : a dict with a key referring to the name of a condition and the
+        value referring to count of the condition that needs to be reached.
+        e.g. {"executor_episodes": 100}
+
+    Returns:
+        the condition key and count.
+    """
+
+    valid_options = [
+        "trainer_steps",
+        "trainer_walltime",
+        "evaluator_steps",
+        "evaluator_episodes",
+        "executor_episodes",
+        "executor_steps",
+    ]
+
+    condition_key, condition_count = None, None
+    if condition is not None:
+        assert len(condition) == 1
+        condition_key, condition_count = list(condition.items())[0]
+        assert condition_key in valid_options
+        assert condition_count > 0
+
+    return condition_key, condition_count
 
 
 # Checkpoint the networks.

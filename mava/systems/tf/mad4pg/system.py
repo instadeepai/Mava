@@ -87,7 +87,9 @@ class MAD4PG(MADDPG):
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
         termination_condition: Optional[Dict[str, int]] = None,
+        evaluator_interval: Optional[dict] = None,
     ):
         """Initialise the system
 
@@ -154,23 +156,37 @@ class MAD4PG(MADDPG):
             checkpoint: whether to checkpoint models.
             checkpoint_minute_interval: The number of minutes to wait between
                 checkpoints.
-            checkpoint_subpath: subdirectory specifying where to store
-                checkpoints.
-            logger_config: additional configuration settings for the
-                logger factory.
-            train_loop_fn: function to instantiate a train loop.
-            eval_loop_fn: function to instantiate an evaluation
-                loop.
-            train_loop_fn_kwargs: possible keyword arguments to send
-                to the training loop.
-            eval_loop_fn_kwargs: possible keyword arguments to send to
-            the evaluation loop.
+            checkpoint_subpath (str, optional): subdirectory specifying where to store
+                checkpoints. Defaults to "~/mava/".
+            logger_config (Dict, optional): additional configuration settings for the
+                logger factory. Defaults to {}.
+            train_loop_fn (Callable, optional): function to instantiate a train loop.
+                Defaults to ParallelEnvironmentLoop.
+            eval_loop_fn (Callable, optional): function to instantiate an evaluation
+                loop. Defaults to ParallelEnvironmentLoop.
+            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
+                to the training loop. Defaults to {}.
+            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
+                the evaluation loop. Defaults to {}.
+            learning_rate_scheduler_fn: dict with two functions/classes (one for the
+                policy and one for the critic optimizer), that takes in a trainer
+                step t and returns the current learning rate,
+                e.g. {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
+                See
+                examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
+                for an example.
             termination_condition: An optional terminal condition can be
                 provided that stops the program once the condition is
                 satisfied. Available options include specifying maximum
                 values for trainer_steps, trainer_walltime, evaluator_steps,
                 evaluator_episodes, executor_episodes or executor_steps.
                 E.g. termination_condition = {'trainer_steps': 100000}.
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         super().__init__(
@@ -210,5 +226,7 @@ class MAD4PG(MADDPG):
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
             target_averaging=target_averaging,
             target_update_rate=target_update_rate,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             termination_condition=termination_condition,
+            evaluator_interval=evaluator_interval,
         )
