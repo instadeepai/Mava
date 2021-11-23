@@ -29,6 +29,7 @@ try:
     from flatland.envs.predictions import ShortestPathPredictorForRailEnv
     from flatland.envs.rail_env import RailEnv
     from flatland.envs.rail_generators import sparse_rail_generator
+
 except ModuleNotFoundError:
     pass
 
@@ -118,8 +119,4 @@ def flatland_env_factory(
     if random_seed and hasattr(wrapped_env, "seed"):
         wrapped_env.seed(random_seed)
 
-        if random_seed and hasattr(wrapped_env, "seed"):
-            wrapped_env.seed(random_seed)
-    else:
-        raise Exception("Flatland is not installed.")
     return wrapped_env
