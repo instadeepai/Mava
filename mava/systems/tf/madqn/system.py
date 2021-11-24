@@ -172,7 +172,7 @@ class MADQN:
             learning_rate_scheduler_fn : function/class that takes in a trainer step t
                 and returns the current learning rate.
             seed: seed for reproducible sampling (used for epsilon greedy action selection).
-            evaluator_interval: An optional condition that is used to
+evaluator_interval: An optional condition that is used to
                 evaluate/test system performance after [evaluator_interval]
                 condition has been met. If None, evaluation will
                 happen at every timestep.
@@ -245,7 +245,22 @@ class MADQN:
         else:
             # Using an executor level config
             if all(key.startswith("executor") for key in exploration_scheduler_fn):
-                self._exploration_scheduler_fn = exploration_scheduler_fn
+                # Agents have distinct configs
+                if all(
+                    isinstance(value, dict)
+                    for value in exploration_scheduler_fn.values()
+                ):
+                    self._exploration_scheduler_fn = exploration_scheduler_fn
+                # All agents have the same config.
+                else:
+                    self._exploration_scheduler_fn = {}
+                    for executor_id in range(self._num_exectors):
+                        executor = f"executor_{executor_id}"
+                        self._exploration_scheduler_fn[executor] = {}
+                        for agent in environment_spec.get_agent_ids():
+                            self._exploration_scheduler_fn[executor][
+                                agent
+                            ] = exploration_scheduler_fn[executor]
 
             # Using an agent level config - assume all executor have the same config.
             elif all(key.startswith("agent") for key in exploration_scheduler_fn):
@@ -679,3 +694,4 @@ class MADQN:
                 )
 
         return program
+        

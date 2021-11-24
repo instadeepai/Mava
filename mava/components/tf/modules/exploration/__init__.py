@@ -21,4 +21,6 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     ExponentialExplorationTimestepScheduler,
     LinearExplorationScheduler,
     LinearExplorationTimestepScheduler,
+    ConstantScheduler,
+    apex_exploration_scheduler,
 )

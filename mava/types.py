@@ -24,6 +24,7 @@ from acme.utils import loggers
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     BaseExplorationScheduler,
     BaseExplorationTimestepScheduler,
+    ConstantScheduler,
 )
 
 NestedArray = Any
@@ -51,6 +52,7 @@ Observation = Union[OLT, Dict[str, OLT], Dict[str, np.ndarray]]
 EpsilonScheduler = Union[
     BaseExplorationTimestepScheduler,
     BaseExplorationScheduler,
+    ConstantScheduler,
 ]
 
 

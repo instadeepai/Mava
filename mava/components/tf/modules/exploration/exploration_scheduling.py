@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import abc
+from typing import Dict, Mapping
 
 import numpy as np
 import tensorflow as tf
@@ -235,3 +236,15 @@ class ConstantScheduler:
             constant epsilon.
         """
         return self._epsilon
+
+def apex_exploration_scheduler(
+        num_executors: int = 1,
+        epsilon: float = 0.4,
+        alpha: float = 7.,
+    ) -> Mapping[str, ConstantScheduler]:
+    exploration_scheduler_fn: Dict = {}
+    for executor_id in range(num_executors):
+        executor = f"executor_{executor_id}"
+        epsilon_i = epsilon**(1 + alpha * executor_id / (num_executors-1))
+        exploration_scheduler_fn[executor] = ConstantScheduler(epsilon=epsilon_i)
+    return exploration_scheduler_fn
