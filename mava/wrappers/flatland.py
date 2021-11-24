@@ -225,13 +225,22 @@ if _has_flatland:  # noqa: C901
             if self.env_done():
                 self._step_type = dm_env.StepType.LAST
                 self._reset_next_step = True
+
+                # Zero discount when env done
+                discounts = {
+                    agent: convert_np_type(
+                        self.discount_spec()[agent].dtype, 0
+                    )  # Zero discount on final step
+                    for agent in self.possible_agents
+                }
             else:
                 self._step_type = dm_env.StepType.MID
+                discounts = self._discounts
 
             return dm_env.TimeStep(
                 observation=observations,
                 reward=rewards,
-                discount=self._discounts,
+                discount=discounts,
                 step_type=self._step_type,
             )
 
@@ -245,7 +254,7 @@ if _has_flatland:  # noqa: C901
             return convert_dm_compatible_observations(
                 observes,  # type: ignore
                 dones,
-                self.observation_spaces,  # type:ignore
+                self.observation_spec(),
                 self.env_done(),
                 self.possible_agents,
             )

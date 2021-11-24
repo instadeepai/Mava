@@ -117,7 +117,9 @@ def generate_zeros_from_spec(spec: specs.Array) -> np.ndarray:
     return np.zeros(spec.shape, spec.dtype)
 
 
-def convert_np_type(dtype: np.dtype, value: Union[int, float]) -> Union[int, float]:
+def convert_np_type(dtype: np.dtype,
+                    value: Union[int, float]
+                    ) -> Union[int, float]:
     """Converts value to np dtype.
 
     Args:
@@ -169,7 +171,8 @@ def parameterized_termination(
 
 
 def broadcast_timestep_to_all_agents(
-    timestep: dm_env.TimeStep, possible_agents: list
+    timestep: dm_env.TimeStep,
+    possible_agents: list
 ) -> dm_env.TimeStep:
     """Project single timestep to all agents."""
     parallel_timestep = dm_env.TimeStep(
@@ -183,7 +186,8 @@ def broadcast_timestep_to_all_agents(
 
 
 def convert_seq_timestep_and_actions_to_parallel(
-    timesteps: Dict[str, SeqTimestepDict], possible_agents: list
+    timesteps: Dict[str, SeqTimestepDict],
+    possible_agents: list
 ) -> Tuple[dict, dm_env.TimeStep]:
     """Convert dict of seq timestep and actions to parallel"""
 
@@ -242,7 +246,10 @@ class RunningStatistics:
     """
 
     # The queue_size is used to estimate a moving mean and variance value.
-    def __init__(self, label: str, queue_size: int = 100) -> None:
+    def __init__(self,
+                 label: str,
+                 queue_size: int = 100
+                 ) -> None:
 
         self.queue: collections.deque = collections.deque(maxlen=queue_size)
         self._max = -float("inf")
@@ -256,7 +263,9 @@ class RunningStatistics:
 
         self._raw = 0.0
 
-    def push(self, x: float) -> None:
+    def push(self,
+             x: float
+             ) -> None:
         self._raw = x
         self.queue.append(x)
 
@@ -294,7 +303,10 @@ class RunningStatistics:
 
 # Adapted From https://github.com/DLR-RM/stable-baselines3/blob/237223f834fe9b8143ea24235d087c4e32addd2f/stable_baselines3/common/running_mean_std.py # noqa: E501
 class RunningMeanStd(object):
-    def __init__(self, epsilon: float = 1e-4, shape: Tuple[int, ...] = ()):
+    def __init__(self,
+                 epsilon: float = 1e-4,
+                 shape: Tuple[int, ...] = ()
+                 ):
         """
         Calulates the running mean and std of a data stream
         https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
@@ -305,13 +317,17 @@ class RunningMeanStd(object):
         self.var = np.ones(shape, np.float64)
         self.count = epsilon
 
-    def update_batch(self, arr: np.ndarray) -> None:
+    def update_batch(self,
+                     arr: np.ndarray
+                     ) -> None:
         batch_mean = np.mean(arr, axis=0)
         batch_var = np.var(arr, axis=0)
         batch_count = arr.shape[0]
         self.update_from_moments(batch_mean, batch_var, batch_count)
 
-    def update(self, arr: np.ndarray) -> None:
+    def update(self,
+               arr: np.ndarray
+               ) -> None:
         batch_mean = np.mean(arr)
         batch_var = np.var(arr)
         batch_count = 1
