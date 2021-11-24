@@ -6,6 +6,8 @@ ARG folder=/home/app/mava
 # Flag to record agents
 ARG record
 RUN apt-get -y --fix-missing update
+# Install sudo
+RUN apt-get -y install sudo
 ## working directory
 WORKDIR ${folder}
 # Tensorflow gpu config.
@@ -35,7 +37,7 @@ RUN python -m pip install -e .[pz]
 # PettingZoo Atari envs
 RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6  -y
-RUN apt-get install unrar-free
+RUN apt-get install -y unrar-free
 RUN python -m pip install autorom
 RUN AutoROM -v
 ##########################################################
