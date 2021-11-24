@@ -20,9 +20,9 @@ class launcher:
     # replay = program.add(builder.make_replay_tables, node_type=NodeType.reverb, name="replay")
 
     # trainer = program.add(builder.make_trainer, replay, node_type=NodeType.corrier, name="trainer")
-    
+
     # executors = [program.add(builder.make_executor, [replay, trainer],
-    #             node_type=NodeType.corrier, name="trainer") for _ in range(num_workers)]
+    #             node_type=NodeType.corrier, name="executor") for _ in range(num_workers)]
 
     # variable_server = program.add(builder.make_coordinator, [trainer, executors],
     #             node_type=NodeType.corrier, name="coordinator")
