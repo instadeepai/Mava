@@ -522,6 +522,10 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 ) >= 1.0
                 if should_run_loop:
                     self._last_evaluator_run_t = int(count)
+                    print(
+                        "Running eval loop at executor step: "
+                        + f"{self._last_evaluator_run_t}"
+                    )
             return should_run_loop
 
         episode_count, step_count = 0, 0

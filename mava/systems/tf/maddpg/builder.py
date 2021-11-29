@@ -471,6 +471,7 @@ class MADDPGBuilder:
         get_keys.extend(count_names)
         counts = {name: variables[name] for name in count_names}
 
+        evaluator_interval = self._config.evaluator_interval if evaluator else None
         variable_client = None
         if variable_source:
             # Get new policy variables
@@ -478,7 +479,11 @@ class MADDPGBuilder:
                 client=variable_source,
                 variables=variables,
                 get_keys=get_keys,
-                update_period=self._config.executor_variable_update_period,
+                # If we are using evaluator_intervals,
+                # we should always get the latest variables.
+                update_period=0
+                if evaluator_interval
+                else self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -496,7 +501,7 @@ class MADDPGBuilder:
             variable_client=variable_client,
             adder=adder,
             evaluator=evaluator,
-            interval=self._config.evaluator_interval if evaluator else None,
+            interval=evaluator_interval,
         )
 
     def make_trainer(

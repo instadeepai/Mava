@@ -8,7 +8,7 @@ import tensorflow as tf
 from acme.tf import utils as tf2_utils
 
 from mava.systems.tf import savers as tf2_savers
-from mava.utils.training_utils import check_count_condition
+from mava.utils.training_utils import check_count_condition, non_blocking_sleep
 
 
 class VariableSource:
@@ -135,7 +135,7 @@ class VariableSource:
         # Checkpoints every 5 minutes
         while True:
             # Wait 10 seconds before checking again
-            time.sleep(10)
+            non_blocking_sleep(10)
 
             # Add 1 extra second just to make sure that the checkpointer
             # is ready to save.
