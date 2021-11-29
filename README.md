@@ -76,7 +76,7 @@ For details on how to add your own environment, see [here](https://github.com/in
 
 |<img  src="docs/images/robocup_animation.gif" width="1300px"/> |
 |:---:|
-|6 instances of MAD4PG training on RoboCup.|
+|MAD4PG on the RoboCup 2D simulator using 6 executors.|
 
 ## System Implementations
 
