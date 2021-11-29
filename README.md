@@ -74,6 +74,10 @@ For details on how to add your own environment, see [here](https://github.com/in
 |:---:|:---:|:---:|
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.| MADQN on Flatland. |
 
+|<img  src="docs/images/robocup_animation.gif" width="1300px"/> |
+|:---:|
+|6 instances of MAD4PG training on RoboCup.|
+
 ## System Implementations
 
 Mava includes several system implementations. Below we list these together with an indication of the maturity of the system using the following keys: 🟩  -- Tested and working well, 🟨  -- Running and training on simple environments, but not extensively tested and 🟥  -- Implemented but untested and yet to show clear signs of stable training.
