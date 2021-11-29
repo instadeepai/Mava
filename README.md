@@ -74,7 +74,7 @@ For details on how to add your own environment, see [here](https://github.com/in
 |:---:|:---:|:---:|
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.| MADQN on Flatland. |
 
-|<img  src="docs/images/robocup_animation.gif" width="1300px"/> |
+|<img  src="docs/images/robocup_animation.gif" width="450px"/> |
 |:---:|
 |MAD4PG on the 2D RoboCup environment using 6 executors.|
 
