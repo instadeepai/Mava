@@ -17,13 +17,14 @@
 
 import functools
 import inspect
-import time
 from typing import Any, Callable, Dict, List, Optional
 
 import launchpad as lp
 from absl import flags, logging
 from acme.utils import counting
 from launchpad.nodes.python.local_multi_processing import PythonProcess
+
+from mava.utils.training_utils import non_blocking_sleep
 
 FLAGS = flags.FLAGS
 
@@ -119,4 +120,4 @@ class StepsLimiter:
                 lp.stop()
 
             # Don't spam the counter.
-            time.sleep(10.0)
+            non_blocking_sleep(10)

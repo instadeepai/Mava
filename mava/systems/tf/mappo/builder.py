@@ -231,6 +231,7 @@ class MAPPOBuilder:
         """
 
         variable_client = None
+        evaluator_interval = self._config.evaluator_interval if evaluator else None
         if variable_source:
             # Create policy variables.
             variables = {
@@ -243,7 +244,11 @@ class MAPPOBuilder:
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"policy": variables},
-                update_period=self._config.executor_variable_update_period,
+                # If we are using evaluator_intervals,
+                # we should always get the latest variables.
+                update_period=0
+                if evaluator_interval
+                else self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -257,7 +262,7 @@ class MAPPOBuilder:
             variable_client=variable_client,
             adder=adder,
             evaluator=evaluator,
-            interval=self._config.evaluator_interval if evaluator else None,
+            interval=evaluator_interval,
         )
 
     def make_trainer(

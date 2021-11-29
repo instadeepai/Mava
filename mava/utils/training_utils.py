@@ -1,9 +1,22 @@
 import os
+import time
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import sonnet as snt
 import tensorflow as tf
 import trfl
+
+
+def non_blocking_sleep(time_in_seconds: int) -> None:
+    """Function to sleep for time_in_seconds, without hanging lp program.
+
+    Args:
+        time_in_seconds : number of seconds to sleep for.
+    """
+    for _ in range(time_in_seconds):
+        # Do not sleep for a long period of time to avoid LaunchPad program
+        # termination hangs (time.sleep is not interruptible).
+        time.sleep(1)
 
 
 def check_count_condition(condition: Optional[dict]) -> Tuple:
