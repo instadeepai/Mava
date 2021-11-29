@@ -30,6 +30,7 @@ from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments.flatland_utils import flatland_env_factory
 from mava.utils.loggers import logger_utils
+from mava.wrappers.environment_loop_wrappers import MonitorParallelEnvironmentLoop
 
 FLAGS = flags.FLAGS
 
@@ -74,7 +75,7 @@ def main(_: Any) -> None:
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    checkpoint_dir = f"{FLAGS.base_dir}/apex-{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -87,16 +88,22 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
+    num_executors = 8
+
     # distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=2,
-        exploration_scheduler_fn=apex_exploration_scheduler(num_executors=16),
+        num_executors=num_executors,
+        exploration_scheduler_fn=apex_exploration_scheduler(
+            num_executors=num_executors
+        ),
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         max_executor_steps=100_000,
         checkpoint_subpath=checkpoint_dir,
+        eval_loop_fn=MonitorParallelEnvironmentLoop,
+        eval_loop_fn_kwargs={"path": checkpoint_dir, "record_every": 1},
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

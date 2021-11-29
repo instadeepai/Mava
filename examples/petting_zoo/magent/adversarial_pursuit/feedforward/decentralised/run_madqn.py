@@ -68,7 +68,7 @@ def main(_: Any) -> None:
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    checkpoint_dir = f"{FLAGS.base_dir}/madqn-{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -81,13 +81,11 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    num_executors = 1
+    num_executors = 8
 
     exploration_scheduler_fn = LinearExplorationScheduler(
         epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-4
     )
-
-    # exploration_scheduler_fn = apex_exploration_scheduler(num_executors=num_executors)
 
     # distributed program
     program = madqn.MADQN(

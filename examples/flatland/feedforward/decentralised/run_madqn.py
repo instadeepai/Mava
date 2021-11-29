@@ -29,6 +29,7 @@ from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments.flatland_utils import flatland_env_factory
 from mava.utils.loggers import logger_utils
+from mava.wrappers.environment_loop_wrappers import MonitorParallelEnvironmentLoop
 
 FLAGS = flags.FLAGS
 
@@ -73,7 +74,7 @@ def main(_: Any) -> None:
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
+    checkpoint_dir = f"{FLAGS.base_dir}/madqn-{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -86,37 +87,48 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
+    num_executors = 8
+
+    # exploration_scheduler_fn={
+    #     "executor_0": {
+    #         "train_0": LinearExplorationScheduler(
+    #             epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-4
+    #         ),
+    #         "train_1": LinearExplorationScheduler(
+    #             epsilon_start=1.0, epsilon_min=0.06, epsilon_decay=2e-4
+    #         ),
+    #         "train_2": LinearExplorationScheduler(
+    #             epsilon_start=1.0, epsilon_min=0.07, epsilon_decay=3e-4
+    #         ),
+    #     },
+    #     "executor_1": {
+    #         "train_0": LinearExplorationScheduler(
+    #             epsilon_start=1.0, epsilon_min=0.08, epsilon_decay=4e-4
+    #         ),
+    #         "train_1": LinearExplorationScheduler(
+    #             epsilon_start=1.0, epsilon_min=0.09, epsilon_decay=5e-4
+    #         ),
+    #         "train_2": LinearExplorationScheduler(
+    #             epsilon_start=1.0, epsilon_min=0.10, epsilon_decay=6e-4
+    #         ),
+    #     },
+    # },
+
+    exploration_scheduler_fn = LinearExplorationScheduler(
+        epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-4
+    )
+
     # distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=2,
-        exploration_scheduler_fn={
-            "executor_0": {
-                "train_0": LinearExplorationScheduler(
-                    epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-4
-                ),
-                "train_1": LinearExplorationScheduler(
-                    epsilon_start=1.0, epsilon_min=0.06, epsilon_decay=2e-4
-                ),
-                "train_2": LinearExplorationScheduler(
-                    epsilon_start=1.0, epsilon_min=0.07, epsilon_decay=3e-4
-                ),
-            },
-            "executor_1": {
-                "train_0": LinearExplorationScheduler(
-                    epsilon_start=1.0, epsilon_min=0.08, epsilon_decay=4e-4
-                ),
-                "train_1": LinearExplorationScheduler(
-                    epsilon_start=1.0, epsilon_min=0.09, epsilon_decay=5e-4
-                ),
-                "train_2": LinearExplorationScheduler(
-                    epsilon_start=1.0, epsilon_min=0.10, epsilon_decay=6e-4
-                ),
-            },
-        },
+        num_executors=num_executors,
+        exploration_scheduler_fn=exploration_scheduler_fn,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        max_executor_steps=100_000,
+        eval_loop_fn=MonitorParallelEnvironmentLoop,
+        eval_loop_fn_kwargs={"path": checkpoint_dir, "record_every": 1},
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
