@@ -393,12 +393,7 @@ def infer_observation_space(
 ) -> Union[Box, tuple, dict]:
     """Infer a gym Observation space from a sample observation from flatland"""
     if isinstance(obs, np.ndarray):
-        return Box(
-            -np.inf,
-            np.inf,
-            shape=obs.shape,
-            dtype=obs.dtype,
-        )
+        return Box(-np.inf, np.inf, shape=obs.shape, dtype=obs.dtype,)
     elif isinstance(obs, tuple):
         return tuple(infer_observation_space(o) for o in obs)
     elif isinstance(obs, dict):
