@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import abc
+from collections import defaultdict
 from typing import Dict, List, Mapping
 
 import numpy as np
@@ -255,7 +256,6 @@ def apex_exploration_scheduler(
         executor = f"executor_{executor_id}"
         epsilon_i = epsilon ** (1 + alpha * executor_id / (num_executors - 1))
         exploration_scheduler_fn[executor] = ConstantScheduler(epsilon=epsilon_i)
-    print("exploration_scheduler_fn", exploration_scheduler_fn)
     return exploration_scheduler_fn
 
 
@@ -275,10 +275,9 @@ def monotonic_ma_apex_exploration_scheduler(
 
     """
     num_agents = len(agent_ids)
-    exploration_scheduler_fn: Dict = {}
+    exploration_scheduler_fn: defaultdict = defaultdict(dict)
     for executor_id in range(num_executors):
         executor = f"executor_{executor_id}"
-        exploration_scheduler_fn[executor] = {}
         # Iterate over agents in a random order
         executor_agents_list = np.random.choice(agent_ids, num_agents, replace=False)
         for i, agent_id in enumerate(executor_agents_list):
@@ -314,10 +313,9 @@ def random_ma_apex_exploration_scheduler(
     ]
     # Random order for epsilon values
     np.random.shuffle(epsilons)
-    exploration_scheduler_fn: Dict = {}
+    exploration_scheduler_fn: defaultdict = defaultdict(dict)
     for executor_id in range(num_executors):
         executor = f"executor_{executor_id}"
-        exploration_scheduler_fn[executor] = {}
         for i, agent_id in enumerate(agent_ids):
             exploration_scheduler_fn[executor][agent_id] = ConstantScheduler(
                 epsilon=epsilons[num_agents * executor_id + i]
