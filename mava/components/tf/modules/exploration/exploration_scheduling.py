@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import abc
-from typing import Dict, Mapping
+from typing import Dict, List, Mapping
 
 import numpy as np
 import tensorflow as tf
@@ -66,7 +66,9 @@ class LinearExplorationScheduler(BaseExplorationScheduler):
     ):
         """Decays epsilon linearly to epsilon_min."""
         super(LinearExplorationScheduler, self).__init__(
-            epsilon_start, epsilon_min, epsilon_decay,
+            epsilon_start,
+            epsilon_min,
+            epsilon_decay,
         )
 
     def decrement_epsilon(self) -> float:
@@ -88,7 +90,9 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
     ):
         """Decays epsilon exponentially to epsilon_min."""
         super(ExponentialExplorationScheduler, self).__init__(
-            epsilon_start, epsilon_min, epsilon_decay,
+            epsilon_start,
+            epsilon_min,
+            epsilon_decay,
         )
 
     def decrement_epsilon(self) -> float:
@@ -150,7 +154,9 @@ class LinearExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
     ):
         """Decays epsilon linearly to epsilon_min, in epsilon_decay_steps."""
         super(LinearExplorationTimestepScheduler, self).__init__(
-            epsilon_decay_steps, epsilon_start, epsilon_min,
+            epsilon_decay_steps,
+            epsilon_start,
+            epsilon_min,
         )
 
         self._delta = (
@@ -180,7 +186,9 @@ class ExponentialExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
     ):
         """Decays epsilon exponentially to epsilon_min, in epsilon_decay_steps."""
         super(ExponentialExplorationTimestepScheduler, self).__init__(
-            epsilon_decay_steps, epsilon_start, epsilon_min,
+            epsilon_decay_steps,
+            epsilon_start,
+            epsilon_min,
         )
 
         self._exp_scaling = (
@@ -231,11 +239,14 @@ class ConstantScheduler:
 
 
 def apex_exploration_scheduler(
-    num_executors: int = 1, epsilon: float = 0.4, alpha: float = 7.0,
+    num_executors: int = 1,
+    epsilon: float = 0.4,
+    alpha: float = 7.0,
 ) -> Mapping[str, ConstantScheduler]:
-    """
-    Returns a scheduler with a single espilon per executor.
+    """Returns a scheduler with a single espilon per executor.
+
     The espilons are given by Ape-X formula
+
     Returns:
         Ape-X exploration scheduler exploration_scheduler_fn
     """
@@ -249,17 +260,19 @@ def apex_exploration_scheduler(
 
 
 def monotonic_ma_apex_exploration_scheduler(
-    agent_ids,  # TODO: Add type list[str]
+    agent_ids: List[str],
     num_executors: int = 1,
     epsilon: float = 0.4,
     alpha: float = 7.0,
 ) -> Mapping[str, Mapping[str, ConstantScheduler]]:
-    """
-    Returns a scheduler with distinct espilons per executor and agent.
+    """Returns a scheduler with distinct espilons per executor and agent.
+
     The schedulers are assigned in increasing order to all executor.
     Within every scheduler, the espilons are randomy assigned to agents.
+
     Returns:
         Monotonic Multi-Agent Ape-X exploration scheduler exploration_scheduler_fn
+
     """
     num_agents = len(agent_ids)
     exploration_scheduler_fn: Dict = {}
@@ -282,14 +295,15 @@ def monotonic_ma_apex_exploration_scheduler(
 
 
 def random_ma_apex_exploration_scheduler(
-    agent_ids,  # TODO: Add type list[str]
+    agent_ids: List[str],
     num_executors: int = 1,
     epsilon: float = 0.4,
     alpha: float = 7.0,
 ) -> Mapping[str, Mapping[str, ConstantScheduler]]:
-    """
-    Returns a scheduler with distinct espilons per executor and agent.
+    """Returns a scheduler with distinct espilons per executor and agent.
+
     All epsilons are shuffled and randomly assigned to a executor/agent
+
     Returns:
         Random Multi-Agent Ape-X exploration scheduler exploration_scheduler_fn
     """
