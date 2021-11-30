@@ -94,6 +94,7 @@ class MADQN:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        evaluator_interval: Optional[dict] = None,
     ):
         """Initialise the system
 
@@ -182,7 +183,13 @@ class MADQN:
             train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
-            the evaluation loop. Defaults to {}.
+                the evaluation loop. Defaults to {}.
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         if not environment_spec:
@@ -225,6 +232,7 @@ class MADQN:
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
         self._checkpoint_minute_interval = checkpoint_minute_interval
+        self._evaluator_interval = evaluator_interval
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
@@ -255,6 +263,7 @@ class MADQN:
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                evaluator_interval=evaluator_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -465,6 +474,7 @@ class MADQN:
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
             trainer=trainer,
+            evaluator=False,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors

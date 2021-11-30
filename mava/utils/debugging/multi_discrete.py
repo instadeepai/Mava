@@ -6,7 +6,7 @@
 # (https://github.com/openai/gym/blob/1fb81d4e3fb780ccf77fec731287ba07da35eb84
 # /gym/spaces/multi_discrete.py)
 
-from typing import List, Tuple
+from typing import List, Union
 
 import gym
 import numpy as np
@@ -37,7 +37,7 @@ class MultiDiscrete(gym.Space):
         MultiDiscrete([ [0,4], [0,1], [0,1] ])
     """
 
-    def __init__(self, array_of_param_array: np.array) -> None:
+    def __init__(self, array_of_param_array: np.ndarray) -> None:
         self.low = np.array([x[0] for x in array_of_param_array])
         self.high = np.array([x[1] for x in array_of_param_array])
         self.num_discrete_space = self.low.shape[0]
@@ -53,7 +53,7 @@ class MultiDiscrete(gym.Space):
             )
         ]
 
-    def contains(self, x: List) -> Tuple[bool]:
+    def contains(self, x: List) -> Union[bool, np.bool_]:
         return (
             len(x) == self.num_discrete_space
             and (np.array(x) >= self.low).all()
@@ -61,7 +61,7 @@ class MultiDiscrete(gym.Space):
         )
 
     @property
-    def shape(self) -> Tuple:
+    def shape(self) -> int:
         return self.num_discrete_space
 
     def __repr__(self) -> str:

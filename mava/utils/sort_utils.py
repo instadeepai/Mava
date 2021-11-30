@@ -27,7 +27,7 @@ def sample_new_agent_keys(
     agents: List,
     network_sampling_setup: List,
     net_keys_to_ids: Dict[str, int] = None,
-) -> Tuple[Dict[str, np.array], Dict[str, np.array]]:
+) -> Tuple[Dict[str, np.ndarray], Dict[str, str]]:
     """
     Samples new agent networks using the network sampling setup.
     Args:

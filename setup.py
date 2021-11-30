@@ -32,7 +32,7 @@ reverb_requirements = [
 ]
 
 tf_requirements = [
-    "tensorflow~=2.6.0",
+    "tensorflow~=2.7.0",
     "tensorflow_probability~=0.13.0",
     "dm-sonnet",
     "trfl",
@@ -47,7 +47,7 @@ env_requirements = [
 ]
 
 launchpad_requirements = [
-    "dm-launchpad-nightly",
+    "dm-launchpad~=0.3.1",
 ]
 
 testing_formatting_requirements = [

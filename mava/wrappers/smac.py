@@ -18,7 +18,7 @@
 
 """Wraps a StarCraft II MARL environment (SMAC) as a dm_env environment."""
 
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Type, Union
 
 import dm_env
 import numpy as np
@@ -73,7 +73,7 @@ try:  # noqa
             self.reward: dict = {}
             self.renderer: Optional[Renderer] = None
 
-        def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
+        def reset(self) -> Tuple[dm_env.TimeStep, Dict[str, np.ndarray]]:
             """Resets the env and returns observations from ready agents.
             Returns:
                 obs (dict): New observations for each ready agent.
@@ -86,7 +86,7 @@ try:  # noqa
             obs_list, state = self._environment.reset()
 
             # Convert observations
-            observe: Dict[str, np.ndarray] = {}
+            observe: Dict[str, Dict] = {}
 
             for i, obs in enumerate(obs_list):
                 observe[f"agent_{i}"] = {
@@ -123,7 +123,7 @@ try:  # noqa
 
         def step(
             self, actions: Dict[str, np.ndarray]
-        ) -> Tuple[dm_env.TimeStep, np.array]:
+        ) -> Tuple[dm_env.TimeStep, Dict[str, np.ndarray]]:
             """Returns observations from ready agents.
             The returns are dicts mapping from agent_id strings to values. The
             number of agents in the env can vary over time.
@@ -200,7 +200,9 @@ try:  # noqa
             return self._env_done
 
         def _convert_observations(
-            self, observes: Dict[str, np.ndarray], dones: Dict[str, bool]
+            self,
+            observes: Mapping[str, Union[Dict, np.ndarray]],
+            dones: Dict[str, bool],
         ) -> types.Observation:
             observations: Dict[str, types.OLT] = {}
             for agent, observation in observes.items():

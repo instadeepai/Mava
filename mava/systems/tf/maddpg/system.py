@@ -106,6 +106,7 @@ class MADDPG:
         eval_loop_fn_kwargs: Dict = {},
         connection_spec: Callable[[Dict[str, List[str]]], Dict[str, List[str]]] = None,
         termination_condition: Optional[Dict[str, int]] = None,
+        evaluator_interval: Optional[dict] = None,
     ):
         """Initialise the system
         Args:
@@ -189,6 +190,12 @@ class MADDPG:
                 values for trainer_steps, trainer_walltime, evaluator_steps,
                 evaluator_episodes, executor_episodes or executor_steps.
                 E.g. termination_condition = {'trainer_steps': 100000}.
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
         if not environment_spec:
@@ -329,6 +336,7 @@ class MADDPG:
         self._train_loop_fn_kwargs = train_loop_fn_kwargs
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
+        self._evaluator_interval = evaluator_interval
 
         if connection_spec:
             self._connection_spec = connection_spec(  # type: ignore
@@ -377,6 +385,7 @@ class MADDPG:
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
                 termination_condition=termination_condition,
+                evaluator_interval=evaluator_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -487,6 +496,7 @@ class MADDPG:
             policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
+            evaluator=False,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -533,7 +543,7 @@ class MADDPG:
 
         # Create the agent.
         executor = self._builder.make_executor(
-            # executor_id="evaluator",
+            evaluator=True,
             networks=networks,
             policy_networks=behaviour_policy_networks,
             variable_source=variable_source,

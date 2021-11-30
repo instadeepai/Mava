@@ -82,7 +82,9 @@ def generate_zeros_from_spec(spec: specs.Array) -> np.ndarray:
     return np.zeros(spec.shape, spec.dtype)
 
 
-def convert_np_type(dtype: np.dtype, value: Union[int, float]) -> Union[int, float]:
+def convert_np_type(
+    dtype: Union[np.dtype, str], value: Union[int, float]
+) -> Union[int, float]:
     return np.dtype(dtype).type(value)
 
 
@@ -249,7 +251,10 @@ class RunningMeanStd(object):
         self.update_from_moments(batch_mean, batch_var, batch_count)
 
     def update_from_moments(
-        self, batch_mean: np.ndarray, batch_var: np.ndarray, batch_count: int
+        self,
+        batch_mean: np.ndarray,
+        batch_var: np.ndarray,
+        batch_count: int,
     ) -> None:
         delta = batch_mean - self.mean
         tot_count = self.count + batch_count

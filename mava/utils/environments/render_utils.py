@@ -12,13 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import collections
 import math
 import os
 import queue
 import time
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 
@@ -127,7 +126,7 @@ try:  # noqa
                     self._name_lengths[key] = name
             return self._name_lengths[key]
 
-        def render(self, mode: str) -> np.array:
+        def render(self, mode: str) -> Optional[np.ndarray]:
             self.obs = self.env._obs
             self.score = self.env.reward
             self.step = self.env._episode_steps
@@ -175,9 +174,9 @@ try:  # noqa
                 or self.env.map_name == "so_many_baneling"
                 or self.env.map_name == "2s_vs_1sc"
             ):
-                hmap = np.flip(hmap)
+                hmap = np.flip(hmap)  # type: ignore
             else:
-                hmap = np.rot90(hmap, axes=(1, 0))
+                hmap = np.rot90(hmap, axes=(1, 0))  # type: ignore
             if not hmap.any():
                 hmap = hmap + 100  # pylint: disable=g-no-augmented-assignment
             hmap_color = hmap_feature.color(hmap)

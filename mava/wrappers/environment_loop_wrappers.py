@@ -16,7 +16,7 @@
 """Generic environment loop wrapper to track system statistics"""
 
 import time
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dm_env
 import matplotlib.pyplot as plt
@@ -311,7 +311,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         self._append_frame()
         return timestep
 
-    def _retrieve_render(self) -> np.ndarray:
+    def _retrieve_render(self) -> Optional[np.ndarray]:
         render = None
         try:
             if self._format == "video":

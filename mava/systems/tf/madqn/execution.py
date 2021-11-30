@@ -53,6 +53,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         communication_module: Optional[BaseCommunicationModule] = None,
         fingerprint: bool = False,
         evaluator: bool = False,
+        interval: Optional[dict] = None,
     ):
         """Initialise the system executor
 
@@ -74,6 +75,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
                 stabilise experience replay. Defaults to False.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
@@ -85,6 +87,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         self._agent_net_keys = agent_net_keys
         self._fingerprint = fingerprint
         self._evaluator = evaluator
+        self._interval = interval
 
     @tf.function
     def _policy(
@@ -295,6 +298,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         communication_module: Optional[BaseCommunicationModule] = None,
         fingerprint: bool = False,
         evaluator: bool = False,
+        interval: Optional[dict] = None,
     ):
         """Initialise the system executor
 
@@ -319,6 +323,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
                 stabilise experience replay. Defaults to False.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
@@ -330,6 +335,8 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         self._store_recurrent_state = store_recurrent_state
         self._trainer = trainer
         self._agent_net_keys = agent_net_keys
+        self._interval = interval
+        self._evaluator = evaluator
 
         self._states: Dict[str, Any] = {}
 
@@ -450,6 +457,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         trainer: MADQNTrainer = None,
         fingerprint: bool = False,
         evaluator: bool = False,
+        interval: Optional[dict] = None,
     ):
         """Initialise the system executor
 
@@ -473,6 +481,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
                 stabilise experience replay. Defaults to False.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
@@ -485,6 +494,8 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         self._store_recurrent_state = store_recurrent_state
         self._trainer = trainer
         self._agent_net_keys = agent_net_keys
+        self._interval = interval
+        self._evaluator = evaluator
 
         self._states: Dict[str, Any] = {}
         self._messages: Dict[str, Any] = {}

@@ -17,6 +17,7 @@
 
 
 import types as tp
+import typing
 from functools import partial
 from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
 
@@ -141,7 +142,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         """Return list of all possible agents."""
         return self._possible_agents
 
-    def render(self, mode: str = "human") -> np.array:
+    def render(self, mode: str = "human") -> np.ndarray:
         """Renders the environment."""
         if mode == "human":
             show = True
@@ -166,9 +167,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
 
         self._reset_next_step = False
         self._agents = self.possible_agents[:]
-        self._discounts = {
-            agent: np.dtype("float32").type(1.0) for agent in self.agents
-        }
+
         observe, info = self._environment.reset()
         observations = self._create_observations(observe, info, self._environment.dones)
         rewards_spec = self.reward_spec()
@@ -233,10 +232,12 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     # Convert Flatland observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
     def _convert_observations(
-        self, observes: Dict[str, Tuple[np.array, np.ndarray]], dones: Dict[str, bool]
+        self,
+        observes: Dict[str, Tuple[np.ndarray, np.ndarray]],
+        dones: Dict[str, bool],
     ) -> Observation:
         return convert_dm_compatible_observations(
-            observes,
+            observes,  # type: ignore
             dones,
             self.action_spaces,
             self.observation_spaces,
@@ -248,16 +249,16 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     # be a tuple of the observation from the env and the agent info
     def _collate_obs_and_info(
         self, observes: Dict[int, np.ndarray], info: Dict[str, Dict[int, Any]]
-    ) -> Dict[str, Tuple[np.array, np.ndarray]]:
-        observations: Dict[str, Tuple[np.array, np.ndarray]] = {}
+    ) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
+        observations: Dict[str, Tuple[np.ndarray, np.ndarray]] = {}
         observes = self.preprocessor(observes)
         for agent, obs in observes.items():
             agent_id = get_agent_id(agent)
             agent_info = np.array(
                 [info[k][agent] for k in sort_str_num(info.keys())], dtype=np.float32
             )
-            obs = (obs, agent_info) if self._include_agent_info else obs
-            observations[agent_id] = obs
+            obs = (obs, agent_info) if self._include_agent_info else obs  # type: ignore
+            observations[agent_id] = obs  # type: ignore
 
         return observations
 
@@ -475,6 +476,7 @@ def min_gt(seq: Sequence, val: Any) -> Any:
     return min
 
 
+@typing.no_type_check
 def norm_obs_clip(
     obs: np.ndarray,
     clip_min: int = -1,
@@ -531,6 +533,7 @@ def _split_node_into_feature_groups(
     return data, distance, agent_data
 
 
+@typing.no_type_check
 def _split_subtree_into_feature_groups(
     node: Node, current_tree_depth: int, max_tree_depth: int
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -572,9 +575,9 @@ def split_tree_into_feature_groups(
         sub_data, sub_distance, sub_agent_data = _split_subtree_into_feature_groups(
             tree.childs[direction], 1, max_tree_depth
         )
-        data = np.concatenate((data, sub_data))
-        distance = np.concatenate((distance, sub_distance))
-        agent_data = np.concatenate((agent_data, sub_agent_data))
+        data = np.concatenate((data, sub_data))  # type: ignore
+        distance = np.concatenate((distance, sub_distance))  # type: ignore
+        agent_data = np.concatenate((agent_data, sub_agent_data))  # type: ignore
 
     return data, distance, agent_data
 
@@ -593,6 +596,7 @@ def normalize_observation(
     distance = norm_obs_clip(distance, normalize_to_range=True)
     agent_data = np.clip(agent_data, -1, 1)
     normalized_obs = np.array(
-        np.concatenate((np.concatenate((data, distance)), agent_data)), dtype=np.float32
+        np.concatenate((np.concatenate((data, distance)), agent_data)),  # type:ignore
+        dtype=np.float32,
     )
     return normalized_obs
