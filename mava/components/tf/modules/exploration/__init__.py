@@ -23,4 +23,6 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationTimestepScheduler,
     ConstantScheduler,
     apex_exploration_scheduler,
+    random_ma_apex_exploration_scheduler,
+    monotonic_ma_apex_exploration_scheduler,
 )

@@ -66,9 +66,7 @@ class LinearExplorationScheduler(BaseExplorationScheduler):
     ):
         """Decays epsilon linearly to epsilon_min."""
         super(LinearExplorationScheduler, self).__init__(
-            epsilon_start,
-            epsilon_min,
-            epsilon_decay,
+            epsilon_start, epsilon_min, epsilon_decay,
         )
 
     def decrement_epsilon(self) -> float:
@@ -90,9 +88,7 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
     ):
         """Decays epsilon exponentially to epsilon_min."""
         super(ExponentialExplorationScheduler, self).__init__(
-            epsilon_start,
-            epsilon_min,
-            epsilon_decay,
+            epsilon_start, epsilon_min, epsilon_decay,
         )
 
     def decrement_epsilon(self) -> float:
@@ -154,9 +150,7 @@ class LinearExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
     ):
         """Decays epsilon linearly to epsilon_min, in epsilon_decay_steps."""
         super(LinearExplorationTimestepScheduler, self).__init__(
-            epsilon_decay_steps,
-            epsilon_start,
-            epsilon_min,
+            epsilon_decay_steps, epsilon_start, epsilon_min,
         )
 
         self._delta = (
@@ -186,9 +180,7 @@ class ExponentialExplorationTimestepScheduler(BaseExplorationTimestepScheduler):
     ):
         """Decays epsilon exponentially to epsilon_min, in epsilon_decay_steps."""
         super(ExponentialExplorationTimestepScheduler, self).__init__(
-            epsilon_decay_steps,
-            epsilon_start,
-            epsilon_min,
+            epsilon_decay_steps, epsilon_start, epsilon_min,
         )
 
         self._exp_scaling = (
@@ -237,14 +229,83 @@ class ConstantScheduler:
         """
         return self._epsilon
 
+
 def apex_exploration_scheduler(
-        num_executors: int = 1,
-        epsilon: float = 0.4,
-        alpha: float = 7.,
-    ) -> Mapping[str, ConstantScheduler]:
+    num_executors: int = 1, epsilon: float = 0.4, alpha: float = 7.0,
+) -> Mapping[str, ConstantScheduler]:
+    """
+    Returns a scheduler with a single espilon per executor.
+    The espilons are given by Ape-X formula
+    Returns:
+        Ape-X exploration scheduler exploration_scheduler_fn
+    """
     exploration_scheduler_fn: Dict = {}
     for executor_id in range(num_executors):
         executor = f"executor_{executor_id}"
-        epsilon_i = epsilon**(1 + alpha * executor_id / (num_executors-1))
+        epsilon_i = epsilon ** (1 + alpha * executor_id / (num_executors - 1))
         exploration_scheduler_fn[executor] = ConstantScheduler(epsilon=epsilon_i)
+    print("exploration_scheduler_fn", exploration_scheduler_fn)
+    return exploration_scheduler_fn
+
+
+def monotonic_ma_apex_exploration_scheduler(
+    agent_ids,  # TODO: Add type list[str]
+    num_executors: int = 1,
+    epsilon: float = 0.4,
+    alpha: float = 7.0,
+) -> Mapping[str, Mapping[str, ConstantScheduler]]:
+    """
+    Returns a scheduler with distinct espilons per executor and agent.
+    The schedulers are assigned in increasing order to all executor.
+    Within every scheduler, the espilons are randomy assigned to agents.
+    Returns:
+        Monotonic Multi-Agent Ape-X exploration scheduler exploration_scheduler_fn
+    """
+    num_agents = len(agent_ids)
+    exploration_scheduler_fn: Dict = {}
+    for executor_id in range(num_executors):
+        executor = f"executor_{executor_id}"
+        exploration_scheduler_fn[executor] = {}
+        # Iterate over agents in a random order
+        executor_agents_list = np.random.choice(agent_ids, num_agents, replace=False)
+        for i, agent_id in enumerate(executor_agents_list):
+            eps = epsilon ** (
+                1
+                + alpha
+                * (num_agents * executor_id + i)
+                / (num_agents * num_executors - 1)
+            )
+            exploration_scheduler_fn[executor][agent_id] = ConstantScheduler(
+                epsilon=eps
+            )
+    return exploration_scheduler_fn
+
+
+def random_ma_apex_exploration_scheduler(
+    agent_ids,  # TODO: Add type list[str]
+    num_executors: int = 1,
+    epsilon: float = 0.4,
+    alpha: float = 7.0,
+) -> Mapping[str, Mapping[str, ConstantScheduler]]:
+    """
+    Returns a scheduler with distinct espilons per executor and agent.
+    All epsilons are shuffled and randomly assigned to a executor/agent
+    Returns:
+        Random Multi-Agent Ape-X exploration scheduler exploration_scheduler_fn
+    """
+    num_agents = len(agent_ids)
+    num_epsilons = num_agents * num_executors
+    epsilons = [
+        epsilon ** (1 + alpha * i / (num_epsilons - 1)) for i in range(num_epsilons)
+    ]
+    # Random order for epsilon values
+    np.random.shuffle(epsilons)
+    exploration_scheduler_fn: Dict = {}
+    for executor_id in range(num_executors):
+        executor = f"executor_{executor_id}"
+        exploration_scheduler_fn[executor] = {}
+        for i, agent_id in enumerate(agent_ids):
+            exploration_scheduler_fn[executor][agent_id] = ConstantScheduler(
+                epsilon=epsilons[num_agents * executor_id + i]
+            )
     return exploration_scheduler_fn
