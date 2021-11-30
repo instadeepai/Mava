@@ -504,7 +504,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 a bool indicatings if eval should run.
             """
             should_run_loop = False
-            eval_interval_key, eval_interval_count = eval_condtion
+            eval_interval_key, eval_interval_count = eval_condition
             counts = self.get_counts()
             if counts:
                 count = counts.get(eval_interval_key)
