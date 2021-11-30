@@ -505,13 +505,13 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             """Check if the eval loop should run in current step.
 
             Args:
-                eval_condtion : tuple containing interval key and count.
+                eval_condition : tuple containing interval key and count.
 
             Returns:
                 a bool indicatings if eval should run.
             """
             should_run_loop = False
-            eval_interval_key, eval_interval_count = eval_condtion
+            eval_interval_key, eval_interval_count = eval_condition
             counts = self.get_counts()
             if counts:
                 count = counts.get(eval_interval_key)
@@ -535,16 +535,18 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             self._executor._evaluator and self._executor._interval
         )
         if environment_loop_schedule:
-            eval_condtion = check_count_condition(self._executor._interval)
+            eval_condition = check_count_condition(self._executor._interval)
 
         while not should_terminate(episode_count, step_count):
-            if (not environment_loop_schedule) or should_run_loop(eval_condtion):
+            if (not environment_loop_schedule) or should_run_loop(eval_condition):
                 result = self.run_episode()
                 episode_count += 1
                 step_count += result["episode_length"]
                 # Log the given results.
                 self._logger.write(result)
-
+            else:
+                # Note: We assume that the evaluator will be running less than once per second.
+                time.sleep(1)
             # We need to get the latest counts if we are using eval intervals.
             if environment_loop_schedule:
                 self._executor.update()
