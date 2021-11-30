@@ -1,6 +1,6 @@
 ##########################################################
 # Core Mava image
-FROM nvcr.io/nvidia/cuda:11.4.2-cudnn8-runtime-ubuntu20.04
+FROM nvcr.io/nvidia/cuda:11.4.2-cudnn8-runtime-ubuntu20.04 as mava-core
 # Update packages
 RUN apt-get update -y && apt-get install -y python3-pip
 # Update python path
