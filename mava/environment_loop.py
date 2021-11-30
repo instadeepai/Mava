@@ -498,7 +498,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             """Check if the eval loop should run in current step.
 
             Args:
-                eval_condtion : tuple containing interval key and count.
+                eval_condition : tuple containing interval key and count.
 
             Returns:
                 a bool indicatings if eval should run.
