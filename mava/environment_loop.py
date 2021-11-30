@@ -531,7 +531,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
             eval_condtion = check_count_condition(self._executor._interval)
 
         while not should_terminate(episode_count, step_count):
-            if (not environment_loop_schedule) or should_run_loop(eval_condtion):
+            if (not environment_loop_schedule) or should_run_loop(eval_condition):
                 result = self.run_episode()
                 episode_count += 1
                 step_count += result["episode_length"]
