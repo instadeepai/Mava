@@ -22,9 +22,10 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
+from mava import specs as mava_specs
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
-    apex_exploration_scheduler,
+    random_ma_apex_exploration_scheduler,
 )
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
@@ -69,13 +70,21 @@ def main(_: Any) -> None:
         flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
     )
 
+    # Environment Spec
+    environment_spec = mava_specs.MAEnvironmentSpec(
+        environment_factory(evaluation=False)  # type:ignore
+    )
+
+    # Agent ids
+    agents = environment_spec.get_agent_ids()
+
     # Networks.
     network_factory = lp_utils.partial_kwargs(
         madqn.make_default_networks, policy_networks_layer_sizes=(128, 128)
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_dir = f"{FLAGS.base_dir}/apex-{FLAGS.mava_id}"
+    checkpoint_dir = f"{FLAGS.base_dir}/random-apex-{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
@@ -89,7 +98,9 @@ def main(_: Any) -> None:
     )
 
     num_executors = 8
-    exploration_scheduler_fn = apex_exploration_scheduler(num_executors=num_executors)
+    exploration_scheduler_fn = random_ma_apex_exploration_scheduler(
+        agent_ids=agents, num_executors=num_executors
+    )
 
     # distributed program
     program = madqn.MADQN(
