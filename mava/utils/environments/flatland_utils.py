@@ -47,7 +47,7 @@ def create_rail_env_with_tree_obs(
     malfunction_max_duration: int = 50,
     observation_max_path_depth: int = 30,
     observation_tree_depth: int = 2,
-) -> RailEnv:
+) -> "RailEnv":
     """Create a Flatland RailEnv with TreeObservation.
 
     Args:
