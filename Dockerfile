@@ -1,6 +1,10 @@
 ##########################################################
 # Core Mava image
 FROM nvcr.io/nvidia/cuda:11.4.2-cudnn8-runtime-ubuntu20.04 as mava-core
+# Flag to record agents
+ARG record
+# Ensure no installs try launch interactive screen
+ARG DEBIAN_FRONTEND=noninteractive
 # Update packages
 RUN apt-get update -y && apt-get install -y python3-pip
 # Update python path
@@ -10,8 +14,6 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10 &
 RUN python -m pip install --upgrade pip
 # Location of mava folder
 ARG folder=/home/app/mava
-# Flag to record agents
-ARG record
 ## working directory
 WORKDIR ${folder}
 ## Copy code from current path.
