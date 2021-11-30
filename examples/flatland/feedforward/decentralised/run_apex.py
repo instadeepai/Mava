@@ -23,7 +23,6 @@ import sonnet as snt
 from absl import app, flags
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
     apex_exploration_scheduler,
 )
 from mava.systems.tf import madqn
@@ -66,7 +65,7 @@ def main(_: Any) -> None:
 
     # Environment.
     environment_factory = functools.partial(
-        flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
+        flatland_env_factory, env_config=flatland_env_config
     )
 
     # Networks.

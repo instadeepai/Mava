@@ -65,7 +65,7 @@ def main(_: Any) -> None:
 
     # Environment.
     environment_factory = functools.partial(
-        flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
+        flatland_env_factory, env_config=flatland_env_config
     )
 
     # Networks.
