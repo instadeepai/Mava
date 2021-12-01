@@ -11,7 +11,7 @@ sudo apt-get update \
        cmake \
        python-opengl
 
-VERSION=16.0.0
+VERSION=16.0.1
 
 # fetch repo / ppa packages, etc
 sudo apt-get -y update --fix-missing
