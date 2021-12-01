@@ -17,12 +17,13 @@
 """MARL system stabilising modules."""
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
+    ConstantScheduler,
     ExponentialExplorationScheduler,
     ExponentialExplorationTimestepScheduler,
     LinearExplorationScheduler,
     LinearExplorationTimestepScheduler,
-    ConstantScheduler,
     apex_exploration_scheduler,
-    random_ma_apex_exploration_scheduler,
+    gaussian_ma_apex_exploration_scheduler,
     monotonic_ma_apex_exploration_scheduler,
+    random_ma_apex_exploration_scheduler,
 )
