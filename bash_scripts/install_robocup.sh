@@ -24,9 +24,13 @@ apt update && \
 
 apt -y install build-essential libboost-all-dev qt5-default libfontconfig1-dev libaudio-dev libxt-dev libglib2.0-dev libxi-dev libxrender-dev libboost-all-dev
 
+apt-get -y install vim
+
 wget https://github.com/rcsoccersim/rcssserver/archive/rcssserver-$VERSION.tar.gz && \
     tar xfz rcssserver-$VERSION.tar.gz && \
     cd rcssserver-rcssserver-$VERSION && \
+    # Temp fix for ubuntu 20.04 - https://github.com/rcsoccersim/rcssserver/issues/50
+    !vim -c "%s/-lrcssclangparser/librcssclangparser.la/g|wq" src/Makefile.am && \
     ./bootstrap && \
     ./configure && \
     make && \
@@ -44,6 +48,6 @@ wget https://github.com/rcsoccersim/rcssmonitor/archive/rcssmonitor-$VERSION.tar
 
 ldconfig && \
     apt update && \
-    apt install -y libboost-filesystem1.65.1 libboost-system1.65.1 libboost-program-options-dev tmux
+    apt install -y libboost-filesystem1.71.0 libboost-system1.71.0 libboost-program-options-dev tmux
 
 apt-get install -y libqt5widgets5
