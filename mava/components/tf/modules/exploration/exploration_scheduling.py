@@ -254,7 +254,8 @@ def apex_exploration_scheduler(
     exploration_scheduler_fn: Dict = {}
     for executor_id in range(num_executors):
         executor = f"executor_{executor_id}"
-        epsilon_i = epsilon ** (1 + alpha * executor_id / (num_executors - 1))
+        num_executers_minus_1 = float(num_executors - 1) if num_executors > 1 else 1.0
+        epsilon_i = epsilon ** (1 + alpha * executor_id / num_executers_minus_1)
         exploration_scheduler_fn[executor] = ConstantScheduler(epsilon=epsilon_i)
     return exploration_scheduler_fn
 
@@ -276,16 +277,16 @@ def monotonic_ma_apex_exploration_scheduler(
     """
     num_agents = len(agent_ids)
     exploration_scheduler_fn: defaultdict = defaultdict(dict)
+    num_epsilons = num_agents * num_executors
+    num_epsilons_minus_1 = float(num_epsilons - 1) if num_epsilons > 1 else 1.0
     for executor_id in range(num_executors):
         executor = f"executor_{executor_id}"
         # Iterate over agents in a random order
         executor_agents_list = np.random.choice(agent_ids, num_agents, replace=False)
+
         for i, agent_id in enumerate(executor_agents_list):
             eps = epsilon ** (
-                1
-                + alpha
-                * (num_agents * executor_id + i)
-                / (num_agents * num_executors - 1)
+                1 + alpha * (num_agents * executor_id + i) / num_epsilons_minus_1
             )
             exploration_scheduler_fn[executor][agent_id] = ConstantScheduler(
                 epsilon=eps
@@ -308,8 +309,9 @@ def random_ma_apex_exploration_scheduler(
     """
     num_agents = len(agent_ids)
     num_epsilons = num_agents * num_executors
+    num_epsilons_minus_1 = float(num_epsilons - 1) if num_epsilons > 1 else 1.0
     epsilons = [
-        epsilon ** (1 + alpha * i / (num_epsilons - 1)) for i in range(num_epsilons)
+        epsilon ** (1 + alpha * i / num_epsilons_minus_1) for i in range(num_epsilons)
     ]
     # Random order for epsilon values
     np.random.shuffle(epsilons)
