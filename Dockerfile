@@ -73,6 +73,7 @@ RUN python -m pip install -e .[flatland]
 ##########################################################
 ## Robocup Image
 FROM tf-core AS robocup
+RUN apt-get install sudo -y
 RUN ./bash_scripts/install_robocup.sh
 ##########################################################
 
