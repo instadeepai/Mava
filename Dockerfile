@@ -90,5 +90,5 @@ FROM tf-core AS meltingpot
 RUN apt-get install -y git
 RUN ./bash_scripts/install_meltingpot.sh
 # Add meltingpot to python path
-ENV PYTHONPATH "${PYTHONPATH}:/home/app/packages/meltingpot"
+ENV PYTHONPATH "${PYTHONPATH}:${folder}/../packages/meltingpot"
 ##########################################################

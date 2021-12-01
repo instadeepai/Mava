@@ -311,7 +311,7 @@ We have tested `mava` on Python 3.7, 3.8 and 3.9.
 
         Add MeltingPot to your python path:
         ```bash
-        export PYTHONPATH="${PYTHONPATH}:${PWD}/meltingpot"
+        export PYTHONPATH="${PYTHONPATH}:${PWD}/../packages/meltingpot"
         ```
 
         If this fails, follow instructions [here](https://github.com/deepmind/meltingpot#installation).
