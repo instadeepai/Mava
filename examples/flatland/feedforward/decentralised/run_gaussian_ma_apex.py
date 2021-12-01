@@ -83,7 +83,7 @@ def main(_: Any) -> None:
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
-    checkpoint_dir = f"{FLAGS.base_dir}/monotonic-apex-{FLAGS.mava_id}"
+    checkpoint_dir = f"{FLAGS.base_dir}/gaussian-apex-{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
     log_every = 10
