@@ -30,7 +30,7 @@ wget https://github.com/rcsoccersim/rcssserver/archive/rcssserver-$VERSION.tar.g
     tar xfz rcssserver-$VERSION.tar.gz && \
     cd rcssserver-rcssserver-$VERSION && \
     # Temp fix for ubuntu 20.04 - https://github.com/rcsoccersim/rcssserver/issues/50
-    !vim -c "%s/-lrcssclangparser/librcssclangparser.la/g|wq" src/Makefile.am && \
+    vim -c "%s/-lrcssclangparser/librcssclangparser.la/g|wq" src/Makefile.am && \
     ./bootstrap && \
     ./configure && \
     make && \
