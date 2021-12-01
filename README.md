@@ -208,11 +208,6 @@ We have tested `mava` on Python 3.7, 3.8 and 3.9.
         ```
     - MeltingPot
 
-        Download MeltingPot:
-        ```bash
-        git clone -b main https://github.com/deepmind/meltingpot
-        ```
-
         ```bash
         make build version=meltingpot
         ```
@@ -308,11 +303,6 @@ We have tested `mava` on Python 3.7, 3.8 and 3.9.
         ```
 
     - MeltingPot:
-
-        Download MeltingPot:
-        ```bash
-        git clone -b main https://github.com/deepmind/meltingpot
-        ```
 
         Install MeltingPot:
         ```bash
