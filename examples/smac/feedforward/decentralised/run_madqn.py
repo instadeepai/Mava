@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADQN on multi-agent Starcraft 2 (SMAC) environment."""
 
 import functools
 from datetime import datetime
@@ -23,10 +22,12 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationTimestepScheduler,
+)
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments import smac_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -45,10 +46,10 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-
+    """Example running MADQN on multi-agent Starcraft 2 (SMAC) environment."""
     # environment
     environment_factory = functools.partial(
-        smac_utils.make_environment, map_name=FLAGS.map_name
+        pettingzoo_utils.make_environment, env_class="smac", env_name=FLAGS.map_name
     )
 
     # Networks.
@@ -76,11 +77,13 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.05,
-        epsilon_decay=1e-5,
+        exploration_scheduler_fn=LinearExplorationTimestepScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=50000
+        ),
         importance_sampling_exponent=0.2,
-        optimizer=snt.optimizers.SGD(learning_rate=1e-2),
+        optimizer=snt.optimizers.RMSProp(
+            learning_rate=0.0005, epsilon=0.00001, decay=0.99
+        ),
         checkpoint_subpath=checkpoint_dir,
         batch_size=512,
         executor_variable_update_period=100,

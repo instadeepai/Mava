@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Network tests."""
+import sys
 from typing import Any, Dict
 
 import numpy as np
@@ -43,6 +44,8 @@ flags.DEFINE_string(
     "discrete",
     "Environment action space type (str).",
 )
+
+FLAGS(sys.argv)
 
 
 @pytest.mark.parametrize(
@@ -310,13 +313,16 @@ class TestNetworksSeeding:
             system (Any): network.
         """
         test_seed = 42
+
         network, network_params = network
 
+        tf.random.set_seed(test_seed)
         # Network 1
         net = network(**network_params, seed=test_seed)
         # Simple forward pass
         net(tf.ones([10, 10]))
 
+        tf.random.set_seed(test_seed)
         # Network 2
         net2 = network(**network_params, seed=test_seed)
         # Simple forward pass

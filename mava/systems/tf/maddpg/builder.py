@@ -44,6 +44,7 @@ DiscreteArray = dm_specs.DiscreteArray
 @dataclasses.dataclass
 class MADDPGConfig:
     """Configuration options for the MADDPG system.
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
@@ -84,6 +85,13 @@ class MADDPGConfig:
             include specifying maximum values for trainer_steps, trainer_walltime,
             evaluator_steps, evaluator_episodes, executor_episodes or executor_steps.
             E.g. termination_condition = {'trainer_steps': 100000}.
+        learning_rate_scheduler_fn: dict with two functions/classes (one for the
+                policy and one for the critic optimizer), that takes in a trainer
+                step t and returns the current learning rate,
+                e.g. {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
+                See
+                examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
+                for an example.
         evaluator_interval: An optional condition that is used to
             evaluate/test system performance after [evaluator_interval]
             condition has been met.
@@ -121,6 +129,7 @@ class MADDPGConfig:
     checkpoint_subpath: str = "~/mava/"
     termination_condition: Optional[Dict[str, int]] = None
     evaluator_interval: Optional[dict] = None
+    learning_rate_scheduler_fn: Optional[Any] = None
 
 
 class MADDPGBuilder:
@@ -594,6 +603,7 @@ class MADDPGBuilder:
             "dataset": dataset,
             "counts": counts,
             "logger": logger,
+            "learning_rate_scheduler_fn": self._config.learning_rate_scheduler_fn,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec

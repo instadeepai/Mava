@@ -161,48 +161,82 @@ All modules in Mava aim to work in this way.
 
 ## Installation
 
-We have tested `mava` on Python 3.6, 3.7 and 3.8.
+We have tested `mava` on Python 3.7, 3.8 and 3.9.
 
 ### Docker (**Recommended**)
 
-1. Build the docker image using the following make command:
-    ```bash
-    make build
-    ```
+1. Build the correct docker image using the `make` command:
+
     For Windows, before the docker image build, we recommend to first install the package manager [chocolatey](https://chocolatey.org/install) and run (to install make):
     ```bash
     choco install make
     ```
 
+    1.1 Only Mava core:
+    ```bash
+    make build
+    ```
+
+    1.2 For **optional** environments:
+    - PettingZoo:
+        ```
+        make build version=pz
+        ```
+
+    - SMAC: The StarCraft Multi-Agent Challenge Environments :
+
+        Install StarCraft II using a bash script, which is a slightly modified version of the script found [here][pymarl]:
+        ```
+        ./bash_scripts/install_sc2.sh
+        ```
+        Build Image
+        ```
+        make build version=sc2
+        ```
+
+    - Flatland:
+        ```
+        make build version=flatland
+        ```
+    - 2D RoboCup environment
+        ```
+        make build version=robocup
+        ```
+    - Openspiel
+        ```
+        make build version=openspiel
+        ```
+    - MeltingPot
+
+        ```bash
+        make build version=meltingpot
+        ```
+
+    To allow for agent recordings, where agents evaluations are recorded and these recordings are stored in a `/recordings` folder:
+    ```
+    make build version=[] record=true
+    ```
+
 2. Run an example:
     ```bash
-    make run EXAMPLE=dir/to/example/example.py
+    make run example=dir/to/example/example.py
     ```
-    For example, `make run EXAMPLE=examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py`. Alternatively, run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
+    For example, `make run example=examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py`.
+
+    Alternatively, run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
 
     To run an example with tensorboard viewing enabled, you can run
     ```bash
-    make run-tensorboard EXAMPLE=dir/to/example/example.py
+    make run-tensorboard example=dir/to/example/example.py
     ```
     and navigate to `http://127.0.0.1:6006/`.
 
-3. Install multi-agent Starcraft 2 environment [Optional]:
-    To install the environment, please run the provided bash script, which is a slightly modified version of the script found [here][pymarl].
-    ```bash
-    ./install_sc2.sh
+    To run an example where agents are recorded (**ensure you built the image with `record=true`**):
     ```
-    Or optionally install through docker (*each build downloads and installs StarCraftII ~3.8G* ):
-    ```bash
-    make build
-    make build_sc2
+    make run-record example=dir/to/example/example.py
     ```
+    Where example, is an example with recording available e.g. `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_record.py`.
 
-3. Install 2D RoboCup environment [Optional]:
-    To install the environment, please run the robocup docker build command after running the Mava docker build command.
-    ```bash
-    make build
-    make build_robocup
-    ```
 ### Python virtual environment
 
 1.  If not using docker, we strongly recommend using a
@@ -215,56 +249,79 @@ We have tested `mava` on Python 3.6, 3.7 and 3.8.
     pip install --upgrade pip setuptools
     ```
 
-2.  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset :
+    1.1  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset , Tensorflow and [Launchpad](https://github.com/deepmind/launchpad) - for distributed agent support :
+
+    - Install swig for box2d:
 
     ```bash
-    pip install id-mava
-    pip install id-mava[reverb]
+    sudo apt-get install swig -y
     ```
 
-    Or for nightly builds:
+    - Install core dependencies:
     ```bash
-    pip install id-mava-nightly
-    pip install id-mava-nightly[reverb]
+    pip install id-mava[tf,reverb,launchpad]
     ```
 
-3. To install dependencies for tensorflow agents:
-    ```bash
-    pip install id-mava[tf]
-    ```
-4. For distributed agent support:
-    ```bash
-    pip install id-mava[launchpad]
-    ```
-
-5. To install example environments, such as [PettingZoo](https://github.com/PettingZoo-Team/PettingZoo):
-    ```bash
-    pip install id-mava[envs]
-    ```
-6.  **NB**: For Flatland, OpenSpiel and SMAC environments, installations have to be done separately. Flatland can be installed using:
+    - Or for the latest version of mava from source (**you can do this for all pip install commands below for the latest depedencies**):
 
     ```bash
-    pip install id-mava[flatland]
+    pip install git+https://github.com/instadeepai/Mava[tf,reverb,launchpad]
     ```
-    and for OpenSpiel, after ensuring that the right cmake and clang versions are installed as specified [here](https://github.com/deepmind/open_spiel/blob/master/docs/install.md):
-    ```bash
-    pip install id-mava[open_spiel]
-    ```
-    For StarCraft II installation, this must be installed separately according to your operating system.
-    To install the StarCraft II ML environment and associated packages, please follow the instructions on [PySC2](https://github.com/deepmind/pysc2) to install the StarCraft II game files.
-    Please ensure you have the required game maps (for both PySC2 and SMAC) extracted in the StarCraft II maps directory.
-    Once this is done you can install the packages for the single agent case (PySC2) and the multi-agent case (SMAC).
 
-    ```bash
-    pip install pysc2
-    pip install git+https://github.com/oxwhirl/smac.git
+    1.2 For **optional** environments:
+    - PettingZoo:
+        ```
+        pip install id-mava[pz]
+        ```
+    - Flatland:
+        ```
+        pip install id-mava[flatland]
+        ```
+    - Openspiel:
+        ```
+        pip install id-mava[open_spiel]
+        ```
+    - 2D RoboCup environment:
+
+        A local install has only been tested using the Ubuntu 18.04 operating system.
+        The installation can be performed by running the RoboCup bash script while inside the Mava
+        python virtual environment.
+
+        ```bash
+        ./bash_scripts/install_robocup.sh
+        ```
+
+    - StarCraft II:
+
+        First install StarCraft II
+        ```bash
+        ./bash_scripts/install_sc2.sh
+        ```
+        Then set SC2PATH to the location of 3rdparty/StarCraftII, e.g. :
+        ```
+        export SC2PATH="/home/Documents/Code/Mava/3rdparty/StarCraftII"
+        ```
+
+    - MeltingPot:
+
+        Install MeltingPot:
+        ```bash
+        ./bash_scripts/install_meltingpot.sh
+        ```
+
+        Add MeltingPot to your python path:
+        ```bash
+        export PYTHONPATH="${PYTHONPATH}:${PWD}/../packages/meltingpot"
+        ```
+
+        If this fails, follow instructions [here](https://github.com/deepmind/meltingpot#installation).
+
+2. Run an example:
     ```
-7.  For the 2D RoboCup environment, a local install has only been tested using the Ubuntu 18.04 operating system.
-    The installation can be performed by running the RoboCup bash script while inside the Mava
-    python virtual environment.
-    ```bash
-    ./install_robocup.sh
-We also have a list of [optional installs](OPTIONAL_INSTALL.md) for extra functionality such as the use of Atari environments, environment wrappers, gpu support and agent episode recording.
+    python dir/to/example/example.py
+    ```
+
+    For certain examples and extra functionality such as the use of Atari environments, environment wrappers, gpu support and agent episode recording, we also have a list of [optional installs](OPTIONAL_INSTALL.md).
 
 ## Debugging
 

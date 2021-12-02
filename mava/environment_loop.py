@@ -147,9 +147,9 @@ class SequentialEnvironmentLoop(acme.core.Worker):
         # save action, timestep pairs for current agent
         timestep = self._set_step_type(timestep, self._step_type[agent])
         self._agent_action_timestep[agent] = (
-            self._prev_action[agent],
+            self._prev_action[agent],  # type: ignore
             timestep,
-        )  # type: ignore
+        )
 
         self._prev_timestep[agent] = timestep
 
@@ -181,9 +181,9 @@ class SequentialEnvironmentLoop(acme.core.Worker):
             agent = self._environment.current_agent
             timestep = self._set_step_type(timestep, dm_env.StepType.LAST)
             self._agent_action_timestep[agent] = (
-                self._prev_action[agent],
+                self._prev_action[agent],  # type: ignore
                 timestep,
-            )  # type: ignore
+            )
 
             timestep = self._environment.step(
                 generate_zeros_from_spec(self._environment.action_spec()[agent])
@@ -441,6 +441,13 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             # Book-keeping.
             episode_steps += 1
+
+            if hasattr(self._executor, "after_action_selection"):
+                total_steps_before_current_episode = self._counter.get_counts().get(
+                    "executor_steps", 0
+                )
+                current_step_t = total_steps_before_current_episode + episode_steps
+                self._executor.after_action_selection(current_step_t)
 
             self._compute_step_statistics(rewards)
 

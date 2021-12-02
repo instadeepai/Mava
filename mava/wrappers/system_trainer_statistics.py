@@ -84,6 +84,10 @@ class TrainerStatisticsBase(TrainerWrapperBase):
         if self._logger:
             self._logger.write(fetches)
 
+    def after_trainer_step(self) -> None:
+        if hasattr(self._trainer, "after_trainer_step"):
+            self._trainer.after_trainer_step()
+
 
 class DetailedTrainerStatistics(TrainerStatisticsBase):
     """A trainer class that logs episode stats."""
@@ -140,11 +144,12 @@ class DetailedTrainerStatistics(TrainerStatisticsBase):
             for key, val in datum.items():
                 network_running_statistics: Dict[str, float] = {}
                 network_running_statistics[f"{network}_raw_{key}"] = val
-                self._networks_stats[network][key].push(val)
-                for stat in self._summary_stats:
-                    network_running_statistics[
-                        f"{network}_{stat}_{key}"
-                    ] = self._networks_stats[network][key].__getattribute__(stat)()
+                if key in self._networks_stats[network]:
+                    self._networks_stats[network][key].push(val)
+                    for stat in self._summary_stats:
+                        network_running_statistics[
+                            f"{network}_{stat}_{key}"
+                        ] = self._networks_stats[network][key].__getattribute__(stat)()
 
                 self._network_loggers[network].write(network_running_statistics)
 

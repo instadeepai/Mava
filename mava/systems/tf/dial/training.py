@@ -16,7 +16,7 @@
 
 """DIAL system trainer implementation."""
 
-from typing import Any, Dict, List, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import sonnet as snt
 import tensorflow as tf
@@ -27,9 +27,6 @@ from acme.types import NestedArray
 from acme.utils import counting, loggers
 
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
-)
 from mava.systems.tf.madqn.training import MADQNRecurrentCommTrainer
 from mava.utils import training_utils as train_utils
 
@@ -55,7 +52,6 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         discount: float,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
-        exploration_scheduler: LinearExplorationScheduler,
         communication_module: BaseCommunicationModule,
         max_gradient_norm: float = None,
         fingerprint: bool = False,
@@ -63,6 +59,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
     ):
         """Initialise DIAL trainer for switch game
 
@@ -80,8 +77,6 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
                 Defaults to {}.
             checkpoint_minute_interval (int): The number of minutes to wait between
                 checkpoints.
-            exploration_scheduler (LinearExplorationScheduler): function specifying a
-                decaying scheduler for epsilon exploration.
             communication_module (BaseCommunicationModule): module for communication
                 between agents.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -95,6 +90,8 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
                 True.
             checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
         """
 
         super().__init__(
@@ -108,7 +105,6 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             discount=discount,
             agent_net_keys=agent_net_keys,
             checkpoint_minute_interval=checkpoint_minute_interval,
-            exploration_scheduler=exploration_scheduler,
             max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,
             counter=counter,
@@ -116,6 +112,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             communication_module=communication_module,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _forward(self, inputs: Any) -> None:
@@ -148,7 +145,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
 
         with tf.GradientTape(persistent=True) as tape:
             q_network_losses: Dict[str, NestedArray] = {
-                agent: {"q_value_loss": tf.zeros(())} for agent in self._agents
+                agent: {"policy_loss": tf.zeros(())} for agent in self._agents
             }
 
             state = {agent: core_state[agent][0] for agent in self._agents}
@@ -230,7 +227,7 @@ class DIALSwitchTrainer(MADQNRecurrentCommTrainer):
 
                     loss = tf.reduce_mean(loss[t - 1 <= ep_end])
                     # loss = tf.reduce_mean(loss)
-                    q_network_losses[agent]["q_value_loss"] += loss
+                    q_network_losses[agent]["policy_loss"] += loss
 
         self._q_network_losses = q_network_losses
         self.tape = tape

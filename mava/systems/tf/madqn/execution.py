@@ -16,7 +16,7 @@
 
 """MADQN system executor implementation."""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import dm_env
 import numpy as np
@@ -28,6 +28,9 @@ from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    BaseExplorationTimestepScheduler,
+)
 from mava.systems.tf.executors import (
     FeedForwardExecutor,
     RecurrentCommExecutor,
@@ -37,7 +40,58 @@ from mava.systems.tf.madqn.training import MADQNTrainer
 from mava.types import OLT
 
 
-class MADQNFeedForwardExecutor(FeedForwardExecutor):
+class DQNExecutor:
+    def __init__(self, action_selectors: Dict):
+        self._action_selectors = action_selectors
+
+    def _get_epsilon(self) -> Union[float, np.ndarray]:
+        """Return epsilon.
+
+        Returns:
+            epsilon values.
+        """
+        data = list(
+            {
+                action_selector.get_epsilon()
+                for action_selector in self._action_selectors.values()
+            }
+        )
+        if len(data) == 1:
+            return data[0]
+        else:
+            return np.array(list(data))
+
+    def _decrement_epsilon(self, time_t: Optional[int]) -> None:
+        """Decrements epsilon in action selectors."""
+        {
+            action_selector.decrement_epsilon_time_t(time_t)
+            if (
+                isinstance(
+                    action_selector._exploration_scheduler,
+                    BaseExplorationTimestepScheduler,
+                )
+                and time_t
+            )
+            else action_selector.decrement_epsilon()
+            for action_selector in self._action_selectors.values()
+        }
+
+    def after_action_selection(self, time_t: int) -> None:
+        self._decrement_epsilon(time_t)
+
+    def get_stats(self) -> Dict:
+        """Return extra stats to log.
+
+        Returns:
+            epsilon information.
+        """
+        return {
+            f"{network}_epsilon": action_selector.get_epsilon()
+            for network, action_selector in self._action_selectors.items()
+        }
+
+
+class MADQNFeedForwardExecutor(FeedForwardExecutor, DQNExecutor):
     """A feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system.
     """
@@ -95,7 +149,6 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         agent: str,
         observation: types.NestedTensor,
         legal_actions: types.NestedTensor,
-        epsilon: tf.Tensor,
         fingerprint: Optional[tf.Tensor] = None,
     ) -> types.NestedTensor:
         """Agent specific policy function
@@ -106,14 +159,12 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
                 environment.
             legal_actions (types.NestedTensor): actions allowed to be taken at the
                 current observation.
-            epsilon (tf.Tensor): value for epsilon greedy action selection.
             fingerprint (Optional[tf.Tensor], optional): policy fingerprints. Defaults
                 to None.
 
         Returns:
             types.NestedTensor: agent action
         """
-
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
         batched_legals = tf2_utils.add_batch_dim(legal_actions)
@@ -128,9 +179,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         else:
             q_values = self._q_networks[agent_net_key](batched_observation)
 
-        # select legal action
-        action = self._action_selectors[agent_net_key](
-            q_values, batched_legals, epsilon=epsilon
+        action = self._action_selectors[agent](
+            action_values=q_values, legal_actions_mask=batched_legals
         )
 
         return action
@@ -149,27 +199,19 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             types.NestedArray: agent action
         """
 
-        if not self._evaluator:
-            epsilon = self._trainer.get_epsilon()
-        else:
-            epsilon = 1e-10
-
-        epsilon = tf.convert_to_tensor(epsilon)
-
         if self._fingerprint:
             trainer_step = self._trainer.get_trainer_steps()
-            fingerprint = tf.concat([epsilon, trainer_step], axis=0)
+            fingerprint = tf.concat([self._get_epsilon(), trainer_step], axis=0)
             fingerprint = tf.expand_dims(fingerprint, axis=0)
             fingerprint = tf.cast(fingerprint, "float32")
         else:
             fingerprint = None
 
         action = self._policy(
-            agent,
-            observation.observation,
-            observation.legal_actions,
-            epsilon,
-            fingerprint,
+            agent=agent,
+            observation=observation.observation,
+            legal_actions=observation.legal_actions,
+            fingerprint=fingerprint,
         )
 
         action = tf2_utils.to_numpy_squeeze(action)
@@ -191,7 +233,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         """
 
         if self._fingerprint and self._trainer is not None:
-            epsilon = self._trainer.get_epsilon()
+            epsilon = self._get_epsilon()
             trainer_step = self._trainer.get_trainer_steps()
             fingerprint = np.array([epsilon, trainer_step])
             extras.update({"fingerprint": fingerprint})
@@ -217,7 +259,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
 
         if self._fingerprint and self._trainer is not None:
             trainer_step = self._trainer.get_trainer_steps()
-            epsilon = self._trainer.get_epsilon()
+            epsilon = self._get_epsilon()
             fingerprint = np.array([epsilon, trainer_step])
             next_extras.update({"fingerprint": fingerprint})
 
@@ -236,35 +278,9 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         Returns:
             Dict[str, types.NestedArray]: actions for all agents in the system.
         """
-
         actions = {}
         for agent, observation in observations.items():
-            # Pass the observation through the policy network.
-            if not self._evaluator:
-                epsilon = self._trainer.get_epsilon()
-            else:
-                # Note (dries): For some reason 0 epsilon breaks on StarCraft.
-                epsilon = 1e-10
-
-            epsilon = tf.convert_to_tensor(epsilon)
-
-            if self._fingerprint:
-                trainer_step = self._trainer.get_trainer_steps()
-                fingerprint = tf.concat([epsilon, trainer_step], axis=0)
-                fingerprint = tf.expand_dims(fingerprint, axis=0)
-                fingerprint = tf.cast(fingerprint, "float32")
-            else:
-                fingerprint = None
-
-            action = self._policy(
-                agent,
-                observation.observation,
-                observation.legal_actions,
-                epsilon,
-                fingerprint,
-            )
-
-            actions[agent] = tf2_utils.to_numpy_squeeze(action)
+            actions[agent] = self.select_action(agent, observation)
 
         # Return a numpy array with squeezed out batch dimension.
         return actions
@@ -281,7 +297,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             self._variable_client.update(wait)
 
 
-class MADQNRecurrentExecutor(RecurrentExecutor):
+class MADQNRecurrentExecutor(RecurrentExecutor, DQNExecutor):
     """A recurrent executor.
     An executor based on a recurrent policy for each agent in the system
     """
@@ -347,7 +363,6 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         observation: types.NestedTensor,
         state: types.NestedTensor,
         legal_actions: types.NestedTensor,
-        epsilon: tf.Tensor,
     ) -> types.NestedTensor:
         """Agent specific policy function
 
@@ -359,7 +374,6 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
             message (types.NestedTensor): received agent messsage.
             legal_actions (types.NestedTensor): actions allowed to be taken at the
                 current observation.
-            epsilon (tf.Tensor): value for epsilon greedy action selection.
 
         Returns:
             types.NestedTensor: action and new recurrent hidden state
@@ -376,9 +390,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         q_values, new_state = self._q_networks[agent_key](batched_observation, state)
 
         # select legal action
-        action = self._action_selectors[agent_key](
-            q_values, batched_legals, epsilon=epsilon
-        )
+        action = self._action_selectors[agent](q_values, batched_legals)
 
         return action, new_state
 
@@ -396,7 +408,16 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
             NotImplementedError: has not been implemented for this training type.
         """
 
-        raise NotImplementedError
+        policy_output, new_state = self._policy(
+            agent,
+            observation.observation,
+            self._states[agent],
+            observation.legal_actions,
+        )
+
+        self._states[agent] = new_state
+
+        return tf2_utils.to_numpy_squeeze(policy_output)
 
     def select_actions(
         self, observations: Dict[str, OLT]
@@ -412,34 +433,14 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
         """
 
         actions = {}
-
         for agent, observation in observations.items():
-
-            # Pass the observation through the policy network.
-            if self._trainer is not None:
-                epsilon = self._trainer.get_epsilon()
-            else:
-                epsilon = 0.0
-
-            epsilon = tf.convert_to_tensor(epsilon)
-
-            policy_output, new_state = self._policy(
-                agent,
-                observation.observation,
-                self._states[agent],
-                observation.legal_actions,
-                epsilon,
-            )
-
-            self._states[agent] = new_state
-
-            actions[agent] = tf2_utils.to_numpy_squeeze(policy_output)
+            actions[agent] = self.select_action(agent, observation)
 
         # Return a numpy array with squeezed out batch dimension.
         return actions
 
 
-class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
+class MADQNRecurrentCommExecutor(RecurrentCommExecutor, DQNExecutor):
     """A recurrent executor with communication.
     An executor based on a recurrent policy for each agent in the system using learned
     communication.
@@ -508,7 +509,6 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         state: types.NestedTensor,
         message: types.NestedTensor,
         legal_actions: types.NestedTensor,
-        epsilon: tf.Tensor,
     ) -> types.NestedTensor:
         """Agent specific policy function
 
@@ -520,7 +520,6 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
             message (types.NestedTensor): received agent messsage.
             legal_actions (types.NestedTensor): actions allowed to be taken at the
                 current observation.
-            epsilon (tf.Tensor): value for epsilon greedy action selection.
 
         Returns:
             types.NestedTensor: action and new recurrent hidden state
@@ -539,9 +538,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
         )
 
         # select legal action
-        action = self._action_selectors[agent_key](
-            q_values, batched_legals, epsilon=epsilon
-        )
+        action = self._action_selectors[agent](q_values, batched_legals)
 
         return (action, m_values), new_state
 
@@ -559,7 +556,19 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
             NotImplementedError: has not been implemented for this training type.
         """
 
-        raise NotImplementedError
+        message_inputs = self._communication_module.process_messages(self._messages)
+        (policy_output, new_message), new_state = self._policy(
+            agent,
+            observation.observation,
+            self._states[agent],
+            message_inputs[agent],
+            observation.legal_actions,
+        )
+
+        self._states[agent] = new_state
+        self._messages[agent] = new_message
+
+        return tf2_utils.to_numpy_squeeze(policy_output)
 
     def select_actions(
         self, observations: Dict[str, OLT]
@@ -576,31 +585,8 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
 
         actions = {}
 
-        message_inputs = self._communication_module.process_messages(self._messages)
-
         for agent, observation in observations.items():
-
-            # Pass the observation through the policy network.
-            if self._trainer is not None:
-                epsilon = self._trainer.get_epsilon()
-            else:
-                epsilon = 0.0
-
-            epsilon = tf.convert_to_tensor(epsilon)
-
-            (policy_output, new_message), new_state = self._policy(
-                agent,
-                observation.observation,
-                self._states[agent],
-                message_inputs[agent],
-                observation.legal_actions,
-                epsilon,
-            )
-
-            self._states[agent] = new_state
-            self._messages[agent] = new_message
-
-            actions[agent] = tf2_utils.to_numpy_squeeze(policy_output)
+            actions[agent] = self.select_action(agent, observation)
 
         # Return a numpy array with squeezed out batch dimension.
         return actions

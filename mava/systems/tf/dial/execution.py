@@ -90,6 +90,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         self._evaluator = evaluator
         self._interval = interval
 
+    @tf.function
     def _policy(
         self,
         agent: str,
@@ -97,7 +98,6 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         state: types.NestedTensor,
         message: types.NestedTensor,
         legal_actions: types.NestedTensor,
-        epsilon: tf.Tensor,
     ) -> types.NestedTensor:
         """Agent specific policy function
 
@@ -109,7 +109,6 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
             message (types.NestedTensor): received agent messsage.
             legal_actions (types.NestedTensor): actions allowed to be taken at the
                 current observation.
-            epsilon (tf.Tensor): value for epsilon greedy action selection.
 
         Returns:
             types.NestedTensor: action, message and new recurrent hidden state
@@ -121,7 +120,6 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
             state,
             message,
             legal_actions,
-            epsilon,
         )
 
         # Mask message if obs[0] == 1.

@@ -674,6 +674,6 @@ class RecurrentCommExecutor(RecurrentExecutor):
 
         actions = {}
         for agent, observation in observations.items():
-            actions[agent] = self._select_action(agent, observations)
+            actions[agent] = self._select_action(agent, observation)
         # Return a numpy array with squeezed out batch dimension.
         return actions

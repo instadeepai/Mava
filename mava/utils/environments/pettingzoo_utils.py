@@ -20,8 +20,30 @@ from typing import Any, List, Optional, Union
 
 import dm_env
 import numpy as np
-import supersuit
-from supersuit import black_death_v1
+
+try:
+    import supersuit
+
+    _has_supersuit = True
+except ModuleNotFoundError:
+    _has_supersuit = False
+    pass
+
+try:
+    from smac.env.pettingzoo import StarCraft2PZEnv
+
+    _has_smac = True
+except ModuleNotFoundError:
+    _has_smac = False
+    pass
+
+try:
+    import pettingzoo  # noqa: F401
+
+    _has_petting_zoo = True
+except ModuleNotFoundError:
+    _has_petting_zoo = False
+    pass
 
 from mava.wrappers import (
     ParallelEnvWrapper,
@@ -34,28 +56,37 @@ from mava.wrappers import (
 def atari_preprocessing(
     env: Union[ParallelEnvWrapper, SequentialEnvWrapper]
 ) -> Union[ParallelEnvWrapper, SequentialEnvWrapper]:
+    """Preprocess atari env.
 
-    # Preprocessing
-    env = supersuit.max_observation_v0(env, 2)
+    Args:
+        env : a mava supported atari env.
 
-    # repeat_action_probability is set to 0.25
-    # to introduce non-determinism to the system
-    env = supersuit.sticky_actions_v0(env, repeat_action_probability=0.25)
+    Returns:
+        a wrapped mava env.
+    """
+    if _has_supersuit:
+        # Preprocessing
+        env = supersuit.max_observation_v0(env, 2)
 
-    # skip frames for faster processing and less control
-    # to be compatable with gym, use frame_skip(env, (2,5))
-    env = supersuit.frame_skip_v0(env, 4)
+        # repeat_action_probability is set to 0.25
+        # to introduce non-determinism to the system
+        env = supersuit.sticky_actions_v0(env, repeat_action_probability=0.25)
 
-    # downscale observation for faster processing
-    env = supersuit.resize_v0(env, 84, 84)
+        # skip frames for faster processing and less control
+        # to be compatable with gym, use frame_skip(env, (2,5))
+        env = supersuit.frame_skip_v0(env, 4)
 
-    # allow agent to see everything on the screen
-    # despite Atari's flickering screen problem
-    env = supersuit.frame_stack_v1(env, 4)
+        # downscale observation for faster processing
+        env = supersuit.resize_v0(env, 84, 84)
 
-    # set dtype to float32
-    env = supersuit.dtype_v0(env, np.float32)
+        # allow agent to see everything on the screen
+        # despite Atari's flickering screen problem
+        env = supersuit.frame_stack_v1(env, 4)
 
+        # set dtype to float32
+        env = supersuit.dtype_v0(env, np.float32)
+    else:
+        raise Exception("Supersuit is not installed.")
     return env
 
 
@@ -64,7 +95,7 @@ def make_environment(
     env_type: str = "parallel",
     env_class: str = "mpe",
     env_name: str = "simple_spread_v2",
-    env_preprocess_wrappers: Optional[List] = [(black_death_v1, None)],
+    env_preprocess_wrappers: Optional[List] = None,
     random_seed: Optional[int] = None,
     **kwargs: Any,
 ) -> dm_env.Environment:
@@ -78,28 +109,41 @@ def make_environment(
     Returns:
         A Pettingzoo environment wrapped as a DeepMind environment.
     """
-    del evaluation
+    if _has_petting_zoo:
+        del evaluation
 
-    env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
+        if env_class == "smac":
+            if _has_smac:
+                env = StarCraft2PZEnv.parallel_env(map_name=env_name)
+                # wrap parallel environment
+                environment = PettingZooParallelEnvWrapper(
+                    env, env_preprocess_wrappers=[], return_state_info=True
+                )
+            else:
+                raise Exception("Smac is not installed.")
+        else:
+            env_module = importlib.import_module(f"pettingzoo.{env_class}.{env_name}")
 
-    if env_type == "parallel":
-        env = env_module.parallel_env(**kwargs)  # type: ignore
-        if env_class == "atari":
-            env = atari_preprocessing(env)
-        # wrap parallel environment
-        environment = PettingZooParallelEnvWrapper(
-            env, env_preprocess_wrappers=env_preprocess_wrappers
-        )
-    elif env_type == "sequential":
-        env = env_module.env(**kwargs)  # type: ignore
-        if env_class == "atari":
-            env = atari_preprocessing(env)
-        # wrap sequential environment
-        environment = PettingZooAECEnvWrapper(
-            env, env_preprocess_wrappers=env_preprocess_wrappers
-        )
+            if env_type == "parallel":
+                env = env_module.parallel_env(**kwargs)  # type: ignore
+                if env_class == "atari":
+                    env = atari_preprocessing(env)
+                # wrap parallel environment
+                environment = PettingZooParallelEnvWrapper(
+                    env, env_preprocess_wrappers=env_preprocess_wrappers
+                )
+            elif env_type == "sequential":
+                env = env_module.env(**kwargs)  # type: ignore
+                if env_class == "atari":
+                    env = atari_preprocessing(env)
+                # wrap sequential environment
+                environment = PettingZooAECEnvWrapper(
+                    env, env_preprocess_wrappers=env_preprocess_wrappers
+                )
 
-    if random_seed and hasattr(environment, "seed"):
-        environment.seed(random_seed)
+        if random_seed and hasattr(environment, "seed"):
+            environment.seed(random_seed)
+    else:
+        raise Exception("Pettingzoo is not installed.")
 
     return environment
