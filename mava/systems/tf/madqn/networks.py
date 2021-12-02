@@ -12,17 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from typing import Dict, Mapping, Optional, Sequence, Union
 
 import sonnet as snt
-import tensorflow as tf
 from acme import types
 from acme.tf.networks.atari import DQNAtariNetwork
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
-from mava.components.tf.networks import epsilon_greedy_action_selector
 from mava.components.tf.networks.communication import CommunicationNetwork
+from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 from mava.utils.enums import ArchitectureType, Network
 
 
@@ -86,15 +86,6 @@ def make_default_networks(
             key: policy_networks_layer_sizes for key in specs.keys()
         }
 
-    def action_selector_fn(
-        q_values: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: Optional[tf.Variable] = None,
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
-
     q_networks = {}
     action_selectors = {}
     for key in specs.keys():
@@ -149,9 +140,8 @@ def make_default_networks(
 
             q_network = q_network_func(q_network)
 
-        # epsilon greedy action selector
         q_networks[key] = q_network
-        action_selectors[key] = action_selector_fn
+        action_selectors[key] = EpsilonGreedy
 
     return {
         "q_networks": q_networks,

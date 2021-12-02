@@ -10,6 +10,7 @@ from mava.types import Action
 
 class OpenSpielSequentialEnvironmentLoop(SequentialEnvironmentLoop):
     """A Sequential MARL environment loop.
+
     This takes `Environment` and `Executor` instances and coordinates their
     interaction. Executors are updated if `should_update=True`. This can be used as:
         loop = EnvironmentLoop(environment, executor)

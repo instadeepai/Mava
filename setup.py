@@ -26,35 +26,35 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb~=0.4.0",
+    "dm-reverb~=0.6.0",
     "jax",
     "jaxlib",
 ]
 
 tf_requirements = [
-    "tensorflow~=2.6.0",
-    "tensorflow_probability~=0.13.0",
+    "tensorflow~=2.7.0",
+    "tensorflow_probability~=0.14.1",
     "dm-sonnet",
     "trfl",
 ]
 
-env_requirements = [
-    "pettingzoo~=1.11.0",
+pettingzoo_requirements = [
+    "pettingzoo~=1.13.1",
     "multi_agent_ale_py",
-    "supersuit==2.6.6",
+    "supersuit==3.3.1",
     "pygame",
     "pysc2",
 ]
 
-launchpad_requirements = [
-    "dm-launchpad-nightly",
-]
+launchpad_requirements = ["dm-launchpad~=0.3.2"]
 
+smac_requirements = ["pysc2", "SMAC @ git+https://github.com/oxwhirl/smac.git"]
 testing_formatting_requirements = [
+    "pytest==6.2.4",
     "pre-commit",
     "mypy==0.910",
     "pytest-xdist",
-    "flake8==3.9.1",
+    "flake8==3.8.2",
     "black==21.4b1",
     "pytest-cov",
     "interrogate",
@@ -64,7 +64,7 @@ testing_formatting_requirements = [
 
 record_episode_requirements = ["array2gif"]
 
-flatland_requirements = ["flatland-rl==2.2.2"]
+flatland_requirements = ["flatland-rl==3.0.1"]
 open_spiel_requirements = ["open_spiel"]
 
 long_description = """Mava is a library for building multi-agent reinforcement
@@ -102,17 +102,20 @@ setup(
         "pillow",
         "matplotlib",
         "dataclasses",
-        "Box2D",
+        "box2d-py",
+        "gym",
     ],
     extras_require={
         "tf": tf_requirements,
-        "envs": env_requirements,
+        "pz": pettingzoo_requirements,
         "flatland": flatland_requirements,
         "open_spiel": open_spiel_requirements,
         "reverb": reverb_requirements,
         "launchpad": launchpad_requirements,
         "testing_formatting": testing_formatting_requirements,
         "record_episode": record_episode_requirements,
+        "sc2": smac_requirements,
+        "envs": pettingzoo_requirements + open_spiel_requirements + smac_requirements,
     },
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -121,9 +124,9 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
     ],
 )

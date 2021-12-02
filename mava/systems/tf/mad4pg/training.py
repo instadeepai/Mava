@@ -16,7 +16,7 @@
 
 """MAD4PG system trainer implementation."""
 
-from typing import Any, Dict, List, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import reverb
 import sonnet as snt
@@ -74,6 +74,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise MAD4PG trainer
         Args:
@@ -107,6 +108,9 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 before clipping is applied.
             logger: logger object for logging trainer
                 statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         """Initialise the decentralised MADDPG trainer."""
@@ -131,6 +135,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             agent_net_keys=agent_net_keys,
             max_gradient_norm=max_gradient_norm,
             logger=logger,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     # Forward pass that calculates loss.
@@ -247,6 +252,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the decentralised MAD4PG trainer."""
         super().__init__(
@@ -270,6 +276,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -298,6 +305,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the centralised MAD4PG trainer."""
         super().__init__(
@@ -321,6 +329,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -349,6 +358,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the state-based MAD4PG trainer."""
         super().__init__(
@@ -372,6 +382,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -404,6 +415,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise Recurrent MAD4PG trainer
 
@@ -438,6 +450,9 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 before clipping is applied.
             logger: logger object for logging trainer
                 statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         super().__init__(
@@ -462,6 +477,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             variable_client=variable_client,
             counts=counts,
             bootstrap_n=bootstrap_n,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     # Forward pass that calculates loss.
@@ -632,6 +648,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -656,6 +673,7 @@ class MAD4PGDecentralisedRecurrentTrainer(
             variable_client=variable_client,
             counts=counts,
             bootstrap_n=bootstrap_n,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -687,6 +705,7 @@ class MAD4PGCentralisedRecurrentTrainer(
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -711,6 +730,7 @@ class MAD4PGCentralisedRecurrentTrainer(
             variable_client=variable_client,
             counts=counts,
             bootstrap_n=bootstrap_n,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -742,6 +762,7 @@ class MAD4PGStateBasedRecurrentTrainer(
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -766,6 +787,7 @@ class MAD4PGStateBasedRecurrentTrainer(
             variable_client=variable_client,
             counts=counts,
             bootstrap_n=bootstrap_n,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 

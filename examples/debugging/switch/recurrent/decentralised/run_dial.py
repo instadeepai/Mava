@@ -89,11 +89,11 @@ def main(_: Any) -> None:
         num_executors=1,
         trainer_fn=dial.DIALSwitchTrainer,
         executor_fn=dial.DIALSwitchExecutor,
-        exploration_scheduler_fn=LinearExplorationScheduler,
+        exploration_scheduler_fn=LinearExplorationScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=2.5e-4
+        ),
         communication_module=BroadcastedCommunication,
         sequence_length=6,
-        epsilon_min=0.05,
-        epsilon_decay=2.5e-4,
         optimizer=snt.optimizers.RMSProp(learning_rate=1e-4, momentum=0.95),
         checkpoint_subpath=checkpoint_dir,
         n_step=1,

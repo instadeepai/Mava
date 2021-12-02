@@ -29,22 +29,24 @@ from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
 from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
+    BaseExplorationScheduler,
+    BaseExplorationTimestepScheduler,
+    ConstantScheduler,
 )
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import execution, training
-from mava.wrappers import MADQNDetailedTrainerStatistics
+from mava.utils.builder_utils import initialize_epsilon_schedulers
+from mava.wrappers import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass
 class MADQNConfig:
     """Configuration options for the MADQN system.
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
-        epsilon_min: final minimum value for epsilon at the end of a decay schedule.
-        epsilon_decay: the rate at which epislon decays.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         target_update_period: number of learner steps to perform before updating
@@ -68,11 +70,12 @@ class MADQNConfig:
             checkpoints.
         optimizer: type of optimizer to use for updating the parameters of models.
         replay_table_name: string indicating what name to give the replay table.
-        checkpoint_subpath: subdirectory specifying where to store checkpoints."""
+        checkpoint_subpath: subdirectory specifying where to store checkpoints.
+        learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
+    """
 
     environment_spec: specs.MAEnvironmentSpec
-    epsilon_min: float
-    epsilon_decay: float
     agent_net_keys: Dict[str, str]
     target_update_period: int
     executor_variable_update_period: int
@@ -93,6 +96,8 @@ class MADQNConfig:
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
+    evaluator_interval: Optional[dict] = None
+    learning_rate_scheduler_fn: Optional[Any] = None
 
 
 class MADQNBuilder:
@@ -104,9 +109,6 @@ class MADQNBuilder:
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ):
         """Initialise the system.
@@ -122,11 +124,7 @@ class MADQNBuilder:
                 Defaults to execution.MADQNFeedForwardExecutor.
             extra_specs (Dict[str, Any], optional): defines the specifications of extra
                 information used by the system. Defaults to {}.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
-                epsilon decay scheduler. Defaults to LinearExplorationScheduler.
-            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
-                optional): optional function to stabilise experience replay. Defaults
-                to None.
+            replay_stabilisation_fn : optional function to stabilise experience replay.
         """
 
         self._config = config
@@ -136,7 +134,6 @@ class MADQNBuilder:
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
-        self._exploration_scheduler_fn = exploration_scheduler_fn
         self._replay_stabiliser_fn = replay_stabilisation_fn
 
     def make_replay_tables(
@@ -276,11 +273,20 @@ class MADQNBuilder:
         self,
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, Any],
+        exploration_schedules: Dict[
+            str,
+            Union[
+                BaseExplorationTimestepScheduler,
+                BaseExplorationScheduler,
+                ConstantScheduler,
+            ],
+        ],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
         trainer: Optional[training.MADQNTrainer] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
         evaluator: bool = False,
+        seed: Optional[int] = None,
     ) -> core.Executor:
         """Create an executor instance.
 
@@ -289,6 +295,7 @@ class MADQNBuilder:
                 system.
             action_selectors (Dict[str, Any]): policy action selector method, e.g.
                 epsilon greedy.
+            exploration_schedules: epsilon decay scheduler per agent.
             adder (Optional[adders.ParallelAdder], optional): adder to send data to
                 a replay buffer. Defaults to None.
             variable_source (Optional[core.VariableSource], optional): variables server.
@@ -299,6 +306,7 @@ class MADQNBuilder:
                 communication protocols between agents. Defaults to None.
             evaluator (bool, optional): boolean indicator if the executor is used for
                 for evaluation only. Defaults to False.
+            seed: seed for reproducible sampling.
 
         Returns:
             core.Executor: system executor, a collection of agents making up the part
@@ -306,7 +314,7 @@ class MADQNBuilder:
         """
 
         agent_net_keys = self._config.agent_net_keys
-
+        evaluator_interval = self._config.evaluator_interval if evaluator else None
         variable_client = None
         if variable_source:
             # Create policy variables
@@ -317,7 +325,11 @@ class MADQNBuilder:
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={"q_network": variables},
-                update_period=self._config.executor_variable_update_period,
+                # If we are using evaluator_intervals,
+                # we should always get the latest variables.
+                update_period=0
+                if evaluator_interval
+                else self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -327,10 +339,15 @@ class MADQNBuilder:
         # Check if we should use fingerprints
         fingerprint = True if self._replay_stabiliser_fn is not None else False
 
+        # Pass scheduler and initialize action selectors
+        action_selectors_with_scheduler = initialize_epsilon_schedulers(
+            exploration_schedules, action_selectors, agent_net_keys, seed=seed
+        )
+
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
-            action_selectors=action_selectors,
+            action_selectors=action_selectors_with_scheduler,
             agent_net_keys=agent_net_keys,
             variable_client=variable_client,
             adder=adder,
@@ -338,6 +355,7 @@ class MADQNBuilder:
             communication_module=communication_module,
             evaluator=evaluator,
             fingerprint=fingerprint,
+            interval=evaluator_interval,
         )
 
     def make_trainer(
@@ -373,12 +391,6 @@ class MADQNBuilder:
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
-        # Make epsilon scheduler
-        exploration_scheduler = self._exploration_scheduler_fn(
-            epsilon_min=self._config.epsilon_min,
-            epsilon_decay=self._config.epsilon_decay,
-        )
-
         # Check if we should use fingerprints
         fingerprint = True if self._replay_stabiliser_fn is not None else False
 
@@ -393,7 +405,6 @@ class MADQNBuilder:
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
-            exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             dataset=dataset,
             counter=counter,
@@ -402,8 +413,9 @@ class MADQNBuilder:
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
             checkpoint_minute_interval=self._config.checkpoint_minute_interval,
+            learning_rate_scheduler_fn=self._config.learning_rate_scheduler_fn,
         )
 
-        trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore
+        trainer = DetailedTrainerStatistics(trainer)  # type:ignore
 
         return trainer

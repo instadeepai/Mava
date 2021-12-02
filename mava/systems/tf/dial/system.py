@@ -15,16 +15,13 @@
 
 """DIAL system implementation."""
 
-import functools
 from typing import Any, Callable, Dict, Optional, Type, Union
 
 import acme
 import dm_env
-import launchpad as lp
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
-from acme.tf import utils as tf2_utils
 from acme.utils import counting
 
 import mava
@@ -35,38 +32,36 @@ from mava.components.tf.modules.communication import (
     BaseCommunicationModule,
     BroadcastedCommunication,
 )
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
-from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.dial import builder
 from mava.systems.tf.dial.execution import DIALSwitchExecutor
 from mava.systems.tf.dial.training import DIALSwitchTrainer
 from mava.systems.tf.madqn import training
-from mava.utils import lp_utils
-from mava.utils.loggers import MavaLogger, logger_utils
-from mava.wrappers import DetailedPerAgentStatistics
+from mava.systems.tf.madqn.system import MADQN
+from mava.types import EpsilonScheduler
+from mava.utils.loggers import MavaLogger
 
 
-class DIAL:
+class DIAL(MADQN):
     """DIAL system."""
 
     def __init__(
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        exploration_scheduler_fn: Union[
+            EpsilonScheduler,
+            Dict[str, EpsilonScheduler],
+            Dict[str, Dict[str, EpsilonScheduler]],
+        ],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.MADQNRecurrentCommTrainer] = DIALSwitchTrainer,
         communication_module: Type[BaseCommunicationModule] = BroadcastedCommunication,
         executor_fn: Type[core.Executor] = DIALSwitchExecutor,
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
-        epsilon_min: float = 0.05,
-        epsilon_decay: float = 1e-3,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -80,6 +75,8 @@ class DIAL:
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
+        importance_sampling_exponent: Optional[float] = None,
+        max_priority_weight: float = 0.9,
         max_gradient_norm: float = None,
         discount: float = 1,
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
@@ -96,6 +93,9 @@ class DIAL:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        evaluator_interval: Optional[dict] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
+        seed: Optional[int] = None,
     ):
         """Initialise the system
 
@@ -119,13 +119,10 @@ class DIAL:
                 execution.MADQNFeedForwardExecutor.
             exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
                 function specifying a decaying scheduler for epsilon exploration.
-                Defaults to LinearExplorationScheduler.
+                See mava/systems/tf/madqn/system.py for details.
             replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
                 optional): replay buffer stabilisaiton function, e.g. fingerprints.
                 Defaults to None.
-            epsilon_min (float, optional): final minimum epsilon value at the end of a
-                decaying schedule. Defaults to 0.05.
-            epsilon_decay (float, optional): epsilon decay rate. Defaults to 1e-3.
             num_executors (int, optional): number of executor processes to run in
                 parallel. Defaults to 1.
             num_caches (int, optional): number of trainer node caches. Defaults to 0.
@@ -178,47 +175,56 @@ class DIAL:
             train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
-            the evaluation loop. Defaults to {}.
+                the evaluation loop. Defaults to {}.
+            learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
+            seed: seed for reproducible sampling (for epsilon greedy action selection).
+            evaluator_interval: An optional condition that is used to evaluate/test
+                system performance after [evaluator_interval] condition has been met.
+                If None, evaluation will happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
         """
 
-        if not environment_spec:
-            environment_spec = mava_specs.MAEnvironmentSpec(
-                environment_factory(evaluation=False)  # type:ignore
-            )
-
-        # set default logger if no logger provided
-        if not logger_factory:
-            logger_factory = functools.partial(
-                logger_utils.make_logger,
-                directory="~/mava",
-                to_terminal=True,
-                time_delta=10,
-            )
-
-        self._architecture = architecture
-        self._communication_module_fn = communication_module
-        self._environment_factory = environment_factory
-        self._network_factory = network_factory
-        self._logger_factory = logger_factory
-        self._environment_spec = environment_spec
-        # Setup agent networks
-        self._agent_net_keys = agent_net_keys
-        if not agent_net_keys:
-            agents = environment_spec.get_agent_ids()
-            self._agent_net_keys = {
-                agent: agent.split("_")[0] if shared_weights else agent
-                for agent in agents
-            }
-        self._num_exectors = num_executors
-        self._num_caches = num_caches
-        self._max_executor_steps = max_executor_steps
-        self._checkpoint_subpath = checkpoint_subpath
-        self._checkpoint = checkpoint
-        self._logger_config = logger_config
-        self._train_loop_fn = train_loop_fn
-        self._train_loop_fn_kwargs = train_loop_fn_kwargs
-        self._eval_loop_fn = eval_loop_fn
-        self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
+        super(DIAL, self).__init__(
+            environment_factory=environment_factory,
+            network_factory=network_factory,
+            logger_factory=logger_factory,
+            architecture=architecture,
+            trainer_fn=trainer_fn,
+            communication_module=communication_module,
+            executor_fn=executor_fn,
+            replay_stabilisation_fn=replay_stabilisation_fn,
+            num_executors=num_executors,
+            num_caches=num_caches,
+            environment_spec=environment_spec,
+            agent_net_keys=agent_net_keys,
+            shared_weights=shared_weights,
+            batch_size=batch_size,
+            prefetch_size=prefetch_size,
+            min_replay_size=min_replay_size,
+            max_replay_size=max_replay_size,
+            samples_per_insert=samples_per_insert,
+            n_step=n_step,
+            sequence_length=sequence_length,
+            period=period,
+            discount=discount,
+            optimizer=optimizer,
+            target_update_period=target_update_period,
+            executor_variable_update_period=executor_variable_update_period,
+            max_executor_steps=max_executor_steps,
+            checkpoint=checkpoint,
+            checkpoint_subpath=checkpoint_subpath,
+            checkpoint_minute_interval=checkpoint_minute_interval,
+            logger_config=logger_config,
+            train_loop_fn=train_loop_fn,
+            eval_loop_fn=eval_loop_fn,
+            train_loop_fn_kwargs=train_loop_fn_kwargs,
+            eval_loop_fn_kwargs=eval_loop_fn_kwargs,
+            exploration_scheduler_fn=exploration_scheduler_fn,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+            seed=seed,
+        )
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
@@ -227,9 +233,7 @@ class DIAL:
         self._checkpoint_minute_interval = checkpoint_minute_interval
         self._builder = builder.DIALBuilder(
             builder.DIALConfig(
-                environment_spec=environment_spec,
-                epsilon_min=epsilon_min,
-                epsilon_decay=epsilon_decay,
+                environment_spec=self._environment_spec,
                 agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
@@ -247,47 +251,16 @@ class DIAL:
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+                importance_sampling_exponent=importance_sampling_exponent,
+                max_priority_weight=max_priority_weight,
+                evaluator_interval=evaluator_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             extra_specs=extra_specs,
-            exploration_scheduler_fn=exploration_scheduler_fn,
             replay_stabilisation_fn=replay_stabilisation_fn,
         )
-
-    def _get_extra_specs(self) -> Dict[str, Any]:
-        """helper to establish specs for extra information
-
-        Returns:
-            Dict[str, Any]: dictionary containing extra specs
-        """
-        agents = self._environment_spec.get_agent_ids()
-        core_state_specs = {}
-        core_message_specs = {}
-
-        networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec,
-            agent_net_keys=self._agent_net_keys,
-        )
-        for agent in agents:
-            agent_type = agent.split("_")[0]
-            core_state_specs[agent] = (
-                tf2_utils.squeeze_batch_dim(
-                    networks["q_networks"][agent_type].initial_state(1)
-                ),
-            )
-            if self._communication_module_fn is not None:
-                core_message_specs[agent] = (
-                    tf2_utils.squeeze_batch_dim(
-                        networks["q_networks"][agent_type].initial_message(1)
-                    ),
-                )
-
-        extras = {
-            "core_states": core_state_specs,
-            "core_messages": core_message_specs,
-        }
-        return extras
 
     def replay(self) -> Any:
         """Replay data storage.
@@ -297,95 +270,7 @@ class DIAL:
         """
         return self._builder.make_replay_tables(self._environment_spec)
 
-    def counter(self) -> Any:
-        """Step counter
-
-        Returns:
-            Any: checkpointing object logging steps in a counter subdirectory.
-        """
-        return tf2_savers.CheckpointingRunner(
-            counting.Counter(),
-            time_delta_minutes=self._checkpoint_minute_interval,
-            directory=self._checkpoint_subpath,
-            subdirectory="counter",
-        )
-
-    def coordinator(self, counter: counting.Counter) -> Any:
-        """Coordination helper for a distributed program
-
-        Args:
-            counter (counting.Counter): step counter object.
-
-        Returns:
-            Any: step limiter object.
-        """
-        return lp_utils.StepsLimiter(counter, self._max_executor_steps)  # type: ignore
-
-    def trainer(
-        self,
-        replay: reverb.Client,
-        counter: counting.Counter,
-    ) -> mava.core.Trainer:
-        """System trainer
-
-        Args:
-            replay (reverb.Client): replay data table to pull data from.
-            counter (counting.Counter): step counter object.
-
-        Returns:
-            mava.core.Trainer: system trainer.
-        """
-
-        # Create the networks to optimize (online)
-        networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec,
-            agent_net_keys=self._agent_net_keys,
-        )
-
-        # Create system architecture with target networks.
-        architecture = self._architecture(
-            environment_spec=self._environment_spec,
-            value_networks=networks["q_networks"],
-            agent_net_keys=self._agent_net_keys,
-        )
-
-        if self._builder._replay_stabiliser_fn is not None:
-            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
-                architecture
-            )
-
-        communication_module = None
-        if self._communication_module_fn is not None:
-            communication_module = self._communication_module_fn(
-                architecture=architecture,
-                shared=True,
-                channel_size=1,
-                channel_noise=0,
-            )
-            system_networks = communication_module.create_system()
-        else:
-            system_networks = architecture.create_system()
-
-        # create logger
-        trainer_logger_config = {}
-        if self._logger_config and "trainer" in self._logger_config:
-            trainer_logger_config = self._logger_config["trainer"]
-        trainer_logger = self._logger_factory(  # type: ignore
-            "trainer", **trainer_logger_config
-        )
-
-        dataset = self._builder.make_dataset_iterator(replay)
-        counter = counting.Counter(counter, "trainer")
-
-        return self._builder.make_trainer(
-            networks=system_networks,
-            dataset=dataset,
-            counter=counter,
-            communication_module=communication_module,
-            logger=trainer_logger,
-        )
-
-    def executor(
+    def executor(  # type: ignore[override]
         self,
         executor_id: str,
         replay: reverb.Client,
@@ -408,74 +293,15 @@ class DIAL:
             mava.ParallelEnvironmentLoop: environment-executor loop instance.
         """
 
-        # Create the behavior policy.
-        networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec,
-            agent_net_keys=self._agent_net_keys,
-        )
-
-        # Create system architecture with target networks.
-        architecture = self._architecture(
-            environment_spec=self._environment_spec,
-            value_networks=networks["q_networks"],
-            agent_net_keys=self._agent_net_keys,
-        )
-
-        if self._builder._replay_stabiliser_fn is not None:
-            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
-                architecture
-            )
-
-        communication_module = None
-        if self._communication_module_fn is not None:
-            communication_module = self._communication_module_fn(
-                architecture=architecture,
-                shared=True,
-                channel_size=1,
-                channel_noise=0,
-            )
-            system_networks = communication_module.create_system()
-        else:
-            system_networks = architecture.create_system()
-
-        # Create the executor.
-        executor = self._builder.make_executor(
-            q_networks=system_networks["values"],
-            action_selectors=networks["action_selectors"],
-            communication_module=communication_module,
-            adder=self._builder.make_adder(replay),
+        return super().executor(
+            executor_id=executor_id,
+            replay=replay,
             variable_source=variable_source,
+            counter=counter,
             trainer=trainer,
         )
 
-        # Create the environment.
-        environment = self._environment_factory(evaluation=False)  # type: ignore
-
-        # Create logger and counter; actors will not spam bigtable.
-        counter = counting.Counter(counter, "executor")
-
-        # Create executor logger
-        executor_logger_config = {}
-        if self._logger_config and "executor" in self._logger_config:
-            executor_logger_config = self._logger_config["executor"]
-        exec_logger = self._logger_factory(  # type: ignore
-            f"executor_{executor_id}", **executor_logger_config
-        )
-
-        # Create the loop to connect environment and executor.
-        train_loop = self._train_loop_fn(
-            environment,
-            executor,
-            counter=counter,
-            logger=exec_logger,
-            **self._train_loop_fn_kwargs,
-        )
-
-        train_loop = DetailedPerAgentStatistics(train_loop)
-
-        return train_loop
-
-    def evaluator(
+    def evaluator(  # type: ignore[override]
         self,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
@@ -495,70 +321,11 @@ class DIAL:
                 performance of a system.
         """
 
-        # Create the behavior policy.
-        networks = self._network_factory(  # type: ignore
-            environment_spec=self._environment_spec,
-            agent_net_keys=self._agent_net_keys,
-        )
-
-        # Create system architecture with target networks.
-        architecture = self._architecture(
-            environment_spec=self._environment_spec,
-            value_networks=networks["q_networks"],
-            agent_net_keys=self._agent_net_keys,
-        )
-
-        if self._builder._replay_stabiliser_fn is not None:
-            architecture = self._builder._replay_stabiliser_fn(  # type: ignore
-                architecture
-            )
-
-        communication_module = None
-        if self._communication_module_fn is not None:
-            communication_module = self._communication_module_fn(
-                architecture=architecture,
-                shared=True,
-                channel_size=1,
-                channel_noise=0,
-            )
-            system_networks = communication_module.create_system()
-        else:
-            system_networks = architecture.create_system()
-
-        # Create the agent.
-        executor = self._builder.make_executor(
-            q_networks=system_networks["values"],
-            action_selectors=networks["action_selectors"],
+        return super().evaluator(
             variable_source=variable_source,
-            communication_module=communication_module,
-            trainer=trainer,
-            evaluator=True,
-        )
-
-        # Make the environment.
-        environment = self._environment_factory(evaluation=True)  # type: ignore
-
-        # Create logger and counter.
-        counter = counting.Counter(counter, "evaluator")
-        evaluator_logger_config = {}
-        if self._logger_config and "evaluator" in self._logger_config:
-            evaluator_logger_config = self._logger_config["evaluator"]
-        eval_logger = self._logger_factory(  # type: ignore
-            "evaluator", **evaluator_logger_config
-        )
-
-        # Create the run loop and return it.
-        # Create the loop to connect environment and executor.
-        eval_loop = self._eval_loop_fn(
-            environment,
-            executor,
             counter=counter,
-            logger=eval_logger,
-            **self._eval_loop_fn_kwargs,
+            trainer=trainer,
         )
-
-        eval_loop = DetailedPerAgentStatistics(eval_loop)
-        return eval_loop
 
     def build(self, name: str = "dial") -> Any:
         """Build the distributed system as a graph program.
@@ -570,54 +337,4 @@ class DIAL:
             Any: graph program for distributed system training.
         """
 
-        program = lp.Program(name=name)
-        counter = None
-
-        with program.group("replay"):
-            replay = program.add_node(lp.ReverbNode(self.replay))
-
-        if self._checkpoint:
-            with program.group("counter"):
-                counter = program.add_node(lp.CourierNode(self.counter))
-
-        if self._max_executor_steps:
-            with program.group("coordinator"):
-                _ = program.add_node(lp.CourierNode(self.coordinator, counter))
-
-        with program.group("trainer"):
-            trainer = program.add_node(lp.CourierNode(self.trainer, replay, counter))
-
-        with program.group("evaluator"):
-            program.add_node(lp.CourierNode(self.evaluator, trainer, counter, trainer))
-
-        if not self._num_caches:
-            # Use the trainer as a single variable source.
-            sources = [trainer]
-        else:
-            with program.group("cacher"):
-                # Create a set of trainer caches.
-                sources = []
-                for _ in range(self._num_caches):
-                    cacher = program.add_node(
-                        lp.CacherNode(
-                            trainer, refresh_interval_ms=2000, stale_after_ms=4000
-                        )
-                    )
-                    sources.append(cacher)
-
-        with program.group("executor"):
-            # Add executors which pull round-robin from our variable sources.
-            for executor_id in range(self._num_exectors):
-                source = sources[executor_id % len(sources)]
-                program.add_node(
-                    lp.CourierNode(
-                        self.executor,
-                        executor_id,
-                        replay,
-                        source,
-                        counter,
-                        trainer,
-                    )
-                )
-
-        return program
+        return super().build(name=name)
