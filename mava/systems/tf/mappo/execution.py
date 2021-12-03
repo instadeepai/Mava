@@ -248,6 +248,8 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        evaluator: bool = False,
+        interval: Optional[dict] = None,
     ):
         """Initialise the system executor
         Args:
@@ -259,12 +261,17 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
                 client to copy weights from the trainer. Defaults to None.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            evaluator (bool, optional): whether the executor will be used for
+                evaluation. Defaults to False.
+            interval: interval that evaluations are run at.
         """
         self._agent_specs = agent_specs
         self._network_sampling_setup = network_sampling_setup
         self._counts = counts
         self._net_keys_to_ids = net_keys_to_ids
         self._network_int_keys_extras: Dict[str, np.array] = {}
+        self._evaluator = evaluator
+        self._interval = interval
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,

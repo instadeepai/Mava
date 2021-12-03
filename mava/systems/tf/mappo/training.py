@@ -620,6 +620,7 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -641,6 +642,7 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _get_critic_feed(
