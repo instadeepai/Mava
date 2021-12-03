@@ -1698,7 +1698,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         # State based
         obs_trans_feed = extras["env_states"]
         target_obs_trans_feed = extras["env_states"]
-        if type(obs_trans_feed) == dict:
+        if type(obs_trans_feed) == dict:  # type: ignore
             obs_trans_feed = obs_trans_feed[agent]
             target_obs_trans_feed = target_obs_trans_feed[agent]
 

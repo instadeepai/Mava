@@ -32,7 +32,7 @@ try:
     from mava.wrappers.flatland import FlatlandEnvWrapper
 
     _has_flatland = True
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     _has_flatland = False
 try:
     from pettingzoo.utils.env import AECEnv, ParallelEnv
