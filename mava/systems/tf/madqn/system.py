@@ -16,7 +16,7 @@
 """MADQN system implementation."""
 
 import functools
-from typing import Any, Callable, Dict, Optional, Type, Union
+from typing import Any, Callable, Dict, Mapping, Optional, Type, Union
 
 import acme
 import dm_env
@@ -32,12 +32,15 @@ from mava import core
 from mava import specs as mava_specs
 from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    ConstantScheduler,
+)
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
 from mava.systems.tf.madqn import builder, execution, training
+from mava.types import EpsilonScheduler
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
@@ -50,6 +53,11 @@ class MADQN:
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        exploration_scheduler_fn: Union[
+            EpsilonScheduler,
+            Mapping[str, EpsilonScheduler],
+            Mapping[str, Mapping[str, EpsilonScheduler]],
+        ],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Union[
@@ -57,12 +65,7 @@ class MADQN:
         ] = training.MADQNTrainer,
         communication_module: Type[BaseCommunicationModule] = None,
         executor_fn: Type[core.Executor] = execution.MADQNFeedForwardExecutor,
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
-        epsilon_min: float = 0.05,
-        epsilon_decay: float = 1e-4,
         num_executors: int = 1,
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
@@ -94,95 +97,90 @@ class MADQN:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        evaluator_interval: Optional[dict] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
+        seed: Optional[int] = None,
     ):
-        """Initialise the system
+        """Initialise the madqn system.
 
         Args:
-            environment_factory (Callable[[bool], dm_env.Environment]): function to
+            environment_factory : function to
                 instantiate an environment.
-            network_factory (Callable[[acme_specs.BoundedArray],
-                Dict[str, snt.Module]]): function to instantiate system networks.
-            logger_factory (Callable[[str], MavaLogger], optional): function to
-                instantiate a system logger. Defaults to None.
-            architecture (Type[DecentralisedValueActor], optional): system architecture,
-                e.g. decentralised or centralised. Defaults to DecentralisedValueActor.
-            trainer_fn (Union[ Type[training.MADQNTrainer],
-                Type[training.MADQNRecurrentTrainer] ], optional): training type
+            network_factory : function to instantiate system networks.
+            exploration_scheduler_fn : function specifying a decaying scheduler for epsilon exploration.
+                This can be
+                    1. The same across all agents & executors,
+                        e.g. LinearExplorationTimestepScheduler(...),
+                    2. Or at an executor level,
+                        e.g. see examples/debugging/simple_spread/feedforward/decentralised/run_madqn_configurable_epsilon.py  # noqa: E501
+                    3. Or at an agent level (same across all executors),
+                        e.g. { "agent_0": LinearExplorationTimestepScheduler(...),"agent_1": LinearExplorationTimestepScheduler(...))}.  # noqa: E501
+            logger_factory : function to
+                instantiate a system logger.
+            architecture : system architecture,
+                e.g. decentralised ,centralised or networked.
+            trainer_fn :  training type
                 associated with executor and architecture, e.g. centralised training.
-                Defaults to training.MADQNTrainer.
-            communication_module (Type[BaseCommunicationModule], optional):
-                module for enabling communication protocols between agents. Defaults to
-                None.
-            executor_fn (Type[core.Executor], optional): executor type, e.g.
-                feedforward or recurrent. Defaults to
-                execution.MADQNFeedForwardExecutor.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
-                function specifying a decaying scheduler for epsilon exploration.
-                Defaults to LinearExplorationScheduler.
-            replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
-                optional): replay buffer stabilisaiton function, e.g. fingerprints.
-                Defaults to None.
-            epsilon_min (float, optional): final minimum epsilon value at the end of a
-                decaying schedule. Defaults to 0.05.
-            epsilon_decay (float, optional): epsilon decay rate. Defaults to 1e-4.
-            num_executors (int, optional): number of executor processes to run in
-                parallel. Defaults to 1.
-            num_caches (int, optional): number of trainer node caches. Defaults to 0.
-            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
-                the action, observation spaces etc. for each agent in the system.
-                Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                When agent_net_keys are provided the value of shared_weights is ignored.
-                Defaults to True.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
-            batch_size (int, optional): sample batch size for updates. Defaults to 256.
-            prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
-            min_replay_size (int, optional): minimum replay size before updating.
-                Defaults to 1000.
-            max_replay_size (int, optional): maximum replay size. Defaults to 1000000.
-            samples_per_insert (Optional[float], optional): number of samples to take
-                from replay for every insert that is made. Defaults to 32.0.
-            n_step (int, optional): number of steps to include prior to boostrapping.
-                Defaults to 5.
-            sequence_length (int, optional): recurrent sequence rollout length. Defaults
-                to 20.
-            importance_sampling_exponent (float, optional): value of importance sampling
-                exponent (usually around 0.2). If None, importance sampling is not used.
-            max_priority_weight (float): Required if importance_sampling_exponent
-                is not None. Defaults to 0.9. Used to scale the maximum priority of
-                reverb samples.
-            period (int, optional): consecutive starting points for overlapping
-                rollouts across a sequence. Defaults to 20.
-            max_gradient_norm (float, optional): maximum allowed norm for gradients
-                before clipping is applied. Defaults to None.
-            discount (float, optional): discount factor to use for TD updates. Defaults
-                to 0.99.
-            optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]], optional):
-                type of optimizer to use to update network parameters. Defaults to
-                snt.optimizers.Adam( learning_rate=1e-4 ).
-            target_update_period (int, optional): number of steps before target
-                networks are updated. Defaults to 100.
-            executor_variable_update_period (int, optional): number of steps before
-                updating executor variables from the variable source. Defaults to 1000.
-            max_executor_steps (int, optional): maximum number of steps and executor
-                can in an episode. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint models. Defaults to
-                False.
-            checkpoint_subpath (str, optional): subdirectory specifying where to store
-                checkpoints. Defaults to "~/mava/".
-            checkpoint_minute_interval (int): The number of minutes to wait between
+            communication_module :  module for enabling communication protocols between agents.
+            executor_fn : executor type, e.g.
+                feedforward or recurrent.
+            replay_stabilisation_fn : replay buffer stabilisaiton function, e.g. fingerprints.
+            num_executors : number of executor processes to run in
+                parallel.
+            num_caches : number of trainer node caches.
+            environment_spec : escription of
+                the action, observation spaces etc.
+            shared_weights :  whether agents should share weights or not.
+            agent_net_keys : specifies what network each agent uses.
+            batch_size : sample batch size for updates.
+            prefetch_size : size to prefetch from replay.
+            min_replay_size : minimum replay size before updating.
+            max_replay_size : maximum replay size.
+            samples_per_insert : number of samples to take
+                from replay for every insert that is made.
+            n_step : number of steps to include prior to boostrapping.
+            sequence_length : recurrent sequence rollout length.
+            importance_sampling_exponent : value of importance sampling
+                exponent (usually around 0.2).
+            max_priority_weight : Required if importance_sampling_exponent
+                is not None.
+            period : consecutive starting points for overlapping
+                rollouts across a sequence.
+            max_gradient_norm : maximum allowed norm for gradients
+                before clipping is applied.
+            discount : discount factor to use for TD updates.
+            optimizer : type of optimizer to use to update network parameters.
+            target_update_period : number of steps before target
+                networks are updated.
+            executor_variable_update_period : number of steps before
+                updating executor variables from the variable source.
+            max_executor_steps : maximum number of steps and executor
+                can in an episode.
+            checkpoint : whether to checkpoint models.
+            checkpoint_subpath : subdirectory specifying where to store
                 checkpoints.
-            logger_config (Dict, optional): additional configuration settings for the
-                logger factory. Defaults to {}.
-            train_loop_fn (Callable, optional): function to instantiate a train loop.
-                Defaults to ParallelEnvironmentLoop.
-            eval_loop_fn (Callable, optional): function to instantiate an evaluation
-                loop. Defaults to ParallelEnvironmentLoop.
-            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
-                to the training loop. Defaults to {}.
-            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
-            the evaluation loop. Defaults to {}.
+            checkpoint_minute_interval : The number of minutes to wait between
+                checkpoints.
+            logger_config : additional configuration settings for the
+                logger factory.
+            train_loop_fn : function to instantiate a train loop.
+            eval_loop_fn : function to instantiate a eval loop.
+            train_loop_fn_kwargs : possible keyword arguments to send
+                to the training loop.
+            eval_loop_fn_kwargs :possible keyword arguments to send to
+                the evaluation loop.
+            learning_rate_scheduler_fn : function/class that takes in a trainer step t
+                and returns the current learning rate.
+            seed: seed for reproducible sampling (used for epsilon greedy action selection).
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
+        Raises:
+            ValueError: [description]
+
         """
 
         if not environment_spec:
@@ -225,17 +223,47 @@ class MADQN:
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
         self._checkpoint_minute_interval = checkpoint_minute_interval
+        self._seed = seed
+        self._evaluator_interval = evaluator_interval
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
         else:
             extra_specs = {}
 
+        # Setup epsilon schedules
+        # If we receive a single schedule, we use that for all agents.
+        if not isinstance(exploration_scheduler_fn, dict):
+            self._exploration_scheduler_fn: Dict = {}
+            for executor_id in range(self._num_exectors):
+                executor = f"executor_{executor_id}"
+                self._exploration_scheduler_fn[executor] = {}
+                for agent in environment_spec.get_agent_ids():
+                    self._exploration_scheduler_fn[executor][
+                        agent
+                    ] = exploration_scheduler_fn
+        else:
+            # Using an executor level config
+            if all(key.startswith("executor") for key in exploration_scheduler_fn):
+                self._exploration_scheduler_fn = exploration_scheduler_fn
+
+            # Using an agent level config - assume all executor have the same config.
+            elif all(key.startswith("agent") for key in exploration_scheduler_fn):
+                for executor_id in range(self._num_exectors):
+                    self._exploration_scheduler_fn[
+                        executor_id
+                    ] = exploration_scheduler_fn
+
+            else:
+                raise ValueError(
+                    "Unknown exploration_scheduler_fn, please pass a callable or a dict"
+                    + " with an agent or executor"
+                    + f" level config: {exploration_scheduler_fn}"
+                )
+
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
                 environment_spec=environment_spec,
-                epsilon_min=epsilon_min,
-                epsilon_decay=epsilon_decay,
                 agent_net_keys=self._agent_net_keys,
                 discount=discount,
                 batch_size=batch_size,
@@ -255,19 +283,20 @@ class MADQN:
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                evaluator_interval=evaluator_interval,
+                learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             extra_specs=extra_specs,
-            exploration_scheduler_fn=exploration_scheduler_fn,
             replay_stabilisation_fn=replay_stabilisation_fn,
         )
 
     def _get_extra_specs(self) -> Any:
-        """helper to establish specs for extra information
+        """Helper to establish specs for extra information.
 
         Returns:
-            Dict[str, Any]: dictionary containing extra specs
+            dictionary containing extra specs
         """
 
         agents = self._environment_spec.get_agent_ids()
@@ -410,7 +439,9 @@ class MADQN:
         replay: reverb.Client,
         variable_source: acme.VariableSource,
         counter: counting.Counter,
-        trainer: Optional[training.MADQNTrainer] = None,
+        trainer: Optional[
+            Union[training.MADQNTrainer, training.MADQNRecurrentTrainer]
+        ] = None,
     ) -> mava.ParallelEnvironmentLoop:
         """System executor
 
@@ -465,6 +496,11 @@ class MADQN:
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
             trainer=trainer,
+            evaluator=False,
+            exploration_schedules=self._exploration_scheduler_fn[
+                f"executor_{executor_id}"
+            ],
+            seed=self._seed,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -501,17 +537,16 @@ class MADQN:
         counter: counting.Counter,
         trainer: training.MADQNTrainer,
     ) -> Any:
-        """System evaluator (an executor process not connected to a dataset)
+        """System evaluator (an executor process not connected to a dataset).
 
         Args:
-            variable_source (acme.VariableSource): variable server for updating
+            variable_source : variable server for updating
                 network variables.
-            counter (counting.Counter): step counter object.
-            trainer (Optional[training.MADQNRecurrentCommTrainer], optional):
-                system trainer. Defaults to None.
+            counter : step counter object.
+            trainer : system trainer.
 
         Returns:
-            Any: environment-executor evaluation loop instance for evaluating the
+            environment-executor evaluation loop instance for evaluating the
                 performance of a system.
         """
 
@@ -553,6 +588,11 @@ class MADQN:
             communication_module=communication_module,
             trainer=trainer,
             evaluator=True,
+            exploration_schedules={
+                agent: ConstantScheduler(epsilon=0.0)
+                for agent in self._environment_spec.get_agent_ids()
+            },
+            seed=self._seed,
         )
 
         # Make the environment.

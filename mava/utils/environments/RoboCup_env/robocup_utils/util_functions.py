@@ -547,7 +547,7 @@ class SpecWrapper(dm_env.Environment):
 
         return proc_agent_obs
 
-    def _proc_robocup_state(self, state: Dict, proc_obs: Dict) -> np.array:
+    def _proc_robocup_state(self, state: Dict, proc_obs: Dict) -> np.ndarray:
         state_dict = {
             "time_left": 0,
             "ball_coords": (1, 3),

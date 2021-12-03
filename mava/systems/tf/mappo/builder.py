@@ -68,11 +68,9 @@ class MAPPOConfig:
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         replay_table_name: string indicating what name to give the replay table.
-        termination_condition: An optional terminal condition can be provided
-        that stops the program once the condition is satisfied. Available options
-        include specifying maximum values for trainer_steps, trainer_walltime,
-        evaluator_steps, evaluator_episodes, executor_episodes or executor_steps.
-        E.g. termination_condition = {'trainer_steps': 100000}.
+        evaluator_interval: intervals that evaluator are run at.
+        learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
     """
 
     environment_spec: specs.EnvironmentSpec
@@ -100,7 +98,8 @@ class MAPPOConfig:
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
-    termination_condition: Optional[Dict[str, int]] = None
+    learning_rate_scheduler_fn: Optional[Any] = None
+    evaluator_interval: Optional[dict] = None
 
 
 class MAPPOBuilder:
@@ -343,7 +342,6 @@ class MAPPOBuilder:
             self._config.checkpoint,
             self._config.checkpoint_subpath,
             self._config.checkpoint_minute_interval,
-            self._config.termination_condition,
         )
         return variable_source
 
@@ -354,16 +352,19 @@ class MAPPOBuilder:
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[MavaVariableSource] = None,
+        evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
-            networks: dictionary with the system's networks in.
             policy_networks: policy networks for each agent in
                 the system.
-            adder: adder to send data to
+            adder : adder to send data to
                 a replay buffer. Defaults to None.
             variable_source: variables server.
                 Defaults to None.
+            evaluator: boolean indicator if the executor is used for
+                for evaluation only.
+
         Returns:
             system executor, a collection of agents making up the part
                 of the system generating data by interacting the environment.
@@ -390,13 +391,18 @@ class MAPPOBuilder:
         counts = {name: variables[name] for name in count_names}
 
         variable_client = None
+        evaluator_interval = self._config.evaluator_interval if evaluator else None
         if variable_source:
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables=variables,
                 get_keys=get_keys,
-                update_period=self._config.executor_variable_update_period,
+                # If we are using evaluator_intervals,
+                # we should always get the latest variables.
+                update_period=0
+                if evaluator_interval
+                else self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -413,6 +419,8 @@ class MAPPOBuilder:
             network_sampling_setup=self._config.network_sampling_setup,
             variable_client=variable_client,
             adder=adder,
+            evaluator=evaluator,
+            interval=evaluator_interval,
         )
 
     def make_trainer(
@@ -506,6 +514,7 @@ class MAPPOBuilder:
             "entropy_cost": self._config.entropy_cost,
             "baseline_cost": self._config.baseline_cost,
             "clipping_epsilon": self._config.clipping_epsilon,
+            "learning_rate_scheduler_fn": self._config.learning_rate_scheduler_fn,
         }
 
         # The learner updates the parameters (and initializes them).

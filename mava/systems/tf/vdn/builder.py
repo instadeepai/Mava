@@ -24,18 +24,16 @@ from acme.utils import counting
 
 from mava import core, types
 from mava.components.tf.modules.communication import BaseCommunicationModule
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
-)
 from mava.components.tf.modules.stabilising import FingerPrintStabalisation
 from mava.systems.tf.madqn.builder import MADQNBuilder, MADQNConfig
 from mava.systems.tf.vdn import execution, training
-from mava.wrappers import MADQNDetailedTrainerStatistics
+from mava.wrappers import DetailedTrainerStatistics
 
 
 @dataclasses.dataclass
 class VDNConfig(MADQNConfig):
     """Configuration options for the VDN system.
+
     environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
         epsilon_min: final minimum value for epsilon at the end of a decay schedule.
@@ -63,7 +61,10 @@ class VDNConfig(MADQNConfig):
                 checkpoints.
         optimizer: type of optimizer to use for updating the parameters of models.
         replay_table_name: string indicating what name to give the replay table.
-        checkpoint_subpath: subdirectory specifying where to store checkpoints."""
+        checkpoint_subpath: subdirectory specifying where to store checkpoints.
+        learning_rate_scheduler_fn: function/class that takes in a trainer step t
+                and returns the current learning rate.
+    """
 
 
 class VDNBuilder(MADQNBuilder):
@@ -75,9 +76,6 @@ class VDNBuilder(MADQNBuilder):
         trainer_fn: Type[training.VDNTrainer] = training.VDNTrainer,
         executor_fn: Type[core.Executor] = execution.VDNFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
-        exploration_scheduler_fn: Type[
-            LinearExplorationScheduler
-        ] = LinearExplorationScheduler,
         replay_stabilisation_fn: Optional[Type[FingerPrintStabalisation]] = None,
     ) -> None:
         """Initialise the system.
@@ -93,8 +91,6 @@ class VDNBuilder(MADQNBuilder):
                 Defaults to execution.VDNFeedForwardExecutor.
             extra_specs (Dict[str, Any], optional): defines the specifications of extra
                 information used by the system. Defaults to {}.
-            exploration_scheduler_fn (Type[ LinearExplorationScheduler ], optional):
-                epsilon decay scheduler. Defaults to LinearExplorationScheduler.
             replay_stabilisation_fn (Optional[Type[FingerPrintStabalisation]],
                 optional): optional function to stabilise experience replay. Defaults
                 to None.
@@ -104,7 +100,6 @@ class VDNBuilder(MADQNBuilder):
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             extra_specs=extra_specs,
-            exploration_scheduler_fn=exploration_scheduler_fn,
             replay_stabilisation_fn=replay_stabilisation_fn,
         )
 
@@ -140,17 +135,10 @@ class VDNBuilder(MADQNBuilder):
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
-        q_networks = networks["values"]
-        target_q_networks = networks["target_values"]
-
+        q_networks = networks["agent_networks"]["values"]
+        target_q_networks = networks["agent_networks"]["target_values"]
         mixing_network = networks["mixing"]
         target_mixing_network = networks["target_mixing"]
-
-        # Make epsilon scheduler
-        exploration_scheduler = self._exploration_scheduler_fn(
-            epsilon_min=self._config.epsilon_min,
-            epsilon_decay=self._config.epsilon_decay,
-        )
 
         # Check if we should use fingerprints
         fingerprint = True if self._replay_stabiliser_fn is not None else False
@@ -168,7 +156,6 @@ class VDNBuilder(MADQNBuilder):
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
-            exploration_scheduler=exploration_scheduler,
             communication_module=communication_module,
             dataset=dataset,
             counter=counter,
@@ -177,8 +164,9 @@ class VDNBuilder(MADQNBuilder):
             checkpoint_minute_interval=self._config.checkpoint_minute_interval,
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
+            learning_rate_scheduler_fn=self._config.learning_rate_scheduler_fn,
         )
 
-        trainer = MADQNDetailedTrainerStatistics(trainer)  # type:ignore
+        trainer = DetailedTrainerStatistics(trainer)  # type:ignore
 
         return trainer

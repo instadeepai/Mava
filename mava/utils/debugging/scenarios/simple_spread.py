@@ -14,7 +14,8 @@
 # limitations under the License.
 
 # Adapted from https://github.com/openai/multiagent-particle-envs.
-
+# type: ignore
+import typing
 from typing import Optional
 
 import numpy as np
@@ -50,6 +51,7 @@ class Scenario(BaseScenario):
         self.reset_world(world)
         return world
 
+    @typing.no_type_check
     def reset_world(self, world: World) -> None:
         # random properties for agents
         for i, agent in enumerate(world.agents):
@@ -75,9 +77,10 @@ class Scenario(BaseScenario):
         return True if dist < dist_min else False
 
     @staticmethod
-    def dist(pt1: np.array, pt2: np.array) -> float:
+    def dist(pt1: np.ndarray, pt2: np.ndarray) -> float:
         return np.sqrt(np.sum(np.square(pt1 - pt2)))
 
+    @typing.no_type_check
     def reward(self, agent: Agent, a_i: int, world: World) -> float:
         # Agents are rewarded based on agent distance to its corresponding
         # landmark, penalized for collisions
@@ -101,7 +104,7 @@ class Scenario(BaseScenario):
 
         return rew
 
-    def observation(self, agent: Agent, a_i: int, world: World) -> np.array:
+    def observation(self, agent: Agent, a_i: int, world: World) -> np.ndarray:
         # get the position of the agent's target landmark
         if world.current_step < 5 or not self.recurrent_test:
             target_landmark = world.landmarks[a_i].state.p_pos - agent.state.p_pos

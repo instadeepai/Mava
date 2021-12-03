@@ -21,9 +21,6 @@ from typing import Any, Dict
 import launchpad as lp
 import sonnet as snt
 from absl import app, flags
-from flatland.envs.observations import TreeObsForRailEnv
-from flatland.envs.rail_generators import sparse_rail_generator
-from flatland.envs.schedule_generators import sparse_schedule_generator
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
@@ -44,21 +41,19 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 # flatland environment config
-rail_gen_cfg: Dict = {
-    "max_num_cities": 4,
+flatland_env_config: Dict = {
+    "n_agents": 3,
+    "x_dim": 30,
+    "y_dim": 30,
+    "n_cities": 2,
     "max_rails_between_cities": 2,
     "max_rails_in_city": 3,
-    "grid_mode": True,
-    "seed": 42,
-}
-
-flatland_env_config: Dict = {
-    "number_of_agents": 2,
-    "width": 25,
-    "height": 25,
-    "rail_generator": sparse_rail_generator(**rail_gen_cfg),
-    "schedule_generator": sparse_schedule_generator(),
-    "obs_builder_object": TreeObsForRailEnv(max_depth=2),
+    "seed": 0,
+    "malfunction_rate": 1 / 200,
+    "malfunction_min_duration": 20,
+    "malfunction_max_duration": 50,
+    "observation_max_path_depth": 30,
+    "observation_tree_depth": 2,
 }
 
 
@@ -92,9 +87,9 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.05,
-        epsilon_decay=1e-4,
+        exploration_scheduler_fn=LinearExplorationScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-4
+        ),
         importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,

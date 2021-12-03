@@ -18,7 +18,7 @@
 
 import copy
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import reverb
@@ -68,6 +68,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise MADDPG trainer
         Args:
@@ -100,11 +101,15 @@ class MADDPGBaseTrainer(mava.Trainer):
                 before clipping is applied.
             logger: logger object for logging trainer
                 statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         self._agents = agents
         self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
+        self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
 
         # Setup counts
         self._counts = counts
@@ -222,7 +227,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         pass
 
     def _transform_observations(
-        self, obs: Dict[str, np.ndarray], next_obs: Dict[str, np.ndarray]
+        self, obs: Dict[str, mava_types.OLT], next_obs: Dict[str, mava_types.OLT]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """Transform the observatations using the observation networks of each agent."
 
@@ -254,7 +259,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
         e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
+        e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         """get data to feed to the agent critic network(s)
@@ -506,6 +511,35 @@ class MADDPGBaseTrainer(mava.Trainer):
         if self._logger:
             self._logger.write(fetches)
 
+    def after_trainer_step(self) -> None:
+        """Optionally decay lr after every training step."""
+        if self._learning_rate_scheduler_fn:
+            self._decay_lr(self._num_steps)
+            info: Dict[str, Dict[str, float]] = {}
+            for agent in self._agents:
+                info[agent] = {}
+                info[agent]["policy_learning_rate"] = self._policy_optimizers[
+                    self._agent_net_keys[agent]
+                ].learning_rate
+                info[agent]["critic_learning_rate"] = self._critic_optimizers[
+                    self._agent_net_keys[agent]
+                ].learning_rate
+            if self._logger:
+                self._logger.write(info)
+
+    def _decay_lr(self, trainer_step: int) -> None:
+        """Decay lr.
+
+        Args:
+            trainer_step : trainer step time t.
+        """
+        train_utils.decay_lr_actor_critic(
+            self._learning_rate_scheduler_fn,
+            self._policy_optimizers,
+            self._critic_optimizers,
+            trainer_step,
+        )
+
 
 class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
     """MADDPG trainer for a decentralised architecture."""
@@ -531,6 +565,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the decentralised MADDPG trainer."""
         super().__init__(
@@ -553,6 +588,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -580,6 +616,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the centralised MADDPG trainer."""
         super().__init__(
@@ -602,6 +639,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _get_critic_feed(
@@ -611,7 +649,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
         e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
+        e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
@@ -669,6 +707,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the networked MADDPG trainer."""
         super().__init__(
@@ -691,6 +730,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
         self._connection_spec = connection_spec
 
@@ -701,7 +741,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
         e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
+        e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
@@ -775,6 +815,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the decentralised MADDPG trainer."""
         super().__init__(
@@ -797,6 +838,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
             logger=logger,
             variable_client=variable_client,
             counts=counts,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _get_critic_feed(
@@ -806,7 +848,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         a_tm1: Dict[str, np.ndarray],
         a_t: Dict[str, np.ndarray],
         e_tm1: Dict[str, np.ndarray],
-        e_t: Dict[str, np.array],
+        e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
 
@@ -867,6 +909,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise Recurrent MADDPG trainer
         Args:
@@ -899,12 +942,16 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 before clipping is applied.
             logger: logger object for logging trainer
                 statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
         self._bootstrap_n = bootstrap_n
 
         self._agents = agents
         self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
+        self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
 
         # Setup counts
         self._counts = counts
@@ -1019,7 +1066,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._num_steps.assign_add(1)
 
     def _transform_observations(
-        self, observations: Dict[str, np.ndarray]
+        self, observations: Dict[str, mava_types.OLT]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """apply the observation networks to the raw observations from the dataset
         Args:
@@ -1401,6 +1448,35 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             }
         return variables
 
+    def after_trainer_step(self) -> None:
+        """Optionally decay lr after every training step."""
+        if self._learning_rate_scheduler_fn:
+            self._decay_lr(self._num_steps)
+            info: Dict[str, Dict[str, float]] = {}
+            for agent in self._agents:
+                info[agent] = {}
+                info[agent]["policy_learning_rate"] = self._policy_optimizers[
+                    self._agent_net_keys[agent]
+                ].learning_rate
+                info[agent]["critic_learning_rate"] = self._critic_optimizers[
+                    self._agent_net_keys[agent]
+                ].learning_rate
+            if self._logger:
+                self._logger.write(info)
+
+    def _decay_lr(self, trainer_step: int) -> None:
+        """Decay lr.
+
+        Args:
+            trainer_step : trainer step time t.
+        """
+        train_utils.decay_lr_actor_critic(
+            self._learning_rate_scheduler_fn,
+            self._policy_optimizers,
+            self._critic_optimizers,
+            trainer_step,
+        )
+
 
 class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """Recurrent MADDPG trainer for a decentralised architecture.
@@ -1430,6 +1506,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -1453,6 +1530,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             variable_client=variable_client,
             counts=counts,
             bootstrap_n=bootstrap_n,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
 
@@ -1484,6 +1562,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -1507,6 +1586,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             variable_client=variable_client,
             counts=counts,
             bootstrap_n=bootstrap_n,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _get_critic_feed(
@@ -1578,6 +1658,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -1601,6 +1682,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             variable_client=variable_client,
             counts=counts,
             bootstrap_n=bootstrap_n,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _get_critic_feed(

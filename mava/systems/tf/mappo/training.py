@@ -17,7 +17,7 @@
 
 import copy
 import time
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 import sonnet as snt
@@ -31,6 +31,7 @@ from acme.utils import counting, loggers
 import mava
 from mava.adders.reverb.base import Trajectory
 from mava.systems.tf.variable_utils import VariableClient
+from mava.types import OLT
 from mava.utils import training_utils as train_utils
 from mava.utils.sort_utils import sort_str_num
 
@@ -65,6 +66,7 @@ class MAPPOTrainer(mava.Trainer):
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise MAPPO trainer
 
@@ -99,6 +101,13 @@ class MAPPOTrainer(mava.Trainer):
             counter (counting.Counter, optional): step counter object. Defaults to None.
             logger (loggers.Logger, optional): logger object for logging trainer
                 statistics. Defaults to None.
+            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         # Store agents.
@@ -112,6 +121,9 @@ class MAPPOTrainer(mava.Trainer):
 
         # Setup counts
         self._counts = counts
+
+        # Setup learning rate scheduler_fn
+        self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
 
         # Store networks.
         self._observation_networks = observation_networks
@@ -203,12 +215,12 @@ class MAPPOTrainer(mava.Trainer):
         return observation_feed
 
     def _transform_observations(
-        self, observations: Dict[str, np.ndarray]
+        self, observations: Dict[str, OLT]
     ) -> Dict[str, np.ndarray]:
         """apply the observation networks to the raw observations from the dataset
 
         Args:
-            observation (Dict[str, np.ndarray]): raw agent observations
+            observations (Dict[str, np.ndarray]): raw agent observations
 
         Returns:
             Dict[str, np.ndarray]: transformed
@@ -492,6 +504,35 @@ class MAPPOTrainer(mava.Trainer):
             }
         return variables
 
+    def after_trainer_step(self) -> None:
+        """Optionally decay lr after every training step."""
+        if self._learning_rate_scheduler_fn:
+            self._decay_lr(self._counter.get_counts().get("trainer_steps", 0))
+            info: Dict[str, Dict[str, float]] = {}
+            for agent in self._agents:
+                info[agent] = {}
+                info[agent]["policy_learning_rate"] = self._policy_optimizers[
+                    self._agent_net_keys[agent]
+                ].learning_rate
+                info[agent]["critic_learning_rate"] = self._critic_optimizers[
+                    self._agent_net_keys[agent]
+                ].learning_rate
+            if self._logger:
+                self._logger.write(info)
+
+    def _decay_lr(self, trainer_step: int) -> None:
+        """Decay lr.
+
+        Args:
+            trainer_step : trainer step time t.
+        """
+        train_utils.decay_lr_actor_critic(
+            self._learning_rate_scheduler_fn,
+            self._policy_optimizers,
+            self._critic_optimizers,
+            trainer_step,
+        )
+
 
 class CentralisedMAPPOTrainer(MAPPOTrainer):
     """MAPPO trainer for a centralised architecture."""
@@ -516,6 +557,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         max_gradient_norm: Optional[float] = None,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
@@ -537,6 +579,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             max_gradient_norm=max_gradient_norm,
             counter=counter,
             logger=logger,
+            learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
     def _get_critic_feed(

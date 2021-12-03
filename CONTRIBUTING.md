@@ -22,7 +22,7 @@ Install the pre-commit hooks and testing dependencies:
 pip install .[testing_formatting]
 pre-commit install
 ```
-You can run all the pre-commit hooks without making a commit as follows:
+You can run all the pre-commit hooks on all files as follows:
 ```bash
 pre-commit run --all-files
 ```

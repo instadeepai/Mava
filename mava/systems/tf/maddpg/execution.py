@@ -51,9 +51,11 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
         net_keys_to_ids: Dict[str, int],
+        evaluator: bool = False,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        interval: Optional[dict] = None,
     ):
 
         """Initialise the system executor
@@ -71,15 +73,19 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             counts: Count values used to record excutor episode and steps.
             variable_client:
                 client to copy weights from the trainer. Defaults to None.
-
+            evaluator: whether the executor will be used for
+                evaluation.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
         self._agent_specs = agent_specs
         self._network_sampling_setup = network_sampling_setup
         self._counts = counts
-        self._network_int_keys_extras: Dict[str, np.array] = {}
+        self._network_int_keys_extras: Dict[str, np.ndarray] = {}
         self._net_keys_to_ids = net_keys_to_ids
+        self._evaluator = evaluator
+        self._interval = interval
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,
@@ -233,10 +239,12 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
         net_keys_to_ids: Dict[str, int],
+        evaluator: bool = False,
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
+        interval: Optional[dict] = None,
     ):
         """Initialise the system executor
         Args:
@@ -255,6 +263,9 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
                 client to copy weights from the trainer. Defaults to None.
             store_recurrent_state: boolean to store the recurrent
                 network hidden state. Defaults to True.
+            evaluator: whether the executor will be used for
+                evaluation.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
@@ -262,7 +273,9 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self._network_sampling_setup = network_sampling_setup
         self._counts = counts
         self._net_keys_to_ids = net_keys_to_ids
-        self._network_int_keys_extras: Dict[str, np.array] = {}
+        self._network_int_keys_extras: Dict[str, np.ndarray] = {}
+        self._evaluator = evaluator
+        self._interval = interval
         super().__init__(
             policy_networks=policy_networks,
             agent_net_keys=agent_net_keys,

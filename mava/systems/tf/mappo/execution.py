@@ -49,6 +49,8 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        evaluator: bool = False,
+        interval: Optional[dict] = None,
     ):
         """Initialise the system executor
         Args:
@@ -60,6 +62,9 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
                 client to copy weights from the trainer. Defaults to None.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            evaluator (bool, optional): whether the executor will be used for
+                evaluation. Defaults to False.
+            interval: interval that evaluations are run at.
         """
         self._agent_specs = agent_specs
         self._network_sampling_setup = network_sampling_setup
@@ -72,6 +77,14 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
             adder=adder,
             variable_client=variable_client,
         )
+        # Store these for later use.
+        self._adder = adder
+        self._variable_client = variable_client
+        self._policy_networks = policy_networks
+        self._agent_net_keys = agent_net_keys
+        self._prev_log_probs: Dict[str, Any] = {}
+        self._interval = interval
+        self._evaluator = evaluator
 
     @tf.function
     def _policy(

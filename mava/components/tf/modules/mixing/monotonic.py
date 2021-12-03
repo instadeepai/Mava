@@ -58,7 +58,7 @@ class MonotonicMixing(BaseMixingModule):
         self._hypernet_hidden_dim = hypernet_hidden_dim
         self._n_agents = architecture._n_agents
         self._architecture = architecture
-        self._agent_networks = self._architecture.create_actor_variables()
+        self._agent_networks: Dict[str, snt.Module] = {}
 
     def _create_mixing_layer(self, name: str = "mixing") -> snt.Module:
         """Modify and return system architecture given mixing structure."""
@@ -69,7 +69,6 @@ class MonotonicMixing(BaseMixingModule):
 
         # Implement method from base class
         self._mixed_network = MonotonicMixingNetwork(
-            agent_networks=self._agent_networks,
             n_agents=self._n_agents,
             qmix_hidden_dim=self._qmix_hidden_dim,
             num_hypernet_layers=self._num_hypernet_layers,
@@ -82,6 +81,9 @@ class MonotonicMixing(BaseMixingModule):
 
     def create_system(self) -> Dict[str, Dict[str, snt.Module]]:
         # Implement method from base class
+        self._agent_networks[
+            "agent_networks"
+        ] = self._architecture.create_actor_variables()
         self._agent_networks["mixing"] = self._create_mixing_layer(name="mixing")
         self._agent_networks["target_mixing"] = self._create_mixing_layer(
             name="target_mixing"

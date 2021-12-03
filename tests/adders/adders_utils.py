@@ -177,7 +177,8 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
 
 
 def make_trajectory(
-    observations: np.ndarray, agents: Set[str] = {"agent_0", "agent_1", "agent_2"}
+    observations: np.ndarray,
+    agents: Set[str] = {"agent_0", "agent_1", "agent_2"},
 ) -> Any:
     """Make a simple trajectory from a sequence of observations.
     Arguments:
