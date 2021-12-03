@@ -18,7 +18,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 import dm_env
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -69,7 +68,7 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
         self._agent_specs = agent_specs
         self._network_sampling_setup = network_sampling_setup
         self._counts = counts
-        self._network_int_keys_extras: Dict[str, np.array] = {}
+        self._network_int_keys_extras: Dict[str, Any] = {}
         self._net_keys_to_ids = net_keys_to_ids
         super().__init__(
             policy_networks=policy_networks,
@@ -269,7 +268,7 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
         self._network_sampling_setup = network_sampling_setup
         self._counts = counts
         self._net_keys_to_ids = net_keys_to_ids
-        self._network_int_keys_extras: Dict[str, np.array] = {}
+        self._network_int_keys_extras: Dict[str, Any] = {}
         self._evaluator = evaluator
         self._interval = interval
         super().__init__(
