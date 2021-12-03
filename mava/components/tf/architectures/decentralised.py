@@ -157,7 +157,7 @@ class DecentralisedPolicyActor(BasePolicyArchitecture):
             emb_spec = tf2_utils.create_variables(
                 self._observation_networks[agent_net_key], [obs_spec]
             )
-            self._embed_specs[agent_key] = emb_spec
+            self._embed_specs[agent_net_key] = emb_spec
 
             # Create variables.
             tf2_utils.create_variables(self._policy_networks[agent_net_key], [emb_spec])
@@ -294,10 +294,8 @@ class DecentralisedValueActorCritic(BaseActorCritic):
 
         # create critics
         for net_key in self._net_keys:
-            agent_key = self._net_spec_keys[net_key]
-
             # get specs
-            emb_spec = embed_specs[agent_key]
+            emb_spec = embed_specs[net_key]
 
             # Create variables.
             tf2_utils.create_variables(self._critic_networks[net_key], [emb_spec])
@@ -371,7 +369,7 @@ class DecentralisedQValueActorCritic(DecentralisedValueActorCritic):
             agent_key = self._net_spec_keys[net_key]
 
             # get specs
-            emb_spec = embed_specs[agent_key]
+            emb_spec = embed_specs[net_key]
             act_spec = act_specs[agent_key]
 
             # Create variables.
