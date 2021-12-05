@@ -8,6 +8,7 @@ import tensorflow as tf
 from acme.tf import utils as tf2_utils
 
 from mava.systems.tf import savers as tf2_savers
+from mava.utils.training_utils import check_count_condition, non_blocking_sleep
 
 
 class VariableSource:
@@ -35,18 +36,9 @@ class VariableSource:
         self._last_checkpoint_time = time.time()
         self._termination_condition = termination_condition
 
-        terminal_options = [
-            "trainer_steps",
-            "trainer_walltime",
-            "evaluator_steps",
-            "evaluator_episodes",
-            "executor_episodes",
-            "executor_steps",
-        ]
-        if self._termination_condition is not None:
-            assert len(self._termination_condition.keys()) == 1
-            terminal_key, _ = list(self._termination_condition.items())[0]
-            assert terminal_key in terminal_options
+        self._terminal_key, self._terminal_count = check_count_condition(
+            self._termination_condition
+        )
 
         if checkpoint:
             # Only save variables that are not empty.
@@ -143,7 +135,7 @@ class VariableSource:
         # Checkpoints every 5 minutes
         while True:
             # Wait 10 seconds before checking again
-            time.sleep(10)
+            non_blocking_sleep(10)
 
             # Add 1 extra second just to make sure that the checkpointer
             # is ready to save.
@@ -158,16 +150,13 @@ class VariableSource:
                 print("Updated variables checkpoint.")
 
             if self._termination_condition is not None:
-                terminal_key, terminal_count = list(
-                    self._termination_condition.items()
-                )[0]
-                current_count = float(self.variables[terminal_key])
-                if current_count >= terminal_count:
+                current_count = float(self.variables[self._terminal_key])
+                if current_count >= self._terminal_count:
                     tf.print(
                         "StepsLimiter: Max",
-                        self.variables[terminal_key],
+                        self.variables[self._terminal_key],
                         "of",
-                        terminal_count,
+                        self._terminal_count,
                         "reached, terminating.",
                     )
                     lp.stop()

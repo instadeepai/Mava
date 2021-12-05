@@ -15,7 +15,7 @@
 
 # Adapted from https://github.com/openai/multiagent-particle-envs.
 # TODO (dries): Try using this class directly from PettingZoo and delete this file.
-
+# type: ignore
 import copy
 from typing import Any, Callable, Dict, List, Tuple, Union
 
@@ -136,7 +136,7 @@ class MultiAgentEnv(gym.Env):
     def step(
         self, action_n: Dict[str, Union[int, List[float]]]
     ) -> Tuple[
-        Dict[str, Union[np.array, Any]],
+        Dict[str, Union[np.ndarray, Any]],
         Union[dict, Dict[str, Union[float, Any]]],
         Dict[str, Any],
         Dict[str, dict],
@@ -189,7 +189,7 @@ class MultiAgentEnv(gym.Env):
         return self.info_callback(agent, self.world)
 
     # get observation for a particular agent
-    def _get_obs(self, a_i: int, agent: Agent) -> np.array:
+    def _get_obs(self, a_i: int, agent: Agent) -> np.ndarray:
         if self.observation_callback is None:
             return np.zeros(0)
         else:
@@ -208,7 +208,7 @@ class MultiAgentEnv(gym.Env):
             return 0.0
         return self.reward_callback(agent, a_i, self.world)
 
-    def _get_state(self) -> np.array:
+    def _get_state(self) -> np.ndarray:
         # get positions of all entities in this agent's reference frame
         entity_pos = []
         for entity in self.world.landmarks:  # world.entities:
@@ -231,7 +231,7 @@ class MultiAgentEnv(gym.Env):
     # set env action for a particular agent
     def _set_action(
         self,
-        action: np.array,
+        action: np.ndarray,
         agent: Agent,
         action_space: spaces,
     ) -> None:
@@ -285,7 +285,7 @@ class MultiAgentEnv(gym.Env):
         self.render_geoms_xform = None
 
     # render environment
-    def render(self, mode: str = "human") -> List[np.array]:
+    def render(self, mode: str = "human") -> List[np.ndarray]:
 
         for i in range(len(self.viewers)):
             # create viewers (if necessary)
@@ -352,7 +352,7 @@ class MultiAgentEnv(gym.Env):
         return np.squeeze(results)
 
     # create receptor field locations in local coordinate frame
-    def _make_receptor_locations(self) -> List[np.array]:
+    def _make_receptor_locations(self) -> List[np.ndarray]:
         receptor_type = "polar"
         range_min = 0.05 * 2.0
         range_max = 1.00

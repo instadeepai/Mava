@@ -47,8 +47,10 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def make_environment(
-    evaluation: bool = False, game: str = FLAGS.game
+    game: str,
+    evaluation: bool = False,
 ) -> dm_env.Environment:
+    del evaluation
     raw_environment = rl_environment.Environment(game)
     environment = OpenSpielSequentialWrapper(raw_environment)
     return environment
@@ -57,7 +59,10 @@ def make_environment(
 def main(_: Any) -> None:
 
     # environment
-    environment_factory = make_environment
+    environment_factory = functools.partial(
+        make_environment,
+        game=FLAGS.game,
+    )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)
@@ -82,9 +87,9 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.05,
-        epsilon_decay=1e-4,
+        exploration_scheduler_fn=LinearExplorationScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-4
+        ),
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         train_loop_fn=OpenSpielSequentialEnvironmentLoop,

@@ -42,6 +42,7 @@ class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
         communication_module: Optional[BaseCommunicationModule] = None,
         fingerprint: bool = False,
         evaluator: bool = False,
+        interval: Optional[dict] = None,
     ):
         """Initialise the system executor
 
@@ -63,6 +64,7 @@ class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
                 stabilise experience replay. Defaults to False.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
+            interval: interval that evaluations are run at.
         """
 
         super(QMIXFeedForwardExecutor, self).__init__(
@@ -75,4 +77,5 @@ class QMIXFeedForwardExecutor(MADQNFeedForwardExecutor):
             fingerprint=fingerprint,
             trainer=trainer,
             evaluator=evaluator,
+            interval=interval,
         )

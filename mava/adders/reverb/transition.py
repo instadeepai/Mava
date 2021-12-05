@@ -131,15 +131,15 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
 
     def _write(self) -> None:
         # Convenient getters for use in tree operations.
-        def get_first(x: np.array) -> np.array:
+        def get_first(x: np.ndarray) -> np.ndarray:
             return x[self._first_idx]
 
-        def get_last(x: np.array) -> np.array:
+        def get_last(x: np.ndarray) -> np.ndarray:
             return x[self._last_idx]
 
         # Note: this getter is meant to be used on a TrajectoryWriter.history to
         # obtain its numpy values.
-        def get_all_np(x: np.array) -> np.array:
+        def get_all_np(x: np.ndarray) -> np.ndarray:
             return x[self._first_idx : self._last_idx].numpy()
 
         # Get the state, action, next_state, as well as possibly extras for the

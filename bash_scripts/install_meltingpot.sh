@@ -13,31 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-# Bash settings: fail on any error and display all commands being run.
-set -e
-set -x
-
-# Python must be 3.6 or higher.
-python --version
-
-# Set up a virtual environment.
-python -m venv mava_testing
-source mava_testing/bin/activate
-
-# Install dependencies.
-pip install --upgrade pip setuptools
-pip --version
-pip install .[tf,envs,reverb,testing_formatting,launchpad,record_episode]
-
-N_CPU=$(grep -c ^processor /proc/cpuinfo)
-
-# Run static type-checking.
-mypy mava
-
-# Run all tests.
-pytest -n "${N_CPU}" tests
-
-# Clean-up.
-deactivate
-rm -rf mava_testing/
+# Adapted from https://github.com/deepmind/meltingpot#installation
+# Install Install dmlab2d
+pip install https://github.com/deepmind/lab2d/releases/download/release_candidate_2021-07-13/dmlab2d-1.0-cp38-cp38-manylinux_2_31_x86_64.whl
+# Install Melting Pot
+mkdir ../packages
+cd ../packages
+git clone -b main https://github.com/deepmind/meltingpot
+pip install meltingpot/

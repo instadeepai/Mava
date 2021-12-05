@@ -18,7 +18,6 @@
 
 """Mixing for multi-agent RL systems"""
 
-from typing import Dict
 
 import sonnet as snt
 import tensorflow as tf
@@ -34,7 +33,6 @@ class MonotonicMixingNetwork(snt.Module):
 
     def __init__(
         self,
-        agent_networks: Dict[str, snt.Module],
         n_agents: int,
         name: str = "mixing",
         qmix_hidden_dim: int = 64,
@@ -51,7 +49,6 @@ class MonotonicMixingNetwork(snt.Module):
                 layer. Relevant for num_hypernet_layers > 1.
         """
         super(MonotonicMixingNetwork, self).__init__(name=name)
-        self._agent_networks = agent_networks
         self._n_agents = n_agents
         self._qmix_hidden_dim = qmix_hidden_dim
         self._num_hypernet_layers = num_hypernet_layers
@@ -59,7 +56,6 @@ class MonotonicMixingNetwork(snt.Module):
 
         # Create hypernetwork
         self._hypernetworks = HyperNetwork(
-            self._agent_networks,
             self._qmix_hidden_dim,
             self._n_agents,
             self._num_hypernet_layers,

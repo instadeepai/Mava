@@ -18,7 +18,7 @@ from typing import Optional
 from gym import Space
 
 from . import scenarios as scenarios
-from .environment import MultiAgentEnv
+from .environment import MultiAgentEnv  # type: ignore
 
 
 def make_debugging_env(

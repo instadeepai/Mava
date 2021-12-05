@@ -210,13 +210,13 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
     ) -> types.OLT:
         if isinstance(observe, dict):
             legals = np.array(observe["action_mask"], np.float32)
-            observation = np.array(observe["observation"])
+            observation_data = np.array(observe["observation"])
         else:
             legals = np.ones(self.num_actions, np.float32)
-            observation = np.array(observe)
+            observation_data = np.array(observe)
 
         observation = types.OLT(
-            observation=observation,
+            observation=observation_data,
             legal_actions=legals,
             terminal=np.asarray([done], dtype=np.float32),
         )

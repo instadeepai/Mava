@@ -37,7 +37,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "./logs", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 flags.DEFINE_string("substrate", "clean_up", "substrate to train on.")
 
 
@@ -73,9 +73,9 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.05,
-        epsilon_decay=1e-4,
+        exploration_scheduler_fn=LinearExplorationScheduler(
+            epsilon_min=0.05, epsilon_decay=1e-4
+        ),
         importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,

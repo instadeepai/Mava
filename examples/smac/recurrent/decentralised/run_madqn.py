@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Mapping, Sequence, Union
 
 import launchpad as lp
 import sonnet as snt
@@ -27,11 +26,13 @@ from acme import types
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.components.tf.networks import epsilon_greedy_action_selector
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationTimestepScheduler,
+)
+from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments import smac_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -64,15 +65,6 @@ def custom_recurrent_network(
     if isinstance(q_networks_layer_sizes, Sequence):
         q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
 
-    def action_selector_fn(
-        q_values: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: Optional[tf.Variable] = None,
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
-
     q_networks = {}
     action_selectors = {}
     for key in specs.keys():
@@ -91,7 +83,7 @@ def custom_recurrent_network(
         )
 
         # epsilon greedy action selector
-        action_selector = action_selector_fn
+        action_selector = EpsilonGreedy
 
         q_networks[key] = q_network
         action_selectors[key] = action_selector
@@ -103,10 +95,10 @@ def custom_recurrent_network(
 
 
 def main(_: Any) -> None:
-
+    """Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
     # environment
     environment_factory = functools.partial(
-        smac_utils.make_environment, map_name=FLAGS.map_name
+        pettingzoo_utils.make_environment, env_class="smac", env_name=FLAGS.map_name
     )
 
     # Networks.
@@ -135,10 +127,12 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.05,
-        epsilon_decay=1e-5,
-        optimizer=snt.optimizers.RMSProp(learning_rate=1e-5),
+        exploration_scheduler_fn=LinearExplorationTimestepScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=50000
+        ),
+        optimizer=snt.optimizers.RMSProp(
+            learning_rate=0.0005, epsilon=0.00001, decay=0.99
+        ),
         checkpoint_subpath=checkpoint_dir,
         batch_size=32,
         executor_variable_update_period=100,

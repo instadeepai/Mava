@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running QMIX on SMAC environments."""
+
 import functools
 from datetime import datetime
 from typing import Any
@@ -22,10 +22,10 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration import LinearExplorationTimestepScheduler
 from mava.systems.tf import qmix
 from mava.utils import lp_utils
-from mava.utils.environments import smac_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -44,9 +44,10 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
+    """Example running QMIX on SMAC environments."""
     # Environment.
     environment_factory = functools.partial(
-        smac_utils.make_environment, map_name=FLAGS.map_name
+        pettingzoo_utils.make_environment, env_class="smac", env_name=FLAGS.map_name
     )
 
     # Networks.
@@ -72,11 +73,13 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.05,
-        epsilon_decay=1e-5,
+        exploration_scheduler_fn=LinearExplorationTimestepScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=50000
+        ),
         max_replay_size=1000000,
-        optimizer=snt.optimizers.RMSProp(learning_rate=1e-5),
+        optimizer=snt.optimizers.RMSProp(
+            learning_rate=0.0005, epsilon=0.00001, decay=0.99
+        ),
         checkpoint_subpath=checkpoint_dir,
         batch_size=512,
         qmix_hidden_dim=32,

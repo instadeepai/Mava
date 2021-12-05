@@ -21,6 +21,9 @@ import launchpad as lp
 import sonnet as snt
 
 import mava
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationTimestepScheduler,
+)
 from mava.systems.tf import dial
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
@@ -57,6 +60,9 @@ class TestDial:
             checkpoint=False,
             sequence_length=3,
             period=3,
+            exploration_scheduler_fn=LinearExplorationTimestepScheduler(
+                epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=500
+            ),
         )
 
         program = system.build()
