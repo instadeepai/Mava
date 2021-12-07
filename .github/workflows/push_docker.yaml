@@ -1,0 +1,89 @@
+name: push-docker-container
+
+on: push
+# on:
+#   push:
+#     branches:
+#       - 'develop'
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      -
+        name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Build and push tf-core
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepai/mava:tf-core-latest,instadeepai/mava:tf-core-$(date +'%Y-%m-%d')
+          target: tf-core
+
+      -
+        name: Build and push pz
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepai/mava:pz-latest,instadeepai/mava:pz-$(date +'%Y-%m-%d')
+          target: pz
+
+      -
+        name: Build and push sc2
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepai/mava:sc2-latest,instadeepai/mava:sc2-$(date +'%Y-%m-%d')
+          target: sc2
+
+      -
+        name: Build and push flatland
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepai/mava:flatland-latest,instadeepai/mava:flatland-$(date +'%Y-%m-%d')
+          target: flatland
+
+      -
+        name: Build and push robocup
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepai/mava:robocup-latest,instadeepai/mava:robocup-$(date +'%Y-%m-%d')
+          target: robocup
+
+      -
+        name: Build and push openspiel
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepai/mava:openspiel-latest,instadeepai/mava:openspiel-$(date +'%Y-%m-%d')
+          target: openspiel
+
+      -
+        name: Build and push meltingpot
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepai/mava:meltingpot-latest,instadeepai/mava:meltingpot-$(date +'%Y-%m-%d')
+          target: meltingpot

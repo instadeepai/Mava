@@ -11,7 +11,7 @@
 #   pydocstyle: Checking docstring style.
 #   interrogate: Checks docstring code coverage.
 
-default_stages: ["commit", "push"]
+default_stages: ["commit", "push","commit-msg"]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.4.0

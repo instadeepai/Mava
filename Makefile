@@ -19,7 +19,7 @@ RUN_FLAGS_TENSORBOARD=$(GPUS) -p 6006:6006 $(BASE_FLAGS)
 
 # Default version is tf-core
 version = tf-core
-DOCKER_IMAGE_NAME = mava
+DOCKER_IMAGE_NAME = instadeepai/mava
 DOCKER_IMAGE_TAG = $(version)
 DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 DOCKER_RUN_TENSORBOARD=docker run $(RUN_FLAGS_TENSORBOARD) $(IMAGE)
@@ -44,7 +44,7 @@ endif
 IMAGE = $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 # make file commands
 build:
-	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE) --target $(DOCKER_IMAGE_TAG)  --build-arg record=$(record) .
+	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE) $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)-latest --target $(DOCKER_IMAGE_TAG)  --build-arg record=$(record) .
 
 run:
 	$(DOCKER_RUN) python $(example) --base_dir /home/app/mava/logs/
