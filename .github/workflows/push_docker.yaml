@@ -10,8 +10,6 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - name: Set current date as env variable
-        run: echo "DATE=$(date +'%Y%m%dT%H%M%S')" >> $GITHUB_ENV
       -
         name: Checkout
         uses: actions/checkout@v2
@@ -27,13 +25,18 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set outputs
+        id: vars
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
       -
         name: Build and push tf-core
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
-          tags: instadeepct/mava:tf-core-latest,instadeepct/mava:tf-core-${{env.DATE}}
+          tags: instadeepct/mava:tf-core-latest,instadeepct/mava:tf-core-${{ steps.vars.outputs.sha_short }}
           target: tf-core
 
       -
@@ -42,7 +45,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:pz-latest,instadeepct/mava:pz-${{env.DATE}}
+          tags: instadeepct/mava:pz-latest,instadeepct/mava:pz-${{ steps.vars.outputs.sha_short }}
           target: pz
 
       -
@@ -51,7 +54,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:sc2-latest,instadeepct/mava:sc2-${{env.DATE}}
+          tags: instadeepct/mava:sc2-latest,instadeepct/mava:sc2-${{ steps.vars.outputs.sha_short }}
           target: sc2
 
       -
@@ -60,7 +63,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:flatland-latest,instadeepct/mava:flatland-${{env.DATE}}
+          tags: instadeepct/mava:flatland-latest,instadeepct/mava:flatland-${{ steps.vars.outputs.sha_short }}
           target: flatland
 
       -
@@ -69,7 +72,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:robocup-latest,instadeepct/mava:robocup-${{env.DATE}}
+          tags: instadeepct/mava:robocup-latest,instadeepct/mava:robocup-${{ steps.vars.outputs.sha_short }}
           target: robocup
 
       -
@@ -78,7 +81,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:openspiel-latest,instadeepct/mava:openspiel-${{env.DATE}}
+          tags: instadeepct/mava:openspiel-latest,instadeepct/mava:openspiel-${{ steps.vars.outputs.sha_short }}
           target: openspiel
 
       -
@@ -87,5 +90,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:meltingpot-latest,instadeepct/mava:meltingpot-${{env.DATE}}
+          tags: instadeepct/mava:meltingpot-latest,instadeepct/mava:meltingpot-${{ steps.vars.outputs.sha_short }}
           target: meltingpot
