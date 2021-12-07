@@ -19,7 +19,7 @@ RUN_FLAGS_TENSORBOARD=$(GPUS) -p 6006:6006 $(BASE_FLAGS)
 
 # Default version is tf-core
 version = tf-core
-DOCKER_IMAGE_NAME = instadeepai/mava
+DOCKER_IMAGE_NAME = instadeepct/mava
 DOCKER_IMAGE_TAG = $(version)
 DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 DOCKER_RUN_TENSORBOARD=docker run $(RUN_FLAGS_TENSORBOARD) $(IMAGE)
