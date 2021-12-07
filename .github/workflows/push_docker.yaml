@@ -9,65 +9,101 @@ on: push
 
 
 jobs:
-  docker:
+  build-push-develop:
+    if: ${{ github.ref == 'refs/heads/develop' }}
     runs-on: ubuntu-latest
     steps:
       -
         name: Checkout
         uses: actions/checkout@v2
-
-      - name: Set outputs
-        id: vars
-        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
-
-      # Tags for branchs
-      -
-        name: Docker branch meta
-        if: github.ref != 'refs/heads/develop'
-        id: meta
-        uses: docker/metadata-action@v3
-        with:
-          # list of Docker images to use as base name for tags
-          images: |
-            instadeepct/mava
-          # generate Docker tags based on the following events/attributes
-          tags: |
-            tf-core-${{ steps.vars.outputs.sha_short }}
-            pz-${{ steps.vars.outputs.sha_short }}
-            sc2-${{ steps.vars.outputs.sha_short }}
-            flatland-${{ steps.vars.outputs.sha_short }}
-            robocup-${{ steps.vars.outputs.sha_short }}
-            openspiel-${{ steps.vars.outputs.sha_short }}
-            meltingpot-${{ steps.vars.outputs.sha_short }}
-
-      # # Tags for PR to Dev
-      # -
-      #   name: Docker dev meta
-      #   if: github.ref == 'refs/heads/develop'
-      #   id: meta
-      #   uses: docker/metadata-action@v3
-      #   with:
-      #     # list of Docker images to use as base name for tags
-      #     images: |
-      #       instadeepct/mava
-      #     # generate Docker tags based on the following events/attributes
-      #     tags: |
-      #       tf-core-latest
-      #       pz-latest
-      #       sc2-latest
-      #       flatland-latest
-      #       robocup-latest
-      #       openspiel-latest
-      #       meltingpot-latest
-
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v1
-
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
+      -
+        name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Build and push tf-core
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:tf-core-latest
+          target: tf-core
 
+      -
+        name: Build and push pz
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:pz-latest
+          target: pz
+
+      -
+        name: Build and push sc2
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:sc2-latest
+          target: sc2
+
+      -
+        name: Build and push flatland
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:flatland-latest
+          target: flatland
+
+      -
+        name: Build and push robocup
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:robocup-latest
+          target: robocup
+
+      -
+        name: Build and push openspiel
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:openspiel-latest
+          target: openspiel
+
+      -
+        name: Build and push meltingpot
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:meltingpot-latest
+          target: meltingpot
+
+  build-push-branches:
+    if: ${{ github.ref != 'refs/heads/develop' }}
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
       -
         name: Login to DockerHub
         uses: docker/login-action@v1
@@ -75,11 +111,69 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Set outputs
+        id: vars
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
       -
-        name: Build and push image
+        name: Build and push tf-core
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          target: ${{ steps.meta.outputs.labels }}
+          tags: instadeepct/mava:tf-core-$GITHUB_SHA
+          target: tf-core
+
+      -
+        name: Build and push pz
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:pz-$GITHUB_SHA
+          target: pz
+
+      -
+        name: Build and push sc2
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:sc2-$GITHUB_SHA
+          target: sc2
+
+      -
+        name: Build and push flatland
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:flatland-$GITHUB_SHA
+          target: flatland
+
+      -
+        name: Build and push robocup
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:robocup-$GITHUB_SHA
+          target: robocup
+
+      -
+        name: Build and push openspiel
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:openspiel-$GITHUB_SHA
+          target: openspiel
+
+      -
+        name: Build and push meltingpot
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: instadeepct/mava:meltingpot-$GITHUB_SHA
+          target: meltingpot
