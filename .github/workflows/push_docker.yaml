@@ -121,7 +121,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:tf-core-$GITHUB_SHA
+          tags: instadeepct/mava:tf-core-${{ steps.vars.outputs.sha_short }}
           target: tf-core
 
       -
@@ -130,7 +130,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:pz-$GITHUB_SHA
+          tags: instadeepct/mava:pz-${{ steps.vars.outputs.sha_short }}
           target: pz
 
       -
@@ -139,7 +139,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:sc2-$GITHUB_SHA
+          tags: instadeepct/mava:sc2-${{ steps.vars.outputs.sha_short }}
           target: sc2
 
       -
@@ -148,7 +148,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:flatland-$GITHUB_SHA
+          tags: instadeepct/mava:flatland-${{ steps.vars.outputs.sha_short }}
           target: flatland
 
       -
@@ -157,7 +157,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:robocup-$GITHUB_SHA
+          tags: instadeepct/mava:robocup-${{ steps.vars.outputs.sha_short }}
           target: robocup
 
       -
@@ -166,7 +166,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:openspiel-$GITHUB_SHA
+          tags: instadeepct/mava:openspiel-${{ steps.vars.outputs.sha_short }}
           target: openspiel
 
       -
@@ -175,5 +175,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepct/mava:meltingpot-$GITHUB_SHA
+          tags: instadeepct/mava:meltingpot-${{ steps.vars.outputs.sha_short }}
           target: meltingpot
