@@ -10,6 +10,8 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
+      - name: Set current date as env variable
+        run: echo "NOW::$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
       -
         name: Checkout
         uses: actions/checkout@v2
@@ -31,7 +33,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepai/mava:tf-core-latest,instadeepai/mava:tf-core-$(date +'%Y-%m-%d')
+          tags: instadeepai/mava:tf-core-latest,instadeepai/mava:tf-core-$NOW
           target: tf-core
 
       -
@@ -40,7 +42,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepai/mava:pz-latest,instadeepai/mava:pz-$(date +'%Y-%m-%d')
+          tags: instadeepai/mava:pz-latest,instadeepai/mava:pz-$NOW
           target: pz
 
       -
@@ -49,7 +51,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepai/mava:sc2-latest,instadeepai/mava:sc2-$(date +'%Y-%m-%d')
+          tags: instadeepai/mava:sc2-latest,instadeepai/mava:sc2-$NOW
           target: sc2
 
       -
@@ -58,7 +60,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepai/mava:flatland-latest,instadeepai/mava:flatland-$(date +'%Y-%m-%d')
+          tags: instadeepai/mava:flatland-latest,instadeepai/mava:flatland-$NOW
           target: flatland
 
       -
@@ -67,7 +69,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepai/mava:robocup-latest,instadeepai/mava:robocup-$(date +'%Y-%m-%d')
+          tags: instadeepai/mava:robocup-latest,instadeepai/mava:robocup-$NOW
           target: robocup
 
       -
@@ -76,7 +78,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepai/mava:openspiel-latest,instadeepai/mava:openspiel-$(date +'%Y-%m-%d')
+          tags: instadeepai/mava:openspiel-latest,instadeepai/mava:openspiel-$NOW
           target: openspiel
 
       -
@@ -85,5 +87,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: instadeepai/mava:meltingpot-latest,instadeepai/mava:meltingpot-$(date +'%Y-%m-%d')
+          tags: instadeepai/mava:meltingpot-latest,instadeepai/mava:meltingpot-$NOW
           target: meltingpot
