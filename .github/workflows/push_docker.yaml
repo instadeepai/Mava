@@ -40,25 +40,25 @@ jobs:
             openspiel-${{ steps.vars.outputs.sha_short }}
             meltingpot-${{ steps.vars.outputs.sha_short }}
 
-      # Tags for PR to Dev
-      -
-        name: Docker dev meta
-        if: github.ref == 'refs/heads/develop'
-        id: meta
-        uses: docker/metadata-action@v3
-        with:
-          # list of Docker images to use as base name for tags
-          images: |
-            instadeepct/mava
-          # generate Docker tags based on the following events/attributes
-          tags: |
-            tf-core-latest
-            pz-latest
-            sc2-latest
-            flatland-latest
-            robocup-latest
-            openspiel-latest
-            meltingpot-latest
+      # # Tags for PR to Dev
+      # -
+      #   name: Docker dev meta
+      #   if: github.ref == 'refs/heads/develop'
+      #   id: meta
+      #   uses: docker/metadata-action@v3
+      #   with:
+      #     # list of Docker images to use as base name for tags
+      #     images: |
+      #       instadeepct/mava
+      #     # generate Docker tags based on the following events/attributes
+      #     tags: |
+      #       tf-core-latest
+      #       pz-latest
+      #       sc2-latest
+      #       flatland-latest
+      #       robocup-latest
+      #       openspiel-latest
+      #       meltingpot-latest
 
       -
         name: Set up QEMU
