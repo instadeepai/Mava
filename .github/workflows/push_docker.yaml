@@ -83,4 +83,3 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           target: ${{ steps.meta.outputs.labels }}
-          label: ${{ steps.meta.outputs.labels }}
