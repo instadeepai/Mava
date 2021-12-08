@@ -25,7 +25,7 @@ jobs:
 
       - name: Set docker repo vars
         id: vars2
-        run: echo "::set-output name=docker_repo::instadeepct/baselines"
+        run: echo "::set-output name=docker_repo::ktessera/mava"
 
       -
         name: Login to DockerHub
@@ -117,7 +117,7 @@ jobs:
 
       - name: Set docker repo vars
         id: vars2
-        run: echo "::set-output name=docker_repo::instadeepct/baselines"
+        run: echo "::set-output name=docker_repo::ktessera/mava"
 
       -
         name: Login to DockerHub
