@@ -29,8 +29,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set vars
-        id: vars
+      - name: Set docker repo vars
+        id: vars2
         run: echo "::set-output name=docker_repo::instadeepct/baselines"
 
       -
@@ -39,7 +39,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:tf-core-latest
+          tags: ${{ steps.vars2.outputs.docker_repo }}:tf-core-latest
           target: tf-core
 
       -
@@ -48,7 +48,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:pz-latest
+          tags: ${{ steps.vars2.outputs.docker_repo }}:pz-latest
           target: pz
 
       -
@@ -57,7 +57,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:sc2-latest
+          tags: ${{ steps.vars2.outputs.docker_repo }}:sc2-latest
           target: sc2
 
       -
@@ -66,7 +66,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:flatland-latest
+          tags: ${{ steps.vars2.outputs.docker_repo }}:flatland-latest
           target: flatland
 
       -
@@ -75,7 +75,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:robocup-latest
+          tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-latest
           target: robocup
 
       -
@@ -84,7 +84,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:openspiel-latest
+          tags: ${{ steps.vars2.outputs.docker_repo }}:openspiel-latest
           target: openspiel
 
       -
@@ -93,7 +93,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:meltingpot-latest
+          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-latest
           target: meltingpot
 
   build-push-branches:
@@ -116,9 +116,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set vars
+      - name: Set sha vars
         id: vars
         run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD) name=docker_repo::instadeepct/baselines"
+
+      - name: Set docker repo vars
+        id: vars2
+        run: echo "::set-output name=docker_repo::instadeepct/baselines"
 
       -
         name: Build and push tf-core
@@ -126,7 +130,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:tf-core-${{ steps.vars.outputs.sha_short }}
+          tags: ${{ steps.vars2.outputs.docker_repo }}:tf-core-${{ steps.vars.outputs.sha_short }}
           target: tf-core
 
       -
@@ -135,7 +139,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:pz-${{ steps.vars.outputs.sha_short }}
+          tags: ${{ steps.vars2.outputs.docker_repo }}:pz-${{ steps.vars.outputs.sha_short }}
           target: pz
 
       -
@@ -144,7 +148,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:sc2-${{ steps.vars.outputs.sha_short }}
+          tags: ${{ steps.vars2.outputs.docker_repo }}:sc2-${{ steps.vars.outputs.sha_short }}
           target: sc2
 
       -
@@ -153,7 +157,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:flatland-${{ steps.vars.outputs.sha_short }}
+          tags: ${{ steps.vars2.outputs.docker_repo }}:flatland-${{ steps.vars.outputs.sha_short }}
           target: flatland
 
       -
@@ -162,7 +166,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:robocup-${{ steps.vars.outputs.sha_short }}
+          tags: ${{ steps.vars2.outputs.docker_repo }}:robocup-${{ steps.vars.outputs.sha_short }}
           target: robocup
 
       -
@@ -171,7 +175,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:openspiel-${{ steps.vars.outputs.sha_short }}
+          tags: ${{ steps.vars2.outputs.docker_repo }}:openspiel-${{ steps.vars.outputs.sha_short }}
           target: openspiel
 
       -
@@ -180,5 +184,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.vars.outputs.docker_repo }}:meltingpot-${{ steps.vars.outputs.sha_short }}
+          tags: ${{ steps.vars2.outputs.docker_repo }}:meltingpot-${{ steps.vars.outputs.sha_short }}
           target: meltingpot
