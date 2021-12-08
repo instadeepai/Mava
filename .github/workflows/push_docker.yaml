@@ -118,7 +118,7 @@ jobs:
 
       - name: Set sha vars
         id: vars
-        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD) name=docker_repo::instadeepct/baselines"
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
 
       - name: Set docker repo vars
         id: vars2
