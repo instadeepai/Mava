@@ -26,14 +26,14 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb~=0.6.0",
+    "dm-reverb~=0.6.1",
     "jax",
     "jaxlib",
 ]
 
 tf_requirements = [
     "tensorflow~=2.7.0",
-    "tensorflow_probability~=0.14.1",
+    "tensorflow_probability~=0.15.0",
     "dm-sonnet",
     "trfl",
 ]
@@ -94,11 +94,11 @@ setup(
     keywords="multi-agent reinforcement-learning python machine learning",
     packages=find_packages(),
     install_requires=[
-        "dm-acme~=0.2.2",
+        "dm-acme~=0.2.3",
         "absl-py",
         "dm_env",
         "dm-tree",
-        "numpy",
+        "numpy~=1.21.4",
         "pillow",
         "matplotlib",
         "dataclasses",
