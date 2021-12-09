@@ -16,9 +16,10 @@
 5. [Usage](#usage)
 6. [Installation](#installation)
 7. [Debugging](#debugging)
-8. [Roadmap](#roadmap)
-9. [Contributing](#contributing)
-10. [Troubleshooting and FAQ](#troubleshooting-and-faqs)
+8. [Logging](#logging)
+9. [Roadmap](#roadmap)
+10. [Contributing](#contributing)
+11. [Troubleshooting and FAQ](#troubleshooting-and-faqs)
 
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability.
 
@@ -340,6 +341,14 @@ Debugging in MARL can be very difficult and time consuming, therefore it is impo
 <img src="docs/images/discrete.png" width="45%">
 <img src="docs/images/continuous.png" width="45%">
 </p>
+
+## Logging
+Mava logs using `tensorboard`, with the default logging directory being 
+```
+./mava/<run_timestamp>
+```
+A `mava` folder will be created in the root directory and here `<run_timestamp>` is the date and time at which an experiment is run. Once tensorboard has been opened, there will be three main cards for the `evaluator` and for each  `executor` and `trainer`. Under each main card there will be logging information for each respective agent. We log 
+
 
 ## Roadmap
 
