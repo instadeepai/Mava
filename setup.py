@@ -94,8 +94,7 @@ setup(
     keywords="multi-agent reinforcement-learning python machine learning",
     packages=find_packages(),
     install_requires=[
-        "dm-acme~=0.2.3",
-        "chex",
+        "dm-acme~=0.2.4",
         "absl-py",
         "dm_env",
         "dm-tree",
