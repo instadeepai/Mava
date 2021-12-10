@@ -343,11 +343,15 @@ Debugging in MARL can be very difficult and time consuming, therefore it is impo
 </p>
 
 ## Logging
-Mava logs using `tensorboard`, with the default logging directory being 
+Mava logs various metrics using `tensorboard`, with the default logging directory being 
 ```
 ./mava/<run_timestamp>
 ```
-A `mava` folder will be created in the root directory and here `<run_timestamp>` is the date and time at which an experiment is run. Once tensorboard has been opened, there will be three main cards for the `evaluator` and for each  `executor` and `trainer`. Under each main card there will be logging information for each respective agent. We log 
+A `mava` folder will be created in the root directory and here `<run_timestamp>` is the date and time at which an experiment is run. Once tensorboard has been opened, there will be three main card classes namely `evaluator`, `executor` and `trainer` corresponding to the amount speciifed by the user. Under each main card there will also be logging information for each respective agent in that class.
+
+During evaluation agents are allowed to act according to their current policies without training.
+
+The most straightforward metrics to keep track of in order to see whether agents are learning are the `MeanEpisodeReturn` and `MeanEpisodeLength` metrics. These are visible under both the `executor` and `evaluator` cards and are both computed by using a rolling average. Relevant loss metrics are available under the `trainer` card.
 
 
 ## Roadmap
