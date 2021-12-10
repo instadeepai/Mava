@@ -95,6 +95,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "dm-acme~=0.2.4",
+        "chex",
         "absl-py",
         "dm_env",
         "dm-tree",
