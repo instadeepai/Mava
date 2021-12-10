@@ -367,7 +367,7 @@ logger_factory = functools.partial(
 )
 ```
 
-Logging occurs at user specified time intervals and, as such, the independent variable in all `tensorboard` plots is when logging has occured. In the above example logging occurs every 10 seconds, and as such, each point on the x-axis of a plot corresponds to 10 seconds of system runtime. When the `time_delta` parameter is set to 0, this will lead to nearly consant logging which corresponds roughly with steps taken by the system.
+Logging occurs at user specified time intervals and, as such, the independent variable in all `tensorboard` plots is when logging has occured. In the above example logging occurs every 10 seconds, and as such, each point on the x-axis of a plot corresponds to 10 seconds of system runtime. When the `time_delta` parameter is set to 0, this will lead to nearly constant logging which corresponds roughly with steps taken by the system.
 
 ## Roadmap
 
