@@ -343,16 +343,31 @@ Debugging in MARL can be very difficult and time consuming, therefore it is impo
 </p>
 
 ## Logging
-Mava logs various metrics using `tensorboard`, with the default logging directory being 
+Mava logs various metrics using `tensorboard`, with the default logging directory being
 ```
 ./mava/<run_timestamp>
 ```
-A `mava` folder will be created in the root directory and here `<run_timestamp>` is the date and time at which an experiment is run. Once tensorboard has been opened, there will be three main card classes namely `evaluator`, `executor` and `trainer` corresponding to the amount speciifed by the user. Under each main card there will also be logging information for each respective agent in that class.
+A `mava` folder will be created in the root directory and here `<run_timestamp>` is the date and time at which an experiment is run. Once tensorboard has been opened, there will be three main card classes namely `evaluator`, `executor` and `trainer` corresponding to the amount specified by the user. Under each main card there will also be logging information for each respective agent in that class.
 
 During evaluation agents are allowed to act according to their current policies without training.
 
 The most straightforward metrics to keep track of in order to see whether agents are learning are the `MeanEpisodeReturn` and `MeanEpisodeLength` metrics. These are visible under both the `executor` and `evaluator` cards and are both computed by using a rolling average. Relevant loss metrics are available under the `trainer` card.
 
+Here is a example of how the logger may be set up in order to be passed to the relevant system implementation:
+```
+# Log every [log_every] seconds.
+log_every = 10
+logger_factory = functools.partial(
+    logger_utils.make_logger,
+    directory=base_dir,
+    to_terminal=True,
+    to_tensorboard=True,
+    time_stamp=mava_id,
+    time_delta=log_every,
+)
+```
+
+Logging occurs at user specified time intervals and, as such, the independent variable in all `tensorboard` plots is when logging has occured. In the above example logging occurs every 10 seconds, and as such, each point on the x-axis of a plot corresponds to 10 seconds of system runtime. When the `time_delta` parameter is set to 0, this will lead to nearly consant logging which corresponds roughly with steps taken by the system.
 
 ## Roadmap
 
