@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [develop]
 
+# TODO(Kale-ab) Specify mava container to run tests on.
 jobs:
   test-ubuntu:
     runs-on: ubuntu-latest

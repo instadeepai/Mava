@@ -41,7 +41,7 @@ else ifneq (,$(findstring meltingpot,$(example)))
 DOCKER_IMAGE_TAG=meltingpot
 endif
 
-IMAGE = $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
+IMAGE = $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)-latest
 # make file commands
 build:
 	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE) --target $(DOCKER_IMAGE_TAG)  --build-arg record=$(record) .
