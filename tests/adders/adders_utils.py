@@ -154,7 +154,7 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
             self.assertEqual(self.num_episodes(), repeat_episode_times)
 
         # Make sure our expected and observed data match.
-        observed_items = [p[2] for p in self.client.writer.priorities]
+        observed_items = self.items()
 
         # Check matching number of items.
         self.assertEqual(len(expected_items), len(observed_items))
@@ -179,8 +179,11 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
         def _check_signature(spec: tf.TensorSpec, value: np.ndarray) -> None:
             self.assertTrue(spec.is_compatible_with(tf.convert_to_tensor(value)))
 
-        # Check the last transition's signature.
-        tree.map_structure(_check_signature, signature, observed_items[-1])
+        # Check that it is possible to unpack observed using the signature.
+        for item in observed_items:
+            tree.map_structure(
+                _check_signature, tree.flatten(signature), tree.flatten(item)
+            )
 
 
 def make_trajectory(
