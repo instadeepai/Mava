@@ -109,7 +109,7 @@ def make_default_networks(
                     networks.MultivariateNormalDiagHead(
                         num_dimensions=num_actions,
                         w_init=tf.initializers.VarianceScaling(1e-4, seed=seed),
-                        b_init=tf.initializers.Zeros(seed=seed),
+                        b_init=tf.initializers.Zeros(),
                     ),
                     networks.TanhToSpec(specs[key].actions),
                 ]
