@@ -1,11 +1,10 @@
 name: push-docker-container
 
-on: push
-# on:
-#   push:
-#     branches: [develop]
-#   pull_request:
-#     branches: [develop]
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
 
 
 jobs:
