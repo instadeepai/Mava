@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export DEBIAN_FRONTEND=noninteractive
+
 # Bash settings: fail on any error and display all commands being run.
 set -e
 set -x
