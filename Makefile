@@ -44,7 +44,7 @@ endif
 IMAGE = $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 # make file commands
 build:
-	DOCKER_BUILDKIT=1 docker build --tag $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)-latest --target $(DOCKER_IMAGE_TAG)  --build-arg record=$(record) .
+	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE)-latest --target $(DOCKER_IMAGE_TAG)  --build-arg record=$(record) .
 
 run:
 	$(DOCKER_RUN) python $(example) --base_dir /home/app/mava/logs/
