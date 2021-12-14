@@ -88,6 +88,7 @@ class MAPPO:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        termination_condition: Optional[Dict[str, int]] = None,
         evaluator_interval: Optional[dict] = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
@@ -164,6 +165,12 @@ class MAPPO:
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
+            termination_condition: An optional terminal condition can be
+                provided that stops the program once the condition is
+                satisfied. Available options include specifying maximum
+                values for trainer_steps, trainer_walltime, evaluator_steps,
+                evaluator_episodes, executor_episodes or executor_steps.
+                E.g. termination_condition = {'trainer_steps': 100000}.
             learning_rate_scheduler_fn: dict with two functions/classes (one for the
                 policy and one for the critic optimizer), that takes in a trainer
                 step t and returns the current learning rate,
@@ -354,6 +361,7 @@ class MAPPO:
                 network_sampling_setup=self._network_sampling_setup,  # type: ignore
                 net_keys_to_ids=net_keys_to_ids,
                 unique_net_keys=unique_net_keys,
+                termination_condition=termination_condition,
                 evaluator_interval=evaluator_interval,
                 learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             ),

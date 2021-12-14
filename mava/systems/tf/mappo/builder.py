@@ -67,6 +67,11 @@ class MAPPOConfig:
             norm during optimization.
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
+        termination_condition: An optional terminal condition can be provided
+            that stops the program once the condition is satisfied. Available options
+            include specifying maximum values for trainer_steps, trainer_walltime,
+            evaluator_steps, evaluator_episodes, executor_episodes or executor_steps.
+            E.g. termination_condition = {'trainer_steps': 100000}.
         replay_table_name: string indicating what name to give the replay table.
         evaluator_interval: intervals that evaluator are run at.
         learning_rate_scheduler_fn: function/class that takes in a trainer step t
@@ -98,6 +103,7 @@ class MAPPOConfig:
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    termination_condition: Optional[Dict[str, int]] = None
     learning_rate_scheduler_fn: Optional[Any] = None
     evaluator_interval: Optional[dict] = None
 
@@ -337,6 +343,7 @@ class MAPPOBuilder:
             self._config.checkpoint,
             self._config.checkpoint_subpath,
             self._config.checkpoint_minute_interval,
+            self._config.termination_condition,
         )
         return variable_source
 
