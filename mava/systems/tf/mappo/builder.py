@@ -245,11 +245,6 @@ class MAPPOBuilder:
         """
 
         # Create tensorflow dataset to interface with reverb
-        # dataset = datasets.make_reverb_dataset(
-        #     server_address=replay_client.server_address,
-        #     batch_size=self._config.batch_size,
-        # )
-
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=replay_client.server_address,
             table=table_name,
