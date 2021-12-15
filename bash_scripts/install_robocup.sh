@@ -1,3 +1,4 @@
+export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update \
     && apt-get install -y --no-install-recommends \
        apt-utils \
@@ -17,7 +18,7 @@ VERSION=16.0.1
 sudo apt-get -y update --fix-missing
 
 # Install package, that hangs the operation, separately
-sudo DEBIAN_FRONTEND=noninteractive apt install -y tzdata
+sudo apt install -y tzdata
 
 sudo apt update && \
     apt -y install autoconf bison clang flex libboost-dev libboost-all-dev libc6-dev make wget
