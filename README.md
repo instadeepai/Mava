@@ -270,7 +270,7 @@ We have tested `mava` on Python 3.7, 3.8 and 3.9.
     - Or for the latest version of mava from source (**you can do this for all pip install commands below for the latest depedencies**):
 
     ```bash
-    pip install git+https://github.com/instadeepai/Mava[tf,reverb,launchpad]
+    pip install git+https://github.com/instadeepai/Mava#egg=id-mava[reverb,tf,launchpad]
     ```
 
     1.2 For **optional** environments:
