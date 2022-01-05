@@ -12,7 +12,7 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10 &
     rm -rf /root/.cache && apt-get clean
 # Setup virtual env
 RUN python -m venv mava
-RUN source mava/bin/activate
+RUN . mava/bin/activate
 RUN pip install --upgrade pip setuptools wheel
 # Location of mava folder
 ARG folder=/home/app/mava
