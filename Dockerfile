@@ -1,17 +1,16 @@
 ##########################################################
 # Core Mava image
-FROM registry.kao.instadeep.io/library/nvidia/cuda:11.4.2-cudnn8-runtime-ubuntu20.04 as mava-core
+FROM nvidia/cuda:11.4.2-cudnn8-runtime-ubuntu20.04 as mava-core
 # Flag to record agents
 ARG record
 # Ensure no installs try launch interactive screen
 ARG DEBIAN_FRONTEND=noninteractive
 # Update packages
-RUN apt-get update -y && apt-get install -y python3-pip
+RUN apt-get update -y && apt-get install -y python3-pip && apt-get install -y python3-venv
 # Update python path
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10 &&\
     rm -rf /root/.cache && apt-get clean
 # Setup virtual env
-RUN python -m pip install --user virtualenv
 RUN python -m venv mava
 ENV VIRTUAL_ENV /mava
 ENV PATH /mava/bin:$PATH
