@@ -40,9 +40,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_init_create_init(
-        self, system: System, builder: SystemBuilder
-    ) -> None:
+    def on_building_init(self, system: System, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 

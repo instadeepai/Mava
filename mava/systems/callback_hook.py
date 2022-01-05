@@ -7,87 +7,113 @@ class SystemCallbackHookMixin(ABC):
     # system builder hooks
     ######################
 
+    # initialisation
     def on_building_init_start(self) -> None:
         """Called when the builder initialisation begins."""
         for callback in self.callbacks:
             callback.on_building_init_start(self, self.builder)
+
+    def on_building_init(self) -> None:
+        """Called when the builder initialisation begins."""
+        for callback in self.callbacks:
+            callback.on_building_init(self, self.builder)
 
     def on_building_init_end(self) -> None:
         """Called when the builder initialisation ends."""
         for callback in self.callbacks:
             callback.on_building_init_end(self, self.builder)
 
-    def on_building_make_replay_table_start(self) -> None:
+    # tables
+    def on_building_tables_start(self) -> None:
         """[description]"""
         for callback in self.callbacks:
-            callback.on_building_make_replay_table_start(self, self.builder)
+            callback.on_building_tables_start(self, self.builder)
 
-    def on_building_adder_signature(self) -> None:
+    def on_building_tables_adder_signature(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_adder_signature(self, self.builder)
+            callback.on_building_tables_adder_signature(self, self.builder)
 
-    def on_building_rate_limiter(self) -> None:
+    def on_building_tables_rate_limiter(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_rate_limiter(self, self.builder)
+            callback.on_building_tables_rate_limiter(self, self.builder)
 
-    def on_building_make_tables(self) -> None:
+    def on_building_create_tables(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_tables(self, self.builder)
+            callback.on_building_tables_create_tables(self, self.builder)
 
-    def on_building_make_replay_table_end(self) -> None:
+    def on_building_tables_end(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_replay_table_end(self, self.builder)
+            callback.on_building_table_end(self, self.builder)
 
-    def on_building_make_dataset_iterator_start(self) -> None:
+    # dataset
+    def on_building_dataset_start(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_dataset_iterator_start(self, self.builder)
+            callback.on_building_dataset_start(self, self.builder)
 
-    def on_building_dataset(self) -> None:
+    def on_building_dataset_create_dataset(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_dataset(self, self.builder)
+            callback.on_building_dataset_create_dataset(self, self.builder)
 
-    def on_building_make_dataset_iterator_end(self) -> None:
+    def on_building_dataset_end(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_dataset_iterator_end(self, self.builder)
+            callback.on_building_dataset_end(self, self.builder)
 
-    def on_building_make_adder_start(self) -> None:
+    # adder
+    def on_building_adder_start(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_adder_start(self, self.builder)
+            callback.on_building_adder_start(self, self.builder)
 
-    def on_building_adder_priority(self) -> None:
+    def on_building_adder_set_priority(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_adder_priority(self, self.builder)
+            callback.on_building_adder_set_priority(self, self.builder)
 
-    def on_building_make_adder(self) -> None:
+    def on_building_adder_create_adder(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_adder(self, self.builder)
+            callback.on_building_adder_create_adder(self, self.builder)
 
-    def on_building_make_tables(self) -> None:
+    # system
+    def on_building_system_start(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_tables(self, self.builder)
+            callback.on_building_system_start(self, self.builder)
 
-    def on_building_make_replay_table_start(self) -> None:
+    def on_building_system_networks(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_replay_table_start(self, self.builder)
+            callback.on_building_system_networks(self, self.builder)
 
-    def on_building_make_variable_server_start(self) -> None:
+    def on_building_system_architecture(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_system_architecture(self, self.builder)
+
+    def on_building_system_create_system(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_system_create_system(self, self.builder)
+
+    def on_building_system_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_system_end(self, self.builder)
+
+    # variable server
+    def on_building_variable_server_start(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_make_variable_server_start(self, self.builder)
 
-    def on_building_variable_server(self) -> None:
+    def on_building_variable_server_create_variable_server(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_variable_server(self, self.builder)
@@ -97,63 +123,153 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_make_variable_server_end(self, self.builder)
 
-    def on_building_make_executor_start(self) -> None:
+    # executor
+    def on_building_executor_start(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_executor_start(self, self.builder)
+            callback.on_building_executor_start(self, self.builder)
 
-    def on_building_variable_client(self) -> None:
+    def on_building_executor_logger(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_variable_client(self, self.builder)
+            callback.on_building_executor_logger(self, self.builder)
 
-    def on_building_executor(self) -> None:
+    def on_building_executor_variable_client(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_executor(self, self.builder)
+            callback.on_building_executor_variable_client(self, self.builder)
 
-    def on_building_make_executor_end(self) -> None:
+    def on_building_executor_create_executor(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_executor_end(self, self.builder)
+            callback.on_building_executor_create_executor(self, self.builder)
 
-    def on_building_make_trainer_start(self) -> None:
+    def on_building_executor_environment(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_trainer_start(self, self.builder)
+            callback.on_building_executor_environment(self, self.builder)
 
-    def on_building_variable_client(self) -> None:
+    def on_building_executor_train_loop(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_variable_client(self, self.builder)
+            callback.on_building_executor_train_loop(self, self.builder)
 
-    def on_building_trainer(self) -> None:
+    def on_building_executor_end(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_trainer(self, self.builder)
+            callback.on_building_executor_end(self, self.builder)
 
-    def on_building_trainer_statistics(self) -> None:
+    # evaluator
+    def on_building_evaluator_start(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_trainer_statistics(self, self.builder)
+            callback.on_building_evaluator_start(self, self.builder)
+
+    def on_building_evaluator_logger(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_evaluator_logger(self, self.builder)
+
+    def on_building_evaluator_variable_client(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_evaluator_variable_client(self, self.builder)
+
+    def on_building_evaluator_create_evaluator(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_evaluator_create_evaluator(self, self.builder)
+
+    def on_building_evaluator_environment(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_evaluator_environment(self, self.builder)
+
+    def on_building_evaluator_train_loop(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_evaluator_train_loop(self, self.builder)
+
+    def on_building_evaluator_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_evaluator_end(self, self.builder)
+
+    # trainer
+    def on_building_trainer_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_trainer_start(self, self.builder)
+
+    def on_building_trainer_logger(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_trainer_logger(self, self.builder)
+
+    def on_building_trainer_variable_client(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_trainer_variable_client(self, self.builder)
+
+    def on_building_trainer_create_trainer(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_trainer_create_trainer(self, self.builder)
 
     def on_building_make_trainer_end(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_make_trainer_end(self, self.builder)
 
+    # distributor
+    def on_building_distributor_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_distributor_start(self, self.builder)
+
+    def on_building_distributor_tables(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_distributor_tables(self, self.builder)
+
+    def on_building_distributor_variable_server(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_distributor_variable_server(self, self.builder)
+
+    def on_building_distributor_trainer(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_distributor_trainer(self, self.builder)
+
+    def on_building_distributor_evaluator(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_distributor_evaluator(self, self.builder)
+
+    def on_building_distributor_executor(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_distributor_executor(self, self.builder)
+
+    def on_building_distributor_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_distributor_end(self, self.builder)
+
     ########################
     # system execution hooks
     ########################
 
     def on_execution_init_start(self) -> None:
-        """[summary]
-
-        Args:
-            executor (SystemExecutor): [description]
-        """
+        """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_init_start(self, self.executor)
+
+    def on_execution_init(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_init(self, self.executor)
 
     def on_execution_init_end(self) -> None:
         """[summary]"""
@@ -259,3 +375,120 @@ class SystemCallbackHookMixin(ABC):
         """[summary]"""
         for callback in self.callbacks:
             callback.on_execution_update_end(self, self.executor)
+
+    ######################
+    # system trainer hooks
+    ######################
+
+    def on_training_init_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_init_start(self, self.trainer)
+
+    def on_training_init_observation_networks(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_init_observation_networks(self, self.trainer)
+
+    def on_training_init_target_observation_networks(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_init_target_observation_networks(self, self.trainer)
+
+    def on_training_init_policy_networks(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_init_policy_networks(self, self.trainer)
+
+    def on_training_init_target_policy_networks(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_init_target_policy_networks(self, self.trainer)
+
+    def on_training_init_critic_networks(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_init_critic_networks(self, self.trainer)
+
+    def on_training_init_target_critic_networks(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_init_target_critic_networks(self, self.trainer)
+
+    def on_training_init_parameters(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_init_parameters(self, self.trainer)
+
+    def on_training_init(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_init(self, self.trainer)
+
+    def on_training_init_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_init_parameters(self, self.trainer)
+
+    # updating target networks
+    def on_training_update_target_networks_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_update_target_networks_start(self, self.trainer)
+
+    def on_training_update_target_observation_networks(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_update_target_observation_networks(self, self.trainer)
+
+    def on_training_update_target_policy_networks(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_update_target_policy_networks(self, self.trainer)
+
+    def on_training_update_target_critic_networks(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_update_target_critic_networks(self, self.trainer)
+
+    def on_training_update_target_networks_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_update_target_networks_end(self, self.trainer)
+
+    # transform observations
+    def on_training_transform_observations_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_transform_observations_start(self, self.trainer)
+
+    def on_training_transform_observations(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_transform_observations(self, self.trainer)
+
+    def on_training_transform_target_observations(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_transform_target_observations(self, self.trainer)
+
+    def on_training_transform_observations_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_transform_observations_end(self, self.trainer)
+
+    # get feed
+    def on_training_get_feed_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_get_feed_start(self, self.trainer)
+
+    def on_training_get_feed(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_get_feed(self, self.trainer)
+
+    def on_training_get_feed_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_training_get_feed_end(self, self.trainer)
