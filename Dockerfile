@@ -6,12 +6,14 @@ ARG record
 # Ensure no installs try launch interactive screen
 ARG DEBIAN_FRONTEND=noninteractive
 # Update packages
-RUN apt-get update -y && apt-get install -y python3-pip
+RUN apt-get update -y && apt-get install -y python3-pip && apt-get install -y python3-venv
 # Update python path
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10 &&\
     rm -rf /root/.cache && apt-get clean
-# Upgrade pip
-RUN python -m pip install --upgrade pip
+# Setup virtual env
+RUN python -m venv mava
+RUN source mava/bin/activate
+RUN pip install --upgrade pip setuptools wheel
 # Location of mava folder
 ARG folder=/home/app/mava
 ## working directory
