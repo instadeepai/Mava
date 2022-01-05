@@ -174,9 +174,9 @@ You can pull & run the latest pre-built images from our [DockerHub](https://hub.
 
 For example, this will pull the latest mava tensorflow core image and run the `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py` example:
 ```
-docker run --gpus all -it --rm  -v $(PWD):/home/app/mava -w /home/app/mava instadeepct/mava:tf-core-latest python examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py --base_dir /home/app/mava/logs/
+docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava instadeepct/mava:tf-core-latest python examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py --base_dir /home/app/mava/logs/
 ```
-For windows, replace `$(PWD)` with `$(CURDIR)`.
+For windows, replace `$(pwd)` with `$(curdir)`.
 
 #### Building the image yourself
 
