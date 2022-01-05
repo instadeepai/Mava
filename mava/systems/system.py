@@ -26,6 +26,7 @@ from mava.core import SystemBuilder
 from mava.callbacks import Callback
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 from mava.systems.callback_hook import SystemCallbackHookMixin
+from mava.wrappers import DetailedTrainerStatistics
 
 
 class System(SystemBuilder, SystemCallbackHookMixin):
@@ -53,7 +54,7 @@ class System(SystemBuilder, SystemCallbackHookMixin):
 
         self.on_building_init_start(self)
 
-        self.on_building_init(self)
+        self.on_building_init_create_init(self)
 
         self.on_building_init_end(self)
 
@@ -70,7 +71,7 @@ class System(SystemBuilder, SystemCallbackHookMixin):
         self.on_building_tables_rate_limiter(self)
 
         # make tables
-        self.on_building_tables(self)
+        self.on_building_tables_create_tables(self)
 
         # end of make replay tables
         self.on_building_tables_end(self)
@@ -95,13 +96,13 @@ class System(SystemBuilder, SystemCallbackHookMixin):
         self._table_name = table_name
 
         # start of make dataset iterator
-        self.on_building_make_dataset_iterator_start(self)
+        self.on_building_dataset_start(self)
 
         # make dataset
-        self.on_building_dataset(self)
+        self.on_building_dataset_create_dataset(self)
 
         # end of make dataset iterator
-        self.on_building_make_dataset_iterator_end(self)
+        self.on_building_dataset_end(self)
 
         return self.dataset
 
@@ -124,12 +125,12 @@ class System(SystemBuilder, SystemCallbackHookMixin):
         self.on_building_adder_start(self)
 
         # make adder signature
-        self.on_building_adder_priority(self)
+        self.on_building_adder_set_priority(self)
 
         # make rate limiter
-        self.on_building_adder(self)
+        self.on_building_adder_create_adder(self)
 
-        # end of make make adder
+        # end of make adder
         self.on_building_adder_end(self)
 
         return self.adder
@@ -145,7 +146,7 @@ class System(SystemBuilder, SystemCallbackHookMixin):
 
         self.on_building_system_architecture(self)
 
-        self.on_building_system(self)
+        self.on_building_system_create_system(self)
 
         self.on_building_system_end(self)
 
@@ -164,7 +165,7 @@ class System(SystemBuilder, SystemCallbackHookMixin):
         self.on_building_variable_server_start(self)
 
         # make variable server
-        self.on_building_variable_server(self)
+        self.on_building_variable_server_create_variable_server(self)
 
         # end of make variable server
         self.on_building_variable_server_end(self)
@@ -191,12 +192,17 @@ class System(SystemBuilder, SystemCallbackHookMixin):
         self._executor_id = executor_id
         self._replay_client = replay_client
         self._variable_source = variable_source
+        self._system_networks = self.system()
 
         self.on_building_executor_start(self)
 
         self.on_building_executor_logger(self)
 
-        self.on_building_executor(self)
+        self.on_building_executor_variable_client(self)
+
+        self.on_building_executor_create_executor(self)
+
+        self.on_building_executor_environment(self)
 
         self.on_building_executor_train_loop(self)
 
@@ -219,12 +225,17 @@ class System(SystemBuilder, SystemCallbackHookMixin):
         """
 
         self._variable_source = variable_source
+        self._system_networks = self.system()
 
         self.on_building_evaluator_start(self)
 
         self.on_building_evaluator_logger(self)
 
-        self.on_building_evaluator(self)
+        self.on_building_evaluator_variable_client(self)
+
+        self.on_building_evaluator_create_evaluator(self)
+
+        self.on_building_evaluator_environment(self)
 
         self.on_building_evaluator_eval_loop(self)
 
@@ -249,23 +260,26 @@ class System(SystemBuilder, SystemCallbackHookMixin):
         self._trainer_id = trainer_id
         self._replay_client = replay_client
         self._variable_source = variable_source
+        self._system_networks = self.system()
 
-        self.on_building_evaluator_start(self)
+        self.on_building_trainer_start(self)
 
-        self.on_building_evaluator_logger(self)
+        self.on_building_trainer_logger(self)
 
-        self.on_building_evaluator(self)
+        self.on_building_trainer_dataset(self)
 
-        self.on_building_evaluator_eval_loop(self)
+        self.on_building_trainer_variable_client(self)
 
-        self.on_building_evaluator_end(self)
+        self.on_building_trainer_create_trainer(self)
+
+        self.on_building_trainer_end(self)
 
         return self.trainer
 
     def distributor(self) -> Any:
         """Build the distributed system as a graph program.
         Args:
-            name (str, optional): system name. Defaults to "maddpg".
+            name (str, optional): system name.
         Returns:
             Any: graph program for distributed system training.
         """

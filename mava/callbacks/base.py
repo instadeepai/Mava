@@ -39,7 +39,9 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_init(self, system: System, builder: SystemBuilder) -> None:
+    def on_building_init_create_init(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
         """[summary]"""
         pass
 
@@ -52,17 +54,21 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_adder_signature(
+    def on_building_tables_adder_signature(
         self, system: System, builder: SystemBuilder
     ) -> None:
         """[summary]"""
         pass
 
-    def on_building_rate_limiter(self, system: System, builder: SystemBuilder) -> None:
+    def on_building_tables_rate_limiter(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
         """[summary]"""
         pass
 
-    def on_building_tables(self, system: System, builder: SystemBuilder) -> None:
+    def on_building_tables_create_tables(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
         """[summary]"""
         pass
 
@@ -71,19 +77,17 @@ class Callback(abc.ABC):
         pass
 
     # dataset
-    def on_building_dataset_iterator_start(
+    def on_building_dataset_start(self, system: System, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_dataset_create_dataset(
         self, system: System, builder: SystemBuilder
     ) -> None:
         """[summary]"""
         pass
 
-    def on_building_dataset(self, system: System, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_dataset_iterator_end(
-        self, system: System, builder: SystemBuilder
-    ) -> None:
+    def on_building_dataset_end(self, system: System, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
@@ -92,17 +96,46 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_adder_priority(
+    def on_building_adder_set_priority(
         self, system: System, builder: SystemBuilder
     ) -> None:
         """[summary]"""
         pass
 
-    def on_building_adder(self, system: System, builder: SystemBuilder) -> None:
+    def on_building_adder_create_adder(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
         """[summary]"""
         pass
 
     def on_building_adder_end(self, system: System, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
+    # system
+    def on_building_system_start(self, system: System, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_system_networks(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_system_architecture(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_system_create_system(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_system_end(self, system: System, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
@@ -113,7 +146,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_variable_server(
+    def on_building_variable_server_create_variable_server(
         self, system: System, builder: SystemBuilder
     ) -> None:
         """[summary]"""
@@ -132,13 +165,33 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
+    def on_building_executor_logger(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
     def on_building_executor_variable_client(
         self, system: System, builder: SystemBuilder
     ) -> None:
         """[summary]"""
         pass
 
-    def on_building_executor(self, system: System, builder: SystemBuilder) -> None:
+    def on_building_executor_create_executor(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_executor_environment(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_executor_train_loop(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
         """[summary]"""
         pass
 
@@ -146,8 +199,61 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
+    # evaluator
+    def on_building_evaluator_start(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_evaluator_logger(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_evaluator_variable_client(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_evaluator_create_evaluator(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_evaluator_environment(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_evaluator_train_loop(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_evaluator_end(self, system: System, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
     # trainer
     def on_building_trainer_start(self, system: System, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_trainer_logger(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_trainer_dataset(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
         """[summary]"""
         pass
 
@@ -157,11 +263,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_trainer(self, system: System, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_trainer_statistics(
+    def on_building_trainer_create_trainer(
         self, system: System, builder: SystemBuilder
     ) -> None:
         """[summary]"""
@@ -171,16 +273,59 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    ######################
+    # distributor
+    def on_building_distributor_start(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_distributor_tables(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_distributor_variable_server(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_distributor_trainer(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_distributor_evaluator(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_distributor_executor(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_distributor_end(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        """[summary]"""
+        pass
+
+    #######################
     # system executor hooks
-    ######################
+    #######################
 
     def on_execution_init_start(self, system: System, executor: SystemExecutor) -> None:
-        """[summary]
+        """[summary]"""
+        pass
 
-        Args:
-            executor (SystemExecutor): [description]
-        """
+    def on_execution_init(self, system: System, executor: SystemExecutor) -> None:
+        """[summary]"""
         pass
 
     def on_execution_init_end(self, system: System, executor: SystemExecutor) -> None:
@@ -298,3 +443,7 @@ class Callback(abc.ABC):
     def on_execution_update_end(self, system: System, executor: SystemExecutor) -> None:
         """[summary]"""
         pass
+
+    ######################
+    # system trainer hooks
+    ######################

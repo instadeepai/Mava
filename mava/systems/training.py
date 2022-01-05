@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-"""MADDPG trainer implementation."""
+"""System Trainer implementation."""
 
 from typing import Dict, List, Tuple
 
@@ -24,6 +24,7 @@ from mava import types
 from mava.core import SystemTrainer
 from mava.callbacks import Callback
 from mava.systems.callback_hook import SystemCallbackHookMixin
+from mava.utils import training_utils as train_utils
 
 
 class Trainer(SystemTrainer, SystemCallbackHookMixin):
@@ -42,6 +43,20 @@ class Trainer(SystemTrainer, SystemCallbackHookMixin):
 
         self.on_training_init_start(self)
 
+        self.on_training_init_observation_networks(self)
+
+        self.on_training_init_target_observation_networks(self)
+
+        self.on_training_init_policy_networks(self)
+
+        self.on_training_init_target_policy_networks(self)
+
+        self.on_training_init_critic_networks(self)
+
+        self.on_training_init_target_critic_networks(self)
+
+        self.on_training_init_parameters(self)
+
         self.on_training_init(self)
 
         self.on_training_init_end(self)
@@ -52,13 +67,15 @@ class Trainer(SystemTrainer, SystemCallbackHookMixin):
 
         self.on_training_update_target_networks_start(self)
 
-        # for key in self.unique_net_keys:
+        for key in self.unique_net_keys:
 
-        #     self.on_training_update_target_networks_get_variables(self, key)
+            self._unique_net_key = key
 
-        #     self.on_training_update_target_networks_update(self, key)
+            self.on_training_update_target_observation_networks(self)
 
-        self.on_training_update_target_networks(self)
+            self.on_training_update_target_policy_networks(self)
+
+            self.on_training_update_target_critic_networks(self)
 
         self.on_training_update_target_networks_end(self)
 
@@ -72,11 +89,17 @@ class Trainer(SystemTrainer, SystemCallbackHookMixin):
 
         self.on_training_transform_observations_start(self)
 
-        self.on_training_transform_observations(self)
+        for agent in self._agents:
+
+            self._agent_key = self._agent_net_keys[agent]
+
+            self.on_training_transform_observations(self)
+
+            self.on_training_transform_target_observations(self)
 
         self.on_training_transform_observations_end(self)
 
-        self.transformed_observations
+        return self.transformed_observations
 
     def _get_feed(
         self,
@@ -94,56 +117,23 @@ class Trainer(SystemTrainer, SystemCallbackHookMixin):
 
         self.on_training_get_feed_end(self)
 
-        self.feed
+        return self.feed
 
     def _step(self) -> Dict:
         """Trainer forward and backward passes."""
 
-        self.on_training__step_start(self)
+        # Update the target networks
+        self._update_target_networks()
 
-        self.on_training__step_update_target_networks(self)
+        # Draw a batch of data from replay.
+        sample: reverb.ReplaySample = next(self._iterator)
 
-        self.on_training__step_sample_batch(self)
+        self._forward(sample)
 
-        self.on_training__step_forward(self)
+        self._backward()
 
-        self.on_training__step_backward(self)
-
-        self.on_training__step_log(self)
-
-        self.on_training__step_end(self)
-
-        self.loss
-
-    def _forward(self, inputs: reverb.ReplaySample) -> None:
-        """Trainer forward pass"""
-
-        self.on_training_forward_start(self)
-
-        # self.on_training_forward_get_transitions(self)
-
-        # with tf.GradientTape(persistent=True) as tape:
-
-        #     self.on_training_forward_gradient_tape_start(self)
-
-        #     for agent in self._trainer_agent_list:
-
-        #         self.on_training_forward_agent_loop_start(self, agent)
-
-        #         self.on_training_forward_agent_loop_get_feed(self, agent)
-
-        self.on_training_forward(self)
-
-        self.on_training_forward_end(self)
-
-    def _backward(self) -> None:
-        """Trainer backward pass updating network parameters"""
-
-        self.on_training_backward_start(self)
-
-        self.on_training_backward(self)
-
-        self.on_training_backward_end(self)
+        # Log losses per agent
+        return train_utils.map_losses_per_agent_ac(*self.losses)
 
     def step(self) -> None:
         """trainer step to update the parameters of the agents in the system"""
