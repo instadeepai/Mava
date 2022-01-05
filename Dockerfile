@@ -1,6 +1,6 @@
 ##########################################################
 # Core Mava image
-FROM nvidia/cuda:11.4.2-cudnn8-runtime-ubuntu20.04 as mava-core
+FROM registry.kao.instadeep.io/library/nvidia/cuda:11.4.2-cudnn8-runtime-ubuntu20.04 as mava-core
 # Flag to record agents
 ARG record
 # Ensure no installs try launch interactive screen
