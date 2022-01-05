@@ -18,6 +18,7 @@ Abstract base class used to build new callbacks.
 """
 
 import abc
+from mava.core import SystemTrainer
 
 from mava.systems.system import System
 from mava.systems.building import SystemBuilder
@@ -447,3 +448,125 @@ class Callback(abc.ABC):
     ######################
     # system trainer hooks
     ######################
+
+    def on_training_init_start(self, system: System, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init_observation_networks(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init_target_observation_networks(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init_policy_networks(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init_target_policy_networks(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init_critic_networks(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init_target_critic_networks(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init_parameters(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init(self, system: System, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init_end(self, system: System, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_update_target_networks_start(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_update_target_observation_networks(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_update_target_policy_networks(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_update_target_critic_networks(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_update_target_networks_end(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_transform_observations_start(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_transform_observations(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_transform_target_observations(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_transform_observations_end(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_get_feed_start(
+        self, system: System, trainer: SystemTrainer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_get_feed(self, system: System, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_get_feed_end(self, system: System, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass

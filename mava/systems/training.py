@@ -134,12 +134,3 @@ class Trainer(SystemTrainer, SystemCallbackHookMixin):
 
         # Log losses per agent
         return train_utils.map_losses_per_agent_ac(*self.losses)
-
-    def step(self) -> None:
-        """trainer step to update the parameters of the agents in the system"""
-
-        self.on_training_step_start(self)
-
-        self.on_training_step(self)
-
-        self.on_training_step_end(self)
