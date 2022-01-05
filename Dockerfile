@@ -23,7 +23,7 @@ COPY . /home/app/mava
 # For box2d
 RUN apt-get install swig -y
 ## Install core dependencies.
-RUN python -m pip install -e .[reverb,launchpad]
+RUN pip install -e .[reverb,launchpad]
 ## Optional install for screen recording.
 ENV DISPLAY=:0
 RUN if [ "$record" = "true" ]; then \
@@ -40,18 +40,18 @@ ENV TF_FORCE_GPU_ALLOW_GROWTH=true
 ENV CUDA_DEVICE_ORDER=PCI_BUS_ID
 ENV TF_CPP_MIN_LOG_LEVEL=3
 ## Install core tf dependencies.
-RUN python -m pip install -e .[tf]
+RUN pip install -e .[tf]
 ##########################################################
 
 ##########################################################
 # PZ image
 FROM tf-core AS pz
-RUN python -m pip install -e .[pz]
+RUN pip install -e .[pz]
 # PettingZoo Atari envs
 RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6  -y
 RUN apt-get install -y unrar-free
-RUN python -m pip install autorom
+RUN pip install autorom
 RUN AutoROM -v
 ##########################################################
 
@@ -69,7 +69,7 @@ ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 ##########################################################
 # Flatland Image
 FROM tf-core AS flatland
-RUN python -m pip install -e .[flatland]
+RUN pip install -e .[flatland]
 ##########################################################
 
 #########################################################
