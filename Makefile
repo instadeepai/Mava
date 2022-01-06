@@ -21,6 +21,7 @@ RUN_FLAGS_TENSORBOARD=$(GPUS) -p 6006:6006 $(BASE_FLAGS)
 version = tf-core
 DOCKER_IMAGE_NAME = mava
 DOCKER_IMAGE_TAG = $(version)
+IMAGE = $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)-latest
 DOCKER_RUN=docker run $(RUN_FLAGS) $(IMAGE)
 DOCKER_RUN_TENSORBOARD=docker run $(RUN_FLAGS_TENSORBOARD) $(IMAGE)
 
@@ -41,7 +42,6 @@ else ifneq (,$(findstring meltingpot,$(example)))
 DOCKER_IMAGE_TAG=meltingpot
 endif
 
-IMAGE = $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)-latest
 # make file commands
 build:
 	DOCKER_BUILDKIT=1 docker build --tag $(IMAGE) --target $(DOCKER_IMAGE_TAG)  --build-arg record=$(record) .
