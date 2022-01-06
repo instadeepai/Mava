@@ -169,6 +169,17 @@ All modules in Mava aim to work in this way.
 We have tested `mava` on Python 3.7, 3.8 and 3.9.
 
 ### Docker (**Recommended**)
+#### Using pre-built images
+You can pull & run the latest pre-built images from our [DockerHub](https://hub.docker.com/repository/docker/instadeepct/mava) by specifying the docker image and example/file you want to run.
+
+For example, this will pull the latest mava tensorflow core image and run the `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py` example:
+```
+docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava instadeepct/mava:tf-core-latest python examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py --base_dir /home/app/mava/logs/
+```
+- For windows, replace `$(pwd)` with `$(curdir)`.
+
+- You can replace the example with your custom python file.
+#### Building the image yourself
 
 1. Build the correct docker image using the `make` command:
 

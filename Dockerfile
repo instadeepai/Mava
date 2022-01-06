@@ -1,17 +1,20 @@
 ##########################################################
 # Core Mava image
-FROM registry.kao.instadeep.io/library/nvidia/cuda:11.4.2-cudnn8-runtime-ubuntu20.04 as mava-core
+FROM nvidia/cuda:11.4.2-cudnn8-runtime-ubuntu20.04 as mava-core
 # Flag to record agents
 ARG record
 # Ensure no installs try launch interactive screen
 ARG DEBIAN_FRONTEND=noninteractive
 # Update packages
-RUN apt-get update -y && apt-get install -y python3-pip
+RUN apt-get update -y && apt-get install -y python3-pip && apt-get install -y python3-venv
 # Update python path
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10 &&\
     rm -rf /root/.cache && apt-get clean
-# Upgrade pip
-RUN python -m pip install --upgrade pip
+# Setup virtual env
+RUN python -m venv mava
+ENV VIRTUAL_ENV /mava
+ENV PATH /mava/bin:$PATH
+RUN pip install --upgrade pip setuptools wheel
 # Location of mava folder
 ARG folder=/home/app/mava
 ## working directory
@@ -21,7 +24,7 @@ COPY . /home/app/mava
 # For box2d
 RUN apt-get install swig -y
 ## Install core dependencies.
-RUN python -m pip install -e .[reverb,launchpad]
+RUN pip install -e .[reverb,launchpad]
 ## Optional install for screen recording.
 ENV DISPLAY=:0
 RUN if [ "$record" = "true" ]; then \
@@ -38,18 +41,18 @@ ENV TF_FORCE_GPU_ALLOW_GROWTH=true
 ENV CUDA_DEVICE_ORDER=PCI_BUS_ID
 ENV TF_CPP_MIN_LOG_LEVEL=3
 ## Install core tf dependencies.
-RUN python -m pip install -e .[tf]
+RUN pip install -e .[tf]
 ##########################################################
 
 ##########################################################
 # PZ image
 FROM tf-core AS pz
-RUN python -m pip install -e .[pz]
+RUN pip install -e .[pz]
 # PettingZoo Atari envs
 RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6  -y
 RUN apt-get install -y unrar-free
-RUN python -m pip install autorom
+RUN pip install autorom
 RUN AutoROM -v
 ##########################################################
 
@@ -67,7 +70,7 @@ ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 ##########################################################
 # Flatland Image
 FROM tf-core AS flatland
-RUN python -m pip install -e .[flatland]
+RUN pip install -e .[flatland]
 ##########################################################
 
 #########################################################
