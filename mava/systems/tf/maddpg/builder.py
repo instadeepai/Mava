@@ -44,6 +44,7 @@ DiscreteArray = dm_specs.DiscreteArray
 @dataclasses.dataclass
 class MADDPGConfig:
     """Configuration options for the MADDPG system.
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
@@ -80,10 +81,21 @@ class MADDPGConfig:
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
         termination_condition: An optional terminal condition can be provided
-        that stops the program once the condition is satisfied. Available options
-        include specifying maximum values for trainer_steps, trainer_walltime,
-        evaluator_steps, evaluator_episodes, executor_episodes or executor_steps.
-        E.g. termination_condition = {'trainer_steps': 100000}."""
+            that stops the program once the condition is satisfied. Available options
+            include specifying maximum values for trainer_steps, trainer_walltime,
+            evaluator_steps, evaluator_episodes, executor_episodes or executor_steps.
+            E.g. termination_condition = {'trainer_steps': 100000}.
+        learning_rate_scheduler_fn: dict with two functions/classes (one for the
+                policy and one for the critic optimizer), that takes in a trainer
+                step t and returns the current learning rate,
+                e.g. {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
+                See
+                examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
+                for an example.
+        evaluator_interval: An optional condition that is used to
+            evaluate/test system performance after [evaluator_interval]
+            condition has been met.
+    """
 
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
@@ -116,6 +128,8 @@ class MADDPGConfig:
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     termination_condition: Optional[Dict[str, int]] = None
+    evaluator_interval: Optional[dict] = None
+    learning_rate_scheduler_fn: Optional[Any] = None
 
 
 class MADDPGBuilder:
@@ -415,11 +429,11 @@ class MADDPGBuilder:
 
     def make_executor(
         self,
-        # executor_id: str,
         networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[MavaVariableSource] = None,
+        evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -430,6 +444,8 @@ class MADDPGBuilder:
                 a replay buffer. Defaults to None.
             variable_source: variables server.
                 Defaults to None.
+            evaluator: boolean indicator if the executor is used for
+                for evaluation only.
         Returns:
             system executor, a collection of agents making up the part
                 of the system generating data by interacting the environment.
@@ -455,6 +471,7 @@ class MADDPGBuilder:
         get_keys.extend(count_names)
         counts = {name: variables[name] for name in count_names}
 
+        evaluator_interval = self._config.evaluator_interval if evaluator else None
         variable_client = None
         if variable_source:
             # Get new policy variables
@@ -462,7 +479,11 @@ class MADDPGBuilder:
                 client=variable_source,
                 variables=variables,
                 get_keys=get_keys,
-                update_period=self._config.executor_variable_update_period,
+                # If we are using evaluator_intervals,
+                # we should always get the latest variables.
+                update_period=0
+                if evaluator_interval
+                else self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -479,6 +500,8 @@ class MADDPGBuilder:
             network_sampling_setup=self._config.network_sampling_setup,
             variable_client=variable_client,
             adder=adder,
+            evaluator=evaluator,
+            interval=evaluator_interval,
         )
 
     def make_trainer(
@@ -580,6 +603,7 @@ class MADDPGBuilder:
             "dataset": dataset,
             "counts": counts,
             "logger": logger,
+            "learning_rate_scheduler_fn": self._config.learning_rate_scheduler_fn,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec

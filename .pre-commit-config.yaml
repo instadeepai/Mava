@@ -7,11 +7,12 @@
 #   isort: Sorts imports.
 #   flake8: Checks code follows PEP8 standard.
 #   mypy: Static typing.
+#   conventional-pre-commit: commit format checker.
 #   blacken-docs: Checks docs follow black format standard.
 #   pydocstyle: Checking docstring style.
 #   interrogate: Checks docstring code coverage.
 
-default_stages: ["commit", "push"]
+default_stages: ["commit"]
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.4.0
@@ -41,17 +42,24 @@ repos:
       - id: isort
 
   - repo: https://gitlab.com/pycqa/flake8
-    rev: 3.9.1
+    rev: 3.8.2
     hooks:
       - id: flake8
         additional_dependencies: [flake8-isort]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v0.812
+    rev: v0.910
     hooks:
       - id: mypy
         exclude: ^docs/
         args: [--config-file=mypy.ini]
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v1.2.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
 
   - repo: https://github.com/asottile/blacken-docs
     rev: v1.8.0

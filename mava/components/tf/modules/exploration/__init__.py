@@ -18,5 +18,7 @@
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     ExponentialExplorationScheduler,
+    ExponentialExplorationTimestepScheduler,
     LinearExplorationScheduler,
+    LinearExplorationTimestepScheduler,
 )

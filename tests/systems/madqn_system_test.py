@@ -21,6 +21,9 @@ import launchpad as lp
 import sonnet as snt
 
 import mava
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationTimestepScheduler,
+)
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
@@ -54,6 +57,9 @@ class TestMADQN:
             max_replay_size=1000,
             optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
+            exploration_scheduler_fn=LinearExplorationTimestepScheduler(
+                epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=500
+            ),
         )
 
         program = system.build()
@@ -106,6 +112,9 @@ class TestMADQN:
             executor_fn=madqn.execution.MADQNRecurrentExecutor,
             sequence_length=4,
             period=4,
+            exploration_scheduler_fn=LinearExplorationTimestepScheduler(
+                epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=500
+            ),
         )
 
         program = system.build()

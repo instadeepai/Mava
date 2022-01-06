@@ -36,9 +36,6 @@ __MACOSX
 *.manifest
 *.spec
 
-# mac
-__MACOSX
-
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -155,3 +152,8 @@ mava/workspace.code-workspace
 mava_testing
 .devcontainer/devcontainer.json
 3rdparty
+
+# PyCharm
+.idea/
+
+meltingpot/

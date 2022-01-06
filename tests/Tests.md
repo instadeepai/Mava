@@ -1,20 +1,13 @@
 # Tests
 ## How to run
-- Sequential
+- Build, download packages and test on local environment
     ```bash
-    pytest -s
+    ./bash_scripts/tests.sh
     ```
-- Parallel
-    ```bash
-    pytest  -n "$(grep -c ^processor /proc/cpuinfo)" tests
+- Use Docker
     ```
-- Parallel and get code coverage
-    ```bash
-    pytest --cov-report term-missing --cov=mava  -n "$(grep -c ^processor /proc/cpuinfo)" tests
-    ```
-- Build, download packages and test
-    ```bash
-    ./test.sh
+    make build
+    make run-tests
     ```
 ## Structure
 ```

@@ -168,6 +168,15 @@ class SystemBuilder(abc.ABC):
         variable_source: MavaVariableSource,
     ) -> Any:
         """[summary]"""
+        iterator = range(num_steps) if num_steps is not None else itertools.count()
+        for _ in iterator:
+            self.step()
+            self.after_trainer_step()
+
+    # TODO(Arnu/Kale-ab): find a more suitable way to do this using callbacks
+    def after_trainer_step(self) -> None:
+        """Function that gets executed after every trainer step."""
+        pass
 
     @abc.abstractmethod
     def trainer(

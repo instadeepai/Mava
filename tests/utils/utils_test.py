@@ -64,6 +64,6 @@ class TestUtils:
         ), "Failed to convert seq timesteps to parallel."
 
         assert np.array_equal(
-            parallel_actions,
-            expected_actions,
+            parallel_actions,  # type: ignore
+            expected_actions,  # type: ignore
         ), "Failed to convert seq actions to parallel."

@@ -16,7 +16,7 @@
 """Utilities for testing Reverb adders."""
 
 from collections import Counter
-from typing import Any, Dict, Sequence, Set
+from typing import Any, Callable, Dict, Optional, Sequence, Set
 
 import dm_env
 import numpy as np
@@ -76,6 +76,7 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
         stack_sequence_fields: bool = True,
         repeat_episode_times: int = 1,
         end_behavior: EndBehavior = EndBehavior.ZERO_PAD,
+        item_transform: Optional[Callable[[Sequence[np.ndarray]], Any]] = None,
     ) -> None:
         """
         Runs a unit test case for the adder.
@@ -144,13 +145,16 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
             # Add the final step.
             adder.add(*steps[-1])
 
+        # Force run the destructor to trigger the flushing of all pending items.
+        getattr(adder, "__del__", lambda: None)()
+
         # Ending the episode should close the writer. No new writer should yet have
         # been created as it is constructed lazily.
         if end_behavior is not EndBehavior.CONTINUE:
-            self.assertEqual(self.client.writer.num_episodes, repeat_episode_times)
+            self.assertEqual(self.num_episodes(), repeat_episode_times)
 
         # Make sure our expected and observed data match.
-        observed_items = [p[2] for p in self.client.writer.priorities]
+        observed_items = self.items()
 
         # Check matching number of items.
         self.assertEqual(len(expected_items), len(observed_items))
@@ -160,24 +164,31 @@ class MultiAgentAdderTestMixin(test_utils.AdderTestMixin):
             if stack_sequence_fields:
                 expected_item = tree_utils.stack_sequence_fields(expected_item)
 
-            # Set check_types=False because we check them below.
+            # Apply the transformation which would be done by the dataset in a real
+            # setup.
+            if item_transform:
+                observed_item = item_transform(observed_item)
+
             tree.map_structure(
                 np.testing.assert_array_almost_equal,
-                expected_item,
-                tuple(observed_item),
-                check_types=False,
+                tree.flatten(expected_item),
+                tree.flatten(observed_item),
             )
 
         # Make sure the signature matches was is being written by Reverb.
         def _check_signature(spec: tf.TensorSpec, value: np.ndarray) -> None:
             self.assertTrue(spec.is_compatible_with(tf.convert_to_tensor(value)))
 
-        # Check the last transition's signature.
-        tree.map_structure(_check_signature, signature, observed_items[-1])
+        # Check that it is possible to unpack observed using the signature.
+        for item in observed_items:
+            tree.map_structure(
+                _check_signature, tree.flatten(signature), tree.flatten(item)
+            )
 
 
 def make_trajectory(
-    observations: np.ndarray, agents: Set[str] = {"agent_0", "agent_1", "agent_2"}
+    observations: np.ndarray,
+    agents: Set[str] = {"agent_0", "agent_1", "agent_2"},
 ) -> Any:
     """Make a simple trajectory from a sequence of observations.
     Arguments:
