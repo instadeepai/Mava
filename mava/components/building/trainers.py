@@ -15,28 +15,27 @@
 
 """Trainer components for system builders"""
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 
+from mava.core import SystemBuilder
+from mava.systems.training import Trainer
 from mava.systems.tf import variable_utils
 from mava.callbacks import Callback
-from mava.systems.building import SystemBuilder
 
 
 class Trainer(Callback):
     def __init__(
         self,
         config: Dict[str, Any],
+        components: List[Callback],
     ):
         """[summary]
 
         Args:
-            config (Dict[str, Any]): [description]
-            executor_fn (Type[core.Executor]): [description]
+            trainer (SystemTrainer): [description]
         """
         self.config = config
-
-    def on_building_trainer_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        self.components = components
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
@@ -47,23 +46,16 @@ class Trainer(Callback):
         trainer_logger = builder._logger_factory(  # type: ignore
             builder._trainer_id, **trainer_logger_config
         )
-        builder._trainer_logger = trainer_logger
+        builder.trainer_logger = trainer_logger
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
-        # Create the system
+        # Create networks
         networks = builder.create_system()
 
+        # create dataset
         dataset = builder.dataset(builder._replay_client, builder._trainer_id)
-
-        # This assumes agents are sort_str_num in the other methods
-        agent_types = builder._agent_types
-        max_gradient_norm = builder._config.max_gradient_norm
-        discount = builder._config.discount
-        target_update_period = builder._config.target_update_period
-        target_averaging = builder._config.target_averaging
-        target_update_rate = builder._config.target_update_rate
 
         # Create variable client
         variables = {}
@@ -111,47 +103,28 @@ class Trainer(Callback):
             for a_i, agent in enumerate(trainer_agents)
         }
 
-        trainer_config: Dict[str, Any] = {
-            "agents": trainer_agents,
-            "agent_types": agent_types,
-            "policy_networks": networks["policies"],
-            "critic_networks": networks["critics"],
-            "observation_networks": networks["observations"],
-            "target_policy_networks": networks["target_policies"],
-            "target_critic_networks": networks["target_critics"],
-            "target_observation_networks": networks["target_observations"],
-            "agent_net_keys": trainer_agent_net_keys,
-            "policy_optimizer": builder._config.policy_optimizer,
-            "critic_optimizer": builder._config.critic_optimizer,
-            "max_gradient_norm": max_gradient_norm,
-            "discount": discount,
-            "target_averaging": target_averaging,
-            "target_update_period": target_update_period,
-            "target_update_rate": target_update_rate,
-            "variable_client": variable_client,
-            "dataset": dataset,
-            "counts": counts,
-            "logger": builder._trainer_logger,
-        }
-        # if connection_spec:
-        #     trainer_config["connection_spec"] = connection_spec
-
-        # if issubclass(self._trainer_fn, training.MADDPGBaseRecurrentTrainer):
-        #     trainer_config["bootstrap_n"] = self._config.bootstrap_n
+        self.config.update(
+            {
+                "networks": networks,
+                "agent_net_keys": trainer_agent_net_keys,
+                "variable_client": variable_client,
+                "dataset": dataset,
+                "counts": counts,
+                "logger": builder.trainer_logger,
+            }
+        )
 
         # The learner updates the parameters (and initializes them).
-        trainer = builder._trainer_fn(**trainer_config)
+        builder.trainer = Trainer(self.config, self.components)
+
+    def on_building_trainer_end(self, builder: SystemBuilder) -> None:
+        """[summary]"""
 
         # NB If using both NetworkStatistics and TrainerStatistics, order is important.
         # NetworkStatistics needs to appear before TrainerStatistics.
         # TODO(Kale-ab/Arnu): need to fix wrapper type issues
-        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
+        builder.trainer = NetworkStatisticsActorCritic(builder.trainer)  # type: ignore
 
-        trainer = ScaledDetailedTrainerStatistics(  # type: ignore
-            trainer, metrics=["policy_loss", "critic_loss"]
+        builder.trainer = ScaledDetailedTrainerStatistics(  # type: ignore
+            builder.trainer, metrics=["policy_loss", "critic_loss"]
         )
-
-        builder.trainer = trainer
-
-    def on_building_trainer_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""

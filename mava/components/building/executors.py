@@ -15,29 +15,24 @@
 
 """Execution components for system builders"""
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 
+from mava.core import SystemBuilder
+from mava.systems.executing import Executor
 from mava.systems.tf import variable_utils
 from mava.callbacks import Callback
-from mava.systems.building import SystemBuilder
 from mava.wrappers import DetailedPerAgentStatistics
 
 
 class Executor(Callback):
-    def __init__(
-        self,
-        config: Dict[str, Any],
-    ):
+    def __init__(self, config: Dict[str, Any], components: List[Callback]):
         """[summary]
 
         Args:
-            config (Dict[str, Any]): [description]
             executor_fn (Type[core.Executor]): [description]
         """
         self.config = config
-
-    def on_building_executor_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        self.components = components
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
@@ -48,23 +43,24 @@ class Executor(Callback):
         exec_logger = builder._logger_factory(  # type: ignore
             f"executor_{builder._executor_id}", **executor_logger_config
         )
-        builder._exec_logger = exec_logger
+        builder.executor_logger = exec_logger
 
     def on_building_executor(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
-        # create system
-        builder._system_networks = builder.create_system()
+        # create networks
+        networks = builder.create_system()
+
+        # create adder
+        adder = builder.adder(builder._replay_client)
 
         # Create policy variables
         variables = {}
         get_keys = []
         for net_type_key in ["observations", "policies"]:
-            for net_key in builder._system_networks[net_type_key].keys():
+            for net_key in networks[net_type_key].keys():
                 var_key = f"{net_key}_{net_type_key}"
-                variables[var_key] = builder._system_networks[net_type_key][
-                    net_key
-                ].variables
+                variables[var_key] = networks[net_type_key][net_key].variables
                 get_keys.append(var_key)
         variables = self.create_counter_variables(variables)
 
@@ -93,42 +89,37 @@ class Executor(Callback):
             # assigning variables before running the environment loop.
             variable_client.get_and_wait()
 
-        adder = builder.adder(builder._replay_client)
-
-        # TODO(Arnu): executor_fn needs standardisation
-        builder._executor = builder._executor_fn(
-            policy_networks=builder._system_networks,
-            counts=counts,
-            net_keys_to_ids=builder._config.net_keys_to_ids,
-            agent_specs=builder._config.environment_spec.get_agent_specs(),
-            agent_net_keys=builder._config.agent_net_keys,
-            network_sampling_setup=builder._config.network_sampling_setup,
-            variable_client=variable_client,
-            adder=adder,
+        self.config.update(
+            {
+                "networks": networks,
+                "adder": adder,
+                "variable_client": variable_client,
+                "counts": counts,
+                "logger": builder.executor_logger,
+            }
         )
+
+        builder.executor = Executor(self.config, self.components)
 
     def on_building_executor_train_loop(self, builder: SystemBuilder) -> None:
         """[summary]"""
         environment = builder._environment_factory(evaluation=False)  # type: ignore
 
         # Create the loop to connect environment and executor.
-        train_loop = builder._train_loop_fn(
+        builder.train_loop = builder._train_loop_fn(
             environment,
             builder._executor,
             logger=builder._exec_logger,
             **builder._train_loop_fn_kwargs,
         )
 
-        builder.train_loop = DetailedPerAgentStatistics(train_loop)
-
-    def on_building_executor_end(self, builder: SystemBuilder) -> None:
+    def on_building_evaluator_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
+
+        builder.train_loop = DetailedPerAgentStatistics(builder.train_loop)
 
 
 class Evaluator(Executor):
-    def on_building_evaluator_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-
     def on_building_evaluator_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
         # Create eval logger.
@@ -143,8 +134,11 @@ class Evaluator(Executor):
     def on_building_evaluator(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
-        # create system
-        builder._system_networks = builder.create_system()
+        # create networks
+        networks = builder.create_system()
+
+        # create adder
+        adder = builder.adder(builder._replay_client)
 
         # Create policy variables
         variables = {}
@@ -183,10 +177,17 @@ class Evaluator(Executor):
             # assigning variables before running the environment loop.
             variable_client.get_and_wait()
 
-        adder = builder.adder(builder._replay_client)
+        self.config.update(
+            {
+                "networks": networks,
+                "adder": adder,
+                "variable_client": variable_client,
+                "counts": counts,
+                "logger": builder.executor_logger,
+            }
+        )
 
-        # TODO(Arnu): executor_fn needs standardisation
-        builder._evaluator = builder._executor_fn(
+        builder.evaluator = builder.executor(
             policy_networks=builder._system_networks,
             counts=counts,
             net_keys_to_ids=builder._config.net_keys_to_ids,
@@ -202,14 +203,14 @@ class Evaluator(Executor):
         environment = builder._environment_factory(evaluation=False)  # type: ignore
 
         # Create the loop to connect environment and executor.
-        eval_loop = builder._eval_loop_fn(
+        builder.eval_loop = builder._eval_loop_fn(
             environment,
             builder._evaluator,
             logger=builder._eval_logger,
             **builder._eval_loop_fn_kwargs,
         )
 
-        builder.eval_loop = DetailedPerAgentStatistics(eval_loop)
-
     def on_building_evaluator_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
+
+        builder.eval_loop = DetailedPerAgentStatistics(builder.eval_loop)

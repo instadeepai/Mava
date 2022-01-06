@@ -14,14 +14,13 @@
 # limitations under the License.
 
 """MADDPG system executor implementation."""
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Any
 
 import dm_env
 
 from mava import types
 from mava.core import SystemExecutor
-from mava.callbacks import Callback
-from mava.systems.callback_hook import SystemCallbackHookMixin
+from mava.callbacks import Callback, SystemCallbackHookMixin
 
 
 class Executor(SystemExecutor, SystemCallbackHookMixin):

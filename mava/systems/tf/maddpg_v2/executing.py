@@ -15,7 +15,7 @@
 
 """MADDPG system executor implementation."""
 
-from mava.systems.execution import OnlineSystemExecutor
+from mava.systems.execution import Executor
 from mava.components.tf import execution as tf_executing
 
 # construct default executor components
@@ -32,5 +32,3 @@ executor_components = [
     policy,
     action_selection,
 ]
-
-system_executor = OnlineSystemExecutor(components=executor_components)

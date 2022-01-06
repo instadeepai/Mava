@@ -16,14 +16,13 @@
 
 """System Trainer implementation."""
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 import reverb
 
 from mava import types
 from mava.core import SystemTrainer
-from mava.callbacks import Callback
-from mava.systems.callback_hook import SystemCallbackHookMixin
+from mava.callbacks import Callback, SystemCallbackHookMixin
 from mava.utils import training_utils as train_utils
 
 
