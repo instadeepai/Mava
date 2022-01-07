@@ -20,7 +20,7 @@ import launchpad as lp
 
 from mava.callbacks import Callback
 from mava.core import SystemBuilder
-
+from mava.utils import enums
 from mava.utils.sort_utils import sort_str_num, sample_new_agent_keys
 
 
@@ -28,74 +28,102 @@ class Distributor(Callback):
     def __init__(
         self,
         num_executors: int = 1,
+        network_sampling_setup: Union[
+            List, enums.NetworkSampler
+        ] = enums.NetworkSampler.fixed_agent_networks,
         termination_condition: Optional[Dict[str, int]] = None,
     ) -> None:
-        """[summary]
-
-        Args:
-            num_executors (int, optional): [description]. Defaults to 1.
-            trainer_networks (Union[ Dict[str, List], enums.Trainer ], optional): [description]. Defaults to enums.Trainer.single_trainer.
-            network_sampling_setup (Union[ List, enums.NetworkSampler ], optional): [description]. Defaults to enums.NetworkSampler.fixed_agent_networks.
-            prefetch_size (int, optional): [description]. Defaults to 4.
-            executor_variable_update_period (int, optional): [description]. Defaults to 1000.
-            samples_per_insert (Optional[float], optional): [description]. Defaults to 32.0.
-            termination_condition (Optional[Dict[str, int]], optional): [description]. Defaults to None.
-        """
+        """summary"""
 
         self.num_executors = num_executors
+        self.network_sampling_setup = network_sampling_setup
         self.termination_condition = termination_condition
 
     def on_building_init(self, builder: SystemBuilder) -> None:
-        # Setup agent networks and executor sampler
-        agents = sort_str_num(builder.environment_spec.get_agent_ids())
-        self._executor_samples = builder._system_config["executor_samples"]
-        if not self._executor_samples:
-            # if no executor samples provided, use shared_weights to determine setup
-            self._agent_net_keys = {
-                agent: agent.split("_")[0]
-                if builder._system_config["shared_weights"]
-                else agent
-                for agent in agents
-            }
-            self._executor_samples = [
-                [
-                    self._agent_net_keys[key]
-                    for key in sort_str_num(self._agent_net_keys.keys())
+        # Setup agent networks and network sampling setup
+        agents = sort_str_num(environment_spec.get_agent_ids())
+
+        if type(self.network_sampling_setup) is not list:
+            if self.network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
+                # if no network_sampling_setup is fixed, use shared_weights to
+                # determine setup
+                builder.agent_net_keys = {
+                    agent: "network_0" if builder.shared_weights else f"network_{i}"
+                    for i, agent in enumerate(agents)
+                }
+                self.network_sampling_setup = [
+                    [
+                        self._agent_net_keys[key]
+                        for key in sort_str_num(self._agent_net_keys.keys())
+                    ]
                 ]
-            ]
+            elif (
+                self.network_sampling_setup
+                == enums.NetworkSampler.random_agent_networks
+            ):
+                """Create N network policies, where N is the number of agents. Randomly
+                select policies from this sets for each agent at the start of a
+                episode. This sampling is done with replacement so the same policy
+                can be selected for more than one agent for a given episode."""
+                if builder.shared_weights:
+                    raise ValueError(
+                        "Shared weights cannot be used with random policy per agent"
+                    )
+                builder.agent_net_keys = {
+                    agents[i]: f"network_{i}" for i in range(len(agents))
+                }
+                self.network_sampling_setup = [
+                    [
+                        [self._agent_net_keys[key]]
+                        for key in sort_str_num(self._agent_net_keys.keys())
+                    ]
+                ]
+            else:
+                raise ValueError(
+                    "network_sampling_setup must be a dict or fixed_agent_networks"
+                )
+
         else:
-            # if executor samples provided, use executor_samples to determine setup
-            _, self._agent_net_keys = sample_new_agent_keys(
+            # if a dictionary is provided, use network_sampling_setup to determine setup
+            _, builder.agent_net_keys = sample_new_agent_keys(
                 agents,
-                self._executor_samples,
+                self.network_sampling_setup,  # type: ignore
             )
 
         # Check that the environment and agent_net_keys has the same amount of agents
-        sample_length = len(self._executor_samples[0])
-        assert len(builder._environment_spec.get_agent_ids()) == len(
-            self._agent_net_keys.keys()
-        )
+        sample_length = len(self._network_sampling_setup[0])  # type: ignore
+        assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
 
         # Check if the samples are of the same length and that they perfectly fit
         # into the total number of agents
         assert len(self._agent_net_keys.keys()) % sample_length == 0
-        for i in range(1, len(self._executor_samples)):
-            assert len(self._executor_samples[i]) == sample_length
+        for i in range(1, len(self._network_sampling_setup)):  # type: ignore
+            assert len(self._network_sampling_setup[i]) == sample_length  # type: ignore
 
         # Get all the unique agent network keys
         all_samples = []
-        for sample in self._executor_samples:
+        for sample in self._network_sampling_setup:  # type: ignore
             all_samples.extend(sample)
-        unique_net_keys = sort_str_num(list(set(all_samples)))
+        unique_net_keys = list(sort_str_num(list(set(all_samples))))
 
         # Create mapping from ints to networks
-        builder._net_to_ints = {net_key: i for i, net_key in enumerate(unique_net_keys)}
+        net_keys_to_ids = {net_key: i for i, net_key in enumerate(unique_net_keys)}
 
         # Setup trainer_networks
-        if not builder._system_config["trainer_networks"]:
-            self._trainer_networks = {"trainer_0": list(unique_net_keys)}
+        if type(trainer_networks) is not dict:
+            if trainer_networks == enums.Trainer.single_trainer:
+                self._trainer_networks = {"trainer": unique_net_keys}
+            elif trainer_networks == enums.Trainer.one_trainer_per_network:
+                self._trainer_networks = {
+                    f"trainer_{i}": [unique_net_keys[i]]
+                    for i in range(len(unique_net_keys))
+                }
+            else:
+                raise ValueError(
+                    "trainer_networks does not support this enums setting."
+                )
         else:
-            self._trainer_networks = builder._system_config["trainer_networks"]
+            self._trainer_networks = trainer_networks  # type: ignore
 
         # Get all the unique trainer network keys
         all_trainer_net_keys = []
@@ -112,26 +140,26 @@ class Distributor(Callback):
 
         # Setup table_network_config
         table_network_config = {}
-        for t_id in range(len(self._trainer_networks.keys())):
+        for trainer_key in self._trainer_networks.keys():
             most_matches = 0
-            trainer_nets = self._trainer_networks[f"trainer_{t_id}"]
-            for sample in self._executor_samples:
+            trainer_nets = self._trainer_networks[trainer_key]
+            for sample in self._network_sampling_setup:  # type: ignore
                 matches = 0
                 for entry in sample:
                     if entry in trainer_nets:
                         matches += 1
                 if most_matches < matches:
                     matches = most_matches
-                    table_network_config[f"trainer_{t_id}"] = sample
+                    table_network_config[trainer_key] = sample
 
-        self._table_network_config = table_network_config
-
-        builder._extra_specs = {}
+        extra_specs = {}
+        # if issubclass(executor_fn, executors.RecurrentExecutor):
+        #     extra_specs = self._get_extra_specs()
 
         int_spec = specs.DiscreteArray(len(unique_net_keys))
-        agents = builder._environment_spec.get_agent_ids()
+        agents = environment_spec.get_agent_ids()
         net_spec = {"network_keys": {agent: int_spec for agent in agents}}
-        builder._extra_specs.update(net_spec)
+        extra_specs.update(net_spec)
 
     def on_building_distributor_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
