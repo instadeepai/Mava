@@ -19,7 +19,6 @@ from typing import Dict, Any, List
 
 from mava.core import SystemBuilder
 from mava.systems.training import Trainer
-from mava.systems.tf import variable_utils
 from mava.callbacks import Callback
 
 
@@ -51,70 +50,32 @@ class Trainer(Callback):
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
-        # Create networks
-        networks = builder.create_system()
+        # create networks
+        networks = builder.system()
 
         # create dataset
         dataset = builder.dataset(builder._replay_client, builder._trainer_id)
 
-        # Create variable client
-        variables = {}
-        set_keys = []
-        get_keys = []
-        # TODO (dries): Only add the networks this trainer is working with.
-        # Not all of them.
-        for net_type_key in networks.keys():
-            for net_key in networks[net_type_key].keys():
-                variables[f"{net_key}_{net_type_key}"] = networks[net_type_key][
-                    net_key
-                ].variables
-                if net_key in set(builder._trainer_networks):
-                    set_keys.append(f"{net_key}_{net_type_key}")
-                else:
-                    get_keys.append(f"{net_key}_{net_type_key}")
-
-        variables = builder.create_counter_variables(variables)
-        count_names = [
-            "trainer_steps",
-            "trainer_walltime",
-            "evaluator_steps",
-            "evaluator_episodes",
-            "executor_episodes",
-            "executor_steps",
-        ]
-        get_keys.extend(count_names)
-        counts = {name: variables[name] for name in count_names}
-
-        variable_client = variable_utils.VariableClient(
-            client=builder._variable_source,
-            variables=variables,
-            get_keys=get_keys,
-            set_keys=set_keys,
-            update_period=10,
-        )
-
-        # Get all the initial variables
-        variable_client.get_all_and_wait()
-
-        # Convert network keys for the trainer.
+        # convert network keys for the trainer
         trainer_agents = builder._agents[: len(builder._trainer_table_entry)]
         trainer_agent_net_keys = {
             agent: builder._trainer_table_entry[a_i]
             for a_i, agent in enumerate(trainer_agents)
         }
 
+        # update config
         self.config.update(
             {
                 "networks": networks,
-                "agent_net_keys": trainer_agent_net_keys,
-                "variable_client": variable_client,
                 "dataset": dataset,
-                "counts": counts,
+                "agent_net_keys": trainer_agent_net_keys,
+                "variable_client": builder.trainer_variable_client,
+                "counts": builder.trainer_counts,
                 "logger": builder.trainer_logger,
             }
         )
 
-        # The learner updates the parameters (and initializes them).
+        # trainer
         builder.trainer = Trainer(self.config, self.components)
 
     def on_building_trainer_end(self, builder: SystemBuilder) -> None:

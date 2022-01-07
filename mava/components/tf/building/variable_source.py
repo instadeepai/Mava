@@ -67,17 +67,17 @@ class VariableServer(VariableSource):
 
     def on_building_variable_server_start(self, builder: SystemBuilder) -> None:
         # Create the system
-        builder._networks = builder.system()
+        builder.networks = builder.system()
 
     def on_building_variable_server(self, builder: SystemBuilder) -> None:
         # Create variables
         variables = {}
         # Network variables
-        for net_type_key in builder._networks.keys():
-            for net_key in builder._networks[net_type_key].keys():
+        for net_type_key in builder.networks.keys():
+            for net_key in builder.networks[net_type_key].keys():
                 # Ensure obs and target networks are sonnet modules
                 variables[f"{net_key}_{net_type_key}"] = tf2_utils.to_sonnet_module(
-                    builder._networks[net_type_key][net_key]
+                    builder.networks[net_type_key][net_key]
                 ).variables
 
         variables = self._create_tf_counter_variables(variables)
@@ -108,11 +108,11 @@ class ExecutorVariableClient(VariableSource):
         variables = {}
         get_keys = []
         for net_type_key in ["observations", "policies"]:
-            for net_key in builder._networks[net_type_key].keys():
+            for net_key in builder.networks[net_type_key].keys():
                 var_key = f"{net_key}_{net_type_key}"
-                variables[var_key] = builder._networks[net_type_key][net_key].variables
+                variables[var_key] = builder.networks[net_type_key][net_key].variables
                 get_keys.append(var_key)
-        variables = builder.create_counter_variables(variables)
+        variables = self._create_tf_counter_variables(variables)
 
         count_names = [
             "trainer_steps",
@@ -123,13 +123,13 @@ class ExecutorVariableClient(VariableSource):
             "executor_steps",
         ]
         get_keys.extend(count_names)
-        counts = {name: variables[name] for name in count_names}
+        builder.executor_counts = {name: variables[name] for name in count_names}
 
         variable_client = None
-        if builder._variable_source:
+        if builder.variable_server:
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
-                client=builder._variable_source,
+                client=builder.variable_server,
                 variables=variables,
                 get_keys=get_keys,
                 get_period=self.executor_variable_update_period,
@@ -139,7 +139,6 @@ class ExecutorVariableClient(VariableSource):
             # assigning variables before running the environment loop.
             variable_client.get_and_wait()
 
-        builder.counts = counts
         builder.executor_variable_client = variable_client
 
 
@@ -151,18 +150,17 @@ class TrainerVariableClient(VariableSource):
         get_keys = []
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
-        for net_type_key in builder._networks.keys():
-            for net_key in builder._networks[net_type_key].keys():
-                variables[f"{net_key}_{net_type_key}"] = builder._networks[
-                    net_type_key
-                ][net_key].variables
-                if net_key in set(builder._trainer_networks):
+        for net_type_key in builder.networks.keys():
+            for net_key in builder.networks[net_type_key].keys():
+                variables[f"{net_key}_{net_type_key}"] = builder.networks[net_type_key][
+                    net_key
+                ].variables
+                if net_key in set(builder.trainer_networks):
                     set_keys.append(f"{net_key}_{net_type_key}")
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")
 
-        variables = self._create_counter_variables(variables)
-        num_steps = variables["trainer_steps"]
+        variables = self._create_tf_counter_variables(variables)
 
         count_names = [
             "trainer_steps",
@@ -173,10 +171,10 @@ class TrainerVariableClient(VariableSource):
             "executor_steps",
         ]
         get_keys.extend(count_names)
-        counts = {name: variables[name] for name in count_names}
+        builder.trainer_counts = {name: variables[name] for name in count_names}
 
         variable_client = variable_utils.VariableClient(
-            client=builder._variable_source,
+            client=builder.variable_server,
             variables=variables,
             get_keys=get_keys,
             set_keys=set_keys,

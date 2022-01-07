@@ -13,22 +13,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG system executor implementation."""
-
-from mava.systems.execution import Executor
+from mava.components import building
 from mava.components.tf import execution as tf_executing
 
-# construct default executor components
-#######################################
+"""MADDPG system executor implementation."""
+
+##############
+#   Executor
+##############
+
+# config = {
+#     policy_networks: Dict[str, snt.Module],
+#     agent_specs: Dict[str, EnvironmentSpec],
+#     agent_net_keys: Dict[str, str],
+#     network_sampling_setup: List,
+#     net_keys_to_ids: Dict[str, int],
+#     evaluator: bool = False,
+#     adder: Optional[adders.ParallelAdder] = None,
+#     counts: Optional[Dict[str, Any]] = None,
+#     variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+#     interval: Optional[dict] = None,
+# }
+
 observer = tf_executing.OnlineObserver()
 preprocess = tf_executing.Batch()
 policy = tf_executing.DistributionPolicy()
 action_selection = tf_executing.OnlineActionSampling()
 
-# Executor components
 executor_components = [
     observer,
     preprocess,
     policy,
     action_selection,
 ]
+
+# Executor
+executor = building.Executor(config=..., components=executor_components)

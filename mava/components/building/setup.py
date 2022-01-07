@@ -166,9 +166,6 @@ class MultiTrainer(Default):
 
         builder._extra_specs = {}
 
-        # if issubclass(executor_fn, executors.RecurrentExecutor):
-        #     extra_specs = self._get_extra_specs()
-
         int_spec = specs.DiscreteArray(len(unique_net_keys))
         agents = builder._environment_spec.get_agent_ids()
         net_spec = {"network_keys": {agent: int_spec for agent in agents}}
