@@ -18,7 +18,6 @@
 from typing import Dict, Any, List
 
 from mava.core import SystemBuilder
-from mava.systems.executing import Executor
 
 from mava.callbacks import Callback
 from mava.wrappers import DetailedPerAgentStatistics
@@ -34,6 +33,10 @@ class Executor(Callback):
         self.config = config
         self.components = components
 
+    def on_building_init(self, system: System, builder: SystemBuilder) -> None:
+        """[summary]"""
+        # TODO(Arnu): need to setup executor samples/ network sampling setup
+
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
         # Create executor logger
@@ -45,7 +48,7 @@ class Executor(Callback):
         )
         builder.executor_logger = exec_logger
 
-    def on_building_executor(self, builder: SystemBuilder) -> None:
+    def on_building_executor_create_executor(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
         # create networks
@@ -67,15 +70,19 @@ class Executor(Callback):
 
         builder.executor = Executor(self.config, self.components)
 
+    def on_building_executor_environment(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        builder.executor_environment = builder.environment_factory(evaluation=False)  # type: ignore
+
     def on_building_executor_train_loop(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        environment = builder._environment_factory(evaluation=False)  # type: ignore
 
         # Create the loop to connect environment and executor.
         builder.train_loop = builder._train_loop_fn(
-            environment,
-            builder._executor,
-            logger=builder._exec_logger,
+            builder.executor_environment,
+            builder.executor,
+            logger=builder.executor_logger,
             **builder._train_loop_fn_kwargs,
         )
 
@@ -110,15 +117,19 @@ class Evaluator(Executor):
 
         builder.evaluator = Executor(self.config, self.components)
 
+    def on_building_evaluator_environment(
+        self, system: System, builder: SystemBuilder
+    ) -> None:
+        builder.evaluator_environment = builder.environment_factory(evaluation=False)  # type: ignore
+
     def on_building_evaluator_eval_loop(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        environment = builder._environment_factory(evaluation=False)  # type: ignore
 
         # Create the loop to connect environment and executor.
         builder.eval_loop = builder._eval_loop_fn(
-            environment,
-            builder._evaluator,
-            logger=builder._eval_logger,
+            builder.evaluator_environment,
+            builder.evaluator,
+            logger=builder.evaluator_logger,
             **builder._eval_loop_fn_kwargs,
         )
 

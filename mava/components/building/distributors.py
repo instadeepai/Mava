@@ -19,8 +19,7 @@ from typing import Dict, List, Optional, Union
 import launchpad as lp
 
 from mava.callbacks import Callback
-from mava.systems.building import SystemBuilder
-from mava.utils import enums
+from mava.core import SystemBuilder
 
 from mava.utils.sort_utils import sort_str_num, sample_new_agent_keys
 
@@ -29,15 +28,6 @@ class Distributor(Callback):
     def __init__(
         self,
         num_executors: int = 1,
-        trainer_networks: Union[
-            Dict[str, List], enums.Trainer
-        ] = enums.Trainer.single_trainer,
-        network_sampling_setup: Union[
-            List, enums.NetworkSampler
-        ] = enums.NetworkSampler.fixed_agent_networks,
-        prefetch_size: int = 4,
-        executor_variable_update_period: int = 1000,
-        samples_per_insert: Optional[float] = 32.0,
         termination_condition: Optional[Dict[str, int]] = None,
     ) -> None:
         """[summary]
@@ -51,6 +41,9 @@ class Distributor(Callback):
             samples_per_insert (Optional[float], optional): [description]. Defaults to 32.0.
             termination_condition (Optional[Dict[str, int]], optional): [description]. Defaults to None.
         """
+
+        self.num_executors = num_executors
+        self.termination_condition = termination_condition
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         # Setup agent networks and executor sampler

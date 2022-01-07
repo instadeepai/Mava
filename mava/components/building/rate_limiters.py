@@ -14,13 +14,14 @@
 # limitations under the License.
 
 """Commonly used rate limiter components for system builders"""
+import abc
 
 from typing import Optional
 
 import reverb
 
 from mava.callbacks import Callback
-from mava.systems.building import SystemBuilder
+from mava.core import SystemBuilder
 
 
 class RateLimiter(Callback):
@@ -38,13 +39,13 @@ class RateLimiter(Callback):
         self.sample_per_insert = samples_per_insert
         self.min_replay_size = min_replay_size
 
+    @abc.abstractmethod
     def on_building_rate_limiter(self, builder: SystemBuilder) -> None:
         """[summary]
 
         Args:
             builder (SystemBuilder): [description]
         """
-        pass
 
 
 class OffPolicyRateLimiter(RateLimiter):

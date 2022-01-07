@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Commonly used replay table components for system builders"""
-
+import abc
 import copy
 from typing import Dict, List, Any
 
@@ -25,14 +25,14 @@ from acme.specs import EnvironmentSpec
 
 from mava import specs
 from mava.callbacks import Callback
-from mava.systems.building import SystemBuilder
+from mava.core import SystemBuilder
 from mava.utils.sort_utils import sort_str_num
 
 BoundedArray = dm_specs.BoundedArray
 DiscreteArray = dm_specs.DiscreteArray
 
 
-class ReplayTables(Callback):
+class Tables(Callback):
     def __init__(
         self,
         name: str,
@@ -64,13 +64,13 @@ class ReplayTables(Callback):
         self.max_size = max_size
         self.max_times_sampled = max_times_sampled
 
+    @abc.abstractmethod
     def on_building_make_tables(self, builder: SystemBuilder):
         """[summary]
 
         Args:
             builder (SystemBuilder): [description]
         """
-        pass
 
 
 class OffPolicyReplayTables(ReplayTables):

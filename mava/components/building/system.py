@@ -15,20 +15,33 @@
 
 """Commonly used dataset components for system builders"""
 
-from typing import Dict, Any
+from typing import Dict, Any, Callable, Type
+
+from acme import specs as acme_specs
 
 from mava.callbacks import Callback
-from mava.systems.building import SystemBuilder
+from mava.core import SystemBuilder
+
+# TODO (Arnu): make general architecture type
 
 
 class System(Callback):
-    def __init__(self, config: Dict[str, Dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        network_factory: Callable[[acme_specs.BoundedArray], Dict[str, Any]],
+        architecture: Type[
+            DecentralisedQValueActorCritic
+        ] = DecentralisedQValueActorCritic,
+        shared_weights: bool = True,
+    ) -> None:
         """[summary]
 
         Args:
             config (Dict[str, Dict[str, Any]]): [description]
         """
-        self.config = config
+        self.network_factory = network_factory
+        self.architecture = architecture
+        self.shared_weights = shared_weights
 
     def on_building_system_start(self, builder: SystemBuilder) -> None:
         """[summary]

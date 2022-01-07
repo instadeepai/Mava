@@ -16,7 +16,7 @@
 """Commonly used adder signature components for system builders"""
 
 from mava.callbacks import Callback
-from mava.systems.building import SystemBuilder
+from mava.core import SystemBuilder
 
 
 class VariableSource(Callback):

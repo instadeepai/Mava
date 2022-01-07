@@ -24,7 +24,7 @@ from mava.utils.sort_utils import sort_str_num, sample_new_agent_keys
 
 from mava import specs as mava_specs
 from mava.callbacks import Callback
-from mava.systems.building import SystemBuilder
+from mava.core import SystemBuilder
 
 
 class Setup(Callback):

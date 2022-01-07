@@ -14,12 +14,14 @@
 # limitations under the License.
 
 """Commonly used dataset components for system builders"""
+import abc
+
 from typing import Optional
 
 from acme import datasets
 
 from mava.callbacks import Callback
-from mava.systems.building import SystemBuilder
+from mava.core import SystemBuilder
 
 
 class Iterator(Callback):
@@ -45,17 +47,17 @@ class Iterator(Callback):
         self.num_parallel_calls = num_parallel_calls
         self.max_in_flight_samples_per_worker = max_in_flight_samples_per_worker
 
-    def on_building_dataset(self, builder: SystemBuilder) -> None:
+    @abc.abstractmethod
+    def on_building_dataset_create_dataset(self, builder: SystemBuilder) -> None:
         """[summary]
 
         Args:
             builder (SystemBuilder): [description]
         """
-        pass
 
 
 class DatasetIterator(Iterator):
-    def on_building_dataset(self, builder: SystemBuilder) -> None:
+    def on_building_dataset_create_dataset(self, builder: SystemBuilder) -> None:
         dataset = datasets.make_reverb_dataset(
             table=self._table_name,
             server_address=self._replay_client.server_address,

@@ -14,18 +14,19 @@
 # limitations under the License.
 
 """Commonly used adder signature components for system builders"""
-from typing import Dict
+from typing import Dict, Optional, Union, List
 
 import tensorflow as tf
 from acme.tf import utils as tf2_utils
 
 from mava.systems.building import SystemBuilder
-from mava.components.building import VariableSource
+from mava.components.building import VariableSource as BaseVariableSource
 from mava.systems.tf import variable_utils
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils import enums
 
 
-class VariableSource(VariableSource):
+class VariableSource(BaseVariableSource):
     def _create_tf_counter_variables(
         self, variables: Dict[str, tf.Variable]
     ) -> Dict[str, tf.Variable]:
@@ -52,6 +53,7 @@ class VariableServer(VariableSource):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         checkpoint_minute_interval: int = 10,
+        termination_condition: Optional[Dict[str, int]] = None,
     ) -> None:
         """[summary]
 
@@ -64,6 +66,7 @@ class VariableServer(VariableSource):
         self.checkpoint = checkpoint
         self.checkpoint_subpath = checkpoint_subpath
         self.checkpoint_minute_interval = checkpoint_minute_interval
+        self.termination_condition = termination_condition
 
     def on_building_variable_server_start(self, builder: SystemBuilder) -> None:
         # Create the system
@@ -88,13 +91,20 @@ class VariableServer(VariableSource):
             self.checkpoint,
             self.checkpoint_subpath,
             self.checkpoint_minute_interval,
+            self.termination_condition,
         )
 
         builder.variable_server = variable_source
 
 
 class ExecutorVariableClient(VariableSource):
-    def __init__(self, executor_variable_update_period: int = 1000) -> None:
+    def __init__(
+        self,
+        trainer_networks: Union[
+            Dict[str, List], enums.Trainer
+        ] = enums.Trainer.single_trainer,
+        executor_variable_update_period: int = 1000,
+    ) -> None:
         """[summary]
 
         Args:
@@ -102,6 +112,7 @@ class ExecutorVariableClient(VariableSource):
         """
 
         self.executor_variable_update_period = executor_variable_update_period
+        self.trainer_networks = trainer_networks
 
     def on_building_executor_variable_client(self, builder: SystemBuilder) -> None:
         # Create policy variables
@@ -143,6 +154,20 @@ class ExecutorVariableClient(VariableSource):
 
 
 class TrainerVariableClient(VariableSource):
+    def __init__(
+        self,
+        trainer_networks: Union[
+            Dict[str, List], enums.Trainer
+        ] = enums.Trainer.single_trainer,
+    ) -> None:
+        """[summary]
+
+        Args:
+            trainer_networks (Union[ Dict[str, List], enums.Trainer ], optional):
+                [description]. Defaults to enums.Trainer.single_trainer.
+        """
+        self.trainer_networks = trainer_networks
+
     def on_building_trainer_variable_client(self, builder: SystemBuilder) -> None:
         # Create variable client
         variables = {}
@@ -155,7 +180,7 @@ class TrainerVariableClient(VariableSource):
                 variables[f"{net_key}_{net_type_key}"] = builder.networks[net_type_key][
                     net_key
                 ].variables
-                if net_key in set(builder.trainer_networks):
+                if net_key in set(self.trainer_networks):
                     set_keys.append(f"{net_key}_{net_type_key}")
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")

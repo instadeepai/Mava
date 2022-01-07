@@ -14,55 +14,14 @@
 # limitations under the License.
 
 """Commonly used adder components for system builders"""
+import abc
 
 from typing import Dict, Any, List
 
 from mava import specs
 from mava.callbacks import Callback
-from mava.systems.building import SystemBuilder
+from mava.core import SystemBuilder
 from mava.adders import reverb as reverb_adders
-
-
-class AdderSignature(Callback):
-    def on_building_adder_signature(self, builder: SystemBuilder) -> None:
-        """[summary]
-
-        Args:
-            builder (SystemBuilder): [description]
-        """
-        pass
-
-
-class ParallelNStepTransitionAdderSignature(AdderSignature):
-    def on_building_adder_signature(self, builder: SystemBuilder) -> None:
-        def adder_sig_fn(
-            env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
-        ) -> Any:
-            return reverb_adders.ParallelNStepTransitionAdder.signature(
-                env_spec, extra_specs
-            )
-
-        builder.adder_signature_fn = adder_sig_fn
-
-
-class ParallelSequenceAdderSignature(AdderSignature):
-    def __init__(self, sequence_length: int = 20) -> None:
-        """[summary]
-
-        Args:
-            sequence_length (int, optional): [description]. Defaults to 20.
-        """
-        self.sequence_length = sequence_length
-
-    def on_building_adder_signature(self, builder: SystemBuilder) -> None:
-        def adder_sig_fn(
-            env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
-        ) -> Any:
-            return reverb_adders.ParallelSequenceAdder.signature(
-                env_spec, self.sequence_length, extra_specs
-            )
-
-        builder.adder_signature = adder_sig_fn
 
 
 class Adder(Callback):
@@ -72,13 +31,23 @@ class Adder(Callback):
         self.net_to_ints = net_to_ints
         self.table_network_config = table_network_config
 
-    def on_building_make_adder(self, builder: SystemBuilder) -> None:
+    @abc.abstractmethod
+    def on_building_adder_create_adder(self, builder: SystemBuilder) -> None:
         """[summary]
 
         Args:
             builder (SystemBuilder): [description]
         """
-        pass
+
+
+class AdderSignature(Callback):
+    @abc.abstractmethod
+    def on_building_tables_adder_signature(self, builder: SystemBuilder) -> None:
+        """[summary]
+
+        Args:
+            builder (SystemBuilder): [description]
+        """
 
 
 class ParallelNStepTransitionAdder(Adder):
@@ -94,7 +63,7 @@ class ParallelNStepTransitionAdder(Adder):
         self.n_step = n_step
         self.discount = discount
 
-    def on_building_make_adder(self, builder: SystemBuilder) -> None:
+    def on_building_adder_create_adder(self, builder: SystemBuilder) -> None:
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.priority_fns,
             client=self._replay_client,
@@ -105,6 +74,18 @@ class ParallelNStepTransitionAdder(Adder):
         )
 
         builder.adder = adder
+
+
+class ParallelNStepTransitionAdderSignature(AdderSignature):
+    def on_building_tables_adder_signature(self, builder: SystemBuilder) -> None:
+        def adder_sig_fn(
+            env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
+        ) -> Any:
+            return reverb_adders.ParallelNStepTransitionAdder.signature(
+                env_spec, extra_specs
+            )
+
+        builder.adder_signature_fn = adder_sig_fn
 
 
 class ParallelSequenceAdder(Adder):
@@ -120,7 +101,7 @@ class ParallelSequenceAdder(Adder):
         self.sequence_length = sequence_length
         self.period = period
 
-    def on_building_make_adder(self, builder: SystemBuilder) -> None:
+    def on_building_adder_create_adder(self, builder: SystemBuilder) -> None:
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.priority_fns,
             client=self._replay_client,
@@ -131,3 +112,23 @@ class ParallelSequenceAdder(Adder):
         )
 
         builder.adder = adder
+
+
+class ParallelSequenceAdderSignature(AdderSignature):
+    def __init__(self, sequence_length: int = 20) -> None:
+        """[summary]
+
+        Args:
+            sequence_length (int, optional): [description]. Defaults to 20.
+        """
+        self.sequence_length = sequence_length
+
+    def on_building_tables_adder_signature(self, builder: SystemBuilder) -> None:
+        def adder_sig_fn(
+            env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
+        ) -> Any:
+            return reverb_adders.ParallelSequenceAdder.signature(
+                env_spec, self.sequence_length, extra_specs
+            )
+
+        builder.adder_signature = adder_sig_fn

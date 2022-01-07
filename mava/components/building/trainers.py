@@ -18,7 +18,6 @@
 from typing import Dict, Any, List
 
 from mava.core import SystemBuilder
-from mava.systems.training import Trainer
 from mava.callbacks import Callback
 
 
