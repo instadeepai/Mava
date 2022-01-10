@@ -20,7 +20,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import acme
 import dm_env
-import launchpad as lp
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
@@ -44,6 +43,9 @@ from mava.systems.tf.maddpg.execution import (
 )
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 from mava.utils import enums
+
+# For some reason this must be at the end of the imports.
+from mava.utils.experimental.launcher import NodeType, launcher
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import DetailedPerAgentStatistics
@@ -627,29 +629,38 @@ class MADDPG:
         Returns:
             graph program for distributed system training.
         """
-        program = lp.Program(name=name)
+        program = launcher(single_process=False, nodes_on_gpu=["trainer"], name=name)
 
-        with program.group("replay"):
-            replay = program.add_node(lp.ReverbNode(self.replay))
+        replay = program.add(self.replay, node_type=NodeType.reverb, name="replay")
 
-        with program.group("variable_server"):
-            variable_server = program.add_node(lp.CourierNode(self.variable_server))
+        variable_server = program.add(
+            self.variable_server, node_type=NodeType.corrier, name="variable_server"
+        )
 
-        with program.group("trainer"):
-            # Add executors which pull round-robin from our variable sources.
-            for trainer_id in self._trainer_networks.keys():
-                program.add_node(
-                    lp.CourierNode(self.trainer, trainer_id, replay, variable_server)
-                )
+        for trainer_id in self._trainer_networks.keys():
+            program.add(
+                self.trainer,
+                [trainer_id, replay, variable_server],
+                node_type=NodeType.corrier,
+                name="trainer",
+            )
 
-        with program.group("evaluator"):
-            program.add_node(lp.CourierNode(self.evaluator, variable_server))
+        program.add(
+            self.evaluator,
+            [variable_server],
+            node_type=NodeType.corrier,
+            name="evaluator",
+        )
 
-        with program.group("executor"):
-            # Add executors which pull round-robin from our variable sources.
-            for executor_id in range(self._num_exectors):
-                program.add_node(
-                    lp.CourierNode(self.executor, executor_id, replay, variable_server)
-                )
+        # Add executors which pull round-robin from our variable sources.
+        for executor_id in range(self._num_exectors):
+            program.add(
+                self.executor,
+                [executor_id, replay, variable_server],
+                node_type=NodeType.corrier,
+                name="executor",
+            )
+
+        program.launch()
 
         return program
