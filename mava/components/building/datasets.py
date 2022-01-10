@@ -51,11 +51,7 @@ class Iterator(Callback):
 
     @abc.abstractmethod
     def on_building_dataset_make_dataset(self, builder: SystemBuilder) -> None:
-        """[summary]
-
-        Args:
-            builder (SystemBuilder): [description]
-        """
+        """[summary]"""
 
 
 class Dataset(Iterator):

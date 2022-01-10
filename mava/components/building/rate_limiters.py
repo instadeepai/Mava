@@ -41,11 +41,7 @@ class RateLimiter(Callback):
 
     @abc.abstractmethod
     def on_building_rate_limiter(self, builder: SystemBuilder) -> None:
-        """[summary]
-
-        Args:
-            builder (SystemBuilder): [description]
-        """
+        """[summary]"""
 
 
 class OffPolicyRateLimiter(RateLimiter):

@@ -33,21 +33,13 @@ class Adder(Callback):
 
     @abc.abstractmethod
     def on_building_adder_make_adder(self, builder: SystemBuilder) -> None:
-        """[summary]
-
-        Args:
-            builder (SystemBuilder): [description]
-        """
+        """[summary]"""
 
 
 class AdderSignature(Callback):
     @abc.abstractmethod
     def on_building_tables_adder_signature(self, builder: SystemBuilder) -> None:
-        """[summary]
-
-        Args:
-            builder (SystemBuilder): [description]
-        """
+        """[summary]"""
 
 
 class ParallelNStepTransitionAdder(Adder):

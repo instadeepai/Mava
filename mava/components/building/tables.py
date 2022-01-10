@@ -53,7 +53,6 @@ class Tables(Callback):
             remover (reverb_types.SelectorType): [description]
             max_size (int): [description]
             max_times_sampled (int, optional): [description]. Defaults to 0.
-            extensions (Sequence[TableExtensionBase], optional): [description]. Defaults to ().
         """
 
         self.name = name
@@ -66,11 +65,7 @@ class Tables(Callback):
 
     @abc.abstractmethod
     def on_building_tables_make_tables(self, builder: SystemBuilder):
-        """[summary]
-
-        Args:
-            builder (SystemBuilder): [description]
-        """
+        """[summary]"""
 
 
 class OffPolicyReplayTables(Tables):

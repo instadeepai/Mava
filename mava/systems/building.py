@@ -190,7 +190,6 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         self._executor_id = executor_id
         self._replay_client = replay_client
         self._variable_source = variable_source
-        self._system_networks = self.system()
 
         self.on_building_executor_start(self)
 
@@ -223,7 +222,6 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         """
 
         self._variable_source = variable_source
-        self._system_networks = self.system()
 
         self.on_building_evaluator_start(self)
 
@@ -258,7 +256,6 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         self._trainer_id = trainer_id
         self._replay_client = replay_client
         self._variable_source = variable_source
-        self._system_networks = self.system()
 
         self.on_building_trainer_start(self)
 

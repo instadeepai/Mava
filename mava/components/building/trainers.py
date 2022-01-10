@@ -35,17 +35,6 @@ class Trainer(Callback):
         self.config = config
         self.components = components
 
-    def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        # create trainer logger
-        trainer_logger_config = {}
-        if builder._logger_config and "trainer" in builder._logger_config:
-            trainer_logger_config = builder._logger_config["trainer"]
-        trainer_logger = builder._logger_factory(  # type: ignore
-            builder._trainer_id, **trainer_logger_config
-        )
-        builder.trainer_logger = trainer_logger
-
     def on_building_trainer_make_trainer(self, builder: SystemBuilder) -> None:
         """[summary]"""
 

@@ -14,32 +14,21 @@
 # limitations under the License.
 
 """Commonly used adder signature components for system builders"""
+import abc
 
 from mava.callbacks import Callback
 from mava.core import SystemBuilder
 
 
 class VariableSource(Callback):
+    @abc.abstractmethod
     def on_building_variable_server(self, builder: SystemBuilder) -> None:
-        """[summary]
+        """[summary]"""
 
-        Args:
-            builder (SystemBuilder): [description]
-        """
-        pass
-
+    @abc.abstractmethod
     def on_building_executor_variable_client(self, builder: SystemBuilder) -> None:
-        """[summary]
+        """[summary]"""
 
-        Args:
-            builder (SystemBuilder): [description]
-        """
-        pass
-
+    @abc.abstractmethod
     def on_building_trainer_variable_client(self, builder: SystemBuilder) -> None:
-        """[summary]
-
-        Args:
-            builder (SystemBuilder): [description]
-        """
-        pass
+        """[summary]"""
