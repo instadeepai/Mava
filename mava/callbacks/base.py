@@ -215,35 +215,6 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    # distributor
-    def on_building_distributor_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_distributor_tables(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_distributor_variable_server(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_distributor_trainer(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_distributor_evaluator(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_distributor_executor(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_distributor_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
     #######################
     # system executor hooks
     #######################

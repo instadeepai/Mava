@@ -53,12 +53,12 @@ class AdderSignature(Callback):
 class ParallelNStepTransitionAdder(Adder):
     def __init__(
         self,
-        net_to_ints: Dict[str, int],
+        net_keys_to_ids: Dict[str, int],
         table_network_config: Dict[str, List],
         n_step: int,
         discount: float,
     ):
-        super().__init__(net_to_ints, table_network_config)
+        super().__init__(net_keys_to_ids, table_network_config)
 
         self.n_step = n_step
         self.discount = discount
@@ -67,7 +67,7 @@ class ParallelNStepTransitionAdder(Adder):
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.priority_fns,
             client=self._replay_client,
-            net_ids_to_keys=self.unique_net_keys,
+            net_ids_to_keys=builder.unique_net_keys,
             n_step=self.n_step,
             table_network_config=self.table_network_config,
             discount=self.discount,
@@ -91,12 +91,12 @@ class ParallelNStepTransitionAdderSignature(AdderSignature):
 class ParallelSequenceAdder(Adder):
     def __init__(
         self,
-        net_to_ints: Dict[str, int],
+        net_keys_to_ids: Dict[str, int],
         table_network_config: Dict[str, List],
         sequence_length: int,
         period: int,
     ):
-        super().__init__(net_to_ints, table_network_config)
+        super().__init__(net_keys_to_ids, table_network_config)
 
         self.sequence_length = sequence_length
         self.period = period
@@ -105,7 +105,7 @@ class ParallelSequenceAdder(Adder):
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.priority_fns,
             client=self._replay_client,
-            net_ids_to_keys=self.unique_net_keys,
+            net_ids_to_keys=builder.unique_net_keys,
             sequence_length=self.sequence_length,
             table_network_config=self.table_network_config,
             period=self.period,

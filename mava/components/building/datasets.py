@@ -27,6 +27,7 @@ from mava.core import SystemBuilder
 class Iterator(Callback):
     def __init__(
         self,
+        name: str = "data_store",
         batch_size: Optional[int] = None,
         prefetch_size: Optional[int] = None,
         num_parallel_calls: int = 12,
@@ -42,6 +43,7 @@ class Iterator(Callback):
             num_parallel_calls (int, optional): [description]. Defaults to 12.
             max_in_flight_samples_per_worker (Optional[int], optional): [description]. Defaults to None.
         """
+        self.table_name = name
         self.batch_size = batch_size
         self.prefetch_size = prefetch_size
         self.num_parallel_calls = num_parallel_calls
@@ -56,11 +58,11 @@ class Iterator(Callback):
         """
 
 
-class DatasetIterator(Iterator):
+class Dataset(Iterator):
     def on_building_dataset_create_dataset(self, builder: SystemBuilder) -> None:
         dataset = datasets.make_reverb_dataset(
-            table=self._table_name,
-            server_address=self._replay_client.server_address,
+            table=self.table_name,
+            server_address=builder.replay_client.server_address,
             batch_size=self.batch_size,
             prefetch_size=self.prefetch_size,
             num_parallel_calls=self.num_parallel_calls,

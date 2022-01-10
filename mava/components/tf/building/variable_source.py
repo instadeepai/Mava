@@ -100,9 +100,6 @@ class VariableServer(VariableSource):
 class ExecutorVariableClient(VariableSource):
     def __init__(
         self,
-        trainer_networks: Union[
-            Dict[str, List], enums.Trainer
-        ] = enums.Trainer.single_trainer,
         executor_variable_update_period: int = 1000,
     ) -> None:
         """[summary]
@@ -112,7 +109,6 @@ class ExecutorVariableClient(VariableSource):
         """
 
         self.executor_variable_update_period = executor_variable_update_period
-        self.trainer_networks = trainer_networks
 
     def on_building_executor_variable_client(self, builder: SystemBuilder) -> None:
         # Create policy variables
@@ -154,19 +150,13 @@ class ExecutorVariableClient(VariableSource):
 
 
 class TrainerVariableClient(VariableSource):
-    def __init__(
-        self,
-        trainer_networks: Union[
-            Dict[str, List], enums.Trainer
-        ] = enums.Trainer.single_trainer,
-    ) -> None:
+    def __init__(self) -> None:
         """[summary]
 
         Args:
             trainer_networks (Union[ Dict[str, List], enums.Trainer ], optional):
                 [description]. Defaults to enums.Trainer.single_trainer.
         """
-        self.trainer_networks = trainer_networks
 
     def on_building_trainer_variable_client(self, builder: SystemBuilder) -> None:
         # Create variable client
@@ -180,7 +170,7 @@ class TrainerVariableClient(VariableSource):
                 variables[f"{net_key}_{net_type_key}"] = builder.networks[net_type_key][
                     net_key
                 ].variables
-                if net_key in set(self.trainer_networks):
+                if net_key in set(builder.trainer_networks):
                     set_keys.append(f"{net_key}_{net_type_key}")
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")

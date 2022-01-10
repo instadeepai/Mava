@@ -221,42 +221,6 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_make_trainer_end(self, self.builder)
 
-    # distributor
-    def on_building_distributor_start(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_building_distributor_start(self, self.builder)
-
-    def on_building_distributor_tables(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_building_distributor_tables(self, self.builder)
-
-    def on_building_distributor_variable_server(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_building_distributor_variable_server(self, self.builder)
-
-    def on_building_distributor_trainer(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_building_distributor_trainer(self, self.builder)
-
-    def on_building_distributor_evaluator(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_building_distributor_evaluator(self, self.builder)
-
-    def on_building_distributor_executor(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_building_distributor_executor(self, self.builder)
-
-    def on_building_distributor_end(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_building_distributor_end(self, self.builder)
-
     ########################
     # system execution hooks
     ########################

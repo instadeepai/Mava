@@ -103,9 +103,9 @@ class MADDPGConfig:
     num_executors: int
     agent_net_keys: Dict[str, str]
     trainer_networks: Dict[str, List]
-    table_network_config: Dict[str, List]  # fine
-    network_sampling_setup: List  # executor_samples
-    net_keys_to_ids: Dict[str, int]  # net_to_ints
+    table_network_config: Dict[str, List]
+    network_sampling_setup: List
+    net_keys_to_ids: Dict[str, int]
     unique_net_keys: List[str]
     checkpoint_minute_interval: int
     discount: float = 0.99

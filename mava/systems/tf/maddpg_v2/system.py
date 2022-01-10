@@ -57,10 +57,15 @@ class MADDPG:
 
     def __init__(  # noqa
         self,
+        target_averaging: bool = False,
+        target_update_period: int = 100,
+        target_update_rate: Optional[float] = None,
+        executor_variable_update_period: int = 1000,
         policy_optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        bootstrap_n: int = 10,
         max_gradient_norm: float = None,
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,

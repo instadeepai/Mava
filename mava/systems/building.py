@@ -273,29 +273,3 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         self.on_building_trainer_end(self)
 
         return self.trainer
-
-    def distributor(self) -> Any:
-        """Build the distributed system as a graph program.
-        Args:
-            name (str, optional): system name.
-        Returns:
-            Any: graph program for distributed system training.
-        """
-        name = self.config.system_name
-        self.program = lp.Program(name=name)
-
-        self.on_building_distributor_start(self)
-
-        self.on_building_distributor_tables(self)
-
-        self.on_building_distributor_variable_server(self)
-
-        self.on_building_distributor_trainer(self)
-
-        self.on_building_distributor_evaluator(self)
-
-        self.on_building_distributor_executor(self)
-
-        self.on_building_distributor_end(self)
-
-        return self.program

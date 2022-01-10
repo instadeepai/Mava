@@ -41,7 +41,7 @@ class Distributor(Callback):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         # Setup agent networks and network sampling setup
-        agents = sort_str_num(environment_spec.get_agent_ids())
+        agents = sort_str_num(builder.environment_spec.get_agent_ids())
 
         if type(self.network_sampling_setup) is not list:
             if self.network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
@@ -53,8 +53,8 @@ class Distributor(Callback):
                 }
                 self.network_sampling_setup = [
                     [
-                        self._agent_net_keys[key]
-                        for key in sort_str_num(self._agent_net_keys.keys())
+                        builder.agent_net_keys[key]
+                        for key in sort_str_num(builder.agent_net_keys.keys())
                     ]
                 ]
             elif (
@@ -74,8 +74,8 @@ class Distributor(Callback):
                 }
                 self.network_sampling_setup = [
                     [
-                        [self._agent_net_keys[key]]
-                        for key in sort_str_num(self._agent_net_keys.keys())
+                        [builder.agent_net_keys[key]]
+                        for key in sort_str_num(builder.agent_net_keys.keys())
                     ]
                 ]
             else:
@@ -91,23 +91,27 @@ class Distributor(Callback):
             )
 
         # Check that the environment and agent_net_keys has the same amount of agents
-        sample_length = len(self._network_sampling_setup[0])  # type: ignore
-        assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
+        sample_length = len(self.network_sampling_setup[0])  # type: ignore
+        assert len(builder.environment_spec.get_agent_ids()) == len(
+            builder.agent_net_keys.keys()
+        )
 
         # Check if the samples are of the same length and that they perfectly fit
         # into the total number of agents
-        assert len(self._agent_net_keys.keys()) % sample_length == 0
-        for i in range(1, len(self._network_sampling_setup)):  # type: ignore
-            assert len(self._network_sampling_setup[i]) == sample_length  # type: ignore
+        assert len(builder.agent_net_keys.keys()) % sample_length == 0
+        for i in range(1, len(self.network_sampling_setup)):  # type: ignore
+            assert len(self.network_sampling_setup[i]) == sample_length  # type: ignore
 
         # Get all the unique agent network keys
         all_samples = []
-        for sample in self._network_sampling_setup:  # type: ignore
+        for sample in self.network_sampling_setup:  # type: ignore
             all_samples.extend(sample)
         unique_net_keys = list(sort_str_num(list(set(all_samples))))
 
         # Create mapping from ints to networks
-        net_keys_to_ids = {net_key: i for i, net_key in enumerate(unique_net_keys)}
+        builder.net_keys_to_ids = {
+            net_key: i for i, net_key in enumerate(unique_net_keys)
+        }
 
         # Setup trainer_networks
         if type(trainer_networks) is not dict:
