@@ -26,9 +26,9 @@ from mava.adders import reverb as reverb_adders
 
 class Adder(Callback):
     def __init__(
-        self, net_to_ints: Dict[str, int], table_network_config: Dict[str, List]
+        self, net_keys_to_ids: Dict[str, int], table_network_config: Dict[str, List]
     ):
-        self.net_to_ints = net_to_ints
+        self.net_keys_to_ids = net_keys_to_ids
         self.table_network_config = table_network_config
 
     @abc.abstractmethod
@@ -67,7 +67,7 @@ class ParallelNStepTransitionAdder(Adder):
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.priority_fns,
             client=self._replay_client,
-            int_to_nets=self.unique_net_keys,
+            net_ids_to_keys=self.unique_net_keys,
             n_step=self.n_step,
             table_network_config=self.table_network_config,
             discount=self.discount,
@@ -105,7 +105,7 @@ class ParallelSequenceAdder(Adder):
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.priority_fns,
             client=self._replay_client,
-            int_to_nets=self.unique_net_keys,
+            net_ids_to_keys=self.unique_net_keys,
             sequence_length=self.sequence_length,
             table_network_config=self.table_network_config,
             period=self.period,
