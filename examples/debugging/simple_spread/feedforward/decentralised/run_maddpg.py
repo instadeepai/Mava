@@ -18,7 +18,6 @@ import functools
 from datetime import datetime
 from typing import Any
 
-import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
@@ -84,18 +83,7 @@ def main(_: Any) -> None:
         max_gradient_norm=40.0,
     ).build()
 
-    # Ensure only trainer runs on gpu, while other processes run on cpu.
-    local_resources = lp_utils.to_device(
-        program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
-    )
-
-    # Launch.
-    lp.launch(
-        program,
-        lp.LaunchType.LOCAL_MULTI_PROCESSING,
-        terminal="current_terminal",
-        local_resources=local_resources,
-    )
+    program.launch()
 
 
 if __name__ == "__main__":

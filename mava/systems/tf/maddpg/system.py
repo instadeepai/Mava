@@ -661,6 +661,4 @@ class MADDPG:
                 name="executor",
             )
 
-        program.launch()
-
         return program
