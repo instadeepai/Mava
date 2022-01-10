@@ -33,7 +33,7 @@ class Executor(Callback):
         self.config = config
         self.components = components
 
-    def on_building_init(self, system: System, builder: SystemBuilder) -> None:
+    def on_building_init(self, builder: SystemBuilder) -> None:
         """[summary]"""
         # TODO(Arnu): need to setup executor samples/ network sampling setup
 
@@ -70,9 +70,7 @@ class Executor(Callback):
 
         builder.executor = Executor(self.config, self.components)
 
-    def on_building_executor_environment(
-        self, system: System, builder: SystemBuilder
-    ) -> None:
+    def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         builder.executor_environment = builder.environment_factory(evaluation=False)  # type: ignore
 
     def on_building_executor_train_loop(self, builder: SystemBuilder) -> None:
@@ -117,9 +115,7 @@ class Evaluator(Executor):
 
         builder.evaluator = Executor(self.config, self.components)
 
-    def on_building_evaluator_environment(
-        self, system: System, builder: SystemBuilder
-    ) -> None:
+    def on_building_evaluator_environment(self, builder: SystemBuilder) -> None:
         builder.evaluator_environment = builder.environment_factory(evaluation=False)  # type: ignore
 
     def on_building_evaluator_eval_loop(self, builder: SystemBuilder) -> None:
