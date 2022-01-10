@@ -32,7 +32,7 @@ class Adder(Callback):
         self.table_network_config = table_network_config
 
     @abc.abstractmethod
-    def on_building_adder_create_adder(self, builder: SystemBuilder) -> None:
+    def on_building_adder_make_adder(self, builder: SystemBuilder) -> None:
         """[summary]
 
         Args:
@@ -63,7 +63,7 @@ class ParallelNStepTransitionAdder(Adder):
         self.n_step = n_step
         self.discount = discount
 
-    def on_building_adder_create_adder(self, builder: SystemBuilder) -> None:
+    def on_building_adder_make_adder(self, builder: SystemBuilder) -> None:
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.priority_fns,
             client=self._replay_client,
@@ -101,7 +101,7 @@ class ParallelSequenceAdder(Adder):
         self.sequence_length = sequence_length
         self.period = period
 
-    def on_building_adder_create_adder(self, builder: SystemBuilder) -> None:
+    def on_building_adder_make_adder(self, builder: SystemBuilder) -> None:
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.priority_fns,
             client=self._replay_client,

@@ -48,7 +48,7 @@ class Executor(Callback):
         )
         builder.executor_logger = exec_logger
 
-    def on_building_executor_create_executor(self, builder: SystemBuilder) -> None:
+    def on_building_executor_make_executor(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
         # create networks
@@ -104,7 +104,7 @@ class Evaluator(Executor):
         )
         builder._eval_logger = eval_logger
 
-    def on_building_evaluator(self, builder: SystemBuilder) -> None:
+    def on_building_evaluator_make_evaluator(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
         # create networks

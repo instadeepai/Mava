@@ -46,7 +46,7 @@ class Trainer(Callback):
         )
         builder.trainer_logger = trainer_logger
 
-    def on_building_trainer(self, builder: SystemBuilder) -> None:
+    def on_building_trainer_make_trainer(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
         # create networks

@@ -58,7 +58,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_tables_create_tables(self, builder: SystemBuilder) -> None:
+    def on_building_tables_make_tables(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
@@ -71,7 +71,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_dataset_create_dataset(self, builder: SystemBuilder) -> None:
+    def on_building_dataset_make_dataset(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
@@ -88,7 +88,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_adder_create_adder(self, builder: SystemBuilder) -> None:
+    def on_building_adder_make_adder(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
@@ -109,7 +109,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_system_create_system(self, builder: SystemBuilder) -> None:
+    def on_building_system_make_system(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
@@ -122,7 +122,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_variable_server_create_variable_server(
+    def on_building_variable_server_make_variable_server(
         self, builder: SystemBuilder
     ) -> None:
         """[summary]"""
@@ -145,7 +145,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_executor_create_executor(self, builder: SystemBuilder) -> None:
+    def on_building_executor_make_executor(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
@@ -174,7 +174,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_evaluator_create_evaluator(self, builder: SystemBuilder) -> None:
+    def on_building_evaluator_make_evaluator(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
@@ -182,7 +182,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_evaluator_train_loop(self, builder: SystemBuilder) -> None:
+    def on_building_evaluator_eval_loop(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
@@ -207,7 +207,7 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_building_trainer_create_trainer(self, builder: SystemBuilder) -> None:
+    def on_building_trainer_make_trainer(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 

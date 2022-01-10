@@ -72,7 +72,9 @@ class VariableServer(VariableSource):
         # Create the system
         builder.networks = builder.system()
 
-    def on_building_variable_server(self, builder: SystemBuilder) -> None:
+    def on_building_variable_server_make_variable_server(
+        self, builder: SystemBuilder
+    ) -> None:
         # Create variables
         variables = {}
         # Network variables

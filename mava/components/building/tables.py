@@ -65,7 +65,7 @@ class Tables(Callback):
         self.max_times_sampled = max_times_sampled
 
     @abc.abstractmethod
-    def on_building_make_tables(self, builder: SystemBuilder):
+    def on_building_tables_make_tables(self, builder: SystemBuilder):
         """[summary]
 
         Args:
@@ -73,7 +73,7 @@ class Tables(Callback):
         """
 
 
-class OffPolicyReplayTables(ReplayTables):
+class OffPolicyReplayTables(Tables):
     def _covert_specs(self, spec: Dict[str, Any], num_networks: int) -> Dict[str, Any]:
         """[summary]
 
@@ -98,7 +98,7 @@ class OffPolicyReplayTables(ReplayTables):
                 converted_spec[key] = self._covert_specs(spec[key], num_networks)
         return converted_spec
 
-    def on_building_make_tables(self, builder: SystemBuilder):
+    def on_building_tables_make_tables(self, builder: SystemBuilder):
         # Create table per trainer
         replay_tables = []
         for trainer_id in range(len(self.table_network_config.keys())):

@@ -50,7 +50,7 @@ class Iterator(Callback):
         self.max_in_flight_samples_per_worker = max_in_flight_samples_per_worker
 
     @abc.abstractmethod
-    def on_building_dataset_create_dataset(self, builder: SystemBuilder) -> None:
+    def on_building_dataset_make_dataset(self, builder: SystemBuilder) -> None:
         """[summary]
 
         Args:
@@ -59,7 +59,7 @@ class Iterator(Callback):
 
 
 class Dataset(Iterator):
-    def on_building_dataset_create_dataset(self, builder: SystemBuilder) -> None:
+    def on_building_dataset_make_dataset(self, builder: SystemBuilder) -> None:
         dataset = datasets.make_reverb_dataset(
             table=self.table_name,
             server_address=builder.replay_client.server_address,

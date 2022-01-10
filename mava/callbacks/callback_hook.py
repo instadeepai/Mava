@@ -39,10 +39,10 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_tables_rate_limiter(self, self.builder)
 
-    def on_building_create_tables(self) -> None:
+    def on_building_make_tables(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_tables_create_tables(self, self.builder)
+            callback.on_building_tables_make_tables(self, self.builder)
 
     def on_building_tables_end(self) -> None:
         """[summary]"""
@@ -55,10 +55,10 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_dataset_start(self, self.builder)
 
-    def on_building_dataset_create_dataset(self) -> None:
+    def on_building_dataset_make_dataset(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_dataset_create_dataset(self, self.builder)
+            callback.on_building_dataset_make_dataset(self, self.builder)
 
     def on_building_dataset_end(self) -> None:
         """[summary]"""
@@ -76,10 +76,15 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_adder_set_priority(self, self.builder)
 
-    def on_building_adder_create_adder(self) -> None:
+    def on_building_adder_make_adder(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_adder_create_adder(self, self.builder)
+            callback.on_building_adder_make_adder(self, self.builder)
+
+    def on_building_adder_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_adder_end(self, self.builder)
 
     # system
     def on_building_system_start(self) -> None:
@@ -97,10 +102,10 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_system_architecture(self, self.builder)
 
-    def on_building_system_create_system(self) -> None:
+    def on_building_system_make_system(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_system_create_system(self, self.builder)
+            callback.on_building_system_make_system(self, self.builder)
 
     def on_building_system_end(self) -> None:
         """[summary]"""
@@ -113,15 +118,17 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_make_variable_server_start(self, self.builder)
 
-    def on_building_variable_server_create_variable_server(self) -> None:
+    def on_building_variable_server_make_variable_server(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_variable_server(self, self.builder)
+            callback.on_building_variable_server_make_variable_server(
+                self, self.builder
+            )
 
-    def on_building_make_variable_server_end(self) -> None:
+    def on_building_variable_server_end(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_make_variable_server_end(self, self.builder)
+            callback.on_building_variable_server_end(self, self.builder)
 
     # executor
     def on_building_executor_start(self) -> None:
@@ -139,10 +146,10 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_executor_variable_client(self, self.builder)
 
-    def on_building_executor_create_executor(self) -> None:
+    def on_building_executor_make_executor(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_executor_create_executor(self, self.builder)
+            callback.on_building_executor_make_executor(self, self.builder)
 
     def on_building_executor_environment(self) -> None:
         """[summary]"""
@@ -175,20 +182,20 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_evaluator_variable_client(self, self.builder)
 
-    def on_building_evaluator_create_evaluator(self) -> None:
+    def on_building_evaluator_make_evaluator(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_evaluator_create_evaluator(self, self.builder)
+            callback.on_building_evaluator_make_evaluator(self, self.builder)
 
     def on_building_evaluator_environment(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_evaluator_environment(self, self.builder)
 
-    def on_building_evaluator_train_loop(self) -> None:
+    def on_building_evaluator_eval_loop(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_evaluator_train_loop(self, self.builder)
+            callback.on_building_evaluator_eval_loop(self, self.builder)
 
     def on_building_evaluator_end(self) -> None:
         """[summary]"""
@@ -206,17 +213,22 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_trainer_logger(self, self.builder)
 
+    def on_building_trainer_dataset(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_trainer_dataset(self, self.builder)
+
     def on_building_trainer_variable_client(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_trainer_variable_client(self, self.builder)
 
-    def on_building_trainer_create_trainer(self) -> None:
+    def on_building_trainer_make_trainer(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_building_trainer_create_trainer(self, self.builder)
+            callback.on_building_trainer_make_trainer(self, self.builder)
 
-    def on_building_make_trainer_end(self) -> None:
+    def on_building_trainer_end(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_make_trainer_end(self, self.builder)
