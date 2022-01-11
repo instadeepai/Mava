@@ -16,16 +16,20 @@
 """MADDPG system builder implementation."""
 
 import dataclasses
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import reverb
 import sonnet as snt
 from acme.utils import counting, loggers
 
 from mava import specs
-from mava.systems.building import Builder
 from mava.components import building
 from mava.components.tf import building as tf_building
+from mava.systems.building import Builder
+
+# Import launcher
+from mava.systems.launcher import Launcher
+from mava.utils import enums
 
 
 @dataclasses.dataclass
@@ -156,6 +160,14 @@ config = MADDPGConfig
 #   Builder
 ##############
 
+# General setup
+setup = building.GeneralSetup(
+    num_executors=1,
+    network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
+    trainer_networks=enums.Trainer.single_trainer,
+    termination_condition=None,
+)
+
 # Replay table
 table = building.OffPolicyReplayTables(
     name=config.replay_table_name,
@@ -200,6 +212,7 @@ trainer_client = tf_building.TrainerVariableClient()
 
 # component list
 system_components = [
+    setup,
     table,
     dataset,
     adder,
@@ -212,3 +225,12 @@ system_components = [
 
 # Builder
 system_builder = Builder(config=config, components=system_components)
+
+# Create the launcher
+program = Launcher(multi_process=True, nodes_on_gpu=["trainer"], name="MADDPG")
+
+# Automatically generate nodes using the builder setup
+system_builder.add_program_nodes(program)
+
+# Launch the program
+program.launch()
