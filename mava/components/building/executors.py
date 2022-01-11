@@ -20,12 +20,12 @@ from typing import Dict, Any, List
 from mava.core import SystemBuilder
 from mava.systems.executing import Executor as Exec
 from mava.callbacks import Callback
-from mava.wrappers import DetailedPerAgentStatistics
+from mava.utils.decorators import execution, evaluation
 
 
 class Executor(Callback):
     def __init__(
-        self, config: Dict[str, Any], components: List[Callback], evaluator=False
+        self, config: Dict[str, Any], components: List[Callback], evaluation=False
     ):
         """[summary]
 
@@ -36,10 +36,11 @@ class Executor(Callback):
         """
         self.config = config
         self.components = components
+        self.evaluation = evaluation
 
+    @execution
     def on_building_executor_make_executor(self, builder: SystemBuilder) -> None:
         """[summary]"""
-
         # create networks
         networks = builder.system()
 
@@ -59,22 +60,7 @@ class Executor(Callback):
 
         builder.executor = Exec(self.config, self.components)
 
-    def on_building_executor_train_loop(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-
-        # Create the loop to connect environment and executor.
-        builder.train_loop = builder._train_loop_fn(
-            builder.executor_environment,
-            builder.executor,
-            logger=builder.executor_logger,
-            **builder._train_loop_fn_kwargs,
-        )
-
-    def on_building_executor_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-
-        builder.train_loop = DetailedPerAgentStatistics(builder.train_loop)
-
+    @evaluation
     def on_building_evaluator_make_evaluator(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
@@ -86,7 +72,6 @@ class Executor(Callback):
         self.config.update(
             {
                 "networks": networks,
-                "adder": adder,
                 "variable_client": builder.executor_variable_client,
                 "counts": builder.executor_counts,
                 "logger": builder.executor_logger,
@@ -94,19 +79,3 @@ class Executor(Callback):
         )
 
         builder.evaluator = Exec(self.config, self.components)
-
-    def on_building_evaluator_eval_loop(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-
-        # Create the loop to connect environment and executor.
-        builder.evaluator_loop = builder._evaluator_loop_fn(
-            builder.evaluator_environment,
-            builder.evaluator,
-            logger=builder.evaluator_logger,
-            **builder._eval_loop_fn_kwargs,
-        )
-
-    def on_building_evaluator_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-
-        builder.evaluator_loop = DetailedPerAgentStatistics(builder.evaluator_loop)

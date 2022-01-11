@@ -36,8 +36,6 @@ class Tables(Callback):
     def __init__(
         self,
         name: str,
-        agent_net_keys: Dict[str, str],
-        table_network_config: Dict[str, List],
         sampler: reverb_types.SelectorType,
         remover: reverb_types.SelectorType,
         max_size: int,

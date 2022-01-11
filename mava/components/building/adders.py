@@ -25,12 +25,6 @@ from mava.adders import reverb as reverb_adders
 
 
 class Adder(Callback):
-    def __init__(
-        self, net_keys_to_ids: Dict[str, int], table_network_config: Dict[str, List]
-    ):
-        self.net_keys_to_ids = net_keys_to_ids
-        self.table_network_config = table_network_config
-
     @abc.abstractmethod
     def on_building_adder_make_adder(self, builder: SystemBuilder) -> None:
         """[summary]"""
@@ -45,12 +39,9 @@ class AdderSignature(Callback):
 class ParallelNStepTransitionAdder(Adder):
     def __init__(
         self,
-        net_keys_to_ids: Dict[str, int],
-        table_network_config: Dict[str, List],
         n_step: int,
         discount: float,
     ):
-        super().__init__(net_keys_to_ids, table_network_config)
 
         self.n_step = n_step
         self.discount = discount
@@ -58,10 +49,10 @@ class ParallelNStepTransitionAdder(Adder):
     def on_building_adder_make_adder(self, builder: SystemBuilder) -> None:
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.priority_fns,
-            client=self._replay_client,
+            client=builder._replay_client,
             net_ids_to_keys=builder.unique_net_keys,
             n_step=self.n_step,
-            table_network_config=self.table_network_config,
+            table_network_config=builder.table_network_config,
             discount=self.discount,
         )
 
@@ -83,12 +74,9 @@ class ParallelNStepTransitionAdderSignature(AdderSignature):
 class ParallelSequenceAdder(Adder):
     def __init__(
         self,
-        net_keys_to_ids: Dict[str, int],
-        table_network_config: Dict[str, List],
         sequence_length: int,
         period: int,
     ):
-        super().__init__(net_keys_to_ids, table_network_config)
 
         self.sequence_length = sequence_length
         self.period = period
@@ -96,10 +84,10 @@ class ParallelSequenceAdder(Adder):
     def on_building_adder_make_adder(self, builder: SystemBuilder) -> None:
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.priority_fns,
-            client=self._replay_client,
+            client=builder._replay_client,
             net_ids_to_keys=builder.unique_net_keys,
             sequence_length=self.sequence_length,
-            table_network_config=self.table_network_config,
+            table_network_config=builder.table_network_config,
             period=self.period,
         )
 
