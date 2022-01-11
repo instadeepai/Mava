@@ -15,15 +15,15 @@
 
 """Mava system implementation."""
 
-from typing import Any, Dict, List, Tuple, Optional, Iterator
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import launchpad as lp
 import reverb
 
 import mava
 from mava import adders
-from mava.core import SystemBuilder
 from mava.callbacks import Callback, SystemCallbackHookMixin
+from mava.core import SystemBuilder
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 
 
@@ -50,6 +50,9 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         #     for component in system_components.values():
         #         self.callbacks.append(component)
 
+        self.on_builder_setup(self)
+
+        # Question (dries): What is on_building_init_start used for?
         self.on_building_init_start(self)
 
         self.on_building_init(self)
@@ -270,3 +273,7 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         self.on_building_trainer_end(self)
 
         return self.trainer
+
+    def add_program_nodes(self, program):
+        # TODO (dries): Is it needed to specify this hook? Maybe for better readability from the user side.
+        self.on_add_program_nodes(self, program)
