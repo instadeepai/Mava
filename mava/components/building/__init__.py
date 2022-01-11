@@ -16,14 +16,15 @@
 """Components for building systems"""
 
 from mava.components.building.adders import (
-    ParallelNStepTransitionAdderSignature,
-    ParallelSequenceAdderSignature,
     ParallelNStepTransitionAdder,
+    ParallelNStepTransitionAdderSignature,
     ParallelSequenceAdder,
+    ParallelSequenceAdderSignature,
 )
-from mava.components.building.rate_limiters import OffPolicyRateLimiter
-from mava.components.building.replay_tables import OffPolicyReplayTables
 from mava.components.building.dataset_iterators import DatasetIterator
 from mava.components.building.executors import Executor
+from mava.components.building.rate_limiters import OffPolicyRateLimiter
+from mava.components.building.replay_tables import OffPolicyReplayTables
+from mava.components.building.setup import GeneralSetup
 from mava.components.building.trainers import Trainer
 from mava.components.building.variable_source import VariableSource
