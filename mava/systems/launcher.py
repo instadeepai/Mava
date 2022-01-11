@@ -18,7 +18,6 @@ from typing import Dict, List, Optional, Union, Any
 
 import launchpad as lp
 
-from mava.callbacks import Callback
 from mava.core import SystemBuilder
 from mava.utils import enums
 from mava.utils.sort_utils import sort_str_num, sample_new_agent_keys
