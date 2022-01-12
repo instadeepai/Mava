@@ -254,7 +254,7 @@ class MAPPOBuilder:
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=replay_client.server_address,
             table=table_name,
-            max_in_flight_samples_per_worker=1,
+            max_in_flight_samples_per_worker=2 * self._config.batch_size,
         ).batch(
             self._config.batch_size, drop_remainder=True
         )  # .prefetch(self._config.prefetch_size)

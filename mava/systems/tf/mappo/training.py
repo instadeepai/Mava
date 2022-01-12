@@ -59,7 +59,8 @@ class MAPPOTrainer(mava.Trainer):
         counts: Dict[str, Any],
         agent_net_keys: Dict[str, str],
         discount: float = 0.999,
-        lambda_gae: float = 1.0,  # Question (dries): What is this used for?
+        lambda_gae: float = 0.95,  # Note (dries): This might still be wrong
+        # e.g. should always be 1.0.
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
         clipping_epsilon: float = 0.2,
@@ -550,7 +551,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         counts: Dict[str, Any],
         agent_net_keys: Dict[str, str],
         discount: float = 0.999,
-        lambda_gae: float = 1.0,
+        lambda_gae: float = 0.95,
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
         clipping_epsilon: float = 0.2,
@@ -613,7 +614,7 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
         variable_client: VariableClient,
         agent_net_keys: Dict[str, str],
         discount: float = 0.999,
-        lambda_gae: float = 1.0,
+        lambda_gae: float = 0.95,
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
         clipping_epsilon: float = 0.2,
