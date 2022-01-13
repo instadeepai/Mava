@@ -113,16 +113,22 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
         agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
-        logits = self._policy_networks[agent_key](batched_observation)
+        policy = self._policy_networks[agent_key](batched_observation)
 
-        # Sample from the policy and compute the log likelihood.
-        action = tfd.Categorical(logits).sample()
+        if type(policy) == tfd.transformed_distribution.TransformedDistribution:
+            # Sample from the policy and compute the log likelihood.
+            action = policy.sample()
+            log_prob = policy.log_prob(action)
+        else:
+            # Sample from the policy and compute the log likelihood.
+            policy = tfd.Categorical(policy)
+            action = policy.sample()
+            log_prob = policy.log_prob(action)
 
-        # Cast for compatibility with reverb.
-        # sample() returns a 'int32', which is a problem.
-        action = tf.cast(action, "int64")
-
-        return action, logits
+            # Cast for compatibility with reverb.
+            # sample() returns a 'int32', which is a problem.
+            action = tf.cast(action, "int64")
+        return action, log_prob
 
     def select_action(
         self, agent: str, observation: types.NestedArray
@@ -138,15 +144,15 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
             types.NestedArray: action and policy.
         """
         # Step the recurrent policy forward given the current observation and state.
-        action, logits = self._policy(
+        action, log_prob = self._policy(
             agent,
             observation.observation,
         )
 
         # Return a numpy array with squeezed out batch dimension.
         action = tf2_utils.to_numpy_squeeze(action)
-        logits = tf2_utils.to_numpy_squeeze(logits)
-        return action, logits
+        log_prob = tf2_utils.to_numpy_squeeze(log_prob)
+        return action, log_prob
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
@@ -164,10 +170,10 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
 
         # TODO (dries): Add this to a function and add tf.function here.
         actions = {}
-        logits = {}
+        log_prob = {}
         for agent, observation in observations.items():
-            actions[agent], logits[agent] = self.select_action(agent, observation)
-        return actions, logits
+            actions[agent], log_prob[agent] = self.select_action(agent, observation)
+        return actions, log_prob
 
     def observe_first(
         self,

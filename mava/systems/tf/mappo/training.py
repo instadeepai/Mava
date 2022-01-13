@@ -300,11 +300,11 @@ class MAPPOTrainer(mava.Trainer):
 
         with tf.GradientTape(persistent=True) as tape:
             for agent in self._agents:
-                action, reward, discount, behaviour_logits, actor_observation = (
+                action, reward, discount, behaviour_log_prob, actor_observation = (
                     actions[agent]["actions"],
                     rewards[agent],
                     discounts[agent],
-                    actions[agent]["logits"],
+                    actions[agent]["log_probs"],
                     observations_trans[agent],
                 )
 
@@ -313,7 +313,7 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 # Chop off final timestep for bootstrapping value
-                action = action[:-1]
+                behaviour_log_prob = behaviour_log_prob[:-1]
                 reward = reward[:-1]
                 discount = discount[:-1]
 
@@ -336,13 +336,28 @@ class MAPPOTrainer(mava.Trainer):
                 else:
                     # Pass observations through the feedforward policy
                     actor_observation, dims = train_utils.combine_dim(actor_observation)
-                    logits = train_utils.extract_dim(
-                        policy_network(actor_observation), dims
-                    )
+
+                    logits = policy_network(actor_observation)
+
+                    if type(logits) != tfp.distributions.TransformedDistribution:
+                        logits = train_utils.extract_dim(logits, dims)
+                    else:
+                        logits = tfp.distributions.BatchReshape(logits, dims)
+                        # logits = logits.reshape(dims)
 
                 # Compute importance sampling weights: current policy / behavior policy.
-                pi_behaviour = tfd.Categorical(logits=behaviour_logits[:-1])
-                pi_target = tfd.Categorical(logits=logits[:-1])
+                if type(logits) in [
+                    tfd.transformed_distribution.TransformedDistribution,
+                    tfp.distributions.BatchReshape,
+                ]:
+                    # Sample from the policy and compute the log likelihood.
+                    pi_target = logits
+                    pi_target_log_prob = pi_target.log_prob(action)[:-1]
+                else:
+                    # Sample from the policy and compute the log likelihood.
+                    pi_target = tfd.Categorical(logits=logits[:-1])
+                    action = action[:-1]
+                    pi_target_log_prob = pi_target.log_prob(action)
 
                 # Calculate critic values.
                 dims = critic_observation.shape[:2]
@@ -374,7 +389,7 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 # Compute importance sampling weights: current policy / behavior policy.
-                log_rhos = pi_target.log_prob(action) - pi_behaviour.log_prob(action)
+                log_rhos = pi_target_log_prob - behaviour_log_prob
                 importance_ratio = tf.exp(log_rhos)
                 clipped_importance_ratio = tf.clip_by_value(
                     importance_ratio,
@@ -397,7 +412,11 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 # Entropy regulariser.
-                entropy_loss = trfl.policy_entropy_loss(pi_target).loss
+                # Entropy regularization. Only implemented for categorical dist.
+                try:
+                    entropy_loss = trfl.policy_entropy_loss(pi_target).loss
+                except NotImplementedError:
+                    entropy_loss = tf.convert_to_tensor(0.0)
 
                 # Combine weighted sum of actor & entropy regularization.
                 policy_loss = policy_gradient_loss + entropy_loss

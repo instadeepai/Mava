@@ -155,9 +155,7 @@ class MAPPOBuilder:
             new_act_spec = {"actions": agent_spec.actions}
 
             # Make dummy logits
-            new_act_spec["logits"] = tf.ones(
-                shape=(agent_spec.actions.num_values), dtype=tf.float32
-            )
+            new_act_spec["log_probs"] = tf.ones(shape=(), dtype=tf.float32)
 
             env_adder_spec._specs[key] = EnvironmentSpec(
                 observations=agent_spec.observations,
