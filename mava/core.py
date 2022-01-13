@@ -187,7 +187,3 @@ class SystemBuilder(abc.ABC):
         variable_source: MavaVariableSource,
     ) -> SystemTrainer:
         """[summary]"""
-
-    @abc.abstractmethod
-    def distributor(self) -> Any:
-        """[summary]"""
