@@ -431,6 +431,6 @@ If you use Mava in your work, please cite the accompanying
 [roadmap]: https://github.com/instadeepai/Mava/issues/246
 [wishlist]: https://github.com/instadeepai/Mava/issues/247
 [bsuite]: https://github.com/deepmind/bsuite
-[quickstart]: examples/quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/quickstart.ipynb
 [blog]: https://medium.com/instadeep/mava-a-new-framework-for-multi-agent-reinforcement-learning-5dcc158e104e
 [release]: https://www.instadeep.com/2021/07/mava-a-new-framework-for-distributed-multi-agent-reinforcement-learning/

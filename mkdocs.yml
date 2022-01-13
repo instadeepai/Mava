@@ -1,0 +1,25 @@
+site_name: Mava docs
+site_description: Mava
+site_author: Mava Contributors
+repo_name: instadeep/Mava
+repo_url: https://github.com/instadeepai/Mava
+strict: false
+
+
+theme:
+  name: "material"
+
+plugins:
+- search
+- mkdocstrings
+
+markdown_extensions:
+  - pymdownx.snippets:
+      base_path: ./
+
+  - pymdownx.pathconverter:
+      base_path: ./
+      relative_path: docs
+
+nav:
+  - Home: index.md
