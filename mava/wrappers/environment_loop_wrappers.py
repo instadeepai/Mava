@@ -289,7 +289,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
     def __init__(
         self,
         environment: dm_env.Environment,
-        executor: mava.core.Executor,
+        executor: mava.core.SystemExecutor,
         filename: str = "agents",
         counter: counting.Counter = None,
         logger: loggers.Logger = None,

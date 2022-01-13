@@ -55,17 +55,15 @@ class Launcher:
         if type(arguments) is not list:
             arguments = [arguments]
 
-        if self._single_process:
-            raise NotImplementedError("Single process launching not implemented yet.")
-        else:
+        if self._multi_process:
             with self._program.group(name):
                 node = self._program.add_node(node_type(node_fn, *arguments))
             return node
+        else:
+            raise NotImplementedError("Single process launching not implemented yet.")
 
     def launch(self) -> None:
-        if self._single_process:
-            raise NotImplementedError("Single process launching not implemented yet.")
-        else:
+        if self._multi_process:
             local_resources = lp_utils.to_device(
                 program_nodes=self._program.groups.keys(),
                 nodes_on_gpu=self._nodes_on_gpu,
@@ -77,3 +75,5 @@ class Launcher:
                 terminal="current_terminal",
                 local_resources=local_resources,
             )
+        else:
+            raise NotImplementedError("Single process launching not implemented yet.")

@@ -17,16 +17,17 @@
 """Core Mava interfaces."""
 
 import abc
-from typing import Dict, Optional, Tuple, TypeVar, Union, Any, Iterator, List
+from typing import Any, Dict, Iterator, List, Optional, Tuple, TypeVar, Union
 
 import dm_env
-import reverb
 import numpy as np
+import reverb
 import sonnet as snt
+from acme import core as acme_core
 from acme import types
 
-import mava
-from mava import adders, types
+# import mava
+from mava import adders
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 
 T = TypeVar("T")
@@ -159,7 +160,7 @@ class SystemBuilder(abc.ABC):
         executor_id: str,
         replay_client: reverb.Client,
         variable_source: MavaVariableSource,
-    ) -> mava.ParallelEnvironmentLoop:
+    ) -> acme_core.Worker:
         """[summary]"""
 
     @abc.abstractmethod
