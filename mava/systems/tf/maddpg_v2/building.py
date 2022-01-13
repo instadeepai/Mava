@@ -161,7 +161,7 @@ config = MADDPGConfig
 ##############
 
 # General setup
-setup = building.GeneralSetup(
+setup = building.SystemSetup(
     num_executors=1,
     network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
     trainer_networks=enums.Trainer.single_trainer,
@@ -210,6 +210,9 @@ executor_client = tf_building.ExecutorVariableClient(
 # Trainer client
 trainer_client = tf_building.TrainerVariableClient()
 
+# Launcher
+program = Launcher(multi_process=True, nodes_on_gpu=["trainer"], name="MADDPG")
+
 # component list
 system_components = [
     setup,
@@ -226,11 +229,9 @@ system_components = [
 # Builder
 system_builder = Builder(config=config, components=system_components)
 
-# Create the launcher
-program = Launcher(multi_process=True, nodes_on_gpu=["trainer"], name="MADDPG")
-
-# Automatically generate nodes using the builder setup
-system_builder.add_program_nodes(program)
+# TODO (Arnu): make system to take in builder and program! Then launch from system :)
+# build system
+system_builder.build(program)
 
 # Launch the program
 program.launch()

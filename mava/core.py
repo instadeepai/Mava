@@ -23,11 +23,13 @@ import dm_env
 import numpy as np
 import reverb
 import sonnet as snt
+from launchpad import program as lp_program
 from acme import core as acme_core
 from acme import types
 
 # import mava
 from mava import adders
+from mava.systems.launcher import Launcher
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 
 T = TypeVar("T")
@@ -186,4 +188,11 @@ class SystemBuilder(abc.ABC):
         replay_client: reverb.Client,
         variable_source: MavaVariableSource,
     ) -> SystemTrainer:
+        """[summary]"""
+
+    @abc.abstractmethod
+    def build(
+        self,
+        program: Launcher,
+    ) -> Any:
         """[summary]"""

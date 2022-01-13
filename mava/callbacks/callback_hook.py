@@ -39,7 +39,7 @@ class SystemCallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_tables_rate_limiter(self, self.builder)
 
-    def on_building_make_tables(self) -> None:
+    def on_building_tables_make_tables(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_tables_make_tables(self, self.builder)
@@ -232,6 +232,12 @@ class SystemCallbackHookMixin(ABC):
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_make_trainer_end(self, self.builder)
+
+    # distributor
+    def on_building_program_nodes(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_program_nodes(self, self.builder)
 
     ########################
     # system execution hooks

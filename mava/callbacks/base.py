@@ -215,6 +215,11 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
+    # distributor
+    def on_building_program_nodes(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
     #######################
     # system executor hooks
     #######################

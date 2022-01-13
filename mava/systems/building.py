@@ -18,6 +18,7 @@
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import launchpad as lp
+from mava.systems.launcher import Launcher
 import reverb
 
 import mava
@@ -49,8 +50,6 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         # for system_components in components.values():
         #     for component in system_components.values():
         #         self.callbacks.append(component)
-
-        self.on_builder_setup(self)
 
         # Question (dries): What is on_building_init_start used for?
         self.on_building_init_start(self)
@@ -274,6 +273,10 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
 
         return self.trainer
 
-    def add_program_nodes(self, program):
-        # TODO (dries): Is it needed to specify this hook? Maybe for better readability from the user side.
-        self.on_add_program_nodes(self, program)
+    def build(self, program: Launcher):
+
+        self._program = program
+
+        self.on_building_program_nodes(self)
+
+        return self.program
