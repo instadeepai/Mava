@@ -4,13 +4,13 @@
 from acme import types as acme_types
 from acme.core import Saveable, VariableSource, Worker
 
-from mava import specs, types, utils
+from mava import core, specs, types, utils
 
 # Make __version__ accessible.
 from mava._metadata import __version__
 
 # Expose core interfaces.
-from mava.core import Executor, Trainer
+from mava.core import SystemExecutor, SystemTrainer
 
 # Expose the environment loop.
 from mava.environment_loop import ParallelEnvironmentLoop, SequentialEnvironmentLoop

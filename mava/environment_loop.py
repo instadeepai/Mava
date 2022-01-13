@@ -52,7 +52,7 @@ class SequentialEnvironmentLoop(acme.core.Worker):
     def __init__(
         self,
         environment: dm_env.Environment,
-        executor: mava.core.Executor,
+        executor: mava.core.SystemExecutor,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         should_update: bool = True,
@@ -314,7 +314,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
     def __init__(
         self,
         environment: dm_env.Environment,
-        executor: mava.core.Executor,
+        executor: mava.core.SystemExecutor,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         should_update: bool = True,
