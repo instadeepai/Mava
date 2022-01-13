@@ -54,8 +54,6 @@ class Tables(Callback):
         """
 
         self.name = name
-        self.agent_net_keys = agent_net_keys
-        self.table_network_config = table_network_config
         self.sampler = sampler
         self.remover = remover
         self.max_size = max_size
@@ -94,11 +92,11 @@ class OffPolicyReplayTables(Tables):
     def on_building_tables_make_tables(self, builder: SystemBuilder):
         # Create table per trainer
         replay_tables = []
-        for trainer_id in range(len(self.table_network_config.keys())):
+        for trainer_id in range(len(builder.table_network_config.keys())):
             # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
-            num_networks = len(self.table_network_config[f"trainer_{trainer_id}"])
-            env_spec = copy.deepcopy(builder._environment_spec)
+            num_networks = len(builder.table_network_config[f"trainer_{trainer_id}"])
+            env_spec = copy.deepcopy(builder.environment_spec)
             env_spec._specs = self._covert_specs(env_spec._specs, num_networks)
 
             env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
@@ -107,7 +105,7 @@ class OffPolicyReplayTables(Tables):
                     env_spec.extra_specs, num_networks
                 )
             extra_specs = self._covert_specs(
-                builder._extra_specs,
+                builder.extra_specs,
                 num_networks,
             )
 

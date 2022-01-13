@@ -23,7 +23,7 @@ from mava.systems.building import SystemBuilder
 from mava.components.building import VariableSource as BaseVariableSource
 from mava.systems.tf import variable_utils
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
-from mava.utils import enums
+from mava.utils.decorators import execution, evaluation
 
 
 class VariableSource(BaseVariableSource):
@@ -112,6 +112,7 @@ class ExecutorVariableClient(VariableSource):
 
         self.executor_variable_update_period = executor_variable_update_period
 
+    @execution
     def on_building_executor_variable_client(self, builder: SystemBuilder) -> None:
         # Create policy variables
         variables = {}
@@ -149,6 +150,45 @@ class ExecutorVariableClient(VariableSource):
             variable_client.get_and_wait()
 
         builder.executor_variable_client = variable_client
+
+    @evaluation
+    def on_building_evaluator_variable_client(self, builder: SystemBuilder) -> None:
+        # Create policy variables
+        variables = {}
+        get_keys = []
+        for net_type_key in ["observations", "policies"]:
+            for net_key in builder.networks[net_type_key].keys():
+                var_key = f"{net_key}_{net_type_key}"
+                variables[var_key] = builder.networks[net_type_key][net_key].variables
+                get_keys.append(var_key)
+        variables = self._create_tf_counter_variables(variables)
+
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        get_keys.extend(count_names)
+        builder.evaluator_counts = {name: variables[name] for name in count_names}
+
+        variable_client = None
+        if builder.variable_server:
+            # Get new policy variables
+            variable_client = variable_utils.VariableClient(
+                client=builder.variable_server,
+                variables=variables,
+                get_keys=get_keys,
+                get_period=self.executor_variable_update_period,
+            )
+
+            # Make sure not to use a random policy after checkpoint restoration by
+            # assigning variables before running the environment loop.
+            variable_client.get_and_wait()
+
+        builder.evaluator_variable_client = variable_client
 
 
 class TrainerVariableClient(VariableSource):

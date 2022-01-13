@@ -58,7 +58,7 @@ class Executor(Callback):
             }
         )
 
-        builder.executor = Exec(self.config, self.components)
+        builder.executor = Exec(self.config, self.components, self.evaluation)
 
     @evaluation
     def on_building_evaluator_make_evaluator(self, builder: SystemBuilder) -> None:
@@ -67,15 +67,14 @@ class Executor(Callback):
         # create networks
         networks = builder.system()
 
-        # TODO(Arnu): create variable client for evaluator
         # update config
         self.config.update(
             {
                 "networks": networks,
-                "variable_client": builder.executor_variable_client,
-                "counts": builder.executor_counts,
-                "logger": builder.executor_logger,
+                "variable_client": builder.evaluator_variable_client,
+                "counts": builder.evaluator_counts,
+                "logger": builder.evaluator_logger,
             }
         )
 
-        builder.evaluator = Exec(self.config, self.components)
+        builder.evaluator = Exec(self.config, self.components, self.evaluation)
