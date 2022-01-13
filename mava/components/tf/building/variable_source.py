@@ -112,8 +112,7 @@ class ExecutorVariableClient(VariableSource):
 
         self.executor_variable_update_period = executor_variable_update_period
 
-    @execution
-    def on_building_executor_variable_client(self, builder: SystemBuilder) -> None:
+    def _make_variable_client(self, builder: SystemBuilder):
         # Create policy variables
         variables = {}
         get_keys = []
@@ -133,7 +132,7 @@ class ExecutorVariableClient(VariableSource):
             "executor_steps",
         ]
         get_keys.extend(count_names)
-        builder.executor_counts = {name: variables[name] for name in count_names}
+        counts = {name: variables[name] for name in count_names}
 
         variable_client = None
         if builder.variable_server:
@@ -148,47 +147,21 @@ class ExecutorVariableClient(VariableSource):
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
             variable_client.get_and_wait()
+        return variable_client, counts
 
+    @execution
+    def on_building_executor_variable_client(self, builder: SystemBuilder) -> None:
+
+        variable_client, counts = self._make_variable_client(builder)
         builder.executor_variable_client = variable_client
+        builder.executor_counts = counts
 
     @evaluation
     def on_building_evaluator_variable_client(self, builder: SystemBuilder) -> None:
-        # Create policy variables
-        variables = {}
-        get_keys = []
-        for net_type_key in ["observations", "policies"]:
-            for net_key in builder.networks[net_type_key].keys():
-                var_key = f"{net_key}_{net_type_key}"
-                variables[var_key] = builder.networks[net_type_key][net_key].variables
-                get_keys.append(var_key)
-        variables = self._create_tf_counter_variables(variables)
 
-        count_names = [
-            "trainer_steps",
-            "trainer_walltime",
-            "evaluator_steps",
-            "evaluator_episodes",
-            "executor_episodes",
-            "executor_steps",
-        ]
-        get_keys.extend(count_names)
-        builder.evaluator_counts = {name: variables[name] for name in count_names}
-
-        variable_client = None
-        if builder.variable_server:
-            # Get new policy variables
-            variable_client = variable_utils.VariableClient(
-                client=builder.variable_server,
-                variables=variables,
-                get_keys=get_keys,
-                get_period=self.executor_variable_update_period,
-            )
-
-            # Make sure not to use a random policy after checkpoint restoration by
-            # assigning variables before running the environment loop.
-            variable_client.get_and_wait()
-
+        variable_client, counts = self._make_variable_client(builder)
         builder.evaluator_variable_client = variable_client
+        builder.evaluator_counts = counts
 
 
 class TrainerVariableClient(VariableSource):
