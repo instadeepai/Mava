@@ -16,7 +16,7 @@
 
 """System Trainer implementation."""
 
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple
 
 import reverb
 
