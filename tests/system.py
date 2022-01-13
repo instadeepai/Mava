@@ -57,7 +57,7 @@ class System(mava.core.SystemExecutor, mava.core.VariableSource):
 
     def __init__(
         self,
-        executor: SystemExecutor,
+        executor: mava.core.SystemExecutor,
         trainer: mava.core.Trainer,
         min_observations: int,
         observations_per_step: float,
