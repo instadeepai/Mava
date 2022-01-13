@@ -41,7 +41,7 @@ def _calculate_num_learner_steps(
         return int(1 / observations_per_step)
 
 
-class System(mava.core.Executor, mava.core.VariableSource):
+class System(mava.core.SystemExecutor, mava.core.VariableSource):
     """Agent class which combines acting and learning.
     This provides an implementation of the `Actor` interface which acts and
     learns. It takes as input instances of both `acme.Actor` and `acme.Learner`
@@ -57,7 +57,7 @@ class System(mava.core.Executor, mava.core.VariableSource):
 
     def __init__(
         self,
-        executor: mava.core.Executor,
+        executor: mava.core.SystemExecutor,
         trainer: mava.core.Trainer,
         min_observations: int,
         observations_per_step: float,

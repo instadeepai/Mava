@@ -28,7 +28,7 @@ class OpenSpielSequentialEnvironmentLoop(SequentialEnvironmentLoop):
     def __init__(
         self,
         environment: dm_env.Environment,
-        executor: mava.core.Executor,
+        executor: mava.core.SystemExecutor,
         counter: counting.Counter = None,
         logger: loggers.Logger = None,
         should_update: bool = True,
