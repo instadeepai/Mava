@@ -32,8 +32,8 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
 
     def __init__(
         self,
-        config: Dict[str, Any],
         components: Dict[str, List[Callback]],
+        config: Dict[str, Any] = {},
     ):
         """[summary]
 
@@ -247,13 +247,13 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         trainer_id: str,
         replay_client: reverb.Client,
         variable_source: MavaVariableSource,
-    ) -> mava.core.Trainer:
+    ) -> mava.core.SystemTrainer:
         """System trainer
         Args:
             replay (reverb.Client): replay data table to pull data from.
             counter (counting.Counter): step counter object.
         Returns:
-            mava.core.Trainer: system trainer.
+            mava.core.SystemTrainer: system trainer.
         """
 
         self._trainer_id = trainer_id

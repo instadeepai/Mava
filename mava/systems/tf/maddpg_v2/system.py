@@ -552,7 +552,7 @@ class MADDPG:
         trainer_id: str,
         replay: reverb.Client,
         variable_source: MavaVariableSource,
-    ) -> mava.core.Trainer:
+    ) -> mava.core.SystemTrainer:
         """System trainer
         Args:
             trainer_id: Id of the trainer being created.

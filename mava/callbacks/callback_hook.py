@@ -8,6 +8,12 @@ class SystemCallbackHookMixin(ABC):
     ######################
 
     # initialisation
+    def on_builder_setup(self) -> None:
+        """Called right before the builder initialisation begins."""
+        # TODO (dries): Combine this with on_building_init_start maybe?
+        for callback in self.callbacks:
+            callback.on_builder_setup(self, self.builder)
+
     def on_building_init_start(self) -> None:
         """Called when the builder initialisation begins."""
         for callback in self.callbacks:

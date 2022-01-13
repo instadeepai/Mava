@@ -280,7 +280,7 @@ class QMIX(MADQN):
         self,
         replay: reverb.Client,
         counter: counting.Counter,
-    ) -> mava.core.Trainer:
+    ) -> mava.core.SystemTrainer:
         """System trainer
 
         Args:
@@ -291,7 +291,7 @@ class QMIX(MADQN):
             Exception: no option for recurrence (yet).
 
         Returns:
-            mava.core.Trainer: system trainer.
+            mava.core.SystemTrainer: system trainer.
         """
 
         # Create the networks to optimize (online)
