@@ -24,7 +24,7 @@ from mava.core import SystemBuilder
 class System(SystemCallbackHookMixin):
     """MARL system."""
 
-    def __init__(self, builder: SystemBuilder):
+    def __init__(self, builder: SystemBuilder, program: Launcher):
         """[summary]
 
         Args:
@@ -32,10 +32,11 @@ class System(SystemCallbackHookMixin):
         """
 
         self.builder = builder
+        self.program = program
         self.callbacks = builder.callbacks
 
-    def build(self, program: Launcher):
-        self.program = self.builder.build(program)
+    def build(self):
+        self.builder.build(self.program)
 
     def launch(self):
         self.program.launch()

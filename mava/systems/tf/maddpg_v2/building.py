@@ -229,8 +229,11 @@ system_components = [
 # Builder
 builder = Builder(components=system_components)
 
-# Builder system
-system = System(builder).build(program)
+# System
+system = System(builder, program)
+
+# build the system
+system.build()
 
 # Launch the system
 system.launch()
