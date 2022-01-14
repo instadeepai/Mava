@@ -26,6 +26,7 @@ from mava import specs
 from mava.components import building
 from mava.components.tf import building as tf_building
 from mava.systems.building import Builder
+from mava.systems.system import System
 
 # Import launcher
 from mava.systems.launcher import Launcher
@@ -161,7 +162,7 @@ config = MADDPGConfig
 ##############
 
 # General setup
-setup = building.GeneralSetup(
+setup = building.SystemSetup(
     num_executors=1,
     network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
     trainer_networks=enums.Trainer.single_trainer,
@@ -210,7 +211,9 @@ executor_client = tf_building.ExecutorVariableClient(
 # Trainer client
 trainer_client = tf_building.TrainerVariableClient()
 
-# component list
+# Launcher
+program = Launcher(multi_process=True, nodes_on_gpu=["trainer"], name="MADDPG")
+
 system_components = [
     setup,
     table,
@@ -224,13 +227,13 @@ system_components = [
 ]
 
 # Builder
-system_builder = Builder(config=config, components=system_components)
+builder = Builder(components=system_components)
 
-# Create the launcher
-program = Launcher(multi_process=True, nodes_on_gpu=["trainer"], name="MADDPG")
+# System
+system = System(builder, program)
 
-# Automatically generate nodes using the builder setup
-system_builder.add_program_nodes(program)
+# build the system
+system.build()
 
-# Launch the program
-program.launch()
+# Launch the system
+system.launch()

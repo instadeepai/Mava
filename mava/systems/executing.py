@@ -20,10 +20,10 @@ import dm_env
 
 from mava import types
 from mava.core import SystemExecutor
-from mava.callbacks import Callback, SystemCallbackHookMixin
+from mava.callbacks import Callback
 
 
-class Executor(SystemExecutor, SystemCallbackHookMixin):
+class Executor(SystemExecutor):
     """A generic feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system.
     """

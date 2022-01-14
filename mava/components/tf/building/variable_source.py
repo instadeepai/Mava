@@ -23,7 +23,7 @@ from mava.systems.building import SystemBuilder
 from mava.components.building import VariableSource as BaseVariableSource
 from mava.systems.tf import variable_utils
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
-from mava.utils import enums
+from mava.utils.decorators import execution, evaluation
 
 
 class VariableSource(BaseVariableSource):
@@ -112,7 +112,7 @@ class ExecutorVariableClient(VariableSource):
 
         self.executor_variable_update_period = executor_variable_update_period
 
-    def on_building_executor_variable_client(self, builder: SystemBuilder) -> None:
+    def _make_variable_client(self, builder: SystemBuilder):
         # Create policy variables
         variables = {}
         get_keys = []
@@ -132,7 +132,7 @@ class ExecutorVariableClient(VariableSource):
             "executor_steps",
         ]
         get_keys.extend(count_names)
-        builder.executor_counts = {name: variables[name] for name in count_names}
+        counts = {name: variables[name] for name in count_names}
 
         variable_client = None
         if builder.variable_server:
@@ -147,8 +147,21 @@ class ExecutorVariableClient(VariableSource):
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
             variable_client.get_and_wait()
+        return variable_client, counts
 
+    @execution
+    def on_building_executor_variable_client(self, builder: SystemBuilder) -> None:
+
+        variable_client, counts = self._make_variable_client(builder)
         builder.executor_variable_client = variable_client
+        builder.executor_counts = counts
+
+    @evaluation
+    def on_building_evaluator_variable_client(self, builder: SystemBuilder) -> None:
+
+        variable_client, counts = self._make_variable_client(builder)
+        builder.evaluator_variable_client = variable_client
+        builder.evaluator_counts = counts
 
 
 class TrainerVariableClient(VariableSource):

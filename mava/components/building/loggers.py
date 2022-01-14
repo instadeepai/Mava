@@ -20,6 +20,7 @@ from typing import Callable, Dict
 from mava.core import SystemBuilder
 
 from mava.callbacks import Callback
+from mava.utils.decorators import execution
 from mava.utils.loggers import MavaLogger
 
 
@@ -32,14 +33,26 @@ class Logger(Callback):
         """[summary]"""
         self.logger_factory = logger_factory
         self.logger_config = logger_config
+        self.evaluation = True
 
+    # TODO(Arnu): not sure if this is the cleanest way.
     def make_logger(self, name: str, builder: SystemBuilder) -> MavaLogger:
         logger_config = {}
         if self.logger_config and name in self.logger_config:
             logger_config = self.logger_config[name]
-        logger = self.logger_factory(  # type: ignore
-            f"executor_{builder._executor_id}", **logger_config
-        )
+        if name == "executor":
+            logger = self.logger_factory(  # type: ignore
+                f"{name}_{builder._executor_id}", **logger_config
+            )
+        elif name == "evaluator":
+            logger = self.logger_factory(name, **logger_config)  # type: ignore
+        elif name == "trainer":
+            logger = self.logger_factory(  # type: ignore
+                f"{name}_{builder._trainer_id}", **logger_config
+            )
+        else:
+            raise NotImplementedError
+
         return logger
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:

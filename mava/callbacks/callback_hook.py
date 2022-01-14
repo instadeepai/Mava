@@ -1,20 +1,12 @@
 from abc import ABC
-from mava.systems.launcher import Launcher
 
-
-class SystemCallbackHookMixin(ABC):
+class CallbackHookMixin(ABC):
 
     ######################
     # system builder hooks
     ######################
 
     # initialisation
-    def on_builder_setup(self) -> None:
-        """Called right before the builder initialisation begins."""
-        # TODO (dries): Combine this with on_building_init_start maybe?
-        for callback in self.callbacks:
-            callback.on_builder_setup(self)
-
     def on_building_init_start(self) -> None:
         """Called when the builder initialisation begins."""
         for callback in self.callbacks:
@@ -237,6 +229,12 @@ class SystemCallbackHookMixin(ABC):
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_trainer_end(self)
+
+    # distributor
+    def on_building_program_nodes(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_building_program_nodes(self)
 
     ########################
     # system execution hooks
@@ -473,9 +471,3 @@ class SystemCallbackHookMixin(ABC):
         """[summary]"""
         for callback in self.callbacks:
             callback.on_training_get_feed_end(self, self.trainer)
-
-    # Launcher
-    def on_add_program_nodes(self, program: Launcher) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_add_program_nodes(self, program)

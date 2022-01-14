@@ -21,12 +21,12 @@ from typing import Dict, List, Tuple
 import reverb
 
 from mava import types
+from mava.callbacks import Callback
 from mava.core import SystemTrainer
-from mava.callbacks import Callback, SystemCallbackHookMixin
 from mava.utils import training_utils as train_utils
 
 
-class Trainer(SystemTrainer, SystemCallbackHookMixin):
+class Trainer(SystemTrainer):
     """MARL trainer"""
 
     def __init__(

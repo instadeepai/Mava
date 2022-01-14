@@ -17,17 +17,17 @@
 
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-import launchpad as lp
 import reverb
 
 import mava
 from mava import adders
-from mava.callbacks import Callback, SystemCallbackHookMixin
+from mava.callbacks import Callback, CallbackHookMixin
 from mava.core import SystemBuilder
+from mava.systems.launcher import Launcher
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 
 
-class Builder(SystemBuilder, SystemCallbackHookMixin):
+class Builder(SystemBuilder, CallbackHookMixin):
     """MARL system."""
 
     def __init__(
@@ -40,19 +40,15 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         Args:
             components (Dict[str, Dict[str, Callback]]): [description]
         """
-        self.config = config
-        self.callbacks = components
 
-        # self.components = components
+        self.callbacks = []
+        for component in components:
+            if "callbacks" in dir(component):
+                for sub_component in component:
+                    self.callbacks.append(sub_component)
+            else:
+                self.callbacks.append(component)
 
-        # self.callbacks = []
-        # for system_components in components.values():
-        #     for component in system_components.values():
-        #         self.callbacks.append(component)
-
-        self.on_builder_setup()
-
-        # Question (dries): What is on_building_init_start used for?
         self.on_building_init_start()
 
         self.on_building_init()
@@ -278,6 +274,8 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
 
         return self.trainer
 
-    def add_program_nodes(self, program):
-        # TODO (dries): Is it needed to specify this hook? Maybe for better readability from the user side.
-        self.on_add_program_nodes(program)
+    def build(self, program: Launcher):
+
+        self._program = program
+
+        self.on_building_program_nodes()

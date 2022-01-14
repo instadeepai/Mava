@@ -18,7 +18,6 @@ from typing import Any, List, Union
 
 import launchpad as lp
 
-from mava.core import SystemBuilder
 from mava.utils import lp_utils
 
 

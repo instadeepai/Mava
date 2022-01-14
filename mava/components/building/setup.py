@@ -3,12 +3,12 @@ from typing import Any, Dict, List, Optional, Union
 
 from mava.callbacks import Callback
 from mava.core import SystemBuilder
-from mava.systems.launcher import Launcher, NodeType
+from mava.systems.launcher import NodeType
 from mava.utils import enums
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
 
-class GeneralSetup(Callback):
+class SystemSetup(Callback):
     def __init__(
         self,
         num_executors: int = 1,
@@ -25,7 +25,7 @@ class GeneralSetup(Callback):
         self._trainer_networks = trainer_networks
         self._termination_condition = termination_condition
 
-    def on_builder_setup(self, builder: SystemBuilder) -> None:
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
         builder.network_sampling_setup = self._network_sampling_setup
         builder.trainer_networks = self._trainer_networks
 
@@ -157,25 +157,39 @@ class GeneralSetup(Callback):
         # net_spec = {"network_keys": {agent: int_spec for agent in agents}}
         # extra_specs.update(net_spec)
 
-    def on_add_program_nodes(self, builder: SystemBuilder, program: Launcher) -> None:
-        replay = program.add(
-            builder.make_replay_tables, node_type=NodeType.reverb, name="replay"
+    def on_building_program_nodes(self, builder: SystemBuilder) -> None:
+        # tables node
+        tables = builder._program.add(
+            builder.tables, node_type=NodeType.reverb, name="tables"
         )
-        trainer = program.add(
-            builder.make_trainer, replay, node_type=NodeType.corrier, name="trainer"
+
+        # trainer node
+        trainer = builder._program.add(
+            builder.trainer, tables, node_type=NodeType.corrier, name="trainer"
         )
+
+        # evaluator node
+        evaluator = builder._program.add(
+            builder.evaluator, trainer, node_type=NodeType.corrier, name="evaluator"
+        )
+
+        # executor nodes
         executors = [
-            program.add(
-                builder.make_executor,
-                [replay, trainer],
+            builder._program.add(
+                builder.executor,
+                [tables, trainer],
                 node_type=NodeType.corrier,
                 name="executor",
             )
             for _ in range(self.num_executors)
         ]
-        variable_source = program.add(
-            builder.make_coordinator,
-            [trainer, executors],
+
+        # variable server node
+        _ = builder._program.add(
+            builder.variable_server,
+            [trainer, executors, evaluator],
             node_type=NodeType.corrier,
-            name="variable_source",
+            name="variable_server",
         )
+
+        builder.program = builder._program
