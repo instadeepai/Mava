@@ -9,7 +9,6 @@
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/instadeepai/Mava/blob/main/LICENSE)
 
 # Table of Contents
-
 1. [Overview](#overview)
 2. [Getting Started](#getting-started)
 3. [Supported Environments](#supported-environments)
@@ -30,7 +29,7 @@ Mava is a library for building multi-agent reinforcement learning (MARL) systems
 </p>
 <hr>
 
-To read more about the motivation behind Mava, please see our [blog post][blog], [release][release] and [technical report][paper].
+To read more about the motivation behind Mava, please see our [blog post][blog], [release][release] and [technical report][Paper].
 
 > 👷‍♀️ **NOTICE**: Our release of Mava is foremost to benefit the wider community and make it easier for researchers to work on MARL.
 > However, we consider this release a **Beta version of Mava**. As with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
@@ -40,13 +39,12 @@ To read more about the motivation behind Mava, please see our [blog post][blog],
 > It is also inevitable that there might be bugs we are not aware of and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
 
 ## Overview
-
 ### Systems and the Executor-Trainer Paradigm
 
 At the core of the Mava framework is the concept of a `system`. A system refers to a full multi-agent reinforcement learning algorithm consisting of the following specific components: an `Executor`, a `Trainer` and a `Dataset`.
 
 The `Executor` is the part of the system that interacts with the environment, takes actions for each agent and observes the next state as a collection of observations, one for each agent in the system. Essentially, executors are the multi-agent version of the Actor class in Acme and are themselves constructed through feeding to the executor a dictionary of policy networks. The `Trainer` is responsible for sampling data from the Dataset originally collected from the executor and updating the parameters for every agent in the system. Trainers are therefore the multi-agent version of the Learner class in Acme. The `Dataset` stores all of the information collected by the executors in the form of a collection of dictionaries for the actions, observations and rewards with keys corresponding to the individual agent ids. The basic system design is shown on the left in the above figure.
-Several examples of system implementations can be viewed [here][systems].
+Several examples of system implementations can be viewed [here][Systems].
 
 <p align="center">
   <img align="center" src="docs/images/animation_quick.gif" width="70%">
@@ -57,7 +55,6 @@ Several examples of system implementations can be viewed [here][systems].
 Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to scale systems in a simple way, using the same underlying multi-agent RL system code. Mava uses [Launchpad](launchpad) for creating distributed programs. In Mava, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of all the actor networks used within each executor. This approach to distributed system training is illustrated on the right in the figure above. ✋ **NOTE: In the near future, Mava aims to support additional training setups, e.g. distributed training using multiple trainers to support Bayesian optimisation or population based training (PBT).**
 
 ## Getting Started
-
 We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System. For more information on how to use Mava, please view our [usage section](#usage).
 
 ## Supported Environments
@@ -65,44 +62,45 @@ We have a [Quickstart notebook][quickstart] that can be used to quickly create a
 A given multi-agent system interacts with its environment via an `EnvironmentLoop`. This loop takes as input a `system` instance and a multi-agent `environment`
 instance which implements the [DeepMind Environment API][dm_env]. Mava currently supports multi-agent environment loops and environment wrappers for the following environments and environment suites:
 
-- [PettingZoo][pettingzoo]
-- [SMAC][smac]
-- [Flatland][flatland]
-- [2D RoboCup][robocup]
-- [OpenSpiel][openspiel]
-- [Melting pot][meltingpot]
+* [PettingZoo][pettingzoo]
+* [SMAC][smac]
+* [Flatland][flatland]
+* [2D RoboCup][robocup]
+* [OpenSpiel][openspiel]
+* [Melting pot][meltingpot]
+
 
 For details on how to add your own environment, see [here](https://github.com/instadeepai/Mava/blob/develop/mava/wrappers/README.md).
 
-| <img  src="docs/images/multiw_animation.gif" width="1300px"/> | <img src="docs/images/sc2_animation.gif" width="1500px"/> | <img src="docs/images/flatland.gif" /> |
-| :-----------------------------------------------------------: | :-------------------------------------------------------: | :------------------------------------: |
-|       MAD4PG on PettingZoo's Multi-Walker environment.        |                  VDN on the SMAC 3m map.                  |           MADQN on Flatland.           |
+|<img  src="docs/images/multiw_animation.gif" width="1300px"/> | <img src="docs/images/sc2_animation.gif" width="1500px"/>  | <img src="docs/images/flatland.gif" />  |
+|:---:|:---:|:---:|
+|MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.| MADQN on Flatland. |
 
-| <img  src="docs/images/robocup_animation.gif" width="350px"/> | <img  src="docs/images/madqn_meltingpot_cleanup_scenario.gif" width="350px"/> |
-| :-----------------------------------------------------------: | :---------------------------------------------------------------------------: |
-|    MAD4PG on the 2D RoboCup environment using 6 executors.    |                   MADQN on a melting pot clean up scenario                    |
+|<img  src="docs/images/robocup_animation.gif" width="350px"/> |<img  src="docs/images/madqn_meltingpot_cleanup_scenario.gif" width="350px"/> |
+|:---:|:---:|
+|MAD4PG on the 2D RoboCup environment using 6 executors.| MADQN on a melting pot clean up scenario |
 
 ## System Implementations
 
-Mava includes several system implementations. Below we list these together with an indication of the maturity of the system using the following keys: 🟩 -- Tested and working well, 🟨 -- Running and training on simple environments, but not extensively tested and 🟥 -- Implemented but untested and yet to show clear signs of stable training.
+Mava includes several system implementations. Below we list these together with an indication of the maturity of the system using the following keys: 🟩  -- Tested and working well, 🟨  -- Running and training on simple environments, but not extensively tested and 🟥  -- Implemented but untested and yet to show clear signs of stable training.
 
-- 🟩 - Multi-Agent Deep Q-Networks (MADQN).
-- 🟩 - Multi-Agent Deep Deterministic Policy Gradient (MADDPG).
-- 🟩 - Multi-Agent Distributed Distributional Deep Deterministic Policy Gradient (MAD4PG).
-- 🟨 - Differentiable Inter-Agent Learning (DIAL).
-- 🟨 - Multi-Agent Proximal Policy Optimisation (MAPPO).
-- 🟨 - Value Decomposition Networks (VDN).
-- 🟥 - Monotonic value function factorisation (QMIX).
+* 🟩 - Multi-Agent Deep Q-Networks (MADQN).
+* 🟩 - Multi-Agent Deep Deterministic Policy Gradient (MADDPG).
+* 🟩 - Multi-Agent Distributed Distributional Deep Deterministic Policy Gradient (MAD4PG).
+* 🟨 - Differentiable Inter-Agent Learning (DIAL).
+* 🟨 - Multi-Agent Proximal Policy Optimisation (MAPPO).
+* 🟨 - Value Decomposition Networks (VDN).
+* 🟥 - Monotonic value function factorisation (QMIX).
 
-| **Name** | **Recurrent**      | **Continuous**     | **Discrete**       | **Centralised training** | **Communication**  | **Multi Processing** |
-| -------- | ------------------ | ------------------ | ------------------ | ------------------------ | ------------------ | -------------------- |
-| MADQN    | :heavy_check_mark: | :x:                | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark: | :heavy_check_mark:   |
-| DIAL     | :heavy_check_mark: | :x:                | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark: | :heavy_check_mark:   |
-| MADDPG   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :x:                | :heavy_check_mark:   |
-| MAD4PG   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :x:                | :heavy_check_mark:   |
-| MAPPO    | :x:                | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :x:                | :heavy_check_mark:   |
-| VDN      | :x:                | :x:                | :heavy_check_mark: | :heavy_check_mark:       | :x:                | :heavy_check_mark:   |
-| QMIX     | :x:                | :x:                | :heavy_check_mark: | :heavy_check_mark:       | :x:                | :heavy_check_mark:   |
+| **Name**         | **Recurrent**      | **Continuous** | **Discrete**  | **Centralised training** | **Communication**  | **Multi Processing**   |
+| ------------------- | ------------------ | ------------------ | ------------------ | ------------------- | ------------------ | ------------------- |
+| MADQN   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| DIAL   | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| MADDPG  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:       | :heavy_check_mark:        | :x: | :heavy_check_mark: |
+| MAD4PG   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:             | :x: | :heavy_check_mark: |
+| MAPPO   | :x: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark:              | :x: | :heavy_check_mark: |
+| VDN   | :x: | :x: | :heavy_check_mark: | :heavy_check_mark:  | :x: | :heavy_check_mark: |
+| QMIX   | :x: | :x: | :heavy_check_mark:                | :heavy_check_mark:                 | :x: | :heavy_check_mark: |
 
 As we develop Mava further, we aim to have all systems well tested on a wide variety of environments.
 
@@ -172,108 +170,89 @@ All modules in Mava aim to work in this way.
 We have tested `mava` on Python 3.7, 3.8 and 3.9.
 
 ### Docker (**Recommended**)
-
 #### Using pre-built images
-
 You can pull & run the latest pre-built images from our [DockerHub](https://hub.docker.com/repository/docker/instadeepct/mava) by specifying the docker image and example/file you want to run.
 
 For example, this will pull the latest mava tensorflow core image and run the `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py` example:
-
 ```
 docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava instadeepct/mava:tf-core-latest python examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py --base_dir /home/app/mava/logs/
 ```
-
 - For windows, replace `$(pwd)` with `$(curdir)`.
 
 - You can replace the example with your custom python file.
-
 #### Building the image yourself
 
 1. Build the correct docker image using the `make` command:
 
-   For Windows, before the docker image build, we recommend to first install the package manager [chocolatey](https://chocolatey.org/install) and run (to install make):
+    For Windows, before the docker image build, we recommend to first install the package manager [chocolatey](https://chocolatey.org/install) and run (to install make):
+    ```bash
+    choco install make
+    ```
 
-   ```bash
-   choco install make
-   ```
+    1.1 Only Mava core:
+    ```bash
+    make build
+    ```
 
-   1.1 Only Mava core:
+    1.2 For **optional** environments:
+    - PettingZoo:
+        ```
+        make build version=pz
+        ```
 
-   ```bash
-   make build
-   ```
+    - SMAC: The StarCraft Multi-Agent Challenge Environments :
 
-   1.2 For **optional** environments:
+        Install StarCraft II using a bash script, which is a slightly modified version of the script found [here][pymarl]:
+        ```
+        ./bash_scripts/install_sc2.sh
+        ```
+        Build Image
+        ```
+        make build version=sc2
+        ```
 
-   - PettingZoo:
+    - Flatland:
+        ```
+        make build version=flatland
+        ```
+    - 2D RoboCup environment
+        ```
+        make build version=robocup
+        ```
+    - Openspiel
+        ```
+        make build version=openspiel
+        ```
+    - MeltingPot
 
-     ```
-     make build version=pz
-     ```
+        ```bash
+        make build version=meltingpot
+        ```
 
-   - SMAC: The StarCraft Multi-Agent Challenge Environments :
-
-     Install StarCraft II using a bash script, which is a slightly modified version of the script found [here][pymarl]:
-
-     ```
-     ./bash_scripts/install_sc2.sh
-     ```
-
-     Build Image
-
-     ```
-     make build version=sc2
-     ```
-
-   - Flatland:
-     ```
-     make build version=flatland
-     ```
-   - 2D RoboCup environment
-     ```
-     make build version=robocup
-     ```
-   - Openspiel
-     ```
-     make build version=openspiel
-     ```
-   - MeltingPot
-
-     ```bash
-     make build version=meltingpot
-     ```
-
-   To allow for agent recordings, where agents evaluations are recorded and these recordings are stored in a `/recordings` folder:
-
-   ```
-   make build version=[] record=true
-   ```
+    To allow for agent recordings, where agents evaluations are recorded and these recordings are stored in a `/recordings` folder:
+    ```
+    make build version=[] record=true
+    ```
 
 2. Run an example:
+    ```bash
+    make run example=dir/to/example/example.py
+    ```
+    For example, `make run example=examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py`.
 
-   ```bash
-   make run example=dir/to/example/example.py
-   ```
+    Alternatively, run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
 
-   For example, `make run example=examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py`.
+    To run an example with tensorboard viewing enabled, you can run
+    ```bash
+    make run-tensorboard example=dir/to/example/example.py
+    ```
+    and navigate to `http://127.0.0.1:6006/`.
 
-   Alternatively, run bash inside a docker container with mava installed, `make bash`, and from there examples can be run as follows: `python dir/to/example/example.py`.
-
-   To run an example with tensorboard viewing enabled, you can run
-
-   ```bash
-   make run-tensorboard example=dir/to/example/example.py
-   ```
-
-   and navigate to `http://127.0.0.1:6006/`.
-
-   To run an example where agents are recorded (**ensure you built the image with `record=true`**):
-
-   ```
-   make run-record example=dir/to/example/example.py
-   ```
-
-   Where example, is an example with recording available e.g. `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_record.py`.
+    To run an example where agents are recorded (**ensure you built the image with `record=true`**):
+    ```
+    make run-record example=dir/to/example/example.py
+    ```
+    Where example, is an example with recording available e.g. `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_record.py`.
 
 ### Python virtual environment
 
@@ -287,7 +266,7 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     pip install --upgrade pip setuptools
     ```
 
-    1.1 To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset , Tensorflow and [Launchpad](https://github.com/deepmind/launchpad) - for distributed agent support :
+    1.1  To install the core libraries, including [Reverb](https://github.com/deepmind/reverb) - our storage dataset , Tensorflow and [Launchpad](https://github.com/deepmind/launchpad) - for distributed agent support :
 
     - Install swig for box2d:
 
@@ -296,7 +275,6 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     ```
 
     - Install core dependencies:
-
     ```bash
     pip install id-mava[tf,reverb,launchpad]
     ```
@@ -308,61 +286,54 @@ docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava insta
     ```
 
     1.2 For **optional** environments:
-
     - PettingZoo:
-      ```
-      pip install id-mava[pz]
-      ```
+        ```
+        pip install id-mava[pz]
+        ```
     - Flatland:
-      ```
-      pip install id-mava[flatland]
-      ```
+        ```
+        pip install id-mava[flatland]
+        ```
     - Openspiel:
-      ```
-      pip install id-mava[open_spiel]
-      ```
+        ```
+        pip install id-mava[open_spiel]
+        ```
     - 2D RoboCup environment:
 
-      A local install has only been tested using the Ubuntu 18.04 operating system.
-      The installation can be performed by running the RoboCup bash script while inside the Mava
-      python virtual environment.
+        A local install has only been tested using the Ubuntu 18.04 operating system.
+        The installation can be performed by running the RoboCup bash script while inside the Mava
+        python virtual environment.
 
-      ```bash
-      ./bash_scripts/install_robocup.sh
-      ```
+        ```bash
+        ./bash_scripts/install_robocup.sh
+        ```
 
     - StarCraft II:
 
-      First install StarCraft II
-
-      ```bash
-      ./bash_scripts/install_sc2.sh
-      ```
-
-      Then set SC2PATH to the location of 3rdparty/StarCraftII, e.g. :
-
-      ```
-      export SC2PATH="/home/Documents/Code/Mava/3rdparty/StarCraftII"
-      ```
+        First install StarCraft II
+        ```bash
+        ./bash_scripts/install_sc2.sh
+        ```
+        Then set SC2PATH to the location of 3rdparty/StarCraftII, e.g. :
+        ```
+        export SC2PATH="/home/Documents/Code/Mava/3rdparty/StarCraftII"
+        ```
 
     - MeltingPot:
 
-      Install MeltingPot:
+        Install MeltingPot:
+        ```bash
+        ./bash_scripts/install_meltingpot.sh
+        ```
 
-      ```bash
-      ./bash_scripts/install_meltingpot.sh
-      ```
+        Add MeltingPot to your python path:
+        ```bash
+        export PYTHONPATH="${PYTHONPATH}:${PWD}/../packages/meltingpot"
+        ```
 
-      Add MeltingPot to your python path:
+        If this fails, follow instructions [here](https://github.com/deepmind/meltingpot#installation).
 
-      ```bash
-      export PYTHONPATH="${PYTHONPATH}:${PWD}/../packages/meltingpot"
-      ```
-
-      If this fails, follow instructions [here](https://github.com/deepmind/meltingpot#installation).
-
-2.  Run an example:
-
+2. Run an example:
     ```
     python dir/to/example/example.py
     ```
@@ -384,13 +355,10 @@ Debugging in MARL can be very difficult and time consuming, therefore it is impo
 </p>
 
 ## Logging
-
 Mava logs various metrics using `tensorboard`, with the default logging directory being
-
 ```
 ./mava/<run_timestamp>
 ```
-
 A `mava` folder will be created in the root directory and here `<run_timestamp>` is the date and time at which an experiment is run. Once tensorboard has been opened, there will be three main card classes namely `evaluator`, `executor` and `trainer` corresponding to the amount specified by the user. Under each main card there will also be logging information for each respective agent in that class.
 
 During evaluation agents are allowed to act according to their current policies without training.
@@ -398,7 +366,6 @@ During evaluation agents are allowed to act according to their current policies 
 The most straightforward metrics to keep track of in order to see whether agents are learning are the `MeanEpisodeReturn` and `MeanEpisodeLength` metrics. These are visible under both the `executor` and `evaluator` cards and are both computed by using a rolling average. Relevant loss metrics are available under the `trainer` card.
 
 Here is a example of how the logger may be set up in order to be passed to the relevant system implementation:
-
 ```
 # Log every [log_every] seconds.
 log_every = 10
@@ -416,10 +383,10 @@ Logging occurs at user specified time intervals and, as such, the independent va
 
 ## Roadmap
 
-We have big ambitions for Mava! 🚀 But there is still much work that needs to be done. We have a clear roadmap and wish list for expanding our system implementations and associated modules, improving testing and robustness and providing support for across-machine training. Please visit them using the links below and feel free to add your own suggestions!
+We have big ambitions for Mava!  🚀  But there is still much work that needs to be done. We have a clear roadmap and wish list for expanding our system implementations and associated modules, improving testing and robustness and providing support for across-machine training. Please visit them using the links below and feel free to add your own suggestions!
 
-- [ROADMAP][roadmap]
-- [WISHLIST][wishlist]
+* [ROADMAP][roadmap]
+* [WISHLIST][wishlist]
 
 In the slightly more longer term, the Mava team plans to release benchmarking results for several different systems and environments and contribute a MARL specific behavioural environment suite (similar to the [bsuite][bsuite] for single-agent RL) specifically engineered to study aspects of MARL such as cooperation and coordination.
 
@@ -430,11 +397,10 @@ Please read our [contributing docs](./CONTRIBUTING.md) for details on how to sub
 ## Troubleshooting and FAQs
 
 Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
-
 ## Citing Mava
 
 If you use Mava in your work, please cite the accompanying
-[technical report][paper]:
+[technical report][Paper]:
 
 ```bibtex
 @article{pretorius2021mava,
@@ -449,11 +415,11 @@ If you use Mava in your work, please cite the accompanying
 }
 ```
 
-[acme]: https://github.com/deepmind/acme
-[systems]: mava/systems/
-[examples]: examples
+[Acme]: https://github.com/deepmind/acme
+[Systems]: mava/systems/
+[Examples]: examples
 [debug]: examples/debugging_envs/
-[paper]: https://arxiv.org/pdf/2107.01460.pdf
+[Paper]: https://arxiv.org/pdf/2107.01460.pdf
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [smac]: https://github.com/oxwhirl/smac
 [openspiel]: https://github.com/deepmind/open_spiel
