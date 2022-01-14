@@ -67,6 +67,7 @@ instance which implements the [DeepMind Environment API][dm_env]. Mava currently
 * [Flatland][flatland]
 * [2D RoboCup][robocup]
 * [OpenSpiel][openspiel]
+* [Melting pot][meltingpot]
 
 
 For details on how to add your own environment, see [here](https://github.com/instadeepai/Mava/blob/develop/mava/wrappers/README.md).
@@ -75,9 +76,9 @@ For details on how to add your own environment, see [here](https://github.com/in
 |:---:|:---:|:---:|
 |MAD4PG on PettingZoo's Multi-Walker environment. | VDN on the SMAC 3m map.| MADQN on Flatland. |
 
-|<img  src="docs/images/robocup_animation.gif" width="350px"/> |
-|:---:|
-|MAD4PG on the 2D RoboCup environment using 6 executors.|
+|<img  src="docs/images/robocup_animation.gif" width="350px"/> |<img  src="docs/images/madqn_meltingpot_cleanup_scenario.gif" width="350px"/> |
+|:---:|:---:|
+|MAD4PG on the 2D RoboCup environment using 6 executors.| MADQN on a melting pot clean up scenario |
 
 ## System Implementations
 
@@ -422,6 +423,7 @@ If you use Mava in your work, please cite the accompanying
 [pettingzoo]: https://github.com/PettingZoo-Team/PettingZoo
 [smac]: https://github.com/oxwhirl/smac
 [openspiel]: https://github.com/deepmind/open_spiel
+[meltingpot]: https://github.com/deepmind/meltingpot
 [flatland]: https://gitlab.aicrowd.com/flatland/flatland
 [robocup]: https://github.com/rcsoccersim
 [dm_env]: https://github.com/deepmind/dm_env
