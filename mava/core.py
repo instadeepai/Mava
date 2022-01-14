@@ -196,3 +196,21 @@ class SystemBuilder(abc.ABC):
         program: Launcher,
     ) -> Any:
         """[summary]"""
+
+
+class System(abc.ABC):
+    """Abstract system builder object."""
+
+    @abc.abstractmethod
+    def build(self, program: Launcher) -> None:
+        """[summary]"""
+
+    @abc.abstractmethod
+    def launch(
+        self,
+    ) -> None:
+        """[summary]
+
+        Args:
+            program (Launcher): [description]
+        """

@@ -26,7 +26,7 @@ from mava.callbacks import Callback, SystemCallbackHookMixin
 from mava.utils import training_utils as train_utils
 
 
-class Trainer(SystemTrainer, SystemCallbackHookMixin):
+class Trainer(SystemTrainer):
     """MARL trainer"""
 
     def __init__(

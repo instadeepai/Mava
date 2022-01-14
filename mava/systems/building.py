@@ -17,23 +17,21 @@
 
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-import launchpad as lp
 from mava.systems.launcher import Launcher
 import reverb
 
 import mava
 from mava import adders
-from mava.callbacks import Callback, SystemCallbackHookMixin
+from mava.callbacks import Callback
 from mava.core import SystemBuilder
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 
 
-class Builder(SystemBuilder, SystemCallbackHookMixin):
+class Builder(SystemBuilder):
     """MARL system."""
 
     def __init__(
         self,
-        config: Dict[str, Any],
         components: Dict[str, List[Callback]],
     ):
         """[summary]
@@ -41,17 +39,15 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         Args:
             components (Dict[str, Dict[str, Callback]]): [description]
         """
-        self.config = config
-        self.callbacks = components
 
-        # self.components = components
+        self.callbacks = []
+        for component in components.values():
+            if "callbacks" in dir(component):
+                for sub_component in component:
+                    self.callbacks.append(sub_component)
+            else:
+                self.callbacks.append(component)
 
-        # self.callbacks = []
-        # for system_components in components.values():
-        #     for component in system_components.values():
-        #         self.callbacks.append(component)
-
-        # Question (dries): What is on_building_init_start used for?
         self.on_building_init_start(self)
 
         self.on_building_init(self)

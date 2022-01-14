@@ -26,6 +26,7 @@ from mava import specs
 from mava.components import building
 from mava.components.tf import building as tf_building
 from mava.systems.building import Builder
+from mava.systems.system import System
 
 # Import launcher
 from mava.systems.launcher import Launcher
@@ -213,7 +214,6 @@ trainer_client = tf_building.TrainerVariableClient()
 # Launcher
 program = Launcher(multi_process=True, nodes_on_gpu=["trainer"], name="MADDPG")
 
-# component list
 system_components = [
     setup,
     table,
@@ -227,11 +227,10 @@ system_components = [
 ]
 
 # Builder
-system_builder = Builder(config=config, components=system_components)
+builder = Builder(components=system_components)
 
-# TODO (Arnu): make system to take in builder and program! Then launch from system :)
-# build system
-system_builder.build(program)
+# Builder system
+system = System(builder).build(program)
 
-# Launch the program
-program.launch()
+# Launch the system
+system.launch()
