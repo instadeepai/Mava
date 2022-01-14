@@ -50,34 +50,34 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         #     for component in system_components.values():
         #         self.callbacks.append(component)
 
-        self.on_builder_setup(self)
+        self.on_builder_setup()
 
         # Question (dries): What is on_building_init_start used for?
-        self.on_building_init_start(self)
+        self.on_building_init_start()
 
-        self.on_building_init(self)
+        self.on_building_init()
 
-        self.on_building_init_end(self)
+        self.on_building_init_end()
 
     def tables(self) -> List[reverb.Table]:
         """ "make tables to insert data into."""
 
         # start of make replay tables
-        self.on_building_tables_start(self)
+        self.on_building_tables_start()
 
         # make adder signature
-        self.on_building_tables_adder_signature(self)
+        self.on_building_tables_adder_signature()
 
         # make rate limiter
-        self.on_building_tables_rate_limiter(self)
+        self.on_building_tables_rate_limiter()
 
         # make tables
-        self.on_building_tables_make_tables(self)
+        self.on_building_tables_make_tables()
 
         # end of make replay tables
-        self.on_building_tables_end(self)
+        self.on_building_tables_end()
 
-        return self.tables
+        return self._replay_tables
 
     def dataset(
         self,
@@ -97,13 +97,13 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         self._table_name = table_name
 
         # start of make dataset iterator
-        self.on_building_dataset_start(self)
+        self.on_building_dataset_start()
 
         # make dataset
-        self.on_building_dataset_make_dataset(self)
+        self.on_building_dataset_make_dataset()
 
         # end of make dataset iterator
-        self.on_building_dataset_end(self)
+        self.on_building_dataset_end()
 
         return self.dataset
 
@@ -123,37 +123,37 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         self._replay_client = replay_client
 
         # start of make make adder
-        self.on_building_adder_start(self)
+        self.on_building_adder_start()
 
         # make adder signature
-        self.on_building_adder_set_priority(self)
+        self.on_building_adder_set_priority()
 
         # make rate limiter
-        self.on_building_adder_make_adder(self)
+        self.on_building_adder_make_adder()
 
         # end of make adder
-        self.on_building_adder_end(self)
+        self.on_building_adder_end()
 
-        return self.adder
+        return self._adder
 
     def system(
         self,
     ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
         """Initialise the system variables from the network factory."""
 
-        self.on_building_system_start(self)
+        self.on_building_system_start()
 
-        self.on_building_system_networks(self)
+        self.on_building_system_networks()
 
-        self.on_building_system_architecture(self)
+        self.on_building_system_architecture()
 
-        self.on_building_system_make_system(self)
+        self.on_building_system_make_system()
 
-        self.on_building_system_end(self)
+        self.on_building_system_end()
 
         return self.system_networks
 
-    def variable_server(self) -> MavaVariableSource:
+    def variable_server(self, extra_nodes={}) -> MavaVariableSource:
         """Create the variable server.
         Args:
             networks (Dict[str, Dict[str, Any]]): dictionary with the
@@ -162,14 +162,18 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
             variable_source (MavaVariableSource): A Mava variable source object.
         """
 
+        # Extra nodes
+        # TODO (dries): Remove this again if it is not necessary.
+        self._extra_nodes = extra_nodes
+
         # start of make variable server
-        self.on_building_variable_server_start(self)
+        self.on_building_variable_server_start()
 
         # make variable server
-        self.on_building_variable_server_make_variable_server(self)
+        self.on_building_variable_server_make_variable_server()
 
         # end of make variable server
-        self.on_building_variable_server_end(self)
+        self.on_building_variable_server_end()
 
         return self.variable_server
 
@@ -194,19 +198,19 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         self._replay_client = replay_client
         self._variable_source = variable_source
 
-        self.on_building_executor_start(self)
+        self.on_building_executor_start()
 
-        self.on_building_executor_logger(self)
+        self.on_building_executor_logger()
 
-        self.on_building_executor_variable_client(self)
+        self.on_building_executor_variable_client()
 
-        self.on_building_executor_make_executor(self)
+        self.on_building_executor_make_executor()
 
-        self.on_building_executor_environment(self)
+        self.on_building_executor_environment()
 
-        self.on_building_executor_train_loop(self)
+        self.on_building_executor_train_loop()
 
-        self.on_building_executor_end(self)
+        self.on_building_executor_end()
 
         return self.train_loop
 
@@ -226,19 +230,19 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
 
         self._variable_source = variable_source
 
-        self.on_building_evaluator_start(self)
+        self.on_building_evaluator_start()
 
-        self.on_building_evaluator_logger(self)
+        self.on_building_evaluator_logger()
 
-        self.on_building_evaluator_variable_client(self)
+        self.on_building_evaluator_variable_client()
 
-        self.on_building_evaluator_make_evaluator(self)
+        self.on_building_evaluator_make_evaluator()
 
-        self.on_building_evaluator_environment(self)
+        self.on_building_evaluator_environment()
 
-        self.on_building_evaluator_eval_loop(self)
+        self.on_building_evaluator_eval_loop()
 
-        self.on_building_evaluator_end(self)
+        self.on_building_evaluator_end()
 
         return self.eval_loop
 
@@ -260,20 +264,20 @@ class Builder(SystemBuilder, SystemCallbackHookMixin):
         self._replay_client = replay_client
         self._variable_source = variable_source
 
-        self.on_building_trainer_start(self)
+        self.on_building_trainer_start()
 
-        self.on_building_trainer_logger(self)
+        self.on_building_trainer_logger()
 
-        self.on_building_trainer_dataset(self)
+        self.on_building_trainer_dataset()
 
-        self.on_building_trainer_variable_client(self)
+        self.on_building_trainer_variable_client()
 
-        self.on_building_trainer_make_trainer(self)
+        self.on_building_trainer_make_trainer()
 
-        self.on_building_trainer_end(self)
+        self.on_building_trainer_end()
 
         return self.trainer
 
     def add_program_nodes(self, program):
         # TODO (dries): Is it needed to specify this hook? Maybe for better readability from the user side.
-        self.on_add_program_nodes(self, program)
+        self.on_add_program_nodes(program)

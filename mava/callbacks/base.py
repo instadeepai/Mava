@@ -18,6 +18,7 @@ Abstract base class used to build new callbacks.
 """
 
 import abc
+from app.mava.mava.systems.launcher import Launcher
 
 from mava.core import SystemBuilder, SystemExecutor, SystemTrainer
 
@@ -33,6 +34,13 @@ class Callback(abc.ABC):
     ######################
 
     # initialisation
+    # TODO (dries): Find a better naming distinction between
+    # on_builder_setup and on_building_init_start. Or unify
+    # them.
+    def on_builder_setup(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
@@ -404,5 +412,13 @@ class Callback(abc.ABC):
         pass
 
     def on_training_get_feed_end(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    ################
+    # Launcher hooks
+    ################
+
+    def on_add_program_nodes(self, builder: SystemBuilder, program: Launcher) -> None:
         """[summary]"""
         pass
