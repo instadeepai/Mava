@@ -1,9 +1,8 @@
 """Commonly used setup configuration for system builders"""
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from mava.callbacks import Callback
 from mava.core import SystemBuilder
-from mava.systems.launcher import NodeType
 from mava.utils import enums
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
@@ -156,40 +155,3 @@ class SystemSetup(Callback):
         # agents = builder.environment_spec.get_agent_ids()
         # net_spec = {"network_keys": {agent: int_spec for agent in agents}}
         # extra_specs.update(net_spec)
-
-    def on_building_program_nodes(self, builder: SystemBuilder) -> None:
-        # tables node
-        tables = builder._program.add(
-            builder.tables, node_type=NodeType.reverb, name="tables"
-        )
-
-        # trainer node
-        trainer = builder._program.add(
-            builder.trainer, tables, node_type=NodeType.corrier, name="trainer"
-        )
-
-        # evaluator node
-        evaluator = builder._program.add(
-            builder.evaluator, trainer, node_type=NodeType.corrier, name="evaluator"
-        )
-
-        # executor nodes
-        executors = [
-            builder._program.add(
-                builder.executor,
-                [tables, trainer],
-                node_type=NodeType.corrier,
-                name="executor",
-            )
-            for _ in range(self.num_executors)
-        ]
-
-        # variable server node
-        _ = builder._program.add(
-            builder.variable_server,
-            [trainer, executors, evaluator],
-            node_type=NodeType.corrier,
-            name="variable_server",
-        )
-
-        builder.program = builder._program

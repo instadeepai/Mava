@@ -1,5 +1,6 @@
 from abc import ABC
 
+
 class CallbackHookMixin(ABC):
 
     ######################
@@ -235,6 +236,11 @@ class CallbackHookMixin(ABC):
         """[summary]"""
         for callback in self.callbacks:
             callback.on_building_program_nodes(self)
+
+    def on_launch_distributor(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_launch_distributor(self)
 
     ########################
     # system execution hooks

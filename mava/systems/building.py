@@ -23,7 +23,6 @@ import mava
 from mava import adders
 from mava.callbacks import Callback, CallbackHookMixin
 from mava.core import SystemBuilder
-from mava.systems.launcher import Launcher
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
 
 
@@ -274,8 +273,9 @@ class Builder(SystemBuilder, CallbackHookMixin):
 
         return self.trainer
 
-    def build(self, program: Launcher):
-
-        self._program = program
-
+    def build(self):
+        # Build the program
         self.on_building_program_nodes()
+
+    def launch(self):
+        self.on_launch_distributor()
