@@ -57,6 +57,8 @@ class MAPPOTrainer(mava.Trainer):
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
+        minibatch_size: int = 128,
+        num_epochs:int = 5,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.0,
@@ -162,6 +164,8 @@ class MAPPOTrainer(mava.Trainer):
             ] = policy_network_to_expose.variables
 
         # Other trainer parameters.
+        self._minibatch_size = minibatch_size
+        self._num_epochs = num_epochs
         self._discount = discount
         self._entropy_cost = entropy_cost
         self._baseline_cost = baseline_cost
@@ -230,7 +234,7 @@ class MAPPOTrainer(mava.Trainer):
         return observation_feed
 
     def _transform_observations(
-        self, observation: Dict[str, OLT]
+        self, observations: Dict[str, OLT]
     ) -> Dict[str, np.ndarray]:
         """apply the observation networks to the raw observations from the dataset
 
@@ -245,10 +249,18 @@ class MAPPOTrainer(mava.Trainer):
         observation_trans = {}
         for agent in self._agents:
             agent_key = self._agent_net_keys[agent]
-            observation_trans[agent] = self._observation_networks[agent_key](
-                observation[agent].observation
+
+            reshaped_obs, dims = train_utils.combine_dim(
+                observations[agent].observation
+            )
+
+            observation_trans[agent] = train_utils.extract_dim(
+                self._observation_networks[agent_key](reshaped_obs), dims
             )
         return observation_trans
+
+
+    
 
     @tf.function
     def _step(
@@ -262,10 +274,13 @@ class MAPPOTrainer(mava.Trainer):
 
         # Get data from replay.
         inputs = next(self._iterator)
+        
+        # TODO minibatch of training batch - need to figure out some way of sampling from inputs
+        for epoch in range(self._num_epochs):
+        
+            self._forward(inputs)
 
-        self._forward(inputs)
-
-        self._backward()
+            self._backward()
 
         # Log losses per agent
         return train_utils.map_losses_per_agent_ac(

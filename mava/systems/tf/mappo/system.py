@@ -67,8 +67,10 @@ class MAPPO:
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
         max_gradient_norm: Optional[float] = None,
-        max_queue_size: int = 100000,
-        batch_size: int = 256,
+        max_queue_size: int = 10000,
+        train_batch_size: int = 512,
+        minibatch_size: int = 256,
+        num_epochs: int = 5,
         sequence_length: int = 10,
         sequence_period: int = 5,
         max_executor_steps: int = None,
@@ -133,7 +135,9 @@ class MAPPO:
             gradient norm during optimization.
             max_queue_size (int, optional): maximum number of items in the queue.
                 Defaults to 100000.
-            batch_size (int, optional): sample batch size for updates. Defaults to 256.
+            train_batch_size (int, optional): sample batch size for updates. Defaults to 512. Minibatches are sampled from this data.
+            minibatch_size (int, optional): minibatch size used every sampled from train batch. Minibatches are used every epoch.
+            num_epochs (int, optional): number of epochs every training step.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 10.
             sequence_period (int, optional): consecutive starting points for
@@ -223,7 +227,9 @@ class MAPPO:
                 baseline_cost=baseline_cost,
                 max_gradient_norm=max_gradient_norm,
                 max_queue_size=max_queue_size,
-                batch_size=batch_size,
+                train_batch_size=train_batch_size,
+                minibatch_size=minibatch_size,
+                num_epochs=num_epochs,
                 sequence_length=sequence_length,
                 sequence_period=sequence_period,
                 checkpoint=checkpoint,

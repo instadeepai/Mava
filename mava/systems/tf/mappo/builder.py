@@ -81,9 +81,11 @@ class MAPPOConfig:
     sequence_period: int = 5
     discount: float = 0.99
     lambda_gae: float = 0.95
-    max_queue_size: int = 100_000
+    max_queue_size: int = 10000
     executor_variable_update_period: int = 100
-    batch_size: int = 32
+    train_batch_size: int = 32
+    minibatch_size: int = 32
+    num_epochs: int = 5
     entropy_cost: float = 0.01
     baseline_cost: float = 0.5
     clipping_epsilon: float = 0.1
@@ -179,7 +181,7 @@ class MAPPOBuilder:
         # Create tensorflow dataset to interface with reverb
         dataset = datasets.make_reverb_dataset(
             server_address=replay_client.server_address,
-            batch_size=self._config.batch_size,
+            batch_size=self._config.train_batch_size,
         )
 
         return iter(dataset)
@@ -310,6 +312,8 @@ class MAPPOBuilder:
             agent_net_keys=agent_net_keys,
             critic_optimizer=self._config.critic_optimizer,
             policy_optimizer=self._config.policy_optimizer,
+            minibatch_size=self._config.minibatch_size,
+            num_epochs=self._config.num_epochs,
             discount=self._config.discount,
             lambda_gae=self._config.lambda_gae,
             entropy_cost=self._config.entropy_cost,
