@@ -220,6 +220,10 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
+    def on_launch_distributor(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
     #######################
     # system executor hooks
     #######################
