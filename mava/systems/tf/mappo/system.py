@@ -283,7 +283,7 @@ class MAPPO:
         self,
         replay: reverb.Client,
         counter: counting.Counter,
-    ) -> mava.core.Trainer:
+    ) -> mava.core.SystemTrainer:
         """System trainer
 
         Args:
@@ -291,7 +291,7 @@ class MAPPO:
             counter (counting.Counter): step counter object.
 
         Returns:
-            mava.core.Trainer: system trainer.
+            mava.core.SystemTrainer: system trainer.
         """
 
         # Create the networks to optimize (online)

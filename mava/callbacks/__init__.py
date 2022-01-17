@@ -14,4 +14,4 @@
 # limitations under the License.
 
 from mava.callbacks.base import Callback
-from mava.callbacks.callback_hook import SystemCallbackHookMixin
+from mava.callbacks.callback_hook import CallbackHookMixin
