@@ -51,6 +51,7 @@ class EnvironmentLoop(Callback):
     @execution
     def on_building_executor_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
+        # TODO (Arnu): find neater and more general way to add trainer loop wrappers
         builder.train_loop = DetailedPerAgentStatistics(builder.train_loop)
 
     @evaluation

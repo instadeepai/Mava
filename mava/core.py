@@ -23,7 +23,6 @@ import dm_env
 import numpy as np
 import reverb
 import sonnet as snt
-from launchpad import program as lp_program
 from acme import core as acme_core
 from acme import types
 
@@ -199,7 +198,7 @@ class SystemBuilder(abc.ABC):
 
 
 class System(abc.ABC):
-    """Abstract system builder object."""
+    """Abstract system object."""
 
     @abc.abstractmethod
     def build(self, program: Launcher) -> None:
