@@ -15,7 +15,6 @@
 
 """MADDPG system implementation."""
 
-from mava.components.building import distributor
 import reverb
 
 from mava.core import System
