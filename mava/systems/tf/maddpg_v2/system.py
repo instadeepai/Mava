@@ -18,8 +18,8 @@
 from mava.components.building import distributor
 import reverb
 
+from mava.core import System
 from mava.systems.building import Builder
-from mava.systems.launcher import Launcher
 from mava.components import building
 from mava.components.tf import building as tf_building
 from mava.utils import enums
@@ -28,7 +28,7 @@ from mava.utils import enums
 system_config = {"setup": {}, "table": {}, "dataset": {}}
 
 
-class System:
+class MADDPG(System):
     def __init__(self, config):
 
         self._config = config
@@ -129,7 +129,7 @@ class System:
 
 
 ## Example of create/launching system
-system = System(system_config)
+system = MADDPG(system_config)
 
 # Build system
 system.build(name="maddpg")

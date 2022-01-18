@@ -32,7 +32,6 @@ class Builder(SystemBuilder, CallbackHookMixin):
     def __init__(
         self,
         components: List[Callback],
-        config: Dict[str, Any] = {},
     ):
         """[summary]
 

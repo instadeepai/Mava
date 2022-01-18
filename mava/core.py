@@ -201,15 +201,26 @@ class System(abc.ABC):
     """Abstract system object."""
 
     @abc.abstractmethod
-    def build(self, program: Launcher) -> None:
-        """[summary]"""
+    def build(self, name: str) -> None:
+        """[summary]
+
+        Args:
+            name (str): [description]
+        """
 
     @abc.abstractmethod
-    def launch(
+    def distribute(
         self,
+        num_executors: int,
+        nodes_on_gpu: List[str],
     ) -> None:
         """[summary]
 
         Args:
-            program (Launcher): [description]
+            num_executors (int): [description]
+            nodes_on_gpu (List[str]): [description]
         """
+
+    @abc.abstractmethod
+    def launch(self):
+        """[summary]"""

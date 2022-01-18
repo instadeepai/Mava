@@ -39,11 +39,11 @@ class Executor(SystemExecutor):
         """
         self.callbacks = components
 
-        self.on_execution_init_start(self)
+        self.on_execution_init_start()
 
-        self.on_execution_init(self)
+        self.on_execution_init()
 
-        self.on_execution_init_end(self)
+        self.on_execution_init_end()
 
     def _policy(
         self,
@@ -65,15 +65,15 @@ class Executor(SystemExecutor):
         self._observation = observation
         self._state = state
 
-        self.on_execution_policy_start(self)
+        self.on_execution_policy_start()
 
-        self.on_execution_policy_preprocess(self)
+        self.on_execution_policy_preprocess()
 
-        self.on_execution_policy_compute(self)
+        self.on_execution_policy_compute()
 
-        self.on_execution_policy_sample_action(self)
+        self.on_execution_policy_sample_action()
 
-        self.on_execution_policy_end(self)
+        self.on_execution_policy_end()
 
         return self.action_info
 
