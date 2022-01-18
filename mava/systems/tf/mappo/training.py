@@ -41,6 +41,7 @@ tfd = tfp.distributions
 
 class MAPPOTrainer(mava.Trainer):
     """MAPPO trainer.
+
     This is the trainer component of a MAPPO system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -89,6 +90,9 @@ class MAPPOTrainer(mava.Trainer):
                 Defaults to {}.
             checkpoint_minute_interval (int): The number of minutes to wait between
                 checkpoints.
+            minibatch_size (int, optional): size of minibatch that is sampled from
+                the training batch. Minibatches are used for each gradient step.
+            num_epochs (int, optional): number of epochs every training step.
             discount (float, optional): discount factor for TD updates. Defaults
                 to 0.99.
             lambda_gae (float, optional): scalar determining the mix of bootstrapping
@@ -236,7 +240,7 @@ class MAPPOTrainer(mava.Trainer):
     def _transform_observations(
         self, observations: Dict[str, OLT]
     ) -> Dict[str, np.ndarray]:
-        """apply the observation networks to the raw observations from the dataset
+        """Apply the observation networks to the raw observations from the dataset
 
         Args:
             observation (Dict[str, np.ndarray]): raw agent observations
@@ -277,11 +281,13 @@ class MAPPOTrainer(mava.Trainer):
         for epoch in range(self._num_epochs):
             indices = np.random.permutation(train_batch_size)
             minibatch_indices = np.split(
-                indices, train_batch_size//self._minibatch_size)
+                indices, train_batch_size // self._minibatch_size
+            )
             for minibatch_index in minibatch_indices:
 
                 minibatch_data = tf.nest.map_structure(
-                    lambda x: tf.gather(x, minibatch_index, axis=0), inputs.data)
+                    lambda x: tf.gather(x, minibatch_index, axis=0), inputs.data
+                )
 
                 self._forward(minibatch_data)
 
@@ -459,7 +465,7 @@ class MAPPOTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
-        """trainer step to update the parameters of the agents in the system"""
+        """Trainer step to update the parameters of the agents in the system"""
 
         # Run the learning step.
         fetches = self._step()
@@ -481,7 +487,7 @@ class MAPPOTrainer(mava.Trainer):
             self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
-        """get network variables
+        """Get network variables
 
         Args:
             names (Sequence[str]): network names
@@ -545,6 +551,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
+        minibatch_size: int = 128,
+        num_epochs: int = 5,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.0,
@@ -569,6 +577,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
+            minibatch_size=minibatch_size,
+            num_epochs=num_epochs,
             discount=discount,
             lambda_gae=lambda_gae,
             entropy_cost=entropy_cost,
