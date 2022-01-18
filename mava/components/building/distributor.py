@@ -66,5 +66,5 @@ class Distributor(Callback):
             name="variable_server",
         )
 
-    def on_launch_distributor(self, builder: SystemBuilder):
+    def on_building_launch_distributor(self, builder: SystemBuilder):
         builder._program.launch()

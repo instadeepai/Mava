@@ -278,4 +278,4 @@ class Builder(SystemBuilder, CallbackHookMixin):
         self.on_building_program_nodes()
 
     def launch(self):
-        self.on_launch_distributor()
+        self.on_building_launch_distributor()

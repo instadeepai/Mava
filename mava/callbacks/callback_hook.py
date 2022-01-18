@@ -240,7 +240,7 @@ class CallbackHookMixin(ABC):
     def on_building_launch_distributor(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_launch_distributor(self)
+            callback.on_building_launch_distributor(self)
 
     ########################
     # system execution hooks
