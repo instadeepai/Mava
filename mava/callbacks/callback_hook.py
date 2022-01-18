@@ -237,7 +237,7 @@ class CallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_building_program_nodes(self)
 
-    def on_launch_distributor(self) -> None:
+    def on_building_launch_distributor(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_launch_distributor(self)
