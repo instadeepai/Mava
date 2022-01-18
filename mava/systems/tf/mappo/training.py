@@ -258,8 +258,6 @@ class MAPPOTrainer(mava.Trainer):
                 self._observation_networks[agent_key](reshaped_obs), dims
             )
         return observation_trans
-
-
     
 
     @tf.function
@@ -275,12 +273,18 @@ class MAPPOTrainer(mava.Trainer):
         # Get data from replay.
         inputs = next(self._iterator)
         
-        # TODO minibatch of training batch - need to figure out some way of sampling from inputs
-        for epoch in range(self._num_epochs):
+        train_batch_size = inputs.data.observations["agent_0"].observation.shape[0]
         
-            self._forward(inputs)
+        for epoch in range(self._num_epochs):
+            indices = np.random.permutation(train_batch_size)
+            minibatch_indices = np.split(indices,train_batch_size//self._minibatch_size)
+            for minibatch_index in minibatch_indices:
+                
+                minibatch_data = tf.nest.map_structure(lambda x: tf.gather(x,minibatch_index,axis=0),inputs.data)
 
-            self._backward()
+                self._forward(minibatch_data)
+
+                self._backward()
 
         # Log losses per agent
         return train_utils.map_losses_per_agent_ac(
@@ -297,7 +301,7 @@ class MAPPOTrainer(mava.Trainer):
 
         # Convert to sequence data
         # TODO(Kale-ab): Is this the recurrent trainer?
-        data = tf2_utils.batch_to_sequence(inputs.data)
+        data = tf2_utils.batch_to_sequence(inputs)
 
         # Unpack input data as follows:
         observations, actions, rewards, discounts, extras = (
