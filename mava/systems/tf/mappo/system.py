@@ -136,7 +136,7 @@ class MAPPO:
             max_queue_size (int, optional): maximum number of items in the queue.
                 Defaults to 100000.
             train_batch_size (int, optional): sample batch size for updates. Defaults to 512. Minibatches are sampled from this data.
-            minibatch_size (int, optional): minibatch size used every sampled from train batch. Minibatches are used every epoch.
+            minibatch_size (int, optional): size of minibatch that is sampled from the training batch. Minibatches are used for each gradient step.
             num_epochs (int, optional): number of epochs every training step.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 10.

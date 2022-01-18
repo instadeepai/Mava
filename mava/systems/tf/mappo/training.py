@@ -58,7 +58,7 @@ class MAPPOTrainer(mava.Trainer):
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
         minibatch_size: int = 128,
-        num_epochs:int = 5,
+        num_epochs: int = 5,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
         entropy_cost: float = 0.0,
@@ -258,7 +258,6 @@ class MAPPOTrainer(mava.Trainer):
                 self._observation_networks[agent_key](reshaped_obs), dims
             )
         return observation_trans
-    
 
     @tf.function
     def _step(
@@ -272,15 +271,17 @@ class MAPPOTrainer(mava.Trainer):
 
         # Get data from replay.
         inputs = next(self._iterator)
-        
+
         train_batch_size = inputs.data.observations["agent_0"].observation.shape[0]
-        
+
         for epoch in range(self._num_epochs):
             indices = np.random.permutation(train_batch_size)
-            minibatch_indices = np.split(indices,train_batch_size//self._minibatch_size)
+            minibatch_indices = np.split(
+                indices, train_batch_size//self._minibatch_size)
             for minibatch_index in minibatch_indices:
-                
-                minibatch_data = tf.nest.map_structure(lambda x: tf.gather(x,minibatch_index,axis=0),inputs.data)
+
+                minibatch_data = tf.nest.map_structure(
+                    lambda x: tf.gather(x, minibatch_index, axis=0), inputs.data)
 
                 self._forward(minibatch_data)
 
