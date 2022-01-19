@@ -31,3 +31,5 @@ from mava.wrappers.system_trainer_statistics import (
     NetworkStatisticsMixing,
     ScaledDetailedTrainerStatistics,
 )
+from mava.wrappers.flatland import FlatlandEnvWrapper
+from mava.wrappers.smac import SMACWrapper

@@ -125,6 +125,17 @@ def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
 
     return logged_losses
 
+# Map value losses to dict, grouped by agent.
+def map_losses_per_agent_value(value_losses: Dict) -> Dict:
+    assert len(value_losses) > 0 , "Invalid System Checkpointer."
+    logged_losses: Dict[str, Dict[str, Any]] = {}
+    for agent in value_losses.keys():
+        logged_losses[agent] = {
+            "value_loss": value_losses[agent],
+        }
+
+    return logged_losses
+
 
 def combine_dim(inputs: Union[tf.Tensor, List, Tuple]) -> tf.Tensor:
     if isinstance(inputs, tf.Tensor):

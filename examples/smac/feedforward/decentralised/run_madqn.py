@@ -54,7 +54,7 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks, policy_networks_layer_sizes=[64, 64]
+        madqn.make_default_networks, value_networks_layer_sizes=[64, 64]
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -80,15 +80,14 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationTimestepScheduler(
             epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=50000
         ),
-        importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.RMSProp(
             learning_rate=0.0005, epsilon=0.00001, decay=0.99
         ),
         checkpoint_subpath=checkpoint_dir,
-        batch_size=512,
-        executor_variable_update_period=100,
+        batch_size=256,
+        executor_variable_update_period=1000,
         target_update_period=200,
-        max_gradient_norm=10.0,
+        max_gradient_norm=20.0,
     ).build()
 
     # launch

@@ -12,138 +12,127 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import Dict, Mapping, Optional, Sequence, Union
 
+import numpy as np
 import sonnet as snt
+import tensorflow as tf
 from acme import types
-from acme.tf.networks.atari import DQNAtariNetwork
+from acme.tf import utils as tf2_utils
+from dm_env import specs
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
-from mava.components.tf.networks.communication import CommunicationNetwork
+from mava.utils.enums import ArchitectureType
 from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
-from mava.utils.enums import ArchitectureType, Network
+
+Array = specs.Array
+BoundedArray = specs.BoundedArray
+DiscreteArray = specs.DiscreteArray
 
 
-# TODO Use fingerprints variable
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
+    value_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     archecture_type: ArchitectureType = ArchitectureType.feedforward,
-    network_type: Network = Network.mlp,
-    fingerprints: bool = False,
-    message_size: Optional[int] = None,
     seed: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
-    """Default networks for madqn.
+    """Default networks for maddpg.
 
     Args:
-        environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
+        environment_spec: description of the action and
             observation spaces etc. for each agent in the system.
-        agent_net_keys: (dict, optional): specifies what network each agent uses.
-            Defaults to {}.
-        policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
-            size of policy networks.
-        archecture_type (ArchitectureType, optional): archecture used
+        agent_net_keys: specifies what network each agent uses.
+        vmin: hyperparameters for the distributional critic in mad4pg.
+        vmax: hyperparameters for the distributional critic in mad4pg.
+        net_spec_keys: specifies the specs of each network.
+        policy_networks_layer_sizes: size of policy networks.
+        critic_networks_layer_sizes: size of critic networks.
+        sigma: hyperparameters used to add Gaussian noise
+            for simple exploration. Defaults to 0.3.
+        archecture_type: archecture used
             for agent networks. Can be feedforward or recurrent.
             Defaults to ArchitectureType.feedforward.
-        network_type (Network, optional): Agent network type.
-            Can be mlp, atari_dqn_network or coms_network.
-            Defaults to Network.mlp.
-        fingerprints (bool, optional): whether to apply replay stabilisation using
-            policy fingerprints. Defaults to False.
-        message_size (Optional[int], optional): size of message passed,
-            if using a coms network. Defaults to None.
-        seed (int, optional): random seed for network initialization.
+
+        num_atoms:  hyperparameters for the distributional critic in
+            mad4pg.
+        seed: random seed for network initialization.
 
     Returns:
-        Mapping[str, types.TensorTransformation]: returned agent networks.
+        returned agent networks.
     """
-
-    # Set Policy function and layer size.
+    # Set Policy function and layer size
     # Default size per arch type.
     if archecture_type == ArchitectureType.feedforward:
-        if not policy_networks_layer_sizes:
-            policy_networks_layer_sizes = (512, 512, 256)
-        q_network_func = snt.Sequential
+        if not value_networks_layer_sizes:
+            value_networks_layer_sizes = (
+                256,
+                256,
+                256,
+            )
+        value_network_func = snt.Sequential
     elif archecture_type == ArchitectureType.recurrent:
-        if not policy_networks_layer_sizes:
-            policy_networks_layer_sizes = (128, 128)
-        q_network_func = snt.DeepRNN
+        if not value_networks_layer_sizes:
+            value_networks_layer_sizes = (128, 64)
+        value_network_func = snt.DeepRNN
 
-    assert policy_networks_layer_sizes is not None
-    assert q_network_func is not None
+    assert value_networks_layer_sizes is not None
+    assert value_network_func is not None
 
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
     specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
 
-    if isinstance(policy_networks_layer_sizes, Sequence):
-        policy_networks_layer_sizes = {
-            key: policy_networks_layer_sizes for key in specs.keys()
+
+    if isinstance(value_networks_layer_sizes, Sequence):
+        value_networks_layer_sizes = {
+            key: value_networks_layer_sizes for key in specs.keys()
+        }
+    if isinstance(value_networks_layer_sizes, Sequence):
+        value_networks_layer_sizes = {
+            key: value_networks_layer_sizes for key in specs.keys()
         }
 
-    q_networks = {}
+    observation_networks = {}
+    value_networks = {}
     action_selectors = {}
-    for key in specs.keys():
+    for key, spec in specs.items():
+        num_actions = spec.actions.num_values
 
-        # Get total number of action dimensions from action spec.
-        num_dimensions = specs[key].actions.num_values
+        # An optional network to process observations
+        observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
         # Create the policy network.
-        if network_type == Network.atari_dqn_network:
-            q_network = DQNAtariNetwork(num_dimensions)
-        elif network_type == Network.coms_network:
-            assert message_size is not None, "Message size not set."
-            q_network = CommunicationNetwork(
-                networks.LayerNormMLP((128,), activate_final=True, seed=seed),
-                networks.LayerNormMLP((128,), activate_final=True, seed=seed),
-                snt.LSTM(128),
-                snt.Sequential(
-                    [
-                        networks.LayerNormMLP((128,), activate_final=True, seed=seed),
-                        networks.NearZeroInitializedLinear(num_dimensions, seed=seed),
-                        networks.TanhToSpec(specs[key].actions),
-                    ]
+        if archecture_type == ArchitectureType.feedforward:
+            value_network = [
+                networks.LayerNormMLP(
+                    value_networks_layer_sizes[key], activate_final=True, seed=seed
                 ),
-                snt.Sequential(
-                    [
-                        networks.LayerNormMLP(
-                            (128, message_size), activate_final=True, seed=seed
-                        ),
-                    ]
+            ]
+        elif archecture_type == ArchitectureType.recurrent:
+            value_network = [
+                networks.LayerNormMLP(
+                    value_networks_layer_sizes[key][:-1],
+                    activate_final=True,
+                    seed=seed,
                 ),
-                message_size=message_size,
-            )
-        else:
-            if archecture_type == ArchitectureType.feedforward:
-                q_network = [
-                    networks.LayerNormMLP(
-                        list(policy_networks_layer_sizes[key]) + [num_dimensions],
-                        activate_final=False,
-                        seed=seed,
-                    ),
-                ]
-            elif archecture_type == ArchitectureType.recurrent:
-                q_network = [
-                    networks.LayerNormMLP(
-                        policy_networks_layer_sizes[key][:-1],
-                        activate_final=True,
-                        seed=seed,
-                    ),
-                    snt.LSTM(policy_networks_layer_sizes[key][-1]),
-                    snt.Linear(num_dimensions),
-                ]
+                snt.GRU(value_networks_layer_sizes[key][-1]),
+            ]
 
-            q_network = q_network_func(q_network)
+        value_network += [
+            networks.NearZeroInitializedLinear(num_actions, seed=seed),
+        ]
 
-        q_networks[key] = q_network
+        value_network = value_network_func(value_network)
+
+        observation_networks[key] = observation_network
+        value_networks[key] = value_network
         action_selectors[key] = EpsilonGreedy
 
     return {
-        "q_networks": q_networks,
+        "values": value_networks,
         "action_selectors": action_selectors,
+        "observations": observation_networks,
     }

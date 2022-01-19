@@ -91,6 +91,7 @@ def main(_: Any) -> None:
         checkpoint_subpath=checkpoint_dir,
         trainer_fn=madqn.training.MADQNRecurrentTrainer,
         executor_fn=madqn.execution.MADQNRecurrentExecutor,
+        max_replay_size=5000,
         batch_size=32,
     ).build()
 
