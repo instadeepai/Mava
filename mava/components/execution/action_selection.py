@@ -14,6 +14,9 @@
 # limitations under the License.
 
 """Commonly used adder components for system builders"""
+import abc
+
+# TODO (Arnu): remove dependence on TF
 from acme.tf import utils as tf2_utils
 
 from mava.callbacks import Callback
@@ -21,29 +24,29 @@ from mava.core import SystemExecutor
 
 
 class ActionSelector(Callback):
+    @abc.abstractmethod
     def on_execution_policy_sample_action(self, executor: SystemExecutor) -> None:
         """[summary]
 
         Args:
             executor (SystemExecutor): [description]
         """
-        pass
 
+    @abc.abstractmethod
     def on_execution_select_action(self, executor: SystemExecutor) -> None:
         """[summary]
 
         Args:
             executor (SystemExecutor): [description]
         """
-        pass
 
+    @abc.abstractmethod
     def on_execution_select_action(self, executor: SystemExecutor) -> None:
         """[summary]
 
         Args:
             executor (SystemExecutor): [description]
         """
-        pass
 
 
 class OnlineActionSampling(ActionSelector):

@@ -17,6 +17,8 @@
 from typing import Dict, Optional
 
 import sonnet as snt
+
+# TODO (Arnu): remove dependence on TF
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders

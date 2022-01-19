@@ -13,23 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Commonly used adder components for system builders"""
-
-from mava.callbacks import Callback
-from mava.core import SystemExecutor
-
-
-class Update(Callback):
-    def on_execution_update(self, executor: SystemExecutor) -> None:
-        """[summary]
-
-        Args:
-            executor (SystemExecutor): [description]
-        """
-        pass
-
-
-class OnlineUpdate(Update):
-    def on_execution_update(self, executor: SystemExecutor) -> None:
-        if self._variable_client:
-            self._variable_client.update(self._wait)
+from mava.components.execution.observation import Observer
+from mava.components.execution.preprocess import Batch
+from mava.components.execution.policy import DistributionPolicy
+from mava.components.execution.action_selection import OnlineActionSampling
+from mava.components.execution.update import OnlineUpdate

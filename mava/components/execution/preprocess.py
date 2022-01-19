@@ -15,19 +15,23 @@
 
 """Commonly used adder components for system builders"""
 
+import abc
+
+# TODO (Arnu): remove dependence on TF
 from acme.tf import utils as tf2_utils
+
 from mava.callbacks import Callback
 from mava.core import SystemExecutor
 
 
 class Preprocess(Callback):
+    @abc.abstractmethod
     def on_execution_policy_preprocess(self, executor: SystemExecutor) -> None:
         """[summary]
 
         Args:
             executor (SystemExecutor): [description]
         """
-        pass
 
 
 class Batch(Preprocess):

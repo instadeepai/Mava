@@ -15,18 +15,20 @@
 
 """Commonly used adder components for system builders"""
 
+import abc
+
 from mava.callbacks import Callback
 from mava.core import SystemExecutor
 
 
 class Policy(Callback):
+    @abc.abstractmethod
     def on_execution_policy_compute(self, executor: SystemExecutor) -> None:
         """[summary]
 
         Args:
             executor (SystemExecutor): [description]
         """
-        pass
 
 
 class DistributionPolicy(Policy):

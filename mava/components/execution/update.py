@@ -13,8 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.components.tf.execution.observation import OnlineObserver
-from mava.components.tf.execution.preprocess import Batch
-from mava.components.tf.execution.policy import DistributionPolicy
-from mava.components.tf.execution.action_selection import OnlineActionSampling
-from mava.components.tf.execution.update import OnlineUpdate
+"""Commonly used adder components for system builders"""
+import abc
+
+from mava.callbacks import Callback
+from mava.core import SystemExecutor
+
+
+class Update(Callback):
+    @abc.abstractmethod
+    def on_execution_update(self, executor: SystemExecutor) -> None:
+        """[summary]
+
+        Args:
+            executor (SystemExecutor): [description]
+        """
+
+
+class OnlineUpdate(Update):
+    def on_execution_update(self, executor: SystemExecutor) -> None:
+        if self._variable_client:
+            self._variable_client.update(self._wait)
