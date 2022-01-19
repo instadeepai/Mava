@@ -16,9 +16,6 @@
 """Commonly used adder components for system builders"""
 import abc
 
-# TODO (Arnu): remove dependence on TF
-from acme.tf import utils as tf2_utils
-
 from mava.callbacks import Callback
 from mava.core import SystemExecutor
 
@@ -47,31 +44,3 @@ class ActionSelector(Callback):
         Args:
             executor (SystemExecutor): [description]
         """
-
-
-class OnlineActionSampling(ActionSelector):
-    def on_execution_policy_sample_action(self, executor: SystemExecutor) -> None:
-
-        # Sample from the policy if it is stochastic.
-        action = executor.policy.sample()
-
-        executor.action_info = action
-
-    def on_execution_select_action(self, executor: SystemExecutor) -> None:
-
-        # Pass the observation through the policy network.
-        action = self._policy(self._agent, self._observation.observation)
-
-        executor.action = action
-
-    def on_execution_select_action_end(self, executor: SystemExecutor) -> None:
-        executor.action = tf2_utils.to_numpy_squeeze(executor.action)
-
-    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
-
-        actions = {}
-        for agent, observation in self._observations.items():
-            action = self._policy(agent, observation.observation)
-            actions[agent] = tf2_utils.to_numpy_squeeze(action)
-
-        executor.actions = actions

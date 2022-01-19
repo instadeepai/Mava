@@ -14,22 +14,23 @@
 # limitations under the License.
 
 """Commonly used adder components for system builders"""
-import abc
+from typing import Dict, Optional
 
-from typing import Dict, Optional, Any
+import sonnet as snt
+from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
-from mava.callbacks import Callback
+from mava.components.execution import Executor
 from mava.core import SystemExecutor
 
 
-class Executor(Callback):
+class Executor(Executor):
     def __init__(
         self,
-        policy_networks: Dict[str, Any],
+        policy_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
         adder: Optional[adders.ParallelAdder] = None,
-        variable_client: Optional[Any] = None,
+        variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ) -> None:
 
         # Store these for later use.
@@ -38,10 +39,9 @@ class Executor(Callback):
         self._adder = adder
         self._variable_client = variable_client
 
-    @abc.abstractmethod
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
-        """[summary]
 
-        Args:
-            executor (SystemExecutor): [description]
-        """
+        executor._policy_networks = self._policy_networks
+        executor._agent_net_keys = self._agent_net_keys
+        executor._adder = self._adder
+        executor._variable_client = self._variable_client

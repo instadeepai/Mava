@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mava.components.execution.executor import Executor
 from mava.components.execution.observation import Observer
 from mava.components.execution.preprocess import Batch
 from mava.components.execution.policy import DistributionPolicy
-from mava.components.execution.action_selection import OnlineActionSampling
+from mava.components.execution.action_selection import ActionSelector
 from mava.components.execution.update import OnlineUpdate

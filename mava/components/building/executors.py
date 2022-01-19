@@ -18,7 +18,7 @@
 from typing import Dict, Any, List
 
 from mava.core import SystemBuilder
-from mava.systems.executing import Executor as Exec
+from mava.systems.executing import Executor as Execute
 from mava.callbacks import Callback
 from mava.utils.decorators import execution, evaluation
 
@@ -58,7 +58,7 @@ class Executor(Callback):
             }
         )
 
-        builder.executor = Exec(self.config, self.components, self.evaluation)
+        builder.executor = Execute(self.config, self.components, self.evaluation)
 
     @evaluation
     def on_building_evaluator_make_evaluator(self, builder: SystemBuilder) -> None:
@@ -77,4 +77,4 @@ class Executor(Callback):
             }
         )
 
-        builder.evaluator = Exec(self.config, self.components, self.evaluation)
+        builder.evaluator = Execute(self.config, self.components, self.evaluation)
