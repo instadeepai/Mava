@@ -17,6 +17,7 @@
 
 from typing import Dict, Any, List
 
+from mava.systems.training import Trainer as Train
 from mava.core import SystemBuilder
 from mava.callbacks import Callback
 
@@ -24,7 +25,6 @@ from mava.callbacks import Callback
 class Trainer(Callback):
     def __init__(
         self,
-        config: Dict[str, Any],
         components: List[Callback],
     ):
         """[summary]
@@ -32,7 +32,6 @@ class Trainer(Callback):
         Args:
             trainer (SystemTrainer): [description]
         """
-        self.config = config
         self.components = components
 
     def on_building_trainer_make_trainer(self, builder: SystemBuilder) -> None:
@@ -64,7 +63,7 @@ class Trainer(Callback):
         )
 
         # trainer
-        builder.trainer = Trainer(self.config, self.components)
+        builder.trainer = Train(self.components)
 
     def on_building_trainer_end(self, builder: SystemBuilder) -> None:
         """[summary]"""

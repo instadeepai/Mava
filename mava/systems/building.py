@@ -39,13 +39,17 @@ class Builder(SystemBuilder, CallbackHookMixin):
             components (Dict[str, Dict[str, Callback]]): [description]
         """
 
-        self.callbacks = []
-        for component in components:
-            if "callbacks" in dir(component):
-                for sub_component in component:
-                    self.callbacks.append(sub_component)
-            else:
-                self.callbacks.append(component)
+        # self.callbacks = []
+        # for component in components:
+        #     if "callbacks" in dir(component):
+        #         for sub_component in component:
+        #             self.callbacks.append(sub_component)
+        #     else:
+        #         self.callbacks.append(component)
+
+        self.callbacks = components["builder"]
+        self.executor_components = components["executor"]
+        self.trainer_components = components["trainer"]
 
         self.on_building_init_start()
 

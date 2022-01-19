@@ -20,7 +20,9 @@ import reverb
 from mava.core import System
 from mava.systems.building import Builder
 from mava.components import building
+from mava.components import execution
 from mava.components.tf import building as tf_building
+from mava.components.tf import execution as tf_executing
 from mava.utils import enums
 
 # TODO (Arnu): figure out best way to send in system arguments
@@ -32,6 +34,10 @@ class MADDPG(System):
 
         self._config = config
         self._distribute = False
+
+        ###########
+        # Building
+        ###########
 
         # General setup
         setup = building.SystemSetup(
@@ -82,11 +88,28 @@ class MADDPG(System):
         # Trainer client
         trainer_client = tf_building.TrainerVariableClient()
 
+        ##########
         # Executor
-        executor = building.Executor()
+        ##########
+        observer = execution.Observer()
+        preprocess = execution.Batch()
+        policy = execution.DistributionPolicy()
+        action_selection = tf_executing.OnlineActionSampling()
 
+        executor_components = [
+            observer,
+            preprocess,
+            policy,
+            action_selection,
+        ]
+        executor = building.Executor(executor_components)
+
+        #########
         # Trainer
-        trainer = building.Trainer()
+        #########
+
+        trainer_components = []
+        trainer = building.Trainer(trainer_components)
 
         self._system_components = [
             setup,

@@ -20,10 +20,10 @@ import dm_env
 
 from mava import types
 from mava.core import SystemExecutor
-from mava.callbacks import Callback
+from mava.callbacks import Callback, CallbackHookMixin
 
 
-class Executor(SystemExecutor):
+class Executor(SystemExecutor, CallbackHookMixin):
     """A generic feed-forward executor.
     An executor based on a feed-forward policy for each agent in the system.
     """
@@ -94,11 +94,11 @@ class Executor(SystemExecutor):
         self._agent = agent
         self._observation = observation
 
-        self.on_execution_select_action_start(self)
+        self.on_execution_select_action_start()
 
-        self.on_execution_select_action(self)
+        self.on_execution_select_action()
 
-        self.on_execution_select_action_end(self)
+        self.on_execution_select_action_end()
 
         return self.action
 
@@ -118,11 +118,11 @@ class Executor(SystemExecutor):
         self._timestep = timestep
         self._extras = extras
 
-        self.on_execution_observe_first_start(self)
+        self.on_execution_observe_first_start()
 
-        self.on_execution_observe_first(self)
+        self.on_execution_observe_first()
 
-        self.on_execution_observe_first_end(self)
+        self.on_execution_observe_first_end()
 
     def observe(
         self,
@@ -143,11 +143,11 @@ class Executor(SystemExecutor):
         self._next_timestep = next_timestep
         self._next_extras = next_extras
 
-        self.on_execution_observe_start(self)
+        self.on_execution_observe_start()
 
-        self.on_execution_observe(self)
+        self.on_execution_observe()
 
-        self.on_execution_observe_end(self)
+        self.on_execution_observe_end()
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
@@ -167,11 +167,11 @@ class Executor(SystemExecutor):
         """
         self._observation = observations
 
-        self.on_execution_select_actions_start(self)
+        self.on_execution_select_actions_start()
 
-        self.on_execution_select_actions(self)
+        self.on_execution_select_actions()
 
-        self.on_execution_select_actions_end(self)
+        self.on_execution_select_actions_end()
 
         return self.actions_info
 
@@ -184,8 +184,8 @@ class Executor(SystemExecutor):
         """
         self._wait = wait
 
-        self.on_execution_update_start(self)
+        self.on_execution_update_start()
 
-        self.on_execution_update(self)
+        self.on_execution_update()
 
-        self.on_execution_update_end(self)
+        self.on_execution_update_end()

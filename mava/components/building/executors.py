@@ -24,9 +24,7 @@ from mava.utils.decorators import execution, evaluation
 
 
 class Executor(Callback):
-    def __init__(
-        self, config: Dict[str, Any], components: List[Callback], evaluation=False
-    ):
+    def __init__(self, components: List[Callback], evaluation=False):
         """[summary]
 
         Args:
@@ -34,7 +32,6 @@ class Executor(Callback):
             components (List[Callback]): [description]
             evaluator (bool, optional): [description]. Defaults to False.
         """
-        self.config = config
         self.components = components
         self.evaluation = evaluation
 
@@ -58,7 +55,7 @@ class Executor(Callback):
             }
         )
 
-        builder.executor = Execute(self.config, self.components, self.evaluation)
+        builder.executor = Execute(self.components, self.evaluation)
 
     @evaluation
     def on_building_evaluator_make_evaluator(self, builder: SystemBuilder) -> None:
@@ -77,4 +74,4 @@ class Executor(Callback):
             }
         )
 
-        builder.evaluator = Execute(self.config, self.components, self.evaluation)
+        builder.evaluator = Execute(self.components, self.evaluation)
