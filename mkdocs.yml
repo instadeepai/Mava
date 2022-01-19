@@ -8,10 +8,19 @@ strict: false
 
 theme:
   name: "material"
+  language: en
+  palette:
+    primary: indigo
+    accent: red
+  font:
+    text: Avenir Next
+  features:
+    - navigation.tracking
 
 plugins:
 - search
 - mkdocstrings
+
 
 markdown_extensions:
   - pymdownx.snippets:
@@ -23,3 +32,23 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Systems:
+    - General: systems/general.md
+    - Tensorflow:
+      - maddpg: systems/tf/maddpg.md
+      - mad4pg: systems/tf/mad4pg.md
+      - mappo: systems/tf/mappo.md
+      - madqn: systems/tf/madqn.md
+      - vdn: systems/tf/vdn.md
+      - qmix: systems/tf/qmix.md
+      - dial: systems/tf/dial.md
+  - Environments:
+    - General: environments/general.md
+    - Supported Environments:
+      - Debugging Env: environments/debugging.md
+      - PettingZoo: environments/pettingzoo.md
+      - SMAC: environments/smac.md
+      - Flatland: environments/flatland.md
+      - Robocup: environments/robocup.md
+      - Melting Pot: environments/meltingpot.md
+      - Open Spiel: environments/open_spiel.md
