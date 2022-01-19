@@ -14,6 +14,8 @@
 # limitations under the License.
 
 """MADDPG system implementation."""
+from types import SimpleNamespace
+from mava.callbacks.base import Callback
 
 import reverb
 
@@ -35,18 +37,16 @@ class MADDPG(System):
         self._config = config
         self._distribute = False
 
-        ###########
-        # Building
-        ###########
+        ##############################
+        # Data and variable management
+        ##############################
 
-        # General setup
         setup = building.SystemSetup(
             network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
             trainer_networks=enums.Trainer.single_trainer,
             termination_condition=None,
         )
 
-        # Replay table
         table = building.OffPolicyReplayTables(
             name=config.replay_table_name,
             sampler=reverb.selectors.Uniform(),
@@ -59,13 +59,11 @@ class MADDPG(System):
             signature=building.ParallelSequenceAdderSignature(),
         )
 
-        # Dataset
         dataset = building.DatasetIterator(
             batch_size=config.batch_size,
             prefetch_size=config.prefetch_size,
         )
 
-        # Adder
         adder = building.ParallelNStepTransitionAdder(
             net_to_ints=config.net_to_ints,
             table_network_config=config.table_network_config,
@@ -73,24 +71,22 @@ class MADDPG(System):
             discount=config.discount,
         )
 
-        # Variable server and clients
         variable_server = tf_building.VariableServer(
             checkpoint=config.checkpoint,
             checkpoint_subpath=config.checkpoint_subpath,
             checkpoint_minute_interval=config.checkpoint_minute_interval,
         )
 
-        # Executor client
         executor_client = tf_building.ExecutorVariableClient(
             executor_variable_update_period=config.executor_variable_update_period
         )
 
-        # Trainer client
         trainer_client = tf_building.TrainerVariableClient()
 
         ##########
         # Executor
         ##########
+
         observer = execution.Observer()
         preprocess = execution.Batch()
         policy = execution.DistributionPolicy()
@@ -104,6 +100,12 @@ class MADDPG(System):
         ]
         executor = building.Executor(executor_components)
 
+        ###########
+        # Evaluator
+        ###########
+
+        evaluator = building.Executor(executor_components, evaluation=True)
+
         #########
         # Trainer
         #########
@@ -111,23 +113,46 @@ class MADDPG(System):
         trainer_components = []
         trainer = building.Trainer(trainer_components)
 
-        self._system_components = [
-            setup,
-            table,
-            dataset,
-            adder,
-            variable_server,
-            executor_client,
-            trainer_client,
-            executor,
-            trainer,
-        ]
+        ########
+        # System
+        ########
+
+        self.system_components = SimpleNamespace(
+            setup=setup,
+            table=table,
+            dataset=dataset,
+            adder=adder,
+            variable_server=variable_server,
+            executor_client=executor_client,
+            trainer_client=trainer_client,
+            executor=executor,
+            evaluator=evaluator,
+            trainer=trainer,
+        )
+        self.component_names = list(self.system_components.__dict__.keys())
+
+    def update(self, component: Callback, name: str):
+        if name in self.component_names:
+            self.system_components.__dict__[name] = component
+        else:
+            raise Exception(
+                "The given component is not part of the current system. Perhaps try adding it instead using .add()."
+            )
+
+    def add(self, component: Callback, name: str):
+        if name in self.component_names:
+            raise Exception(
+                "The given component is already part of the current system. Perhaps try updating it instead using .update()."
+            )
+        else:
+            self.system_components.__dict__[name] = component
 
     def build(self, name="maddpg"):
         self._name = name
+        self._component_feed = list(self.system_components)
 
         # Builder
-        self._builder = Builder(components=self._system_components)
+        self._builder = Builder(components=self.system_components)
         self._builder.build()
 
     def distribute(self, num_executors=1, nodes_on_gpu=["trainer"]):

@@ -21,6 +21,7 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple, TypeVar, Union, S
 
 import dm_env
 import numpy as np
+from mava.callbacks.base import Callback
 import reverb
 import sonnet as snt
 from acme import core as acme_core
@@ -198,6 +199,14 @@ class SystemBuilder(abc.ABC):
 
 class System(abc.ABC):
     """Abstract system object."""
+
+    @abc.abstractmethod
+    def update(self, component: Callback) -> None:
+        """[summary]"""
+
+    @abc.abstractmethod
+    def add(self, component: Callback) -> None:
+        """[summary]"""
 
     @abc.abstractmethod
     def build(self, name: str) -> None:
