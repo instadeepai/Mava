@@ -17,7 +17,7 @@
 from acme.tf import utils as tf2_utils
 
 from mava.callbacks import Callback
-from mava.systems.execution import SystemExecutor
+from mava.core import SystemExecutor
 
 
 class ActionSelector(Callback):

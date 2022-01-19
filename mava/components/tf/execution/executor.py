@@ -21,7 +21,7 @@ from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
 from mava.callbacks import Callback
-from mava.systems.execution import SystemExecutor
+from mava.core import SystemExecutor
 
 
 class Executor(Callback):

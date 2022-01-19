@@ -16,7 +16,7 @@
 """Commonly used adder components for system builders"""
 
 from mava.callbacks import Callback
-from mava.systems.execution import SystemExecutor
+from mava.core import SystemExecutor
 
 
 class Policy(Callback):
