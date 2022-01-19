@@ -631,8 +631,6 @@ class MADQNRecurrentTrainer:
         )
         data = tf2_utils.batch_to_sequence(data)
 
-        print(data)
-
         # Note (dries): The unused variable is start_of_episodes.
         observations, actions, rewards, discounts, _, extras = (
             data.observations,
@@ -649,7 +647,7 @@ class MADQNRecurrentTrainer:
         # core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
         # target_core_state = tree.map_structure(tf.identity, core_state)
         core_state = tree.map_structure(lambda s: s[0, :, :], extras["core_states"])
-        target_core_state = tree.map_structure(lambda s: s[1, :, :], extras["core_states"])
+        target_core_state = tree.map_structure(lambda s: s[0, :, :], extras["core_states"])
 
         # TODO (dries): Take out all the data_points that does not need
         #  to be processed here at the start. Therefore it does not have
@@ -667,14 +665,17 @@ class MADQNRecurrentTrainer:
                 agent_key = self._agent_net_keys[agent]
 
                 # Double Q-learning
+                print(core_state[agent][0])
+                print(obs_trans[agent].shape)
                 q, _ = snt.static_unroll(
-                    self._value_networks[agent_key], obs_trans, core_state[agent][0]
+                    self._value_networks[agent_key], obs_trans[agent], core_state[agent][0]
                 )
                 q_tm1 = q[:-1]   
                 q_t_selector = q[1:]
                 q_t_value, _ = snt.static_unroll(
-                    self._target_value_networks[agent_key], target_obs_trans[1:], target_core_state[agent][0]
+                    self._target_value_networks[agent_key], target_obs_trans[agent], target_core_state[agent][0]
                 )
+                q_t_value = q_t_value[1:]
 
                 # TODO Legal action masking
                 # q_t_selector = tf.where(observations[agent].legal_actions, q_t_selector, -999999999)

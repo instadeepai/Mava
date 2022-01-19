@@ -282,7 +282,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
             self._variable_client.get_async()
 
 
-class MADQNRecurrentExecutor(executors.RecurrentExecutor, MADQNFeedForwardExecutor):
+class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
     """A recurrent executor for MADQN.
 
     An executor based on a recurrent policy for each agent in the system.

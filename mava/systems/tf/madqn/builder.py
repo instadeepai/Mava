@@ -319,6 +319,8 @@ class MADQNBuilder:
             for table_key in self._config.table_network_config.keys()
         }
 
+        print()
+
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
