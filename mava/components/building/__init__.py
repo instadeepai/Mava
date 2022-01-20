@@ -28,4 +28,4 @@ from mava.components.building.rate_limiters import OffPolicyRateLimiter
 from mava.components.building.setup import SystemSetup
 from mava.components.building.tables import OffPolicyReplayTables
 from mava.components.building.trainers import Trainer
-from mava.components.building.variable_source import VariableSource
+from mava.components.building.variable_server import VariableSource

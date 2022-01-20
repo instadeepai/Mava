@@ -21,9 +21,15 @@ from mava.systems.launcher import Launcher, NodeType
 
 class Distributor(Callback):
     def __init__(
-        self, num_executors, multi_process=True, nodes_on_gpu=["trainer"], name="System"
+        self,
+        num_executors,
+        multi_process=True,
+        nodes_on_gpu=["trainer"],
+        run_evaluator=True,
+        name="System",
     ):
         self._num_executors = num_executors
+        self._run_evaluator = run_evaluator
         # Create the launcher program
         self._program = Launcher(
             multi_process=multi_process, nodes_on_gpu=nodes_on_gpu, name=name
@@ -38,30 +44,39 @@ class Distributor(Callback):
         )
 
         # trainer node
+        # TODO (dries): This still need to be converted into a loop,
+        # where multiple trainers are possible.
+        trainer_id = 0
         trainer = builder._program.add(
-            builder.trainer, tables, node_type=NodeType.corrier, name="trainer"
-        )
-
-        # evaluator node
-        evaluator = builder._program.add(
-            builder.evaluator, trainer, node_type=NodeType.corrier, name="evaluator"
+            builder.trainer,
+            [trainer_id, tables],
+            node_type=NodeType.corrier,
+            name="trainer",
         )
 
         # executor nodes
         executors = [
             builder._program.add(
                 builder.executor,
-                [tables, trainer],
+                [executor_id, tables, trainer],
                 node_type=NodeType.corrier,
                 name="executor",
             )
-            for _ in range(self._num_executors)
+            for executor_id in range(self._num_executors)
         ]
+
+        var_args = [trainer, executors]
+        if self._run_evaluator:
+            # evaluator node
+            evaluator = builder._program.add(
+                builder.evaluator, trainer, node_type=NodeType.corrier, name="evaluator"
+            )
+            var_args.append(evaluator)
 
         # variable server node
         _ = builder._program.add(
             builder.variable_server,
-            [trainer, executors, evaluator],
+            var_args,
             node_type=NodeType.corrier,
             name="variable_server",
         )

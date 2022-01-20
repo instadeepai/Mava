@@ -15,14 +15,13 @@
 
 """MADDPG system implementation."""
 import abc
-
-from typing import Any, List
 from types import SimpleNamespace
+from typing import Any, List
 
 from mava.callbacks.base import Callback
+from mava.components import building
 from mava.core import BaseSystem
 from mava.systems.building import Builder
-from mava.components import building
 
 
 class System(BaseSystem):
@@ -66,6 +65,7 @@ class System(BaseSystem):
             num_executors=num_executors,
             multi_process=multi_process,
             nodes_on_gpu=nodes_on_gpu,
+            run_evaluator="evaluator" in list(self.system_components.__dict__.keys()),
             name=name,
         )
         self.add(distribute)

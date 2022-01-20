@@ -15,15 +15,14 @@
 
 """MADDPG system implementation."""
 from types import SimpleNamespace
-from mava.systems.tf.maddpg.builder import MADDPGConfig
 
 import reverb
 
-from mava.systems.system import System
-from mava.components import building
-from mava.components import execution
+from mava.components import building, execution
 from mava.components.tf import building as tf_building
 from mava.components.tf import execution as tf_executing
+from mava.systems.system import System
+from mava.systems.tf.maddpg.builder import MADDPGConfig
 from mava.utils import enums
 
 
@@ -110,7 +109,7 @@ class MADDPG(System):
         # System
         ########
 
-        self.system_components = SimpleNamespace(
+        return SimpleNamespace(
             setup=setup,
             table=table,
             dataset=dataset,
