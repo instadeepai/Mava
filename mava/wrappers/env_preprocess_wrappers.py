@@ -360,3 +360,36 @@ class StandardizeRewardParallel(
 
     def _modify_action(self, action: Action) -> Action:
         return action
+
+class ConcatAgentIdToObservation:
+    """Concat one-hot vector of agent ID to obs.
+    
+    We assume the environment has an ordered list 
+    self.possible_agents.
+    """
+
+    def __init__(self):
+        pass
+
+    def reset(self):
+        pass
+
+    def step(self, actions: Dict) -> Any:
+        pass
+
+class ConcatPrevActionToObservation:
+    """Concat one-hot vector of agent prev_action to obs.
+    
+    We assume the environment has discreet actions.
+
+    TODO support continuous actions.
+    """
+
+    def __init__(self):
+        pass
+
+    def reset(self):
+        pass
+
+    def step(self, actions: Dict) -> Any:
+        pass

@@ -394,12 +394,6 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
             action and policy.
         """
 
-        # Initialize the RNN state if necessary.
-        if self._states[agent] is None:
-            # index network either on agent type or on agent id
-            agent_key = self._agent_net_keys[agent]
-            self._states[agent] = self._value_networks[agent_key].initia_state(1)
-
         # Step the recurrent policy forward given the current observation and state.
         action, new_state = self._policy(
             agent, observation.observation, observation.legal_actions, self._states[agent]

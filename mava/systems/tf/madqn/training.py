@@ -643,9 +643,6 @@ class MADQNRecurrentTrainer:
 
         # Get initial state for the LSTM from replay and
         # extract the first state in the sequence.
-        # NOTE maybe indexing the wrong thing here?!
-        # core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])
-        # target_core_state = tree.map_structure(tf.identity, core_state)
         core_state = tree.map_structure(lambda s: s[0, :, :], extras["core_states"])
         target_core_state = tree.map_structure(lambda s: s[0, :, :], extras["core_states"])
 
@@ -668,14 +665,14 @@ class MADQNRecurrentTrainer:
                 q, _ = snt.static_unroll(
                     self._value_networks[agent_key], obs_trans[agent], core_state[agent][0]
                 )
-                q_tm1 = q[:-1]   
-                q_t_selector = q[1:]
+                q_tm1 = q[:-1] # Chop off last timestep
+                q_t_selector = q[1:] # Chop off first timestep
                 q_t_value, _ = snt.static_unroll(
                     self._target_value_networks[agent_key], target_obs_trans[agent], target_core_state[agent][0]
                 )
-                q_t_value = q_t_value[1:]
+                q_t_value = q_t_value[1:] # Chop off first timestep
 
-                # TODO Legal action masking
+                # Legal action masking
                 q_t_selector = tf.where(tf.cast(observations[agent].legal_actions[1:], 'bool'), q_t_selector, -999999999)
 
                 # Cast the additional discount to match
@@ -683,7 +680,7 @@ class MADQNRecurrentTrainer:
                 discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
 
                 # Flatten out time and batch dim
-                q_tm1, dims = train_utils.combine_dim(
+                q_tm1, _ = train_utils.combine_dim(
                     q_tm1
                 )
                 q_t_selector, _ = train_utils.combine_dim(
@@ -693,13 +690,13 @@ class MADQNRecurrentTrainer:
                     q_t_value
                 )
                 a_tm1, _ = train_utils.combine_dim(
-                    actions[agent][:-1]
+                    actions[agent][:-1] # Chop off last timestep
                 )
                 r_t, _ = train_utils.combine_dim(
-                    rewards[agent][:-1]
+                    rewards[agent][:-1] # Chop off last timestep
                 )
                 d_t, _ = train_utils.combine_dim(
-                    discounts[agent][:-1]
+                    discounts[agent][:-1] # Chop off last timestep
                 )
 
                 # Value loss

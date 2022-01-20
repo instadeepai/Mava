@@ -43,7 +43,7 @@ from mava.wrappers import SMACWrapper
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "8m",
+    "corridor",
     "Starcraft 2 micromanagement map name (str).",
 )
 
