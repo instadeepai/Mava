@@ -18,10 +18,10 @@ import abc
 from types import SimpleNamespace
 from typing import Any, List
 
-from mava.callbacks.base import Callback
+from mava.callbacks import Callback
 from mava.components import building
 from mava.core import BaseSystem
-from mava.systems.building import Builder
+from mava.systems import Builder
 
 
 class System(BaseSystem):

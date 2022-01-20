@@ -18,7 +18,7 @@
 from typing import Dict, Any, List
 
 from mava.core import SystemBuilder
-from mava.systems.executing import Executor as Execute
+from mava.systems import Executor as Execute
 from mava.callbacks import Callback
 from mava.utils.decorators import execution, evaluation
 

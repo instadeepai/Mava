@@ -15,9 +15,9 @@
 
 """Trainer components for system builders"""
 
-from typing import Dict, Any, List
+from typing import List
 
-from mava.systems.training import Trainer as Train
+from mava.systems import Trainer as Train
 from mava.core import SystemBuilder
 from mava.callbacks import Callback
 
