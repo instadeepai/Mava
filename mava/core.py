@@ -17,6 +17,7 @@
 """Core Mava interfaces."""
 
 import abc
+from types import SimpleNamespace
 from typing import Any, Dict, Iterator, List, Optional, Tuple, TypeVar, Union, Sequence
 
 import dm_env
@@ -197,8 +198,14 @@ class SystemBuilder(abc.ABC):
         """[summary]"""
 
 
-class System(abc.ABC):
+class BaseSystem(abc.ABC):
     """Abstract system object."""
+
+    # TODO (Arnu): change config type once decided what will work best.
+    # e.g. dataclass or dict etc.
+    @abc.abstractmethod
+    def configure(self, config: Any) -> SimpleNamespace:
+        """[summary]"""
 
     @abc.abstractmethod
     def update(self, component: Callback) -> None:

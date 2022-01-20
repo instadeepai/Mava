@@ -19,7 +19,7 @@ from mava.callbacks.base import Callback
 
 import reverb
 
-from mava.core import System
+from mava.systems.system import System
 from mava.systems.building import Builder
 from mava.components import building
 from mava.components import execution
@@ -32,10 +32,7 @@ system_config = {"setup": {}, "table": {}, "dataset": {}}
 
 
 class MADDPG(System):
-    def __init__(self, config):
-
-        self._config = config
-        self._distribute = False
+    def configure(self, config):
 
         ##############################
         # Data and variable management
@@ -129,50 +126,6 @@ class MADDPG(System):
             evaluator=evaluator,
             trainer=trainer,
         )
-        self.component_names = list(self.system_components.__dict__.keys())
-
-    def update(self, component: Callback, name: str):
-        if name in self.component_names:
-            self.system_components.__dict__[name] = component
-        else:
-            raise Exception(
-                "The given component is not part of the current system. Perhaps try adding it instead using .add()."
-            )
-
-    def add(self, component: Callback, name: str):
-        if name in self.component_names:
-            raise Exception(
-                "The given component is already part of the current system. Perhaps try updating it instead using .update()."
-            )
-        else:
-            self.system_components.__dict__[name] = component
-
-    def build(self, name="maddpg"):
-        self._name = name
-        self._component_feed = list(self.system_components)
-
-        # Builder
-        self._builder = Builder(components=self.system_components)
-        self._builder.build()
-
-    def distribute(self, num_executors=1, nodes_on_gpu=["trainer"]):
-        self._distribute = True
-
-        # Distributor
-        distributor = building.Distributor(
-            num_executors=num_executors,
-            multi_process=True,
-            nodes_on_gpu=nodes_on_gpu,
-            name=self._name,
-        )
-        self._system_components.append(distributor)
-
-    def launch(self):
-        if not self._distribute:
-            distributor = building.Distributor(multi_process=False)
-            self._system_components.append(distributor)
-
-        self._builder.launch()
 
 
 ## Example of create/launching system
