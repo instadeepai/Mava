@@ -60,8 +60,6 @@ class System(BaseSystem):
         distributor: Callback = None,
     ):
 
-        component_feed = list(self.system_components.__dict__.values())
-
         # Distributor
         distributor_fn = distributor if distributor else building.Distributor
         distribute = distributor_fn(
@@ -70,7 +68,9 @@ class System(BaseSystem):
             nodes_on_gpu=nodes_on_gpu,
             name=name,
         )
-        component_feed.append(distribute)
+        self.add(distribute)
+
+        component_feed = list(self.system_components.__dict__.values())
 
         # Builder
         self._builder = Builder(components=component_feed)
