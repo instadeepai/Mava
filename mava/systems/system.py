@@ -57,18 +57,20 @@ class System(BaseSystem):
         multi_process: str = False,
         nodes_on_gpu: List[str] = ["trainer"],
         name: str = "system",
+        distributor: Callback = None,
     ):
 
         component_feed = list(self.system_components.__dict__.values())
 
         # Distributor
-        distributor = building.Distributor(
+        distributor_fn = distributor if distributor else building.Distributor
+        distribute = distributor_fn(
             num_executors=num_executors,
             multi_process=multi_process,
             nodes_on_gpu=nodes_on_gpu,
             name=name,
         )
-        component_feed.append(distributor)
+        component_feed.append(distribute)
 
         # Builder
         self._builder = Builder(components=component_feed)
