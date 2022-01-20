@@ -43,43 +43,39 @@ class Distributor(Callback):
             builder.tables, node_type=NodeType.reverb, name="tables"
         )
 
-        # trainer node
-        # TODO (dries): This still need to be converted into a loop,
-        # where multiple trainers are possible.
-        trainer_id = 0
-        trainer = builder._program.add(
-            builder.trainer,
-            [trainer_id, tables],
-            node_type=NodeType.corrier,
-            name="trainer",
-        )
-
-        # executor nodes
-        executors = [
-            builder._program.add(
-                builder.executor,
-                [executor_id, tables, trainer],
-                node_type=NodeType.corrier,
-                name="executor",
-            )
-            for executor_id in range(self._num_executors)
-        ]
-
-        var_args = [trainer, executors]
-        if self._run_evaluator:
-            # evaluator node
-            evaluator = builder._program.add(
-                builder.evaluator, trainer, node_type=NodeType.corrier, name="evaluator"
-            )
-            var_args.append(evaluator)
-
         # variable server node
-        _ = builder._program.add(
+        variable_server = builder._program.add(
             builder.variable_server,
-            var_args,
             node_type=NodeType.corrier,
             name="variable_server",
         )
+
+        # trainer nodes
+        for trainer_id in builder.trainer_networks.keys():
+            builder._program.add(
+                builder.trainer,
+                [trainer_id, tables, variable_server],
+                node_type=NodeType.corrier,
+                name="trainer",
+            )
+
+        # executor nodes
+        for executor_id in range(self._num_executors):
+            builder._program.add(
+                builder.executor,
+                [executor_id, tables, variable_server],
+                node_type=NodeType.corrier,
+                name="executor",
+            )
+
+        if self._run_evaluator:
+            # evaluator node
+            builder._program.add(
+                builder.evaluator,
+                variable_server,
+                node_type=NodeType.corrier,
+                name="evaluator",
+            )
 
     def on_building_launch_distributor(self, builder: SystemBuilder):
         builder._program.launch()
