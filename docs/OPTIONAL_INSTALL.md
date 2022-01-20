@@ -1,1 +1,1 @@
---8<-- OPTIONAL_INSTALL.md
+--8<-- "OPTIONAL_INSTALL.md"
