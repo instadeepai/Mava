@@ -279,8 +279,8 @@ class SMACWrapper(ParallelEnvWrapper):
         Returns:
             extra stats to be logged.
         """
-        
-        return {"win_rate": self._info["win_rate"]}
+        pass
+        # return {"win_rate": self._info["win_rate"]}
 
     @property
     def agents(self) -> List:

@@ -665,8 +665,6 @@ class MADQNRecurrentTrainer:
                 agent_key = self._agent_net_keys[agent]
 
                 # Double Q-learning
-                print(core_state[agent][0])
-                print(obs_trans[agent].shape)
                 q, _ = snt.static_unroll(
                     self._value_networks[agent_key], obs_trans[agent], core_state[agent][0]
                 )
@@ -678,7 +676,7 @@ class MADQNRecurrentTrainer:
                 q_t_value = q_t_value[1:]
 
                 # TODO Legal action masking
-                # q_t_selector = tf.where(observations[agent].legal_actions, q_t_selector, -999999999)
+                q_t_selector = tf.where(tf.cast(observations[agent].legal_actions[1:], 'bool'), q_t_selector, -999999999)
 
                 # Cast the additional discount to match
                 # the environment discount dtype.

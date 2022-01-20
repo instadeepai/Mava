@@ -27,18 +27,23 @@ from acme import types
 from mava import specs as mava_specs
 from mava.components.tf import networks
 from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationTimestepScheduler,
+    LinearExplorationScheduler,
 )
 from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
+from mava.utils.enums import ArchitectureType
+
+from smac.env import StarCraft2Env
+from mava.wrappers import SMACWrapper
+
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "3m",
+    "8m",
     "Starcraft 2 micromanagement map name (str).",
 )
 
@@ -49,62 +54,24 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
+def smac_env_factory(env_name="3m", evaluation = False):
+    env = StarCraft2Env(map_name=env_name)
+    env = SMACWrapper(env)
 
-def custom_recurrent_network(
-    environment_spec: mava_specs.MAEnvironmentSpec,
-    agent_net_keys: Dict[str, str],
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = [128, 128],
-) -> Mapping[str, types.TensorTransformation]:
-    """Creates networks used by the agents."""
-
-    specs = environment_spec.get_agent_specs()
-
-    # Create agent_type specs
-    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
-
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
-
-    q_networks = {}
-    action_selectors = {}
-    for key in specs.keys():
-
-        # Get total number of action dimensions from action spec.
-        num_dimensions = specs[key].actions.num_values
-
-        # Create the policy network.
-        q_network = snt.DeepRNN(
-            [
-                snt.Linear(q_networks_layer_sizes[key][0]),
-                tf.nn.relu,
-                snt.GRU(q_networks_layer_sizes[key][1]),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
-        )
-
-        # epsilon greedy action selector
-        action_selector = EpsilonGreedy
-
-        q_networks[key] = q_network
-        action_selectors[key] = action_selector
-
-    return {
-        "q_networks": q_networks,
-        "action_selectors": action_selectors,
-    }
+    return env
 
 
 def main(_: Any) -> None:
     """Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
     # environment
     environment_factory = functools.partial(
-        pettingzoo_utils.make_environment, env_class="smac", env_name=FLAGS.map_name
+        smac_env_factory, env_name=FLAGS.map_name
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        custom_recurrent_network,
-        q_networks_layer_sizes=[128, 128],
+        madqn.make_default_networks,
+        archecture_type=ArchitectureType.recurrent
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -127,17 +94,21 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationTimestepScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=50000
+        exploration_scheduler_fn=LinearExplorationScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
         ),
         optimizer=snt.optimizers.RMSProp(
             learning_rate=0.0005, epsilon=0.00001, decay=0.99
         ),
         checkpoint_subpath=checkpoint_dir,
         batch_size=32,
-        executor_variable_update_period=100,
+        executor_variable_update_period=200,
         target_update_period=200,
-        max_gradient_norm=10.0,
+        max_gradient_norm=20.0,
+        sequence_length=60,
+        period=60,
+        min_replay_size=100,
+        max_replay_size=4000,
         trainer_fn=madqn.training.MADQNRecurrentTrainer,
         executor_fn=madqn.execution.MADQNRecurrentExecutor,
     ).build()
