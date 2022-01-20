@@ -19,7 +19,8 @@ import gym
 import numpy as np
 from pettingzoo.utils import BaseParallelWraper
 from supersuit.utils.base_aec_wrapper import BaseWrapper
-
+import dm_env
+from mava.types import OLT
 from mava.types import Action, Observation, Reward
 from mava.utils.wrapper_utils import RunningMeanStd
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
@@ -368,14 +369,77 @@ class ConcatAgentIdToObservation:
     self.possible_agents.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, environment):
+        self._environment = environment 
+        self._num_agents = len(environment.possible_agents)
 
     def reset(self):
-        pass
+        timestep, extras = self._environment.reset()
+        old_observations = timestep.observation
+        
+        new_observations = {}
+
+        for agent_id, agent in enumerate(self._environment.possible_agents):
+            agent_olt = old_observations[agent]
+            
+            agent_observation = agent_olt.observation
+            agent_one_hot = np.zeros(self._num_agents, dtype = agent_observation.dtype)
+            agent_one_hot[agent_id] = 1
+
+            new_observations[agent] = OLT(
+                observation = np.concatenate([agent_one_hot, agent_observation]), 
+                legal_actions= agent_olt.legal_actions, 
+                terminal=agent_olt.terminal
+            )
+
+        return dm_env.TimeStep(timestep.step_type, timestep.reward, timestep.discount, new_observations), extras
+
 
     def step(self, actions: Dict) -> Any:
-        pass
+        timestep, extras = self._environment.step(actions)
+
+        old_observations = timestep.observation
+        new_observations = {}
+        for agent_id, agent in enumerate(self._environment.possible_agents):
+            agent_olt = old_observations[agent]
+
+            agent_observation = agent_olt.observation
+            agent_one_hot = np.zeros(self._num_agents, dtype = agent_observation.dtype)
+            agent_one_hot[agent_id] = 1
+
+            new_observations[agent] = OLT(
+                observation = np.concatenate([agent_one_hot, agent_observation]),
+                legal_actions=agent_olt.legal_actions,
+                terminal=agent_olt.terminal
+            )
+            
+
+        return dm_env.TimeStep(timestep.step_type, timestep.reward, timestep.discount, new_observations), extras
+
+    def observation_spec(self) -> Dict[str, OLT]:
+        """Observation spec.
+
+        Returns:
+            types.Observation: spec for environment.
+        """
+        timestep, extras =  self.reset()
+        observations = timestep.observation
+        return observations
+
+    def __getattr__(self, name: str) -> Any:
+        """Expose any other attributes of the underlying environment.
+
+        Args:
+            name (str): attribute.
+
+        Returns:
+            Any: return attribute from env or underlying env.
+        """
+        if hasattr(self.__class__, name):
+            return self.__getattribute__(name)
+        else:
+            return getattr(self._environment, name)
+
 
 class ConcatPrevActionToObservation:
     """Concat one-hot vector of agent prev_action to obs.
@@ -384,12 +448,21 @@ class ConcatPrevActionToObservation:
 
     TODO support continuous actions.
     """
-
-    def __init__(self):
+    
+    def __init__(self, environment):
         pass
 
+        self._env
+        self._prev_act
+        self._num_agents
+
     def reset(self):
+        prev_act = zero_vector
         pass
 
     def step(self, actions: Dict) -> Any:
-        pass
+        timestep, extras = self.env.step(actions)
+        obs = concat(self.prev_actions, obs)
+
+        self.prev_actions = actions
+        return timestep, extras

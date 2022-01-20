@@ -35,7 +35,7 @@ class SMACWrapper(ParallelEnvWrapper):
     def __init__(
         self,
         environment: StarCraft2Env,
-        return_state_info: bool = False,
+        return_state_info: bool = True,
     ):
         """Constructor for parallel PZ wrapper.
 
@@ -279,8 +279,7 @@ class SMACWrapper(ParallelEnvWrapper):
         Returns:
             extra stats to be logged.
         """
-        pass
-        # return {"win_rate": self._info["win_rate"]}
+        return self._info
 
     @property
     def agents(self) -> List:

@@ -35,7 +35,6 @@ def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
     value_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
-    architecture_type: ArchitectureType = ArchitectureType.feedforward,
     seed: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
     """Default networks for maddpg.
@@ -62,20 +61,11 @@ def make_default_networks(
     Returns:
         returned agent networks.
     """
-    # Set Policy function and layer size
-    # Default size per arch type.
-    if architecture_type == ArchitectureType.feedforward:
-        if not value_networks_layer_sizes:
-            value_networks_layer_sizes = (
-                256,
-                256,
-                256,
-            )
-        value_network_func = snt.Sequential
-    elif architecture_type == ArchitectureType.recurrent:
-        if not value_networks_layer_sizes:
-            value_networks_layer_sizes = (128, 64)
-        value_network_func = snt.DeepRNN
+
+    if not value_networks_layer_sizes:
+        value_networks_layer_sizes = (128, 64)
+
+    value_network_func = snt.DeepRNN
 
     assert value_networks_layer_sizes is not None
     assert value_network_func is not None
@@ -104,22 +94,14 @@ def make_default_networks(
         # An optional network to process observations
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
-        # Create the policy network.
-        if architecture_type == ArchitectureType.feedforward:
-            value_network = [
-                networks.LayerNormMLP(
-                    value_networks_layer_sizes[key], activate_final=True, seed=seed
-                ),
-            ]
-        elif architecture_type == ArchitectureType.recurrent:
-            value_network = [
-                networks.LayerNormMLP(
-                    value_networks_layer_sizes[key][:-1],
-                    activate_final=True,
-                    seed=seed,
-                ),
-                snt.GRU(value_networks_layer_sizes[key][-1]),
-            ]
+        value_network = [
+            networks.LayerNormMLP(
+                value_networks_layer_sizes[key][:-1],
+                activate_final=True,
+                seed=seed,
+            ),
+            snt.GRU(value_networks_layer_sizes[key][-1]),
+        ]
 
         value_network += [
             networks.NearZeroInitializedLinear(num_actions, seed=seed),

@@ -407,7 +407,6 @@ class MADQNRecurrentTrainer:
         agent_net_keys: Dict[str, str],
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
-        #bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise Recurrent MADDPG trainer
@@ -594,7 +593,7 @@ class MADQNRecurrentTrainer:
         """Depricated"""
         pass
 
-    @tf.function
+    # @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -603,16 +602,15 @@ class MADQNRecurrentTrainer:
         Returns:
             losses
         """
-
-        # Update the target networks
-        self._update_target_networks()
-
         # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
 
         self._forward(sample)
 
         self._backward()
+
+        # Update the target networks
+        self._update_target_networks()
 
         # Log losses per agent
         return train_utils.map_losses_per_agent_value(

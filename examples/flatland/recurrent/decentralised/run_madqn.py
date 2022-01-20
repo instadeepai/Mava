@@ -16,36 +16,23 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any, Dict
 
 import launchpad as lp
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
-from acme import types
 
-from mava import specs as mava_specs
-from mava.components.tf import networks
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
-from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
+from mava.utils.environments.flatland_utils import flatland_env_factory
 from mava.utils.loggers import logger_utils
 from mava.utils.enums import ArchitectureType
 
-from smac.env import StarCraft2Env
-from mava.wrappers import SMACWrapper
-
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string(
-    "map_name",
-    "3m",
-    "Starcraft 2 micromanagement map name (str).",
-)
 
 flags.DEFINE_string(
     "mava_id",
@@ -54,25 +41,36 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
-def smac_env_factory(env_name="3m", evaluation = False):
-    env = StarCraft2Env(map_name=env_name)
-    env = SMACWrapper(env)
 
-    return env
+# flatland environment config
+flatland_env_config: Dict = {
+    "n_agents": 3,
+    "x_dim": 30,
+    "y_dim": 30,
+    "n_cities": 2,
+    "max_rails_between_cities": 2,
+    "max_rails_in_city": 3,
+    "seed": 0,
+    "malfunction_rate": 1 / 200,
+    "malfunction_min_duration": 20,
+    "malfunction_max_duration": 50,
+    "observation_max_path_depth": 30,
+    "observation_tree_depth": 2,
+}
 
 
 def main(_: Any) -> None:
-    """Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
-    # environment
+
+    # Environment.
     environment_factory = functools.partial(
-        smac_env_factory, env_name=FLAGS.map_name
+        flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
         madqn.make_default_networks,
         architecture_type=ArchitectureType.recurrent
-    )
+        )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
@@ -97,26 +95,26 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationScheduler(
             epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
         ),
-        optimizer=snt.optimizers.RMSProp(
-            learning_rate=0.0005, epsilon=0.00001, decay=0.99
-        ),
-        checkpoint_subpath=checkpoint_dir,
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         batch_size=32,
         executor_variable_update_period=200,
         target_update_period=200,
         max_gradient_norm=20.0,
-        sequence_length=60,
-        period=60,
+        sequence_length=20,
+        period=10,
         min_replay_size=100,
-        max_replay_size=4000,
+        max_replay_size=5000,
         trainer_fn=madqn.training.MADQNRecurrentTrainer,
         executor_fn=madqn.execution.MADQNRecurrentExecutor,
+        checkpoint_subpath=checkpoint_dir,
     ).build()
 
-    # launch
+    # Ensure only trainer runs on gpu, while other processes run on cpu.
     local_resources = lp_utils.to_device(
         program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )
+
+    # Launch.
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,

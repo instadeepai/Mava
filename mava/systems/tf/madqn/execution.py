@@ -417,7 +417,6 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         Returns:
             actions and policies for all agents in the system.
         """
-
         actions = {}
         for agent, observation in observations.items():
             actions[agent] = self.select_action(agent, observation)
@@ -436,7 +435,6 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
             extras: possible extra information
                 to record during the first step.
         """
-
         # Re-initialize the RNN state.
         for agent, _ in timestep.observation.items():
             # index network either on agent type or on agent id
@@ -477,7 +475,6 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
             next_extras: possible extra
                 information to record during the transition.
         """
-
         if not self._adder:
             return
 

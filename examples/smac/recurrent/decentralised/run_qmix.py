@@ -16,25 +16,20 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any
 
 import launchpad as lp
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
-from acme import types
 
-from mava import specs as mava_specs
-from mava.components.tf import networks
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
-from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
-from mava.systems.tf import madqn
+from mava.systems.tf import value_decomposition
 from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
-from mava.utils.enums import ArchitectureType
+
+from mava.systems.tf.value_decomposition.mixer import QMIX
 
 from smac.env import StarCraft2Env
 from mava.wrappers import SMACWrapper
@@ -70,8 +65,7 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks,
-        architecture_type=ArchitectureType.recurrent
+        value_decomposition.make_default_networks,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -88,14 +82,17 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
+    num_agents = len(environment_factory().possible_agents)
+
     # distributed program
-    program = madqn.MADQN(
+    program = value_decomposition.ValueDecomposition(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        mixer=QMIX(num_agents=num_agents),
         logger_factory=logger_factory,
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=3e-5
         ),
         optimizer=snt.optimizers.RMSProp(
             learning_rate=0.0005, epsilon=0.00001, decay=0.99
@@ -108,9 +105,7 @@ def main(_: Any) -> None:
         sequence_length=60,
         period=60,
         min_replay_size=100,
-        max_replay_size=4000,
-        trainer_fn=madqn.training.MADQNRecurrentTrainer,
-        executor_fn=madqn.execution.MADQNRecurrentExecutor,
+        max_replay_size=5000,
     ).build()
 
     # launch
