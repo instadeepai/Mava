@@ -254,3 +254,45 @@ class SystemVariableServer(abc.ABC):
         """Run the variable source. This function allows for
         checkpointing and other centralised computations to
         be performed by the variable server."""
+
+
+class SystemVariableClient(abc.ABC):
+    @abc.abstractmethod
+    def get_async(self) -> None:
+        """Asynchronously updates the get variables with the latest copy from source."""
+
+    @abc.abstractmethod
+    def set_async(self) -> None:
+        """Asynchronously updates source with the set variables."""
+
+    @abc.abstractmethod
+    def set_and_get_async(self) -> None:
+        """Asynchronously updates source and gets from source."""
+
+    @abc.abstractmethod
+    def add_async(self, names: List[str], vars: Dict[str, Any]) -> None:
+        """Asynchronously adds to source variables."""
+
+    @abc.abstractmethod
+    def add_and_wait(self, names: List[str], vars: Dict[str, Any]) -> None:
+        """Adds the specified variables to the corresponding variables in source
+        and waits for the process to complete before continuing."""
+
+    @abc.abstractmethod
+    def get_and_wait(self) -> None:
+        """Updates the get variables with the latest copy from source
+        and waits for the process to complete before continuing."""
+
+    @abc.abstractmethod
+    def get_all_and_wait(self) -> None:
+        """Updates all the variables with the latest copy from source
+        and waits for the process to complete before continuing."""
+
+    @abc.abstractmethod
+    def set_and_wait(self) -> None:
+        """Updates source with the set variables
+        and waits for the process to complete before continuing."""
+
+    @abc.abstractmethod
+    def _copy(self, new_variables: Dict[str, Any]) -> None:
+        """Copies the new variables to the old ones."""

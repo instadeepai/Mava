@@ -16,11 +16,12 @@
 """Mava variable server implementation."""
 
 
-from typing import Dict, Sequence, Union, List
+from typing import Dict, Sequence, Union, List, Any
 
 import numpy as np
 
 from mava.core import SystemVariableServer
+from mava.core import SystemVariableClient
 from mava.callbacks import Callback
 from mava.callbacks import CallbackHookMixin
 from mava.utils.training_utils import non_blocking_sleep
@@ -42,13 +43,13 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
         """
         self.callbacks = components
 
-        self.on_variables_init_start()
+        self.on_variables_server_init_start()
 
-        self.on_variables_init()
+        self.on_variables_server_init()
 
-        self.on_variables_checkpoint()
+        self.on_variables_server_checkpoint()
 
-        self.on_variables_init_end()
+        self.on_variables_server_init_end()
 
     def get_variables(
         self, names: Union[str, Sequence[str]]
@@ -123,7 +124,7 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
 
             # Add 1 extra second just to make sure that the checkpointer
             # is ready to save.
-            self.on_building_variable_run_server_loop_start()
+            self.on_variables_run_server_loop_start()
 
             self.on_variables_run_server_loop_checkpoint()
 
@@ -131,4 +132,101 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
 
             self.on_variables_run_server_loop_termination()
 
-            self.on_building_variable_run_server_loop_end()
+            self.on_variables_run_server_loop_end()
+
+
+class VariableClient(SystemVariableClient, CallbackHookMixin):
+    """A variable client for updating variables from a remote source."""
+
+    def __init__(
+        self,
+        components: List[Callback],
+    ):
+
+        self.callbacks = components
+
+        self.on_variables_client_init_start()
+
+        self.on_variables_client_init()
+
+        self.on_variables_client_adjust_and_request()
+
+        self.on_variables_client_thread_pool()
+
+        self.on_variables_client_futures()
+
+        self.on_variables_client_init_end()
+
+    def get_async(self) -> None:
+        """Asynchronously updates the get variables with the latest copy from source."""
+        self.on_variables_client_get_start()
+
+        self.on_variables_client_get()
+
+        self.on_variables_client_get_end()
+
+    def set_async(self) -> None:
+        """Asynchronously updates source with the set variables."""
+        self.on_variables_client_set_start()
+
+        self.on_variables_client_set()
+
+        self.on_variables_client_set_end()
+
+    def set_and_get_async(self) -> None:
+        """Asynchronously updates source and gets from source."""
+        self.on_variables_client_set_and_get_start()
+
+        self.on_variables_client_set_and_get()
+
+        self.on_variables_client_set_and_get_end()
+
+    def add_async(self, names: List[str], vars: Dict[str, Any]) -> None:
+        """Asynchronously adds to source variables."""
+        self._names = names
+        self._vars = vars
+
+        self.on_variables_client_add_start()
+
+        self.on_variables_client_add()
+
+        self.on_variables_client_add_end()
+
+    def add_and_wait(self, names: List[str], vars: Dict[str, Any]) -> None:
+        """Adds the specified variables to the corresponding variables in source
+        and waits for the process to complete before continuing."""
+        self._client.add_to_variables(names, vars)
+
+    def get_and_wait(self) -> None:
+        """Updates the get variables with the latest copy from source
+        and waits for the process to complete before continuing."""
+        self._copy(self._request())  # type: ignore
+
+    def get_all_and_wait(self) -> None:
+        """Updates all the variables with the latest copy from source
+        and waits for the process to complete before continuing."""
+        self._copy(self._request_all())  # type: ignore
+
+    def set_and_wait(self) -> None:
+        """Updates source with the set variables
+        and waits for the process to complete before continuing."""
+        self._adjust()  # type: ignore
+
+    def _copy(self, new_variables: Dict[str, Any]) -> None:
+        """Copies the new variables to the old ones."""
+        self._new_variables = new_variables
+
+        self.on_variables_client_start()
+
+        for key in new_variables.keys():
+            var_type = type(new_variables[key])
+            if var_type == dict:
+                self.on_variables_client_copy_if_dict()
+            elif var_type == np.int32 or var_type == np.float32:
+                self.on_variables_client_copy_if_int_float()
+            elif var_type == tuple:
+                self.on_variables_client_copy_if_tuple()
+            else:
+                NotImplementedError(f"Variable type of {var_type} not implemented.")
+
+        self.on_variables_client_copy_end()

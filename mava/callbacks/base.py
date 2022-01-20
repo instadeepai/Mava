@@ -19,7 +19,13 @@ Abstract base class used to build new callbacks.
 
 import abc
 
-from mava.core import SystemBuilder, SystemExecutor, SystemTrainer
+from mava.core import (
+    SystemBuilder,
+    SystemExecutor,
+    SystemTrainer,
+    SystemVariableServer,
+    SystemVariableClient,
+)
 
 
 class Callback(abc.ABC):
@@ -413,5 +419,205 @@ class Callback(abc.ABC):
         pass
 
     def on_training_get_feed_end(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    ##############################
+    # system variable server hooks
+    ##############################
+
+    def on_variables_server_init_start(self, server: SystemVariableServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_server_init(self, server: SystemVariableServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_server_checkpoint(self, server: SystemVariableServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_server_init_end(self, server: SystemVariableServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_get_server_variables_start(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_get_server_variables(self, server: SystemVariableServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_get_server_variables_end(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_set_server_variables_start(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_set_server_variables(self, server: SystemVariableServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_set_server_variables_end(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_add_to_server_variables_start(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_add_to_server_variables(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_add_to_server_variables_end(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_run_server_start(self, server: SystemVariableServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_run_server_loop_start(self, server: SystemVariableServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_run_server_loop_checkpoint(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_run_server_loop(self, server: SystemVariableServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_run_server_loop_termination(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_run_server_loop_end(self, server: SystemVariableServer) -> None:
+        """[summary]"""
+        pass
+
+    ##############################
+    # system variable client hooks
+    ##############################
+
+    def on_variables_client_init_start(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_init(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_adjust_and_request(
+        self, client: SystemVariableClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_thread_pool(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_futures(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_init_end(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_get_start(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_get(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_get_end(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_set_start(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_set(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_set_end(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_set_and_get_start(
+        self, client: SystemVariableClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_set_and_get(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_set_and_get_end(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_add_start(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_add(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_add_end(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_start(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_copy_if_dict(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_copy_if_int_float(
+        self, client: SystemVariableClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_copy_if_tuple(self, client: SystemVariableClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_client_copy_end(self, client: SystemVariableClient) -> None:
         """[summary]"""
         pass
