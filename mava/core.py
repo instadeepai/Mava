@@ -18,11 +18,10 @@
 
 import abc
 from types import SimpleNamespace
-from typing import Any, Dict, Iterator, List, Optional, Tuple, TypeVar, Union, Sequence
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import dm_env
 import numpy as np
-from mava.callbacks.base import Callback
 import reverb
 import sonnet as snt
 from acme import core as acme_core
@@ -30,7 +29,7 @@ from acme import types
 
 from mava import adders
 from mava.systems.launcher import Launcher
-from mava.systems.tf.variable_sources import VariableServer
+from mava.systems.tf.variable_sources import VariableSource
 
 T = TypeVar("T")
 
@@ -153,7 +152,7 @@ class SystemBuilder(abc.ABC):
     @abc.abstractmethod
     def variable_server(
         self,
-    ) -> VariableServer:
+    ) -> VariableSource:
         """Create the variable server."""
 
     @abc.abstractmethod
@@ -161,14 +160,14 @@ class SystemBuilder(abc.ABC):
         self,
         executor_id: str,
         replay_client: reverb.Client,
-        variable_server: VariableServer,
+        variable_server: VariableSource,
     ) -> acme_core.Worker:
         """[summary]"""
 
     @abc.abstractmethod
     def evaluator(
         self,
-        variable_server: VariableServer,
+        variable_server: VariableSource,
     ) -> Any:
         """[summary]"""
         iterator = range(num_steps) if num_steps is not None else itertools.count()
@@ -186,7 +185,7 @@ class SystemBuilder(abc.ABC):
         self,
         trainer_id: str,
         replay_client: reverb.Client,
-        variable_server: VariableServer,
+        variable_server: VariableSource,
     ) -> SystemTrainer:
         """[summary]"""
 
@@ -207,12 +206,13 @@ class BaseSystem(abc.ABC):
     def configure(self, config: Any) -> SimpleNamespace:
         """[summary]"""
 
+    # Note (dries): Using Callback here causes a circular import issue.
     @abc.abstractmethod
-    def update(self, component: Callback) -> None:
+    def update(self, component: Any) -> None:
         """[summary]"""
 
     @abc.abstractmethod
-    def add(self, component: Callback) -> None:
+    def add(self, component: Any) -> None:
         """[summary]"""
 
     @abc.abstractmethod
@@ -261,11 +261,11 @@ class BaseSystem(abc.ABC):
 #     @abc.abstractmethod
 #     def variable_server(
 #         self,
-#     ) -> VariableServer:
+#     ) -> VariableSource:
 #         """Create the variable server."""
 
 #     @abc.abstractmethod
 #     def variable_client(
 #         self,
-#     ) -> VariableServer:
+#     ) -> VariableSource:
 #         """Create the variable server."""
