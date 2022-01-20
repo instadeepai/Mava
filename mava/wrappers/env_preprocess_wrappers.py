@@ -448,21 +448,81 @@ class ConcatPrevActionToObservation:
 
     TODO support continuous actions.
     """
-    
+    # Need to get the size of the action space of each agent
+
     def __init__(self, environment):
-        pass
-
-        self._env
-        self._prev_act
-        self._num_agents
-
+        self._environment = environment
+        
     def reset(self):
-        prev_act = zero_vector
-        pass
+        # Previous actions needs to be somethings like a dictionary containing zero vectors of 
+        # length of the permitted action space per agent 
+        self._prev_actions = {}
+        action_spec = self._environment.action_spec() 
+        for agent in action_spec:
+            self._prev_actions[agent] = np.zeros(action_spec[agent].num_values)
+        
+        timestep, extras = self._environment.reset()
+        old_observations = timestep.observation
+        
+        new_observations = {}
+        #TODO double check this, because possible agents could shrink
+        for agent in self._environment.possible_agents:
+            agent_olt = old_observations[agent]
+            
+            agent_observation = agent_olt.observation
+            agent_one_hot_action = self._prev_actions[agent]
+            
+            new_observations[agent] = OLT(
+                observation = np.concatenate([agent_one_hot_action, agent_observation]), 
+                legal_actions= agent_olt.legal_actions, 
+                terminal=agent_olt.terminal
+            )
+
+        return dm_env.TimeStep(timestep.step_type, timestep.reward, timestep.discount, new_observations), extras
 
     def step(self, actions: Dict) -> Any:
-        timestep, extras = self.env.step(actions)
-        obs = concat(self.prev_actions, obs)
+        timestep, extras = self._environment.step(actions)
+        old_observations = timestep.observation
+        
+        new_observations = {}
 
-        self.prev_actions = actions
-        return timestep, extras
+        for agent in self._environment.possible_agents:
+            agent_olt = old_observations[agent]
+            
+            agent_observation = agent_olt.observation
+            agent_one_hot_action = self._prev_actions[agent]
+            agent_one_hot_action[actions[agent]] = 1
+            
+            new_observations[agent] = OLT(
+                observation = np.concatenate([agent_one_hot_action, agent_observation]), 
+                legal_actions= agent_olt.legal_actions, 
+                terminal=agent_olt.terminal
+            )
+
+
+        self._prev_actions = actions
+        return dm_env.TimeStep(timestep.step_type, timestep.reward, timestep.discount, new_observations), extras
+    
+    def observation_spec(self) -> Dict[str, OLT]:
+        """Observation spec.
+
+        Returns:
+            types.Observation: spec for environment.
+        """
+        timestep, extras =  self.reset()
+        observations = timestep.observation
+        return observations
+
+    def __getattr__(self, name: str) -> Any:
+        """Expose any other attributes of the underlying environment.
+
+        Args:
+            name (str): attribute.
+
+        Returns:
+            Any: return attribute from env or underlying env.
+        """
+        if hasattr(self.__class__, name):
+            return self.__getattribute__(name)
+        else:
+            return getattr(self._environment, name)
