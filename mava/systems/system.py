@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG system implementation."""
+"""Mava system implementation."""
+
 import abc
 from types import SimpleNamespace
 from typing import Any, List
