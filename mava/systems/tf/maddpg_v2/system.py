@@ -15,20 +15,16 @@
 
 """MADDPG system implementation."""
 from types import SimpleNamespace
-from mava.callbacks.base import Callback
+from mava.systems.tf.maddpg.builder import MADDPGConfig
 
 import reverb
 
 from mava.systems.system import System
-from mava.systems.building import Builder
 from mava.components import building
 from mava.components import execution
 from mava.components.tf import building as tf_building
 from mava.components.tf import execution as tf_executing
 from mava.utils import enums
-
-# TODO (Arnu): figure out best way to send in system arguments
-system_config = {"setup": {}, "table": {}, "dataset": {}}
 
 
 class MADDPG(System):
@@ -129,13 +125,11 @@ class MADDPG(System):
 
 
 ## Example of create/launching system
-system = MADDPG(system_config)
+config = MADDPGConfig(...)
+system = MADDPG(config)
 
 # Build system
-system.build(name="maddpg")
-
-# Distribute system processes
-system.distribute(num_executors=2, nodes_on_gpu=["trainer"])
+system.build(num_executors=2, nodes_on_gpu=["trainer"], name="maddpg")
 
 # Launch system
 system.launch()

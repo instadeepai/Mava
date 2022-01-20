@@ -216,14 +216,12 @@ class BaseSystem(abc.ABC):
         """[summary]"""
 
     @abc.abstractmethod
-    def build(self, name: str) -> None:
-        """[summary]"""
-
-    @abc.abstractmethod
-    def distribute(
+    def build(
         self,
         num_executors: int,
+        multi_process: str,
         nodes_on_gpu: List[str],
+        name: str,
     ) -> None:
         """[summary]"""
 

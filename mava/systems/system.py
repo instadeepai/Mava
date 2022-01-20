@@ -16,7 +16,7 @@
 """MADDPG system implementation."""
 import abc
 
-from typing import Any
+from typing import Any, List
 from types import SimpleNamespace
 
 from mava.callbacks.base import Callback
@@ -29,16 +29,14 @@ class System(BaseSystem):
     def __init__(self, config):
 
         self._config = config
-        self._distribute = False
         self.system_components = self.configure(self._config)
-        self.component_names = list(self.system_components.__dict__.keys())
 
     @abc.abstractmethod
     def configure(self, config: Any) -> SimpleNamespace:
         """[summary]"""
 
     def update(self, component: Callback, name: str):
-        if name in self.component_names:
+        if name in list(self.system_components.__dict__.keys()):
             self.system_components.__dict__[name] = component
         else:
             raise Exception(
@@ -46,36 +44,35 @@ class System(BaseSystem):
             )
 
     def add(self, component: Callback, name: str):
-        if name in self.component_names:
+        if name in list(self.system_components.__dict__.keys()):
             raise Exception(
                 "The given component is already part of the current system. Perhaps try updating it instead using .update()."
             )
         else:
             self.system_components.__dict__[name] = component
 
-    def build(self, name="system"):
-        self._name = name
-        self._component_feed = list(self.system_components)
+    def build(
+        self,
+        num_executors: int = 1,
+        multi_process: str = False,
+        nodes_on_gpu: List[str] = ["trainer"],
+        name: str = "system",
+    ):
 
-        # Builder
-        self._builder = Builder(components=self.system_components)
-        self._builder.build()
-
-    def distribute(self, num_executors=1, nodes_on_gpu=["trainer"]):
-        self._distribute = True
+        component_feed = list(self.system_components.__dict__.values())
 
         # Distributor
         distributor = building.Distributor(
             num_executors=num_executors,
-            multi_process=True,
+            multi_process=multi_process,
             nodes_on_gpu=nodes_on_gpu,
-            name=self._name,
+            name=name,
         )
-        self._system_components.append(distributor)
+        component_feed.append(distributor)
+
+        # Builder
+        self._builder = Builder(components=component_feed)
+        self._builder.build()
 
     def launch(self):
-        if not self._distribute:
-            distributor = building.Distributor(multi_process=False)
-            self._system_components.append(distributor)
-
         self._builder.launch()
