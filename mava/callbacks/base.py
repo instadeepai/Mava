@@ -442,81 +442,81 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_variables_get_server_variables_start(
+    def on_variables_server_get_variables_start(
         self, server: SystemVariableServer
     ) -> None:
         """[summary]"""
         pass
 
-    def on_variables_get_server_variables(self, server: SystemVariableServer) -> None:
+    def on_variables_server_get_variables(self, server: SystemVariableServer) -> None:
         """[summary]"""
         pass
 
-    def on_variables_get_server_variables_end(
+    def on_variables_server_get_variables_end(
         self, server: SystemVariableServer
     ) -> None:
         """[summary]"""
         pass
 
-    def on_variables_set_server_variables_start(
+    def on_variables_server_set_variables_start(
         self, server: SystemVariableServer
     ) -> None:
         """[summary]"""
         pass
 
-    def on_variables_set_server_variables(self, server: SystemVariableServer) -> None:
+    def on_variables_server_set_variables(self, server: SystemVariableServer) -> None:
         """[summary]"""
         pass
 
-    def on_variables_set_server_variables_end(
+    def on_variables_server_set_variables_end(
         self, server: SystemVariableServer
     ) -> None:
         """[summary]"""
         pass
 
-    def on_variables_add_to_server_variables_start(
+    def on_variables_server_add_to_variables_start(
         self, server: SystemVariableServer
     ) -> None:
         """[summary]"""
         pass
 
-    def on_variables_add_to_server_variables(
+    def on_variables_server_add_to_variables(
         self, server: SystemVariableServer
     ) -> None:
         """[summary]"""
         pass
 
-    def on_variables_add_to_server_variables_end(
+    def on_variables_server_add_to_variables_end(
         self, server: SystemVariableServer
     ) -> None:
         """[summary]"""
         pass
 
-    def on_variables_run_server_start(self, server: SystemVariableServer) -> None:
+    def on_variables_server_run_start(self, server: SystemVariableServer) -> None:
         """[summary]"""
         pass
 
-    def on_variables_run_server_loop_start(self, server: SystemVariableServer) -> None:
+    def on_variables_server_run_loop_start(self, server: SystemVariableServer) -> None:
         """[summary]"""
         pass
 
-    def on_variables_run_server_loop_checkpoint(
+    def on_variables_server_run_loop_checkpoint(
         self, server: SystemVariableServer
     ) -> None:
         """[summary]"""
         pass
 
-    def on_variables_run_server_loop(self, server: SystemVariableServer) -> None:
+    def on_variables_server_run_loop(self, server: SystemVariableServer) -> None:
         """[summary]"""
         pass
 
-    def on_variables_run_server_loop_termination(
+    def on_variables_server_run_loop_termination(
         self, server: SystemVariableServer
     ) -> None:
         """[summary]"""
         pass
 
-    def on_variables_run_server_loop_end(self, server: SystemVariableServer) -> None:
+    def on_variables_server_run_loop_end(self, server: SystemVariableServer) -> None:
         """[summary]"""
         pass
 
