@@ -19,7 +19,14 @@ theme:
 
 plugins:
 - search
-- mkdocstrings
+- git-revision-date
+- mkdocstrings:
+    default_handler: python
+    handlers:
+      python:
+        rendering:
+          show_source: true
+
 
 
 markdown_extensions:
@@ -52,3 +59,4 @@ nav:
       - Robocup: environments/robocup.md
       - Melting Pot: environments/meltingpot.md
       - Open Spiel: environments/open_spiel.md
+  - Examples: examples.md
