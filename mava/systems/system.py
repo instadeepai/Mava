@@ -68,7 +68,7 @@ class System(BaseSystem):
             run_evaluator="evaluator" in list(self.system_components.__dict__.keys()),
             name=name,
         )
-        self.add(distribute)
+        self.add(component=distribute, name="distributor")
 
         component_feed = list(self.system_components.__dict__.values())
 
