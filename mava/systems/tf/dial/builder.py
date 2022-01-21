@@ -119,7 +119,7 @@ class DIALBuilder(MADQNBuilder):
         ],
         action_selectors: Dict[str, Any],
         communication_module: BaseCommunicationModule,
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
         trainer: Optional[training.MADQNRecurrentCommTrainer] = None,
         evaluator: bool = False,
@@ -135,8 +135,8 @@ class DIALBuilder(MADQNBuilder):
                 epsilon greedy.
             communication_module (BaseCommunicationModule): module for enabling
                 communication protocols between agents.
-            adder (Optional[adders.ParallelAdder], optional): adder to send data to
-                a replay buffer. Defaults to None.
+            adder (Optional[adders.ReverbParallelAdder], optional): adder to send data
+                to a replay buffer. Defaults to None.
             variable_source (Optional[core.VariableSource], optional): variables server.
                 Defaults to None.
             trainer (Optional[training.MADQNRecurrentCommTrainer], optional):

@@ -102,7 +102,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor, DQNExecutor):
         action_selectors: Dict[str, snt.Module],
         trainer: MADQNTrainer,
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
         fingerprint: bool = False,
@@ -119,8 +119,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor, DQNExecutor):
             trainer (MADQNTrainer, optional): system trainer.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
+            adder (Optional[adders.ReverbParallelAdder], optional): adder which sends
+                data to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
             communication_module (BaseCommunicationModule): module for enabling
@@ -307,7 +307,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor, DQNExecutor):
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
         trainer: MADQNTrainer = None,
@@ -326,8 +326,8 @@ class MADQNRecurrentExecutor(RecurrentExecutor, DQNExecutor):
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
             agent_net_keys (Dict[str, Any]): specifies what network each agent uses.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
+            adder (Optional[adders.ReverbParallelAdder], optional): adder which sends
+                data to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
             store_recurrent_state (bool, optional): boolean to store the recurrent
@@ -452,7 +452,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor, DQNExecutor):
         action_selectors: Dict[str, snt.Module],
         communication_module: BaseCommunicationModule,
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
         trainer: MADQNTrainer = None,
@@ -471,8 +471,8 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor, DQNExecutor):
                 communication protocols between agents.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
+            adder (Optional[adders.ReverbParallelAdder], optional): adder which sends
+                data to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
             store_recurrent_state (bool, optional): boolean to store the recurrent
