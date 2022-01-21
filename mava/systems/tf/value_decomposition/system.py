@@ -249,6 +249,8 @@ class ValueDecomposition(MADQN):
             system trainer.
         """
 
+        print("##########")
+        print("1")
         # create logger
         trainer_logger_config = {}
         if self._logger_config and "trainer" in self._logger_config:
@@ -257,11 +259,14 @@ class ValueDecomposition(MADQN):
             trainer_id, **trainer_logger_config
         )
 
+        print("2")
         # Create the system
         networks = self.create_system()
 
+        print("3")
         dataset = self._builder.make_dataset_iterator(replay, trainer_id)
 
+        print("4")
         trainer = self._builder.make_trainer(
             networks=networks,
             trainer_networks=self._trainer_networks[trainer_id],
@@ -271,6 +276,7 @@ class ValueDecomposition(MADQN):
             variable_source=variable_source,
         )
 
+        print("5")
         trainer.setup_mixer(self._mixer, self._mixer_optimizer)
 
         return trainer

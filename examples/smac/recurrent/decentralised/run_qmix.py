@@ -30,7 +30,7 @@ from mava.utils import lp_utils
 from mava.utils.loggers import logger_utils
 
 from mava.systems.tf.value_decomposition.mixer import QMIX
-
+from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation, ConcatPrevActionToObservation
 from smac.env import StarCraft2Env
 from mava.wrappers import SMACWrapper
 
@@ -38,7 +38,7 @@ from mava.wrappers import SMACWrapper
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "3m",
+    "8m_vs_9m",
     "Starcraft 2 micromanagement map name (str).",
 )
 
@@ -52,6 +52,8 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 def smac_env_factory(env_name="3m", evaluation = False):
     env = StarCraft2Env(map_name=env_name)
     env = SMACWrapper(env)
+    env = ConcatPrevActionToObservation(env)
+    env = ConcatAgentIdToObservation(env)
 
     return env
 
@@ -92,7 +94,7 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=3e-5
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
         ),
         optimizer=snt.optimizers.RMSProp(
             learning_rate=0.0005, epsilon=0.00001, decay=0.99

@@ -605,7 +605,7 @@ class MADQN:
         Returns:
             system trainer.
         """
-
+        print("$$$$$$$$$$$$$$$$$")
         # create logger
         trainer_logger_config = {}
         if self._logger_config and "trainer" in self._logger_config:
@@ -614,11 +614,14 @@ class MADQN:
             trainer_id, **trainer_logger_config
         )
 
+        print("1")
         # Create the system
         networks = self.create_system()
 
+        print("2")
         dataset = self._builder.make_dataset_iterator(replay, trainer_id)
 
+        print("3")
         return self._builder.make_trainer(
             networks=networks,
             trainer_networks=self._trainer_networks[trainer_id],

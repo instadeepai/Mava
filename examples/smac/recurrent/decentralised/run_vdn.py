@@ -90,7 +90,7 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=6e-5
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
         ),
         optimizer=snt.optimizers.RMSProp(
             learning_rate=0.0005, epsilon=0.00001, decay=0.99

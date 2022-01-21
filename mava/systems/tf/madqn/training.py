@@ -237,7 +237,6 @@ class MADQNTrainer(mava.Trainer):
             o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
         return o_tm1, o_t
 
-    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -247,20 +246,23 @@ class MADQNTrainer(mava.Trainer):
             losses
         """
 
-        # Update the target networks
-        self._update_target_networks()
-
         # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
 
-        self._forward(sample)
+        self._forward_backward(sample)
 
-        self._backward()
+        # Update the target networks
+        self._update_target_networks()
 
         # Log losses per agent
         return train_utils.map_losses_per_agent_value(
             self.value_losses
         )
+
+    @tf.function
+    def _forward_backward(self, inputs: Any) -> Dict[str, Dict[str, Any]]:
+        self._forward(inputs)
+        self._backward()
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
@@ -445,8 +447,6 @@ class MADQNRecurrentTrainer:
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
         """
-        #self._bootstrap_n = bootstrap_n
-
         self._agents = agents
         self._agent_type = agent_types
         self._agent_net_keys = agent_net_keys
@@ -521,6 +521,11 @@ class MADQNRecurrentTrainer:
         # This is to avoid including the time it takes for actors to come online and
         # fill the replay buffer.
         self._timestamp: Optional[float] = None
+
+    def step(self) -> None:
+        """trainer step to update the parameters of the agents in the system"""
+
+        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
 
     def _transform_observations(
         self, observations: Dict[str, mava_types.OLT]
@@ -602,7 +607,7 @@ class MADQNRecurrentTrainer:
         Returns:
             losses
         """
-        # Draw a batch of data from replay.
+        # # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
 
         self._forward(sample)
@@ -702,7 +707,7 @@ class MADQNRecurrentTrainer:
 
                 # TODO zero padding mask
 
-                self.value_losses[agent] = tf.reduce_mean(value_loss, axis=0)
+                self.value_losses[agent] = tf.reduce_mean(value_loss)
 
         self.tape = tape
 
@@ -721,7 +726,6 @@ class MADQNRecurrentTrainer:
                 self._observation_networks[agent_key].trainable_variables
                 + self._value_networks[agent_key].trainable_variables
             )
-
 
             # Compute gradients.
             # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient

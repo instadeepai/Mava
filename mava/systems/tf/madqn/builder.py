@@ -519,6 +519,7 @@ class MADQNBuilder:
         target_averaging = self._config.target_averaging
         target_update_rate = self._config.target_update_rate
 
+        print("4")
         # Create variable client
         variables = {}
         set_keys = []
@@ -535,6 +536,7 @@ class MADQNBuilder:
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")
 
+        print("5")
         variables = self.create_counter_variables(variables)
 
         count_names = [
@@ -548,6 +550,7 @@ class MADQNBuilder:
         get_keys.extend(count_names)
         counts = {name: variables[name] for name in count_names}
 
+        print("6")
         variable_client = variable_utils.VariableClient(
             client=variable_source,
             variables=variables,
@@ -556,9 +559,11 @@ class MADQNBuilder:
             update_period=10,
         )
 
+        print("7")
         # Get all the initial variables
         variable_client.get_all_and_wait()
 
+        print("8")
         # Convert network keys for the trainer.
         trainer_agents = self._agents[: len(trainer_table_entry)]
         trainer_agent_net_keys = {

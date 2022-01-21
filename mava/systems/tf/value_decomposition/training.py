@@ -356,7 +356,6 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
 
         # Apply gradients.
         if mixer_variables:
-            tf.print("OPTIMIZING MIXER")
             self._mixer_optimizer.apply(gradients, mixer_variables)
 
         train_utils.safe_del(self, "tape")
