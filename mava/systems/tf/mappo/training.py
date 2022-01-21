@@ -273,6 +273,7 @@ class MAPPOTrainer(mava.Trainer):
             Dict[str, Dict[str, Any]]: losses
         """
 
+        losses = None
         # Get data from replay.
         inputs = next(self._iterator)
 
@@ -281,25 +282,38 @@ class MAPPOTrainer(mava.Trainer):
         for epoch in range(self._num_epochs):
             indices = np.random.permutation(train_batch_size)
             minibatch_indices = np.split(
-                indices, train_batch_size // self._minibatch_size
-            )
+                indices, train_batch_size//self._minibatch_size)
             for minibatch_index in minibatch_indices:
 
                 minibatch_data = tf.nest.map_structure(
-                    lambda x: tf.gather(x, minibatch_index, axis=0), inputs.data
-                )
+                    lambda x: tf.gather(x, minibatch_index, axis=0), inputs.data)
 
-                self._forward(minibatch_data)
+                loss = self.forward_backward(minibatch_data)
 
-                self._backward()
+                # Logging summ of losses
+                if losses is None:
+                    losses = loss
+                else:
+                    for agent in self._agents:
+                        losses[agent] = {
+                            "critic_loss": losses[agent]["critic_loss"]+loss[agent]["critic_loss"],
+                            "policy_loss": losses[agent]["policy_loss"]+loss[agent]["policy_loss"],
+                        }
 
+        # Log losses per agent
+        return losses
+
+    @tf.function
+    def forward_backward(self, inputs: Any) -> Dict[str, Dict[str, Any]]:
+        self._forward_pass(inputs)
+        self._backward_pass()
         # Log losses per agent
         return train_utils.map_losses_per_agent_ac(
             self.critic_losses, self.policy_losses
         )
 
     # Forward pass that calculates loss.
-    def _forward(self, inputs: Any) -> None:
+    def _forward_pass(self, inputs: Any) -> None:
         """Trainer forward pass
 
         Args:
@@ -340,11 +354,8 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 actor_observation = observations_trans[agent]
-                critic_observation = self._get_critic_feed(observations_trans, agent)
-
-                # Chop off final timestep for bootstrapping value
-                reward = reward[:-1]
-                discount = discount[:-1]
+                critic_observation = self._get_critic_feed(
+                    observations_trans, agent)
 
                 # Get agent network
                 agent_key = self._agent_net_keys[agent]
@@ -363,12 +374,20 @@ class MAPPOTrainer(mava.Trainer):
                 values = critic_network(critic_observation)
 
                 # Reshape the outputs.
-                policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
+                policy = tfd.BatchReshape(
+                    policy, batch_shape=dims, name="policy")
                 values = tf.reshape(values, dims, name="value")
+
+                # Mask any padded timestep state values
+                values = values
 
                 # Values along the sequence T.
                 bootstrap_value = values[-1]
                 state_values = values[:-1]
+
+                # Chop off final timestep for bootstrapping value
+                reward = reward[:-1]
+                discount = discount[:-1]
 
                 # Generalized Return Estimation
                 td_loss, td_lambda_extra = trfl.td_lambda(
@@ -383,30 +402,37 @@ class MAPPOTrainer(mava.Trainer):
                 # Do not use the loss provided by td_lambda as they sum the losses over
                 # the sequence length rather than averaging them.
                 critic_loss = self._baseline_cost * tf.reduce_mean(
-                    tf.square(td_lambda_extra.temporal_differences), name="CriticLoss"
+                    tf.square(td_lambda_extra.temporal_differences)*discount, name="CriticLoss"
                 )
 
                 # Compute importance sampling weights: current policy / behavior policy.
                 log_rhos = policy.log_prob(action) - behaviour_log_prob
                 importance_ratio = tf.exp(log_rhos)[:-1]
-                clipped_importance_ratio = tf.clip_by_value(
-                    importance_ratio,
-                    1.0 - self._clipping_epsilon,
-                    1.0 + self._clipping_epsilon,
-                )
+                # clipped_importance_ratio = tf.clip_by_value(
+                #     importance_ratio,
+                #     1.0 - self._clipping_epsilon,
+                #     1.0 + self._clipping_epsilon,
+                # )
 
                 # Generalized Advantage Estimation
                 gae = tf.stop_gradient(td_lambda_extra.temporal_differences)
                 mean, variance = tf.nn.moments(gae, axes=[0, 1], keepdims=True)
                 normalized_gae = (gae - mean) / tf.sqrt(variance)
 
-                policy_gradient_loss = tf.reduce_mean(
-                    -tf.minimum(
-                        tf.multiply(importance_ratio, normalized_gae),
-                        tf.multiply(clipped_importance_ratio, normalized_gae),
-                    ),
-                    name="PolicyGradientLoss",
-                )
+                ratio = importance_ratio
+                min_adv = tf.where(normalized_gae > 0, (1+self._clipping_epsilon)
+                                   * normalized_gae, (1-self._clipping_epsilon)*normalized_gae)
+
+                # policy_gradient_loss = tf.reduce_mean(
+                #     -tf.minimum(
+                #         tf.multiply(importance_ratio, normalized_gae),
+                #         tf.multiply(clipped_importance_ratio, normalized_gae),
+                #     ),
+                #     name="PolicyGradientLoss",
+                # )
+                policy_gradient_loss = -tf.reduce_mean(tf.minimum(ratio * normalized_gae, min_adv)*discount,
+                                                       name="PolicyGradientLoss",
+                                                       )
 
                 # Entropy regularization. Only implemented for categorical dist.
                 try:
@@ -417,7 +443,7 @@ class MAPPOTrainer(mava.Trainer):
                 entropy_loss = -self._entropy_cost * policy_entropy
 
                 # Combine weighted sum of actor & entropy regularization.
-                policy_loss = policy_gradient_loss + entropy_loss
+                policy_loss = policy_gradient_loss + entropy_loss + critic_loss
 
                 policy_losses[agent] = policy_loss
                 critic_losses[agent] = critic_loss
@@ -427,7 +453,7 @@ class MAPPOTrainer(mava.Trainer):
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
-    def _backward(self) -> None:
+    def _backward_pass(self) -> None:
         """Trainer backward pass updating network parameters"""
 
         # Calculate the gradients and update the networks
@@ -440,27 +466,34 @@ class MAPPOTrainer(mava.Trainer):
             agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
+            # critic_variables = self._critic_networks[agent_key].trainable_variables
+
             policy_variables = (
                 self._observation_networks[agent_key].trainable_variables
                 + self._policy_networks[agent_key].trainable_variables
+                + self._critic_networks[agent_key].trainable_variables
             )
-            critic_variables = self._critic_networks[agent_key].trainable_variables
 
             # Get gradients.
-            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
-            critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
+            policy_gradients = tape.gradient(
+                policy_losses[agent], policy_variables)
+            # critic_gradients = tape.gradient(
+            #     critic_losses[agent], critic_variables)
 
             # Optionally apply clipping.
-            critic_grads, critic_norm = tf.clip_by_global_norm(
-                critic_gradients, self._max_gradient_norm
-            )
+            # critic_grads, critic_norm = tf.clip_by_global_norm(
+            #     critic_gradients, self._max_gradient_norm
+            # )
             policy_grads, policy_norm = tf.clip_by_global_norm(
                 policy_gradients, self._max_gradient_norm
             )
 
             # Apply gradients.
-            self._critic_optimizers[agent_key].apply(critic_grads, critic_variables)
-            self._policy_optimizers[agent_key].apply(policy_grads, policy_variables)
+            # self._critic_optimizers[agent_key].apply(
+            #     critic_grads, critic_variables)
+
+            self._policy_optimizers[agent_key].apply(
+                policy_grads, policy_variables)
 
         train_utils.safe_del(self, "tape")
 
