@@ -249,20 +249,24 @@ class MADQNTrainer(mava.Trainer):
         # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
 
-        self._forward_backward(sample)
-
-        # Update the target networks
-        self._update_target_networks()
+        losses = self._forward_backward(sample)
 
         # Log losses per agent
         return train_utils.map_losses_per_agent_value(
-            self.value_losses
+            losses
         )
 
     @tf.function
     def _forward_backward(self, inputs: Any) -> Dict[str, Dict[str, Any]]:
+        
         self._forward(inputs)
+
         self._backward()
+
+        # Update the target networks
+        self._update_target_networks()
+
+        return self.value_losses
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
