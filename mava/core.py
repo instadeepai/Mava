@@ -206,11 +206,11 @@ class BaseSystem(abc.ABC):
 
     # Note (dries): Using Callback here causes a circular import issue.
     @abc.abstractmethod
-    def update(self, component: Any) -> None:
+    def update(self, component: Any, name: str) -> None:
         """[summary]"""
 
     @abc.abstractmethod
-    def add(self, component: Any) -> None:
+    def add(self, component: Any, name: str) -> None:
         """[summary]"""
 
     @abc.abstractmethod
