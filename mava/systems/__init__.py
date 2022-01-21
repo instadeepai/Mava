@@ -14,8 +14,7 @@
 # limitations under the License.
 
 from mava.systems.building import Builder
-from mava.systems.launcher import Launcher
 from mava.systems.executing import Executor
+from mava.systems.launcher import Launcher
 from mava.systems.training import Trainer
-from mava.systems.variable_server import VariableServer
-from mava.systems.variable_client import VariableClient
+from mava.systems.variables import VariableClient, VariableServer

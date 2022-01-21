@@ -28,8 +28,6 @@ from acme import core as acme_core
 from acme import types
 
 from mava import adders
-from mava.systems.launcher import Launcher
-from mava.systems.tf.variable_sources import VariableSource
 
 T = TypeVar("T")
 
@@ -152,7 +150,7 @@ class SystemBuilder(abc.ABC):
     @abc.abstractmethod
     def variable_server(
         self,
-    ) -> VariableSource:
+    ) -> Any:
         """Create the variable server."""
 
     @abc.abstractmethod
@@ -160,14 +158,14 @@ class SystemBuilder(abc.ABC):
         self,
         executor_id: str,
         replay_client: reverb.Client,
-        variable_server: VariableSource,
+        variable_server: Any,
     ) -> acme_core.Worker:
         """[summary]"""
 
     @abc.abstractmethod
     def evaluator(
         self,
-        variable_server: VariableSource,
+        variable_server: Any,
     ) -> Any:
         """[summary]"""
         iterator = range(num_steps) if num_steps is not None else itertools.count()
@@ -185,14 +183,14 @@ class SystemBuilder(abc.ABC):
         self,
         trainer_id: str,
         replay_client: reverb.Client,
-        variable_server: VariableSource,
+        variable_server: Any,
     ) -> SystemTrainer:
         """[summary]"""
 
     @abc.abstractmethod
     def build(
         self,
-        program: Launcher,
+        program: Any,
     ) -> Any:
         """[summary]"""
 
