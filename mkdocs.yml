@@ -10,8 +10,8 @@ theme:
   name: "material"
   language: en
   palette:
-    primary: indigo
-    accent: red
+      primary: red
+      accent: teal
   font:
     text: Avenir Next
   features:
