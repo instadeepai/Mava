@@ -172,9 +172,9 @@ class MADQNTrainer(mava.Trainer):
             self._system_network_variables["observations"][
                 agent_key
             ] = self._target_observation_networks[agent_key].variables
-            self._system_network_variables["values"][
+            self._system_network_variables["values"][agent_key] = self._value_networks[
                 agent_key
-            ] = self._value_networks[agent_key].variables
+            ].variables
 
         # Do not record timestamps until after the first learning step is done.
         # This is to avoid including the time it takes for actors to come online and
@@ -252,9 +252,7 @@ class MADQNTrainer(mava.Trainer):
         losses = self._forward_backward(sample)
 
         # Log losses per agent
-        return train_utils.map_losses_per_agent_value(
-            losses
-        )
+        return train_utils.map_losses_per_agent_value(losses)
 
     @tf.function
     def _forward_backward(self, inputs: Any) -> Dict[str, Dict[str, Any]]:
@@ -318,7 +316,12 @@ class MADQNTrainer(mava.Trainer):
 
                 # Value loss.
                 value_loss, _ = trfl.double_qlearning(
-                    q_tm1, a_tm1[agent], r_t[agent], discount * d_t[agent], q_t_value, q_t_selector
+                    q_tm1,
+                    a_tm1[agent],
+                    r_t[agent],
+                    discount * d_t[agent],
+                    q_t_value,
+                    q_t_selector,
                 )
 
                 self.value_losses[agent] = tf.reduce_mean(value_loss, axis=0)
@@ -341,7 +344,6 @@ class MADQNTrainer(mava.Trainer):
                 + self._value_networks[agent_key].trainable_variables
             )
 
-
             # Compute gradients.
             # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
             #  on a persistent tape inside its context is significantly less efficient
@@ -350,9 +352,7 @@ class MADQNTrainer(mava.Trainer):
             gradients = tape.gradient(value_losses[agent], variables)
 
             # Maybe clip gradients.
-            gradients = tf.clip_by_global_norm(
-                gradients, self._max_gradient_norm
-            )[0]
+            gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
 
             # Apply gradients.
             self._optimizers[agent_key].apply(gradients, variables)
@@ -389,7 +389,7 @@ class MADQNTrainer(mava.Trainer):
 
 class MADQNRecurrentTrainer:
     """Recurrent MADQN trainer.
-    
+
     This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -463,7 +463,7 @@ class MADQNRecurrentTrainer:
         # Store online and target networks.
         self._value_networks = value_networks
         self._target_value_networks = target_value_networks
-        
+
         # Ensure obs and target networks are sonnet modules
         self._observation_networks = {
             k: tf2_utils.to_sonnet_module(v) for k, v in observation_networks.items()
@@ -604,7 +604,7 @@ class MADQNRecurrentTrainer:
 
     # @tf.function
     # NOTE (Claude) The recurrent trainer does not start with tf.function
-    # It does start on SMAC 3m and debug env(num_agents=3) but not on any other SMAC maps. 
+    # It does start on SMAC 3m and debug env but not on any other SMAC maps.
     # TODO (Claude) get tf.function to work.
     def _step(
         self,
@@ -626,10 +626,8 @@ class MADQNRecurrentTrainer:
         self._update_target_networks()
 
         # Log losses per agent
-        return train_utils.map_losses_per_agent_value(
-            self.value_losses
-        )
-        
+        return train_utils.map_losses_per_agent_value(self.value_losses)
+
     # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
@@ -655,14 +653,16 @@ class MADQNRecurrentTrainer:
         # Get initial state for the LSTM from replay and
         # extract the first state in the sequence.
         core_state = tree.map_structure(lambda s: s[0, :, :], extras["core_states"])
-        target_core_state = tree.map_structure(lambda s: s[0, :, :], extras["core_states"])
+        target_core_state = tree.map_structure(
+            lambda s: s[0, :, :], extras["core_states"]
+        )
 
         # TODO (dries): Take out all the data_points that does not need
         #  to be processed here at the start. Therefore it does not have
         #  to be done later on and saves processing time.
 
         self.value_losses: Dict[str, tf.Tensor] = {}
-    
+
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
             # Note (dries): We are assuming that only the policy network
@@ -674,44 +674,48 @@ class MADQNRecurrentTrainer:
 
                 # Double Q-learning
                 q, _ = snt.static_unroll(
-                    self._value_networks[agent_key], obs_trans[agent], core_state[agent][0]
+                    self._value_networks[agent_key],
+                    obs_trans[agent],
+                    core_state[agent][0],
                 )
-                q_tm1 = q[:-1] # Chop off last timestep
-                q_t_selector = q[1:] # Chop off first timestep
+                q_tm1 = q[:-1]  # Chop off last timestep
+                q_t_selector = q[1:]  # Chop off first timestep
                 q_t_value, _ = snt.static_unroll(
-                    self._target_value_networks[agent_key], target_obs_trans[agent], target_core_state[agent][0]
+                    self._target_value_networks[agent_key],
+                    target_obs_trans[agent],
+                    target_core_state[agent][0],
                 )
-                q_t_value = q_t_value[1:] # Chop off first timestep
+                q_t_value = q_t_value[1:]  # Chop off first timestep
 
                 # Legal action masking
-                q_t_selector = tf.where(tf.cast(observations[agent].legal_actions[1:], 'bool'), q_t_selector, -999999999)
+                q_t_selector = tf.where(
+                    tf.cast(observations[agent].legal_actions[1:], "bool"),
+                    q_t_selector,
+                    -999999999,
+                )
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
                 discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
 
                 # Flatten out time and batch dim
-                q_tm1, _ = train_utils.combine_dim(
-                    q_tm1
-                )
-                q_t_selector, _ = train_utils.combine_dim(
-                    q_t_selector
-                )
-                q_t_value, _ = train_utils.combine_dim(
-                    q_t_value
-                )
+                q_tm1, _ = train_utils.combine_dim(q_tm1)
+                q_t_selector, _ = train_utils.combine_dim(q_t_selector)
+                q_t_value, _ = train_utils.combine_dim(q_t_value)
                 a_tm1, _ = train_utils.combine_dim(
-                    actions[agent][:-1] # Chop off last timestep
+                    actions[agent][:-1]  # Chop off last timestep
                 )
                 r_t, _ = train_utils.combine_dim(
-                    rewards[agent][:-1] # Chop off last timestep
+                    rewards[agent][:-1]  # Chop off last timestep
                 )
                 d_t, _ = train_utils.combine_dim(
-                    discounts[agent][:-1] # Chop off last timestep
+                    discounts[agent][:-1]  # Chop off last timestep
                 )
 
                 # Value loss
-                value_loss, _ = trfl.double_qlearning(q_tm1, a_tm1, r_t, discount * d_t, q_t_value, q_t_selector)
+                value_loss, _ = trfl.double_qlearning(
+                    q_tm1, a_tm1, r_t, discount * d_t, q_t_value, q_t_selector
+                )
 
                 # TODO zero padding mask
 
@@ -743,9 +747,7 @@ class MADQNRecurrentTrainer:
             gradients = tape.gradient(value_losses[agent], variables)
 
             # Maybe clip gradients.
-            gradients = tf.clip_by_global_norm(
-                gradients, self._max_gradient_norm
-            )[0]
+            gradients = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
 
             # Apply gradients.
             self._optimizers[agent_key].apply(gradients, variables)

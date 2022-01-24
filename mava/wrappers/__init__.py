@@ -25,11 +25,12 @@ from mava.wrappers.pettingzoo import (
     PettingZooParallelEnvWrapper,
 )
 from mava.wrappers.robocup import RoboCupWrapper
+
+# from mava.wrappers.flatland import FlatlandEnvWrapper
+from mava.wrappers.smac import SMACWrapper
 from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
     NetworkStatisticsActorCritic,
     NetworkStatisticsMixing,
     ScaledDetailedTrainerStatistics,
 )
-from mava.wrappers.flatland import FlatlandEnvWrapper
-from mava.wrappers.smac import SMACWrapper

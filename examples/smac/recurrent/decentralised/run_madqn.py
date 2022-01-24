@@ -29,21 +29,25 @@ from mava.components.tf import networks
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
-from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation, ConcatPrevActionToObservation
 from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
-from mava.utils.loggers import logger_utils
 from mava.utils.enums import ArchitectureType
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.environments.smac_utils import make_environment
+from mava.utils.loggers import logger_utils
+from mava.wrappers.env_preprocess_wrappers import (
+    ConcatAgentIdToObservation,
+    ConcatPrevActionToObservation,
+)
 
-
+SEQUENCE_LENGTH = 60
+MAP_NAME = "3m"
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "3m",
+    MAP_NAME,
     "Starcraft 2 micromanagement map name (str).",
 )
 
@@ -58,14 +62,11 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 def main(_: Any) -> None:
     """Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
     # environment
-    environment_factory = functools.partial(
-        make_environment, env_name=FLAGS.map_name
-    )
+    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks,
-        architecture_type=ArchitectureType.recurrent
+        madqn.make_default_networks, architecture_type=ArchitectureType.recurrent
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -99,8 +100,8 @@ def main(_: Any) -> None:
         executor_variable_update_period=200,
         target_update_period=100,
         max_gradient_norm=20.0,
-        sequence_length=60,
-        period=60,
+        sequence_length=SEQUENCE_LENGTH,
+        period=SEQUENCE_LENGTH,
         min_replay_size=32,
         max_replay_size=5000,
         samples_per_insert=1,
