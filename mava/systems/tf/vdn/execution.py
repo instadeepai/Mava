@@ -37,7 +37,7 @@ class VDNFeedForwardExecutor(MADQNFeedForwardExecutor):
         action_selectors: Dict[str, snt.Module],
         trainer: MADQNTrainer,
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
         fingerprint: bool = False,
@@ -54,8 +54,8 @@ class VDNFeedForwardExecutor(MADQNFeedForwardExecutor):
             trainer (MADQNTrainer, optional): system trainer.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
+            adder (Optional[adders.ReverbParallelAdder], optional): adder which sends
+                data to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
             communication_module (BaseCommunicationModule): module for enabling
