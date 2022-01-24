@@ -253,6 +253,7 @@ class VariableClient(SystemVariableClient, CallbackHookMixin):
         self.on_variables_client_start()
 
         for key in new_variables.keys():
+            self._key = key
             var_type = type(new_variables[key])
             if var_type == dict:
                 self.on_variables_client_copy_if_dict()
