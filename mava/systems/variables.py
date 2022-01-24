@@ -47,7 +47,9 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
 
         self.on_variables_server_init()
 
-        self.on_variables_server_checkpoint()
+        self.on_variables_server_init_checkpointing()
+
+        self.on_variables_server_init_make_checkpointer()
 
         self.on_variables_server_init_end()
 
@@ -65,9 +67,20 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
 
         self.on_variables_get_server_variables_start()
 
-        self.on_variables_get_server_variables()
+        if type(names) == str:
+            variables = self.variables[names]
+        else:
+            variables: Dict[str, Dict[str, np.ndarray]] = {}
+            for var_key in names:
+                self._var_key = var_key
+                # TODO (dries): Do we really have to convert the variables to
+                # numpy each time. Can we not keep the variables in numpy form
+                # without the checkpointer complaining?
+                self.on_variables_get_server_variables()
 
         self.on_variables_get_server_variables_end()
+
+        return variables
 
     def set_variables(self, names: Sequence[str], vars: Dict[str, np.ndarray]) -> None:
         """Set variables in the variable source.
@@ -82,7 +95,19 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
 
         self.on_variables_set_server_variables_start()
 
-        self.on_variables_set_server_variables()
+        if type(names) == str:
+            vars = {names: vars}  # type: ignore
+            names = [names]  # type: ignore
+
+        for var_key in names:
+            assert var_key in self.variables
+            if type(self.variables[var_key]) == tuple:
+                # Loop through tuple
+                for var_i in range(len(self.variables[var_key])):
+                    self._var_i = var_i
+                    self.on_variables_set_server_variables_if_tuple()
+            else:
+                self.on_variables_set_server_variables_if_dict()
 
         self.on_variables_set_server_variables_end()
 
@@ -101,7 +126,16 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
 
         self.on_variables_add_to_server_variables_start()
 
-        self.on_variables_add_to_server_variables()
+        if type(names) == str:
+            vars = {names: vars}  # type: ignore
+            names = [names]  # type: ignore
+
+        for var_key in names:
+            assert var_key in self.variables
+            self._var_key = var_key
+            # Note: Can also use self.variables[var_key] = /
+            # self.variables[var_key] + vars[var_key]
+            self.on_variables_add_to_server_variables()
 
         self.on_variables_add_to_server_variables_end()
 
