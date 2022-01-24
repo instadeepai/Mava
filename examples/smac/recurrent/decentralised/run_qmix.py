@@ -27,8 +27,8 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 )
 from mava.systems.tf import value_decomposition
 from mava.utils import lp_utils
-from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
+from mava.utils.environments.smac_utils import make_environment
 
 SEQUENCE_LENGTH = 60
 MAP_NAME = "3m"
@@ -48,16 +48,12 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-log_msg = (
-    f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
-    f"Executing: {command}" + os.linesep
-)
-
-
 def main(_: Any) -> None:
     """Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
     # environment
-    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
+    environment_factory = functools.partial(
+        make_environment, map_name=FLAGS.map_name
+    )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
@@ -102,7 +98,8 @@ def main(_: Any) -> None:
         max_replay_size=5000,
         samples_per_insert=1,
         evaluator_interval={"executor_episodes": 2},
-        termination_condition={"executor_steps": 3_000_000},
+        termination_condition={"executor_steps": 3_000_000}
+        
     ).build()
 
     # launch
