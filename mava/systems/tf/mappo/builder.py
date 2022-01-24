@@ -36,6 +36,7 @@ from mava.wrappers import DetailedTrainerStatistics
 @dataclasses.dataclass
 class MAPPOConfig:
     """Configuration options for the MAPPO system
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
@@ -218,7 +219,6 @@ class MAPPOBuilder:
         variable_source: Optional[core.VariableSource] = None,
         evaluator: bool = False,
     ) -> core.Executor:
-
         """Create an executor instance.
 
         Args:

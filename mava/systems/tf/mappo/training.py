@@ -41,6 +41,7 @@ tfd = tfp.distributions
 
 class MAPPOTrainer(mava.Trainer):
     """MAPPO trainer.
+
     This is the trainer component of a MAPPO system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -70,8 +71,7 @@ class MAPPOTrainer(mava.Trainer):
         logger: loggers.Logger = None,
         checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava/",
-        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[
-            int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise MAPPO trainer
 
@@ -87,11 +87,11 @@ class MAPPOTrainer(mava.Trainer):
                 optimizer(s) for updating policy networks.
             critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
                 optimizer for updating critic networks.
-            use_single_optimizer (bool): boolean to decide 
-                whether or not the critic, policy and observation networks are 
-                optimized jointly by a single optimizer. If true, all networks 
-                are optimized by the policy_optimizer. If False, the observation and 
-                policy network are optimized by the policy optimizer and the 
+            use_single_optimizer (bool): boolean to decide
+                whether or not the critic, policy and observation networks are
+                optimized jointly by a single optimizer. If true, all networks
+                are optimized by the policy_optimizer. If False, the observation and
+                policy network are optimized by the policy optimizer and the
                 critic network by the critic optimizer.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
@@ -145,8 +145,7 @@ class MAPPOTrainer(mava.Trainer):
         if not isinstance(policy_optimizer, dict):
             self._policy_optimizers: Dict[str, snt.Optimizer] = {}
             for agent in self.unique_net_keys:
-                self._policy_optimizers[agent] = copy.deepcopy(
-                    policy_optimizer)
+                self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
         else:
             self._policy_optimizers = policy_optimizer
 
@@ -281,7 +280,8 @@ class MAPPOTrainer(mava.Trainer):
             adv_var,
             offset=None,
             scale=None,
-            variance_epsilon=variance_epsilon)
+            variance_epsilon=variance_epsilon,
+        )
         return normalized_advantages
 
     @tf.function
@@ -303,11 +303,13 @@ class MAPPOTrainer(mava.Trainer):
         for epoch in range(self._num_epochs):
             indices = np.random.permutation(train_batch_size)
             minibatch_indices = np.split(
-                indices, train_batch_size//self._minibatch_size)
+                indices, train_batch_size // self._minibatch_size
+            )
             for minibatch_index in minibatch_indices:
 
                 minibatch_data = tf.nest.map_structure(
-                    lambda x: tf.gather(x, minibatch_index, axis=0), inputs.data)
+                    lambda x: tf.gather(x, minibatch_index, axis=0), inputs.data
+                )
 
                 loss = self.forward_backward(minibatch_data)
 
@@ -317,8 +319,10 @@ class MAPPOTrainer(mava.Trainer):
                 else:
                     for agent in self._agents:
                         losses[agent] = {
-                            "critic_loss": losses[agent]["critic_loss"]+loss[agent]["critic_loss"],
-                            "policy_loss": losses[agent]["policy_loss"]+loss[agent]["policy_loss"],
+                            "critic_loss": losses[agent]["critic_loss"]
+                            + loss[agent]["critic_loss"],
+                            "policy_loss": losses[agent]["policy_loss"]
+                            + loss[agent]["policy_loss"],
                         }
 
         # Log losses per agent
@@ -327,10 +331,10 @@ class MAPPOTrainer(mava.Trainer):
     @tf.function
     def forward_backward(self, inputs: Any) -> Dict[str, Dict[str, Any]]:
         """Do a single forward and backward pass
-        
+
         Args:
             inputs (Any): input data from the data table (transitions)
-        
+
         Returns:
             Dict[str, Dict[str, Any]]: losses
         """
@@ -383,8 +387,7 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 actor_observation = observations_trans[agent]
-                critic_observation = self._get_critic_feed(
-                    observations_trans, agent)
+                critic_observation = self._get_critic_feed(observations_trans, agent)
 
                 # Get agent network
                 agent_key = self._agent_net_keys[agent]
@@ -404,8 +407,7 @@ class MAPPOTrainer(mava.Trainer):
                 values = critic_network(critic_observation)
 
                 # Reshape the outputs.
-                policy = tfd.BatchReshape(
-                    policy, batch_shape=dims, name="policy")
+                policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
 
                 values = tf.reshape(values, dims, name="value")
 
@@ -432,13 +434,14 @@ class MAPPOTrainer(mava.Trainer):
                 # the sequence length rather than averaging them.
                 # Mask the temporal differences with the sequence mask
                 critic_loss = self._baseline_cost * tf.reduce_mean(
-                    tf.square(td_lambda_extra.temporal_differences)*discount, name="CriticLoss"
+                    tf.square(td_lambda_extra.temporal_differences) * discount,
+                    name="CriticLoss",
                 )
 
                 # Compute importance sampling weights: current policy / behavior policy.
                 log_rhos = policy.log_prob(action) - behaviour_log_prob
                 importance_ratio = tf.exp(log_rhos)[:-1]
-                
+
                 # OLD IMPLEM.
                 # clipped_importance_ratio = tf.clip_by_value(
                 #     importance_ratio,
@@ -451,10 +454,13 @@ class MAPPOTrainer(mava.Trainer):
                 normalized_gae = self._normalize_advantages(gae)
 
                 ratio = importance_ratio
-                min_adv = tf.where(normalized_gae > 0, (1+self._clipping_epsilon)
-                                   * normalized_gae, (1-self._clipping_epsilon)*normalized_gae)
+                min_adv = tf.where(
+                    normalized_gae > 0,
+                    (1 + self._clipping_epsilon) * normalized_gae,
+                    (1 - self._clipping_epsilon) * normalized_gae,
+                )
 
-                #OLD IMPLEM.
+                # OLD IMPLEM.
                 # policy_gradient_loss = tf.reduce_mean(
                 #     -tf.minimum(
                 #         tf.multiply(importance_ratio, normalized_gae),
@@ -462,25 +468,24 @@ class MAPPOTrainer(mava.Trainer):
                 #     )*discount,
                 #     name="PolicyGradientLoss",
                 # )
-                policy_gradient_loss = -tf.reduce_mean(tf.minimum(ratio * normalized_gae, min_adv)*discount,
-                                                       name="PolicyGradientLoss",
-                                                       )
+                policy_gradient_loss = -tf.reduce_mean(
+                    tf.minimum(ratio * normalized_gae, min_adv) * discount,
+                    name="PolicyGradientLoss",
+                )
 
                 # Entropy regularization. Only implemented for categorical dist.
                 try:
-                    policy_entropy = tf.reduce_mean(
-                        policy.entropy()*entropy_mask)
+                    policy_entropy = tf.reduce_mean(policy.entropy() * entropy_mask)
                 except NotImplementedError:
                     policy_entropy = tf.convert_to_tensor(0.0)
 
                 entropy_loss = -self._entropy_cost * policy_entropy
 
-                
                 # Combine weighted sum of actor & entropy regularization.
-                policy_loss = policy_gradient_loss + entropy_loss 
-                
+                policy_loss = policy_gradient_loss + entropy_loss
+
                 if self._use_single_optimizer:
-                    policy_loss+= critic_loss
+                    policy_loss += critic_loss
 
                 policy_losses[agent] = policy_loss
                 critic_losses[agent] = critic_loss
@@ -516,18 +521,16 @@ class MAPPOTrainer(mava.Trainer):
                 )
                 critic_variables = self._critic_networks[agent_key].trainable_variables
                 # Get gradients.
-                critic_gradients = tape.gradient(
-                    critic_losses[agent], critic_variables)
+                critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
                 # Optionally apply clipping.
                 critic_grads, critic_norm = tf.clip_by_global_norm(
-                    critic_gradients, self._max_gradient_norm)
-                 # Apply gradients.
-                self._critic_optimizers[agent_key].apply(
-                    critic_grads, critic_variables)
+                    critic_gradients, self._max_gradient_norm
+                )
+                # Apply gradients.
+                self._critic_optimizers[agent_key].apply(critic_grads, critic_variables)
 
             # Get gradients.
-            policy_gradients = tape.gradient(
-                policy_losses[agent], policy_variables)
+            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
 
             # Optionally apply clipping.
             policy_grads, policy_norm = tf.clip_by_global_norm(
@@ -535,8 +538,7 @@ class MAPPOTrainer(mava.Trainer):
             )
 
             # Apply gradients.
-            self._policy_optimizers[agent_key].apply(
-                policy_grads, policy_variables)
+            self._policy_optimizers[agent_key].apply(policy_grads, policy_variables)
 
         train_utils.safe_del(self, "tape")
 
@@ -640,8 +642,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         logger: loggers.Logger = None,
         checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava",
-        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[
-            int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
 
         super().__init__(
