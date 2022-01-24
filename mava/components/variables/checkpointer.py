@@ -18,6 +18,7 @@ import os
 import time
 import abc
 
+from mava.core import SystemVariableServer
 from mava.callbacks import Callback
 
 
@@ -40,29 +41,35 @@ class VariableCheckpointer(Callback):
         self._checkpoint_minute_interval = checkpoint_minute_interval
         self._last_checkpoint_time = time.time()
 
-    def on_variables_server_init_checkpointing(self) -> None:
+    def on_variables_server_init_checkpointing(
+        self, server: SystemVariableServer
+    ) -> None:
         # Only save variables that are not empty.
         save_variables = {}
-        for key in self._variables.keys():
-            var = self._variables[key]
+        for key in server._variables.keys():
+            var = server._variables[key]
             # Don't store empty tuple (e.g. empty observation_network) variables
             if not (type(var) == tuple and len(var) == 0):
-                save_variables[key] = self._variables[key]
+                save_variables[key] = server._variables[key]
 
         # Create checkpointer
-        self._subdir = os.path.join("variable_source")
-        self._checkpoint_time_interval = self._checkpoint_minute_interval
+        server.checkpoint_subdir = os.path.join("variable_source")
+        server.checkpoint_time_interval = self._checkpoint_minute_interval
 
     @abc.abstractmethod
-    def on_variables_server_init_make_checkpointer(self) -> None:
+    def on_variables_server_init_make_checkpointer(
+        self, server: SystemVariableServer
+    ) -> None:
         """[summary]"""
 
-    def on_variables_run_server_loop_checkpoint(self) -> None:
+    def on_variables_run_server_loop_checkpoint(
+        self, server: SystemVariableServer
+    ) -> None:
         # Add 1 extra second just to make sure that the checkpointer
         # is ready to save.
         if (
-            self._last_checkpoint_time + self._checkpoint_minute_interval * 60 + 1
+            self._last_checkpoint_time + server.checkpoint_minute_interval * 60 + 1
             < time.time()
         ):
-            self._system_checkpointer.save()
+            server.system_checkpointer.save()
             print("Updated variables checkpoint.")

@@ -19,6 +19,7 @@
 import abc
 from typing import Dict, Any
 
+from mava.core import SystemVariableServer
 from mava.callbacks import Callback
 
 
@@ -32,21 +33,27 @@ class VariableServer(Callback):
         self.variables = variables
 
     @abc.abstractmethod
-    def on_variables_get_server_variables(self) -> None:
+    def on_variables_get_server_variables(self, server: SystemVariableServer) -> None:
         """[summary]"""
 
     @abc.abstractmethod
-    def on_variables_set_server_variables_if_tuple(self) -> None:
+    def on_variables_set_server_variables_if_tuple(
+        self, server: SystemVariableServer
+    ) -> None:
         """[summary]"""
 
     @abc.abstractmethod
-    def on_variables_set_server_variables_if_dict(self) -> None:
+    def on_variables_set_server_variables_if_dict(
+        self, server: SystemVariableServer
+    ) -> None:
         """[summary]"""
 
     @abc.abstractmethod
-    def on_variables_add_to_server_variables(self) -> None:
+    def on_variables_add_to_server_variables(
+        self, server: SystemVariableServer
+    ) -> None:
         """[summary]"""
 
     @abc.abstractmethod
-    def on_variables_run_server_loop(self) -> None:
+    def on_variables_run_server_loop(self, server: SystemVariableServer) -> None:
         """[summary]"""
