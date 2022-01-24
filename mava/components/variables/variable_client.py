@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from mava.callbacks import Callback
 from mava.core import SystemVariableClient
-from mava.components.variables.variable_server import VariableServer
+from mava.components.variables import VariableServer
 from mava.utils.sort_utils import sort_str_num
 
 
@@ -58,6 +58,11 @@ class VariableClient(Callback):
         client._set_get_call_counter = 0
         client._request = lambda: self._server.get_variables(client._get_keys)
         client._request_all = lambda: self._server.get_variables(client._all_keys)
+
+    # TODO (Arnu): find a way to not need this function.
+    @abc.abstractmethod
+    def _adjust_and_request(self) -> None:
+        """[summary]"""
 
     @abc.abstractmethod
     def on_variables_client_adjust_and_request(
