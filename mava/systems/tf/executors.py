@@ -40,7 +40,7 @@ class FeedForwardExecutor(core.Executor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
         """Initialise the system executor
@@ -50,8 +50,8 @@ class FeedForwardExecutor(core.Executor):
                 the system.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
+            adder (Optional[adders.ReverbParallelAdder], optional): adder which sends
+                data to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
         """
@@ -200,7 +200,7 @@ class RecurrentExecutor(core.Executor):
         self,
         policy_networks: Dict[str, snt.RNNCore],
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
     ):
@@ -211,8 +211,8 @@ class RecurrentExecutor(core.Executor):
                 the system.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
+            adder (Optional[adders.ReverbParallelAdder], optional): adder which sends
+                data to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
             store_recurrent_state (bool, optional): boolean to store the recurrent
@@ -421,7 +421,7 @@ class RecurrentCommExecutor(RecurrentExecutor):
         policy_networks: Dict[str, snt.RNNCore],
         communication_module: BaseCommunicationModule,
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
     ):
@@ -434,8 +434,8 @@ class RecurrentCommExecutor(RecurrentExecutor):
                 communication protocols between agents.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
+            adder (Optional[adders.ReverbParallelAdder], optional): adder which sends
+                data to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
             store_recurrent_state (bool, optional): boolean to store the recurrent
