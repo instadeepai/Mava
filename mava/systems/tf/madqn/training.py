@@ -602,6 +602,10 @@ class MADQNRecurrentTrainer:
         """Depricated"""
         pass
 
+    # @tf.function
+    # NOTE (Claude) The recurrent trainer does not start with tf.function
+    # It does start on SMAC 3m and debug env(num_agents=3) but not on any other SMAC maps. 
+    # TODO (Claude) get tf.function to work.
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -614,25 +618,18 @@ class MADQNRecurrentTrainer:
         # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
 
-        losses = self._forward_backward(sample)
-
-        # Log losses per agent
-        return train_utils.map_losses_per_agent_value(
-            losses
-        )
-
-    @tf.function
-    def _forward_backward(self, inputs: Any) -> Dict[str, Dict[str, Any]]:
-        
-        self._forward(inputs)
+        self._forward(sample)
 
         self._backward()
 
         # Update the target networks
         self._update_target_networks()
 
-        return self.value_losses
-
+        # Log losses per agent
+        return train_utils.map_losses_per_agent_value(
+            self.value_losses
+        )
+        
     # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass

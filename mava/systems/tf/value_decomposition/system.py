@@ -35,15 +35,14 @@ from mava.systems.tf.variable_sources import VariableSource as MavaVariableSourc
 from mava.utils import enums
 from mava.utils.loggers import MavaLogger
 from mava.systems.tf.madqn import MADQN
+from mava.systems.tf.value_decomposition.mixer import QMIX, VDN
 
 
 class ValueDecomposition(MADQN):
     """Value Decomposition systems."""
 
-    """TODO: Implement faster adders to speed up training times when
-    using multiple trainers with non-shared weights."""
 
-    def __init__(  # noqa
+    def __init__(
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
@@ -60,12 +59,6 @@ class ValueDecomposition(MADQN):
         trainer_fn: Type[ValueDecompositionRecurrentTrainer] = ValueDecompositionRecurrentTrainer,
         executor_fn: Type[MADQNRecurrentExecutor] = MADQNRecurrentExecutor,
         num_executors: int = 1,
-        trainer_networks: Union[
-            Dict[str, List], enums.Trainer
-        ] = enums.Trainer.single_trainer,
-        network_sampling_setup: Union[
-            List, enums.NetworkSampler
-        ] = enums.NetworkSampler.fixed_agent_networks,
         shared_weights: bool = True,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
@@ -77,7 +70,7 @@ class ValueDecomposition(MADQN):
         executor_variable_update_period: int = 200,
         min_replay_size: int = 100,
         max_replay_size: int = 5000,
-        samples_per_insert: Optional[float] = 32.0,
+        samples_per_insert: Optional[float] = 2.0,
         optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=1e-4),
@@ -94,7 +87,7 @@ class ValueDecomposition(MADQN):
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         termination_condition: Optional[Dict[str, int]] = None,
-        evaluator_interval: Optional[dict] = None,
+        evaluator_interval: Optional[dict] = {"executor_episodes": 2},
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the system
@@ -199,8 +192,8 @@ class ValueDecomposition(MADQN):
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
             num_executors=num_executors,
-            trainer_networks=trainer_networks,
-            network_sampling_setup=network_sampling_setup,
+            trainer_networks=enums.Trainer.single_trainer,
+            network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
             shared_weights=shared_weights,
             environment_spec=environment_spec,
             discount=discount,
@@ -230,6 +223,19 @@ class ValueDecomposition(MADQN):
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         ) 
 
+        if isinstance(mixer, str):
+            if mixer == "qmix":
+                env = environment_factory()
+                num_agents = len(env.possible_agents)
+                mixer = QMIX(num_agents)
+                del env
+            elif mixer == "vdn":
+                mixer = VDN()
+            else:
+                raise ValueError(
+                    "Mixer not recognised. Should be either 'vdn' or 'qmix'"
+                )
+
         self._mixer = mixer
         self._mixer_optimizer = mixer_optimizer
 
@@ -248,9 +254,6 @@ class ValueDecomposition(MADQN):
         Returns:
             system trainer.
         """
-
-        print("##########")
-        print("1")
         # create logger
         trainer_logger_config = {}
         if self._logger_config and "trainer" in self._logger_config:
@@ -259,14 +262,11 @@ class ValueDecomposition(MADQN):
             trainer_id, **trainer_logger_config
         )
 
-        print("2")
         # Create the system
         networks = self.create_system()
 
-        print("3")
         dataset = self._builder.make_dataset_iterator(replay, trainer_id)
 
-        print("4")
         trainer = self._builder.make_trainer(
             networks=networks,
             trainer_networks=self._trainer_networks[trainer_id],
@@ -276,7 +276,6 @@ class ValueDecomposition(MADQN):
             variable_source=variable_source,
         )
 
-        print("5")
         trainer.setup_mixer(self._mixer, self._mixer_optimizer)
 
         return trainer

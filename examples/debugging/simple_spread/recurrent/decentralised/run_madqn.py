@@ -57,11 +57,12 @@ def main(_: Any) -> None:
         debugging_utils.make_environment,
         env_name=FLAGS.env_name,
         action_space=FLAGS.action_space,
+        num_agents=10
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks, archecture_type=ArchitectureType.recurrent
+        madqn.make_default_networks, architecture_type=ArchitectureType.recurrent
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir

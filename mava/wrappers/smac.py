@@ -279,8 +279,8 @@ class SMACWrapper(ParallelEnvWrapper):
         Returns:
             extra stats to be logged.
         """
-        return self._info
-
+        return self._environment.get_stats()
+        
     @property
     def agents(self) -> List:
         """Agents still alive in env (not done).

@@ -74,7 +74,7 @@ def make_default_networks(
         value_network_func = snt.Sequential
     elif architecture_type == ArchitectureType.recurrent:
         if not value_networks_layer_sizes:
-            value_networks_layer_sizes = (128, 64)
+            value_networks_layer_sizes = (64, 64)
         value_network_func = snt.DeepRNN
 
     assert value_networks_layer_sizes is not None

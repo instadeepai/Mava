@@ -196,7 +196,7 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
             data.extras,
         )
 
-        # Global environment state
+        # Global environment state for mixer
         if "s_t" in extras:
             global_env_state = extras["s_t"]
         else:
@@ -207,15 +207,9 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
         core_state = tree.map_structure(lambda s: s[0, :, :], extras["core_states"])
         target_core_state = tree.map_structure(lambda s: s[0, :, :], extras["core_states"])
 
-        # TODO (dries): Take out all the data_points that does not need
-        #  to be processed here at the start. Therefore it does not have
-        #  to be done later on and saves processing time.
-        # NOTE (Claude) or do zeropadding mask
-
-        self.value_losses: Dict[str, tf.Tensor] = {}
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            # Note (dries): We are assuming that only the policy network
+            # NOTE (Dries): We are assuming that only the valu network
             # is recurrent and not the observation network.
             obs_trans, target_obs_trans = self._transform_observations(observations)
 
@@ -255,6 +249,7 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
 
 
                 # Append agent values to lists
+                # NOTE (Claude) appending to a list does not work in tf.function
                 chosen_action_q_value_all_agents.append(chosen_action_q_value)
                 max_action_q_value_all_agents.append(max_action_q_value)
                 reward_all_agents.append(rewards[agent])
@@ -321,7 +316,7 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
         value_losses = self.value_losses
         mixer_loss = self.mixer_loss
         tape = self.tape
-        for agent in self._trainer_agent_list:
+        for agent in self._agents:
             agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
@@ -331,10 +326,6 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
             )
 
             # Compute gradients.
-            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
-            #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context." caused by losses.dpg, which calls
-            #  tape.gradient.
             gradients = tape.gradient(value_losses[agent], variables)
 
             # Maybe clip gradients.
@@ -345,7 +336,6 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
             # Apply gradients.
             self._optimizers[agent_key].apply(gradients, variables)
 
-        # TODO (Claude) what happens when there are multiple trainers @Dries
         # Mixer
         mixer_variables = self._mixer.trainable_variables
 
