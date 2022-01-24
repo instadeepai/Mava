@@ -60,7 +60,7 @@ class MAPPOConfig:
         baseline_cost: contribution of the value loss to the total loss.
         clipping_epsilon: Hyper-parameter for clipping in the policy objective. Roughly:
             how far can the new policy go from the old policy while still profiting?
-            The new policy can still go farther than the clip_ratio says, but it doesn’t
+            The new policy can still go farther than the clip_ratio says, but it doesn't
             help on the objective anymore.
         max_gradient_norm: value to specify the maximum clipping value for the gradient
             norm during optimization.
@@ -77,6 +77,7 @@ class MAPPOConfig:
     critic_optimizer: snt.Optimizer
     agent_net_keys: Dict[str, str]
     checkpoint_minute_interval: int
+    use_single_optimizer: bool = True
     sequence_length: int = 10
     sequence_period: int = 5
     discount: float = 0.99
@@ -312,6 +313,7 @@ class MAPPOBuilder:
             agent_net_keys=agent_net_keys,
             critic_optimizer=self._config.critic_optimizer,
             policy_optimizer=self._config.policy_optimizer,
+            use_single_optimizer=self._config.use_single_optimizer,
             minibatch_size=self._config.minibatch_size,
             num_epochs=self._config.num_epochs,
             discount=self._config.discount,

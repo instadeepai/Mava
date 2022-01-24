@@ -61,6 +61,7 @@ class MAPPO:
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=5e-4),
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-5),
+        use_single_optimizer: bool = True,
         discount: float = 0.99,
         lambda_gae: float = 0.99,
         clipping_epsilon: float = 0.2,
@@ -120,6 +121,12 @@ class MAPPO:
                 Defaults to snt.optimizers.Adam(learning_rate=5e-4).
             critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
                 networks. Defaults to snt.optimizers.Adam(learning_rate=1e-5).
+            use_single_optimizer (bool, optional): boolean to decide 
+                whether or not the critic, policy and observation networks are 
+                optimized jointly by a single optimizer. If true, all networks 
+                are optimized by the policy_optimizer. If False, the observation and 
+                policy network are optimized by the policy optimizer and the 
+                critic network by the critic optimizer.
             discount (float, optional): discount factor to use for TD updates. Defaults
                 to 0.99.
             lambda_gae (float, optional): scalar determining the mix of bootstrapping
@@ -135,9 +142,9 @@ class MAPPO:
             gradient norm during optimization.
             max_queue_size (int, optional): maximum number of items in the queue.
                 Defaults to 100000.
-            train_batch_size (int, optional): sample batch size for updates.
-                Minibatches are sampled from this data.
-            minibatch_size (int, optional): size of minibatch that is sampled
+            train_batch_size (int, optional): sample batch size for updates. 
+                Defaults to 512. Minibatches are sampled from this data.
+            minibatch_size (int, optional): size of minibatch that is sampled 
                 from the training batch. Minibatches are used for each gradient step.
             num_epochs (int, optional): number of epochs every training step.
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
@@ -237,6 +244,7 @@ class MAPPO:
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
                 critic_optimizer=critic_optimizer,
+                use_single_optimizer = use_single_optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
                 evaluator_interval=evaluator_interval,
