@@ -78,15 +78,17 @@ class MAPPOTrainer(mava.Trainer):
         Args:
             agents (List[str]): agent ids, e.g. "agent_0".
             agent_types (List[str]): agent types, e.g. "speaker" or "listener".
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
-                the system.
-            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
-                each agent in the system.
+            observation_networks (Dict[str, snt.Module]): observation networks
+                for each agent in the system.
+            policy_networks (Dict[str, snt.Module]): policy networks for each
+                agent in the system.
+            critic_networks (Dict[str, snt.Module]): critic network(s), shared
+                or for each agent in the system.
             dataset (tf.data.Dataset): training dataset.
             policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
                 optimizer(s) for updating policy networks.
-            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                optimizer for updating critic networks.
+            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): optimizer
+                for updating critic networks.
             use_single_optimizer (bool): boolean to decide
                 whether or not the critic, policy and observation networks are
                 optimized jointly by a single optimizer. If true, all networks
@@ -271,23 +273,10 @@ class MAPPOTrainer(mava.Trainer):
             )
         return observation_trans
 
-    def _normalize_advantages(self, advantages, axes=(0, 1), variance_epsilon=1e-8):
-        """Normalise the advantages"""
-        adv_mean, adv_var = tf.nn.moments(advantages, axes=axes, keepdims=True)
-        normalized_advantages = tf.nn.batch_normalization(
-            advantages,
-            adv_mean,
-            adv_var,
-            offset=None,
-            scale=None,
-            variance_epsilon=variance_epsilon,
-        )
-        return normalized_advantages
-
     @tf.function
     def _step(
         self,
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> Union[Dict[str, Dict[str, Any]], Optional[Any]]:
         """PPO Trainer step
 
         Returns:
@@ -451,7 +440,8 @@ class MAPPOTrainer(mava.Trainer):
 
                 # Generalized Advantage Estimation
                 gae = tf.stop_gradient(td_lambda_extra.temporal_differences)
-                normalized_gae = self._normalize_advantages(gae)
+                mean, variance = tf.nn.moments(gae, axes=[0, 1], keepdims=True)
+                normalized_gae = (gae - mean) / tf.sqrt(variance)
 
                 ratio = importance_ratio
                 min_adv = tf.where(
