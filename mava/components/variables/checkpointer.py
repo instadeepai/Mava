@@ -45,14 +45,15 @@ class VariableCheckpointer(Callback):
         self, server: SystemVariableServer
     ) -> None:
         # Only save variables that are not empty.
-        save_variables = {}
+        server.save_variables = {}
         for key in server._variables.keys():
             var = server._variables[key]
             # Don't store empty tuple (e.g. empty observation_network) variables
             if not (type(var) == tuple and len(var) == 0):
-                save_variables[key] = server._variables[key]
+                server.save_variables[key] = server._variables[key]
 
-        # Create checkpointer
+        # Checkpointer settings
+        server.checkpoint_subpath = self._checkpoint_subpath
         server.checkpoint_subdir = os.path.join("variable_source")
         server.checkpoint_time_interval = self._checkpoint_minute_interval
 
