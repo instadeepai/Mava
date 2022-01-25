@@ -717,9 +717,10 @@ class MADQNRecurrentTrainer:
                     q_tm1, a_tm1, r_t, discount * d_t, q_t_value, q_t_selector
                 )
 
-                # TODO zero padding mask
-
-                self.value_losses[agent] = tf.reduce_mean(value_loss)
+                # Zero-padding mask
+                zero_padding_mask = tf.cast(extras["zero_padding_mask"], dtype=value_loss.dtype)[:-1]
+                masked_loss = value_loss * zero_padding_mask
+                self.value_losses[agent] = tf.reduce_sum(masked_loss) / tf.reduce_sum(zero_padding_mask)
 
         self.tape = tape
 

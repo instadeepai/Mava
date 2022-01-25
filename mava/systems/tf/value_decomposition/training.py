@@ -299,12 +299,14 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
 
             # Loss is MSE scaled by 0.5, so the gradient is equal to the TD error.
             value_loss = 0.5 * tf.square(td_error)
-            value_loss = tf.reduce_mean(value_loss)
 
-            # TODO zero padding mask
+            # Zero-padding mask
+            zero_padding_mask = tf.cast(extras["zero_padding_mask"], dtype=value_loss.dtype)[:-1]
+            masked_loss = value_loss * tf.expand_dims(zero_padding_mask, axis=-1)
+            masked_loss = tf.reduce_sum(masked_loss) / tf.reduce_sum(zero_padding_mask)
 
-            self.value_losses = {agent: value_loss for agent in self._agents}
-            self.mixer_loss = value_loss
+            self.value_losses = {agent: masked_loss for agent in self._agents}
+            self.mixer_loss = masked_loss
 
         self.tape = tape
 

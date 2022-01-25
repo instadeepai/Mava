@@ -13,13 +13,6 @@ class BaseMixer(snt.Module):
     def __call__(self, agent_qs: tf.Tensor , states: tf.Tensor):
         return agent_qs
 
-    """Initialize Base Mixer class
-    Args:
-        agent_qs: Tensor containing the q-values of actions chosen by agents
-        states: Tensor containing global environment state. 
-    """
-
-@snt.allow_empty_variables
 class VDN(BaseMixer):
     """VDN mixing network."""
 

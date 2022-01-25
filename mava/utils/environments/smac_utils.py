@@ -18,7 +18,9 @@ from mava.wrappers import SMACWrapper
 
 def make_environment(map_name="3m", concat_prev_actions=True, concat_agent_id=True, evaluation = False, random_seed=None):
     env = StarCraft2Env(map_name=map_name, seed=random_seed)
+    
     env = SMACWrapper(env)
+
     if concat_prev_actions:
         env = ConcatPrevActionToObservation(env)
     

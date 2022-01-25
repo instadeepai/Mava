@@ -63,7 +63,7 @@ def make_default_networks(
     """
 
     if not value_networks_layer_sizes:
-        value_networks_layer_sizes = (128, 64)
+        value_networks_layer_sizes = (64, 64)
 
     value_network_func = snt.DeepRNN
 

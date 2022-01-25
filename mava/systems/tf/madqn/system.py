@@ -18,6 +18,7 @@
 import functools
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, Mapping
 
+import numpy as np
 import acme
 import dm_env
 import launchpad as lp
@@ -442,7 +443,7 @@ class MADQN:
                     networks["values"][agent_net_key].initial_state(1)
                 ),
             )
-        return {"core_states": core_state_specs}
+        return {"core_states": core_state_specs, "zero_padding_mask": np.array(1)}
 
     def replay(self) -> Any:
         """Step counter

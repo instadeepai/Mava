@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, Optional, Tuple, Union
-
-import numpy as np
+from typing import Optional
 
 from mava.wrappers.flatland import FlatlandEnvWrapper
+from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation, ConcatPrevActionToObservation
 
 try:
     from flatland.envs.line_generators import sparse_line_generator
@@ -33,8 +32,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-
-def create_rail_env_with_tree_obs(
+def _create_rail_env_with_tree_obs(
     n_agents: int = 5,
     x_dim: int = 30,
     y_dim: int = 30,
@@ -47,7 +45,7 @@ def create_rail_env_with_tree_obs(
     malfunction_max_duration: int = 50,
     observation_max_path_depth: int = 30,
     observation_tree_depth: int = 2,
-) -> "RailEnv":
+) -> RailEnv:
     """Create a Flatland RailEnv with TreeObservation.
 
     Args:
@@ -100,23 +98,49 @@ def create_rail_env_with_tree_obs(
     return rail_env
 
 
-def flatland_env_factory(
+def make_environment(
+    n_agents: int =10,
+    x_dim: int = 30,
+    y_dim: int = 30,
+    n_cities: int = 2,
+    max_rails_between_cities: int =2,
+    max_rails_in_city: int =3,
+    seed: int =  0,
+    malfunction_rate:float = 1/200,
+    malfunction_min_duration: int = 20,
+    malfunction_max_duration: int = 50,
+    observation_max_path_depth: int = 30,
+    observation_tree_depth: int = 2,
+    concat_prev_actions: bool = True, 
+    concat_agent_id: bool = True,
     evaluation: bool = False,
-    env_config: Dict[str, Any] = {},
-    preprocessor: Callable[
-        [Any], Union[np.ndarray, Tuple[np.ndarray], Dict[str, np.ndarray]]
-    ] = None,
-    include_agent_info: bool = False,
     random_seed: Optional[int] = None,
 ) -> FlatlandEnvWrapper:
     """Loads a flatand environment and wraps it using the flatland wrapper"""
 
     del evaluation  # since it has same behaviour for both train and eval
 
-    env = create_rail_env_with_tree_obs(**env_config)
-    wrapped_env = FlatlandEnvWrapper(env, preprocessor, include_agent_info)
+    env = _create_rail_env_with_tree_obs(
+        n_agents=n_agents,
+        x_dim=x_dim,
+        y_dim=y_dim,
+        n_cities=n_cities,
+        max_rails_between_cities=max_rails_between_cities,
+        max_rails_in_city=max_rails_in_city,
+        seed=random_seed,
+        malfunction_rate=malfunction_rate,
+        malfunction_min_duration=malfunction_min_duration,
+        malfunction_max_duration=malfunction_max_duration,
+        observation_max_path_depth=observation_max_path_depth,
+        observation_tree_depth=observation_tree_depth,
+    )
+    
+    env = FlatlandEnvWrapper(env)
 
-    if random_seed and hasattr(wrapped_env, "seed"):
-        wrapped_env.seed(random_seed)
+    if concat_prev_actions:
+        env = ConcatPrevActionToObservation(env)
+    
+    if concat_agent_id:
+        env = ConcatAgentIdToObservation(env)
 
-    return wrapped_env
+    return env

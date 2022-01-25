@@ -27,7 +27,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 )
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments.flatland_utils import flatland_env_factory
+from mava.utils.environments.flatland_utils import make_environment
 from mava.utils.loggers import logger_utils
 from mava.utils.enums import ArchitectureType
 
@@ -43,7 +43,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 # flatland environment config
-flatland_env_config: Dict = {
+env_config: Dict = {
     "n_agents": 3,
     "x_dim": 30,
     "y_dim": 30,
@@ -63,14 +63,14 @@ def main(_: Any) -> None:
 
     # Environment.
     environment_factory = functools.partial(
-        flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
+        make_environment, **env_config
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
         madqn.make_default_networks,
         architecture_type=ArchitectureType.recurrent
-        )
+    )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
@@ -100,13 +100,15 @@ def main(_: Any) -> None:
         executor_variable_update_period=200,
         target_update_period=200,
         max_gradient_norm=20.0,
-        sequence_length=20,
-        period=10,
-        min_replay_size=100,
+        sequence_length=70,
+        period=70,
+        min_replay_size=32,
         max_replay_size=5000,
         trainer_fn=madqn.training.MADQNRecurrentTrainer,
         executor_fn=madqn.execution.MADQNRecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
+        evaluator_interval={"executor_episodes": 2},
+        termination_condition={"executor_steps": 3_000_000}
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

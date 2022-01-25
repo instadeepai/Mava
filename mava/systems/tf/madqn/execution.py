@@ -453,11 +453,19 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         )
 
         if self._store_recurrent_state:
+            # Core states
             numpy_states = {
                 agent: tf2_utils.to_numpy_squeeze(_state)
                 for agent, _state in self._states.items()
             }
-            extras.update({"core_states": numpy_states})
+
+            extras.update(
+                {
+                    "core_states": numpy_states,
+                    "zero_padding_mask": np.array(1)
+                }
+            )
+
         extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add_first(timestep, extras)
 
@@ -483,7 +491,14 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
                 agent: tf2_utils.to_numpy_squeeze(_state)
                 for agent, _state in self._states.items()
             }
-            next_extras.update({"core_states": numpy_states})
+
+            next_extras.update(
+                {
+                    "core_states": numpy_states,
+                    "zero_padding_mask": np.array(1)
+                }
+            )
+            
         next_extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add(actions, next_timestep, next_extras)  # type: ignore
 

@@ -35,7 +35,7 @@ from mava.systems.tf.variable_sources import VariableSource as MavaVariableSourc
 from mava.utils import enums
 from mava.utils.loggers import MavaLogger
 from mava.systems.tf.madqn import MADQN
-from mava.systems.tf.value_decomposition.mixer import QMIX, VDN
+from mava.components.tf.modules.mixing.mixers import QMIX, VDN
 
 
 class ValueDecomposition(MADQN):
