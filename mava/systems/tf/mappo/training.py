@@ -85,8 +85,8 @@ class MAPPOTrainer(mava.Trainer):
             critic_networks (Dict[str, snt.Module]): critic network(s), shared
                 or for each agent in the system.
             dataset (tf.data.Dataset): training dataset.
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]):
-                optimizer(s) for updating policy networks.
+            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): optimizer
+                for updating policy networks.
             critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): optimizer
                 for updating critic networks.
             use_single_optimizer (bool): boolean to decide
@@ -413,7 +413,7 @@ class MAPPOTrainer(mava.Trainer):
                 td_loss, td_lambda_extra = trfl.td_lambda(
                     state_values=state_values,
                     rewards=reward,
-                    pcontinues=discount,
+                    pcontinues=discount * self._discount,
                     bootstrap_value=bootstrap_value,
                     lambda_=self._lambda_gae,
                     name="CriticLoss",

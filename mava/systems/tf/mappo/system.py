@@ -91,8 +91,7 @@ class MAPPO:
         Args:
             environment_factory (Callable[[bool], dm_env.Environment]): function to
                 instantiate an environment.
-            network_factory (Callable[[acme_specs.BoundedArray],
-                Dict[str, snt.Module]]): function to instantiate system networks.
+            network_factory : function to instantiate system networks.
             logger_factory (Callable[[str], MavaLogger], optional): function to
                 instantiate a system logger. Defaults to None.
             architecture (Type[ DecentralisedValueActorCritic ], optional): system
@@ -116,8 +115,7 @@ class MAPPO:
                 Defaults to {}.
             executor_variable_update_period (int, optional): number of steps before
                 updating executor variables from the variable source. Defaults to 100.
-            policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
-                optional): optimizer(s) for updating policy networks.
+            policy_optimizer : optimizer(s) for updating policy networks.
                 Defaults to snt.optimizers.Adam(learning_rate=5e-4).
             critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
                 networks. Defaults to snt.optimizers.Adam(learning_rate=1e-5).
