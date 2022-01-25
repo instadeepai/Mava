@@ -40,7 +40,7 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
         action_selectors: Dict[str, snt.Module],
         communication_module: BaseCommunicationModule,
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
         trainer: MADQNTrainer = None,
@@ -59,8 +59,8 @@ class DIALSwitchExecutor(MADQNRecurrentCommExecutor):
                 communication protocols between agents.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
+            adder (Optional[adders.ReverbParallelAdder], optional): adder which sends
+                data to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
             store_recurrent_state (bool, optional): boolean to store the recurrent

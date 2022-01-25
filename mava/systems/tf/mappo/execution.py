@@ -40,7 +40,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         evaluator: bool = False,
         interval: Optional[dict] = None,
@@ -52,8 +52,8 @@ class MAPPOFeedForwardExecutor(core.Executor):
                 the system.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
+            adder (Optional[adders.ReverbParallelAdder], optional): adder which sends
+                data to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
             evaluator (bool, optional): whether the executor will be used for
