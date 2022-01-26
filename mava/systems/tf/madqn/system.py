@@ -16,7 +16,7 @@
 """MADQN system implementation."""
 
 import functools
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Mapping, Optional, Type, Union
 
 import acme
 import dm_env
@@ -67,7 +67,7 @@ class MADQN:
         ],
         logger_factory: Callable[[str], MavaLogger] = None,
         architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
-        trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
+        trainer_fn: Type[mava.Trainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = MADQNFeedForwardExecutor,
         num_executors: int = 1,
         trainer_networks: Union[
@@ -117,16 +117,13 @@ class MADQN:
                 exploration. e.g. epsilon greedy
             logger_factory: function to
                 instantiate a system logger.
-            architecture:
-                system architecture, e.g. decentralised or centralised.
-            trainer_fn: training type
-                associated with executor and architecture, e.g. centralised training.
-            executor_fn: executor type, e.g.
-                feedforward or recurrent.
+            architecture: system architecture, e.g. decentralised or centralised.
+            trainer_fn: training type associated with executor and architecture,
+                e.g. centralised training.
+            executor_fn: executor type, e.g. feedforward or recurrent.
             num_executors: number of executor processes to run in
                 parallel.
-            trainer_networks: networks each
-                trainer trains on.
+            trainer_networks: networks each trainer trains on.
             network_sampling_setup: List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
                 enums.NetworkSampler settings:
@@ -160,7 +157,7 @@ class MADQN:
             max_replay_size: maximum replay size.
             samples_per_insert: number of samples to take
                 from replay for every insert that is made.
-            optimizers: optimizer(s) for updating value networks.
+            optimizer: optimizer(s) for updating value networks.
             n_step: number of steps to include prior to boostrapping.
             sequence_length: recurrent sequence rollout length.
             period: Consecutive starting points for overlapping
@@ -453,7 +450,7 @@ class MADQN:
 
     def create_system(
         self,
-    ) -> Tuple[Dict[str, Dict[str, snt.Module]], Dict[str, Dict[str, snt.Module]]]:
+    ) -> Dict:
         """Initialise the system variables from the network factory."""
         # Create the networks to optimize (online)
         networks = self._network_factory(  # type: ignore
@@ -487,12 +484,14 @@ class MADQN:
         replay: reverb.Client,
         variable_source: acme.VariableSource,
     ) -> mava.ParallelEnvironmentLoop:
-        """System executor
+        """System executor.
+
         Args:
             executor_id: id to identify the executor process for logging purposes.
             replay: replay data table to push data to.
             variable_source: variable server for updating
                 network variables.
+
         Returns:
             mava.ParallelEnvironmentLoop: environment-executor loop instance.
         """
@@ -539,7 +538,7 @@ class MADQN:
         self,
         variable_source: acme.VariableSource,
     ) -> Any:
-        """System evaluator (an executor process not connected to a dataset)
+        """System evaluator.
 
         Args:
             variable_source: variable server for updating

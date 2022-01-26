@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """Value Decomposition trainer implementation."""
 
 import copy
@@ -63,7 +61,8 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Initialise Value Decompostion trainer
+        """Initialise Value Decompostion trainer.
+
         Args:
             agents: agent ids, e.g. "agent_0".
             agent_types: agent types, e.g. "speaker" or "listener".
@@ -120,7 +119,7 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
         self._mixer_optimizer = None
 
     def setup_mixer(self, mixer: snt.Module, mixer_optimizer: snt.Module) -> None:
-        """Initialize the mixer network
+        """Initialize the mixer network.
 
         Args:
             mixer: mixer network
@@ -131,8 +130,11 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
         self._mixer_optimizer = mixer_optimizer
 
     def _update_target_networks(self) -> None:
-        """Update the target networks using either target averaging or
-        by directy copying the weights of the online networks every few steps."""
+        """Update the target networks.
+
+        Using either target averaging or
+        by directy copying the weights of the online networks every few steps.
+        """
 
         online_variables = []
         target_variables = []
@@ -170,7 +172,8 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
-        """Trainer forward pass
+        """Trainer forward pass.
+
         Args:
             inputs: input data from the data table (transitions)
         """

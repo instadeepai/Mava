@@ -39,6 +39,7 @@ train_utils.set_growing_gpu_memory()
 
 class MADQNTrainer(mava.Trainer):
     """MADQN trainer.
+
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -64,7 +65,8 @@ class MADQNTrainer(mava.Trainer):
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Initialise MADQN trainer
+        """Initialise MADQN trainer.
+
         Args:
             agents: agent ids, e.g. "agent_0".
             agent_types: agent types, e.g. "speaker" or "listener".
@@ -171,9 +173,11 @@ class MADQNTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def _update_target_networks(self) -> None:
+        """Update the target networks.
 
-        """Update the target networks using either target averaging or
-        by directy copying the weights of the online networks every few steps."""
+        Using either target averaging or
+        by directy copying the weights of the online networks every few steps.
+        """
 
         for key in self.unique_net_keys:
             # Update target network.
@@ -199,7 +203,6 @@ class MADQNTrainer(mava.Trainer):
         self._num_steps.assign_add(1)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
-
         """Depricated"""
 
         pass
@@ -207,12 +210,12 @@ class MADQNTrainer(mava.Trainer):
     def _transform_observations(
         self, obs: Dict[str, mava_types.OLT], next_obs: Dict[str, mava_types.OLT]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-
         """Transform the observations using the observation networks of each agent."
 
         Args:
             obs: observations at timestep t-1
             next_obs: observations at timestep t
+
         Returns:
             Transformed observations
         """
@@ -255,7 +258,8 @@ class MADQNTrainer(mava.Trainer):
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
-        """Trainer forward pass
+        """Trainer forward pass.
+
         Args:
             inputs: input data from the data table (transitions)
         """
@@ -373,11 +377,13 @@ class MADQNTrainer(mava.Trainer):
             trainer_step : trainer step time t.
         """
         train_utils.decay_lr(
-            self._learning_rate_scheduler_fn, self._optimizers, trainer_step
+            self._learning_rate_scheduler_fn,  # type: ignore
+            self._optimizers,
+            trainer_step,
         )
 
 
-class MADQNRecurrentTrainer:
+class MADQNRecurrentTrainer(mava.Trainer):
     """Recurrent MADQN trainer.
 
     This is the trainer component of a recurrent MADQN system. IE it takes a dataset
@@ -769,5 +775,7 @@ class MADQNRecurrentTrainer:
             trainer_step : trainer step time t.
         """
         train_utils.decay_lr(
-            self._learning_rate_scheduler_fn, self._optimizers, trainer_step
+            self._learning_rate_scheduler_fn,  # type: ignore
+            self._optimizers,
+            trainer_step,
         )

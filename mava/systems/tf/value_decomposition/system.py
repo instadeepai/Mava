@@ -89,7 +89,8 @@ class ValueDecomposition(MADQN):
         evaluator_interval: Optional[dict] = {"executor_episodes": 2},
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Initialise the system
+        """Initialise the system.
+
         Args:
             environment_factory: function to
                 instantiate an environment.
@@ -210,7 +211,7 @@ class ValueDecomposition(MADQN):
 
         if isinstance(mixer, str):
             if mixer == "qmix":
-                env = environment_factory()
+                env = environment_factory()  # type: ignore
                 num_agents = len(env.possible_agents)
                 mixer = QMIX(num_agents)
                 del env
@@ -230,12 +231,14 @@ class ValueDecomposition(MADQN):
         replay: reverb.Client,
         variable_source: MavaVariableSource,
     ) -> mava.core.Trainer:
-        """System trainer
+        """System trainer.
+
         Args:
             trainer_id: Id of the trainer being created.
             replay: replay data table to pull data from.
             variable_source: variable server for updating
                 network variables.
+
         Returns:
             system trainer.
         """
@@ -253,7 +256,7 @@ class ValueDecomposition(MADQN):
         # Create the dataset
         dataset = self._builder.make_dataset_iterator(replay, trainer_id)
 
-        trainer: ValueDecompositionRecurrentTrainer = self._builder.make_trainer(
+        trainer = self._builder.make_trainer(
             networks=networks,
             trainer_networks=self._trainer_networks[trainer_id],
             trainer_table_entry=self._table_network_config[trainer_id],
@@ -262,6 +265,7 @@ class ValueDecomposition(MADQN):
             variable_source=variable_source,
         )
 
-        trainer.setup_mixer(self._mixer, self._mixer_optimizer)
+        if isinstance(trainer, ValueDecompositionRecurrentTrainer):
+            trainer.setup_mixer(self._mixer, self._mixer_optimizer)
 
         return trainer
