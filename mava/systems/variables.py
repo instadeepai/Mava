@@ -100,6 +100,7 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
             names = [names]  # type: ignore
 
         for var_key in names:
+            self._var_key = var_key
             assert var_key in self.variables
             if type(self.variables[var_key]) == tuple:
                 # Loop through tuple
