@@ -265,7 +265,6 @@ class ValueDecomposition(MADQN):
             variable_source=variable_source,
         )
 
-        if isinstance(trainer, ValueDecompositionRecurrentTrainer):
-            trainer.setup_mixer(self._mixer, self._mixer_optimizer)
+        trainer.setup_mixer(self._mixer, self._mixer_optimizer)  # type: ignore
 
         return trainer

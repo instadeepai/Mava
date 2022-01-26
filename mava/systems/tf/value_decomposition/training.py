@@ -15,7 +15,7 @@
 """Value Decomposition trainer implementation."""
 
 import copy
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import reverb
 import sonnet as snt
@@ -334,8 +334,7 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
             self._optimizers[agent_key].apply(gradients, variables)
 
         # Mixer
-        if self._mixer is not None:
-            mixer_variables: Sequence[tf.Variable] = self._mixer.trainable_variables
+        mixer_variables = self._mixer.trainable_variables  # type: ignore
 
         gradients = tape.gradient(mixer_loss, mixer_variables)
 
