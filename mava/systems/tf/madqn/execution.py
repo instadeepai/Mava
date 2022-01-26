@@ -43,11 +43,12 @@ tfd = tfp.distributions
 
 
 class DQNExecutor:
-    def __init__(self, action_selectors: Dict):
+    def __init__(self, action_selectors: Dict) -> None:
         self._action_selectors = action_selectors
 
     def _get_epsilon(self) -> Union[float, np.ndarray]:
         """Return epsilon.
+
         Returns:
             epsilon values.
         """
@@ -78,6 +79,11 @@ class DQNExecutor:
         }
 
     def after_action_selection(self, time_t: int) -> None:
+        """After action selection.
+
+        Args:
+            time_t: timestep
+        """
         self._decrement_epsilon(time_t)
 
     def get_stats(self) -> Dict:
@@ -106,7 +112,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         network_sampling_setup: List,
         net_keys_to_ids: Dict[str, int],
         evaluator: bool = False,
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         interval: Optional[dict] = None,
@@ -296,7 +302,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         network_sampling_setup: List,
         net_keys_to_ids: Dict[str, int],
         evaluator: bool = False,
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,

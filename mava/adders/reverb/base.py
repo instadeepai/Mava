@@ -39,6 +39,7 @@ from acme import types
 from acme.adders.reverb.base import ReverbAdder
 
 from mava import types as mava_types
+from mava.adders.base import ParallelAdder
 from mava.utils.sort_utils import sort_str_num
 
 DEFAULT_PRIORITY_TABLE = "priority_table"
@@ -93,13 +94,14 @@ def get_trajectory_net_agents(
     trajectory: Union[Trajectory, mava_types.Transition],
     trajectory_net_keys: Dict[str, str],
 ) -> Tuple[List, Dict[str, List]]:
-    """Returns a dictionary that maps network_keys to a list of agents using that specific
-    network.
+    """Returns a dictionary that maps network_keys to a list of agents using that
+    specific network.
 
     Args:
         trajectory: Episode experience recorded by
         the adders.
         trajectory_net_keys: The network_keys used by each agent in the trajectory.
+
     Returns:
         agents: A sorted list of all the agent_keys.
         agents_per_network: A dictionary that maps network_keys to
@@ -113,7 +115,7 @@ def get_trajectory_net_agents(
     return agents, agents_per_network
 
 
-class ReverbParallelAdder(ReverbAdder):
+class ReverbParallelAdder(ReverbAdder, ParallelAdder):
     """Base reverb class."""
 
     def __init__(
@@ -159,11 +161,13 @@ class ReverbParallelAdder(ReverbAdder):
         trajectory: Union[Trajectory, mava_types.Transition],
         table_priorities: Dict[str, Any],
     ) -> None:
-        """Write an episode experience (trajectory) to the reverb tables. Each
-        table represents experience used by each of the trainers. Therefore
+        """Write an episode experience (trajectory) to the reverb tables.
+
+        Each table represents experience used by each of the trainers. Therefore
         this function dynamically determines to which table(s) to write
         parts of the trajectory based on what networks where used by
         the agents in the episode run.
+
         Args:
             trajectory: Trajectory to be
                 written to the reverb tables.
