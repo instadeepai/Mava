@@ -27,7 +27,7 @@ class VariableCheckpointer(BaseCheckpointer):
         self, server: SystemVariableServer
     ) -> None:
         """[summary]"""
-        server._system_checkpointer = tf2_savers.Checkpointer(
+        server.system_checkpointer = tf2_savers.Checkpointer(
             time_delta_minutes=server.checkpoint_minute_interval,
             directory=server.checkpoint_subpath,
             objects_to_save=server.save_variables,
