@@ -31,13 +31,10 @@ from mava.utils.enums import ArchitectureType
 from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
-SEQUENCE_LENGTH = 60
-MAP_NAME = "3m"
-
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    MAP_NAME,
+    "3m",
     "Starcraft 2 micromanagement map name (str).",
 )
 
