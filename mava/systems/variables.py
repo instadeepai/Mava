@@ -65,7 +65,7 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
         """
         self._names = names
 
-        self.on_variables_get_server_variables_start()
+        self.on_variables_server_get_variables_start()
 
         if type(names) == str:
             variables = self.variables[names]
@@ -76,9 +76,9 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
                 # TODO (dries): Do we really have to convert the variables to
                 # numpy each time. Can we not keep the variables in numpy form
                 # without the checkpointer complaining?
-                self.on_variables_get_server_variables()
+                self.on_variables_server_get_variables()
 
-        self.on_variables_get_server_variables_end()
+        self.on_variables_server_get_variables_end()
 
         return variables
 
@@ -93,7 +93,7 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
         self._names = names
         self._vars = vars
 
-        self.on_variables_set_server_variables_start()
+        self.on_variables_server_set_variables_start()
 
         if type(names) == str:
             vars = {names: vars}  # type: ignore
@@ -106,11 +106,11 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
                 # Loop through tuple
                 for var_i in range(len(self.variables[var_key])):
                     self._var_i = var_i
-                    self.on_variables_set_server_variables_if_tuple()
+                    self.on_variables_server_set_variables_if_tuple()
             else:
-                self.on_variables_set_server_variables_if_dict()
+                self.on_variables_server_set_variables_if_dict()
 
-        self.on_variables_set_server_variables_end()
+        self.on_variables_server_set_variables_end()
 
     def add_to_variables(
         self, names: Sequence[str], vars: Dict[str, np.ndarray]
@@ -125,7 +125,7 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
         self._names = names
         self._vars = vars
 
-        self.on_variables_add_to_server_variables_start()
+        self.on_variables_server_add_to_variables_start()
 
         if type(names) == str:
             vars = {names: vars}  # type: ignore
@@ -136,9 +136,9 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
             self._var_key = var_key
             # Note: Can also use self.variables[var_key] = /
             # self.variables[var_key] + vars[var_key]
-            self.on_variables_add_to_server_variables()
+            self.on_variables_server_add_to_variables()
 
-        self.on_variables_add_to_server_variables_end()
+        self.on_variables_server_add_to_variables_end()
 
     def run(self) -> None:
         """Run the variable source. This function allows for
@@ -150,7 +150,7 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
                     None
         """
 
-        self.on_variables_run_server_start()
+        self.on_variables_server_run_start()
 
         # Checkpoints every 5 minutes
         while True:
@@ -159,15 +159,15 @@ class VariableServer(SystemVariableServer, CallbackHookMixin):
 
             # Add 1 extra second just to make sure that the checkpointer
             # is ready to save.
-            self.on_variables_run_server_loop_start()
+            self.on_variables_server_run_loop_start()
 
-            self.on_variables_run_server_loop_checkpoint()
+            self.on_variables_server_run_loop_checkpoint()
 
-            self.on_variables_run_server_loop()
+            self.on_variables_server_run_loop()
 
-            self.on_variables_run_server_loop_termination()
+            self.on_variables_server_run_loop_termination()
 
-            self.on_variables_run_server_loop_end()
+            self.on_variables_server_run_loop_end()
 
 
 class VariableClient(SystemVariableClient, CallbackHookMixin):

@@ -492,10 +492,15 @@ class CallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_variables_server_init(self)
 
-    def on_variables_server_checkpoint(self) -> None:
+    def on_variables_server_init_checkpointing(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_variables_server_checkpoint(self)
+            callback.on_variables_server_init_checkpointing(self)
+
+    def on_variables_server_init_make_checkpointer(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_variables_server_init_make_checkpoint(self)
 
     def on_variables_server_init_end(self) -> None:
         """[summary]"""
@@ -522,10 +527,15 @@ class CallbackHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_variables_server_set_variables_start(self)
 
-    def on_variables_server_set_variables(self) -> None:
+    def on_variables_server_set_variables_if_tuple(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_variables_server_set_variables(self)
+            callback.on_variables_server_set_variables_if_tuple(self)
+
+    def on_variables_server_set_variables_if_dict(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_variables_server_set_variables_if_dict(self)
 
     def on_variables_server_set_variables_end(self) -> None:
         """[summary]"""

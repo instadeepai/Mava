@@ -434,7 +434,15 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_variables_server_checkpoint(self, server: SystemVariableServer) -> None:
+    def on_variables_server_init_checkpointing(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_server_init_make_checkpointer(
+        self, server: SystemVariableServer
+    ) -> None:
         """[summary]"""
         pass
 
@@ -464,7 +472,15 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    def on_variables_server_set_variables(self, server: SystemVariableServer) -> None:
+    def on_variables_server_set_variables_if_tuple(
+        self, server: SystemVariableServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_variables_server_set_variables_if_dict(
+        self, server: SystemVariableServer
+    ) -> None:
         """[summary]"""
         pass
 
