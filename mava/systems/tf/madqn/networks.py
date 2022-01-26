@@ -14,17 +14,17 @@
 # limitations under the License.
 from typing import Dict, Mapping, Optional, Sequence, Union
 
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme import types
 from acme.tf import utils as tf2_utils
+from acme.tf.networks import AtariTorso
 from dm_env import specs
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
-from mava.utils.enums import ArchitectureType
 from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
+from mava.utils.enums import ArchitectureType
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
@@ -36,6 +36,7 @@ def make_default_networks(
     agent_net_keys: Dict[str, str],
     value_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     architecture_type: ArchitectureType = ArchitectureType.feedforward,
+    atari_torso_observation_network: bool = False,
     seed: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
     """Default networks for maddpg.
@@ -85,7 +86,6 @@ def make_default_networks(
     # Create agent_type specs
     specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
 
-
     if isinstance(value_networks_layer_sizes, Sequence):
         value_networks_layer_sizes = {
             key: value_networks_layer_sizes for key in specs.keys()
@@ -102,7 +102,10 @@ def make_default_networks(
         num_actions = spec.actions.num_values
 
         # An optional network to process observations
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
+        if not atari_torso_observation_network:
+            observation_network = tf2_utils.to_sonnet_module(tf.identity)
+        else:
+            observation_network = AtariTorso()
 
         # Create the policy network.
         if architecture_type == ArchitectureType.feedforward:

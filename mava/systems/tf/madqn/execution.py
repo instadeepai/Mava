@@ -30,17 +30,17 @@ from acme.tf import variable_utils as tf2_variable_utils
 from dm_env import specs
 
 from mava import adders
-from mava import core
-from mava.systems.tf import executors
-from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     BaseExplorationTimestepScheduler,
 )
+from mava.systems.tf import executors
+from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
 tfd = tfp.distributions
+
 
 class DQNExecutor:
     def __init__(self, action_selectors: Dict):
@@ -143,15 +143,16 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         self._observation_networks = observation_networks
         self._action_selectors = action_selectors
         self._value_networks = value_networks
-        self._agent_net_keys=agent_net_keys
-        self._adder=adder
-        self._variable_client=variable_client
+        self._agent_net_keys = agent_net_keys
+        self._adder = adder
+        self._variable_client = variable_client
 
     @tf.function
     def _policy(
-        self, agent: str, 
+        self,
+        agent: str,
         observation: types.NestedTensor,
-        legal_actions: types.NestedTensor
+        legal_actions: types.NestedTensor,
     ) -> types.NestedTensor:
         """Agent specific policy function
 
@@ -206,10 +207,8 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
 
         return action
 
-    def select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
-        """select the actions for all agents in the system
+    def select_actions(self, observations: Dict[str, types.NestedArray]) -> Dict:
+        """Select the actions for all agents in the system
 
         Args:
             observations: agent observations from the
@@ -249,8 +248,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         )
 
         extras["network_int_keys"] = self._network_int_keys_extras
-        
-        
+
         self._adder.add_first(timestep, extras)
 
     def observe(
@@ -290,7 +288,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
 
     def __init__(
         self,
-        observation_networks :Dict[str, snt.Module], 
+        observation_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         value_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
@@ -335,14 +333,13 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         self._evaluator = evaluator
         self._interval = interval
         self._value_networks = value_networks
-        self._agent_net_keys=agent_net_keys
-        self._adder=adder
-        self._variable_client=variable_client
-        self._store_recurrent_state=store_recurrent_state
+        self._agent_net_keys = agent_net_keys
+        self._adder = adder
+        self._variable_client = variable_client
+        self._store_recurrent_state = store_recurrent_state
         self._observation_networks = observation_networks
         self._action_selectors = action_selectors
         self._states: Dict[str, Any] = {}
-        
 
     @tf.function
     def _policy(
@@ -351,7 +348,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         observation: types.NestedTensor,
         legal_actions: types.NestedTensor,
         state: types.NestedTensor,
-    ) -> Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
+    ) -> Tuple:
         """Agent specific policy function
         Args:
             agent: agent id
@@ -379,7 +376,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
 
         # Pass action values through action selector
         action = self._action_selectors[agent](action_values, batched_legal_actions)
-        
+
         return action, new_state
 
     def select_action(
@@ -396,7 +393,10 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
 
         # Step the recurrent policy forward given the current observation and state.
         action, new_state = self._policy(
-            agent, observation.observation, observation.legal_actions, self._states[agent]
+            agent,
+            observation.observation,
+            observation.legal_actions,
+            self._states[agent],
         )
 
         # Bookkeeping of recurrent states for the observe method.
@@ -407,9 +407,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
 
         return action
 
-    def select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+    def select_actions(self, observations: Dict[str, types.NestedArray]) -> Any:
         """select the actions for all agents in the system
         Args:
             observations: agent observations from the
@@ -460,10 +458,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
             }
 
             extras.update(
-                {
-                    "core_states": numpy_states,
-                    "zero_padding_mask": np.array(1)
-                }
+                {"core_states": numpy_states, "zero_padding_mask": np.array(1)}
             )
 
         extras["network_int_keys"] = self._network_int_keys_extras
@@ -493,12 +488,9 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
             }
 
             next_extras.update(
-                {
-                    "core_states": numpy_states,
-                    "zero_padding_mask": np.array(1)
-                }
+                {"core_states": numpy_states, "zero_padding_mask": np.array(1)}
             )
-            
+
         next_extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add(actions, next_timestep, next_extras)  # type: ignore
 

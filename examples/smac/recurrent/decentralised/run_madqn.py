@@ -16,30 +16,20 @@
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any
 
 import launchpad as lp
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
-from acme import types
 
-from mava import specs as mava_specs
-from mava.components.tf import networks
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationScheduler,
 )
-from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
-from mava.utils.environments import pettingzoo_utils
 from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
-from mava.wrappers.env_preprocess_wrappers import (
-    ConcatAgentIdToObservation,
-    ConcatPrevActionToObservation,
-)
 
 SEQUENCE_LENGTH = 60
 MAP_NAME = "3m"
@@ -56,6 +46,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
+
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
@@ -83,14 +74,14 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
+    # Distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=8e-6
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
         ),
         optimizer=snt.optimizers.RMSProp(
             learning_rate=0.0005, epsilon=0.00001, decay=0.99
@@ -98,17 +89,14 @@ def main(_: Any) -> None:
         checkpoint_subpath=checkpoint_dir,
         batch_size=32,
         executor_variable_update_period=200,
-        target_update_period=100,
+        target_update_period=200,
         max_gradient_norm=20.0,
-        sequence_length=SEQUENCE_LENGTH,
-        period=SEQUENCE_LENGTH,
         min_replay_size=32,
-        max_replay_size=5000,
-        samples_per_insert=1,
+        max_replay_size=10000,
+        samples_per_insert=16,
         evaluator_interval={"executor_episodes": 2},
-        termination_condition={"executor_steps": 3_000_000},
-        trainer_fn=madqn.training.MADQNRecurrentTrainer,
-        executor_fn=madqn.execution.MADQNRecurrentExecutor,
+        trainer_fn=madqn.MADQNRecurrentTrainer,
+        executor_fn=madqn.MADQNRecurrentExecutor,
     ).build()
 
     # launch

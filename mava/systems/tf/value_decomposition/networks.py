@@ -14,7 +14,6 @@
 # limitations under the License.
 from typing import Dict, Mapping, Optional, Sequence, Union
 
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme import types
@@ -23,7 +22,6 @@ from dm_env import specs
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
-from mava.utils.enums import ArchitectureType
 from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 
 Array = specs.Array
@@ -37,29 +35,20 @@ def make_default_networks(
     value_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     seed: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
-    """Default networks for maddpg.
+
+    """Default networks for Value Decomposition systems.
 
     Args:
         environment_spec: description of the action and
             observation spaces etc. for each agent in the system.
         agent_net_keys: specifies what network each agent uses.
-        vmin: hyperparameters for the distributional critic in mad4pg.
-        vmax: hyperparameters for the distributional critic in mad4pg.
-        net_spec_keys: specifies the specs of each network.
-        policy_networks_layer_sizes: size of policy networks.
-        critic_networks_layer_sizes: size of critic networks.
-        sigma: hyperparameters used to add Gaussian noise
-            for simple exploration. Defaults to 0.3.
-        archecture_type: archecture used
-            for agent networks. Can be feedforward or recurrent.
-            Defaults to ArchitectureType.feedforward.
-
-        num_atoms:  hyperparameters for the distributional critic in
-            mad4pg.
+        value_networks_layer_sizes: size of value networks
         seed: random seed for network initialization.
 
     Returns:
-        returned agent networks.
+        Agents value networks
+        Agents action selectors
+        Agents observation networks
     """
 
     if not value_networks_layer_sizes:
@@ -74,7 +63,6 @@ def make_default_networks(
 
     # Create agent_type specs
     specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
-
 
     if isinstance(value_networks_layer_sizes, Sequence):
         value_networks_layer_sizes = {

@@ -29,18 +29,18 @@ from dm_env import specs as dm_specs
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.systems.tf import executors, variable_utils
-from mava.systems.tf.madqn import training
-from mava.systems.tf.madqn.execution import MADQNFeedForwardExecutor
-from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
-from mava.utils.sort_utils import sort_str_num
-from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerStatistics
-from mava.utils.builder_utils import initialize_epsilon_schedulers
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     BaseExplorationScheduler,
     BaseExplorationTimestepScheduler,
     ConstantScheduler,
 )
+from mava.systems.tf import executors, variable_utils
+from mava.systems.tf.madqn import training
+from mava.systems.tf.madqn.execution import MADQNFeedForwardExecutor
+from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils.builder_utils import initialize_epsilon_schedulers
+from mava.utils.sort_utils import sort_str_num
+from mava.wrappers import ScaledDetailedTrainerStatistics
 
 BoundedArray = dm_specs.BoundedArray
 DiscreteArray = dm_specs.DiscreteArray
@@ -53,8 +53,7 @@ class MADQNConfig:
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
-        policy_optimizer: optimizer(s) for updating policy networks.
-        critic_optimizer: optimizer for updating critic networks.
+        optimizer: optimizer(s) for updating value networks.
         num_executors: number of parallel executors to use.
         agent_net_keys: specifies what network each agent uses.
         trainer_networks: networks each trainer trains on.
@@ -168,7 +167,6 @@ class MADQNBuilder:
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
         self._executor_fn = executor_fn
-
 
     def covert_specs(self, spec: Dict[str, Any], num_networks: int) -> Dict[str, Any]:
         if type(spec) is not dict:
@@ -319,8 +317,6 @@ class MADQNBuilder:
             for table_key in self._config.table_network_config.keys()
         }
 
-        print()
-
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
@@ -343,7 +339,6 @@ class MADQNBuilder:
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
 
-        print("################3", adder)
         return adder
 
     def create_counter_variables(
@@ -519,7 +514,6 @@ class MADQNBuilder:
         target_averaging = self._config.target_averaging
         target_update_rate = self._config.target_update_rate
 
-        print("4")
         # Create variable client
         variables = {}
         set_keys = []
@@ -536,7 +530,6 @@ class MADQNBuilder:
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")
 
-        print("5")
         variables = self.create_counter_variables(variables)
 
         count_names = [
@@ -550,7 +543,6 @@ class MADQNBuilder:
         get_keys.extend(count_names)
         counts = {name: variables[name] for name in count_names}
 
-        print("6")
         variable_client = variable_utils.VariableClient(
             client=variable_source,
             variables=variables,
@@ -559,11 +551,9 @@ class MADQNBuilder:
             update_period=10,
         )
 
-        print("7")
         # Get all the initial variables
         variable_client.get_all_and_wait()
 
-        print("8")
         # Convert network keys for the trainer.
         trainer_agents = self._agents[: len(trainer_table_entry)]
         trainer_agent_net_keys = {

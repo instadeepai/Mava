@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MADQN on debug Atari Pong."""
+
 import functools
 from datetime import datetime
 from typing import Any
@@ -22,23 +22,19 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
-from mava.systems.tf import madqn
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    LinearExplorationScheduler,
+)
+from mava.systems.tf import value_decomposition
 from mava.utils import lp_utils
-from mava.utils.enums import Network
-from mava.utils.environments import pettingzoo_utils
+from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_class",
-    "atari",
-    "Pettingzoo environment class, e.g. atari (str).",
-)
-flags.DEFINE_string(
-    "env_name",
-    "pong_v2",
-    "Pettingzoo environment name, e.g. pong (str).",
+    "map_name",
+    "3m",
+    "Starcraft 2 micromanagement map name (str).",
 )
 
 flags.DEFINE_string(
@@ -46,21 +42,18 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
+
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-
+    """Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
     # environment
-    environment_factory = functools.partial(
-        pettingzoo_utils.make_environment,
-        env_class=FLAGS.env_class,
-        env_name=FLAGS.env_name,
-    )
+    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks, network_type=Network.mlp
+        value_decomposition.make_default_networks,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -78,25 +71,33 @@ def main(_: Any) -> None:
     )
 
     # distributed program
-    program = madqn.MADQN(
+    program = value_decomposition.ValueDecomposition(
         environment_factory=environment_factory,
         network_factory=network_factory,
+        mixer="qmix",
         logger_factory=logger_factory,
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-4
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
         ),
-        importance_sampling_exponent=0.2,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer=snt.optimizers.RMSProp(
+            learning_rate=0.0005, epsilon=0.00001, decay=0.99
+        ),
         checkpoint_subpath=checkpoint_dir,
+        batch_size=32,
+        executor_variable_update_period=200,
+        target_update_period=200,
+        max_gradient_norm=20.0,
+        min_replay_size=32,
+        max_replay_size=10000,
+        samples_per_insert=16,
+        evaluator_interval={"executor_episodes": 2},
     ).build()
 
-    # Ensure only trainer runs on gpu, while other processes run on cpu.
+    # launch
     local_resources = lp_utils.to_device(
         program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )
-
-    # Launch.
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,

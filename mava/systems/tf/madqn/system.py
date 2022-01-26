@@ -16,29 +16,25 @@
 """MADQN system implementation."""
 
 import functools
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union, Mapping
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, Union
 
-import numpy as np
 import acme
 import dm_env
 import launchpad as lp
+import numpy as np
 import reverb
 import sonnet as snt
 from acme import specs as acme_specs
 from acme.tf import utils as tf2_utils
-from acme.utils import loggers
 from dm_env import specs
 
 import mava
 from mava import core
 from mava import specs as mava_specs
-from mava.components.tf.architectures import (
-    DecentralisedValueActor,
-)
+from mava.components.tf.architectures import DecentralisedValueActor
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     ConstantScheduler,
 )
-from mava.types import EpsilonScheduler
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf.madqn import builder, training
@@ -47,6 +43,7 @@ from mava.systems.tf.madqn.execution import (
     sample_new_agent_keys,
 )
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.types import EpsilonScheduler
 from mava.utils import enums
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.utils.sort_utils import sort_str_num
@@ -69,9 +66,7 @@ class MADQN:
             Mapping[str, Mapping[str, EpsilonScheduler]],
         ],
         logger_factory: Callable[[str], MavaLogger] = None,
-        architecture: Type[
-            DecentralisedValueActor
-        ] = DecentralisedValueActor,
+        architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
         trainer_fn: Type[training.MADQNTrainer] = training.MADQNTrainer,
         executor_fn: Type[core.Executor] = MADQNFeedForwardExecutor,
         num_executors: int = 1,
@@ -91,14 +86,14 @@ class MADQN:
         target_update_rate: Optional[float] = None,
         executor_variable_update_period: int = 1000,
         min_replay_size: int = 1000,
-        max_replay_size: int = 1000000,
+        max_replay_size: int = 100000,
         samples_per_insert: Optional[float] = 32.0,
-        optimizer: Union[
-            snt.Optimizer, Dict[str, snt.Optimizer]
-        ] = snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
+            learning_rate=1e-4
+        ),
         n_step: int = 5,
         sequence_length: int = 20,
-        period: int = 20,
+        period: int = 10,
         max_gradient_norm: float = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -113,10 +108,13 @@ class MADQN:
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the system
+
         Args:
             environment_factory: function to
                 instantiate an environment.
             network_factory: function to instantiate system networks.
+            exploration_scheduler_fn: function to schedule
+                exploration. e.g. epsilon greedy
             logger_factory: function to
                 instantiate a system logger.
             architecture:
@@ -126,9 +124,7 @@ class MADQN:
             executor_fn: executor type, e.g.
                 feedforward or recurrent.
             num_executors: number of executor processes to run in
-                parallel..
-            environment_spec: description of
-                the action, observation spaces etc. for each agent in the system.
+                parallel.
             trainer_networks: networks each
                 trainer trains on.
             network_sampling_setup: List of networks that are randomly
@@ -147,6 +143,8 @@ class MADQN:
             shared_weights: whether agents should share weights or not.
                 When network_sampling_setup are provided the value of shared_weights is
                 ignored.
+            environment_spec: description of
+                the action, observation spaces etc. for each agent in the system.
             discount: discount factor to use for TD updates.
             batch_size: sample batch size for updates.
             prefetch_size: size to prefetch from replay.
@@ -162,9 +160,7 @@ class MADQN:
             max_replay_size: maximum replay size.
             samples_per_insert: number of samples to take
                 from replay for every insert that is made.
-            policy_optimizer: optimizer(s) for updating policy networks.
-            critic_optimizer: optimizer for updating critic
-                networks.
+            optimizers: optimizer(s) for updating value networks.
             n_step: number of steps to include prior to boostrapping.
             sequence_length: recurrent sequence rollout length.
             period: Consecutive starting points for overlapping
@@ -172,9 +168,9 @@ class MADQN:
             max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied.
             checkpoint: whether to checkpoint models.
-            checkpoint_minute_interval: The number of minutes to wait between
-                checkpoints.
             checkpoint_subpath: subdirectory specifying where to store
+                checkpoints.
+            checkpoint_minute_interval: The number of minutes to wait between
                 checkpoints.
             logger_config: additional configuration settings for the
                 logger factory.
@@ -191,6 +187,12 @@ class MADQN:
                 values for trainer_steps, trainer_walltime, evaluator_steps,
                 evaluator_episodes, executor_episodes or executor_steps.
                 E.g. termination_condition = {'trainer_steps': 100000}.
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
             learning_rate_scheduler_fn: dict with two functions/classes (one for the
                 policy and one for the critic optimizer), that takes in a trainer
                 step t and returns the current learning rate,
@@ -198,12 +200,6 @@ class MADQN:
                 See
                 examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
                 for an example.
-            evaluator_interval: An optional condition that is used to
-                evaluate/test system performance after [evaluator_interval]
-                condition has been met. If None, evaluation will
-                happen at every timestep.
-                E.g. to evaluate a system after every 100 executor episodes,
-                evaluator_interval = {"executor_episodes": 100}.
         """
 
         if not environment_spec:
@@ -267,7 +263,6 @@ class MADQN:
                 agents,
                 self._network_sampling_setup,  # type: ignore
             )
-
 
         # Check that the environment and agent_net_keys has the same amount of agents
         sample_length = len(self._network_sampling_setup[0])  # type: ignore
@@ -386,7 +381,6 @@ class MADQN:
         net_spec = {"network_keys": {agent: int_spec for agent in agents}}
         extra_specs.update(net_spec)
 
-
         self._builder = builder.MADQNBuilder(
             builder.MADQNConfig(
                 environment_spec=environment_spec,
@@ -425,9 +419,10 @@ class MADQN:
         )
 
     def _get_extra_specs(self) -> Any:
-        """helper to establish specs for extra information
+        """Helper to establish specs for extra information
+
         Returns:
-            dictionary containing extra specs
+            Dictionary containing extra specs
         """
 
         agents = self._environment_spec.get_agent_ids()
@@ -447,8 +442,10 @@ class MADQN:
 
     def replay(self) -> Any:
         """Step counter
+
         Args:
             checkpoint: whether to checkpoint the counter.
+
         Returns:
             step counter object.
         """
@@ -463,7 +460,6 @@ class MADQN:
             environment_spec=self._environment_spec,
             agent_net_keys=self._agent_net_keys,
         )
-
 
         # architecture args
         architecture_config = {
@@ -542,13 +538,14 @@ class MADQN:
     def evaluator(
         self,
         variable_source: acme.VariableSource,
-        logger: loggers.Logger = None,
     ) -> Any:
         """System evaluator (an executor process not connected to a dataset)
+
         Args:
             variable_source: variable server for updating
                 network variables.
             logger: logger object.
+
         Returns:
             environment-executor evaluation loop instance for evaluating the
                 performance of a system.
@@ -598,11 +595,13 @@ class MADQN:
         variable_source: MavaVariableSource,
     ) -> mava.core.Trainer:
         """System trainer
+
         Args:
             trainer_id: Id of the trainer being created.
             replay: replay data table to pull data from.
             variable_source: variable server for updating
                 network variables.
+
         Returns:
             system trainer.
         """
@@ -628,10 +627,12 @@ class MADQN:
             variable_source=variable_source,
         )
 
-    def build(self, name: str = "maddpg") -> Any:
+    def build(self, name: str = "madqn") -> Any:
         """Build the distributed system as a graph program.
+
         Args:
             name: system name.
+
         Returns:
             graph program for distributed system training.
         """

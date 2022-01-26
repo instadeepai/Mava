@@ -17,7 +17,6 @@
 """MADQN trainer implementation."""
 
 import copy
-import time
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -26,15 +25,11 @@ import sonnet as snt
 import tensorflow as tf
 import tree
 import trfl
-from acme.tf import losses
 from acme.tf import utils as tf2_utils
 from acme.utils import loggers
 
 import mava
 from mava import types as mava_types
-from mava.adders.reverb.base import Trajectory
-from mava.components.tf.losses.sequence import recurrent_n_step_critic_loss
-from mava.systems.tf.madqn.execution import MADQNFeedForwardExecutor
 from mava.systems.tf.variable_utils import VariableClient
 from mava.utils import training_utils as train_utils
 from mava.utils.sort_utils import sort_str_num
@@ -69,20 +64,14 @@ class MADQNTrainer(mava.Trainer):
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Initialise MADDPG trainer
+        """Initialise MADQN trainer
         Args:
             agents: agent ids, e.g. "agent_0".
             agent_types: agent types, e.g. "speaker" or "listener".
-            policy_networks: policy networks for each agent in
+            value_networks: value networks for each agents in
                 the system.
-            critic_networks: critic network(s), shared or for
-                each agent in the system.
-            target_policy_networks: target policy networks.
-            target_critic_networks: target critic networks.
-            policy_optimizer:
-                optimizer(s) for updating policy networks.
-            critic_optimizer:
-                optimizer for updating critic networks.
+            target_value_networks: target value networks.
+            optimizer: optimizer(s) for updating policy networks.
             discount: discount factor for TD updates.
             target_averaging: whether to use polyak averaging for target network
                 updates.
@@ -182,8 +171,10 @@ class MADQNTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def _update_target_networks(self) -> None:
+
         """Update the target networks using either target averaging or
         by directy copying the weights of the online networks every few steps."""
+
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (
@@ -208,19 +199,22 @@ class MADQNTrainer(mava.Trainer):
         self._num_steps.assign_add(1)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
+
         """Depricated"""
+
         pass
 
     def _transform_observations(
         self, obs: Dict[str, mava_types.OLT], next_obs: Dict[str, mava_types.OLT]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        """Transform the observatations using the observation networks of each agent."
+
+        """Transform the observations using the observation networks of each agent."
 
         Args:
             obs: observations at timestep t-1
             next_obs: observations at timestep t
         Returns:
-            Transformed observatations
+            Transformed observations
         """
         o_tm1 = {}
         o_t = {}
@@ -249,22 +243,15 @@ class MADQNTrainer(mava.Trainer):
         # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
 
-        losses = self._forward_backward(sample)
-
-        # Log losses per agent
-        return train_utils.map_losses_per_agent_value(losses)
-
-    @tf.function
-    def _forward_backward(self, inputs: Any) -> Dict[str, Dict[str, Any]]:
-
-        self._forward(inputs)
+        self._forward(sample)
 
         self._backward()
 
         # Update the target networks
         self._update_target_networks()
 
-        return self.value_losses
+        # Log losses per agent
+        return train_utils.map_losses_per_agent_value(self.value_losses)
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
@@ -285,7 +272,7 @@ class MADQNTrainer(mava.Trainer):
         # o_t = dictionary of next observations or next observation sequences
         # e_t [Optional] = extra data for timestep t that the agents persist in replay.
         trans = mava_types.Transition(*inputs.data)
-        o_tm1, o_t, a_tm1, r_t, d_t, e_tm1, e_t = (
+        o_tm1, o_t, a_tm1, r_t, d_t, _, _ = (
             trans.observations,
             trans.next_observations,
             trans.actions,
@@ -308,8 +295,10 @@ class MADQNTrainer(mava.Trainer):
                 q_t_value = self._target_value_networks[agent_key](o_t_trans[agent])
                 q_t_selector = self._value_networks[agent_key](o_t_trans[agent])
 
-                # TODO Legal action masking
-                # q_t_selector = tf.where(o_t[agent].legal_actions, q_t_selector, -999999999)
+                # Legal action masking
+                q_t_selector = tf.where(
+                    tf.cast(o_t[agent].legal_actions, "bool"), q_t_selector, -999999999
+                )
 
                 # pcont
                 discount = tf.cast(self._discount, dtype=d_t[agent].dtype)
@@ -360,7 +349,7 @@ class MADQNTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
-        """trainer step to update the parameters of the agents in the system"""
+        """Trainer step to update the parameters of the agents in the system"""
 
         raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
 
@@ -379,6 +368,7 @@ class MADQNTrainer(mava.Trainer):
 
     def _decay_lr(self, trainer_step: int) -> None:
         """Decay lr.
+
         Args:
             trainer_step : trainer step time t.
         """
@@ -390,8 +380,8 @@ class MADQNTrainer(mava.Trainer):
 class MADQNRecurrentTrainer:
     """Recurrent MADQN trainer.
 
-    This is the trainer component of a MADQN system. IE it takes a dataset as input
-    and implements update functionality to learn from this dataset.
+    This is the trainer component of a recurrent MADQN system. IE it takes a dataset
+    as input and implements update functionality to learn from this dataset.
     """
 
     def __init__(
@@ -415,20 +405,15 @@ class MADQNRecurrentTrainer:
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Initialise Recurrent MADDPG trainer
+        """Initialise Recurrent MADQN trainer
+
         Args:
             agents: agent ids, e.g. "agent_0".
             agent_types: agent types, e.g. "speaker" or "listener".
-            policy_networks: policy networks for each agent in
+            value_networks: value networks for each agent in
                 the system.
-            critic_networks: critic network(s), shared or for
-                each agent in the system.
-            target_policy_networks: target policy networks.
-            target_critic_networks: target critic networks.
-            policy_optimizer:
-                optimizer(s) for updating policy networks.
-            critic_optimizer:
-                optimizer for updating critic networks.
+            target_value_networks: target value networks.
+            optimizer: optimizer(s) for updating value networks.
             discount: discount factor for TD updates.
             target_averaging: whether to use polyak averaging for target network
                 updates.
@@ -527,20 +512,21 @@ class MADQNRecurrentTrainer:
         self._timestamp: Optional[float] = None
 
     def step(self) -> None:
-        """trainer step to update the parameters of the agents in the system"""
+        """Trainer step to update the parameters of the agents in the system"""
 
         raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
 
     def _transform_observations(
         self, observations: Dict[str, mava_types.OLT]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        """apply the observation networks to the raw observations from the dataset
+        """Apply the observation networks to the raw observations from the dataset
+
         Args:
-            obs: raw agent observations
-            next_obs: raw next observations
+            observations: raw agent observations
+
         Returns:
-            transformed
-                observations (features)
+            obs_trans: transformed agent observation
+            obs_target_trans: transformed target network observations
         """
 
         # Note (dries): We are assuming that only the policy network
@@ -573,8 +559,11 @@ class MADQNRecurrentTrainer:
         return obs_trans, obs_target_trans
 
     def _update_target_networks(self) -> None:
-        """Update the target networks using either target averaging or
-        by directy copying the weights of the online networks every few steps."""
+        """Update the target networks.
+
+        Using either target averaging or
+        by directy copying the weights of the online networks every few steps.
+        """
         for key in self.unique_net_keys:
             # Update target network.
             online_variables = (
@@ -630,7 +619,8 @@ class MADQNRecurrentTrainer:
 
     # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
-        """Trainer forward pass
+        """Trainer forward pass.
+
         Args:
             inputs: input data from the data table (transitions)
         """
@@ -669,7 +659,7 @@ class MADQNRecurrentTrainer:
             # is recurrent and not the observation network.
             obs_trans, target_obs_trans = self._transform_observations(observations)
 
-            for agent in self._agents:
+            for agent in self._trainer_agent_list:
                 agent_key = self._agent_net_keys[agent]
 
                 # Double Q-learning
@@ -694,10 +684,6 @@ class MADQNRecurrentTrainer:
                     -999999999,
                 )
 
-                # Cast the additional discount to match
-                # the environment discount dtype.
-                discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
-
                 # Flatten out time and batch dim
                 q_tm1, _ = train_utils.combine_dim(q_tm1)
                 q_t_selector, _ = train_utils.combine_dim(q_t_selector)
@@ -712,15 +698,23 @@ class MADQNRecurrentTrainer:
                     discounts[agent][:-1]  # Chop off last timestep
                 )
 
+                # Cast the additional discount to match
+                # the environment discount dtype.
+                discount = tf.cast(self._discount, dtype=discounts[agent].dtype)
+
                 # Value loss
                 value_loss, _ = trfl.double_qlearning(
                     q_tm1, a_tm1, r_t, discount * d_t, q_t_value, q_t_selector
                 )
 
                 # Zero-padding mask
-                zero_padding_mask = tf.cast(extras["zero_padding_mask"], dtype=value_loss.dtype)[:-1]
+                zero_padding_mask, _ = train_utils.combine_dim(
+                    tf.cast(extras["zero_padding_mask"], dtype=value_loss.dtype)[:-1]
+                )
                 masked_loss = value_loss * zero_padding_mask
-                self.value_losses[agent] = tf.reduce_sum(masked_loss) / tf.reduce_sum(zero_padding_mask)
+                self.value_losses[agent] = tf.reduce_sum(masked_loss) / tf.reduce_sum(
+                    zero_padding_mask
+                )
 
         self.tape = tape
 
@@ -755,11 +749,6 @@ class MADQNRecurrentTrainer:
 
         train_utils.safe_del(self, "tape")
 
-    def step(self) -> None:
-        """trainer step to update the parameters of the agents in the system"""
-
-        raise NotImplementedError("A trainer statistics wrapper should overwrite this.")
-
     def after_trainer_step(self) -> None:
         """Optionally decay lr after every training step."""
         if self._learning_rate_scheduler_fn:
@@ -775,6 +764,7 @@ class MADQNRecurrentTrainer:
 
     def _decay_lr(self, trainer_step: int) -> None:
         """Decay lr.
+
         Args:
             trainer_step : trainer step time t.
         """

@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import functools
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict
 
 import launchpad as lp
 import sonnet as snt
@@ -27,18 +26,12 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 )
 from mava.systems.tf import value_decomposition
 from mava.utils import lp_utils
-from mava.utils.environments.smac_utils import make_environment
+from mava.utils.environments.flatland_utils import make_environment
 from mava.utils.loggers import logger_utils
 
-SEQUENCE_LENGTH = 60
-MAP_NAME = "3m"
+"""Example running VDN on Flatland."""
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string(
-    "map_name",
-    MAP_NAME,
-    "Starcraft 2 micromanagement map name (str).",
-)
 
 flags.DEFINE_string(
     "mava_id",
@@ -47,11 +40,27 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
+# flatland environment config
+env_config: Dict = {
+    "n_agents": 3,
+    "x_dim": 30,
+    "y_dim": 30,
+    "n_cities": 2,
+    "max_rails_between_cities": 2,
+    "max_rails_in_city": 3,
+    "seed": 0,
+    "malfunction_rate": 1 / 200,
+    "malfunction_min_duration": 20,
+    "malfunction_max_duration": 50,
+    "observation_max_path_depth": 30,
+    "observation_tree_depth": 2,
+}
+
 
 def main(_: Any) -> None:
-    """Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
-    # environment
-    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
+
+    # Environment.
+    environment_factory = functools.partial(make_environment, **env_config)
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
@@ -80,22 +89,17 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=8e-6
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
         ),
         optimizer=snt.optimizers.RMSProp(
             learning_rate=0.0005, epsilon=0.00001, decay=0.99
         ),
         checkpoint_subpath=checkpoint_dir,
         batch_size=32,
-        executor_variable_update_period=200,
-        target_update_period=100,
         max_gradient_norm=20.0,
-        sequence_length=SEQUENCE_LENGTH,
-        period=SEQUENCE_LENGTH,
         min_replay_size=32,
-        max_replay_size=5000,
-        samples_per_insert=1,
-        termination_condition={"executor_steps": 3_000_000},
+        max_replay_size=10000,
+        samples_per_insert=16,
         evaluator_interval={"executor_episodes": 2},
     ).build()
 

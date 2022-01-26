@@ -15,8 +15,11 @@
 
 from typing import Optional
 
+from mava.wrappers.env_preprocess_wrappers import (
+    ConcatAgentIdToObservation,
+    ConcatPrevActionToObservation,
+)
 from mava.wrappers.flatland import FlatlandEnvWrapper
-from mava.wrappers.env_preprocess_wrappers import ConcatAgentIdToObservation, ConcatPrevActionToObservation
 
 try:
     from flatland.envs.line_generators import sparse_line_generator
@@ -32,6 +35,7 @@ try:
 except ModuleNotFoundError:
     pass
 
+
 def _create_rail_env_with_tree_obs(
     n_agents: int = 5,
     x_dim: int = 30,
@@ -39,7 +43,7 @@ def _create_rail_env_with_tree_obs(
     n_cities: int = 2,
     max_rails_between_cities: int = 2,
     max_rails_in_city: int = 3,
-    seed: int = 0,
+    seed: Optional[int] = 0,
     malfunction_rate: float = 1 / 200,
     malfunction_min_duration: int = 20,
     malfunction_max_duration: int = 50,
@@ -99,20 +103,20 @@ def _create_rail_env_with_tree_obs(
 
 
 def make_environment(
-    n_agents: int =10,
+    n_agents: int = 10,
     x_dim: int = 30,
     y_dim: int = 30,
     n_cities: int = 2,
-    max_rails_between_cities: int =2,
-    max_rails_in_city: int =3,
-    seed: int =  0,
-    malfunction_rate:float = 1/200,
+    max_rails_between_cities: int = 2,
+    max_rails_in_city: int = 3,
+    seed: int = 0,
+    malfunction_rate: float = 1 / 200,
     malfunction_min_duration: int = 20,
     malfunction_max_duration: int = 50,
     observation_max_path_depth: int = 30,
     observation_tree_depth: int = 2,
-    concat_prev_actions: bool = True, 
-    concat_agent_id: bool = True,
+    concat_prev_actions: bool = True,
+    concat_agent_id: bool = False,
     evaluation: bool = False,
     random_seed: Optional[int] = None,
 ) -> FlatlandEnvWrapper:
@@ -134,12 +138,12 @@ def make_environment(
         observation_max_path_depth=observation_max_path_depth,
         observation_tree_depth=observation_tree_depth,
     )
-    
+
     env = FlatlandEnvWrapper(env)
 
     if concat_prev_actions:
         env = ConcatPrevActionToObservation(env)
-    
+
     if concat_agent_id:
         env = ConcatAgentIdToObservation(env)
 

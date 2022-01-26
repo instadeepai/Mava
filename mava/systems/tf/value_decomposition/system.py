@@ -15,7 +15,7 @@
 
 """Value Decomposition system implementation."""
 
-from typing import Callable, Dict, List, Optional, Type, Union, Mapping
+from typing import Callable, Dict, Mapping, Optional, Type, Union
 
 import dm_env
 import reverb
@@ -24,23 +24,22 @@ from acme import specs as acme_specs
 
 import mava
 from mava import specs as mava_specs
-from mava.components.tf.architectures import (
-    DecentralisedValueActor,
-)
-from mava.types import EpsilonScheduler
+from mava.components.tf.architectures import DecentralisedValueActor
+from mava.components.tf.modules.mixing.mixers import QMIX, VDN
 from mava.environment_loop import ParallelEnvironmentLoop
+from mava.systems.tf.madqn import MADQN
 from mava.systems.tf.madqn.execution import MADQNRecurrentExecutor
-from mava.systems.tf.value_decomposition.training import ValueDecompositionRecurrentTrainer
+from mava.systems.tf.value_decomposition.training import (
+    ValueDecompositionRecurrentTrainer,
+)
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.types import EpsilonScheduler
 from mava.utils import enums
 from mava.utils.loggers import MavaLogger
-from mava.systems.tf.madqn import MADQN
-from mava.components.tf.modules.mixing.mixers import QMIX, VDN
 
 
 class ValueDecomposition(MADQN):
     """Value Decomposition systems."""
-
 
     def __init__(
         self,
@@ -53,10 +52,10 @@ class ValueDecomposition(MADQN):
             Mapping[str, Mapping[str, EpsilonScheduler]],
         ],
         logger_factory: Callable[[str], MavaLogger] = None,
-        architecture: Type[
-            DecentralisedValueActor
-        ] = DecentralisedValueActor,
-        trainer_fn: Type[ValueDecompositionRecurrentTrainer] = ValueDecompositionRecurrentTrainer,
+        architecture: Type[DecentralisedValueActor] = DecentralisedValueActor,
+        trainer_fn: Type[
+            ValueDecompositionRecurrentTrainer
+        ] = ValueDecompositionRecurrentTrainer,
         executor_fn: Type[MADQNRecurrentExecutor] = MADQNRecurrentExecutor,
         num_executors: int = 1,
         shared_weights: bool = True,
@@ -71,9 +70,9 @@ class ValueDecomposition(MADQN):
         min_replay_size: int = 100,
         max_replay_size: int = 5000,
         samples_per_insert: Optional[float] = 2.0,
-        optimizer: Union[
-            snt.Optimizer, Dict[str, snt.Optimizer]
-        ] = snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
+            learning_rate=1e-4
+        ),
         mixer_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
         sequence_length: int = 20,
         period: int = 10,
@@ -95,36 +94,24 @@ class ValueDecomposition(MADQN):
             environment_factory: function to
                 instantiate an environment.
             network_factory: function to instantiate system networks.
+            mixer: mixing network
+            exploration_scheduler_fn: function to schedule
+                exploration. e.g. epsilon greedy
             logger_factory: function to
                 instantiate a system logger.
-            architecture:
-                system architecture, e.g. decentralised or centralised.
+            architecture: system architecture,
+                e.g. decentralised or centralised.
             trainer_fn: training type
                 associated with executor and architecture, e.g. centralised training.
             executor_fn: executor type, e.g.
                 feedforward or recurrent.
             num_executors: number of executor processes to run in
-                parallel..
-            environment_spec: description of
-                the action, observation spaces etc. for each agent in the system.
-            trainer_networks: networks each
-                trainer trains on.
-            network_sampling_setup: List of networks that are randomly
-                sampled from by the executors at the start of an environment run.
-                enums.NetworkSampler settings:
-                fixed_agent_networks: Keeps the networks
-                used by each agent fixed throughout training.
-                random_agent_networks: Creates N network policies, where N is the
-                number of agents. Randomly select policies from this sets for each
-                agent at the start of a episode. This sampling is done with
-                replacement so the same policy can be selected for more than one
-                agent for a given episode.
-                Custom list: Alternatively one can specify a custom nested list,
-                with network keys in, that will be used by the executors at
-                the start of each episode to sample networks for each agent.
+                parallel.
             shared_weights: whether agents should share weights or not.
                 When network_sampling_setup are provided the value of shared_weights is
                 ignored.
+            environment_spec: description of
+                the action, observation spaces etc. for each agent in the system.
             discount: discount factor to use for TD updates.
             batch_size: sample batch size for updates.
             prefetch_size: size to prefetch from replay.
@@ -140,19 +127,17 @@ class ValueDecomposition(MADQN):
             max_replay_size: maximum replay size.
             samples_per_insert: number of samples to take
                 from replay for every insert that is made.
-            policy_optimizer: optimizer(s) for updating policy networks.
-            critic_optimizer: optimizer for updating critic
-                networks.
-            n_step: number of steps to include prior to boostrapping.
+            optimizer: optimizer(s) for updating value networks.
+            mixer_optimizer: optimizer for updating mixing networks.
             sequence_length: recurrent sequence rollout length.
             period: Consecutive starting points for overlapping
                 rollouts across a sequence.
             max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied.
             checkpoint: whether to checkpoint models.
-            checkpoint_minute_interval: The number of minutes to wait between
-                checkpoints.
             checkpoint_subpath: subdirectory specifying where to store
+                checkpoints.
+            checkpoint_minute_interval: The number of minutes to wait between
                 checkpoints.
             logger_config: additional configuration settings for the
                 logger factory.
@@ -169,6 +154,12 @@ class ValueDecomposition(MADQN):
                 values for trainer_steps, trainer_walltime, evaluator_steps,
                 evaluator_episodes, executor_episodes or executor_steps.
                 E.g. termination_condition = {'trainer_steps': 100000}.
+            evaluator_interval: An optional condition that is used to
+                evaluate/test system performance after [evaluator_interval]
+                condition has been met. If None, evaluation will
+                happen at every timestep.
+                E.g. to evaluate a system after every 100 executor episodes,
+                evaluator_interval = {"executor_episodes": 100}.
             learning_rate_scheduler_fn: dict with two functions/classes (one for the
                 policy and one for the critic optimizer), that takes in a trainer
                 step t and returns the current learning rate,
@@ -176,12 +167,6 @@ class ValueDecomposition(MADQN):
                 See
                 examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
                 for an example.
-            evaluator_interval: An optional condition that is used to
-                evaluate/test system performance after [evaluator_interval]
-                condition has been met. If None, evaluation will
-                happen at every timestep.
-                E.g. to evaluate a system after every 100 executor episodes,
-                evaluator_interval = {"executor_episodes": 100}.
         """
         super().__init__(
             environment_factory=environment_factory,
@@ -221,7 +206,7 @@ class ValueDecomposition(MADQN):
             termination_condition=termination_condition,
             evaluator_interval=evaluator_interval,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
-        ) 
+        )
 
         if isinstance(mixer, str):
             if mixer == "qmix":
@@ -265,9 +250,10 @@ class ValueDecomposition(MADQN):
         # Create the system
         networks = self.create_system()
 
+        # Create the dataset
         dataset = self._builder.make_dataset_iterator(replay, trainer_id)
 
-        trainer = self._builder.make_trainer(
+        trainer: ValueDecompositionRecurrentTrainer = self._builder.make_trainer(
             networks=networks,
             trainer_networks=self._trainer_networks[trainer_id],
             trainer_table_entry=self._table_network_config[trainer_id],

@@ -19,15 +19,12 @@ from typing import Any, Dict, List, Optional, Union
 import dm_env
 import numpy as np
 from acme import specs
-
 from smac.env import StarCraft2Env
 
 from mava import types
-from mava.utils.wrapper_utils import (
-    convert_np_type,
-    parameterized_restart,
-)
+from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
 from mava.wrappers.env_wrappers import ParallelEnvWrapper
+
 
 class SMACWrapper(ParallelEnvWrapper):
     """Environment wrapper for PettingZoo MARL environments."""
@@ -68,7 +65,9 @@ class SMACWrapper(ParallelEnvWrapper):
         # Get observation from env
         observation = self.environment.get_obs()
         legal_actions = self._get_legal_actions()
-        observations = self._convert_observations(observation, legal_actions, self._done)
+        observations = self._convert_observations(
+            observation, legal_actions, self._done
+        )
 
         # Set env discount to 1 for all agents
         discount_spec = self.discount_spec()
@@ -93,7 +92,6 @@ class SMACWrapper(ParallelEnvWrapper):
 
         return parameterized_restart(rewards, self._discounts, observations), extras
 
-
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps in env.
 
@@ -108,15 +106,17 @@ class SMACWrapper(ParallelEnvWrapper):
             return self.reset()
 
         # Convert dict of actions to list for SMAC
-        actions = list(actions.values())
+        smac_actions = list(actions.values())
 
         # Step the SMAC environment
-        reward, self._done, self._info = self._environment.step(actions)
+        reward, self._done, self._info = self._environment.step(smac_actions)
 
         # Get the next observations
         next_observations = self._environment.get_obs()
         legal_actions = self._get_legal_actions()
-        next_observations = self._convert_observations(next_observations, legal_actions, self._done)
+        next_observations = self._convert_observations(
+            next_observations, legal_actions, self._done
+        )
 
         # Convert team reward to agent-wise rewards
         rewards = self._convert_reward(reward)
@@ -167,16 +167,14 @@ class SMACWrapper(ParallelEnvWrapper):
         rewards_spec = self.reward_spec()
         rewards = {}
         for agent in self._agents:
-            rewards[agent] = convert_np_type(
-                rewards_spec[agent].dtype, reward
-            )
+            rewards[agent] = convert_np_type(rewards_spec[agent].dtype, reward)
         return rewards
 
-    def _get_legal_actions(self):
+    def _get_legal_actions(self) -> np.ndarray:
         legal_actions = []
         for i, _ in enumerate(self._agents):
             legal_actions.append(
-                np.array(self._environment.get_avail_agent_actions(i), dtype='int')
+                np.array(self._environment.get_avail_agent_actions(i), dtype="int")
             )
         return legal_actions
 
@@ -194,7 +192,7 @@ class SMACWrapper(ParallelEnvWrapper):
         """
         olt_observations = {}
         for i, agent in enumerate(self._agents):
-            
+
             olt_observations[agent] = types.OLT(
                 observation=observations[i],
                 legal_actions=legal_actions[i],
@@ -221,7 +219,7 @@ class SMACWrapper(ParallelEnvWrapper):
             types.Observation: spec for environment.
         """
         self._environment.reset()
-        
+
         observations = self._environment.get_obs()
         legal_actions = self._get_legal_actions()
 
@@ -280,7 +278,7 @@ class SMACWrapper(ParallelEnvWrapper):
             extra stats to be logged.
         """
         return self._environment.get_stats()
-        
+
     @property
     def agents(self) -> List:
         """Agents still alive in env (not done).
@@ -321,8 +319,6 @@ class SMACWrapper(ParallelEnvWrapper):
             return self.__getattribute__(name)
         else:
             return getattr(self._environment, name)
-
-
 
 
 env = StarCraft2Env(map_name="3m")

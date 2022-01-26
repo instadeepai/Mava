@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running Dial on debug MPE environments."""
+
+"""Example running MADQN on SMAC with multiple trainers."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -22,34 +23,26 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.communication.broadcasted import (
-    BroadcastedCommunication,
-)
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
-)
-from mava.systems.tf import dial
-from mava.utils import lp_utils
+from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.systems.tf import madqn
+from mava.utils import enums, lp_utils
 from mava.utils.enums import ArchitectureType
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import smac_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
+    "3m",
+    "SMAC map name.",
 )
-flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
-)
+
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
+
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
@@ -57,17 +50,16 @@ def main(_: Any) -> None:
 
     # Environment.
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
-        env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        smac_utils.make_environment,
+        map_name=FLAGS.env_name,
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        dial.make_default_networks, archecture_type=ArchitectureType.recurrent
+        madqn.make_default_networks, architecture_type=ArchitectureType.recurrent
     )
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir.
+    # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
@@ -81,23 +73,28 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Distributed program.
-    program = dial.DIAL(
+    # distributed program
+    program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        trainer_fn=dial.DIALSwitchTrainer,
-        executor_fn=dial.DIALSwitchExecutor,
         exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=2.5e-4
+            epsilon_start=1.0,
+            epsilon_min=0.05,
+            epsilon_decay=4e-5,
         ),
-        communication_module=BroadcastedCommunication,
-        sequence_length=6,
-        optimizer=snt.optimizers.RMSProp(learning_rate=1e-4, momentum=0.95),
-        checkpoint_subpath=checkpoint_dir,
-        n_step=1,
+        shared_weights=False,
+        trainer_networks=enums.Trainer.one_trainer_per_network,
+        network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
+        trainer_fn=madqn.MADQNRecurrentTrainer,
+        executor_fn=madqn.MADQNRecurrentExecutor,
+        max_replay_size=5000,
+        min_replay_size=32,
         batch_size=32,
+        evaluator_interval={"executor_episodes": 2},
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        checkpoint_subpath=checkpoint_dir,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

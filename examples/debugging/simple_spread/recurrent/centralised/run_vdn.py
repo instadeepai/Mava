@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+"""Example running VDN on debugging environment."""
 
 import functools
 from datetime import datetime
@@ -27,19 +27,20 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 )
 from mava.systems.tf import value_decomposition
 from mava.utils import lp_utils
+from mava.utils.environments.debugging_utils import make_environment
 from mava.utils.loggers import logger_utils
-from mava.utils.environments.smac_utils import make_environment
-
-SEQUENCE_LENGTH = 120
-MAP_NAME = "2s3z"
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "map_name",
-    MAP_NAME,
-    "Starcraft 2 micromanagement map name (str).",
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
 )
-
+flags.DEFINE_string(
+    "action_space",
+    "discrete",
+    "Environment action space type (str).",
+)
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
@@ -49,10 +50,12 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
-    # environment
+
+    # Environment.
     environment_factory = functools.partial(
-        make_environment, map_name=FLAGS.map_name
+        make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
     )
 
     # Networks.
@@ -78,7 +81,7 @@ def main(_: Any) -> None:
     program = value_decomposition.ValueDecomposition(
         environment_factory=environment_factory,
         network_factory=network_factory,
-        mixer="qmix",
+        mixer="vdn",
         logger_factory=logger_factory,
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler(
@@ -89,17 +92,11 @@ def main(_: Any) -> None:
         ),
         checkpoint_subpath=checkpoint_dir,
         batch_size=32,
-        executor_variable_update_period=200,
-        target_update_period=200,
         max_gradient_norm=20.0,
-        sequence_length=20,
-        period=10,
         min_replay_size=32,
-        max_replay_size=10_000,
-        samples_per_insert=32,
+        max_replay_size=10000,
+        samples_per_insert=16,
         evaluator_interval={"executor_episodes": 2},
-        termination_condition={"executor_steps": 3_000_000}
-        
     ).build()
 
     # launch

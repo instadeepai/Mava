@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Example running MADQN on Atari Pong."""
 
-"""Example running MADQN on debug MPE environments."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -23,26 +23,22 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.communication.broadcasted import (
-    BroadcastedCommunication,
-)
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
 from mava.systems.tf import madqn
-from mava.utils import lp_utils
-from mava.utils.enums import ArchitectureType, Network
-from mava.utils.environments import debugging_utils
+from mava.utils import enums, lp_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
+    "env_class",
+    "atari",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "env_name",
+    "pong_v2",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 
 flags.DEFINE_string(
@@ -55,19 +51,18 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 def main(_: Any) -> None:
 
-    # Environment.
+    # environment
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
         madqn.make_default_networks,
-        archecture_type=ArchitectureType.recurrent,
-        message_size=10,
-        network_type=Network.coms_network,
+        architecture_type=enums.ArchitectureType.recurrent,
+        atari_torso_observation_network=True,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -84,21 +79,25 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Distributed program.
+    # distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=5e-4
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-6
         ),
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
-        checkpoint_subpath=checkpoint_dir,
-        trainer_fn=madqn.training.MADQNRecurrentCommTrainer,
-        executor_fn=madqn.execution.MADQNRecurrentCommExecutor,
+        shared_weights=False,
         batch_size=32,
-        communication_module=BroadcastedCommunication,
+        max_replay_size=10000,
+        samples_per_insert=16,
+        min_replay_size=32,
+        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        executor_fn=madqn.MADQNRecurrentExecutor,
+        trainer_fn=madqn.MADQNRecurrentTrainer,
+        evaluator_interval={"executor_episodes": 2},
+        checkpoint_subpath=checkpoint_dir,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

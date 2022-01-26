@@ -27,8 +27,8 @@ from acme.wrappers.gym_wrapper import _convert_to_spec
 try:
     from flatland.envs.observations import GlobalObsForRailEnv, Node, TreeObsForRailEnv
     from flatland.envs.rail_env import RailEnv
-    from flatland.utils.rendertools import AgentRenderVariant, RenderTool
     from flatland.envs.step_utils.states import TrainState
+    from flatland.utils.rendertools import AgentRenderVariant, RenderTool
 except ModuleNotFoundError:
     pass
 from gym.spaces import Discrete
@@ -135,7 +135,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         """Return list of all possible agents."""
         return self._possible_agents
 
-    def _update_stats(self, info, rewards):
+    def _update_stats(self, info: Dict, rewards: Dict) -> None:
         episode_return = sum(list(rewards.values()))
         tasks_finished = sum(
             [1 if state == TrainState.DONE else 0 for state in info["state"].values()]
@@ -148,7 +148,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         self._latest_score = normalized_score
         self._latest_completion = completion
 
-    def get_stats(self):
+    def get_stats(self) -> Dict:
         if self._latest_completion is not None and self._latest_score is not None:
             return {
                 "score": self._latest_score,
@@ -248,12 +248,15 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             self._step_type = dm_env.StepType.MID
             discounts = self._discounts  # discount == 1
 
-        return dm_env.TimeStep(
-            observation=observations,
-            reward=rewards,
-            discount=discounts,
-            step_type=self._step_type,
-        ), {}
+        return (
+            dm_env.TimeStep(
+                observation=observations,
+                reward=rewards,
+                discount=discounts,
+                step_type=self._step_type,
+            ),
+            {},
+        )
 
     # Convert Flatland observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
@@ -340,6 +343,10 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         """Return observation spec."""
         observation_specs = {}
         for agent in self.agents:
+            # Legal actions
+            action_spec = _convert_to_spec(self.action_spaces[agent])
+            legals = np.ones(shape=action_spec.num_values, dtype=action_spec.dtype)
+
             observation_specs[agent] = OLT(
                 observation=tuple(
                     (
@@ -349,7 +356,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
                 )
                 if self._include_agent_info
                 else _convert_to_spec(self.observation_spaces[agent]),
-                legal_actions=_convert_to_spec(self.action_spaces[agent]),
+                legal_actions=legals,
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
@@ -410,7 +417,12 @@ def infer_observation_space(
 ) -> Union[Box, tuple, dict]:
     """Infer a gym Observation space from a sample observation from flatland"""
     if isinstance(obs, np.ndarray):
-        return Box(-np.inf, np.inf, shape=obs.shape, dtype=obs.dtype,)
+        return Box(
+            -np.inf,
+            np.inf,
+            shape=obs.shape,
+            dtype=obs.dtype,
+        )
     elif isinstance(obs, tuple):
         return tuple(infer_observation_space(o) for o in obs)
     elif isinstance(obs, dict):

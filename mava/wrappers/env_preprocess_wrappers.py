@@ -15,13 +15,13 @@
 
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
+import dm_env
 import gym
 import numpy as np
 from pettingzoo.utils import BaseParallelWraper
 from supersuit.utils.base_aec_wrapper import BaseWrapper
-import dm_env
-from mava.types import OLT
-from mava.types import Action, Observation, Reward
+
+from mava.types import OLT, Action, Observation, Reward
 from mava.utils.wrapper_utils import RunningMeanStd
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
@@ -362,40 +362,45 @@ class StandardizeRewardParallel(
     def _modify_action(self, action: Action) -> Action:
         return action
 
+
 class ConcatAgentIdToObservation:
     """Concat one-hot vector of agent ID to obs.
-    
-    We assume the environment has an ordered list 
+
+    We assume the environment has an ordered list
     self.possible_agents.
     """
 
-    def __init__(self, environment):
-        self._environment = environment 
+    def __init__(self, environment: Any) -> None:
+        self._environment = environment
         self._num_agents = len(environment.possible_agents)
 
-    def reset(self):
+    def reset(self) -> dm_env.TimeStep:
         timestep, extras = self._environment.reset()
         old_observations = timestep.observation
-        
+
         new_observations = {}
 
         for agent_id, agent in enumerate(self._environment.possible_agents):
             agent_olt = old_observations[agent]
-            
+
             agent_observation = agent_olt.observation
-            agent_one_hot = np.zeros(self._num_agents, dtype = agent_observation.dtype)
+            agent_one_hot = np.zeros(self._num_agents, dtype=agent_observation.dtype)
             agent_one_hot[agent_id] = 1
 
             new_observations[agent] = OLT(
-                observation = np.concatenate([agent_one_hot, agent_observation]), 
-                legal_actions= agent_olt.legal_actions, 
-                terminal=agent_olt.terminal
+                observation=np.concatenate([agent_one_hot, agent_observation]),
+                legal_actions=agent_olt.legal_actions,
+                terminal=agent_olt.terminal,
             )
 
-        return dm_env.TimeStep(timestep.step_type, timestep.reward, timestep.discount, new_observations), extras
+        return (
+            dm_env.TimeStep(
+                timestep.step_type, timestep.reward, timestep.discount, new_observations
+            ),
+            extras,
+        )
 
-
-    def step(self, actions: Dict) -> Any:
+    def step(self, actions: Dict) -> dm_env.TimeStep:
         timestep, extras = self._environment.step(actions)
 
         old_observations = timestep.observation
@@ -404,17 +409,21 @@ class ConcatAgentIdToObservation:
             agent_olt = old_observations[agent]
 
             agent_observation = agent_olt.observation
-            agent_one_hot = np.zeros(self._num_agents, dtype = agent_observation.dtype)
+            agent_one_hot = np.zeros(self._num_agents, dtype=agent_observation.dtype)
             agent_one_hot[agent_id] = 1
 
             new_observations[agent] = OLT(
-                observation = np.concatenate([agent_one_hot, agent_observation]),
+                observation=np.concatenate([agent_one_hot, agent_observation]),
                 legal_actions=agent_olt.legal_actions,
-                terminal=agent_olt.terminal
+                terminal=agent_olt.terminal,
             )
-            
 
-        return dm_env.TimeStep(timestep.step_type, timestep.reward, timestep.discount, new_observations), extras
+        return (
+            dm_env.TimeStep(
+                timestep.step_type, timestep.reward, timestep.discount, new_observations
+            ),
+            extras,
+        )
 
     def observation_spec(self) -> Dict[str, OLT]:
         """Observation spec.
@@ -422,7 +431,7 @@ class ConcatAgentIdToObservation:
         Returns:
             types.Observation: spec for environment.
         """
-        timestep, extras =  self.reset()
+        timestep, extras = self.reset()
         observations = timestep.observation
         return observations
 
@@ -443,61 +452,76 @@ class ConcatAgentIdToObservation:
 
 class ConcatPrevActionToObservation:
     """Concat one-hot vector of agent prev_action to obs.
-    
+
     We assume the environment has discreet actions.
 
-    TODO support continuous actions.
+    TODO (Claude) support continuous actions.
     """
+
     # Need to get the size of the action space of each agent
 
-    def __init__(self, environment):
+    def __init__(self, environment: Any):
         self._environment = environment
-        
-    def reset(self):        
+
+    def reset(self) -> dm_env.TimeStep:
         timestep, extras = self._environment.reset()
         old_observations = timestep.observation
-        action_spec = self._environment.action_spec() 
+        action_spec = self._environment.action_spec()
         new_observations = {}
-        #TODO double check this, because possible agents could shrink
+        # TODO double check this, because possible agents could shrink
         for agent in self._environment.possible_agents:
             agent_olt = old_observations[agent]
             agent_observation = agent_olt.observation
-            agent_one_hot_action = np.zeros(action_spec[agent].num_values, dtype=np.float32)
-            
-            new_observations[agent] = OLT(
-                observation = np.concatenate([agent_one_hot_action, agent_observation]), 
-                legal_actions= agent_olt.legal_actions, 
-                terminal=agent_olt.terminal
+            agent_one_hot_action = np.zeros(
+                action_spec[agent].num_values, dtype=np.float32
             )
 
-        return dm_env.TimeStep(timestep.step_type, timestep.reward, timestep.discount, new_observations), extras
+            new_observations[agent] = OLT(
+                observation=np.concatenate([agent_one_hot_action, agent_observation]),
+                legal_actions=agent_olt.legal_actions,
+                terminal=agent_olt.terminal,
+            )
 
-    def step(self, actions: Dict) -> Any:
+        return (
+            dm_env.TimeStep(
+                timestep.step_type, timestep.reward, timestep.discount, new_observations
+            ),
+            extras,
+        )
+
+    def step(self, actions: Dict) -> dm_env.TimeStep:
         timestep, extras = self._environment.step(actions)
         old_observations = timestep.observation
-        action_spec = self._environment.action_spec() 
+        action_spec = self._environment.action_spec()
         new_observations = {}
         for agent in self._environment.possible_agents:
             agent_olt = old_observations[agent]
             agent_observation = agent_olt.observation
-            agent_one_hot_action = np.zeros(action_spec[agent].num_values, dtype=np.float32)
+            agent_one_hot_action = np.zeros(
+                action_spec[agent].num_values, dtype=np.float32
+            )
             agent_one_hot_action[actions[agent]] = 1
-            
+
             new_observations[agent] = OLT(
-                observation = np.concatenate([agent_one_hot_action, agent_observation]), 
-                legal_actions= agent_olt.legal_actions, 
-                terminal=agent_olt.terminal
+                observation=np.concatenate([agent_one_hot_action, agent_observation]),
+                legal_actions=agent_olt.legal_actions,
+                terminal=agent_olt.terminal,
             )
 
-        return dm_env.TimeStep(timestep.step_type, timestep.reward, timestep.discount, new_observations), extras
-    
+        return (
+            dm_env.TimeStep(
+                timestep.step_type, timestep.reward, timestep.discount, new_observations
+            ),
+            extras,
+        )
+
     def observation_spec(self) -> Dict[str, OLT]:
         """Observation spec.
 
         Returns:
             types.Observation: spec for environment.
         """
-        timestep, extras =  self.reset()
+        timestep, extras = self.reset()
         observations = timestep.observation
         return observations
 

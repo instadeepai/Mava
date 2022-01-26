@@ -1,50 +1,51 @@
 import sonnet as snt
 import tensorflow as tf
 
+
 @snt.allow_empty_variables
 class BaseMixer(snt.Module):
-    """Base mixing class. 
-    
-    Base mixer should take in agent q-values and environment global state tensors. 
+    """Base mixing class.
+
+    Base mixer should take in agent q-values and environment global state tensors.
     """
-    def __init__(self):
+
+    def __init__(self) -> None:
         super().__init__()
 
-    def __call__(self, agent_qs: tf.Tensor , states: tf.Tensor):
+    def __call__(self, agent_qs: tf.Tensor, states: tf.Tensor) -> tf.Tensor:
         return agent_qs
+
 
 class VDN(BaseMixer):
     """VDN mixing network."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-    
-    def __call__(self, agent_qs: tf.Tensor, states: tf.Tensor):
+
+    def __call__(self, agent_qs: tf.Tensor, states: tf.Tensor) -> tf.Tensor:
         return tf.reduce_sum(agent_qs, axis=-1, keepdims=True)
 
     """Initialize VDN class
     Args:
         agent_qs: Tensor containing the q-values of actions chosen by agents
-        states: Tensor containing global environment state. 
+        states: Tensor containing global environment state.
     Returns:
         Tensor with total q-value.
     """
+
 
 class QMIX(BaseMixer):
     """QMIX mixing network."""
 
     def __init__(
-        self,
-        num_agents: int,
-        embed_dim: int = 32,
-        hypernet_embed: int = 64
-    ):
+        self, num_agents: int, embed_dim: int = 32, hypernet_embed: int = 64
+    ) -> None:
         """Inialize QMIX mixing network
-        
-        Args: 
+
+        Args:
             num_agents: Number of agents in the enviroment
             state_dim: Dimensions of the global environment state
-            embed_dim: TODO (Ruan): Cluade please add 
+            embed_dim: TODO (Ruan): Cluade please add
             hypernet_embed: TODO (Ruan): Claude Please add
         """
 
@@ -52,37 +53,26 @@ class QMIX(BaseMixer):
         self.num_agents = num_agents
         self.embed_dim = embed_dim
         self.hypernet_embed = hypernet_embed
-        
 
         self.hyper_w_1 = snt.Sequential(
             [
                 snt.Linear(self.hypernet_embed),
                 tf.nn.relu,
-                snt.Linear(self.embed_dim * self.num_agents)
+                snt.Linear(self.embed_dim * self.num_agents),
             ]
         )
 
         self.hyper_w_final = snt.Sequential(
-            [
-                snt.Linear(self.hypernet_embed),
-                tf.nn.relu,
-                snt.Linear(self.embed_dim)
-            ]
+            [snt.Linear(self.hypernet_embed), tf.nn.relu, snt.Linear(self.embed_dim)]
         )
 
         # State dependent bias for hidden layer
         self.hyper_b_1 = snt.Linear(self.embed_dim)
 
         # V(s) instead of a bias for the last layers
-        self.V = snt.Sequential(
-            [
-                snt.Linear(self.embed_dim),
-                tf.nn.relu,
-                snt.Linear(1)
-            ]
-        )
+        self.V = snt.Sequential([snt.Linear(self.embed_dim), tf.nn.relu, snt.Linear(1)])
 
-    def __call__(self, agent_qs, states):
+    def __call__(self, agent_qs: tf.Tensor, states: tf.Tensor) -> tf.Tensor:
         bs = agent_qs.shape[1]
         state_dim = states.shape[-1]
 
@@ -107,6 +97,6 @@ class QMIX(BaseMixer):
         y = tf.matmul(hidden, w_final) + v
 
         # Reshape and return
-        q_tot = tf.reshape(y, (-1, bs, 1)) # [T, B, 1]
+        q_tot = tf.reshape(y, (-1, bs, 1))  # [T, B, 1]
 
         return q_tot
