@@ -32,6 +32,7 @@ from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
+
 flags.DEFINE_string(
     "map_name",
     "3m",
