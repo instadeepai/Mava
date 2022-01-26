@@ -40,9 +40,6 @@ use GitHub pull requests for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
-When making a Pull Request with a proposed change, please use this [format](.github/pull_request_template.md).
-
-
 ## Community Guidelines
 
 This project follows

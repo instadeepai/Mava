@@ -7,19 +7,7 @@
 ![pytest](https://github.com/instadeepai/Mava/workflows/format_and_test/badge.svg)
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/instadeepai/Mava.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/instadeepai/Mava/context:python)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/instadeepai/Mava/blob/main/LICENSE)
-
-# Table of Contents
-1. [Overview](#overview)
-2. [Getting Started](#getting-started)
-3. [Supported Environments](#supported-environments)
-4. [System implementations](#system-implementations)
-5. [Usage](#usage)
-6. [Installation](#installation)
-7. [Debugging](#debugging)
-8. [Logging](#logging)
-9. [Roadmap](#roadmap)
-10. [Contributing](#contributing)
-11. [Troubleshooting and FAQ](#troubleshooting-and-faqs)
+[![docs][rtd-badge]][documentation]
 
 Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability.
 
@@ -55,7 +43,7 @@ Several examples of system implementations can be viewed [here][Systems].
 Mava shares much of the design philosophy of Acme for the same reason: to allow a high level of composability for novel research (i.e. building new systems) as well as making it possible to scale systems in a simple way, using the same underlying multi-agent RL system code. Mava uses [Launchpad](launchpad) for creating distributed programs. In Mava, the system executor (which is responsible for data collection) is distributed across multiple processes each with a copy of the environment. Each process collects and stores data which the Trainer uses to update the parameters of all the actor networks used within each executor. This approach to distributed system training is illustrated on the right in the figure above. ✋ **NOTE: In the near future, Mava aims to support additional training setups, e.g. distributed training using multiple trainers to support Bayesian optimisation or population based training (PBT).**
 
 ## Getting Started
-We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System. For more information on how to use Mava, please view our [usage section](#usage).
+We have a [Quickstart notebook][quickstart] that can be used to quickly create and train your first Multi-Agent System. For more information on how to use Mava, please view our [usage section](#usage). Finally, for more on Mava's implementation details, visit our [documentation].
 
 ## Supported Environments
 
@@ -171,7 +159,7 @@ We have tested `mava` on Python 3.7, 3.8 and 3.9.
 
 ### Docker (**Recommended**)
 #### Using pre-built images
-You can pull & run the latest pre-built images from our [DockerHub](https://hub.docker.com/repository/docker/instadeepct/mava) by specifying the docker image and example/file you want to run.
+You can pull & run the latest pre-built images from our [DockerHub](https://hub.docker.com/r/instadeepct/mava) by specifying the docker image and example/file you want to run.
 
 For example, this will pull the latest mava tensorflow core image and run the `examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py` example:
 ```
@@ -433,6 +421,8 @@ If you use Mava in your work, please cite the accompanying
 [roadmap]: https://github.com/instadeepai/Mava/issues/246
 [wishlist]: https://github.com/instadeepai/Mava/issues/247
 [bsuite]: https://github.com/deepmind/bsuite
-[quickstart]: examples/quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/quickstart.ipynb
 [blog]: https://medium.com/instadeep/mava-a-new-framework-for-multi-agent-reinforcement-learning-5dcc158e104e
 [release]: https://www.instadeep.com/2021/07/mava-a-new-framework-for-distributed-multi-agent-reinforcement-learning/
+[documentation]: https://id-mava.readthedocs.io/
+[rtd-badge]: https://readthedocs.org/projects/id-mava/badge/?version=latest
