@@ -78,6 +78,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         agent_info: bool = False,
     ):
         """Wrap Flatland environment.
+
         Args:
             environment: underlying RailEnv
             preprocessor: optional preprocessor. Defaults to None.
@@ -136,6 +137,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         return self._possible_agents
 
     def _update_stats(self, info: Dict, rewards: Dict) -> None:
+        """Update flatland stats."""
         episode_return = sum(list(rewards.values()))
         tasks_finished = sum(
             [1 if state == TrainState.DONE else 0 for state in info["state"].values()]
@@ -149,6 +151,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         self._latest_completion = completion
 
     def get_stats(self) -> Dict:
+        """Get flatland specific stats."""
         if self._latest_completion is not None and self._latest_score is not None:
             return {
                 "score": self._latest_score,
@@ -263,6 +266,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     def _convert_observations(
         self, observes: Dict[str, Tuple[np.array, np.ndarray]], dones: Dict[str, bool]
     ) -> Observation:
+        """Convert observation"""
         return convert_dm_compatible_observations(
             observes,
             dones,
@@ -276,6 +280,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     def _collate_obs_and_info(
         self, observes: Dict[int, np.ndarray], info: Dict[str, Dict[int, Any]]
     ) -> Dict[str, Tuple[np.array, np.ndarray]]:
+        """Combine observation and info."""
         observations: Dict[str, Tuple[np.array, np.ndarray]] = {}
         observes = self.preprocessor(observes)
         for agent, obs in observes.items():
@@ -304,6 +309,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         self, preprocessor: Any
     ) -> Callable[[Dict[int, Any]], Dict[int, np.ndarray]]:
         """Obtains the actual preprocessor.
+
         Obtains the actual preprocessor to be used based on the supplied
         preprocessor and the env's obs_builder object
         """
@@ -326,6 +332,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
                 return x
 
         def returned_preprocessor(obs: Dict[int, Any]) -> Dict[int, np.ndarray]:
+            """Return preprocessor."""
             temp_obs = {}
             for agent_id, ob in obs.items():
                 temp_obs[agent_id] = _preprocessor(ob)
@@ -336,6 +343,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     # set all parameters that should be available before an environment step
     # if no available agent, then environment is done and should be reset
     def _pre_step(self) -> None:
+        """Pre-step."""
         if not self.agents:
             self._step_type = dm_env.StepType.LAST
 
@@ -511,6 +519,7 @@ def norm_obs_clip(
     normalize_to_range: bool = False,
 ) -> np.ndarray:
     """Normalize observation.
+
     This function returns the difference between min and max value of an observation
     :param obs: Observation that should be normalized
     :param clip_min: min value where observation will be clipped

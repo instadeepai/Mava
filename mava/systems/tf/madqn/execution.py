@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """MADQN system executor implementation."""
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -43,7 +42,10 @@ tfd = tfp.distributions
 
 
 class DQNExecutor:
+    """DQN executor."""
+
     def __init__(self, action_selectors: Dict) -> None:
+        """Initialise DQN executor."""
         self._action_selectors = action_selectors
 
     def _get_epsilon(self) -> Union[float, np.ndarray]:
@@ -88,6 +90,7 @@ class DQNExecutor:
 
     def get_stats(self) -> Dict:
         """Return extra stats to log.
+
         Returns:
             epsilon information.
         """
@@ -99,6 +102,7 @@ class DQNExecutor:
 
 class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
     """A feed-forward executor for discrete actions.
+
     An executor based on a feed-forward policy for each agent in the system.
     """
 
@@ -117,8 +121,8 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         interval: Optional[dict] = None,
     ):
-
         """Initialise the system executor
+
         Args:
             policy_networks: policy networks for each agent in
                 the system.
@@ -195,7 +199,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> Tuple[types.NestedArray, types.NestedArray]:
-        """select an action for a single agent in the system
+        """Select an action for a single agent in the system
 
         Args:
             agent: agent id.
@@ -235,7 +239,8 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """Record first observed timestep from the environment
+        """Record first observed timestep from the environment.
+
         Args:
             timestep: data emitted by an environment at first step of
                 interaction.
@@ -265,7 +270,8 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record observed timestep from the environment
+        """Record observed timestep from the environment
+
         Args:
             actions: system agents' actions.
             next_timestep: data emitted by an environment during
@@ -308,9 +314,14 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         store_recurrent_state: bool = True,
         interval: Optional[dict] = None,
     ):
-        """Initialise the system executor
+        """Initialise the system executor.
+
         Args:
-            policy_networks: policy networks for each agent in
+            action_selectors: epsilon greedy action selection
+            value_networks: agents value networks.
+            variable_client: client for managing
+                network variable distribution
+            observation_networks: observation networks for each agent in
                 the system.
             agent_specs: agent observation and action
                 space specifications.
@@ -355,7 +366,8 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         legal_actions: types.NestedTensor,
         state: types.NestedTensor,
     ) -> Tuple:
-        """Agent specific policy function
+        """Agent specific policy function.
+
         Args:
             agent: agent id
             observation: observation tensor received from the
@@ -388,11 +400,13 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
-        """select an action for a single agent in the system
+        """select an action for a single agent in the system.
+
         Args:
             agent: agent id
             observation: observation tensor received from the
                 environment.
+
         Returns:
             action and policy.
         """
@@ -415,9 +429,11 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
 
     def select_actions(self, observations: Dict[str, types.NestedArray]) -> Any:
         """select the actions for all agents in the system
+
         Args:
             observations: agent observations from the
                 environment.
+
         Returns:
             actions and policies for all agents in the system.
         """
@@ -476,7 +492,8 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record observed timestep from the environment
+        """Record observed timestep from the environment.
+
         Args:
             actions: system agents' actions.
             next_timestep: data emitted by an environment during
