@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pytest
@@ -20,8 +20,8 @@ import pytest
 from mava.utils.environments import debugging_utils, pettingzoo_utils
 
 try:
-    import flatland
     from mava.utils.environments import flatland_utils
+
     _has_flatland = True
 except (ModuleNotFoundError, ImportError):
     _has_flatland = False
@@ -49,7 +49,7 @@ except (ModuleNotFoundError, ImportError):
                 "malfunction_max_duration": 50,
                 "observation_max_path_depth": 30,
                 "observation_tree_depth": 2,
-            }
+            },
         )
         if _has_flatland
         else None,

@@ -545,7 +545,7 @@ class ParallelEnvironmentLoop(acme.core.Worker):
                 # Log the given results.
                 self._logger.write(result)
             else:
-                # Note: We assume that the evaluator will be running less 
+                # Note: We assume that the evaluator will be running less
                 # than once per second.
                 time.sleep(1)
             # We need to get the latest counts if we are using eval intervals.

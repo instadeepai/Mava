@@ -109,7 +109,7 @@ def main(_: Any) -> None:
         ),
         optimizer=snt.optimizers.Adam(learning_rate=lr_start),
         checkpoint_subpath=checkpoint_dir,
-        learning_rate_scheduler_fn=learning_rate_scheduler_fn, #typing: ignore
+        learning_rate_scheduler_fn=learning_rate_scheduler_fn,  # typing: ignore
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
