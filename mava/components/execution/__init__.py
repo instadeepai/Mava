@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.components.execution.executor import Executor
+from mava.components.execution.setup import ExecutorSetup
 from mava.components.execution.observation import Observer
 from mava.components.execution.preprocess import Batch
 from mava.components.execution.policy import DistributionPolicy

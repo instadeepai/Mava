@@ -15,16 +15,19 @@
 
 """Execution components for system builders"""
 
-from typing import Dict, Any, List
+from typing import List
 
 from mava.core import SystemBuilder
 from mava.systems import Executor as Execute
 from mava.callbacks import Callback
 from mava.utils.decorators import execution, evaluation
+from mava.components.execution import ExecutorSetup
 
 
 class Executor(Callback):
-    def __init__(self, components: List[Callback], evaluation=False):
+    def __init__(
+        self, components: List[Callback], evaluation=False, evaluation_interval=None
+    ):
         """[summary]
 
         Args:
@@ -34,6 +37,7 @@ class Executor(Callback):
         """
         self.components = components
         self.evaluation = evaluation
+        self.evaluation_interval = evaluation_interval
 
     @execution
     def on_building_executor_make_executor(self, builder: SystemBuilder) -> None:
@@ -44,29 +48,21 @@ class Executor(Callback):
         # create adder
         adder = builder.adder(builder._replay_client)
 
-        # policy_networks=policy_networks,
-        # counts=counts,
-        # net_keys_to_ids=self._config.net_keys_to_ids,
-        # agent_specs=self._config.environment_spec.get_agent_specs(),
-        # agent_net_keys=self._config.agent_net_keys,
-        # network_sampling_setup=self._config.network_sampling_setup,
-        # variable_client=variable_client,
-        # adder=adder,
-        # evaluator=evaluator,
-        # interval=evaluator_interval,
-
-        # update config
-        self.config.update(
-            {
-                "networks": networks,
-                "adder": adder,
-                "variable_client": builder.executor_variable_client,
-                "counts": builder.executor_counts,
-                "logger": builder.executor_logger,
-            }
+        # executor components
+        executor_setup = ExecutorSetup(
+            policy_networks=networks,
+            agent_specs=builder.agent_specs,
+            agent_net_keys=builder.agent_net_keys,
+            network_sampling_setup=builder.network_sampling_setup,
+            net_keys_to_ids=builder.net_keys_to_ids,
+            adder=adder,
+            counts=builder.executor_counts,
+            variable_client=builder.executor_variable_client,
         )
+        self.components.append(executor_setup)
 
-        builder.executor = Execute(self.components, self.evaluation)
+        # create executor
+        builder.executor = Execute(self.components)
 
     @evaluation
     def on_building_evaluator_make_evaluator(self, builder: SystemBuilder) -> None:
@@ -75,14 +71,19 @@ class Executor(Callback):
         # create networks
         networks = builder.system()
 
-        # update config
-        self.config.update(
-            {
-                "networks": networks,
-                "variable_client": builder.evaluator_variable_client,
-                "counts": builder.evaluator_counts,
-                "logger": builder.evaluator_logger,
-            }
+        # evaluator components
+        evaluator_setup = ExecutorSetup(
+            policy_networks=networks,
+            agent_specs=builder.agent_specs,
+            agent_net_keys=builder.agent_net_keys,
+            network_sampling_setup=builder.network_sampling_setup,
+            net_keys_to_ids=builder.net_keys_to_ids,
+            counts=builder.executor_counts,
+            variable_client=builder.executor_variable_client,
+            evaluator=True,
+            interval=self.evaluator_interval,
         )
+        self.components.append(evaluator_setup)
 
-        builder.evaluator = Execute(self.components, self.evaluation)
+        # create evaluator
+        builder.evaluator = Execute(self.components)

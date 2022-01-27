@@ -13,31 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG system executor implementation."""
+"""System executor setup implementation."""
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 import sonnet as snt
-import tensorflow_probability as tfp
 from acme.specs import EnvironmentSpec
 
-# Internal imports.
-from acme.tf import variable_utils as tf2_variable_utils
-from dm_env import specs
-
 from mava import adders
-from mava.systems.tf import executors
-
-Array = specs.Array
-BoundedArray = specs.BoundedArray
-DiscreteArray = specs.DiscreteArray
-tfd = tfp.distributions
+from mava.callbacks import Callback
+from mava.core import SystemExecutor
+from mava.systems import VariableClient
 
 
-class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
-    """A feed-forward executor for discrete actions.
-    An executor based on a feed-forward policy for each agent in the system.
-    """
+class ExecutorSetup(Callback):
+    """Setup for executor"""
 
     def __init__(
         self,
@@ -49,31 +39,17 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         evaluator: bool = False,
         adder: Optional[adders.ReverbParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
-        variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        variable_client: Optional[VariableClient] = None,
         interval: Optional[dict] = None,
     ):
 
-        """Initialise the system executor
-        Args:
-            policy_networks: policy networks for each agent in
-                the system.
-            agent_specs: agent observation and action
-                space specifications.
-            agent_net_keys: specifies what network each agent uses.
-            network_sampling_setup: List of networks that are randomly
-                sampled from by the executors at the start of an environment run.
-            net_keys_to_ids: Specifies a mapping from network keys to their integer id.
-            adder: adder which sends data
-                to a replay buffer. Defaults to None.
-            counts: Count values used to record excutor episode and steps.
-            variable_client:
-                client to copy weights from the trainer. Defaults to None.
-            evaluator: whether the executor will be used for
-                evaluation.
-            interval: interval that evaluations are run at.
-        """
+        """Initialise the system executor"""
 
         # Store these for later use.
+        self._policy_networks = policy_networks
+        self._agent_net_keys = agent_net_keys
+        self._adder = adder
+        self._variable_client = variable_client
         self._agent_specs = agent_specs
         self._network_sampling_setup = network_sampling_setup
         self._counts = counts
@@ -81,9 +57,16 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self._net_keys_to_ids = net_keys_to_ids
         self._evaluator = evaluator
         self._interval = interval
-        super().__init__(
-            policy_networks=policy_networks,
-            agent_net_keys=agent_net_keys,
-            adder=adder,
-            variable_client=variable_client,
-        )
+
+    def on_execution_init(self, executor: SystemExecutor) -> None:
+        executor.policy_networks = self._policy_networks
+        executor.agent_net_keys = self._agent_net_keys
+        executor.adder = self._adder
+        executor.variable_client = self._variable_client
+        executor.agent_specs = self._agent_specs
+        executor.network_sampling_setup = self._network_sampling_setup
+        executor.counts = self._counts
+        executor.network_int_keys_extras = self._network_int_keys_extras
+        executor.net_keys_to_ids = self._net_keys_to_ids
+        executor.evaluator = self._evaluator
+        executor.interval = self._interval

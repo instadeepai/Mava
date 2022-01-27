@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Commonly used adder signature components for system builders"""
-from typing import Dict, Optional, Union, List
-from mava.components.tf.variables import server
+"""TF variable source for system builders"""
+from typing import Dict, Optional
+
 
 import tensorflow as tf
 from acme.tf import utils as tf2_utils
