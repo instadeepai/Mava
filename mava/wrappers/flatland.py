@@ -17,7 +17,7 @@
 
 import types as tp
 from functools import partial
-from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Tuple, Union
 
 import dm_env
 import numpy as np
@@ -157,7 +157,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         else:
             return {}
 
-    def render(self, mode: str = "human") -> np.array:
+    def render(self, mode: str = "human") -> np.ndarray:
         """Renders the environment."""
         if mode == "human":
             show = True
@@ -194,11 +194,11 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
         }
 
         discount_spec = self.discount_spec()
-        self._discounts = {
+        discounts = {
             agent: convert_np_type(discount_spec[agent].dtype, 1)
             for agent in self.possible_agents
         }
-        return parameterized_restart(rewards, self._discounts, observations), {}
+        return parameterized_restart(rewards, discounts, observations), {}
 
     def step(self, actions: Dict[str, np.ndarray]) -> dm_env.TimeStep:
         """Steps the environment."""
@@ -246,7 +246,12 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
             # TODO (Claude) zero discount!
         else:
             self._step_type = dm_env.StepType.MID
-            discounts = self._discounts  # discount == 1
+            discounts = {
+                agent: convert_np_type(
+                    self.discount_spec()[agent].dtype, 1
+                )  # discount = 1
+                for agent in self.possible_agents
+            }
 
         return (
             dm_env.TimeStep(
@@ -261,7 +266,7 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     # Convert Flatland observation so it's dm_env compatible. Also, the list
     # of legal actions must be converted to a legal actions mask.
     def _convert_observations(
-        self, observes: Dict[str, Tuple[np.array, np.ndarray]], dones: Dict[str, bool]
+        self, observes: Dict[str, Tuple[np.ndarray, np.ndarray]], dones: Dict[str, bool]
     ) -> Observation:
         """Convert observation"""
         return convert_dm_compatible_observations(
@@ -276,17 +281,17 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     # be a tuple of the observation from the env and the agent info
     def _collate_obs_and_info(
         self, observes: Dict[int, np.ndarray], info: Dict[str, Dict[int, Any]]
-    ) -> Dict[str, Tuple[np.array, np.ndarray]]:
+    ) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
         """Combine observation and info."""
-        observations: Dict[str, Tuple[np.array, np.ndarray]] = {}
+        observations: Dict = {}
         observes = self.preprocessor(observes)
         for agent, obs in observes.items():
             agent_id = get_agent_id(agent)
             agent_info = np.array(
                 [info[k][agent] for k in sort_str_num(info.keys())], dtype=np.float32
             )
-            obs = (obs, agent_info) if self._include_agent_info else obs
-            observations[agent_id] = obs
+            new_obs = (obs, agent_info) if self._include_agent_info else obs
+            observations[agent_id] = new_obs
 
         return observations
 
@@ -481,7 +486,7 @@ def decorate_step_method(env: RailEnv) -> None:
 # serve as the default preprocessor for the Tree obs builder.
 
 
-def max_lt(seq: Sequence, val: Any) -> Any:
+def max_lt(seq: np.ndarray, val: Any) -> Any:
     """Get max in sequence.
 
     Return greatest item in seq for which item < val applies.
@@ -496,7 +501,7 @@ def max_lt(seq: Sequence, val: Any) -> Any:
     return max
 
 
-def min_gt(seq: Sequence, val: Any) -> Any:
+def min_gt(seq: np.ndarray, val: Any) -> Any:
     """Gets min in a sequence.
 
     Return smallest item in seq for which item > val applies.
@@ -569,7 +574,7 @@ def _split_node_into_feature_groups(
 
 def _split_subtree_into_feature_groups(
     node: Node, current_tree_depth: int, max_tree_depth: int
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple:
     """Split subtree."""
     if node == -np.inf:
         remaining_depth = max_tree_depth - current_tree_depth

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Wraps a PettingZoo MARL environment to be used as a dm_env environment."""
+"""Wraper for SMAC."""
 from typing import Any, Dict, List, Optional, Union
 
 import dm_env
@@ -170,7 +170,7 @@ class SMACWrapper(ParallelEnvWrapper):
             rewards[agent] = convert_np_type(rewards_spec[agent].dtype, reward)
         return rewards
 
-    def _get_legal_actions(self) -> np.ndarray:
+    def _get_legal_actions(self) -> List:
         legal_actions = []
         for i, _ in enumerate(self._agents):
             legal_actions.append(
