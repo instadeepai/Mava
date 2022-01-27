@@ -183,7 +183,9 @@ class TestNetworkAgentKeys:
     [
         dict(
             network_mapping={
-                "value_networks": "q_networks",
+                "value_networks": "values",
+                "observation_networks": "observations",
+                "action_selectors": "action_selectors",
             },
             architecture=DecentralisedValueActor,
             system=madqn,
