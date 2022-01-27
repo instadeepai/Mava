@@ -44,6 +44,17 @@ class Executor(Callback):
         # create adder
         adder = builder.adder(builder._replay_client)
 
+        # policy_networks=policy_networks,
+        # counts=counts,
+        # net_keys_to_ids=self._config.net_keys_to_ids,
+        # agent_specs=self._config.environment_spec.get_agent_specs(),
+        # agent_net_keys=self._config.agent_net_keys,
+        # network_sampling_setup=self._config.network_sampling_setup,
+        # variable_client=variable_client,
+        # adder=adder,
+        # evaluator=evaluator,
+        # interval=evaluator_interval,
+
         # update config
         self.config.update(
             {

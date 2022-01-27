@@ -175,7 +175,7 @@ class TFExecutorVariableClient(TFVariableSource):
         builder.evaluator_counts = counts
 
 
-class TFTrainerVariableClient(VariableSource):
+class TFTrainerVariableClient(TFVariableSource):
     def __init__(self) -> None:
         """[summary]
 
@@ -186,14 +186,14 @@ class TFTrainerVariableClient(VariableSource):
 
     def on_building_trainer_variable_client(self, builder: SystemBuilder) -> None:
         # Create variable client
-        variables = {}
+        vars = {}
         set_keys = []
         get_keys = []
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
         for net_type_key in builder.networks.keys():
             for net_key in builder.networks[net_type_key].keys():
-                variables[f"{net_key}_{net_type_key}"] = builder.networks[net_type_key][
+                vars[f"{net_key}_{net_type_key}"] = builder.networks[net_type_key][
                     net_key
                 ].variables
                 if net_key in set(builder.trainer_networks):
@@ -201,7 +201,7 @@ class TFTrainerVariableClient(VariableSource):
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")
 
-        variables = self._create_tf_counter_variables(variables)
+        vars = self._create_tf_counter_variables(vars)
 
         count_names = [
             "trainer_steps",
@@ -214,12 +214,17 @@ class TFTrainerVariableClient(VariableSource):
         get_keys.extend(count_names)
         builder.trainer_counts = {name: variables[name] for name in count_names}
 
-        variable_client = variable_utils.VariableClient(
+        # Create variable client components
+        client = tf_variables.TFClient(
             client=builder.variable_server,
-            variables=variables,
+            variables=vars,
             get_keys=get_keys,
             set_keys=set_keys,
         )
+        client_components = [client]
+
+        # # Create variable client
+        variable_client = VariableClient(client_components)
 
         # Get all the initial variables
         variable_client.get_all_and_wait()
