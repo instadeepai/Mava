@@ -21,11 +21,11 @@ from mava.core import SystemExecutor
 
 class Observer(Callback):
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:
-        if executor._adder:
-            executor._adder.add_first(executor._timestep, executor._extras)
+        if executor.adder:
+            executor.adder.add_first(executor._timestep, executor._extras)
 
     def on_execution_observe(self, executor: SystemExecutor) -> None:
-        if executor._adder:
-            executor._adder.add(
-                executor._actions, executor._next_timestep, executor._next_extras
+        if executor.adder:
+            executor.adder.add(
+                executor.actions, executor._next_timestep, executor._next_extras
             )

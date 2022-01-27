@@ -14,8 +14,8 @@
 # limitations under the License.
 
 from mava.components.tf.building import (
-    VariableSource,
-    VariableServer,
-    ExecutorVariableClient,
-    TrainerVariableClient,
+    TFVariableSource,
+    TFVariableServer,
+    TFExecutorVariableClient,
+    TFTrainerVariableClient,
 )

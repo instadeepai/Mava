@@ -32,5 +32,5 @@ class Update(Callback):
 
 class OnlineUpdate(Update):
     def on_execution_update(self, executor: SystemExecutor) -> None:
-        if self._variable_client:
-            self._variable_client.update(self._wait)
+        if executor.variable_client:
+            executor.variable_client.update(executor._wait)

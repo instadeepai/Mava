@@ -36,11 +36,3 @@ class ActionSelector(Callback):
         Args:
             executor (SystemExecutor): [description]
         """
-
-    @abc.abstractmethod
-    def on_execution_select_action(self, executor: SystemExecutor) -> None:
-        """[summary]
-
-        Args:
-            executor (SystemExecutor): [description]
-        """

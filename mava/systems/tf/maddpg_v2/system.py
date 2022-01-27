@@ -63,17 +63,17 @@ class MADDPG(System):
             discount=config.discount,
         )
 
-        variable_server = tf_building.VariableServer(
+        variable_server = tf_building.TFVariableServer(
             checkpoint=config.checkpoint,
             checkpoint_subpath=config.checkpoint_subpath,
             checkpoint_minute_interval=config.checkpoint_minute_interval,
         )
 
-        executor_client = tf_building.ExecutorVariableClient(
+        executor_client = tf_building.TFExecutorVariableClient(
             executor_variable_update_period=config.executor_variable_update_period
         )
 
-        trainer_client = tf_building.TrainerVariableClient()
+        trainer_client = tf_building.TFTrainerVariableClient()
 
         ##########
         # Executor
