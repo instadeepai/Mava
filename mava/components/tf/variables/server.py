@@ -25,7 +25,7 @@ from mava.core import SystemVariableServer
 from mava.callbacks import Callback
 
 
-class VariableServer(Callback):
+class TFServer(Callback):
     def __init__(
         self,
         variables: Dict[str, Any],

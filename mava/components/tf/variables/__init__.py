@@ -12,3 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from mava.components.tf.variables.checkpointer import TFCheckpointer
+from mava.components.tf.variables.client import TFClient
+from mava.components.tf.variables.server import TFServer

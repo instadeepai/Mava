@@ -20,7 +20,7 @@ from mava.components.variables import VariableCheckpointer as BaseCheckpointer
 from mava.systems.tf import savers as tf2_savers
 
 
-class VariableCheckpointer(BaseCheckpointer):
+class TFCheckpointer(BaseCheckpointer):
     """A variable checkpointer for checkpointing variables."""
 
     def on_variables_server_init_make_checkpointer(

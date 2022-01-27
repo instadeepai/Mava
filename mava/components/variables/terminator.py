@@ -24,7 +24,7 @@ from mava.callbacks import Callback
 from mava.utils.training_utils import check_count_condition
 
 
-class SystemTerminator(Callback):
+class Terminator(Callback):
     """A terminator object to terminate system training and execution according to
     a pre-specified termintation condition."""
 

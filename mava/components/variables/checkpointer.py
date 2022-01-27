@@ -22,7 +22,7 @@ from mava.core import SystemVariableServer
 from mava.callbacks import Callback
 
 
-class VariableCheckpointer(Callback):
+class Checkpointer(Callback):
     """A variable checkpointer for checkpointing variables."""
 
     def __init__(

@@ -16,7 +16,7 @@
 """Commonly used replay table components for system builders"""
 import abc
 import copy
-from typing import Dict, List, Any
+from typing import Dict, Any
 
 import reverb
 from reverb import reverb_types

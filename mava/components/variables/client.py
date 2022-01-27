@@ -26,7 +26,7 @@ from mava.components.variables import VariableServer
 from mava.utils.sort_utils import sort_str_num
 
 
-class VariableClient(Callback):
+class Client(Callback):
     """A variable client for updating variables from a remote source."""
 
     def __init__(

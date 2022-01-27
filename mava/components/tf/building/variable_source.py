@@ -15,18 +15,20 @@
 
 """Commonly used adder signature components for system builders"""
 from typing import Dict, Optional, Union, List
+from mava.components.tf.variables import server
 
 import tensorflow as tf
 from acme.tf import utils as tf2_utils
 
 from mava.systems.building import SystemBuilder
 from mava.components.building import VariableSource as BaseVariableSource
-from mava.systems.tf import variable_utils
-from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.systems.variables import VariableClient, VariableServer
+from mava.components import variables
+from mava.components.tf import variables as tf_variables
 from mava.utils.decorators import execution, evaluation
 
 
-class VariableSource(BaseVariableSource):
+class TFVariableSource(BaseVariableSource):
     def _create_tf_counter_variables(
         self, variables: Dict[str, tf.Variable]
     ) -> Dict[str, tf.Variable]:
@@ -47,7 +49,7 @@ class VariableSource(BaseVariableSource):
         return variables
 
 
-class VariableServer(VariableSource):
+class TFVariableServer(TFVariableSource):
     def __init__(
         self,
         checkpoint: bool = True,
@@ -76,30 +78,35 @@ class VariableServer(VariableSource):
         self, builder: SystemBuilder
     ) -> None:
         # Create variables
-        variables = {}
+        vars = {}
         # Network variables
         for net_type_key in builder.networks.keys():
             for net_key in builder.networks[net_type_key].keys():
                 # Ensure obs and target networks are sonnet modules
-                variables[f"{net_key}_{net_type_key}"] = tf2_utils.to_sonnet_module(
+                vars[f"{net_key}_{net_type_key}"] = tf2_utils.to_sonnet_module(
                     builder.networks[net_type_key][net_key]
                 ).variables
 
-        variables = self._create_tf_counter_variables(variables)
+        vars = self._create_tf_counter_variables(vars)
 
-        # Create variable source
-        variable_source = MavaVariableSource(
-            variables,
-            self.checkpoint,
-            self.checkpoint_subpath,
-            self.checkpoint_minute_interval,
-            self.termination_condition,
-        )
+        # Create variable server components
+        server = tf_variables.TFServer(vars)
+        terminator = variables.Terminator(self.termination_condition)
+        server_components = [server, terminator]
+        if self.checkpointer:
+            checkpointer = tf_variables.TFCheckpointer(
+                self.checkpoint_subpath,
+                self.checkpoint_minute_interval,
+            )
+            server_components.append(checkpointer)
 
-        builder.variable_server = variable_source
+        # Create variable server
+        variable_server = VariableServer(server_components)
+
+        builder.variable_server = variable_server
 
 
-class ExecutorVariableClient(VariableSource):
+class TFExecutorVariableClient(TFVariableSource):
     def __init__(
         self,
         executor_variable_update_period: int = 1000,
@@ -114,14 +121,14 @@ class ExecutorVariableClient(VariableSource):
 
     def _make_variable_client(self, builder: SystemBuilder):
         # Create policy variables
-        variables = {}
+        vars = {}
         get_keys = []
         for net_type_key in ["observations", "policies"]:
             for net_key in builder.networks[net_type_key].keys():
                 var_key = f"{net_key}_{net_type_key}"
-                variables[var_key] = builder.networks[net_type_key][net_key].variables
+                vars[var_key] = builder.networks[net_type_key][net_key].variables
                 get_keys.append(var_key)
-        variables = self._create_tf_counter_variables(variables)
+        vars = self._create_tf_counter_variables(vars)
 
         count_names = [
             "trainer_steps",
@@ -132,17 +139,21 @@ class ExecutorVariableClient(VariableSource):
             "executor_steps",
         ]
         get_keys.extend(count_names)
-        counts = {name: variables[name] for name in count_names}
+        counts = {name: vars[name] for name in count_names}
 
         variable_client = None
         if builder.variable_server:
-            # Get new policy variables
-            variable_client = variable_utils.VariableClient(
+            # Create variable client components
+            client = tf_variables.TFClient(
                 client=builder.variable_server,
-                variables=variables,
+                variables=vars,
                 get_keys=get_keys,
-                get_period=self.executor_variable_update_period,
+                update_period=self.executor_variable_update_period,
             )
+            client_components = [client]
+
+            # Create variable client
+            variable_client = VariableClient(client_components)
 
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
@@ -164,7 +175,7 @@ class ExecutorVariableClient(VariableSource):
         builder.evaluator_counts = counts
 
 
-class TrainerVariableClient(VariableSource):
+class TFTrainerVariableClient(VariableSource):
     def __init__(self) -> None:
         """[summary]
 

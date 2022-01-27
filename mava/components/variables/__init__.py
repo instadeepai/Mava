@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mava.components.variables.checkpointer import VariableCheckpointer
-from mava.components.variables.variable_client import VariableClient
-from mava.components.variables.variable_server import VariableServer
+from mava.components.variables.checkpointer import Checkpointer
+from mava.components.variables.client import Client
+from mava.components.variables.server import Server
+from mava.components.variables.terminator import Terminator

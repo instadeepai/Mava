@@ -22,7 +22,7 @@ from mava.callbacks import Callback
 from mava.core import SystemVariableClient
 
 
-class VariableClient(BaseClient):
+class TFClient(BaseClient):
     """A variable client for updating variables from a remote source."""
 
     def _adjust_and_request(self, client: SystemVariableClient) -> None:
