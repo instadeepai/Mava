@@ -115,7 +115,7 @@ class Helpers:
             elif env_spec.env_type == EnvType.Sequential:
                 env = mod.env()  # type:ignore
         elif env_spec.env_source == EnvSource.Flatland:
-            env = flatland_utils.make_environment(**flatland_env_config) #type:ignore
+            env = flatland_utils.make_environment(**flatland_env_config)  # type:ignore
         elif env_spec.env_source == EnvSource.OpenSpiel:
             env = load_open_spiel_env(env_spec.env_name)
         else:
