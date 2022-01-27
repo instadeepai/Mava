@@ -21,7 +21,7 @@ from mava.core import SystemExecutor
 from mava.components.execution import ActionSelector
 
 
-class OnlineActionSampling(ActionSelector):
+class TFOnlineActionSampling(ActionSelector):
     def on_execution_policy_sample_action(self, executor: SystemExecutor) -> None:
 
         # Sample from the policy if it is stochastic.
