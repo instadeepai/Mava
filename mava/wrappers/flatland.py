@@ -23,14 +23,10 @@ import dm_env
 import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
-
-try:
-    from flatland.envs.observations import GlobalObsForRailEnv, Node, TreeObsForRailEnv
-    from flatland.envs.rail_env import RailEnv
-    from flatland.envs.step_utils.states import TrainState
-    from flatland.utils.rendertools import AgentRenderVariant, RenderTool
-except ModuleNotFoundError:
-    pass
+from flatland.envs.observations import GlobalObsForRailEnv, Node, TreeObsForRailEnv
+from flatland.envs.rail_env import RailEnv
+from flatland.envs.step_utils.states import TrainState
+from flatland.utils.rendertools import AgentRenderVariant, RenderTool
 from gym.spaces import Discrete
 from gym.spaces.box import Box
 
@@ -46,6 +42,7 @@ from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
 class FlatlandEnvWrapper(ParallelEnvWrapper):
     """Environment wrapper for Flatland environments.
+
     All environments would require an observation preprocessor, except for
     'GlobalObsForRailEnv'. This is because flatland gives users the
     flexibility of designing custom observation builders. 'TreeObsForRailEnv'
@@ -460,6 +457,7 @@ def get_agent_handle(id: str) -> int:
 
 def decorate_step_method(env: RailEnv) -> None:
     """Step method decorator.
+
     Enable the step method of the env to take action dictionaries where agent keys
     are the agent ids. Flatland uses the agent handles as keys instead. This function
     decorates the step method so that it accepts an action dict where the keys are the
@@ -485,6 +483,7 @@ def decorate_step_method(env: RailEnv) -> None:
 
 def max_lt(seq: Sequence, val: Any) -> Any:
     """Get max in sequence.
+
     Return greatest item in seq for which item < val applies.
     None is returned if seq was empty or all items in seq were >= val.
     """
@@ -499,6 +498,7 @@ def max_lt(seq: Sequence, val: Any) -> Any:
 
 def min_gt(seq: Sequence, val: Any) -> Any:
     """Gets min in a sequence.
+
     Return smallest item in seq for which item > val applies.
     None is returned if seq was empty or all items in seq were >= val.
     """
