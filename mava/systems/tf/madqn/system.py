@@ -70,6 +70,7 @@ class MADQN:
         num_caches: int = 0,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
+        using_noisy_networks: bool = False,
         agent_net_keys: Dict[str, str] = {},
         batch_size: int = 256,
         prefetch_size: int = 4,
@@ -131,6 +132,10 @@ class MADQN:
             environment_spec : escription of
                 the action, observation spaces etc.
             shared_weights :  whether agents should share weights or not.
+            using_noisy_networks : whether or not the agents networks are noisy.
+                This requires the network used to have a reset_noise and remove_noise function.
+                e.g look at NoisyMLP component.
+                Currently only works with feedforward trainer.
             agent_net_keys : specifies what network each agent uses.
             batch_size : sample batch size for updates.
             prefetch_size : size to prefetch from replay.
@@ -225,6 +230,7 @@ class MADQN:
         self._checkpoint_minute_interval = checkpoint_minute_interval
         self._seed = seed
         self._evaluator_interval = evaluator_interval
+        self._using_noisy_networks = using_noisy_networks
 
         if issubclass(executor_fn, executors.RecurrentExecutor):
             extra_specs = self._get_extra_specs()
@@ -273,6 +279,7 @@ class MADQN:
                 min_replay_size=min_replay_size,
                 max_replay_size=max_replay_size,
                 samples_per_insert=samples_per_insert,
+                using_noisy_networks=using_noisy_networks,
                 n_step=n_step,
                 sequence_length=sequence_length,
                 importance_sampling_exponent=importance_sampling_exponent,

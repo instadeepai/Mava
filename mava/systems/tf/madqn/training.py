@@ -57,6 +57,7 @@ class MADQNTrainer(mava.Trainer):
         optimizer: Union[Dict[str, snt.Optimizer], snt.Optimizer],
         discount: float,
         agent_net_keys: Dict[str, str],
+        using_noisy_networks: bool,
         checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         importance_sampling_exponent: Optional[float] = None,
@@ -85,6 +86,10 @@ class MADQNTrainer(mava.Trainer):
             discount (float): discount factor for TD updates.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            using_noisy_networks: (bool): whether or not the agents networks are noisy.
+                This requires the network used to have a reset_noise and a
+                remove_noise function. e.g look at NoisyMLP component.
+                Currently only works with feedforward trainer.
             checkpoint_minute_interval (int): The number of minutes to wait between
                 checkpoints.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -200,6 +205,8 @@ class MADQNTrainer(mava.Trainer):
         # fill the replay buffer.
 
         self._timestamp: Optional[float] = None
+
+        self._using_noisy_networks = using_noisy_networks
 
     def get_trainer_steps(self) -> float:
         """get trainer step count
@@ -503,6 +510,10 @@ class MADQNTrainer(mava.Trainer):
                 ].learning_rate
             if self._logger:
                 self._logger.write(info)
+        if self._using_noisy_networks:
+            for agent in self._agents:
+                agent_key = self._agent_net_keys[agent]
+                self._q_networks[agent_key].reset_noise()
 
     def _decay_lr(self, trainer_step: int) -> None:
         """Decay lr.
@@ -532,6 +543,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         agent_net_keys: Dict[str, str],
+        using_noisy_networks: bool,
         checkpoint_minute_interval: int,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
@@ -556,6 +568,8 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             discount (float): discount factor for TD updates.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
+            using_noisy_networks: bool: currently not supported for reccurent networks.
+                https://arxiv.org/abs/2102.04877 for future reference.
             checkpoint_minute_interval (int): The number of minutes to wait between
                 checkpoints.
             max_gradient_norm (float, optional): maximum allowed norm for gradients
@@ -585,6 +599,7 @@ class MADQNRecurrentTrainer(MADQNTrainer):
             optimizer=optimizer,
             discount=discount,
             agent_net_keys=agent_net_keys,
+            using_noisy_networks=False,
             checkpoint_minute_interval=checkpoint_minute_interval,
             max_gradient_norm=max_gradient_norm,
             counter=counter,
@@ -675,6 +690,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
         optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         discount: float,
         agent_net_keys: Dict[str, str],
+        using_noisy_networks: bool,
         checkpoint_minute_interval: int,
         communication_module: BaseCommunicationModule,
         max_gradient_norm: float = None,
@@ -728,6 +744,7 @@ class MADQNRecurrentCommTrainer(MADQNTrainer):
             optimizer=optimizer,
             discount=discount,
             agent_net_keys=agent_net_keys,
+            using_noisy_networks=False,
             checkpoint_minute_interval=checkpoint_minute_interval,
             max_gradient_norm=max_gradient_norm,
             fingerprint=fingerprint,
