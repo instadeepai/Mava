@@ -60,19 +60,19 @@ from tests.mocks import (
 if _has_flatland:
     # flatland environment config
     flatland_env_config = {
-            "n_agents": 3,
-            "x_dim": 30,
-            "y_dim": 30,
-            "n_cities": 2,
-            "max_rails_between_cities": 2,
-            "max_rails_in_city": 3,
-            "seed": 0,
-            "malfunction_rate": 1 / 200,
-            "malfunction_min_duration": 20,
-            "malfunction_max_duration": 50,
-            "observation_max_path_depth": 30,
-            "observation_tree_depth": 2,
-        }
+        "n_agents": 3,
+        "x_dim": 30,
+        "y_dim": 30,
+        "n_cities": 2,
+        "max_rails_between_cities": 2,
+        "max_rails_in_city": 3,
+        "seed": 0,
+        "malfunction_rate": 1 / 200,
+        "malfunction_min_duration": 20,
+        "malfunction_max_duration": 50,
+        "observation_max_path_depth": 30,
+        "observation_tree_depth": 2,
+    }
 
 """
 Helpers contains re-usable test functions.
@@ -115,7 +115,7 @@ class Helpers:
             elif env_spec.env_type == EnvType.Sequential:
                 env = mod.env()  # type:ignore
         elif env_spec.env_source == EnvSource.Flatland:
-            env = flatland_utils.make_environment(**flatland_env_config)
+            env = flatland_utils.make_environment(**flatland_env_config) #type:ignore
         elif env_spec.env_source == EnvSource.OpenSpiel:
             env = load_open_spiel_env(env_spec.env_name)
         else:
