@@ -77,7 +77,7 @@ class DecentralisedValueActor(BaseArchitecture):
             "target_values": {},
             "observations": {},
             "target_observations": {},
-            "selectors": {}
+            "selectors": {},
         }
 
         # get actor specs
@@ -88,12 +88,18 @@ class DecentralisedValueActor(BaseArchitecture):
             agent_net_key = self._agent_net_keys[agent_key]
             obs_spec = actor_obs_specs[agent_key]
             # Create variables for observation and value networks.
-            embed = tf2_utils.create_variables(self._observation_networks[agent_net_key], [obs_spec])
+            embed = tf2_utils.create_variables(
+                self._observation_networks[agent_net_key], [obs_spec]
+            )
             tf2_utils.create_variables(self._value_networks[agent_net_key], [embed])
 
             # Create target value and observation network variables
-            embed = tf2_utils.create_variables(self._target_observation_networks[agent_net_key], [obs_spec])
-            tf2_utils.create_variables(self._target_value_networks[agent_net_key], [embed])
+            embed = tf2_utils.create_variables(
+                self._target_observation_networks[agent_net_key], [obs_spec]
+            )
+            tf2_utils.create_variables(
+                self._target_value_networks[agent_net_key], [embed]
+            )
 
         actor_networks["values"] = self._value_networks
         actor_networks["target_values"] = self._target_value_networks

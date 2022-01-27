@@ -14,4 +14,4 @@
 # limitations under the License.
 
 """Value decomposition mixing modules."""
-from mava.components.tf.modules.mixing.mixers import BaseMixer, VDN, QMIX
+from mava.components.tf.modules.mixing.mixers import QMIX, VDN, BaseMixer

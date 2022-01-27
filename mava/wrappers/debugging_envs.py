@@ -125,7 +125,9 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 #  accordingly
                 if isinstance(self._environment.action_spaces[agent], spaces.Discrete):
                     legals = np.ones(
-                        _convert_to_spec(self._environment.action_spaces[agent]).num_values,
+                        _convert_to_spec(
+                            self._environment.action_spaces[agent]
+                        ).num_values,
                         dtype=self._environment.action_spaces[agent].dtype,
                     )
                 else:
@@ -149,10 +151,10 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
 
             # Legals spec
             if isinstance(self._environment.action_spaces[agent], spaces.Discrete):
-                    legals = np.ones(
-                        _convert_to_spec(self._environment.action_spaces[agent]).num_values,
-                        dtype=self._environment.action_spaces[agent].dtype,
-                    )
+                legals = np.ones(
+                    _convert_to_spec(self._environment.action_spaces[agent]).num_values,
+                    dtype=self._environment.action_spaces[agent].dtype,
+                )
             else:
                 legals = np.ones(
                     _convert_to_spec(self._environment.action_spaces[agent]).shape,

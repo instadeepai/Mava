@@ -21,7 +21,4 @@ from mava.systems.tf.madqn.execution import (
 )
 from mava.systems.tf.madqn.networks import make_default_networks
 from mava.systems.tf.madqn.system import MADQN
-from mava.systems.tf.madqn.training import (
-    MADQNRecurrentTrainer,
-    MADQNTrainer, 
-)
+from mava.systems.tf.madqn.training import MADQNRecurrentTrainer, MADQNTrainer
