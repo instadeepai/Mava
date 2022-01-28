@@ -30,7 +30,7 @@ from acme.utils import counting, loggers
 
 import mava
 from mava.systems.tf import savers as tf2_savers
-from mava.types import OLT, NestedArray
+from mava.types import OLT
 from mava.utils import training_utils as train_utils
 from mava.utils.sort_utils import sort_str_num
 
@@ -102,8 +102,8 @@ class MAPPOTrainer(mava.Trainer):
             minibatch_size (int, optional): size of minibatch that is sampled from
                 the training batch. Minibatches are used for each gradient step.
             num_epochs (int, optional): number of epochs for every training step.
-                Recommendation as per https://arxiv.org/pdf/2103.01955.pdf,
-                "15 epochs for easy tasks, and 10 or 5 epochs for difficult tasks."
+                Recommendation as per https://arxiv.org/pdf/2103.01955.pdf, "15
+                epochs for easy tasks,and 10 or 5 epochs for difficult tasks."
             discount (float, optional): discount factor for TD updates. Defaults
                 to 0.99.
             lambda_gae (float, optional): scalar determining the mix of bootstrapping
@@ -276,17 +276,6 @@ class MAPPOTrainer(mava.Trainer):
         return observation_trans
 
     @tf.function
-    def _internal_step(self, minibatch_data: tf.TensorSliceDataset):
-        """Minibatch step.
-
-        Args:
-            minibatch_data : minibatch of data.
-
-        Returns:
-            loss for minibatch.
-        """
-        return self.forward_backward(minibatch_data)
-
     def _step(
         self,
     ) -> Union[Dict[str, Dict[str, Any]], Optional[Any]]:
@@ -296,28 +285,33 @@ class MAPPOTrainer(mava.Trainer):
             Dict[str, Dict[str, Any]]: losses
         """
 
-        losses: Dict[str, NestedArray] = {
-            agent: {"critic_loss": tf.zeros(()), "policy_loss": tf.zeros(())}
-            for agent in self._agents
-        }
+        losses = None
         # Get data from replay.
         inputs = next(self._iterator)
-        # Split for possible minibatches
         train_batch_size = inputs.data.observations["agent_0"].observation.shape[0]
-        dataset = tf.data.Dataset.from_tensor_slices(inputs.data)
-        dataset = dataset.shuffle(train_batch_size).batch(self._minibatch_size)
         for _ in range(self._num_epochs):
-            for minibatch_data in dataset:
-                loss = self._internal_step(minibatch_data)
+            indices = np.random.permutation(train_batch_size)
+            minibatch_indices = np.split(
+                indices, train_batch_size // self._minibatch_size
+            )
+            for minibatch_index in minibatch_indices:
 
-                # Logging sum of losses
-                for agent in self._agents:
-                    losses[agent] = {
-                        "critic_loss": losses[agent]["critic_loss"]
-                        + loss[agent]["critic_loss"],
-                        "policy_loss": losses[agent]["policy_loss"]
-                        + loss[agent]["policy_loss"],
-                    }
+                minibatch_data = tf.nest.map_structure(
+                    lambda x: tf.gather(x, minibatch_index, axis=0), inputs.data
+                )
+                loss = self.forward_backward(minibatch_data)
+
+                # Logging summ of losses
+                if losses is None:
+                    losses = loss
+                else:
+                    for agent in self._agents:
+                        losses[agent] = {
+                            "critic_loss": losses[agent]["critic_loss"]
+                            + loss[agent]["critic_loss"],
+                            "policy_loss": losses[agent]["policy_loss"]
+                            + loss[agent]["policy_loss"],
+                        }
 
         # Log losses per agent
         return losses
