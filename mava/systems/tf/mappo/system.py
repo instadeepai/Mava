@@ -70,7 +70,7 @@ class MAPPO:
         max_gradient_norm: Optional[float] = None,
         max_queue_size: int = 10000,
         train_batch_size: int = 512,
-        minibatch_size: int = 256,
+        minibatch_size: int = None,
         num_epochs: int = 5,
         sequence_length: int = 10,
         sequence_period: int = 5,
@@ -181,6 +181,17 @@ class MAPPO:
                 E.g. to evaluate a system after every 100 executor episodes,
                 evaluator_interval = {"executor_episodes": 100}.
         """
+        # minibatch size defaults to train batch size
+        if minibatch_size:
+            self._minibatch_size = minibatch_size
+        else:
+            self._minibatch_size = train_batch_size
+
+        assert train_batch_size % self._minibatch_size == 0, (
+            "train_batch_size must be divisible by minibatch_size."
+            + f"Got train_batch_size={train_batch_size},"
+            + f"minibatch_size={self._minibatch_size}"
+        )
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
@@ -235,7 +246,7 @@ class MAPPO:
                 max_gradient_norm=max_gradient_norm,
                 max_queue_size=max_queue_size,
                 train_batch_size=train_batch_size,
-                minibatch_size=minibatch_size,
+                minibatch_size=self._minibatch_size,
                 num_epochs=num_epochs,
                 sequence_length=sequence_length,
                 sequence_period=sequence_period,
@@ -426,16 +437,15 @@ class MAPPO:
         counter: counting.Counter,
         logger: loggers.Logger = None,
     ) -> Any:
-        """System evaluator (an executor process not connected to a dataset)
+        """System evaluator - an executor process not connected to a dataset.
 
         Args:
-            variable_source (acme.VariableSource): variable server for updating
-                network variables.
-            counter (counting.Counter): step counter object.
-            logger (loggers.Logger, optional): logger object. Defaults to None.
+            variable_source : variable server for updating network variables.
+            counter : step counter object.
+            logger : logger object. Defaults to None.
 
         Returns:
-            Any: environment-executor evaluation loop instance for evaluating the
+            environment-executor evaluation loop instance for evaluating the
                 performance of a system.
         """
 
