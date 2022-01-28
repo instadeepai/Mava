@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """MAD4PG system trainer implementation."""
 
 from typing import Any, Callable, Dict, List, Optional, Union
@@ -48,6 +46,7 @@ train_utils.set_growing_gpu_memory()
 
 class MAD4PGBaseTrainer(MADDPGBaseTrainer):
     """MAD4PG trainer.
+
     This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -113,7 +112,6 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 returns the current learning rate.
         """
 
-        """Initialise the decentralised MADDPG trainer."""
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -255,6 +253,7 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the decentralised MAD4PG trainer."""
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -308,6 +307,7 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the centralised MAD4PG trainer."""
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -361,6 +361,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the state-based MAD4PG trainer."""
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -388,6 +389,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
 
 class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """Recurrent MAD4PG trainer.
+
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -650,6 +652,32 @@ class MAD4PGDecentralisedRecurrentTrainer(
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
+        """Init trainer.
+
+        Args:
+            agents: [description]
+            agent_types: [description]
+            policy_networks: [description]
+            critic_networks: [description]
+            target_policy_networks: [description]
+            target_critic_networks: [description]
+            policy_optimizer: [description]
+            critic_optimizer: [description]
+            discount: [description]
+            target_averaging: [description]
+            target_update_period: [description]
+            target_update_rate: [description]
+            dataset: [description]
+            observation_networks: [description]
+            target_observation_networks: [description]
+            variable_client: [description]
+            counts: [description]
+            agent_net_keys: [description]
+            max_gradient_norm: [description]. Defaults to None.
+            logger: [description]. Defaults to None.
+            bootstrap_n: [description]. Defaults to 10.
+            learning_rate_scheduler_fn: [description]. Defaults to None.
+        """
 
         super().__init__(
             agents=agents,
