@@ -33,7 +33,7 @@ from mava.utils.loggers import logger_utils
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "3m",
+    "8m",
     "Starcraft 2 micromanagement map name (str).",
 )
 

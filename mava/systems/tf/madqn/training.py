@@ -597,10 +597,10 @@ class MADQNRecurrentTrainer(mava.Trainer):
         """Depricated"""
         pass
 
-    # @tf.function
     # NOTE (Claude) The recurrent trainer does not start with tf.function
     # It does start on SMAC 3m and debug env but not on any other SMAC maps.
     # TODO (Claude) get tf.function to work.
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:

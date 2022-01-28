@@ -20,6 +20,7 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tree
 from acme import types
 from acme.specs import EnvironmentSpec
 
@@ -124,8 +125,11 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         """Initialise the system executor
 
         Args:
-            policy_networks: policy networks for each agent in
+            value_networks: value networks for each agent in
                 the system.
+            observation_networks: value networks for each agent in
+                the system.
+            action_selectors: eg. epsilon_greedy action selector
             agent_specs: agent observation and action
                 space specifications.
             agent_net_keys: specifies what network each agent uses.
@@ -135,8 +139,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
             adder: adder which sends data
                 to a replay buffer. Defaults to None.
             counts: Count values used to record excutor episode and steps.
-            variable_client:
-                client to copy weights from the trainer. Defaults to None.
+            variable_client: client to copy weights from the trainer. Defaults to None.
             evaluator: whether the executor will be used for
                 evaluation.
             interval: interval that evaluations are run at.
@@ -157,7 +160,6 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         self._adder = adder
         self._variable_client = variable_client
 
-    @tf.function
     def _policy(
         self,
         agent: str,
@@ -196,28 +198,20 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
 
         return action
 
-    def select_action(
-        self, agent: str, observation: types.NestedArray
-    ) -> Tuple[types.NestedArray, types.NestedArray]:
-        """Select an action for a single agent in the system
+    @tf.function
+    def _select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> types.NestedArray:
+        actions = {}
+        for agent, observation in observations.items():
+            actions[agent] = self._policy(
+                agent, observation.observation, observation.legal_actions
+            )
+        return actions
 
-        Args:
-            agent: agent id.
-            observation: observation tensor received
-            from the environment.
-
-        Returns:
-            agent action and policy.
-        """
-        # Get the action from the policy, conditioned on the observation
-        action = self._policy(agent, observation.observation, observation.legal_actions)
-
-        # Return a numpy array with squeezed out batch dimension.
-        action = tf2_utils.to_numpy_squeeze(action)
-
-        return action
-
-    def select_actions(self, observations: Dict[str, types.NestedArray]) -> Dict:
+    def select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> types.NestedArray:
         """Select the actions for all agents in the system
 
         Args:
@@ -228,9 +222,9 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
             actions and policies for all agents in the system.
         """
 
-        actions = {}
-        for agent, observation in observations.items():
-            actions[agent] = self.select_action(agent, observation)
+        actions = self._select_actions(observations)
+
+        actions = tree.map_structure(tf2_utils.to_numpy_squeeze, actions)
 
         return actions
 
@@ -250,7 +244,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         if not self._adder:
             return
 
-        "Select new networks from the sampler at the start of each episode."
+        # Select new networks from the sampler at the start of each episode.
         agents = sort_str_num(list(self._agent_net_keys.keys()))
         self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
             agents,
@@ -358,7 +352,6 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         self._action_selectors = action_selectors
         self._states: Dict[str, Any] = {}
 
-    @tf.function
     def _policy(
         self,
         agent: str,
@@ -373,8 +366,10 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
             observation: observation tensor received from the
                 environment.
             state: recurrent network state.
+
         Raises:
             NotImplementedError: unknown action space
+
         Returns:
             action, policy and new recurrent hidden state
         """
@@ -397,38 +392,26 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
 
         return action, new_state
 
-    def select_action(
-        self, agent: str, observation: types.NestedArray
+    @tf.function
+    def _select_actions(
+        self, observations: Dict[str, types.NestedArray]
     ) -> types.NestedArray:
-        """select an action for a single agent in the system.
+        actions: Dict = {}
+        new_states: Dict = {}
+        for agent, observation in observations.items():
+            actions[agent],
+            new_states[agent] = self._policy(
+                agent,
+                observation.observation,
+                observation.legal_actions,
+                self._states[agent],
+            )
+        return actions, new_states
 
-        Args:
-            agent: agent id
-            observation: observation tensor received from the
-                environment.
-
-        Returns:
-            action and policy.
-        """
-
-        # Step the recurrent policy forward given the current observation and state.
-        action, new_state = self._policy(
-            agent,
-            observation.observation,
-            observation.legal_actions,
-            self._states[agent],
-        )
-
-        # Bookkeeping of recurrent states for the observe method.
-        self._update_state(agent, new_state)
-
-        # Return a numpy array with squeezed out batch dimension.
-        action = tf2_utils.to_numpy_squeeze(action)
-
-        return action
-
-    def select_actions(self, observations: Dict[str, types.NestedArray]) -> Any:
-        """select the actions for all agents in the system
+    def select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> types.NestedArray:
+        """Select the actions for all agents in the system
 
         Args:
             observations: agent observations from the
@@ -437,9 +420,16 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         Returns:
             actions and policies for all agents in the system.
         """
-        actions = {}
-        for agent, observation in observations.items():
-            actions[agent] = self.select_action(agent, observation)
+
+        actions, new_states = self._select_actions(observations)
+
+        # Convert actions to numpy arrays
+        actions = tree.map_structure(tf2_utils.to_numpy_squeeze, actions)
+
+        # Update agent core state
+        for agent, state in new_states.items():
+            self._update_state(agent, state)
+
         return actions
 
     def observe_first(
@@ -447,7 +437,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record first observed timestep from the environment
+        """Record first observed timestep from the environment
 
         Args:
             timestep: data emitted by an environment at first step of

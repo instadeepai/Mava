@@ -47,6 +47,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
+    """Main function."""
 
     # Environment.
     environment_factory = functools.partial(

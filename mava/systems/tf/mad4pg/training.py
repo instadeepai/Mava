@@ -707,6 +707,7 @@ class MAD4PGCentralisedRecurrentTrainer(
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
+        """Init trainer."""
 
         super().__init__(
             agents=agents,
@@ -764,6 +765,7 @@ class MAD4PGStateBasedRecurrentTrainer(
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
+        """Init trainer."""
 
         super().__init__(
             agents=agents,
@@ -820,6 +822,31 @@ class MAD4PGStateBasedSingleActionCriticRecurrentTrainer(
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
     ):
+        """Initialise trainer.
+
+        Args:
+            agents: [description]
+            agent_types: [description]
+            policy_networks: [description]
+            critic_networks: [description]
+            target_policy_networks: [description]
+            target_critic_networks: [description]
+            policy_optimizer: [description]
+            critic_optimizer: [description]
+            discount: [description]
+            target_averaging: [description]
+            target_update_period: [description]
+            target_update_rate: [description]
+            dataset: [description]
+            observation_networks: [description]
+            target_observation_networks: [description]
+            variable_client: [description]
+            counts: [description]
+            agent_net_keys: [description]
+            max_gradient_norm: [description]. Defaults to None.
+            logger: [description]. Defaults to None.
+            bootstrap_n: [description]. Defaults to 10.
+        """
 
         super().__init__(
             agents=agents,

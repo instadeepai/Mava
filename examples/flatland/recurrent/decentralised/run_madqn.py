@@ -43,7 +43,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 # flatland environment config
 env_config: Dict = {
-    "n_agents": 3,
+    "n_agents": 10,
     "x_dim": 30,
     "y_dim": 30,
     "n_cities": 2,
@@ -59,6 +59,7 @@ env_config: Dict = {
 
 
 def main(_: Any) -> None:
+    """Run example"""
 
     # Environment.
     environment_factory = functools.partial(make_environment, **env_config)

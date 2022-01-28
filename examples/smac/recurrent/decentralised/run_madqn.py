@@ -35,7 +35,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
     "map_name",
-    "3m",
+    "10m_vs_11m",
     "Starcraft 2 micromanagement map name (str).",
 )
 
