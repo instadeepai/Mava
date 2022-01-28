@@ -33,7 +33,7 @@ from mava.utils.loggers import logger_utils
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "8m",
+    "1c3s5z",
     "Starcraft 2 micromanagement map name (str).",
 )
 
@@ -78,7 +78,7 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=5e-6
         ),
         optimizer=snt.optimizers.RMSProp(
             learning_rate=0.0005, epsilon=0.00001, decay=0.99
@@ -89,8 +89,10 @@ def main(_: Any) -> None:
         target_update_period=200,
         max_gradient_norm=20.0,
         min_replay_size=32,
-        max_replay_size=10000,
+        max_replay_size=5000,
         samples_per_insert=16,
+        sequence_length=200,
+        period=200,
         evaluator_interval={"executor_episodes": 2},
     ).build()
 

@@ -394,17 +394,16 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
 
     @tf.function
     def _select_actions(
-        self, observations: Dict[str, types.NestedArray]
+        self, observations: Dict[str, types.NestedArray], states
     ) -> types.NestedArray:
         actions: Dict = {}
         new_states: Dict = {}
         for agent, observation in observations.items():
-            actions[agent],
-            new_states[agent] = self._policy(
+            actions[agent], new_states[agent] = self._policy(
                 agent,
                 observation.observation,
                 observation.legal_actions,
-                self._states[agent],
+                states[agent],
             )
         return actions, new_states
 
@@ -421,7 +420,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
             actions and policies for all agents in the system.
         """
 
-        actions, new_states = self._select_actions(observations)
+        actions, new_states = self._select_actions(observations, self._states)
 
         # Convert actions to numpy arrays
         actions = tree.map_structure(tf2_utils.to_numpy_squeeze, actions)
