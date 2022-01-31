@@ -63,7 +63,7 @@ class MAPPO:
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-5),
         use_single_optimizer: bool = True,
         discount: float = 0.99,
-        lambda_gae: float = 0.99,
+        lambda_gae: float = 1.0,
         clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,

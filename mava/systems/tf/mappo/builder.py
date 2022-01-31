@@ -82,7 +82,7 @@ class MAPPOConfig:
     sequence_length: int = 10
     sequence_period: int = 5
     discount: float = 0.99
-    lambda_gae: float = 0.95
+    lambda_gae: float = 1.0
     max_queue_size: int = 10000
     executor_variable_update_period: int = 100
     train_batch_size: int = 32
