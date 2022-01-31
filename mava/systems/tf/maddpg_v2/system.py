@@ -105,6 +105,15 @@ class MADDPG(System):
         trainer_components = []
         trainer = building.Trainer(trainer_components)
 
+        #############
+        # Distributor
+        #############
+        distributor = building.Distributor(
+            num_executors=config.num_executors,
+            nodes_on_gpu=config.nodes_on_gpu,
+            name="maddpg",
+        )
+
         ########
         # System
         ########
@@ -120,15 +129,13 @@ class MADDPG(System):
             executor=executor,
             evaluator=evaluator,
             trainer=trainer,
+            distributor=distributor,
         )
 
 
 ## Example of create/launching system
 config = MADDPGConfig(...)
 system = MADDPG(config)
-
-# Build system
-system.build(num_executors=2, nodes_on_gpu=["trainer"], name="maddpg")
 
 # Launch system
 system.launch()

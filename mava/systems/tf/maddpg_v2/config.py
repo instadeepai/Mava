@@ -75,6 +75,8 @@ class MADDPGConfig:
         evaluator_interval: An optional condition that is used to
             evaluate/test system performance after [evaluator_interval]
             condition has been met.
+        num_executors: Number of executor processes to run.
+        nodes_on_gpu: Nodes to run on the GPU.
     """
 
     environment_spec: specs.MAEnvironmentSpec
@@ -110,3 +112,5 @@ class MADDPGConfig:
     termination_condition: Optional[Dict[str, int]] = None
     evaluator_interval: Optional[dict] = None
     learning_rate_scheduler_fn: Optional[Any] = None
+    num_executors = 1
+    nodes_on_gpu = ["trainer"]

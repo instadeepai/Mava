@@ -51,31 +51,9 @@ class System(BaseSystem):
         else:
             self.system_components.__dict__[name] = component
 
-    def build(
-        self,
-        num_executors: int = 1,
-        multi_process: str = False,
-        nodes_on_gpu: List[str] = ["trainer"],
-        name: str = "system",
-        distributor: Callback = None,
-    ):
-
-        # Distributor
-        distributor_fn = distributor if distributor else building.Distributor
-        distribute = distributor_fn(
-            num_executors=num_executors,
-            multi_process=multi_process,
-            nodes_on_gpu=nodes_on_gpu,
-            run_evaluator="evaluator" in list(self.system_components.__dict__.keys()),
-            name=name,
-        )
-        self.add(component=distribute, name="distributor")
-
+    def launch(self):
+        # Create and launch the builder
         component_feed = list(self.system_components.__dict__.values())
-
-        # Builder
         self._builder = Builder(components=component_feed)
         self._builder.build()
-
-    def launch(self):
         self._builder.launch()
