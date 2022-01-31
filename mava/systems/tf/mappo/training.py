@@ -59,7 +59,7 @@ class MAPPOTrainer(mava.Trainer):
         use_single_optimizer: bool,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
-        minibatch_size: int = 128,
+        minibatch_size: Optional[int] = None,
         num_epochs: int = 5,
         discount: float = 0.99,
         lambda_gae: float = 1.0,

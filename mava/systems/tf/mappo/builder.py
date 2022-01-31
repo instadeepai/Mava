@@ -86,7 +86,7 @@ class MAPPOConfig:
     max_queue_size: int = 10000
     executor_variable_update_period: int = 100
     train_batch_size: int = 32
-    minibatch_size: int = 32
+    minibatch_size: Optional[int] = None
     num_epochs: int = 5
     entropy_cost: float = 0.01
     baseline_cost: float = 0.5
