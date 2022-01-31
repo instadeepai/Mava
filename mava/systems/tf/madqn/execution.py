@@ -394,7 +394,8 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
 
     @tf.function
     def _select_actions(
-        self, observations: Dict[str, types.NestedArray], states
+        self, observations: Dict[str, types.NestedArray], 
+        states: Dict[str, types.NestedArray]
     ) -> types.NestedArray:
         actions: Dict = {}
         new_states: Dict = {}

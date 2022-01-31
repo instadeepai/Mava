@@ -234,6 +234,7 @@ class MADQNTrainer(mava.Trainer):
             o_t[agent] = tree.map_structure(tf.stop_gradient, o_t[agent])
         return o_tm1, o_t
 
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -535,7 +536,7 @@ class MADQNRecurrentTrainer(mava.Trainer):
             obs_target_trans: transformed target network observations
         """
 
-        # Note (dries): We are assuming that only the policy network
+        # NOTE We are assuming that only the value network
         # is recurrent and not the observation network.
         obs_trans = {}
         obs_target_trans = {}
@@ -555,10 +556,8 @@ class MADQNRecurrentTrainer(mava.Trainer):
                 dims,
             )
 
-            # This stop_gradient prevents gradients to propagate into the target
-            # observation network. In addition, since the online policy network is
-            # evaluated at o_t, this also means the policy loss does not influence
-            # the observation network training.
+            # This stop_gradient prevents gradients to propagate into 
+            # the target observation network.
             obs_target_trans[agent] = tree.map_structure(
                 tf.stop_gradient, obs_target_trans[agent]
             )
@@ -597,9 +596,6 @@ class MADQNRecurrentTrainer(mava.Trainer):
         """Depricated"""
         pass
 
-    # NOTE (Claude) The recurrent trainer does not start with tf.function
-    # It does start on SMAC 3m and debug env but not on any other SMAC maps.
-    # TODO (Claude) get tf.function to work.
     @tf.function
     def _step(
         self,
@@ -623,7 +619,6 @@ class MADQNRecurrentTrainer(mava.Trainer):
         # Log losses per agent
         return train_utils.map_losses_per_agent_value(self.value_losses)
 
-    # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass.
 
@@ -741,10 +736,6 @@ class MADQNRecurrentTrainer(mava.Trainer):
             )
 
             # Compute gradients.
-            # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
-            #  on a persistent tape inside its context is significantly less efficient
-            #  than calling it outside the context." caused by losses.dpg, which calls
-            #  tape.gradient.
             gradients = tape.gradient(value_losses[agent], variables)
 
             # Maybe clip gradients.
