@@ -69,7 +69,7 @@ class MAPPO:
         baseline_cost: float = 0.5,
         max_gradient_norm: Optional[float] = None,
         max_queue_size: int = 10000,
-        train_batch_size: int = 512,
+        batch_size: int = 512,
         minibatch_size: int = None,
         num_epochs: int = 5,
         sequence_length: int = 10,
@@ -140,7 +140,7 @@ class MAPPO:
             gradient norm during optimization.
             max_queue_size (int, optional): maximum number of items in the queue.
                 Defaults to 100000.
-            train_batch_size (int, optional): sample batch size for updates.
+            batch_size (int, optional): sample batch size for updates.
                 Defaults to 512. Minibatches are sampled from this data.
             minibatch_size (int, optional): size of minibatch that is sampled
                 from the training batch. Minibatches are used for each gradient step.
@@ -185,11 +185,11 @@ class MAPPO:
         if minibatch_size:
             self._minibatch_size = minibatch_size
         else:
-            self._minibatch_size = train_batch_size
+            self._minibatch_size = batch_size
 
-        assert train_batch_size % self._minibatch_size == 0, (
-            "train_batch_size must be divisible by minibatch_size."
-            + f"Got train_batch_size={train_batch_size},"
+        assert batch_size % self._minibatch_size == 0, (
+            "batch_size must be divisible by minibatch_size."
+            + f"Got batch_size={batch_size},"
             + f"minibatch_size={self._minibatch_size}"
         )
 
@@ -245,7 +245,7 @@ class MAPPO:
                 baseline_cost=baseline_cost,
                 max_gradient_norm=max_gradient_norm,
                 max_queue_size=max_queue_size,
-                train_batch_size=train_batch_size,
+                batch_size=batch_size,
                 minibatch_size=self._minibatch_size,
                 num_epochs=num_epochs,
                 sequence_length=sequence_length,

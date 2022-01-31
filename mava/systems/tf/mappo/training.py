@@ -303,11 +303,9 @@ class MAPPOTrainer(mava.Trainer):
         # Get data from replay.
         inputs = next(self._iterator)
         # Split for possible minibatches
-        train_batch_size = inputs.data.observations[self._agents[0]].observation.shape[
-            0
-        ]
+        batch_size = inputs.data.observations[self._agents[0]].observation.shape[0]
         dataset = tf.data.Dataset.from_tensor_slices(inputs.data)
-        dataset = dataset.shuffle(train_batch_size).batch(self._minibatch_size)
+        dataset = dataset.shuffle(batch_size).batch(self._minibatch_size)
         for _ in range(self._num_epochs):
             for minibatch_data in dataset:
                 loss = self._minibatch_update(minibatch_data)
@@ -350,7 +348,6 @@ class MAPPOTrainer(mava.Trainer):
         """
 
         # Convert to sequence data
-        # TODO(Kale-ab): Is this the recurrent trainer?
         data = tf2_utils.batch_to_sequence(inputs)
 
         # Unpack input data as follows:
