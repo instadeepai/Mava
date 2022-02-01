@@ -85,6 +85,7 @@ class MAPPO:
         eval_loop_fn_kwargs: Dict = {},
         evaluator_interval: Optional[dict] = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
+        normalize_advantage: bool = False,
     ):
         """Initialise the system
 
@@ -180,6 +181,7 @@ class MAPPO:
                 happen at every timestep.
                 E.g. to evaluate a system after every 100 executor episodes,
                 evaluator_interval = {"executor_episodes": 100}.
+            normalize_advantage: whether to normalize the advantage.
         """
         # minibatch size defaults to train batch size
         if minibatch_size:
@@ -258,6 +260,7 @@ class MAPPO:
                 checkpoint_minute_interval=checkpoint_minute_interval,
                 evaluator_interval=evaluator_interval,
                 learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+                normalize_advantage=normalize_advantage,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,

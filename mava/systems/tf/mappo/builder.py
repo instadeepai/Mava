@@ -97,6 +97,7 @@ class MAPPOConfig:
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     learning_rate_scheduler_fn: Optional[Any] = None
     evaluator_interval: Optional[dict] = None
+    normalize_advantage: bool = False
 
 
 class MAPPOBuilder:
@@ -329,6 +330,7 @@ class MAPPOBuilder:
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
             learning_rate_scheduler_fn=self._config.learning_rate_scheduler_fn,
+            normalize_advantage=self._config.normalize_advantage,
         )
 
         trainer = DetailedTrainerStatistics(  # type: ignore

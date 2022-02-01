@@ -24,7 +24,6 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
-import trfl
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
 
@@ -72,6 +71,8 @@ class MAPPOTrainer(mava.Trainer):
         checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava/",
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
+        normalize_advantage: bool = False,
+        value_clipping: bool = False,
     ):
         """Initialise MAPPO trainer
 
@@ -127,6 +128,8 @@ class MAPPOTrainer(mava.Trainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
+            normalize_advantage: whether to normalize the advantage.
+            value_clipping: whether to clip your value estimates.
         """
 
         # Store agents.
@@ -144,6 +147,8 @@ class MAPPOTrainer(mava.Trainer):
         self._critic_networks = critic_networks
 
         self.unique_net_keys = sort_str_num(policy_networks.keys())
+        self._value_clipping = value_clipping
+        self._normalize_advantage = normalize_advantage
 
         # Create optimizers for different agent types.
         if not isinstance(policy_optimizer, dict):
@@ -322,7 +327,6 @@ class MAPPOTrainer(mava.Trainer):
         # Log losses per agent
         return losses
 
-    @tf.function
     def forward_backward(self, inputs: Any) -> Dict[str, Dict[str, Any]]:
         """Do a single forward and backward pass
 
@@ -396,48 +400,55 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 policy = policy_network(actor_observation)
-                values = critic_network(critic_observation)
+                value_pred = critic_network(critic_observation)
 
                 # Compute importance sampling weights: current policy / behavior policy.
                 policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
+                value_pred = tf.reshape(value_pred, dims, name="value")
 
-                values = tf.reshape(values, dims, name="value")
-
-                # Values along the sequence T.
-                bootstrap_value = values[-1]
-                state_values = values[:-1]
-
-                # Chop off final timestep for bootstrapping value
-                behaviour_log_prob = behaviour_log_prob[:-1]
+                # Exclude the bootstrap value
+                bootstrap_value = value_pred[-1]
+                value_pred = value_pred[:-1]
                 reward = reward[:-1]
 
                 pcontinues = termination * self._discount
-                pcontinues = pcontinues[:-1]
-
-                # Generalized Return Estimation
-                discounted_returns = trfl.generalized_lambda_returns(
+                # Generalized Advantage Estimation
+                advantages = train_utils.generalized_advantage_estimation(
+                    values=value_pred,
+                    final_value=bootstrap_value,
                     rewards=reward,
-                    pcontinues=pcontinues,
-                    values=state_values,
-                    bootstrap_value=bootstrap_value,
-                    lambda_=self._lambda_gae,
+                    discounts=pcontinues[:-1],
+                    td_lambda=self._lambda_gae,
+                    time_major=True,
                 )
-                # Advantage - TD error provides an estimate of the
-                # advantages of the actions.
-                advantages = discounted_returns - state_values
-                critic_loss = tf.reduce_mean(tf.square(advantages), name="CriticLoss")
-                # TODO Implement optional critic loss clipping.
-                critic_loss = self._baseline_cost * critic_loss
+
+                if self._normalize_advantage:
+                    # Normalize at minibatch level
+                    advantages = train_utils._normalize_advantages(
+                        advantages, variance_epsilon=1e-8
+                    )
+
+                    advantages = tf.stop_gradient(advantages)
+
+                # td_lambda_returns
+                returns = advantages + value_pred
+                returns = tf.stop_gradient(returns)
+                unclipped_critic_loss = (
+                    tf.square(returns - value_pred) * termination[:-1]
+                )
+
+                if self._value_clipping:
+                    # TODO Clip values to reduce variablility
+                    raise NotImplementedError
+
+                else:
+                    critic_loss = tf.math.reduce_mean(unclipped_critic_loss)
+
+                critic_loss = critic_loss * self._baseline_cost
 
                 # Compute importance sampling weights: current policy / behavior policy.
-                log_rhos = policy.log_prob(action)[:-1] - behaviour_log_prob
+                log_rhos = policy.log_prob(action)[:-1] - behaviour_log_prob[:-1]
                 rhos = tf.exp(log_rhos)
-
-                # Generalized Advantage Estimation
-                advantages = tf.stop_gradient(advantages)
-                advantages = (advantages - tf.math.reduce_mean(advantages, axis=0)) / (
-                    tf.math.reduce_std(advantages, axis=0) + 1e-8
-                )
 
                 clipped_rhos = tf.clip_by_value(
                     rhos,
@@ -449,7 +460,7 @@ class MAPPOTrainer(mava.Trainer):
                 )
 
                 policy_gradient_loss = -tf.reduce_mean(
-                    clipped_objective,
+                    clipped_objective * termination[:-1],
                     name="PolicyGradientLoss",
                 )
 
