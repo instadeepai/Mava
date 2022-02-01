@@ -57,6 +57,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        use_single_optimizer:bool,
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -136,6 +137,7 @@ class MADDPGBaseTrainer(mava.Trainer):
 
         # Other learner parameters.
         self._discount = discount
+        self._use_single_optimizer = use_single_optimizer
 
         # Set up gradient clipping.
         if max_gradient_norm is not None:
@@ -451,16 +453,27 @@ class MADDPGBaseTrainer(mava.Trainer):
         for agent in self._trainer_agent_list:
             agent_key = self._agent_net_keys[agent]
 
+            if self._use_single_optimizer:
             # Get trainable variables.
-            policy_variables = (
-                self._observation_networks[agent_key].trainable_variables
-                + self._policy_networks[agent_key].trainable_variables
-            )
-            critic_variables = (
-                # In this agent, the critic loss trains the observation network.
-                self._observation_networks[agent_key].trainable_variables
-                + self._critic_networks[agent_key].trainable_variables
-            )
+                policy_variables = (
+                    self._observation_networks[agent_key].trainable_variables
+                    + self._policy_networks[agent_key].trainable_variables
+                    + self._critic_networks[agent_key].trainable_variables
+                )
+            else:
+                policy_variables = (
+                    self._observation_networks[agent_key].trainable_variables
+                    + self._policy_networks[agent_key].trainable_variables)
+
+                critic_variables = (
+                    # In this agent, the critic loss trains the observation network.
+                    self._observation_networks[agent_key].trainable_variables
+                    + self._critic_networks[agent_key].trainable_variables
+                )
+
+                critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
+                critic_gradients = tf.clip_by_global_norm(critic_gradients, self._max_gradient_norm)[0]
+                self._critic_optimizers[agent_key].apply(critic_gradients, critic_variables)
 
             # Compute gradients.
             # Note: Warning "WARNING:tensorflow:Calling GradientTape.gradient
@@ -468,19 +481,15 @@ class MADDPGBaseTrainer(mava.Trainer):
             #  than calling it outside the context." caused by losses.dpg, which calls
             #  tape.gradient.
             policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
-            critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
-
+            
             # Maybe clip gradients.
             policy_gradients = tf.clip_by_global_norm(
                 policy_gradients, self._max_gradient_norm
             )[0]
-            critic_gradients = tf.clip_by_global_norm(
-                critic_gradients, self._max_gradient_norm
-            )[0]
-
+            
             # Apply gradients.
             self._policy_optimizers[agent_key].apply(policy_gradients, policy_variables)
-            self._critic_optimizers[agent_key].apply(critic_gradients, critic_variables)
+            
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
@@ -556,6 +565,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
+        use_single_optimizer: bool,
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -588,6 +598,7 @@ class MADDPGDecentralisedTrainer(MADDPGBaseTrainer):
             agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
+            use_single_optimizer=use_single_optimizer,
             max_gradient_norm=max_gradient_norm,
             logger=logger,
             variable_client=variable_client,
@@ -609,6 +620,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
+        use_single_optimizer: bool,
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -641,6 +653,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
             agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
+            use_single_optimizer=use_single_optimizer,
             max_gradient_norm=max_gradient_norm,
             logger=logger,
             variable_client=variable_client,
@@ -702,6 +715,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
+        use_single_optimizer: bool,
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -734,6 +748,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
             agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
+            use_single_optimizer=use_single_optimizer,
             max_gradient_norm=max_gradient_norm,
             logger=logger,
             variable_client=variable_client,
@@ -812,6 +827,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: snt.Optimizer,
+        use_single_optimizer: bool,
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -844,6 +860,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
             agent_net_keys=agent_net_keys,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
+            use_single_optimizer=use_single_optimizer,
             max_gradient_norm=max_gradient_norm,
             logger=logger,
             variable_client=variable_client,
@@ -907,6 +924,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         target_critic_networks: Dict[str, snt.Module],
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        use_single_optimizer: bool,
         discount: float,
         target_averaging: bool,
         target_update_period: int,
@@ -988,6 +1006,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
         # Other learner parameters.
         self._discount = discount
+        self._use_single_optimizer=use_single_optimizer
 
         # Set up gradient clipping.
         if max_gradient_norm is not None:

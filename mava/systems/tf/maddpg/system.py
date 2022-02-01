@@ -91,6 +91,7 @@ class MADDPG:
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        use_single_optimizer: bool = False,
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
@@ -162,6 +163,10 @@ class MADDPG:
             policy_optimizer: optimizer(s) for updating policy networks.
             critic_optimizer: optimizer for updating critic
                 networks.
+            use_single_optimizer: boolean to decide whether or 
+                not to use a single optimizer for policy, critic 
+                and observation network. If using a single optimizer,
+                the policy optimizer is used.
             n_step: number of steps to include prior to boostrapping.
             sequence_length: recurrent sequence rollout length.
             period: Consecutive starting points for overlapping
@@ -345,6 +350,7 @@ class MADDPG:
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
         self._evaluator_interval = evaluator_interval
+        
 
         if connection_spec:
             self._connection_spec = connection_spec(  # type: ignore
@@ -382,6 +388,7 @@ class MADDPG:
                 min_replay_size=min_replay_size,
                 max_replay_size=max_replay_size,
                 samples_per_insert=samples_per_insert,
+                use_single_optimizer=use_single_optimizer,
                 n_step=n_step,
                 sequence_length=sequence_length,
                 period=period,
