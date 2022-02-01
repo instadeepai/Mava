@@ -595,6 +595,7 @@ class MADDPGBuilder:
             "agent_net_keys": trainer_agent_net_keys,
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
+            "use_single_optimizer": self._config.use_single_optimizer,
             "max_gradient_norm": max_gradient_norm,
             "discount": discount,
             "target_averaging": target_averaging,
