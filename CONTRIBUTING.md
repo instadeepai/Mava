@@ -29,7 +29,7 @@ pre-commit run --all-files
 
 ## Naming Conventions
 ### Branch Names
-We name our feature and bugfix branches as follows - `feature/[BRANCH-NAME]` or `bugfix/[BRANCH-NAME]`. Please ensure `[BRANCH-NAME]` is hyphen delimited.
+We name our feature and bugfix branches as follows - `feature/[BRANCH-NAME]`, `bugfix/[BRANCH-NAME]` or `maintenance/[BRANCH-NAME]`. Please ensure `[BRANCH-NAME]` is hyphen delimited.
 ### Commit Messages
 We follow the conventional commits [standard](https://www.conventionalcommits.org/en/v1.0.0/).
 
