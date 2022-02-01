@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """MADDPG system implementation."""
+
 from types import SimpleNamespace
 
 import reverb
