@@ -440,6 +440,10 @@ class MADDPGBaseTrainer(mava.Trainer):
                 )
 
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
+
+                if self._use_single_optimizer:
+                    self.policy_losses[agent] += self.critic_losses[agent]
+
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
@@ -1386,6 +1390,10 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                     clip_norm=clip_norm,
                 )
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
+
+                if self._use_single_optimizer:
+                    self.policy_losses[agent] += self.critic_losses[agent]
+                    
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
