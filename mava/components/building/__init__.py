@@ -21,7 +21,7 @@ from mava.components.building.adders import (
     ParallelSequenceAdder,
     ParallelSequenceAdderSignature,
 )
-from mava.components.building.datasets import Dataset
+from mava.components.building.datasets import AcmeDataset, ReverbDataset
 from mava.components.building.distributor import Distributor
 from mava.components.building.executors import Executor
 from mava.components.building.rate_limiters import OffPolicyRateLimiter
