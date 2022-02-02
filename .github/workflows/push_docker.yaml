@@ -106,6 +106,12 @@ jobs:
       -
         name: Checkout
         uses: actions/checkout@v2
+        with:
+          # Check out pull request's HEAD commit
+          # For more details, see:
+          # https://github.com/actions/checkout/issues/299.
+          ref: ${{ github.event.pull_request.head.sha }}
+
       -
         name: Set up QEMU
         uses: docker/setup-qemu-action@v1
@@ -115,7 +121,7 @@ jobs:
 
       - name: Set sha vars
         id: vars
-        run: echo "::set-output name=sha_short::$(github.event.pull_request.head.sha)"
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
 
       - name: Set docker repo vars
         id: vars2
