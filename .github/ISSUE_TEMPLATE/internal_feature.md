@@ -23,7 +23,6 @@ A precise outline for the feature to be considered fully implemented, i.e. done/
 * [ ] Documentation is updated - README, CONTRIBUTING, or other documentation.
 * [ ] All functional tests are green.
 * [ ] Link experiment/benchmarking after implementation (optional).
-* [ ] Squash and delete branch options are checked.
 
 <!-- Base checklist. Don’t hesitate to adapt it to your use-case. -->
 
