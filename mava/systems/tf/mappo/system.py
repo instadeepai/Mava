@@ -181,7 +181,8 @@ class MAPPO:
                 happen at every timestep.
                 E.g. to evaluate a system after every 100 executor episodes,
                 evaluator_interval = {"executor_episodes": 100}.
-            normalize_advantage: whether to normalize the advantage.
+            normalize_advantage: whether to normalize the advantage estimate. This can
+                hurt peformance when shared weights are used.
         """
         # minibatch size defaults to train batch size
         if minibatch_size:

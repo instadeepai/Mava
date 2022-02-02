@@ -129,7 +129,8 @@ class MAPPOTrainer(mava.Trainer):
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
             normalize_advantage: whether to normalize the advantage.
-            value_clipping: whether to clip your value estimates.
+            value_clipping: whether to clip the difference
+                between new and old value predictions. Currently not implemented.
         """
 
         # Store agents.
@@ -406,7 +407,7 @@ class MAPPOTrainer(mava.Trainer):
                 policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
                 value_pred = tf.reshape(value_pred, dims, name="value")
 
-                # Exclude the bootstrap value
+                # Exclude last step - it was used in bootstraping.
                 bootstrap_value = value_pred[-1]
                 value_pred = value_pred[:-1]
                 reward = reward[:-1]
@@ -439,8 +440,9 @@ class MAPPOTrainer(mava.Trainer):
 
                 if self._value_clipping:
                     # TODO Clip values to reduce variablility
+                    # Need to keep track of old value estimates (either in replay or in
+                    # training state) and clip them.
                     raise NotImplementedError
-
                 else:
                     critic_loss = tf.math.reduce_mean(unclipped_critic_loss)
 
@@ -620,7 +622,7 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         use_single_optimizer: bool,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
-        minibatch_size: int = 128,
+        minibatch_size: Optional[int] = None,
         num_epochs: int = 5,
         discount: float = 0.99,
         lambda_gae: float = 1.0,
@@ -633,7 +635,52 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         checkpoint: bool = False,
         checkpoint_subpath: str = "~/mava",
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
+        normalize_advantage: bool = False,
+        value_clipping: bool = False,
     ):
+        """Centralised MAPPO trainer.
+
+        Args:
+            agents :  agent ids, e.g. "agent_0".
+            agent_types :  agent types, e.g. "speaker" or "listener".
+            observation_networks : observation networks for each agent in the system.
+            policy_networks : policy networks for each agent in the system.
+            critic_networks : critic network(s), shared or for each agent in the system.
+            dataset : training dataset.
+            policy_optimizer : optimizer for updating policy networks.
+            critic_optimizer : optimizer for updating critic networks.
+            use_single_optimizer : [description]
+            agent_net_keys : specifies what network each agent uses.
+            checkpoint_minute_interval : The number of minutes to wait between
+                checkpoints.
+            minibatch_size : size of minibatch that is sampled from
+                the training batch. Minibatches are used for each gradient step.
+            num_epochs : number of epochs for every training step.
+            discount :  discount factor for TD updates.
+            lambda_gae : scalar determining the mix of bootstrapping
+                vs further accumulation of multi-step returns at each timestep.
+            entropy_cost : contribution of entropy regularization to
+                the total loss. Defaults to 0.0.
+            baseline_cost : contribution of the value loss to the
+                total loss. Defaults to 1.0.
+            clipping_epsilon : Hyper-parameter for clipping in the
+                policy objective. Defaults to 0.2.
+            max_gradient_norm : maximum allowed norm for gradients
+                before clipping is applied. Defaults to None.
+            counter : step counter object. Defaults to None.
+            logger : logger object for logging trainer
+                statistics. Defaults to None.
+            checkpoint : whether to checkpoint networks. Defaults to
+                True.
+            checkpoint_subpath : subdirectory for storing checkpoints.
+                Defaults to "~/mava/".
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
+            normalize_advantage: whether to normalize the advantage.
+            value_clipping: whether to clip the difference
+                between new and old value predictions. Currently not implemented.
+        """
 
         super().__init__(
             agents=agents,
@@ -660,6 +707,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+            normalize_advantage=normalize_advantage,
+            value_clipping=value_clipping,
         )
 
     def _get_critic_feed(
