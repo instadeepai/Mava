@@ -15,7 +15,6 @@
 
 
 """MADQN trainer implementation."""
-
 import copy
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -40,7 +39,7 @@ train_utils.set_growing_gpu_memory()
 class MADQNTrainer(mava.Trainer):
     """MADQN trainer.
 
-    This is the trainer component of a MADDPG system. IE it takes a dataset as input
+    This is the trainer component of a MADQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
 
@@ -210,7 +209,9 @@ class MADQNTrainer(mava.Trainer):
     def _transform_observations(
         self, obs: Dict[str, mava_types.OLT], next_obs: Dict[str, mava_types.OLT]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        """Transform the observations using the observation networks of each agent."
+        """Transform the observations using the observation networks of each agent.
+
+        We assume the observation network is non-recurrent.
 
         Args:
             obs: observations at timestep t-1
@@ -238,7 +239,7 @@ class MADQNTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-        """Trainer forward and backward passes.
+        """Trainer step.
 
         Returns:
             losses
@@ -247,8 +248,10 @@ class MADQNTrainer(mava.Trainer):
         # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
 
+        # Compute loss
         self._forward(sample)
 
+        # Compute and apply gradients
         self._backward()
 
         # Update the target networks
@@ -257,7 +260,6 @@ class MADQNTrainer(mava.Trainer):
         # Log losses per agent
         return train_utils.map_losses_per_agent_value(self.value_losses)
 
-    # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass.
 
@@ -322,7 +324,6 @@ class MADQNTrainer(mava.Trainer):
 
         self.tape = tape
 
-    # Backward pass that calculates gradients and updates network.
     def _backward(self) -> None:
         """Trainer backward pass updating network parameters"""
 
@@ -528,6 +529,8 @@ class MADQNRecurrentTrainer(mava.Trainer):
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
         """Apply the observation networks to the raw observations from the dataset
 
+        We assume that the observation network is non-recurrent.
+
         Args:
             observations: raw agent observations
 
@@ -600,7 +603,7 @@ class MADQNRecurrentTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-        """Trainer forward and backward passes.
+        """Trainer step.
 
         Returns:
             losses
@@ -609,8 +612,10 @@ class MADQNRecurrentTrainer(mava.Trainer):
         # Draw a batch of data from replay.
         sample: reverb.ReplaySample = next(self._iterator)
 
+        # Compute loss
         self._forward(sample)
 
+        # Compute and apply gradients
         self._backward()
 
         # Update the target networks
@@ -719,7 +724,6 @@ class MADQNRecurrentTrainer(mava.Trainer):
 
         self.tape = tape
 
-    # Backward pass that calculates gradients and updates network.
     def _backward(self) -> None:
         """Trainer backward pass updating network parameters"""
 

@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """MADQN system implementation."""
-
 import functools
 from typing import Any, Callable, Dict, List, Mapping, Optional, Type, Union
 
@@ -104,7 +103,7 @@ class MADQN:
         evaluator_interval: Optional[dict] = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Initialise the system
+        """Initialise the system.
 
         Args:
             environment_factory: function to
@@ -187,13 +186,8 @@ class MADQN:
                 happen at every timestep.
                 E.g. to evaluate a system after every 100 executor episodes,
                 evaluator_interval = {"executor_episodes": 100}.
-            learning_rate_scheduler_fn: dict with two functions/classes (one for the
-                policy and one for the critic optimizer), that takes in a trainer
-                step t and returns the current learning rate,
-                e.g. {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
-                See
-                examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
-                for an example.
+            learning_rate_scheduler_fn: an optional learning rate scheduler for 
+                the value function optimiser.
         """
 
         if not environment_spec:
@@ -413,7 +407,7 @@ class MADQN:
         )
 
     def _get_extra_specs(self) -> Any:
-        """Helper to establish specs for extra information
+        """Helper to establish specs for extra information.
 
         Returns:
             Dictionary containing extra specs
@@ -435,7 +429,7 @@ class MADQN:
         return {"core_states": core_state_specs, "zero_padding_mask": np.array(1)}
 
     def replay(self) -> Any:
-        """Step counter
+        """Step counter.
 
         Args:
             checkpoint: whether to checkpoint the counter.
@@ -590,7 +584,7 @@ class MADQN:
         replay: reverb.Client,
         variable_source: MavaVariableSource,
     ) -> mava.core.Trainer:
-        """System trainer
+        """System trainer.
 
         Args:
             trainer_id: Id of the trainer being created.

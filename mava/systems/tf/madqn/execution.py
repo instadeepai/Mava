@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """MADQN system executor implementation."""
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -23,8 +24,6 @@ import tensorflow_probability as tfp
 import tree
 from acme import types
 from acme.specs import EnvironmentSpec
-
-# Internal imports.
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 from dm_env import specs
@@ -102,9 +101,10 @@ class DQNExecutor:
 
 
 class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
-    """A feed-forward executor for discrete actions.
+    """A feed-forward executor for MADQN like systems.
 
-    An executor based on a feed-forward policy for each agent in the system.
+    An executor based on a feed-forward epsilon-greedy policy for 
+    each agent in the system.
     """
 
     def __init__(
@@ -166,15 +166,13 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
         observation: types.NestedTensor,
         legal_actions: types.NestedTensor,
     ) -> types.NestedTensor:
-        """Agent specific policy function
+        """Epsilon greedy policy.
 
         Args:
             agent: agent id
             observation: observation tensor received from the
                 environment.
-
-        Raises:
-            NotImplementedError: unknown action space
+            legal_actions: one-hot vector of legal actions.
 
         Returns:
             types.NestedTensor: agent action
@@ -202,6 +200,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
     def _select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> types.NestedArray:
+        """The part of select_actions we can do in tf.function"""
         actions = {}
         for agent, observation in observations.items():
             actions[agent] = self._policy(
@@ -287,9 +286,10 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
 
 
 class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
-    """A recurrent executor for MADQN.
+    """A recurrent executor for MADQN like systems.
 
-    An executor based on a recurrent policy for each agent in the system.
+    An executor based on a recurrent epsilon-greedy policy 
+    for each agent in the system.
     """
 
     def __init__(
@@ -359,16 +359,14 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         legal_actions: types.NestedTensor,
         state: types.NestedTensor,
     ) -> Tuple:
-        """Agent specific policy function.
+        """Agent epsilon-greedy policy.
 
         Args:
             agent: agent id
             observation: observation tensor received from the
                 environment.
+            legal_actions: one-hot vector of legal actions
             state: recurrent network state.
-
-        Raises:
-            NotImplementedError: unknown action space
 
         Returns:
             action, policy and new recurrent hidden state
@@ -397,6 +395,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
         self, observations: Dict[str, types.NestedArray], 
         states: Dict[str, types.NestedArray]
     ) -> types.NestedArray:
+        """The part of select_action that we can do inside tf.function"""
         actions: Dict = {}
         new_states: Dict = {}
         for agent, observation in observations.items():
