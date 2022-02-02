@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+"""Example running VDN on SMAC"""
 
 import functools
 from datetime import datetime
@@ -33,7 +33,7 @@ from mava.utils.loggers import logger_utils
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
     "map_name",
-    "1c3s5z",
+    "3m",
     "Starcraft 2 micromanagement map name (str).",
 )
 
@@ -47,8 +47,9 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
-    # environment
+    """Example running recurrent VDN on SMAC environment."""
+
+    # Environment
     environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
 
     # Networks.
@@ -70,7 +71,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
+    # Distributed program
     program = value_decomposition.ValueDecomposition(
         environment_factory=environment_factory,
         network_factory=network_factory,
@@ -87,17 +88,19 @@ def main(_: Any) -> None:
         batch_size=32,
         max_gradient_norm=20.0,
         min_replay_size=32,
-        max_replay_size=10000,
-        samples_per_insert=16,
-        sequence_length=200,
-        period=200,
+        max_replay_size=5000,
+        samples_per_insert=4,
+        sequence_length=20,
+        period=10,
         evaluator_interval={"executor_episodes": 2},
     ).build()
 
-    # launch
+    # Only the trainer should use the GPU (if available)
     local_resources = lp_utils.to_device(
         program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )
+
+    # Launch
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,

@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """Example running MADQN on SMAC with multiple trainers."""
+
 import functools
 from datetime import datetime
 from typing import Any
@@ -47,7 +46,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Main function."""
+    """Run MADQN on SMAC with multiple trainers."""
 
     # Environment.
     environment_factory = functools.partial(
@@ -74,7 +73,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
+    # Distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
@@ -83,7 +82,7 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationScheduler(
             epsilon_start=1.0,
             epsilon_min=0.05,
-            epsilon_decay=4e-5,
+            epsilon_decay=5e-6,
         ),
         shared_weights=False,
         trainer_networks=enums.Trainer.one_trainer_per_network,
@@ -93,12 +92,12 @@ def main(_: Any) -> None:
         max_replay_size=5000,
         min_replay_size=32,
         batch_size=32,
+        samples_per_insert=4,
         evaluator_interval={"executor_episodes": 2},
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
-    # Ensure only trainer runs on gpu, while other processes run on cpu.
+    # Only the trainer should use the GPU (if available)
     local_resources = lp_utils.to_device(
         program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )

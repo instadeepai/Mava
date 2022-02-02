@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Example running VDN on Flatland."""
 
 import functools
 from datetime import datetime
@@ -29,7 +30,6 @@ from mava.utils import lp_utils
 from mava.utils.environments.flatland_utils import make_environment
 from mava.utils.loggers import logger_utils
 
-"""Example running VDN on Flatland."""
 
 FLAGS = flags.FLAGS
 
@@ -98,15 +98,17 @@ def main(_: Any) -> None:
         batch_size=32,
         max_gradient_norm=20.0,
         min_replay_size=32,
-        max_replay_size=10000,
-        samples_per_insert=16,
+        max_replay_size=5000,
+        samples_per_insert=4,
         evaluator_interval={"executor_episodes": 2},
     ).build()
 
-    # launch
+    # Ensure only trainer runs on gpu, while other processes run on cpu.
     local_resources = lp_utils.to_device(
         program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )
+
+    # Launch
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,

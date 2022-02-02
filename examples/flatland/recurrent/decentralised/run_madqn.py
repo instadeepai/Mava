@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+"""Example running recurrent MADQN on Flatland."""
 
 import functools
 from datetime import datetime
@@ -59,7 +59,7 @@ env_config: Dict = {
 
 
 def main(_: Any) -> None:
-    """Run example"""
+    """Run example."""
 
     # Environment.
     environment_factory = functools.partial(make_environment, **env_config)
@@ -83,7 +83,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
+    # Distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
@@ -92,12 +92,11 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationScheduler(
             epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
         ),
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         batch_size=32,
-        samples_per_insert=16,
+        samples_per_insert=4,
         max_gradient_norm=20.0,
         min_replay_size=32,
-        max_replay_size=10000,
+        max_replay_size=5000,
         trainer_fn=madqn.MADQNRecurrentTrainer,
         executor_fn=madqn.MADQNRecurrentExecutor,
         checkpoint_subpath=checkpoint_dir,
