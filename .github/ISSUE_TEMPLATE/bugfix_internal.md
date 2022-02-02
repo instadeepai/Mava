@@ -20,7 +20,7 @@ Steps to reproduce the behavior:
 ### Expected behavior
 A clear and concise description of what you expected to happen.
 
-## Context (Environment)
+### Context (Environment)
  - Mava (and other package versions): result of `pip freeze > requirements.txt`
  - OS
 
