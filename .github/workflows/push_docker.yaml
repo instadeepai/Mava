@@ -115,7 +115,7 @@ jobs:
 
       - name: Set sha vars
         id: vars
-        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+        run: echo "::set-output name=sha_short::$(github.event.pull_request.head.sha)"
 
       - name: Set docker repo vars
         id: vars2
