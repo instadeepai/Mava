@@ -10,9 +10,11 @@ class BaseMixer(snt.Module):
     """
 
     def __init__(self) -> None:
+        """Initialise base mixer."""
         super().__init__()
 
     def __call__(self, agent_qs: tf.Tensor, states: tf.Tensor) -> tf.Tensor:
+        """Call method."""
         return agent_qs
 
 
@@ -20,18 +22,12 @@ class VDN(BaseMixer):
     """VDN mixing network."""
 
     def __init__(self) -> None:
+        """Initialise VDN mixer."""
         super().__init__()
 
     def __call__(self, agent_qs: tf.Tensor, states: tf.Tensor) -> tf.Tensor:
+        """Call method."""
         return tf.reduce_sum(agent_qs, axis=-1, keepdims=True)
-
-    """Initialize VDN class
-    Args:
-        agent_qs: Tensor containing the q-values of actions chosen by agents
-        states: Tensor containing global environment state.
-    Returns:
-        Tensor with total q-value.
-    """
 
 
 class QMIX(BaseMixer):
@@ -45,8 +41,9 @@ class QMIX(BaseMixer):
         Args:
             num_agents: Number of agents in the enviroment
             state_dim: Dimensions of the global environment state
-            embed_dim: TODO (Ruan): Cluade please add
-            hypernet_embed: TODO (Ruan): Claude Please add
+            embed_dim: The dimension of the output of the first layer
+                of the mixer.
+            hypernet_embed: Number of units in the hyper network
         """
 
         super().__init__()
@@ -73,6 +70,7 @@ class QMIX(BaseMixer):
         self.V = snt.Sequential([snt.Linear(self.embed_dim), tf.nn.relu, snt.Linear(1)])
 
     def __call__(self, agent_qs: tf.Tensor, states: tf.Tensor) -> tf.Tensor:
+        """Call method."""
         bs = agent_qs.shape[1]
         state_dim = states.shape[-1]
 
