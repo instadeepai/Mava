@@ -23,8 +23,11 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-from mava.utils.environments import flatland_utils
-from mava.wrappers.flatland import FlatlandEnvWrapper
+try:
+    from mava.utils.environments import flatland_utils
+    from mava.wrappers.flatland import FlatlandEnvWrapper
+except ModuleNotFoundError:
+    pass
 
 try:
     from pettingzoo.utils.env import AECEnv, ParallelEnv
