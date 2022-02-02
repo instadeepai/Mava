@@ -469,10 +469,11 @@ class MAPPOTrainer(mava.Trainer):
                 # Entropy regularization. Only implemented for categorical dist.
                 try:
                     policy_entropy = policy.entropy() * termination
+                    entropy_loss = -tf.reduce_mean(policy_entropy)
                 except NotImplementedError:
-                    policy_entropy = tf.convert_to_tensor(0.0)
+                    entropy_loss = tf.convert_to_tensor(0.0)
 
-                entropy_loss = self._entropy_cost * -tf.reduce_mean(policy_entropy)
+                entropy_loss = self._entropy_cost * entropy_loss
 
                 # Combine weighted sum of actor & entropy regularization.
                 policy_loss = policy_gradient_loss + entropy_loss
@@ -505,12 +506,13 @@ class MAPPOTrainer(mava.Trainer):
                 policy_variables = (
                     self._policy_networks[agent_key].trainable_variables
                     + self._critic_networks[agent_key].trainable_variables
+                    + self._observation_networks[agent_key].trainable_variables
                 )
             else:
                 policy_variables = self._policy_networks[agent_key].trainable_variables
                 critic_variables = (
-                    self._observation_networks[agent_key].trainable_variables,
-                    self._critic_networks[agent_key].trainable_variables,
+                    self._critic_networks[agent_key].trainable_variables
+                    + self._observation_networks[agent_key].trainable_variables
                 )
                 # Get gradients.
                 critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
@@ -649,7 +651,12 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             dataset : training dataset.
             policy_optimizer : optimizer for updating policy networks.
             critic_optimizer : optimizer for updating critic networks.
-            use_single_optimizer : [description]
+            use_single_optimizer : boolean to decide
+                whether or not the critic, policy and observation networks are
+                optimized jointly by a single optimizer. If true, all networks
+                are optimized by the policy_optimizer. If False, the observation and
+                policy network are optimized by the policy optimizer and the
+                critic network by the critic optimizer.
             agent_net_keys : specifies what network each agent uses.
             checkpoint_minute_interval : The number of minutes to wait between
                 checkpoints.
