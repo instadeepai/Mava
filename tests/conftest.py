@@ -23,13 +23,9 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 
-try:
-    from mava.utils.environments import flatland_utils
-    from mava.wrappers.flatland import FlatlandEnvWrapper
+from mava.utils.environments import flatland_utils
+from mava.wrappers.flatland import FlatlandEnvWrapper
 
-    _has_flatland = True
-except ModuleNotFoundError:
-    _has_flatland = False
 try:
     from pettingzoo.utils.env import AECEnv, ParallelEnv
 except ModuleNotFoundError:
@@ -57,22 +53,21 @@ from tests.mocks import (
     SequentialMADiscreteEnvironment,
 )
 
-if _has_flatland:
-    # flatland environment config
-    flatland_env_config = {
-        "n_agents": 3,
-        "x_dim": 30,
-        "y_dim": 30,
-        "n_cities": 2,
-        "max_rails_between_cities": 2,
-        "max_rails_in_city": 3,
-        "seed": 0,
-        "malfunction_rate": 1 / 200,
-        "malfunction_min_duration": 20,
-        "malfunction_max_duration": 50,
-        "observation_max_path_depth": 30,
-        "observation_tree_depth": 2,
-    }
+# flatland environment config
+flatland_env_config = {
+    "n_agents": 3,
+    "x_dim": 30,
+    "y_dim": 30,
+    "n_cities": 2,
+    "max_rails_between_cities": 2,
+    "max_rails_in_city": 3,
+    "seed": 0,
+    "malfunction_rate": 1 / 200,
+    "malfunction_min_duration": 20,
+    "malfunction_max_duration": 50,
+    "observation_max_path_depth": 30,
+    "observation_tree_depth": 2,
+}
 
 """
 Helpers contains re-usable test functions.
