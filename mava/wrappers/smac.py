@@ -171,6 +171,7 @@ class SMACWrapper(ParallelEnvWrapper):
         return rewards
 
     def _get_legal_actions(self) -> List:
+        """Get legal actions from the environment."""
         legal_actions = []
         for i, _ in enumerate(self._agents):
             legal_actions.append(
@@ -181,7 +182,7 @@ class SMACWrapper(ParallelEnvWrapper):
     def _convert_observations(
         self, observations: List, legal_actions: List, done: bool
     ) -> types.Observation:
-        """Convert PettingZoo observation so it's dm_env compatible.
+        """Convert SMAC observation so it's dm_env compatible.
 
         Args:
             observes (Dict[str, np.ndarray]): observations per agent.
@@ -319,8 +320,3 @@ class SMACWrapper(ParallelEnvWrapper):
             return self.__getattribute__(name)
         else:
             return getattr(self._environment, name)
-
-
-env = StarCraft2Env(map_name="3m")
-
-wrapped_env = SMACWrapper(env)

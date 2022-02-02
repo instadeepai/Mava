@@ -375,6 +375,7 @@ class ConcatAgentIdToObservation:
         self._num_agents = len(environment.possible_agents)
 
     def reset(self) -> dm_env.TimeStep:
+        """Reset environment and concat agent ID."""
         timestep, extras = self._environment.reset()
         old_observations = timestep.observation
 
@@ -401,6 +402,7 @@ class ConcatAgentIdToObservation:
         )
 
     def step(self, actions: Dict) -> dm_env.TimeStep:
+        """Step the environment and concat agent ID"""
         timestep, extras = self._environment.step(actions)
 
         old_observations = timestep.observation
@@ -458,12 +460,11 @@ class ConcatPrevActionToObservation:
     TODO (Claude) support continuous actions.
     """
 
-    # Need to get the size of the action space of each agent
-
     def __init__(self, environment: Any):
         self._environment = environment
 
     def reset(self) -> dm_env.TimeStep:
+        """Reset the environment and add zero action."""
         timestep, extras = self._environment.reset()
         old_observations = timestep.observation
         action_spec = self._environment.action_spec()
@@ -490,6 +491,7 @@ class ConcatPrevActionToObservation:
         )
 
     def step(self, actions: Dict) -> dm_env.TimeStep:
+        """Step the environment and concat prev actions."""
         timestep, extras = self._environment.step(actions)
         old_observations = timestep.observation
         action_spec = self._environment.action_spec()
