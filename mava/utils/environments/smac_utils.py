@@ -16,7 +16,12 @@
 """Utils for SMAC environment."""
 from typing import Any, Optional
 
-from smac.env import StarCraft2Env
+try:
+    from smac.env import StarCraft2Env
+
+    _found_smac = True
+except ModuleNotFoundError:
+    _found_smac = False
 
 from mava.wrappers import SMACWrapper
 from mava.wrappers.env_preprocess_wrappers import (
@@ -24,22 +29,23 @@ from mava.wrappers.env_preprocess_wrappers import (
     ConcatPrevActionToObservation,
 )
 
+if _found_smac:
 
-def make_environment(
-    map_name: str = "3m",
-    concat_prev_actions: bool = True,
-    concat_agent_id: bool = True,
-    evaluation: bool = False,
-    random_seed: Optional[int] = None,
-) -> Any:
-    env = StarCraft2Env(map_name=map_name, seed=random_seed)
+    def make_environment(
+        map_name: str = "3m",
+        concat_prev_actions: bool = True,
+        concat_agent_id: bool = True,
+        evaluation: bool = False,
+        random_seed: Optional[int] = None,
+    ) -> Any:
+        env = StarCraft2Env(map_name=map_name, seed=random_seed)
 
-    env = SMACWrapper(env)
+        env = SMACWrapper(env)
 
-    if concat_prev_actions:
-        env = ConcatPrevActionToObservation(env)
+        if concat_prev_actions:
+            env = ConcatPrevActionToObservation(env)
 
-    if concat_agent_id:
-        env = ConcatAgentIdToObservation(env)
+        if concat_agent_id:
+            env = ConcatAgentIdToObservation(env)
 
-    return env
+        return env
