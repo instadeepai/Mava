@@ -12,8 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Value Decomposition system implementation."""
 
+"""Value Decomposition system implementation."""
 from typing import Callable, Dict, Mapping, Optional, Type, Union
 
 import dm_env
@@ -38,7 +38,11 @@ from mava.utils.loggers import MavaLogger
 
 
 class ValueDecomposition(MADQN):
-    """Value Decomposition systems."""
+    """Value Decomposition systems.
+    
+    
+    Inherits from recurrent MADQN.
+    """
 
     def __init__(
         self,
@@ -208,6 +212,9 @@ class ValueDecomposition(MADQN):
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
+        # NOTE Users can either pass in their own mixer or 
+        # use one of the pre-built ones by passing in a 
+        # string "qmix" or "vdn".
         if isinstance(mixer, str):
             if mixer == "qmix":
                 env = environment_factory()  # type: ignore
@@ -264,6 +271,7 @@ class ValueDecomposition(MADQN):
             variable_source=variable_source,
         )
 
+        # Setup the mixer
         trainer.setup_mixer(self._mixer, self._mixer_optimizer)  # type: ignore
 
         return trainer

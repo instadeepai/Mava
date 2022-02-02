@@ -12,8 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Value Decomposition trainer implementation."""
 
+"""Value Decomposition trainer implementation."""
 import copy
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -130,7 +130,7 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
         self._mixer_optimizer = mixer_optimizer
 
     def _update_target_networks(self) -> None:
-        """Update the target networks.
+        """Update the target networks and the target mixer.
 
         Using either target averaging or
         by directy copying the weights of the online networks every few steps.
@@ -170,7 +170,6 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
 
         self._num_steps.assign_add(1)
 
-    # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass.
 
@@ -208,8 +207,7 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            # NOTE (Dries): We are assuming that only the value network
-            # is recurrent and not the observation network.
+            
             obs_trans, target_obs_trans = self._transform_observations(observations)
 
             # Lists for stacking tensors later
@@ -230,6 +228,7 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
                 chosen_action_q_value = trfl.batched_index(q_tm1_values, actions[agent])
 
                 # Q-value of the next state
+                # Legal action masking
                 q_t_selector = tf.where(
                     tf.cast(observations[agent].legal_actions, "bool"),
                     q_tm1_values,
@@ -269,12 +268,13 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
                     max_action_q_value_all_agents, states=global_env_state
                 )
 
-            # NOTE Team reward is just the mean over agents indevidual rewards
+            # NOTE Weassume team reward is just the mean 
+            # over agents indevidual rewards
             reward_all_agents = tf.reduce_mean(
                 reward_all_agents, axis=-1, keepdims=True
             )
             # NOTE We assume all agents have the same env discount since
-            # it is a team game
+            # it is a team game. 
             env_discount_all_agents = tf.reduce_mean(
                 env_discount_all_agents, axis=-1, keepdims=True
             )
@@ -307,7 +307,6 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
 
         self.tape = tape
 
-    # Backward pass that calculates gradients and updates network.
     def _backward(self) -> None:
         """Trainer backward pass updating network parameters"""
 

@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+"""Default networks for Value Decomposition systems"""
 from typing import Dict, Mapping, Optional, Sequence, Union
 
 import sonnet as snt
