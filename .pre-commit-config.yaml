@@ -71,6 +71,7 @@ repos:
     rev: 6.1.1
     hooks:
     -   id: pydocstyle
+        files: ^mava/
         name: Checking docstring style.
         args: ["--convention=google","--add-ignore=D100,D202,D101,D415"]
 

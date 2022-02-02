@@ -85,7 +85,7 @@ def main(_: Any) -> None:
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
-        num_epochs=10,
+        num_epochs=5,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
