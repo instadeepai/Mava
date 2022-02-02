@@ -103,7 +103,7 @@ class DQNExecutor:
 class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
     """A feed-forward executor for MADQN like systems.
 
-    An executor based on a feed-forward epsilon-greedy policy for 
+    An executor based on a feed-forward epsilon-greedy policy for
     each agent in the system.
     """
 
@@ -288,7 +288,7 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
 class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
     """A recurrent executor for MADQN like systems.
 
-    An executor based on a recurrent epsilon-greedy policy 
+    An executor based on a recurrent epsilon-greedy policy
     for each agent in the system.
     """
 
@@ -392,8 +392,9 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
 
     @tf.function
     def _select_actions(
-        self, observations: Dict[str, types.NestedArray], 
-        states: Dict[str, types.NestedArray]
+        self,
+        observations: Dict[str, types.NestedArray],
+        states: Dict[str, types.NestedArray],
     ) -> types.NestedArray:
         """The part of select_action that we can do inside tf.function"""
         actions: Dict = {}

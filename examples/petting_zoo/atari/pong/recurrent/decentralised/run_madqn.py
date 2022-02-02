@@ -19,7 +19,6 @@ from datetime import datetime
 from typing import Any
 
 import launchpad as lp
-import sonnet as snt
 from absl import app, flags
 
 from mava.components.tf.modules.exploration import LinearExplorationScheduler
@@ -49,6 +48,7 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
+    """Run example."""
 
     # Environment
     environment_factory = functools.partial(

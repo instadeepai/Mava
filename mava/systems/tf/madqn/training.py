@@ -559,7 +559,7 @@ class MADQNRecurrentTrainer(mava.Trainer):
                 dims,
             )
 
-            # This stop_gradient prevents gradients to propagate into 
+            # This stop_gradient prevents gradients to propagate into
             # the target observation network.
             obs_target_trans[agent] = tree.map_structure(
                 tf.stop_gradient, obs_target_trans[agent]

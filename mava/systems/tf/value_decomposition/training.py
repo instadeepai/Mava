@@ -207,7 +207,7 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
 
         # Do forward passes through the networks and calculate the losses
         with tf.GradientTape(persistent=True) as tape:
-            
+
             obs_trans, target_obs_trans = self._transform_observations(observations)
 
             # Lists for stacking tensors later
@@ -268,13 +268,13 @@ class ValueDecompositionRecurrentTrainer(MADQNRecurrentTrainer):
                     max_action_q_value_all_agents, states=global_env_state
                 )
 
-            # NOTE Weassume team reward is just the mean 
+            # NOTE Weassume team reward is just the mean
             # over agents indevidual rewards
             reward_all_agents = tf.reduce_mean(
                 reward_all_agents, axis=-1, keepdims=True
             )
             # NOTE We assume all agents have the same env discount since
-            # it is a team game. 
+            # it is a team game.
             env_discount_all_agents = tf.reduce_mean(
                 env_discount_all_agents, axis=-1, keepdims=True
             )

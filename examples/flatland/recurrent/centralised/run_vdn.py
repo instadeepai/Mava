@@ -30,7 +30,6 @@ from mava.utils import lp_utils
 from mava.utils.environments.flatland_utils import make_environment
 from mava.utils.loggers import logger_utils
 
-
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
@@ -58,6 +57,7 @@ env_config: Dict = {
 
 
 def main(_: Any) -> None:
+    """Run example."""
 
     # Environment.
     environment_factory = functools.partial(make_environment, **env_config)

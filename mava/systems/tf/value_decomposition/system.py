@@ -39,8 +39,7 @@ from mava.utils.loggers import MavaLogger
 
 class ValueDecomposition(MADQN):
     """Value Decomposition systems.
-    
-    
+
     Inherits from recurrent MADQN.
     """
 
@@ -212,8 +211,8 @@ class ValueDecomposition(MADQN):
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
         )
 
-        # NOTE Users can either pass in their own mixer or 
-        # use one of the pre-built ones by passing in a 
+        # NOTE Users can either pass in their own mixer or
+        # use one of the pre-built ones by passing in a
         # string "qmix" or "vdn".
         if isinstance(mixer, str):
             if mixer == "qmix":

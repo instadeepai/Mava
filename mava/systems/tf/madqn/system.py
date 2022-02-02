@@ -186,7 +186,7 @@ class MADQN:
                 happen at every timestep.
                 E.g. to evaluate a system after every 100 executor episodes,
                 evaluator_interval = {"executor_episodes": 100}.
-            learning_rate_scheduler_fn: an optional learning rate scheduler for 
+            learning_rate_scheduler_fn: an optional learning rate scheduler for
                 the value function optimiser.
         """
 
