@@ -9,7 +9,7 @@
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/instadeepai/Mava/blob/main/LICENSE)
 [![docs][rtd-badge]][documentation]
 
-Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability. “Mava” means experience, or wisdom, in Xhosa one of South Africa’s eleven official languages.
+Mava is a library for building multi-agent reinforcement learning (MARL) systems. Mava provides useful components, abstractions, utilities and tools for MARL and allows for simple scaling for multi-process system training and execution while providing a high level of flexibility and composability. “Mava” means experience, or wisdom, in Xhosa - one of South Africa’s eleven official languages.
 
 To read more about the motivation behind Mava, please see our [blog post][blog], [release][release], [documentation] and/or [technical report][Paper].
 
