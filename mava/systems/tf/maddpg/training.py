@@ -1202,9 +1202,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             actions[agent] = tf2_utils.batch_to_sequence(outputs)
         return actions
 
-    # @tf.function
-    print("Add this back in!")
-
+    @tf.function
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -1367,11 +1365,17 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                     clip_norm=clip_norm,
                 )
                 # Multiply by discounts to not train on padded data.
-                loss_mask = tf.reshape(agent_discount, policy_loss.shape) > 0.0
+                policy_mask = tf.reshape(agent_discount, policy_loss.shape) > 0.0
+                critic_mask = (
+                    tf.reshape(
+                        agent_discount[:, self._bootstrap_n :], critic_loss.shape
+                    )
+                    > 0.0
+                )
                 # TODO (dries): Is multiplication maybe better here? As assignment
                 # might not work with tf.function?
-                policy_loss = policy_loss[loss_mask]
-                # critic_loss = critic_loss[loss_mask] # Not masked because
+                policy_loss = policy_loss[policy_mask]
+                critic_loss = critic_loss[critic_mask]  # Not masked because
                 # recurrent loss still needs to be fixed.
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss)
                 self.critic_losses[agent] = tf.reduce_mean(critic_loss)
