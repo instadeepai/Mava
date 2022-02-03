@@ -13,13 +13,12 @@ Mava is a library for building multi-agent reinforcement learning (MARL) systems
 
 To read more about the motivation behind Mava, please see our [blog post][blog], [release][release], [documentation] and/or [technical report][Paper].
 
-> 👷‍♀️ **NOTICE**: We consider this release a **Beta version of Mava**. As with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
-> From incorporating the latest research and innovations to making the framework more stable, robust and well tested.
-> Furthermore, we are committed and will do our best to keep everything working and have the experience of using Mava be as pleasant as possible.
-> During Beta development breaking changes may occur as well as significant design changes (if we feel it could greatly improve the useability of the framework) but these will be clearly communicated before being incorporated into the codebase.
-> It is also inevitable that there might be bugs we are not aware of and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
+<hr>
 
-**UPDATE**: The team has been hard at work over the past few months to improve Mava's systems performance, stability and robustness. These efforts include extensively benchmarking system implementations, fixing bugs and profiling performance and speed. The culmination of this work will be reflected in our next stable release. However, during this period, we have learned a lot about what works and what doesn't. In particular, our current base system design allows for a decent amount of flexibility but quickly becomes difficult to maintain with growing signatures and system constructors as additional modules get added. Our class designs are also overly reliant on wrappers and inheritance which do not scale as well as we would like with increases in system complexity. Furthermore, our original motivation for choosing Tensorflow 2 (TF2) as our deep learning backend was to align with Acme's large repository of RL abstractions and tools for TF2. These were very useful for initially building our systems. But since then, we have found TF2 less performant and flexible than we desire given alternative frameworks. Acme has also affirmed their support of Jax underlying much of the DeepMind RL ecosystem. Therefore, in the coming months, following our stable release, **we plan to rollout a more modular and flexible build system specifically for Jax-based systems.** Please note that all TF2-based systems using the old build system will be maintained during the rollout. However, once a stable Jax release has been made with the new build system, Mava will only support a single DL backend, namely Jax, and we will begin to deprecate all TF2 systems and building support. That said, we will make sure to communicate clearly and often during the migration from TF2 to Jax. 
+👋 **UPDATE**: The team has been hard at work over the past few months to improve Mava's systems performance, stability and robustness. These efforts include extensively benchmarking system implementations, fixing bugs and profiling performance and speed. The culmination of this work will be reflected in our next stable release. However, during this period, we have learned a lot about what works and what doesn't. In particular, our current base system design allows for a decent amount of flexibility but quickly becomes difficult to maintain with growing signatures and system constructors as additional modules get added. Our class designs are also overly reliant on wrappers and inheritance which do not scale as well as we would like with increases in system complexity. Furthermore, our original motivation for choosing Tensorflow 2 (TF2) as our deep learning backend was to align with Acme's large repository of RL abstractions and tools for TF2. These were very useful for initially building our systems. But since then, we have found TF2 less performant and flexible than we desire given alternative frameworks. Acme has also affirmed their support of Jax underlying much of the DeepMind RL ecosystem. Therefore, in the coming months, following our stable release, **we plan to rollout a more modular and flexible build system specifically for Jax-based systems.** Please note that all TF2-based systems using the old build system will be maintained during the rollout. However, once a stable Jax release has been made with the new build system, Mava will only support a single DL backend, namely Jax, and we will begin to deprecate all TF2 systems and building support. That said, we will make sure to communicate clearly and often during the migration from TF2 to Jax. 
+
+<hr>
+
 ## Overview
 ### Systems and the Executor-Trainer Paradigm
 
@@ -334,13 +333,6 @@ logger_factory = functools.partial(
 
 Logging occurs at user specified time intervals and, as such, the independent variable in all `tensorboard` plots is when logging has occured. In the above example logging occurs every 10 seconds, and as such, each point on the x-axis of a plot corresponds to 10 seconds of system runtime. When the `time_delta` parameter is set to 0, this will lead to nearly constant logging which corresponds roughly with steps taken by the system.
 
-## Roadmap
-
-We have big ambitions for Mava!  🚀  But there is still much more work that needs to be done. We have a clear roadmap and wish list for expanding our system implementations and associated modules, improving testing and robustness and providing support for multi-node training. Please visit them using the links below and feel free to add your own suggestions!
-
-* [ROADMAP][roadmap]
-* [WISHLIST][wishlist]
-
 ## Contributing
 
 Please read our [contributing docs](./CONTRIBUTING.md) for details on how to submit pull requests, our Contributor License Agreement and community guidelines.
@@ -348,6 +340,13 @@ Please read our [contributing docs](./CONTRIBUTING.md) for details on how to sub
 ## Troubleshooting and FAQs
 
 Please read our [troubleshooting and FAQs guide](./TROUBLESHOOTING.md).
+
+> 👷‍♀️ **NOTICE**: We consider this release a **Beta version of Mava**. As with many frameworks, Mava is (and will probably always remain) a work in progress and there is much more the team aims to provide and improve in future releases.
+> From incorporating the latest research and innovations to making the framework more stable, robust and well tested.
+> Furthermore, we are committed and will do our best to keep everything working and have the experience of using Mava be as pleasant as possible.
+> During Beta development breaking changes may occur as well as significant design changes (if we feel it could greatly improve the useability of the framework) but these will be clearly communicated before being incorporated into the codebase.
+> It is also inevitable that there might be bugs we are not aware of and that things might break from time to time. We will do our best to fix these bugs and address any issues as quickly as possible. ⭐
+
 ## Citing Mava
 
 If you use Mava in your work, please cite the accompanying
