@@ -563,15 +563,13 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
                 # Critic loss.
                 critic_loss = recurrent_n_step_critic_loss(
-                    q_values,
-                    target_q_values,
-                    rewards[agent],
-                    discount * agent_discount,
+                    q_values=q_values,
+                    target_q_values=target_q_values,
+                    rewards=rewards[agent],
+                    discounts=discount * agent_discount,
                     bootstrap_n=self._bootstrap_n,
                     loss_fn=losses.categorical,
                 )
-                self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
-
                 # Actor learning.
                 obs_agent_feed = target_obs_trans[agent]
                 # TODO (dries): Why is there an extra tuple?
@@ -610,13 +608,21 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 clip_norm = True if self._max_gradient_norm is not None else False
 
                 policy_loss = losses.dpg(
-                    dpg_q_values,
-                    dpg_actions_comb,
+                    q_max=dpg_q_values,
+                    a_max=dpg_actions_comb,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
-                self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
+                # Multiply by discounts to not train on padded data.
+                loss_mask = tf.reshape(agent_discount, policy_loss.shape) > 0.0
+                # TODO (dries): Is multiplication maybe better here? As assignment
+                # might not work with tf.function?
+                policy_loss = policy_loss[loss_mask]
+                # critic_loss = critic_loss[loss_mask] # Not masked because
+                # recurrent loss still needs to be fixed.
+                self.policy_losses[agent] = tf.reduce_mean(policy_loss)
+                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
         self.tape = tape
 
 
