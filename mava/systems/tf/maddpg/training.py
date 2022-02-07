@@ -1188,8 +1188,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             time.time()
             agent_key = self._agent_net_keys[agent]
             target_trans_obs = target_obs_trans[agent]
-            # TODO (dries): Why is there an extra tuple
-            #  wrapping that needs to be removed?
             agent_core_state = target_core_state[agent][0]
 
             transposed_obs = tf2_utils.batch_to_sequence(target_trans_obs)
