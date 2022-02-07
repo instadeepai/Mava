@@ -62,29 +62,16 @@ We also include a number of systems running on discrete action space environment
       - *Feedforward*
         - [decentralised][debug_madqn_ff_dec], [decentralised lr scheduling][debug_madqn_ff_dec_lr_schedule] (***using lr schedule***), [decentralised custom lr scheduling][debug_madqn_ff_dec_custom_lr_schedule] (***using custom lr schedule***) and [decentralised custom epsilon decay scheduling][debug_madqn_ff_dec_custom_eps_schedule] (***using configurable epsilon scheduling***).
       - *Recurrent*
-        - [decentralised][debug_madqn_rec_dec] and [decentralised with coms][debug_madqn_rec_dec_coms] (***using a system with communication***).
-
-  -   **QMIX**:
-      a QMIX system running on the discrete action space simple_spread MPE environment.
-      - *Feedforward* [decentralised][debug_qmix_ff_dec].
+        - [decentralised][debug_madqn_rec_dec].
 
   -   **VDN**:
       a VDN system running on the discrete action space simple_spread MPE environment.
-      - *Feedforward* [decentralised][debug_vdn_ff_dec].
-
-  -   **DIAL**:
-      a DIAL system running on the discrete action space simple_spread MPE environment.
-      - *Recurrent* [decentralised][debug_dial_rec_dec].
-
-### Debugging Environment - Switch
--    **DIAL**:
-    a DIAL system running on the discrete custom SwitchGame environment.
-     - *Recurrent* [decentralised][debug_switch_dial_rec_dec].
+      - *Recurrent* [centralised][debug_vdn_rec_cen].
 
 ### PettingZoo - Multi-Agent Atari
 -   **MADQN**:
    a MADQN system running on the two-player competitive Atari Pong environment.
-    - *Feedforward* [decentralised][pz_madqn_pong_ff_dec].
+    - *Recurrent* [decentralised][pz_madqn_pong_ff_dec].
 
 ### PettingZoo - Multi-Agent Particle Environment
   -   **MADDPG**:
@@ -101,15 +88,15 @@ We also include a number of systems running on discrete action space environment
     - *Feedforward*
         - [decentralised][smac_madqn_ff_dec].
     - *Recurrent*
-        - [decentralised with custom agent networks][smac_madqn_rec_dec_custom_agents] (***using custom agent networks***).
+        - [decentralised][smac_madqn_rec_dec].
 
 -   **QMIX**:
     a QMIX system running on the SMAC environment.
-    - *Feedforward* [decentralised][smac_qmix_ff_dec].
+    - *Recurrent* [centralised][smac_qmix_rec_cen].
 
 -   **VDN**:
     a VDN system running on the SMAC environment.
-    - *Feedforward* [decentralised][smac_vdn_ff_dec] and [decentralised record agents][smac_vdn_ff_dec_record].
+    - *Recurrent* [centralised][smac_vdn_rec_cen].
 
 ### OpenSpiel - Tic Tac Toe
   -   **MADQN**:
@@ -159,33 +146,19 @@ We also include a number of systems running on discrete action space environment
 [debug_madqn_ff_dec_custom_lr_schedule]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_madqn_custom_lr_schedule.py
 [debug_madqn_ff_dec_custom_eps_schedule]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_madqn_configurable_epsilon.py
 [debug_madqn_rec_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/recurrent/decentralised/run_madqn.py
-[debug_madqn_rec_dec_coms]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/recurrent/decentralised/run_madqn_with_coms.py
 
-[debug_qmix_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_qmix.py
+[debug_vdn_rec_cen]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/recurrent/centralised/run_vdn.py
 
-[debug_vdn_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/feedforward/decentralised/run_vdn.py
-
-[debug_dial_rec_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/simple_spread/recurrent/decentralised/run_dial.py
-
-
-[debug_switch_dial_rec_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/debugging/switch/recurrent/decentralised/run_dial.py
-
-
-[pz_madqn_pong_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/atari/pong/feedforward/decentralised/run_madqn.py
+[pz_madqn_pong_rec_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/atari/pong/recurrent/centralised/run_madqn.py
 
 [pz_maddpg_mpe_ssl_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/mpe/simple_speaker_listener/feedforward/decentralised/run_maddpg.py
 
 [pz_maddpg_mpe_ss_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/mpe/simple_spread/feedforward/decentralised/run_maddpg.py
 
+[smac_madqn_rec_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/recurrent/decentralised/run_madqn.py
 
-[smac_madqn_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/feedforward/decentralised/run_madqn.py
+[smac_qmix_rec_cen]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/recurrent/centralised/run_qmix.py
 
-[smac_madqn_rec_dec_custom_agents]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/recurrent/decentralised/run_madqn.py
-
-[smac_qmix_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/feedforward/decentralised/run_qmix.py
-
-[smac_vdn_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/feedforward/decentralised/run_vdn.py
-
-[smac_vdn_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/feedforward/decentralised/run_vdn_record.py
+[smac_vdn_rec_cen]: https://github.com/instadeepai/Mava/blob/develop/examples/smac/recurrent/centralised/run_vdn.py
 
 [openspiel_madqn_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/openspiel/tic_tac_toe/feedforward/decentralised/run_madqn.py
