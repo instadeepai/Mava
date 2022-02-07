@@ -21,6 +21,7 @@ Install the pre-commit hooks and testing dependencies:
 ```bash
 pip install .[testing_formatting]
 pre-commit install
+pre-commit install -t commit-msg
 ```
 You can run all the pre-commit hooks on all files as follows:
 ```bash
