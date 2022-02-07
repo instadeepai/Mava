@@ -215,13 +215,13 @@ class MAPPO:
             + f"batch_size={batch_size}"
         )
 
+        # An extra step is used for bootstrapping when computing advantages.
+        self._sequence_length = sequence_length + 1
+
         if sequence_period:
             self._sequence_period = sequence_period
         else:
-            self._sequence_period = sequence_length - 1
-
-        # An extra step is used for bootstrapping when computing advantages.
-        sequence_length = sequence_length + 1
+            self._sequence_period = self._sequence_length - 1
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
@@ -278,7 +278,7 @@ class MAPPO:
                 batch_size=batch_size,
                 minibatch_size=self._minibatch_size,
                 num_epochs=num_epochs,
-                sequence_length=sequence_length,
+                sequence_length=self._sequence_length,
                 sequence_period=self._sequence_period,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
