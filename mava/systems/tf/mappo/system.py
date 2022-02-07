@@ -75,7 +75,7 @@ class MAPPO:
         minibatch_size: int = None,
         num_epochs: int = 10,
         sequence_length: int = 10,
-        sequence_period: int = 5,
+        sequence_period: Optional[int] = None,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -150,10 +150,10 @@ class MAPPO:
             num_epochs (int, optional): number of epochs every training step.
                 Recommendation as per https://arxiv.org/pdf/2103.01955.pdf, "15
                 epochs for easy tasks,and 10 or 5 epochs for difficult tasks."
-            sequence_length (int, optional): recurrent sequence rollout length. Defaults
+            sequence_length (int, optional): sequence rollout length. Defaults
                 to 10.
             sequence_period (int, optional): consecutive starting points for
-                overlapping rollouts across a sequence. Defaults to 5.
+                overlapping rollouts across a sequence. Defaults to sequence length -1.
             max_executor_steps (int, optional): maximum number of steps and executor
                 can in an episode. Defaults to None.
             checkpoint (bool, optional): whether to checkpoint models. Defaults to
@@ -215,6 +215,14 @@ class MAPPO:
             + f"batch_size={batch_size}"
         )
 
+        if sequence_period:
+            self._sequence_period = sequence_period
+        else:
+            self._sequence_period = sequence_length - 1
+
+        # An extra step is used for bootstrapping when computing advantages.
+        sequence_length = sequence_length + 1
+
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
                 environment_factory(evaluation=False)  # type: ignore
@@ -271,7 +279,7 @@ class MAPPO:
                 minibatch_size=self._minibatch_size,
                 num_epochs=num_epochs,
                 sequence_length=sequence_length,
-                sequence_period=sequence_period,
+                sequence_period=self._sequence_period,
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
                 critic_optimizer=critic_optimizer,

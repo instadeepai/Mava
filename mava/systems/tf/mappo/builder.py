@@ -49,7 +49,7 @@ class MAPPOConfig:
             checkpoints.
         sequence_length: recurrent sequence rollout length.
         sequence_period: consecutive starting points for overlapping rollouts across a
-            sequence.
+            sequence. Defaults to sequence length -1.
         discount: discount to use for TD updates.
         lambda_gae: scalar determining the mix of bootstrapping vs further accumulation
             of multi-step returns at each timestep. See `High-Dimensional Continuous
@@ -82,7 +82,7 @@ class MAPPOConfig:
     checkpoint_minute_interval: int
     use_single_optimizer: bool = True
     sequence_length: int = 10
-    sequence_period: int = 5
+    sequence_period: int = 9
     discount: float = 0.99
     lambda_gae: float = 0.95
     max_queue_size: Optional[int] = None
