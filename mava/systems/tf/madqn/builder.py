@@ -48,7 +48,7 @@ DiscreteArray = dm_specs.DiscreteArray
 
 @dataclasses.dataclass
 class MADQNConfig:
-    """Configuration options for the MADDPG system.
+    """Configuration options for the MADQN system.
 
     Args:
         environment_spec: description of the action and observation spaces etc. for
@@ -145,7 +145,7 @@ class MADQNBuilder:
         executor_fn: Type[core.Executor] = MADQNFeedForwardExecutor,
         extra_specs: Dict[str, Any] = {},
     ):
-        """Initialise the system.
+        """Initialise the builder.
 
         Args:
             config: system configuration specifying hyperparameters and
@@ -169,11 +169,11 @@ class MADQNBuilder:
         """Convert specs.
 
         Args:
-            spec: [description]
-            num_networks: [description]
+            spec: agent specs
+            num_networks: the number of networks
 
         Returns:
-            Dict[str, Any]: converted specs
+            converted specs
         """
         if type(spec) is not dict:
             return spec

@@ -76,6 +76,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise MAD4PG trainer
+
         Args:
             agents: agent ids, e.g. "agent_0".
             agent_types: agent types, e.g. "speaker" or "listener".
@@ -85,10 +86,8 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                 each agent in the system.
             target_policy_networks: target policy networks.
             target_critic_networks: target critic networks.
-            policy_optimizer:
-                optimizer(s) for updating policy networks.
-            critic_optimizer:
-                optimizer for updating critic networks.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic networks.
             discount: discount factor for TD updates.
             target_averaging: whether to use polyak averaging for target network
                 updates.
@@ -252,7 +251,41 @@ class MAD4PGDecentralisedTrainer(MAD4PGBaseTrainer, MADDPGDecentralisedTrainer):
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Initialise the decentralised MAD4PG trainer."""
+        """Initialise decentralised MAD4PG trainer
+
+        Args:
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
+                the system.
+            critic_networks: critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic networks.
+            discount: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
+                updates.
+            target_update_period: number of steps before target networks are
+                updated.
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
+                extraction from raw observation.
+            target_observation_networks: target observation
+                network.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
+        """
 
         super().__init__(
             agents=agents,
@@ -306,7 +339,41 @@ class MAD4PGCentralisedTrainer(MAD4PGBaseTrainer, MADDPGCentralisedTrainer):
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Initialise the centralised MAD4PG trainer."""
+        """Initialise centralised MAD4PG trainer
+
+        Args:
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
+                the system.
+            critic_networks: critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic networks.
+            discount: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
+                updates.
+            target_update_period: number of steps before target networks are
+                updated.
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
+                extraction from raw observation.
+            target_observation_networks: target observation
+                network.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
+        """
 
         super().__init__(
             agents=agents,
@@ -360,7 +427,41 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Initialise the state-based MAD4PG trainer."""
+        """Initialise state-based MAD4PG trainer
+
+        Args:
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
+                the system.
+            critic_networks: critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic networks.
+            discount: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
+                updates.
+            target_update_period: number of steps before target networks are
+                updated.
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
+                extraction from raw observation.
+            target_observation_networks: target observation
+                network.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
+        """
 
         super().__init__(
             agents=agents,
@@ -390,7 +491,7 @@ class MAD4PGStateBasedTrainer(MAD4PGBaseTrainer, MADDPGStateBasedTrainer):
 class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """Recurrent MAD4PG trainer.
 
-    This is the trainer component of a MADDPG system. IE it takes a dataset as input
+    This is the trainer component of a MAD4PG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
 
@@ -430,10 +531,8 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 each agent in the system.
             target_policy_networks: target policy networks.
             target_critic_networks: target critic networks.
-            policy_optimizer:
-                optimizer(s) for updating policy networks.
-            critic_optimizer:
-                optimizer for updating critic networks.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic networks.
             discount: discount factor for TD updates.
             target_averaging: whether to use polyak averaging for target network
                 updates.
@@ -445,6 +544,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 extraction from raw observation.
             target_observation_networks: target observation
                 network.
+            bootstrap_n: number of timestepsto use for bootstrapping.
             variable_client: The client used to manage the variables.
             counts: step counter object.
             agent_net_keys: specifies what network each agent uses.
@@ -652,31 +752,41 @@ class MAD4PGDecentralisedRecurrentTrainer(
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Init trainer.
+        """Initialise Recurrent MAD4PG trainer
 
         Args:
-            agents: [description]
-            agent_types: [description]
-            policy_networks: [description]
-            critic_networks: [description]
-            target_policy_networks: [description]
-            target_critic_networks: [description]
-            policy_optimizer: [description]
-            critic_optimizer: [description]
-            discount: [description]
-            target_averaging: [description]
-            target_update_period: [description]
-            target_update_rate: [description]
-            dataset: [description]
-            observation_networks: [description]
-            target_observation_networks: [description]
-            variable_client: [description]
-            counts: [description]
-            agent_net_keys: [description]
-            max_gradient_norm: [description]. Defaults to None.
-            logger: [description]. Defaults to None.
-            bootstrap_n: [description]. Defaults to 10.
-            learning_rate_scheduler_fn: [description]. Defaults to None.
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
+                the system.
+            critic_networks: critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic networks.
+            discount: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
+                updates.
+            target_update_period: number of steps before target networks are
+                updated.
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
+                extraction from raw observation.
+            target_observation_networks: target observation
+                network.
+            bootstrap_n: number of timestepsto use for bootstrapping.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         super().__init__(
@@ -735,7 +845,42 @@ class MAD4PGCentralisedRecurrentTrainer(
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Init trainer."""
+        """Initialise Recurrent MAD4PG trainer
+
+        Args:
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
+                the system.
+            critic_networks: critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic networks.
+            discount: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
+                updates.
+            target_update_period: number of steps before target networks are
+                updated.
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
+                extraction from raw observation.
+            target_observation_networks: target observation
+                network.
+            bootstrap_n: number of timestepsto use for bootstrapping.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
+        """
 
         super().__init__(
             agents=agents,
@@ -793,7 +938,42 @@ class MAD4PGStateBasedRecurrentTrainer(
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
-        """Init trainer."""
+        """Initialise Recurrent MAD4PG trainer
+
+        Args:
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
+                the system.
+            critic_networks: critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic networks.
+            discount: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
+                updates.
+            target_update_period: number of steps before target networks are
+                updated.
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
+                extraction from raw observation.
+            target_observation_networks: target observation
+                network.
+            bootstrap_n: number of timestepsto use for bootstrapping.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
+        """
 
         super().__init__(
             agents=agents,
@@ -850,30 +1030,41 @@ class MAD4PGStateBasedSingleActionCriticRecurrentTrainer(
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
     ):
-        """Initialise trainer.
+        """Initialise State-Based Recurrent MAD4PG trainer
 
         Args:
-            agents: [description]
-            agent_types: [description]
-            policy_networks: [description]
-            critic_networks: [description]
-            target_policy_networks: [description]
-            target_critic_networks: [description]
-            policy_optimizer: [description]
-            critic_optimizer: [description]
-            discount: [description]
-            target_averaging: [description]
-            target_update_period: [description]
-            target_update_rate: [description]
-            dataset: [description]
-            observation_networks: [description]
-            target_observation_networks: [description]
-            variable_client: [description]
-            counts: [description]
-            agent_net_keys: [description]
-            max_gradient_norm: [description]. Defaults to None.
-            logger: [description]. Defaults to None.
-            bootstrap_n: [description]. Defaults to 10.
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
+                the system.
+            critic_networks: critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic networks.
+            discount: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
+                updates.
+            target_update_period: number of steps before target networks are
+                updated.
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
+                extraction from raw observation.
+            target_observation_networks: target observation
+                network.
+            bootstrap_n: number of timestepsto use for bootstrapping.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
+            learning_rate_scheduler_fn: dict with two functions (one for the policy and
+                one for the critic optimizer), that takes in a trainer step t and
+                returns the current learning rate.
         """
 
         super().__init__(
