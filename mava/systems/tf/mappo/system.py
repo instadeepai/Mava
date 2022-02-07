@@ -68,7 +68,7 @@ class MAPPO:
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
         max_gradient_norm: Optional[float] = None,
-        max_queue_size: int = 10000,
+        max_queue_size: int = 1000,
         batch_size: int = 512,
         minibatch_size: int = None,
         num_epochs: int = 5,
@@ -140,7 +140,7 @@ class MAPPO:
             max_gradient_norm: value to specify the maximum clipping value for the
             gradient norm during optimization.
             max_queue_size (int, optional): maximum number of items in the queue.
-                Defaults to 100000.
+                Should be bigger than batch size.
             batch_size (int, optional): sample batch size for updates.
                 Defaults to 512. Minibatches are sampled from this data.
             minibatch_size (int, optional): size of minibatch that is sampled

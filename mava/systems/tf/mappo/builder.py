@@ -21,8 +21,8 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union
 import reverb
 import sonnet as snt
 import tensorflow as tf
-from acme import datasets
 from acme import types as acme_types
+from acme.adders.reverb.sequence import EndBehavior
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils
 from acme.utils import counting
@@ -53,7 +53,8 @@ class MAPPOConfig:
         lambda_gae: scalar determining the mix of bootstrapping vs further accumulation
             of multi-step returns at each timestep. See `High-Dimensional Continuous
             Control Using Generalized Advantage Estimation` for more information.
-        max_queue_size: maximum number of items in the queue.
+        max_queue_size: maximum number of items in the queue. Should be
+            bigger than batch size.
         executor_variable_update_period: the rate at which executors sync their
             paramters with the trainer.
         batch_size: batch size for updates.
@@ -83,7 +84,7 @@ class MAPPOConfig:
     sequence_period: int = 5
     discount: float = 0.99
     lambda_gae: float = 1.0
-    max_queue_size: int = 10000
+    max_queue_size: int = 1000
     executor_variable_update_period: int = 100
     batch_size: int = 32
     minibatch_size: Optional[int] = None
@@ -152,14 +153,16 @@ class MAPPOBuilder:
         # Squeeze the batch dim.
         extras_spec = tf2_utils.squeeze_batch_dim(extras_spec)
 
+        signature = reverb_adders.ParallelSequenceAdder.signature(
+            environment_spec,
+            sequence_length=self._config.sequence_length,
+            extras_spec=extras_spec,
+        )
+
         replay_table = reverb.Table.queue(
             name=self._config.replay_table_name,
             max_size=self._config.max_queue_size,
-            signature=reverb_adders.ParallelSequenceAdder.signature(
-                environment_spec,
-                sequence_length=self._config.sequence_length,
-                extras_spec=extras_spec,
-            ),
+            signature=signature,
         )
 
         return [replay_table]
@@ -181,13 +184,20 @@ class MAPPOBuilder:
             Iterator[reverb.ReplaySample]: data samples from the dataset.
         """
 
-        # Create tensorflow dataset to interface with reverb
-        dataset = datasets.make_reverb_dataset(
-            server_address=replay_client.server_address,
-            batch_size=self._config.batch_size,
-        )
+        # NOTE: From https://github.com/deepmind/acme/blob/6bf350df1d9dd16cd85217908ec9f47553278976/acme/agents/jax/ppo/builder.py#L89  # noqa: E501
+        # We don't use datasets.make_reverb_dataset() here to avoid interleaving
+        # and prefetching, that doesn't work well with can_sample() check on update.
+        # NOTE: Value for max_in_flight_samples_per_worker comes from a
+        # recommendation here: https://git.io/JYzXB
 
-        return iter(dataset)
+        dataset = reverb.TrajectoryDataset.from_table_signature(
+            server_address=replay_client.server_address,
+            table=self._config.replay_table_name,
+            max_in_flight_samples_per_worker=2 * self._config.batch_size,
+        )
+        # Add batch dimension.
+        dataset = dataset.batch(self._config.batch_size, drop_remainder=True)
+        return dataset.as_numpy_iterator()
 
     def make_adder(
         self,
@@ -212,6 +222,7 @@ class MAPPOBuilder:
             period=self._config.sequence_period,
             sequence_length=self._config.sequence_length,
             use_next_extras=False,
+            end_of_episode_behavior=EndBehavior.CONTINUE,
         )
 
     def make_executor(
