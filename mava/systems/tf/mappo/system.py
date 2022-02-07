@@ -68,7 +68,7 @@ class MAPPO:
         entropy_cost: float = 0.01,
         baseline_cost: float = 0.5,
         max_gradient_norm: Optional[float] = None,
-        max_queue_size: int = 1000,
+        max_queue_size: Optional[int] = None,
         batch_size: int = 512,
         minibatch_size: int = None,
         num_epochs: int = 5,
@@ -140,7 +140,7 @@ class MAPPO:
             max_gradient_norm: value to specify the maximum clipping value for the
             gradient norm during optimization.
             max_queue_size (int, optional): maximum number of items in the queue.
-                Should be bigger than batch size.
+                Should be larger than batch size.
             batch_size (int, optional): sample batch size for updates.
                 Defaults to 512. Minibatches are sampled from this data.
             minibatch_size (int, optional): size of minibatch that is sampled
@@ -196,6 +196,21 @@ class MAPPO:
             + f"minibatch_size={self._minibatch_size}"
         )
 
+        if max_queue_size:
+            self._max_queue_size = max_queue_size
+        else:
+            # NOTE: Based on https://github.com/deepmind/acme/blob/6bf350df1d9dd16cd85217908ec9f47553278976/acme/agents/jax/ppo/builder.py#L75 # noqa: E501
+            extra_capacity_to_avoid_single_machine_deadlocks = 1000
+            self._max_queue_size = (
+                batch_size + extra_capacity_to_avoid_single_machine_deadlocks
+            )
+
+        assert self._max_queue_size > batch_size, (
+            "Max queue size should be larger than batch size."
+            + f"Got max_queue_size={self._max_queue_size},"
+            + f"batch_size={batch_size}"
+        )
+
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
                 environment_factory(evaluation=False)  # type: ignore
@@ -247,7 +262,7 @@ class MAPPO:
                 entropy_cost=entropy_cost,
                 baseline_cost=baseline_cost,
                 max_gradient_norm=max_gradient_norm,
-                max_queue_size=max_queue_size,
+                max_queue_size=self._max_queue_size,
                 batch_size=batch_size,
                 minibatch_size=self._minibatch_size,
                 num_epochs=num_epochs,

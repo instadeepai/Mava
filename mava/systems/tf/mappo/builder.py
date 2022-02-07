@@ -54,7 +54,7 @@ class MAPPOConfig:
             of multi-step returns at each timestep. See `High-Dimensional Continuous
             Control Using Generalized Advantage Estimation` for more information.
         max_queue_size: maximum number of items in the queue. Should be
-            bigger than batch size.
+            larger than batch size.
         executor_variable_update_period: the rate at which executors sync their
             paramters with the trainer.
         batch_size: batch size for updates.
@@ -84,7 +84,7 @@ class MAPPOConfig:
     sequence_period: int = 5
     discount: float = 0.99
     lambda_gae: float = 1.0
-    max_queue_size: int = 1000
+    max_queue_size: Optional[int] = None
     executor_variable_update_period: int = 100
     batch_size: int = 32
     minibatch_size: Optional[int] = None
