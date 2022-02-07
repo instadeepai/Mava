@@ -54,15 +54,15 @@ class MAPPOTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Optional[Union[snt.Optimizer, Dict[str, snt.Optimizer]]],
         use_single_optimizer: bool,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
         minibatch_size: Optional[int] = None,
-        num_epochs: int = 5,
+        num_epochs: int = 10,
         discount: float = 0.99,
-        lambda_gae: float = 1.0,
-        entropy_cost: float = 0.0,
+        lambda_gae: float = 0.95,
+        entropy_cost: float = 0.01,
         baseline_cost: float = 1.0,
         clipping_epsilon: float = 0.2,
         max_gradient_norm: Optional[float] = None,
@@ -89,7 +89,8 @@ class MAPPOTrainer(mava.Trainer):
             policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): optimizer
                 for updating policy networks.
             critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): optimizer
-                for updating critic networks.
+                for updating critic networks. This is not used if using
+                single optim.
             use_single_optimizer (bool): boolean to decide
                 whether or not the critic, policy and observation networks are
                 optimized jointly by a single optimizer. If true, all networks
@@ -620,15 +621,15 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
-        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Optional[Union[snt.Optimizer, Dict[str, snt.Optimizer]]],
         use_single_optimizer: bool,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
         minibatch_size: Optional[int] = None,
-        num_epochs: int = 5,
+        num_epochs: int = 10,
         discount: float = 0.99,
-        lambda_gae: float = 1.0,
-        entropy_cost: float = 0.0,
+        lambda_gae: float = 0.95,
+        entropy_cost: float = 0.01,
         baseline_cost: float = 1.0,
         clipping_epsilon: float = 0.2,
         max_gradient_norm: Optional[float] = None,
@@ -650,7 +651,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             critic_networks : critic network(s), shared or for each agent in the system.
             dataset : training dataset.
             policy_optimizer : optimizer for updating policy networks.
-            critic_optimizer : optimizer for updating critic networks.
+            critic_optimizer : optimizer for updating critic networks. This is not
+                necessary if using single optim.
             use_single_optimizer : boolean to decide
                 whether or not the critic, policy and observation networks are
                 optimized jointly by a single optimizer. If true, all networks
@@ -663,6 +665,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             minibatch_size : size of minibatch that is sampled from
                 the training batch. Minibatches are used for each gradient step.
             num_epochs : number of epochs for every training step.
+                Recommendation as per https://arxiv.org/pdf/2103.01955.pdf, "15
+                epochs for easy tasks,and 10 or 5 epochs for difficult tasks."
             discount :  discount factor for TD updates.
             lambda_gae : scalar determining the mix of bootstrapping
                 vs further accumulation of multi-step returns at each timestep.

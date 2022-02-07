@@ -41,7 +41,8 @@ class MAPPOConfig:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
         policy_optimizer: optimizer(s) for updating policy networks.
-        critic_optimizer: optimizer for updating critic networks.
+        critic_optimizer: optimizer for updating critic networks. This is not
+            used if using single optim.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         checkpoint_minute_interval (int): The number of minutes to wait between
@@ -83,15 +84,15 @@ class MAPPOConfig:
     sequence_length: int = 10
     sequence_period: int = 5
     discount: float = 0.99
-    lambda_gae: float = 1.0
+    lambda_gae: float = 0.95
     max_queue_size: Optional[int] = None
     executor_variable_update_period: int = 100
     batch_size: int = 32
     minibatch_size: Optional[int] = None
-    num_epochs: int = 5
+    num_epochs: int = 10
     entropy_cost: float = 0.01
-    baseline_cost: float = 0.5
-    clipping_epsilon: float = 0.1
+    baseline_cost: float = 1.0
+    clipping_epsilon: float = 0.2
     max_gradient_norm: Optional[float] = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"

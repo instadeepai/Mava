@@ -20,7 +20,6 @@ from datetime import datetime
 from typing import Any
 
 import launchpad as lp
-import sonnet as snt
 from absl import app, flags
 
 from mava.systems.tf import mappo
@@ -80,10 +79,7 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        max_gradient_norm=40.0,
         num_epochs=15,
     ).build()
 

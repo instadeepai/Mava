@@ -60,18 +60,20 @@ class MAPPO:
         policy_optimizer: Union[
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=5e-4),
-        critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-5),
+        critic_optimizer: Optional[snt.Optimizer] = snt.optimizers.Adam(
+            learning_rate=5e-4
+        ),
         use_single_optimizer: bool = True,
         discount: float = 0.99,
-        lambda_gae: float = 1.0,
+        lambda_gae: float = 0.95,
         clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.01,
-        baseline_cost: float = 0.5,
-        max_gradient_norm: Optional[float] = None,
+        baseline_cost: float = 1.0,
+        max_gradient_norm: Optional[float] = 0.5,
         max_queue_size: Optional[int] = None,
         batch_size: int = 512,
         minibatch_size: int = None,
-        num_epochs: int = 5,
+        num_epochs: int = 10,
         sequence_length: int = 10,
         sequence_period: int = 5,
         max_executor_steps: int = None,
@@ -119,7 +121,7 @@ class MAPPO:
             policy_optimizer : optimizer(s) for updating policy networks.
                 Defaults to snt.optimizers.Adam(learning_rate=5e-4).
             critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
-                networks. Defaults to snt.optimizers.Adam(learning_rate=1e-5).
+                networks. This is not used if using single optim.
             use_single_optimizer (bool, optional): boolean to decide
                 whether or not the critic, policy and observation networks are
                 optimized jointly by a single optimizer. If true, all networks
@@ -146,6 +148,8 @@ class MAPPO:
             minibatch_size (int, optional): size of minibatch that is sampled
                 from the training batch. Minibatches are used for each gradient step.
             num_epochs (int, optional): number of epochs every training step.
+                Recommendation as per https://arxiv.org/pdf/2103.01955.pdf, "15
+                epochs for easy tasks,and 10 or 5 epochs for difficult tasks."
             sequence_length (int, optional): recurrent sequence rollout length. Defaults
                 to 10.
             sequence_period (int, optional): consecutive starting points for
