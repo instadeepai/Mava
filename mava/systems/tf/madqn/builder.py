@@ -426,6 +426,7 @@ class MADQNBuilder:
         adder: Optional[adders.ReverbParallelAdder] = None,
         variable_source: Optional[MavaVariableSource] = None,
         evaluator: bool = False,
+        seed: Optional[int] = None,
     ) -> core.Executor:
         """Create an executor instance.
 
@@ -439,6 +440,7 @@ class MADQNBuilder:
                 Defaults to None.
             evaluator: boolean indicator if the executor is used for
                 for evaluation only.
+            seed: seed for reproducible sampling.
 
         Returns:
             system executor, a collection of agents making up the part
@@ -486,7 +488,10 @@ class MADQNBuilder:
 
         # Pass scheduler and initialize action selectors
         action_selectors_with_scheduler = initialize_epsilon_schedulers(
-            exploration_schedules, networks["selectors"], self._config.agent_net_keys
+            exploration_schedules,
+            networks["selectors"],
+            self._config.agent_net_keys,
+            seed=seed,
         )
 
         # Create the actor which defines how we take actions.

@@ -102,6 +102,7 @@ class MADQN:
         termination_condition: Optional[Dict[str, int]] = None,
         evaluator_interval: Optional[dict] = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
+        seed: Optional[int] = None,
     ):
         """Initialise the system.
 
@@ -188,6 +189,9 @@ class MADQN:
                 evaluator_interval = {"executor_episodes": 100}.
             learning_rate_scheduler_fn: an optional learning rate scheduler for
                 the value function optimiser.
+            seed: seed for reproducible sampling (used for epsilon
+                greedy action selection).
+
         """
 
         if not environment_spec:
@@ -359,6 +363,7 @@ class MADQN:
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
         self._evaluator_interval = evaluator_interval
+        self._seed = seed
 
         extra_specs = {}
         if issubclass(executor_fn, executors.RecurrentExecutor):
@@ -499,6 +504,7 @@ class MADQN:
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
             evaluator=False,
+            seed=self._seed,
         )
 
         # TODO (Arnu): figure out why factory function are giving type errors
@@ -553,6 +559,7 @@ class MADQN:
                 for agent in self._environment_spec.get_agent_ids()
             },
             variable_source=variable_source,
+            seed=self._seed,
         )
 
         # Make the environment.
