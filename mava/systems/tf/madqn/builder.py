@@ -83,6 +83,7 @@ class MADQNConfig:
     min_replay_size: int
     max_replay_size: int
     samples_per_insert: Optional[float]
+    using_noisy_networks: bool
     prefetch_size: int
     batch_size: int
     n_step: int
@@ -403,6 +404,7 @@ class MADQNBuilder:
             q_networks=q_networks,
             target_q_networks=target_q_networks,
             agent_net_keys=self._config.agent_net_keys,
+            using_noisy_networks=self._config.using_noisy_networks,
             optimizer=self._config.optimizer,
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
