@@ -1375,8 +1375,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 # TODO (dries): Is multiplication maybe better here? As assignment
                 # might not work with tf.function?
                 policy_loss = policy_loss[policy_mask]
-                critic_loss = critic_loss[critic_mask]  # Not masked because
-                # recurrent loss still needs to be fixed.
+                critic_loss = critic_loss[critic_mask]
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss)
                 self.critic_losses[agent] = tf.reduce_mean(critic_loss)
         self.tape = tape
