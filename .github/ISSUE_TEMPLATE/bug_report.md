@@ -7,25 +7,25 @@ assignees: ''
 
 ---
 
-**Describe the bug**
+### Describe the bug
 A clear and concise description of what the bug is.
 
-**To Reproduce**
+### To Reproduce
 Steps to reproduce the behavior:
 1. 
 2. 
 3. 
 4. 
 
-**Expected behavior**
+### Expected behavior
 A clear and concise description of what you expected to happen.
 
-**Context (Environment)**
+### Context (Environment)
  - Mava (and other package versions): result of `pip freeze > requirements.txt`
  - OS
 
-**Additional context**
+### Additional context
 Add any other context about the problem here.
 
-**Possible Solution**
+### Possible Solution
 Not obligatory, but suggest a fix/reason for the bug.
