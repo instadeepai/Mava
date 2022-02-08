@@ -92,7 +92,7 @@ def main(_: Any) -> None:
         min_replay_size=32,
         batch_size=32,
         samples_per_insert=4,
-        evaluator_interval={"executor_episodes": 2},
+        evaluator_interval={"executor_episodes": 2000},
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
