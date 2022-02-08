@@ -18,21 +18,43 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 import dm_env
 import gym
 import numpy as np
-from pettingzoo.utils import BaseParallelWraper
-from supersuit.utils.base_aec_wrapper import BaseWrapper
 
 from mava.types import OLT, Action, Observation, Reward
 from mava.utils.wrapper_utils import RunningMeanStd
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
-# Prevent circular import issue.
-if TYPE_CHECKING:
-    from mava.wrappers.pettingzoo import (
-        PettingZooAECEnvWrapper,
-        PettingZooParallelEnvWrapper,
-    )
+try:
+    import supersuit
+
+    _has_supersuit = True
+except ModuleNotFoundError:
+    _has_supersuit = False
+    pass
+
+
+try:
+    import pettingzoo  # noqa: F401
+
+    _has_petting_zoo = True
+except ModuleNotFoundError:
+    _has_petting_zoo = False
+    pass
+
+if _has_petting_zoo:
+    from pettingzoo.utils import BaseParallelWraper
+
+    # Prevent circular import issue.
+    if TYPE_CHECKING:
+        from mava.wrappers.pettingzoo import (
+            PettingZooAECEnvWrapper,
+            PettingZooParallelEnvWrapper,
+        )
 
 PettingZooEnv = Union["PettingZooAECEnvWrapper", "PettingZooParallelEnvWrapper"]
+
+if _has_supersuit:
+    from supersuit.utils.base_aec_wrapper import BaseWrapper
+
 
 # TODO(Kale-ab): Make wrapper more general
 # Should Works across any SequentialEnvWrapper or ParallelEnvWrapper.
@@ -40,14 +62,15 @@ PettingZooEnv = Union["PettingZooAECEnvWrapper", "PettingZooParallelEnvWrapper"]
 GYM Preprocess Wrappers.
 
 Other gym preprocess wrappers:
-    https://github.com/PettingZoo-Team/SuperSuit/blob/1f02289e8f51082aa50a413b34700b67042410c6/supersuit/gym_wrappers.py
-    https://github.com/openai/gym/tree/master/gym/wrappers
+    https://github.com/PettingZoo-Team/SuperSuit/blob/1f02289e8f51082aa50a413b34700b67042410c6/supersuit/gym_wrappers.py # noqa: E501
+    https://github.com/openai/gym/tree/master/gym/wrappers # noqa: E501
 """
 
 
 class StandardizeObservationGym(gym.ObservationWrapper):
     """
-    Standardize observations
+    Standardize observations.
+
     Ensures mean of 0 and standard deviation of 1 (unit variance) for obs.
     From https://github.com/ikostrikov/pytorch-a3c/blob/e898f7514a03de73a2bf01e7b0f17a6f93963389/envs.py # noqa: E501
     """
@@ -144,55 +167,65 @@ class StandardizeObservation:
         return (observation - unbiased_mean) / (unbiased_std + 1e-8)
 
 
-class StandardizeObservationSequential(BaseWrapper, StandardizeObservation):
-    """Standardize Obs in Sequential Env"""
+if _has_supersuit:
 
-    def __init__(
-        self, env: PettingZooEnv, load_params: Dict = None, alpha: float = 0.999
-    ) -> None:
-        BaseWrapper.__init__(self, env)
-        StandardizeObservation.__init__(self, env, load_params, alpha)
+    class StandardizeObservationSequential(BaseWrapper, StandardizeObservation):
+        """Standardize Obs in Sequential Env"""
 
-    def _modify_observation(self, agent: str, observation: Observation) -> Observation:
-        self._internal_state[agent]["num_steps"] = (
-            int(self._internal_state[agent]["num_steps"]) + 1
-        )
-        return self._get_updated_observation(agent, observation)
+        def __init__(
+            self, env: PettingZooEnv, load_params: Dict = None, alpha: float = 0.999
+        ) -> None:
+            BaseWrapper.__init__(self, env)
+            StandardizeObservation.__init__(self, env, load_params, alpha)
 
-    def _modify_action(self, agent: str, action: Action) -> Action:
-        return action
+        def _modify_observation(
+            self, agent: str, observation: Observation
+        ) -> Observation:
+            self._internal_state[agent]["num_steps"] = (
+                int(self._internal_state[agent]["num_steps"]) + 1
+            )
+            return self._get_updated_observation(agent, observation)
+
+        def _modify_action(self, agent: str, action: Action) -> Action:
+            return action
 
 
-class StandardizeObservationParallel(BaseParallelWraper, StandardizeObservation):
-    """Standardize Obs in Parallel Env"""
+if _has_petting_zoo:
 
-    def __init__(
-        self, env: PettingZooEnv, load_params: Dict = None, alpha: float = 0.999
-    ) -> None:
-        BaseParallelWraper.__init__(self, env)
-        StandardizeObservation.__init__(self, env, load_params, alpha)
+    class StandardizeObservationParallel(BaseParallelWraper, StandardizeObservation):
+        """Standardize Obs in Parallel Env"""
 
-    def _modify_observation(self, agent: str, observation: Observation) -> Observation:
-        self._internal_state[agent]["num_steps"] = (
-            int(self._internal_state[agent]["num_steps"]) + 1
-        )
-        return self._get_updated_observation(agent, observation)
+        def __init__(
+            self, env: PettingZooEnv, load_params: Dict = None, alpha: float = 0.999
+        ) -> None:
+            BaseParallelWraper.__init__(self, env)
+            StandardizeObservation.__init__(self, env, load_params, alpha)
 
-    def _modify_action(self, action: Action) -> Action:
-        return action
+        def _modify_observation(
+            self, agent: str, observation: Observation
+        ) -> Observation:
+            self._internal_state[agent]["num_steps"] = (
+                int(self._internal_state[agent]["num_steps"]) + 1
+            )
+            return self._get_updated_observation(agent, observation)
 
-    def reset(self) -> Dict:
-        obss = super().reset()
-        return {
-            agent: self._modify_observation(agent, obs) for agent, obs in obss.items()
-        }
+        def _modify_action(self, action: Action) -> Action:
+            return action
 
-    def step(self, actions: Action) -> Any:
-        obss, rew, done, info = super().step(actions)
-        obss = {
-            agent: self._modify_observation(agent, obs) for agent, obs in obss.items()
-        }
-        return obss, rew, done, info
+        def reset(self) -> Dict:
+            obss = super().reset()
+            return {
+                agent: self._modify_observation(agent, obs)
+                for agent, obs in obss.items()
+            }
+
+        def step(self, actions: Action) -> Any:
+            obss, rew, done, info = super().step(actions)
+            obss = {
+                agent: self._modify_observation(agent, obs)
+                for agent, obs in obss.items()
+            }
+            return obss, rew, done, info
 
 
 class StandardizeReward:
@@ -278,89 +311,96 @@ class StandardizeReward:
         return reward
 
 
-class StandardizeRewardSequential(BaseWrapper, StandardizeReward):
-    def __init__(
-        self,
-        env: SequentialEnvWrapper,
-        load_params: Dict = None,
-        lower_bound: float = -10.0,
-        upper_bound: float = 10.0,
-        alpha: float = 0.999,
-    ) -> None:
-        BaseWrapper.__init__(self, env)
-        StandardizeReward.__init__(
-            self, env, load_params, lower_bound, upper_bound, alpha
-        )
+if _has_supersuit:
 
-    def reset(self) -> None:
-        # Reset returns, but not running scores.
-        for stats in self._internal_state.values():
-            stats["return"] = 0
+    class StandardizeRewardSequential(BaseWrapper, StandardizeReward):
+        def __init__(
+            self,
+            env: SequentialEnvWrapper,
+            load_params: Dict = None,
+            lower_bound: float = -10.0,
+            upper_bound: float = 10.0,
+            alpha: float = 0.999,
+        ) -> None:
+            BaseWrapper.__init__(self, env)
+            StandardizeReward.__init__(
+                self, env, load_params, lower_bound, upper_bound, alpha
+            )
 
-        super().reset()
-        self.rewards = {
-            agent: self._get_updated_reward(agent, reward)
-            for agent, reward in self.rewards.items()  # type: ignore
-        }
-        self.__cumulative_rewards = {a: 0 for a in self.agents}
-        self._accumulate_rewards()
+        def reset(self) -> None:
+            # Reset returns, but not running scores.
+            for stats in self._internal_state.values():
+                stats["return"] = 0
 
-    def step(self, action: np.ndarray) -> None:
-        agent = self.env.agent_selection  # type: ignore
-        super().step(action)
-        self.rewards = {
-            agent: self._get_updated_reward(agent, reward)
-            for agent, reward in self.rewards.items()
-        }
-        self.__cumulative_rewards[agent] = 0
-        self._cumulative_rewards = self.__cumulative_rewards
-        self._accumulate_rewards()
+            super().reset()
+            self.rewards = {
+                agent: self._get_updated_reward(agent, reward)
+                for agent, reward in self.rewards.items()  # type: ignore
+            }
+            self.__cumulative_rewards = {a: 0 for a in self.agents}
+            self._accumulate_rewards()
 
-    def _modify_observation(self, agent: str, observation: Observation) -> Observation:
-        return observation
+        def step(self, action: np.ndarray) -> None:
+            agent = self.env.agent_selection  # type: ignore
+            super().step(action)
+            self.rewards = {
+                agent: self._get_updated_reward(agent, reward)
+                for agent, reward in self.rewards.items()
+            }
+            self.__cumulative_rewards[agent] = 0
+            self._cumulative_rewards = self.__cumulative_rewards
+            self._accumulate_rewards()
 
-    def _modify_action(self, agent: str, action: Action) -> Action:
-        return action
+        def _modify_observation(
+            self, agent: str, observation: Observation
+        ) -> Observation:
+            return observation
+
+        def _modify_action(self, agent: str, action: Action) -> Action:
+            return action
 
 
-class StandardizeRewardParallel(
-    BaseParallelWraper,
-    StandardizeReward,
-):
-    def __init__(
-        self,
-        env: ParallelEnvWrapper,
-        load_params: Dict = None,
-        lower_bound: float = -10.0,
-        upper_bound: float = 10.0,
-        alpha: float = 0.999,
-    ) -> None:
-        BaseParallelWraper.__init__(self, env)
-        StandardizeReward.__init__(
-            self, env, load_params, lower_bound, upper_bound, alpha
-        )
+if _has_petting_zoo:
 
-    def reset(self) -> Observation:
-        # Reset returns, but not running scores.
-        for stats in self._internal_state.values():
-            stats["return"] = 0
+    class StandardizeRewardParallel(
+        BaseParallelWraper,
+        StandardizeReward,
+    ):
+        def __init__(
+            self,
+            env: ParallelEnvWrapper,
+            load_params: Dict = None,
+            lower_bound: float = -10.0,
+            upper_bound: float = 10.0,
+            alpha: float = 0.999,
+        ) -> None:
+            BaseParallelWraper.__init__(self, env)
+            StandardizeReward.__init__(
+                self, env, load_params, lower_bound, upper_bound, alpha
+            )
 
-        obs = self.env.reset()  # type: ignore
-        self.agents = self.env.agents  # type: ignore
-        return obs
+        def reset(self) -> Observation:
+            # Reset returns, but not running scores.
+            for stats in self._internal_state.values():
+                stats["return"] = 0
 
-    def step(self, actions: Dict) -> Any:
-        obs, rew, done, info = super().step(actions)
-        rew = {
-            agent: self._get_updated_reward(agent, rew) for agent, rew in rew.items()
-        }
-        return obs, rew, done, info
+            obs = self.env.reset()  # type: ignore
+            self.agents = self.env.agents  # type: ignore
+            return obs
 
-    def _modify_observation(self, observation: Observation) -> Observation:
-        return observation
+        def step(self, actions: Dict) -> Any:
+            obs, rew, done, info = super().step(actions)
+            rew = {
+                agent: self._get_updated_reward(agent, rew)
+                for agent, rew in rew.items()
+            }
+            return obs, rew, done, info
 
-    def _modify_action(self, action: Action) -> Action:
-        return action
+        def _modify_observation(self, observation: Observation) -> Observation:
+            return observation
+
+        def _modify_action(self, action: Action) -> Action:
+            return action
 
 
 class ConcatAgentIdToObservation:
