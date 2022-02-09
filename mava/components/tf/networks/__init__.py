@@ -28,6 +28,7 @@ from mava.components.tf.networks.continuous import (
     NearZeroInitializedLinear,
 )
 from mava.components.tf.networks.convolution import Conv1DNetwork
+from mava.components.tf.networks.distributional import CategoricalHead
 from mava.components.tf.networks.fingerprints import ObservationNetworkWithFingerprint
 from mava.components.tf.networks.mad4pg import (
     DiscreteValuedDistribution,
