@@ -92,7 +92,7 @@ def main(_: Any) -> None:
         samples_per_insert=4,
         sequence_length=20,
         period=10,
-        evaluator_interval={"executor_episodes": 2000},
+        evaluator_interval={"executor_episodes": 2},
     ).build()
 
     # Only the trainer should use the GPU (if available)
