@@ -21,7 +21,7 @@ from typing import Any
 import launchpad as lp
 from absl import app, flags
 
-from mava.components.tf.modules.exploration import LinearExplorationScheduler
+from mava.components.tf.modules.exploration import LinearExplorationTimestepScheduler
 from mava.systems.tf import madqn
 from mava.utils import enums, lp_utils
 from mava.utils.enums import ArchitectureType
@@ -78,10 +78,8 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0,
-            epsilon_min=0.05,
-            epsilon_decay=5e-6,
+        exploration_scheduler_fn=LinearExplorationTimestepScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=50000
         ),
         shared_weights=False,
         trainer_networks=enums.Trainer.one_trainer_per_network,

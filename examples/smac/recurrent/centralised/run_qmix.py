@@ -24,7 +24,7 @@ import sonnet as snt
 from absl import app, flags
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
+    LinearExplorationTimestepScheduler,
 )
 from mava.systems.tf import value_decomposition
 from mava.utils import lp_utils
@@ -79,8 +79,8 @@ def main(_: Any) -> None:
         mixer="qmix",
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=4e-6
+        exploration_scheduler_fn=LinearExplorationTimestepScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=50000
         ),
         optimizer=snt.optimizers.RMSProp(
             learning_rate=0.0005, epsilon=0.00001, decay=0.99
