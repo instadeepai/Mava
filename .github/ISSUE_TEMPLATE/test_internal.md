@@ -1,6 +1,6 @@
 ---
-name: Test
-about: Outline the structure for a test
+name: Planned test
+about: Outline the structure for a planned test, this could be broader system/integration tests or for tests for existing code.
 title: '[TEST]'
 labels: test
 assignees: ''
