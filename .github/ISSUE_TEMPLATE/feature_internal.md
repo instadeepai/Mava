@@ -13,6 +13,15 @@ A clear and concise description of the feature to be implemented and why.
 ### Proposal
 A plan or brief overview of how the feature will be implemented.
 
+### Testing
+A detailed description of how this feature will be tested.
+
+* What are the core aspects of the feature that need testing?
+* Outline the test cases and for each specify:
+    * The purpose of the test.
+    * The inputs.
+    * The expected output.
+
 ### Definition of done
 A precise outline for the feature to be considered fully implemented, i.e. done/complete.
 
