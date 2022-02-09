@@ -93,7 +93,7 @@ def make_default_networks(
                         activate_final=False,
                         seed=seed,
                     ),
-                    networks.CategoricalHead(num_values=specs[key].actions.num_values),
+                    networks.CategoricalHead(num_values=num_actions),
                 ]
             )
         elif isinstance(specs[key].actions, dm_env.specs.BoundedArray):  # continuous
