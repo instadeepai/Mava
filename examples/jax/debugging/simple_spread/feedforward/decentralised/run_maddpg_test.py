@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test for running MADDPG on debug MPE environment."""
 
 import functools
 from datetime import datetime
@@ -22,39 +23,43 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
-)
-from mava.systems.tf import madqn
+from mava.systems.tf import maddpg
 from mava.utils import lp_utils
-from mava.utils.environments.meltingpot_utils import EnvironmentFactory
+from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
-
+flags.DEFINE_string(
+    "env_name",
+    "simple_spread",
+    "Debugging environment name (str).",
+)
+flags.DEFINE_string(
+    "action_space",
+    "continuous",
+    "Environment action space type (str).",
+)
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
-flags.DEFINE_string("scenario", "clean_up_0", "scenario to evaluste on")
 
 
 def main(_: Any) -> None:
-    """Evaluate on a scenario
-
-    Args:
-        _ (Any): ...
-    """
 
     # Environment.
-    environment_factory = EnvironmentFactory(scenario=FLAGS.scenario)
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name=FLAGS.env_name,
+        action_space=FLAGS.action_space,
+    )
 
     # Networks.
-    network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)
+    network_factory = lp_utils.partial_kwargs(maddpg.make_default_networks)
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    # Checkpointer appends "Checkpoints" to checkpoint_dir.
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
@@ -68,18 +73,16 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
-    program = madqn.MADQN(
-        environment_factory=environment_factory,  # type: ignore
+    # Distributed program.
+    program = maddpg.MADDPG(
+        environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_min=0.05, epsilon_decay=1e-4
-        ),
-        importance_sampling_exponent=0.2,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
+        max_gradient_norm=40.0,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
