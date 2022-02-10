@@ -26,45 +26,45 @@ class BaseSystem(abc.ABC):
 
     @abc.abstractmethod
     def build(self, config: SimpleNamespace) -> SimpleNamespace:
-        """[summary]
+        """Build system by constructing system components.
 
         Args:
-            config : [description]
+            config : system configuration including
         Returns:
-            [description]
+            System components
         """
 
     @abc.abstractmethod
     def update(self, component: Any, name: str) -> None:
-        """[summary]
+        """Update a component that has already been added to the system.
 
         Args:
-            component : [description]
-            name : [description]
+            component : system callback component
+            name : component name
         """
 
     @abc.abstractmethod
     def add(self, component: Any, name: str) -> None:
-        """[summary]
+        """Add a new component to the system.
 
         Args:
-            component : [description]
-            name : [description]
+            component : system callback component
+            name : component name
         """
 
     @abc.abstractmethod
     def launch(
         self,
         num_executors: int,
-        multi_process: str,
+        multi_process: bool,
         nodes_on_gpu: List[str],
         name: str,
     ):
-        """[summary]
+        """Run the system, either locally or distributed.
 
         Args:
-            num_executors : [description]
-            multi_process : [description]
-            nodes_on_gpu : [description]
-            name : [description]
+            num_executors : number of executor processes to run in parallel.
+            multi_process : whether to run locally or distributed
+            nodes_on_gpu : which processes to run on gpu
+            name : name of the system
         """
