@@ -443,11 +443,9 @@ class MAPPOTrainer(mava.Trainer):
                     # training state) and clip them.
                     raise NotImplementedError
                 else:
-                    critic_loss = tf.reduce_mean(
-                        tf.ragged.boolean_mask(
-                            unclipped_critic_loss,
-                            mask=tf.cast(termination[:-1], dtype=bool),
-                        ),
+                    masked_critic_loss = unclipped_critic_loss * termination[:-1]
+                    critic_loss = tf.reduce_sum(masked_critic_loss) / tf.reduce_sum(
+                        termination[:-1]
                     )
 
                 critic_loss = critic_loss * self._baseline_cost
@@ -465,19 +463,16 @@ class MAPPOTrainer(mava.Trainer):
                     rhos * advantages, clipped_rhos * advantages
                 )
 
-                policy_gradient_loss = tf.reduce_mean(
-                    tf.ragged.boolean_mask(
-                        clipped_objective, mask=tf.cast(termination[:-1], dtype=bool)
-                    ),
-                )
+                masked_policy_grad_loss = clipped_objective * termination[:-1]
+                policy_gradient_loss = tf.reduce_sum(
+                    masked_policy_grad_loss
+                ) / tf.reduce_sum(termination[:-1])
 
                 # Entropy regularization. Only implemented for categorical dist.
                 try:
-                    entropy_loss = -tf.reduce_mean(
-                        tf.ragged.boolean_mask(
-                            policy.entropy()[:-1],
-                            mask=tf.cast(termination[:-1], dtype=bool),
-                        ),
+                    masked_entropy_loss = policy.entropy()[:-1] * termination[:-1]
+                    entropy_loss = -tf.reduce_sum(masked_entropy_loss) / tf.reduce_sum(
+                        termination[:-1]
                     )
 
                 except NotImplementedError:
