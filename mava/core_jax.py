@@ -59,7 +59,7 @@ class BaseSystem(abc.ABC):
         multi_process: bool,
         nodes_on_gpu: List[str],
         name: str,
-    ):
+    ) -> None:
         """Run the system, either locally or distributed.
 
         Args:

@@ -17,14 +17,14 @@
 """Tests for core Mava interfaces for Jax systems."""
 
 from dataclasses import dataclass
-from typing import Any, List
 from types import SimpleNamespace
+from typing import Any, List
 
 import pytest
 
 from mava.core_jax import BaseSystem
 
-
+# Dummy config and component
 CONFIG = SimpleNamespace()
 COMPONENT = None
 
@@ -44,20 +44,27 @@ CONFIG.set_1 = parameter_set_1(str_param="param")
 CONFIG.set_2 = parameter_set_2(int_param=4, float_param=5.4)
 
 
-class IncompleteSystem(BaseSystem):
-    def build(self, config) -> SimpleNamespace:
+class TestDummySystem(BaseSystem):
+    """Create a complete class with all abstract method overwritten."""
+
+    def build(self, config: SimpleNamespace) -> SimpleNamespace:
+        """Dummy build"""
         assert config.set_1.str_param == "param"
         assert config.set_2.int_param == 4
         assert config.set_2.float_param == 5.4
 
+        # hypothetical system components
+        components = SimpleNamespace()
+        return components
 
-class CompleteSystem(IncompleteSystem):
     def update(self, component: Any, name: str) -> None:
-        assert component == None
+        """Dummy update"""
+        assert component is None
         assert name == "update"
 
     def add(self, component: Any, name: str) -> None:
-        assert component == None
+        """Dummy add"""
+        assert component is None
         assert name == "add"
 
     def launch(
@@ -66,35 +73,32 @@ class CompleteSystem(IncompleteSystem):
         multi_process: bool,
         nodes_on_gpu: List[str],
         name: str,
-    ):
+    ) -> None:
+        """Dummy launch"""
         assert num_executors == 1
-        assert multi_process == False
+        assert multi_process is False
         assert nodes_on_gpu[0] == "process"
         assert name == "system"
 
 
 @pytest.fixture
-def base_system_complete():
-    return CompleteSystem()
+def dummy_system() -> TestDummySystem:
+    """Create complete system for use in tests"""
+    return TestDummySystem()
 
 
-def test_incomplete_base_system():
-    # build system
-    with pytest.raises(TypeError):
-        system = IncompleteSystem()
-
-
-def test_complete_base_system(base_system_complete):
+def test_dummy_system(dummy_system: TestDummySystem) -> None:
+    """Test complete system methods"""
     # update component
-    base_system_complete.update(COMPONENT, "update")
+    dummy_system.update(COMPONENT, "update")
 
     # add component
-    base_system_complete.add(COMPONENT, "add")
+    dummy_system.add(COMPONENT, "add")
 
     # build system
-    base_system_complete.build(CONFIG)
+    dummy_system.build(CONFIG)
 
     # launch system
-    base_system_complete.launch(
+    dummy_system.launch(
         num_executors=1, multi_process=False, nodes_on_gpu=["process"], name="system"
     )
