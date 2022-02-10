@@ -33,6 +33,7 @@ tfd = tfp.distributions
 
 class MAPPOFeedForwardExecutor(core.Executor):
     """A feed-forward executor.
+
     An executor based on a feed-forward policy for each agent in the system.
     """
 
@@ -48,15 +49,13 @@ class MAPPOFeedForwardExecutor(core.Executor):
         """Initialise the system executor
 
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            policy_networks: policy networks for each agent in
                 the system.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
-            adder (Optional[adders.ReverbParallelAdder], optional): adder which sends
-                data to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+            agent_net_keys: specifies what network each agent uses.
+            adder: adder which sends data to a replay buffer.
+            variable_client:
                 client to copy weights from the trainer. Defaults to None.
-            evaluator (bool, optional): whether the executor will be used for
+            evaluator: whether the executor will be used for
                 evaluation. Defaults to False.
             interval: interval that evaluations are run at.
         """
@@ -96,21 +95,26 @@ class MAPPOFeedForwardExecutor(core.Executor):
         # Compute the policy, conditioned on the observation.
         policy = self._policy_networks[network_key](observation)
 
+        # Mask categorical policies using legal actions
+        if hasattr(observation, "legal_actions") and isinstance(
+            policy, tfp.distributions.Categorical
+        ):
+            batched_legals = tf2_utils.add_batch_dim(observation.legal_actions)
+            policy = tfp.distributions.Masked(
+                self._policy_networks[network_key](observation),
+                tf.equal(batched_legals, 1),
+            )
+
         # Sample from the policy and compute the log likelihood.
         action = policy.sample()
         log_prob = policy.log_prob(action)
-
-        # Cast for compatibility with reverb.
-        # sample() returns a 'int32', which is a problem.
-        if isinstance(policy, tfp.distributions.Categorical):
-            action = tf.cast(action, "int64")
 
         return log_prob, action
 
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
-        """select an action for a single agent in the system
+        """Select an action for a single agent in the system
 
         Args:
             agent (str): agent id.
@@ -139,7 +143,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Dict[str, types.NestedArray]:
-        """select the actions for all agents in the system
+        """Select the actions for all agents in the system
 
         Args:
            observations (Dict[str, types.NestedArray]): agent observations from the
@@ -162,7 +166,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record first observed timestep from the environment
+        """Record first observed timestep from the environment
 
         Args:
             timestep (dm_env.TimeStep): data emitted by an environment at first step of
@@ -180,7 +184,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record observed timestep from the environment
+        """Record observed timestep from the environment
 
         Args:
             actions (Dict[str, types.NestedArray]): system agents' actions.
@@ -200,7 +204,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self._adder.add(actions, next_timestep, next_extras)
 
     def update(self, wait: bool = False) -> None:
-        """update executor variables
+        """Update executor variables
 
         Args:
             wait (bool, optional): whether to stall the executor's request for new
