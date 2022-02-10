@@ -27,6 +27,7 @@ from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders, core
+from mava.types import OLT
 
 tfd = tfp.distributions
 
@@ -53,8 +54,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
                 the system.
             agent_net_keys: specifies what network each agent uses.
             adder: adder which sends data to a replay buffer.
-            variable_client:
-                client to copy weights from the trainer. Defaults to None.
+            variable_client: client to copy weights from the trainer.
             evaluator: whether the executor will be used for
                 evaluation. Defaults to False.
             interval: interval that evaluations are run at.
@@ -73,7 +73,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
     def _policy(
         self,
         agent: str,
-        observation: types.NestedTensor,
+        observation_olt: OLT,
     ) -> Tuple[types.NestedTensor, types.NestedTensor]:
         """Agent specific policy function
 
@@ -90,16 +90,16 @@ class MAPPOFeedForwardExecutor(core.Executor):
         network_key = self._agent_net_keys[agent]
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
-        observation = tf2_utils.add_batch_dim(observation.observation)
+        observation = tf2_utils.add_batch_dim(observation_olt.observation)
 
         # Compute the policy, conditioned on the observation.
         policy = self._policy_networks[network_key](observation)
 
         # Mask categorical policies using legal actions
-        if hasattr(observation, "legal_actions") and isinstance(
+        if hasattr(observation_olt, "legal_actions") and isinstance(
             policy, tfp.distributions.Categorical
         ):
-            batched_legals = tf2_utils.add_batch_dim(observation.legal_actions)
+            batched_legals = tf2_utils.add_batch_dim(observation_olt.legal_actions)
             policy = tfp.distributions.Masked(
                 self._policy_networks[network_key](observation),
                 tf.equal(batched_legals, 1),
