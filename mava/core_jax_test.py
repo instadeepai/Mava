@@ -26,6 +26,7 @@ from mava.core_jax import BaseSystem
 
 
 CONFIG = SimpleNamespace()
+COMPONENT = None
 
 
 @dataclass
@@ -52,24 +53,48 @@ class IncompleteSystem(BaseSystem):
 
 class CompleteSystem(IncompleteSystem):
     def update(self, component: Any, name: str) -> None:
-        pass
+        assert component == None
+        assert name == "update"
 
     def add(self, component: Any, name: str) -> None:
-        pass
+        assert component == None
+        assert name == "add"
 
     def launch(
         self,
         num_executors: int,
-        multi_process: str,
+        multi_process: bool,
         nodes_on_gpu: List[str],
         name: str,
     ):
-        pass
+        assert num_executors == 1
+        assert multi_process == False
+        assert nodes_on_gpu[0] == "process"
+        assert name == "system"
 
 
 @pytest.fixture
 def base_system_complete():
-    return CompleteSystem(CONFIG)
+    return CompleteSystem()
 
 
-# def test_core_base_system():
+def test_incomplete_base_system():
+    # build system
+    with pytest.raises(TypeError):
+        system = IncompleteSystem()
+
+
+def test_complete_base_system(base_system_complete):
+    # update component
+    base_system_complete.update(COMPONENT, "update")
+
+    # add component
+    base_system_complete.add(COMPONENT, "add")
+
+    # build system
+    base_system_complete.build(CONFIG)
+
+    # launch system
+    base_system_complete.launch(
+        num_executors=1, multi_process=False, nodes_on_gpu=["process"], name="system"
+    )
