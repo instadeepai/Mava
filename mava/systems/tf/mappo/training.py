@@ -435,9 +435,7 @@ class MAPPOTrainer(mava.Trainer):
                 # td_lambda_returns
                 returns = advantages + value_pred
                 returns = tf.stop_gradient(returns)
-                unclipped_critic_loss = (
-                    tf.square(returns - value_pred) * termination[:-1]
-                )
+                unclipped_critic_loss = tf.square(returns - value_pred)
 
                 if self._value_clipping:
                     # TODO Clip values to reduce variablility
@@ -445,7 +443,12 @@ class MAPPOTrainer(mava.Trainer):
                     # training state) and clip them.
                     raise NotImplementedError
                 else:
-                    critic_loss = tf.math.reduce_mean(unclipped_critic_loss)
+                    critic_loss = tf.reduce_mean(
+                        tf.ragged.boolean_mask(
+                            unclipped_critic_loss,
+                            mask=tf.cast(termination[:-1], dtype=bool),
+                        ),
+                    )
 
                 critic_loss = critic_loss * self._baseline_cost
 
@@ -458,19 +461,25 @@ class MAPPOTrainer(mava.Trainer):
                     clip_value_min=1 - self._clipping_epsilon,
                     clip_value_max=1 + self._clipping_epsilon,
                 )
-                clipped_objective = tf.minimum(
+                clipped_objective = -tf.minimum(
                     rhos * advantages, clipped_rhos * advantages
                 )
 
-                policy_gradient_loss = -tf.reduce_mean(
-                    clipped_objective * termination[:-1],
-                    name="PolicyGradientLoss",
+                policy_gradient_loss = tf.reduce_mean(
+                    tf.ragged.boolean_mask(
+                        clipped_objective, mask=tf.cast(termination[:-1], dtype=bool)
+                    ),
                 )
 
                 # Entropy regularization. Only implemented for categorical dist.
                 try:
-                    policy_entropy = policy.entropy() * termination
-                    entropy_loss = -tf.reduce_mean(policy_entropy)
+                    entropy_loss = -tf.reduce_mean(
+                        tf.ragged.boolean_mask(
+                            policy.entropy()[:-1],
+                            mask=tf.cast(termination[:-1], dtype=bool),
+                        ),
+                    )
+
                 except NotImplementedError:
                     entropy_loss = tf.convert_to_tensor(0.0)
 
