@@ -25,7 +25,7 @@ class BaseSystem(abc.ABC):
     """Abstract system object."""
 
     @abc.abstractmethod
-    def configure(self, config: SimpleNamespace) -> SimpleNamespace:
+    def build(self, config: SimpleNamespace) -> SimpleNamespace:
         """[summary]
 
         Args:
