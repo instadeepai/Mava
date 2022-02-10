@@ -614,7 +614,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
-                # Multiply by discounts to not train on padded data.
                 policy_mask = tf.reshape(agent_discount, policy_loss.shape) > 0.0
                 critic_mask = (
                     tf.reshape(
@@ -622,13 +621,14 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                     )
                     > 0.0
                 )
-                # TODO (dries): Is multiplication maybe better here? As assignment
-                # might not work with tf.function?
-                policy_loss = policy_loss[policy_mask]
-                critic_loss = critic_loss[critic_mask]  # Not masked because
-                # recurrent loss still needs to be fixed.
-                self.policy_losses[agent] = tf.reduce_mean(policy_loss)
-                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
+                policy_loss = policy_loss * policy_mask
+                critic_loss = critic_loss * critic_mask
+                self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
+                    policy_mask
+                )
+                self.critic_losses[agent] = tf.reduce_sum(critic_loss) / tf.reduce_sum(
+                    critic_mask
+                )
         self.tape = tape
 
 
