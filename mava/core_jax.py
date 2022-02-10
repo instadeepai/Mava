@@ -25,14 +25,13 @@ class BaseSystem(abc.ABC):
     """Abstract system object."""
 
     @abc.abstractmethod
-    def configure(self, config: Any) -> SimpleNamespace:
+    def configure(self, config: SimpleNamespace) -> SimpleNamespace:
         """[summary]
 
         Args:
-            config ([type]): [description]
-
+            config : [description]
         Returns:
-            [type]: [description]
+            [description]
         """
 
     @abc.abstractmethod
@@ -40,8 +39,8 @@ class BaseSystem(abc.ABC):
         """[summary]
 
         Args:
-            component (Any): [description]
-            name (str): [description]
+            component : [description]
+            name : [description]
         """
 
     @abc.abstractmethod
@@ -49,8 +48,8 @@ class BaseSystem(abc.ABC):
         """[summary]
 
         Args:
-            component (Any): [description]
-            name (str): [description]
+            component : [description]
+            name : [description]
         """
 
     @abc.abstractmethod
@@ -64,8 +63,8 @@ class BaseSystem(abc.ABC):
         """[summary]
 
         Args:
-            num_executors (int): [description]
-            multi_process (str): [description]
-            nodes_on_gpu (List[str]): [description]
-            name (str): [description]
+            num_executors : [description]
+            multi_process : [description]
+            nodes_on_gpu : [description]
+            name : [description]
         """
