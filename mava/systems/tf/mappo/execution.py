@@ -69,6 +69,7 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self._interval = interval
         self._evaluator = evaluator
 
+    # TODO: Move tf.function out of self._policy.
     @tf.function
     def _policy(
         self,
