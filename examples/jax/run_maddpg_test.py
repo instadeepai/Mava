@@ -23,7 +23,11 @@ import mava.utils as utils
 
 def test_main() -> None:
 
+    # Create system and import associated config
+    system = maddpg.MADDPG()
     config = maddpg.config
+
+    #### adapt/complete system config ####
 
     # Environment.
     config.environment_factory = utils.make_factory(
@@ -54,7 +58,7 @@ def test_main() -> None:
     )
 
     # Build system
-    system = maddpg.MADDPG(config)
+    system.build(config)
 
     # Launch system
     system.launch(num_executors=1, nodes_on_gpu=["trainer"], name="maddpg")
