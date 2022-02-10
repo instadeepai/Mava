@@ -1370,12 +1370,14 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                     )
                     > 0.0
                 )
-                # TODO (dries): Is multiplication maybe better here? As assignment
-                # might not work with tf.function?
-                policy_loss = policy_loss[policy_mask]
-                critic_loss = critic_loss[critic_mask]
-                self.policy_losses[agent] = tf.reduce_mean(policy_loss)
-                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
+                policy_loss = policy_loss * policy_mask
+                critic_loss = critic_loss * critic_mask
+                self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
+                    policy_mask
+                )
+                self.critic_losses[agent] = tf.reduce_sum(critic_loss) / tf.reduce_sum(
+                    critic_mask
+                )
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
