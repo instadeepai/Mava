@@ -15,12 +15,17 @@ A plan or brief overview of how the feature will be implemented.
 
 ### Testing
 A detailed description of how this feature will be tested.
-
 * What are the core aspects of the feature that need testing?
 * Outline the test cases and for each specify:
     * The purpose of the test.
     * The inputs.
     * The expected output.
+
+### Benchmarking (Optional)
+Describe how and why this feature needs to be benchmarked with regards to:
+* Performance in metric(s)...
+* Speed
+* Scale
 
 ### Definition of done
 A precise outline for the feature to be considered fully implemented, i.e. done/complete.
