@@ -188,8 +188,6 @@ class MAPPOBuilder:
         # NOTE: From https://github.com/deepmind/acme/blob/6bf350df1d9dd16cd85217908ec9f47553278976/acme/agents/jax/ppo/builder.py#L89  # noqa: E501
         # We don't use datasets.make_reverb_dataset() here to avoid interleaving
         # and prefetching, that doesn't work well with can_sample() check on update.
-        # NOTE: Value for max_in_flight_samples_per_worker comes from a
-        # recommendation here: https://git.io/JYzXB
 
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=replay_client.server_address,
