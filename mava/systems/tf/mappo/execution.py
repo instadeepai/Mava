@@ -18,7 +18,6 @@
 from typing import Any, Dict, Optional, Tuple
 
 import dm_env
-import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -101,15 +100,17 @@ class MAPPOFeedForwardExecutor(core.Executor):
             policy, tfp.distributions.Categorical
         ):
             batched_legals = tf2_utils.add_batch_dim(observation_olt.legal_actions)
-            policy = tfp.distributions.Masked(
-                self._policy_networks[network_key](observation),
-                tf.equal(batched_legals, 1),
+            # Mask out actions
+            inf_mask = tf.maximum(
+                tf.math.log(tf.cast(batched_legals, tf.float32)), tf.float32.min
             )
+            masked_logits = policy.logits + inf_mask
+
+            policy = tfp.distributions.Categorical(logits=masked_logits, dtype="int64")
 
         # Sample from the policy and compute the log likelihood.
         action = policy.sample()
         log_prob = policy.log_prob(action)
-
         return log_prob, action
 
     def select_action(
@@ -128,16 +129,11 @@ class MAPPOFeedForwardExecutor(core.Executor):
 
         # Step the recurrent policy/value network forward
         # given the current observation and state.
-        self._prev_log_probs[agent], action = self._policy(agent, observation)
+        log_prob, action = self._policy(agent, observation)
 
         # Return a numpy array with squeezed out batch dimension.
         action = tf2_utils.to_numpy_squeeze(action)
-
-        # TODO(Kale-ab) : Remove. This is for debugging.
-        if np.isnan(action).any():
-            print(
-                f"Value error- Log Probs:{self._prev_log_probs[agent]} Action: {action} "  # noqa: E501
-            )
+        self._prev_log_probs[agent] = tf2_utils.to_numpy_squeeze(log_prob)
 
         return action
 
@@ -199,8 +195,6 @@ class MAPPOFeedForwardExecutor(core.Executor):
             return
 
         next_extras.update({"log_probs": self._prev_log_probs})
-
-        next_extras = tf2_utils.to_numpy_squeeze(next_extras)
 
         self._adder.add(actions, next_timestep, next_extras)
 
