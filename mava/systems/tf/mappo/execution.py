@@ -106,7 +106,9 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
             )
             masked_logits = policy.logits + inf_mask
 
-            policy = tfp.distributions.Categorical(logits=masked_logits, dtype="int64")
+            policy = tfp.distributions.Categorical(
+                logits=masked_logits, dtype=policy.dtype
+            )
 
         # Sample from the policy and compute the log likelihood.
         action = policy.sample()
