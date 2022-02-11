@@ -12,27 +12,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Example running recurent MADQN on SMAC."""
 
 
 import functools
 from datetime import datetime
-from typing import Any, Dict, Mapping, Sequence, Union
+from typing import Any
 
 import launchpad as lp
 import sonnet as snt
-import tensorflow as tf
 from absl import app, flags
-from acme import types
 
-from mava import specs as mava_specs
-from mava.components.tf import networks
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     LinearExplorationTimestepScheduler,
 )
-from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
+from mava.utils.enums import ArchitectureType
+from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -50,61 +47,15 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
-def custom_recurrent_network(
-    environment_spec: mava_specs.MAEnvironmentSpec,
-    agent_net_keys: Dict[str, str],
-    q_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = [128, 128],
-) -> Mapping[str, types.TensorTransformation]:
-    """Creates networks used by the agents."""
-
-    specs = environment_spec.get_agent_specs()
-
-    # Create agent_type specs
-    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
-
-    if isinstance(q_networks_layer_sizes, Sequence):
-        q_networks_layer_sizes = {key: q_networks_layer_sizes for key in specs.keys()}
-
-    q_networks = {}
-    action_selectors = {}
-    for key in specs.keys():
-
-        # Get total number of action dimensions from action spec.
-        num_dimensions = specs[key].actions.num_values
-
-        # Create the policy network.
-        q_network = snt.DeepRNN(
-            [
-                snt.Linear(q_networks_layer_sizes[key][0]),
-                tf.nn.relu,
-                snt.GRU(q_networks_layer_sizes[key][1]),
-                networks.NearZeroInitializedLinear(num_dimensions),
-            ]
-        )
-
-        # epsilon greedy action selector
-        action_selector = EpsilonGreedy
-
-        q_networks[key] = q_network
-        action_selectors[key] = action_selector
-
-    return {
-        "q_networks": q_networks,
-        "action_selectors": action_selectors,
-    }
-
-
 def main(_: Any) -> None:
-    """Example running recurrent MADQN on multi-agent Starcraft 2 (SMAC) environment."""
-    # environment
-    environment_factory = functools.partial(
-        pettingzoo_utils.make_environment, env_class="smac", env_name=FLAGS.map_name
-    )
+    """Example running recurrent MADQN on SMAC environment."""
+
+    # Environment
+    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        custom_recurrent_network,
-        q_networks_layer_sizes=[128, 128],
+        madqn.make_default_networks, architecture_type=ArchitectureType.recurrent
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -121,7 +72,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
+    # Distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
@@ -135,17 +86,25 @@ def main(_: Any) -> None:
         ),
         checkpoint_subpath=checkpoint_dir,
         batch_size=32,
-        executor_variable_update_period=100,
+        executor_variable_update_period=200,
         target_update_period=200,
-        max_gradient_norm=10.0,
-        trainer_fn=madqn.training.MADQNRecurrentTrainer,
-        executor_fn=madqn.execution.MADQNRecurrentExecutor,
+        max_gradient_norm=20.0,
+        min_replay_size=32,
+        max_replay_size=5000,
+        samples_per_insert=4,
+        sequence_length=20,
+        period=10,
+        evaluator_interval={"executor_steps": 2000},
+        trainer_fn=madqn.MADQNRecurrentTrainer,
+        executor_fn=madqn.MADQNRecurrentExecutor,
     ).build()
 
-    # launch
+    # Only the trainer should use the GPU (if available)
     local_resources = lp_utils.to_device(
         program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )
+
+    # Launch
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,

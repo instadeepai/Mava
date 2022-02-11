@@ -43,6 +43,7 @@ train_utils.set_growing_gpu_memory()
 
 class MADDPGBaseTrainer(mava.Trainer):
     """MADDPG trainer.
+
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -72,6 +73,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise MADDPG trainer
+
         Args:
             agents: agent ids, e.g. "agent_0".
             agent_types: agent types, e.g. "speaker" or "listener".
@@ -198,6 +200,7 @@ class MADDPGBaseTrainer(mava.Trainer):
 
     def _update_target_networks(self) -> None:
         """Update the target networks using either target averaging or
+
         by directy copying the weights of the online networks every few steps."""
         for key in self.unique_net_keys:
             # Update target network.
@@ -236,6 +239,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         Args:
             obs: observations at timestep t-1
             next_obs: observations at timestep t
+
         Returns:
             Transformed observatations
         """
@@ -264,7 +268,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        """get data to feed to the agent critic network(s)
+        """Get data to feed to the agent critic network(s)
 
         Args:
             o_tm1_trans: transformed (e.g. using observation
@@ -293,7 +297,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        """get data to feed to the agent networks
+        """Get data to feed to the agent networks
 
         Args:
             a_t: action at timestep t
@@ -308,7 +312,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         return dpg_a_t_feed
 
     def _target_policy_actions(self, next_obs: Dict[str, np.ndarray]) -> Any:
-        """select actions using target policy networks
+        """Select actions using target policy networks
 
         Args:
             next_obs: next agent observations.
@@ -351,6 +355,7 @@ class MADDPGBaseTrainer(mava.Trainer):
     # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
+
         Args:
             inputs: input data from the data table (transitions)
         """
@@ -484,7 +489,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
-        """trainer step to update the parameters of the agents in the system"""
+        """Trainer step to update the parameters of the agents in the system"""
 
         # Run the learning step.
         fetches = self._step()
@@ -515,6 +520,7 @@ class MADDPGBaseTrainer(mava.Trainer):
 
     def after_trainer_step(self) -> None:
         """Optionally decay lr after every training step."""
+
         if self._learning_rate_scheduler_fn:
             self._decay_lr(self._num_steps)
             info: Dict[str, Dict[str, float]] = {}
@@ -624,6 +630,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the centralised MADDPG trainer."""
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -658,6 +665,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        """Get critic feed."""
 
         # Centralised based
         o_tm1_feed = tf.stack([o_tm1_trans[agent] for agent in self._agents], 1)
@@ -673,6 +681,7 @@ class MADDPGCentralisedTrainer(MADDPGBaseTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
+        """Get DPG feed."""
 
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
@@ -717,6 +726,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the networked MADDPG trainer."""
+
         super().__init__(
             agents=agents,
             agent_types=agent_types,
@@ -752,6 +762,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        """Get critic feed."""
 
         # Networked based
         connections = self._connection_spec[agent]
@@ -781,6 +792,7 @@ class MADDPGNetworkedTrainer(MADDPGBaseTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
+        """Get DPG feed."""
 
         # Networked based
         tree.map_structure(tf.stop_gradient, a_t)
@@ -861,6 +873,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         e_t: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+        """Get critic feed."""
 
         # State based
         o_tm1_feed = e_tm1["s_t"]
@@ -876,6 +889,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
         dpg_a_t: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
+        """Get DPG feed."""
 
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
@@ -893,6 +907,7 @@ class MADDPGStateBasedTrainer(MADDPGBaseTrainer):
 
 class MADDPGBaseRecurrentTrainer(mava.Trainer):
     """Recurrent MADDPG trainer.
+
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -923,6 +938,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise Recurrent MADDPG trainer
+
         Args:
             agents: agent ids, e.g. "agent_0".
             agent_types: agent types, e.g. "speaker" or "listener".
@@ -1050,6 +1066,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
     def _update_target_networks(self) -> None:
         """Sync the target parameters with the latest online
+
         parameters for all networks"""
 
         for key in self.unique_net_keys:
@@ -1080,7 +1097,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     def _transform_observations(
         self, observations: Dict[str, mava_types.OLT]
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
-        """apply the observation networks to the raw observations from the dataset
+        """Apply the observation networks to the raw observations from the dataset
+
         Args:
             obs: raw agent observations
             next_obs: raw next observations
@@ -1127,7 +1145,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         extras: Dict[str, np.ndarray],
         agent: str,
     ) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
-        """get data to feed to the agent critic network(s)
+        """Get data to feed to the agent critic network(s)
+
         Args:
             o_tm1_trans: transformed (e.g. using observation
                 network) observation at timestep t-1
@@ -1137,6 +1156,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             e_tm1: extras at timestep t-1
             e_t: extras at timestep t
             agent: agent id
+
         Returns:
             agent critic network
                 feeds
@@ -1155,11 +1175,13 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
-        """get data to feed to the agent networks
+        """Get data to feed to the agent networks
+
         Args:
             a_t: action at timestep t
             dpg_a_t: predicted action at timestep t
             agent: agent id
+
         Returns:
             tf.Tensor: agent policy network feed
         """
@@ -1173,11 +1195,13 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         target_obs_trans: Dict[str, np.ndarray],
         target_core_state: Dict[str, np.ndarray],
     ) -> Any:
-        """select actions using target policy networks
+        """Select actions using target policy networks
+
         Args:
             target_obs_trans: agent transformed target
                 observations.
             target_core_state: target recurrent network state
+
         Returns:
             Any: agent target actions
         """
@@ -1206,7 +1230,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
-        """Trainer forward and backward passes.
+        """Trainer forward and backward passes.'
+
         Returns:
             losses
         """
@@ -1229,6 +1254,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     # Forward pass that calculates loss.
     def _forward(self, inputs: reverb.ReplaySample) -> None:
         """Trainer forward pass
+
         Args:
             inputs: input data from the data table (transitions)
         """
@@ -1413,7 +1439,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         train_utils.safe_del(self, "tape")
 
     def step(self) -> None:
-        """trainer step to update the parameters of the agents in the system"""
+        """Trainer step to update the parameters of the agents in the system"""
 
         # Run the learning step.
         fetches = self._step()
@@ -1443,7 +1469,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             self._logger.write(fetches)
 
     def get_variables(self, names: Sequence[str]) -> Dict[str, Dict[str, np.ndarray]]:
-        """get network variables
+        """Get network variables
+
         Args:
             names: network names
         Returns:
@@ -1492,6 +1519,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
 class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """Recurrent MADDPG trainer for a decentralised architecture.
+
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -1550,6 +1578,7 @@ class MADDPGDecentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
 class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
     """Recurrent MADDPG trainer for a centralised architecture.
+
     This is the trainer component of a MADDPG system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """

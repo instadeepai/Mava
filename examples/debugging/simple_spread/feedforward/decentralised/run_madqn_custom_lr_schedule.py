@@ -107,10 +107,9 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationScheduler(
             epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=5e-4
         ),
-        importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=lr_start),
         checkpoint_subpath=checkpoint_dir,
-        learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+        learning_rate_scheduler_fn=learning_rate_scheduler_fn,  # type: ignore
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

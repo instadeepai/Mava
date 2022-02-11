@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Run feedforward MADQN on SMAC."""
 
 
 import functools
@@ -23,11 +24,11 @@ import sonnet as snt
 from absl import app, flags
 
 from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationTimestepScheduler,
+    LinearExplorationScheduler,
 )
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments import pettingzoo_utils
+from mava.utils.environments.smac_utils import make_environment
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -46,15 +47,14 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Example running MADQN on multi-agent Starcraft 2 (SMAC) environment."""
-    # environment
-    environment_factory = functools.partial(
-        pettingzoo_utils.make_environment, env_class="smac", env_name=FLAGS.map_name
-    )
+    """Example running feedforward MADQN on SMAC environment."""
+
+    # Environment
+    environment_factory = functools.partial(make_environment, map_name=FLAGS.map_name)
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks, policy_networks_layer_sizes=[64, 64]
+        madqn.make_default_networks, value_networks_layer_sizes=[64, 64]
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -71,30 +71,31 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
+    # Distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        exploration_scheduler_fn=LinearExplorationTimestepScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=50000
+        exploration_scheduler_fn=LinearExplorationScheduler(
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=5e-6
         ),
-        importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.RMSProp(
             learning_rate=0.0005, epsilon=0.00001, decay=0.99
         ),
         checkpoint_subpath=checkpoint_dir,
-        batch_size=512,
-        executor_variable_update_period=100,
+        batch_size=256,
+        executor_variable_update_period=200,
         target_update_period=200,
-        max_gradient_norm=10.0,
+        max_gradient_norm=20.0,
     ).build()
 
-    # launch
+    # Only the trainer should use the GPU (if available)
     local_resources = lp_utils.to_device(
         program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )
+
+    # Launch
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,
