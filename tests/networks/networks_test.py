@@ -30,7 +30,7 @@ from mava.components.tf.architectures.decentralised import (
     DecentralisedValueActorCritic,
 )
 from mava.components.tf.networks.continuous import LayerNormAndResidualMLP, LayerNormMLP
-from mava.systems.tf import dial, mad4pg, maddpg, madqn, mappo, qmix, vdn
+from mava.systems.tf import mad4pg, maddpg, madqn, mappo
 from mava.utils.environments import debugging_utils
 
 FLAGS = flags.FLAGS
@@ -50,7 +50,7 @@ FLAGS(sys.argv)
 
 @pytest.mark.parametrize(
     "system",
-    [maddpg, mad4pg, madqn, mappo, qmix, vdn, dial],
+    [maddpg, mad4pg, madqn, mappo],
 )
 class TestNetworkAgentKeys:
     """Test that we get the correct agent networks from make network functions."""
@@ -183,7 +183,9 @@ class TestNetworkAgentKeys:
     [
         dict(
             network_mapping={
-                "value_networks": "q_networks",
+                "value_networks": "values",
+                "observation_networks": "observations",
+                "action_selectors": "action_selectors",
             },
             architecture=DecentralisedValueActor,
             system=madqn,
@@ -310,7 +312,7 @@ class TestNetworksSeeding:
         """Test with same seed, networks are the same.
 
         Args:
-            system (Any): network.
+            network: network.
         """
         test_seed = 42
 
@@ -337,7 +339,7 @@ class TestNetworksSeeding:
         """Test with no seed, networks are different.
 
         Args:
-            system (Any): network.
+            network (Any): network.
         """
         network, network_params = network
 
@@ -360,7 +362,7 @@ class TestNetworksSeeding:
         """Test with diff seeds, networks are different.
 
         Args:
-            system (Any): network.
+            network (Any): network.
         """
         network, network_params = network
         test_seed = 42

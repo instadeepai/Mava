@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pytest
@@ -20,24 +20,12 @@ import pytest
 from mava.utils.environments import debugging_utils, pettingzoo_utils
 
 try:
-    from flatland.envs.observations import TreeObsForRailEnv
-    from flatland.envs.rail_generators import sparse_rail_generator
-    from flatland.envs.schedule_generators import sparse_schedule_generator
-
-    from mava.utils.environments.flatland_utils import flatland_env_factory
+    from mava.utils.environments import flatland_utils
 
     _has_flatland = True
 except (ModuleNotFoundError, ImportError):
     _has_flatland = False
     pass
-
-if _has_flatland:
-    rail_gen_cfg: Dict = {
-        "max_num_cities": 4,
-        "max_rails_between_cities": 2,
-        "max_rails_in_city": 3,
-        "grid_mode": True,
-    }
 
 
 @pytest.mark.parametrize(
@@ -47,16 +35,20 @@ if _has_flatland:
         (debugging_utils.make_environment, {}),
         (pettingzoo_utils.make_environment, {}),
         (
-            flatland_env_factory,
+            flatland_utils.make_environment,
             {
-                "env_config": {
-                    "number_of_agents": 2,
-                    "width": 25,
-                    "height": 25,
-                    "rail_generator": sparse_rail_generator(**rail_gen_cfg),
-                    "schedule_generator": sparse_schedule_generator(),
-                    "obs_builder_object": TreeObsForRailEnv(max_depth=2),
-                }
+                "n_agents": 3,
+                "x_dim": 30,
+                "y_dim": 30,
+                "n_cities": 2,
+                "max_rails_between_cities": 2,
+                "max_rails_in_city": 3,
+                "seed": 0,
+                "malfunction_rate": 1 / 200,
+                "malfunction_min_duration": 20,
+                "malfunction_max_duration": 50,
+                "observation_max_path_depth": 30,
+                "observation_tree_depth": 2,
             },
         )
         if _has_flatland
@@ -111,7 +103,7 @@ class TestEnvUtils:
 
         # This test doesn't work with flatland and SC2, since FL uses
         # a default seed (1) and SC2 (5), even when a seed is not provided.
-        if _has_flatland and env_factory == flatland_env_factory:
+        if _has_flatland and env_factory == flatland_utils.make_environment:
             pytest.skip("Skipping no seed test for flatland and SC2.")
 
         wrapped_env = env_factory(**env_params)
@@ -150,7 +142,7 @@ class TestEnvUtils:
 
         # This test doesn't work with flatland, since FL seeds
         # at ini for SparseRailGen .
-        if _has_flatland and env_factory == flatland_env_factory:
+        if _has_flatland and env_factory == flatland_utils.make_environment:
             pytest.skip("Skipping diff seed test for flatland.")
 
         wrapped_env = env_factory(random_seed=test_seed1, **env_params)

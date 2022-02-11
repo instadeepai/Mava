@@ -47,6 +47,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
+
 flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
@@ -61,7 +62,7 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks, archecture_type=ArchitectureType.recurrent
+        madqn.make_default_networks, architecture_type=ArchitectureType.recurrent
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -89,8 +90,10 @@ def main(_: Any) -> None:
         ),
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
-        trainer_fn=madqn.training.MADQNRecurrentTrainer,
-        executor_fn=madqn.execution.MADQNRecurrentExecutor,
+        trainer_fn=madqn.MADQNRecurrentTrainer,
+        executor_fn=madqn.MADQNRecurrentExecutor,
+        max_replay_size=5000,
+        min_replay_size=32,
         batch_size=32,
     ).build()
 

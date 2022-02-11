@@ -20,15 +20,11 @@ import dm_env
 
 
 class ParallelEnvWrapper(dm_env.Environment):
-    """
-    Abstract class for parallel environment wrappers.
-    """
+    """Abstract class for parallel environment wrappers"""
 
     @abstractmethod
     def env_done(self) -> bool:
-        """
-        Returns a bool indicating if all agents in env are done.
-        """
+        """Returns a bool indicating if env is done"""
 
     @property
     @abstractmethod

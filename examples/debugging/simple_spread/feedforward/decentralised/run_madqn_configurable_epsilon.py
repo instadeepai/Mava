@@ -108,7 +108,6 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=2,
         exploration_scheduler_fn=exploration_scheduler_fn,
-        importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()

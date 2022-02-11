@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+"""Example running feedforward MADQN on Flatland."""
 
 import functools
 from datetime import datetime
@@ -27,7 +27,7 @@ from mava.components.tf.modules.exploration.exploration_scheduling import (
 )
 from mava.systems.tf import madqn
 from mava.utils import lp_utils
-from mava.utils.environments.flatland_utils import flatland_env_factory
+from mava.utils.environments.flatland_utils import make_environment
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
@@ -60,9 +60,7 @@ flatland_env_config: Dict = {
 def main(_: Any) -> None:
 
     # Environment.
-    environment_factory = functools.partial(
-        flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
-    )
+    environment_factory = functools.partial(make_environment, **flatland_env_config)
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)
@@ -81,16 +79,15 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
+    # Distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
         exploration_scheduler_fn=LinearExplorationScheduler(
-            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-4
+            epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
         ),
-        importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
     ).build()

@@ -35,7 +35,7 @@ def decay_lr_actor_critic(
 
 
 def decay_lr(
-    lr_schedule: Optional[Callable[[int], None]], optimizers: Dict, trainer_step: int
+    lr_schedule: Optional[Callable], optimizers: Dict, trainer_step: int
 ) -> None:
     """Funtion that decays lr of optim.
 
@@ -121,6 +121,18 @@ def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
         logged_losses[agent] = {
             "critic_loss": critic_losses[agent],
             "policy_loss": policy_losses[agent],
+        }
+
+    return logged_losses
+
+
+# Map value losses to dict, grouped by agent.
+def map_losses_per_agent_value(value_losses: Dict) -> Dict:
+    assert len(value_losses) > 0, "Invalid System Checkpointer."
+    logged_losses: Dict[str, Dict[str, Any]] = {}
+    for agent in value_losses.keys():
+        logged_losses[agent] = {
+            "value_loss": value_losses[agent],
         }
 
     return logged_losses
