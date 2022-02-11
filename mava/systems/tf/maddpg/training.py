@@ -1363,12 +1363,9 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                     clip_norm=clip_norm,
                 )
                 # Multiply by discounts to not train on padded data.
-                policy_mask = tf.reshape(agent_discount, policy_loss.shape) > 0.0
-                critic_mask = (
-                    tf.reshape(
-                        agent_discount[:, self._bootstrap_n :], critic_loss.shape
-                    )
-                    > 0.0
+                policy_mask = tf.reshape(agent_discount, policy_loss.shape)
+                critic_mask = tf.reshape(
+                    agent_discount[:, self._bootstrap_n :], critic_loss.shape
                 )
                 policy_loss = policy_loss * policy_mask
                 critic_loss = critic_loss * critic_mask
