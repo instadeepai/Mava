@@ -21,17 +21,19 @@ import dm_env
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tree
 from acme import types
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
-from mava import adders, core
+from mava import adders
+from mava.systems.tf import executors
 from mava.types import OLT
 
 tfd = tfp.distributions
 
 
-class MAPPOFeedForwardExecutor(core.Executor):
+class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
     """A feed-forward executor.
 
     An executor based on a feed-forward policy for each agent in the system.
@@ -68,8 +70,6 @@ class MAPPOFeedForwardExecutor(core.Executor):
         self._interval = interval
         self._evaluator = evaluator
 
-    # TODO: Move tf.function out of self._policy.
-    @tf.function
     def _policy(
         self,
         agent: str,
@@ -113,33 +113,10 @@ class MAPPOFeedForwardExecutor(core.Executor):
         log_prob = policy.log_prob(action)
         return log_prob, action
 
-    def select_action(
-        self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
-        """Select an action for a single agent in the system
-
-        Args:
-            agent (str): agent id.
-            observation (types.NestedArray): observation tensor received from the
-                environment.
-
-        Returns:
-            types.NestedArray: agent action
-        """
-
-        # Step the recurrent policy/value network forward
-        # given the current observation and state.
-        log_prob, action = self._policy(agent, observation)
-
-        # Return a numpy array with squeezed out batch dimension.
-        action = tf2_utils.to_numpy_squeeze(action)
-        self._prev_log_probs[agent] = tf2_utils.to_numpy_squeeze(log_prob)
-
-        return action
-
-    def select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
+    @tf.function
+    def _select_actions(
+        self, observations: Dict[str, OLT]
+    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
         """Select the actions for all agents in the system
 
         Args:
@@ -152,10 +129,32 @@ class MAPPOFeedForwardExecutor(core.Executor):
         """
 
         actions = {}
+        log_probs = {}
         for agent, observation in observations.items():
-            action = self.select_action(agent, observation)
-            actions[agent] = action
+            # Step the recurrent policy/value network forward
+            # given the current observation and state.
+            log_prob, action = self._policy(agent, observation)
 
+            # Return a numpy array with squeezed out batch dimension.
+            actions[agent] = action
+            log_probs[agent] = log_prob
+
+        return actions, log_probs
+
+    def select_actions(self, observations: Dict[str, OLT]) -> types.NestedArray:
+        """Select the actions for all agents in the system
+
+        Args:
+            observations: agent observations from the
+                environment.
+
+        Returns:
+            actions.
+        """
+
+        actions, log_probs = self._select_actions(observations)
+        actions = tree.map_structure(tf2_utils.to_numpy_squeeze, actions)
+        self._prev_log_probs = tree.map_structure(tf2_utils.to_numpy_squeeze, log_probs)
         return actions
 
     def observe_first(
