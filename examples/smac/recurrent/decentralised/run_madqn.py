@@ -94,7 +94,7 @@ def main(_: Any) -> None:
         samples_per_insert=4,
         sequence_length=20,
         period=10,
-        evaluator_interval={"executor_episodes": 2},
+        evaluator_interval={"executor_steps": 2000},
         trainer_fn=madqn.MADQNRecurrentTrainer,
         executor_fn=madqn.MADQNRecurrentExecutor,
     ).build()
