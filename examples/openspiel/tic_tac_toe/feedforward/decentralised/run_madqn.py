@@ -12,8 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Example running feedforward MADQN on OpenSpiel's tic_tac_toe."""
 
-"""Example running MADQN on OpenSpiel's tic_tac_toe."""
 import functools
 from datetime import datetime
 from typing import Any
@@ -58,7 +58,7 @@ def make_environment(
 
 def main(_: Any) -> None:
 
-    # environment
+    # Environment
     environment_factory = functools.partial(
         make_environment,
         game=FLAGS.game,
@@ -81,7 +81,7 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
+    # Distributed program
     program = madqn.MADQN(
         environment_factory=environment_factory,
         network_factory=network_factory,

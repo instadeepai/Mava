@@ -38,6 +38,8 @@ class DecentralisedValueActor(BaseArchitecture):
         self,
         environment_spec: mava_specs.MAEnvironmentSpec,
         value_networks: Dict[str, snt.Module],
+        action_selectors: Dict[str, snt.Module],
+        observation_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
     ):
         self._env_spec = environment_spec
@@ -47,6 +49,8 @@ class DecentralisedValueActor(BaseArchitecture):
         self._agent_type_specs = self._env_spec.get_agent_type_specs()
 
         self._value_networks = value_networks
+        self._action_selectors = action_selectors
+        self._observation_networks = observation_networks
         self._agent_net_keys = agent_net_keys
         self._n_agents = len(self._agents)
 
@@ -55,6 +59,7 @@ class DecentralisedValueActor(BaseArchitecture):
     def _create_target_networks(self) -> None:
         # create target behaviour networks
         self._target_value_networks = copy.deepcopy(self._value_networks)
+        self._target_observation_networks = copy.deepcopy(self._observation_networks)
 
     def _get_actor_specs(self) -> Dict[str, OLT]:
         actor_obs_specs = {}
@@ -70,6 +75,9 @@ class DecentralisedValueActor(BaseArchitecture):
         actor_networks: Dict[str, Dict[str, snt.Module]] = {
             "values": {},
             "target_values": {},
+            "observations": {},
+            "target_observations": {},
+            "selectors": {},
         }
 
         # get actor specs
@@ -79,16 +87,25 @@ class DecentralisedValueActor(BaseArchitecture):
         for agent_key in self._agents:
             agent_net_key = self._agent_net_keys[agent_key]
             obs_spec = actor_obs_specs[agent_key]
-            # Create variables for value and policy networks.
-            tf2_utils.create_variables(self._value_networks[agent_net_key], [obs_spec])
+            # Create variables for observation and value networks.
+            embed = tf2_utils.create_variables(
+                self._observation_networks[agent_net_key], [obs_spec]
+            )
+            tf2_utils.create_variables(self._value_networks[agent_net_key], [embed])
 
-            # create target value network variables
+            # Create target value and observation network variables
+            embed = tf2_utils.create_variables(
+                self._target_observation_networks[agent_net_key], [obs_spec]
+            )
             tf2_utils.create_variables(
-                self._target_value_networks[agent_net_key], [obs_spec]
+                self._target_value_networks[agent_net_key], [embed]
             )
 
         actor_networks["values"] = self._value_networks
         actor_networks["target_values"] = self._target_value_networks
+        actor_networks["selectors"] = self._action_selectors
+        actor_networks["observations"] = self._observation_networks
+        actor_networks["target_observations"] = self._target_observation_networks
 
         return actor_networks
 
