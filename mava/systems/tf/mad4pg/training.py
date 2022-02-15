@@ -661,16 +661,17 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 # Cast the additional discount to match
                 # the environment discount dtype.
                 agent_discount = discounts[agent]
-                discount = tf.cast(self._discount, dtype=agent_discount.dtype)
+                # discount = tf.cast(self._discount, dtype=agent_discount.dtype)
 
                 # Critic loss.
                 critic_loss = recurrent_n_step_critic_loss(
                     q_values=q_values,
                     target_q_values=target_q_values,
                     rewards=rewards[agent],
-                    discounts=discount * agent_discount,
+                    discount=self._discount,
+                    end_of_episode=agent_discount,
                     bootstrap_n=self._bootstrap_n,
-                    loss_fn=losses.categorical,
+                    # loss_fn=losses.categorical,
                 )
                 # Actor learning.
                 obs_agent_feed = target_obs_trans[agent]
@@ -717,17 +718,12 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                     clip_norm=clip_norm,
                 )
                 policy_mask = tf.reshape(agent_discount, policy_loss.shape)
-                critic_mask = tf.reshape(
-                    agent_discount[:, self._bootstrap_n :], critic_loss.shape
-                )
                 policy_loss = policy_loss * policy_mask
-                critic_loss = critic_loss * critic_mask
                 self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
                     policy_mask
                 )
-                self.critic_losses[agent] = tf.reduce_sum(critic_loss) / tf.reduce_sum(
-                    critic_mask
-                )
+                # Critic loss accounts for padding so no masking is needed.
+                self.critic_losses[agent] = tf.reduce_sum(critic_loss)
         self.tape = tape
 
 

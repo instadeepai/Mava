@@ -327,7 +327,9 @@ class MADDPGBaseTrainer(mava.Trainer):
             actions[agent] = self._target_policy_networks[agent_key](next_observation)
         return actions
 
-    @tf.function
+    # @tf.function
+    tf.print("Add this back in.")
+
     def _step(
         self,
     ) -> Dict[str, Dict[str, Any]]:
@@ -1332,16 +1334,17 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 # Cast the additional discount to match
                 # the environment discount dtype.
                 agent_discount = discounts[agent]
-                discount = tf.cast(self._discount, dtype=agent_discount.dtype)
+                # discount = tf.cast(self._discount, dtype=agent_discount.dtype)
 
                 # Critic loss.
                 critic_loss = recurrent_n_step_critic_loss(
                     q_values=q_values,
                     target_q_values=target_q_values,
                     rewards=rewards[agent],
-                    discounts=discount * agent_discount,
+                    discount=self._discount,
+                    end_of_episode=agent_discount,
                     bootstrap_n=self._bootstrap_n,
-                    loss_fn=trfl.td_learning,
+                    # loss_fn=trfl.td_learning,
                 )
 
                 # Actor learning.
@@ -1390,17 +1393,12 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 )
                 # Multiply by discounts to not train on padded data.
                 policy_mask = tf.reshape(agent_discount, policy_loss.shape)
-                critic_mask = tf.reshape(
-                    agent_discount[:, self._bootstrap_n :], critic_loss.shape
-                )
                 policy_loss = policy_loss * policy_mask
-                critic_loss = critic_loss * critic_mask
                 self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
                     policy_mask
                 )
-                self.critic_losses[agent] = tf.reduce_sum(critic_loss) / tf.reduce_sum(
-                    critic_mask
-                )
+                # Critic loss accounts for padding so no masking is needed.
+                self.critic_losses[agent] = tf.reduce_sum(critic_loss)
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
