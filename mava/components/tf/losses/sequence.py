@@ -31,7 +31,7 @@ def recurrent_n_step_critic_loss(
     end_of_episode: tf.Tensor,
 ) -> tf.Tensor:
 
-    if type(q_values) == DiscreteValuedDistribution:
+    if isinstance(q_values, DiscreteValuedDistribution):
         # Convert to tensor values
         q_values = tf.reshape(q_values._mean(), rewards.shape)
         target_q_values = tf.reshape(target_q_values._mean(), rewards.shape)
@@ -53,13 +53,13 @@ def recurrent_n_step_critic_loss(
     q_tm1 = q_values
 
     # The last values that rolled over do not matter because a
-    # mask is applied to it (hopefully).
+    # mask is applied to it.
     q_t = tf.roll(target_q_values, shift=-bootstrap_n, axis=1)
 
     # Create the end of episode mask.
     ones_mask = tf.ones(shape=q_t[:, :-bootstrap_n].shape)
     zeros_mask = tf.zeros(shape=q_t[:, -bootstrap_n:].shape)
-    eoe_mask = tf.concat([ones_mask, zeros_mask], axis=1)
+    end_of_episode_mask = tf.concat([ones_mask, zeros_mask], axis=1)
 
     q_tm1, _ = combine_dim(q_tm1)
     n_step_rewards = rewards
@@ -72,18 +72,13 @@ def recurrent_n_step_critic_loss(
     n_step_rewards, _ = combine_dim(n_step_rewards)
 
     q_t, _ = combine_dim(q_t)
-    eoe_mask, _ = combine_dim(eoe_mask)
-    done_eoe_masking, _ = combine_dim(
-        tf.roll(end_of_episode, shift=-bootstrap_n, axis=1)
-    )
+    end_of_episode_mask, _ = combine_dim(end_of_episode_mask)
+    done_masking, _ = combine_dim(tf.roll(end_of_episode, shift=-bootstrap_n, axis=1))
 
     critic_loss = trfl.td_learning(
         v_tm1=q_tm1,
         r_t=n_step_rewards,
-        pcont_t=eoe_mask * done_eoe_masking * math.pow(discount, bootstrap_n),
+        pcont_t=end_of_episode_mask * done_masking * math.pow(discount, bootstrap_n),
         v_t=q_t,
-    )
-
-    if type(q_t) != DiscreteValuedDistribution:
-        critic_loss = critic_loss.loss
+    ).loss
     return critic_loss

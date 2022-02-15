@@ -661,7 +661,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 # Cast the additional discount to match
                 # the environment discount dtype.
                 agent_discount = discounts[agent]
-                # discount = tf.cast(self._discount, dtype=agent_discount.dtype)
 
                 # Critic loss.
                 critic_loss = recurrent_n_step_critic_loss(
@@ -671,11 +670,9 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                     discount=self._discount,
                     end_of_episode=agent_discount,
                     bootstrap_n=self._bootstrap_n,
-                    # loss_fn=losses.categorical,
                 )
                 # Actor learning.
                 obs_agent_feed = target_obs_trans[agent]
-                # TODO (dries): Why is there an extra tuple?
                 agent_core_state = core_state[agent][0]
                 transposed_obs = tf2_utils.batch_to_sequence(obs_agent_feed)
                 outputs, updated_states = snt.static_unroll(
