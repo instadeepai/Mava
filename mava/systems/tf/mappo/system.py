@@ -92,85 +92,85 @@ class MAPPO:
         """Initialise the system
 
         Args:
-            environment_factory (Callable[[bool], dm_env.Environment]): function to
+            environment_factory: function to
                 instantiate an environment.
             network_factory : function to instantiate system networks.
-            logger_factory (Callable[[str], MavaLogger], optional): function to
+            logger_factory : function to
                 instantiate a system logger. Defaults to None.
-            architecture (Type[ DecentralisedValueActorCritic ], optional): system
+            architecture : system
                 architecture, e.g. decentralised or centralised. Defaults to
                 DecentralisedValueActorCritic.
-            trainer_fn (Type[training.MAPPOTrainer], optional): training type
+            trainer_fn : training type
                 associated with executor and architecture, e.g. centralised training.
                 Defaults to training.MAPPOTrainer.
-            executor_fn (Type[core.Executor], optional): executor type, e.g. feedforward
+            executor_fn : executor type, e.g. feedforward
                 or recurrent. Defaults to execution.MAPPOFeedForwardExecutor.
-            num_executors (int, optional): number of executor processes to run in
+            num_executors : number of executor processes to run in
                 parallel. Defaults to 1.
-            num_caches (int, optional): number of trainer node caches. Defaults to 0.
-            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
+            num_caches : number of trainer node caches. Defaults to 0.
+            environment_spec : description of
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
+            shared_weights : whether agents should share weights or not.
                 When agent_net_keys are provided the value of shared_weights is ignored.
                 Defaults to True.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: : specifies what network each agent uses.
                 Defaults to {}.
-            executor_variable_update_period (int, optional): number of steps before
+            executor_variable_update_period : number of steps before
                 updating executor variables from the variable source. Defaults to 100.
             policy_optimizer : optimizer(s) for updating policy networks.
                 Defaults to snt.optimizers.Adam(learning_rate=5e-4).
-            critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
+            critic_optimizer : optimizer for updating critic
                 networks. This is not used if using single optim.
-            use_single_optimizer (bool, optional): boolean to decide
+            use_single_optimizer : boolean to decide
                 whether or not the critic, policy and observation networks are
                 optimized jointly by a single optimizer. If true, all networks
                 are optimized by the policy_optimizer. If False, the observation and
                 policy network are optimized by the policy optimizer and the
                 critic network by the critic optimizer.
-            discount (float, optional): discount factor to use for TD updates. Defaults
+            discount : discount factor to use for TD updates. Defaults
                 to 0.99.
-            lambda_gae (float, optional): scalar determining the mix of bootstrapping
+            lambda_gae : scalar determining the mix of bootstrapping
                 vs further accumulation of multi-step returns at each timestep.
                 Defaults to 0.99.
-            clipping_epsilon (float, optional): Hyper-parameter for clipping in the
+            clipping_epsilon : Hyper-parameter for clipping in the
                 policy objective. Defaults to 0.2.
-            entropy_cost (float, optional): contribution of entropy regularization to
+            entropy_cost : contribution of entropy regularization to
                 the total loss. Defaults to 0.01.
-            baseline_cost (float, optional): contribution of the value loss to the
+            baseline_cost : contribution of the value loss to the
                 total loss. Defaults to 0.5.
             max_gradient_norm: value to specify the maximum clipping value for the
             gradient norm during optimization.
-            max_queue_size (int, optional): maximum number of items in the queue.
+            max_queue_size : maximum number of items in the queue.
                 Should be larger than batch size.
-            batch_size (int, optional): sample batch size for updates.
+            batch_size: sample batch size for updates.
                 Defaults to 512. Minibatches are sampled from this data.
-            minibatch_size (int, optional): size of minibatch that is sampled
+            minibatch_size: size of minibatch that is sampled
                 from the training batch. Minibatches are used for each gradient step.
-            num_epochs (int, optional): number of epochs every training step.
+            num_epochs: number of epochs every training step.
                 Recommendation as per https://arxiv.org/pdf/2103.01955.pdf, "15
                 epochs for easy tasks,and 10 or 5 epochs for difficult tasks."
-            sequence_length (int, optional): sequence rollout length. Defaults
+            sequence_length: sequence rollout length. Defaults
                 to 10.
-            sequence_period (int, optional): consecutive starting points for
+            sequence_period: consecutive starting points for
                 overlapping rollouts across a sequence. Defaults to sequence length -1.
-            max_executor_steps (int, optional): maximum number of steps and executor
+            max_executor_steps: maximum number of steps and executor
                 can in an episode. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint models. Defaults to
+            checkpoint : whether to checkpoint models. Defaults to
                 False.
-            checkpoint_subpath (str, optional): subdirectory specifying where to store
+            checkpoint_subpath: subdirectory specifying where to store
                 checkpoints. Defaults to "~/mava/".
-            checkpoint_minute_interval (int): The number of minutes to wait between
+            checkpoint_minute_interval: The number of minutes to wait between
                 checkpoints.
-            logger_config (Dict, optional): additional configuration settings for the
+            logger_config: additional configuration settings for the
                 logger factory. Defaults to {}.
-            train_loop_fn (Callable, optional): function to instantiate a train loop.
+            train_loop_fn: function to instantiate a train loop.
                 Defaults to ParallelEnvironmentLoop.
-            eval_loop_fn (Callable, optional): function to instantiate an evaluation
+            eval_loop_fn: function to instantiate an evaluation
                 loop. Defaults to ParallelEnvironmentLoop.
-            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
+            train_loop_fn_kwargs: possible keyword arguments to send
                 to the training loop. Defaults to {}.
-            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
+            eval_loop_fn_kwargs: possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
             learning_rate_scheduler_fn: dict with two functions/classes (one for the
                 policy and one for the critic optimizer), that takes in a trainer
@@ -307,7 +307,7 @@ class MAPPO:
         """Step counter
 
         Args:
-            checkpoint (bool): whether to checkpoint the counter.
+            checkpoint : whether to checkpoint the counter.
 
         Returns:
             Any: step counter object.
@@ -327,7 +327,7 @@ class MAPPO:
         """Coordination helper for a distributed program
 
         Args:
-            counter (counting.Counter): step counter object.
+            counter: step counter object.
 
         Returns:
             Any: step limiter object.
@@ -343,8 +343,8 @@ class MAPPO:
         """System trainer
 
         Args:
-            replay (reverb.Client): replay data table to pull data from.
-            counter (counting.Counter): step counter object.
+            replay: replay data table to pull data from.
+            counter: step counter object.
 
         Returns:
             mava.core.Trainer: system trainer.
@@ -394,11 +394,11 @@ class MAPPO:
         """System executor
 
         Args:
-            executor_id (str): id to identify the executor process for logging purposes.
-            replay (reverb.Client): replay data table to push data to.
+            executor_id: id to identify the executor process for logging purposes.
+            replay: replay data table to push data to.
             variable_source (acme.VariableSource): variable server for updating
                 network variables.
-            counter (counting.Counter): step counter object.
+            counter: step counter object.
 
         Returns:
             mava.ParallelEnvironmentLoop: environment-executor loop instance.
@@ -538,7 +538,7 @@ class MAPPO:
         """Build the distributed system as a graph program.
 
         Args:
-            name (str, optional): system name. Defaults to "mappo".
+            name : system name. Defaults to "mappo".
 
         Returns:
             Any: graph program for distributed system training.
