@@ -92,7 +92,7 @@ class TestMADDPG:
         # networks
         network_factory = lp_utils.partial_kwargs(
             maddpg.make_default_networks,
-            archecture_type=ArchitectureType.recurrent,
+            architecture_type=ArchitectureType.recurrent,
             policy_networks_layer_sizes=(32, 32),
         )
 
