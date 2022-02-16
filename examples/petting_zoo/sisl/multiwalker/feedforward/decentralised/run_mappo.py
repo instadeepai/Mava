@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running continous MAPPo on pettinzoo SISL environments."""
+"""Example running continous MAPPO on pettinzoo SISL environments."""
 
 import functools
 from datetime import datetime

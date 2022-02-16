@@ -109,7 +109,7 @@ def trajectory_signature(
             act_specs,
             reward_specs,
             step_discount_specs,
-            # TODO Update soe this to be shape=(sequence_length,)
+            # TODO Update soe (start of episode) this to be shape=(sequence_length,)
             specs.Array(shape=(), dtype=bool),
             extras_spec,
         ),
@@ -125,5 +125,3 @@ def trajectory_signature(
     )
 
     return spec_step
-
-    # return tree.map_structure_with_path(base.spec_like_to_tensor_spec, spec_step)
