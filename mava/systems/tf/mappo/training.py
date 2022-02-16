@@ -501,11 +501,20 @@ class MAPPOTrainer(mava.Trainer):
 
             # Get trainable variables.
             if self._use_single_optimizer:
-                policy_variables = (
+                variables = (
                     self._policy_networks[agent_key].trainable_variables
                     + self._critic_networks[agent_key].trainable_variables
                     + self._observation_networks[agent_key].trainable_variables
                 )
+
+                # Get gradients.
+                gradients = tape.gradient(policy_losses[agent], variables)
+
+                # Optionally apply clipping.
+                grads = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
+
+                # Apply gradients.
+                self._policy_optimizers[agent_key].apply(grads, variables)
             else:
                 policy_variables = self._policy_networks[agent_key].trainable_variables
                 critic_variables = (
@@ -521,16 +530,16 @@ class MAPPOTrainer(mava.Trainer):
                 # Apply gradients.
                 self._critic_optimizers[agent_key].apply(critic_grads, critic_variables)
 
-            # Get gradients.
-            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
+                # Get gradients.
+                policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
 
-            # Optionally apply clipping.
-            policy_grads = tf.clip_by_global_norm(
-                policy_gradients, self._max_gradient_norm
-            )[0]
+                # Optionally apply clipping.
+                policy_grads = tf.clip_by_global_norm(
+                    policy_gradients, self._max_gradient_norm
+                )[0]
 
-            # Apply gradients.
-            self._policy_optimizers[agent_key].apply(policy_grads, policy_variables)
+                # Apply gradients.
+                self._policy_optimizers[agent_key].apply(policy_grads, policy_variables)
 
         train_utils.safe_del(self, "tape")
 
