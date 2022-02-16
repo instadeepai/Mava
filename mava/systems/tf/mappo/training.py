@@ -72,7 +72,6 @@ class MAPPOTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
         normalize_advantage: bool = False,
-        value_clipping: bool = False,
     ):
         """Initialise MAPPO trainer
 
@@ -130,8 +129,6 @@ class MAPPOTrainer(mava.Trainer):
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
             normalize_advantage: whether to normalize the advantage.
-            value_clipping: whether to clip the difference
-                between new and old value predictions. Currently not implemented.
         """
 
         # Store agents.
@@ -149,7 +146,6 @@ class MAPPOTrainer(mava.Trainer):
         self._critic_networks = critic_networks
 
         self.unique_net_keys = sort_str_num(policy_networks.keys())
-        self._value_clipping = value_clipping
         self._normalize_advantage = normalize_advantage
 
         # Create optimizers for different agent types.
@@ -437,16 +433,13 @@ class MAPPOTrainer(mava.Trainer):
                 returns = tf.stop_gradient(returns)
                 unclipped_critic_loss = tf.square(returns - value_pred)
 
-                if self._value_clipping:
-                    # TODO Clip values to reduce variablility
-                    # Need to keep track of old value estimates (either in replay or in
-                    # training state) and clip them.
-                    raise NotImplementedError
-                else:
-                    masked_critic_loss = unclipped_critic_loss * termination[:-1]
-                    critic_loss = tf.reduce_sum(masked_critic_loss) / tf.reduce_sum(
-                        termination[:-1]
-                    )
+                # TODO Clip values to reduce variablility
+                # Need to keep track of old value estimates (either in replay or in
+                # training state) and clip them.
+                masked_critic_loss = unclipped_critic_loss * termination[:-1]
+                critic_loss = tf.reduce_sum(masked_critic_loss) / tf.reduce_sum(
+                    termination[:-1]
+                )
 
                 critic_loss = critic_loss * self._baseline_cost
 
@@ -643,7 +636,6 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         checkpoint_subpath: str = "~/mava",
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
         normalize_advantage: bool = False,
-        value_clipping: bool = False,
     ):
         """Centralised MAPPO trainer.
 
@@ -693,8 +685,6 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
             normalize_advantage: whether to normalize the advantage.
-            value_clipping: whether to clip the difference
-                between new and old value predictions. Currently not implemented.
         """
 
         super().__init__(
@@ -723,7 +713,6 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             checkpoint_subpath=checkpoint_subpath,
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             normalize_advantage=normalize_advantage,
-            value_clipping=value_clipping,
         )
 
     def _get_critic_feed(
