@@ -77,54 +77,54 @@ class MAPPOTrainer(mava.Trainer):
         """Initialise MAPPO trainer
 
         Args:
-            agents (List[str]): agent ids, e.g. "agent_0".
-            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
-            observation_networks (Dict[str, snt.Module]): observation networks
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            observation_networks: observation networks
                 for each agent in the system.
-            policy_networks (Dict[str, snt.Module]): policy networks for each
+            policy_networks: policy networks for each
                 agent in the system.
-            critic_networks (Dict[str, snt.Module]): critic network(s), shared
+            critic_networks: critic network(s), shared
                 or for each agent in the system.
             dataset (tf.data.Dataset): training dataset.
-            policy_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): optimizer
+            policy_optimizer: optimizer
                 for updating policy networks.
-            critic_optimizer (Union[snt.Optimizer, Dict[str, snt.Optimizer]]): optimizer
+            critic_optimizer: optimizer
                 for updating critic networks. This is not used if using
                 single optim.
-            use_single_optimizer (bool): boolean to decide
+            use_single_optimizer: boolean to decide
                 whether or not the critic, policy and observation networks are
                 optimized jointly by a single optimizer. If true, all networks
                 are optimized by the policy_optimizer. If False, the observation and
                 policy network are optimized by the policy optimizer and the
                 critic network by the critic optimizer.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: specifies what network each agent uses.
                 Defaults to {}.
-            checkpoint_minute_interval (int): The number of minutes to wait between
+            checkpoint_minute_interval: The number of minutes to wait between
                 checkpoints.
-            minibatch_size (int, optional): size of minibatch that is sampled from
+            minibatch_size: size of minibatch that is sampled from
                 the training batch. Minibatches are used for each gradient step.
-            num_epochs (int, optional): number of epochs for every training step.
+            num_epochs: number of epochs for every training step.
                 Recommendation as per https://arxiv.org/pdf/2103.01955.pdf, "15
                 epochs for easy tasks,and 10 or 5 epochs for difficult tasks."
-            discount (float, optional): discount factor for TD updates. Defaults
+            discount: discount factor for TD updates. Defaults
                 to 0.99.
-            lambda_gae (float, optional): scalar determining the mix of bootstrapping
+            lambda_gae: scalar determining the mix of bootstrapping
                 vs further accumulation of multi-step returns at each timestep.
                 Defaults to 1.0.
-            entropy_cost (float, optional): contribution of entropy regularization to
+            entropy_cost: contribution of entropy regularization to
                 the total loss. Defaults to 0.0.
-            baseline_cost (float, optional): contribution of the value loss to the
+            baseline_cost: contribution of the value loss to the
                 total loss. Defaults to 1.0.
-            clipping_epsilon (float, optional): Hyper-parameter for clipping in the
+            clipping_epsilon: Hyper-parameter for clipping in the
                 policy objective. Defaults to 0.2.
-            max_gradient_norm (float, optional): maximum allowed norm for gradients
+            max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
-            counter (counting.Counter, optional): step counter object. Defaults to None.
-            logger (loggers.Logger, optional): logger object for logging trainer
+            counter: step counter object. Defaults to None.
+            logger: logger object for logging trainer
                 statistics. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
+            checkpoint: whether to checkpoint networks. Defaults to
                 True.
-            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
+            checkpoint_subpath: subdirectory for storing checkpoints.
                 Defaults to "~/mava/".
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
@@ -243,9 +243,9 @@ class MAPPOTrainer(mava.Trainer):
         """Get critic feed.
 
         Args:
-            observations_trans (Dict[str, np.ndarray]): transformed (e.g. using
+            observations_trans: transformed (e.g. using
                 observation network) raw agent observation.
-            agent (str): agent id.
+            agent: agent id.
 
         Returns:
             tf.Tensor: agent critic network feed
@@ -262,7 +262,7 @@ class MAPPOTrainer(mava.Trainer):
         """Apply the observation networks to the raw observations from the dataset
 
         Args:
-            observation (Dict[str, np.ndarray]): raw agent observations
+            observation: raw agent observations
 
         Returns:
             Dict[str, np.ndarray]: transformed
@@ -333,7 +333,7 @@ class MAPPOTrainer(mava.Trainer):
         """Do a single forward and backward pass
 
         Args:
-            inputs (Any): input data from the data table (transitions)
+            inputs: input data from the data table (transitions)
 
         Returns:
             Dict[str, Dict[str, Any]]: losses
@@ -350,7 +350,7 @@ class MAPPOTrainer(mava.Trainer):
         """Trainer forward pass
 
         Args:
-            inputs (Any): input data from the data table (transitions)
+            inputs: input data from the data table (transitions)
         """
 
         # Convert to sequence data
@@ -567,7 +567,7 @@ class MAPPOTrainer(mava.Trainer):
         """Get network variables
 
         Args:
-            names (Sequence[str]): network names
+            names: network names
 
         Returns:
             Dict[str, Dict[str, np.ndarray]]: network variables
