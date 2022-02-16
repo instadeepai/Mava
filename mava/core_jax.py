@@ -25,16 +25,6 @@ class BaseSystem(abc.ABC):
     """Abstract system object."""
 
     @abc.abstractmethod
-    def build(self, config: SimpleNamespace) -> SimpleNamespace:
-        """Build system by constructing system components.
-
-        Args:
-            config : system configuration including
-        Returns:
-            System components
-        """
-
-    @abc.abstractmethod
     def update(self, component: Any, name: str) -> None:
         """Update a component that has already been added to the system.
 
@@ -53,18 +43,38 @@ class BaseSystem(abc.ABC):
         """
 
     @abc.abstractmethod
-    def launch(
-        self,
-        num_executors: int,
-        multi_process: bool,
-        nodes_on_gpu: List[str],
-        name: str,
-    ) -> None:
-        """Run the system, either locally or distributed.
+    def build(self, config: SimpleNamespace) -> SimpleNamespace:
+        """Build system by constructing system components.
 
         Args:
-            num_executors : number of executor processes to run in parallel.
+            config : system configuration including
+        Returns:
+            System components
+        """
+
+    @abc.abstractmethod
+    def distribute(
+        self,
+        num_executors: int,
+        nodes_on_gpu: List[str],
+        distributor: Any = None,
+    ) -> None:
+        """Distribute system across multiple processes.
+
+        Args:
+            num_executors : number of executor processes to run in parallel
             multi_process : whether to run locally or distributed
             nodes_on_gpu : which processes to run on gpu
+            distributor : custom distributor component
+        """
+
+    @abc.abstractmethod
+    def launch(
+        self,
+        name: str = "system",
+    ) -> None:
+        """Run the system.
+
+        Args:
             name : name of the system
         """
