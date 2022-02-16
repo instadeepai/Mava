@@ -95,7 +95,7 @@ class TestMADQN:
         # networks
         network_factory = lp_utils.partial_kwargs(
             madqn.make_default_networks,
-            architecture_type=ArchitectureType.recurrent,
+            architecture_typee=ArchitectureType.recurrent,
             value_networks_layer_sizes=(32, 32),
         )
 
