@@ -2,11 +2,36 @@ import os
 import time
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
+import numpy as np
 import sonnet as snt
 import tensorflow as tf
+import tensorflow_probability as tfp
 import trfl
 
 from mava.types import NestedArray
+
+
+def action_mask_categorical_policies(
+    policy: tfp.distributions.Categorical, batched_legal_actions: np.array
+) -> tfp.distributions.Categorical:
+    """Masks the actions of a categorical policy.
+
+    Args:
+        policy : policy to mask.
+        batched_legal_actions : batched legal actions.
+
+    Returns:
+        masked categorical policy.
+    """
+    # Mask out actions
+    inf_mask = tf.maximum(
+        tf.math.log(tf.cast(batched_legal_actions, tf.float32)), tf.float32.min
+    )
+    masked_logits = policy.logits + inf_mask
+
+    policy = tfp.distributions.Categorical(logits=masked_logits, dtype=policy.dtype)
+
+    return policy
 
 
 # Adapted from
@@ -141,7 +166,7 @@ def decay_lr(
 
     Args:
         lr_schedule : lr schedule function/callable.
-        optimizer : optim to decay.
+        optimizers : optim to decay.
         trainer_step : training time t.
     """
     if lr_schedule and callable(lr_schedule):
@@ -163,8 +188,9 @@ def non_blocking_sleep(time_in_seconds: int) -> None:
 
 
 def check_count_condition(condition: Optional[dict]) -> Tuple:
-    """Checks if condition is valid. These conditions are used for termination
-    or to run evaluators in intervals.
+    """Checks if condition is valid.
+
+    These conditions are used for termination or to run evaluators in intervals.
 
     Args:
         condition : a dict with a key referring to the name of a condition and the
@@ -196,6 +222,11 @@ def check_count_condition(condition: Optional[dict]) -> Tuple:
 
 # Checkpoint the networks.
 def checkpoint_networks(system_checkpointer: Dict) -> None:
+    """Checkpoint networks.
+
+    Args:
+        system_checkpointer : checkpointer used by the system.
+    """
     if system_checkpointer and len(system_checkpointer.keys()) > 0:
         for network_key in system_checkpointer.keys():
             checkpointer = system_checkpointer[network_key]
@@ -203,7 +234,7 @@ def checkpoint_networks(system_checkpointer: Dict) -> None:
 
 
 def set_growing_gpu_memory() -> None:
-    # Solve gpu mem issues.
+    """Solve gpu mem issues."""
     os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
     physical_devices = tf.config.list_physical_devices("GPU")
     if physical_devices:
@@ -213,6 +244,15 @@ def set_growing_gpu_memory() -> None:
 
 # Map critic and polic losses to dict, grouped by agent.
 def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
+    """Map seperate losses dict to loss per agent.
+
+    Args:
+        critic_losses : critic loss per agent.
+        policy_losses : policy loss per agent.
+
+    Returns:
+        dict with losses grouped per agent.
+    """
     assert len(policy_losses) > 0 and (
         len(critic_losses) == len(policy_losses)
     ), "Invalid System Checkpointer."
@@ -226,8 +266,15 @@ def map_losses_per_agent_ac(critic_losses: Dict, policy_losses: Dict) -> Dict:
     return logged_losses
 
 
-# Map value losses to dict, grouped by agent.
 def map_losses_per_agent_value(value_losses: Dict) -> Dict:
+    """Map value losses to dict, grouped by agent.
+
+    Args:
+        value_losses : value losses.
+
+    Returns:
+        losses grouped per agent.
+    """
     assert len(value_losses) > 0, "Invalid System Checkpointer."
     logged_losses: Dict[str, Dict[str, Any]] = {}
     for agent in value_losses.keys():
@@ -239,6 +286,14 @@ def map_losses_per_agent_value(value_losses: Dict) -> Dict:
 
 
 def combine_dim(inputs: Union[tf.Tensor, List, Tuple]) -> tf.Tensor:
+    """Merge dims.
+
+    Args:
+        inputs : input tensor/list.
+
+    Returns:
+        tensor with dims merged.
+    """
     if isinstance(inputs, tf.Tensor):
         dims = inputs.shape[:2]
         return snt.merge_leading_dims(inputs, num_dims=2), dims
@@ -252,15 +307,34 @@ def combine_dim(inputs: Union[tf.Tensor, List, Tuple]) -> tf.Tensor:
 
 
 def extract_dim(inputs: Union[tf.Tensor, List, Tuple], dims: tf.Tensor) -> tf.Tensor:
+    """Reshape or extract dim of tensor.
+
+    Args:
+        inputs : input tensor/list.
+        dims : dim.
+
+    Returns:
+        reshaped or extracted dim.
+    """
     if isinstance(inputs, tf.Tensor):
         return tf.reshape(inputs, [dims[0], dims[1], -1])
     else:
         return [extract_dim(tensor, dims) for tensor in inputs]
 
 
-# Require correct tensor ranks---as long as we have shape information
-# available to check. If there isn't any, we print a warning.
 def check_rank(tensors: Iterable[tf.Tensor], ranks: Sequence[int]) -> None:
+    """Check rank.
+
+    Require correct tensor ranks---as long as we have shape information,
+    available to check. If there isn't any, we print a warning.
+
+    Args:
+        tensors : _description_
+        ranks : _description_
+
+    Raises:
+        ValueError: _description_
+    """
     for i, (tensor, rank) in enumerate(zip(tensors, ranks)):
         if tensor.get_shape():
             trfl.assert_rank_and_shape_compatibility([tensor], rank)
@@ -273,8 +347,13 @@ def check_rank(tensors: Iterable[tf.Tensor], ranks: Sequence[int]) -> None:
             )
 
 
-# Safely delete object from class.
 def safe_del(object_class: Any, attrname: str) -> None:
+    """Safely delete object from class.
+
+    Args:
+        object_class : object closs.
+        attrname : name of attr to delete.
+    """
     try:
         if hasattr(object_class, attrname):
             delattr(object_class, attrname)

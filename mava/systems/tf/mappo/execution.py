@@ -29,6 +29,7 @@ from acme.tf import variable_utils as tf2_variable_utils
 from mava import adders
 from mava.systems.tf import executors
 from mava.types import OLT
+from mava.utils.training_utils import action_mask_categorical_policies
 
 tfd = tfp.distributions
 
@@ -100,14 +101,9 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
             policy, tfp.distributions.Categorical
         ):
             batched_legals = tf2_utils.add_batch_dim(observation_olt.legal_actions)
-            # Mask out actions
-            inf_mask = tf.maximum(
-                tf.math.log(tf.cast(batched_legals, tf.float32)), tf.float32.min
-            )
-            masked_logits = policy.logits + inf_mask
 
-            policy = tfp.distributions.Categorical(
-                logits=masked_logits, dtype=policy.dtype
+            policy = action_mask_categorical_policies(
+                policy=policy, batched_legal_actions=batched_legals
             )
 
         # Sample from the policy and compute the log likelihood.
