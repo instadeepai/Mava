@@ -109,7 +109,6 @@ def trajectory_signature(
             act_specs,
             reward_specs,
             step_discount_specs,
-            # TODO Update soe (start of episode) this to be shape=(sequence_length,)
             specs.Array(shape=(), dtype=bool),
             extras_spec,
         ),
