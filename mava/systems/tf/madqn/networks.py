@@ -49,7 +49,7 @@ def make_default_networks(
         agent_net_keys: specifies what network each agent uses.
         net_spec_keys: specifies the specs of each network.
         value_networks_layer_sizes: size of value networks.
-        archecture_type: archecture used
+        architecture_type: architecture used
             for agent networks. Can be feedforward or recurrent.
             Defaults to ArchitectureType.feedforward.
         seed: random seed for network initialization.
