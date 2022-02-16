@@ -12,7 +12,7 @@ from mava.types import NestedArray
 
 
 def action_mask_categorical_policies(
-    policy: tfp.distributions.Categorical, batched_legal_actions: np.array
+    policy: tfp.distributions.Categorical, batched_legal_actions: np.ndarray
 ) -> tfp.distributions.Categorical:
     """Masks the actions of a categorical policy.
 
