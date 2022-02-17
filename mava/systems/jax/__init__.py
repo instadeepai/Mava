@@ -13,6 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Imports for Mava systems"""
+"""Imports for Jax-based Mava systems"""
 
 from mava.systems.jax.config import Config

@@ -23,7 +23,7 @@ from mava.utils.config_utils import flatten_dict
 
 
 class Config:
-    """Config handler for Mava systems."""
+    """Config handler for Jax-based Mava systems."""
 
     def __init__(self) -> None:
         """Initialise config"""

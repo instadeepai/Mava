@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Config builder class for Mava systems"""
+"""Tests for config class for Jax-based Mava systems"""
 
 from dataclasses import dataclass
 
