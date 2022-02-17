@@ -70,11 +70,7 @@ def test_main() -> None:
     )
     system_config = config.get()
 
-    # Distribute system
-    system.distribute(num_executors=2, nodes_on_gpu=["trainer"])
-    
     # Build system
-    system.build(system_config)
-
-    # Launch system
-    system.launch(name="maddpg")
+    system.launch(
+        config=system_config, num_executors=2, nodes_on_gpu=["trainer"], name="maddpg"
+    )
