@@ -128,6 +128,25 @@ def test_add_configs_twice(
     assert conf.param_1 == 3.8
 
 
+def test_update_config(
+    config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
+) -> None:
+    """Test add two configs, one after the other.
+
+    Args:
+        config : Mava config
+        dummy_component_config : component config dataclass
+        dummy_hyperparameter_config : component config dataclass of hyperparameters
+    """
+    config.add(component=dummy_component_config)
+    config.update(component=dummy_hyperparameter_config)
+    config.build()
+    conf = config.get()
+
+    assert conf.param_0 == 2.7
+    assert conf.param_1 == 3.8
+
+
 def test_set_existing_parameter_on_the_fly(
     config: Config, dummy_component_config: type
 ) -> None:
