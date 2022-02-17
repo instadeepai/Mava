@@ -16,7 +16,7 @@
 # TODO(Arnu): remove later
 # type: ignore
 
-"""Mava system implementation."""
+"""Jax-based Mava system implementation."""
 
 from types import SimpleNamespace
 from typing import Any, List
