@@ -142,7 +142,7 @@ def test_set_existing_parameter_on_the_fly(
     config.add(component=dummy_component_config)
     config.build()
 
-    # update config on the fly
+    # set config on the fly
     config.set(name="new_component_name")
     conf = config.get()
 
@@ -153,7 +153,7 @@ def test_set_existing_parameter_on_the_fly(
 def test_set_before_build_exception(
     config: Config, dummy_component_config: type
 ) -> None:
-    """Test that exception is thrown if it is attempted to update a hyperparameter \
+    """Test that exception is thrown if it is attempted to set a hyperparameter \
         before the config has been built.
 
     Args:
@@ -191,7 +191,7 @@ def test_get_before_build_exception(
 def test_parameter_setting_that_does_not_exist_exception(
     config: Config, dummy_component_config: type
 ) -> None:
-    """Test that exception is thrown if it is attempted to update a hyperparameter \
+    """Test that exception is thrown if it is attempted to set a hyperparameter \
         that does not exist.
 
     Args:
@@ -205,7 +205,7 @@ def test_parameter_setting_that_does_not_exist_exception(
         config.build()
 
         # Try setting a parameter that does not exist
-        config.update(unknown_param="new_value")
+        config.set(unknown_param="new_value")
 
 
 def test_accidental_parameter_override_exception(

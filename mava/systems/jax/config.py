@@ -69,18 +69,18 @@ class Config:
         self._built = True
 
     def set(self, **kwargs: Any) -> None:
-        """Update a specific hyperparameter of a built config.
+        """Set a specific hyperparameter of a built config.
 
         Raises:
-            Exception: if an update is attempted on a config not yet built.
-            Exception: if an update is attempted for a hyperparameter that is not part \
+            Exception: if a set is attempted on a config not yet built.
+            Exception: if a set is attempted for a hyperparameter that is not part \
                 of the built config.
         """
 
         if not self._built:
             raise Exception(
-                "Config must first be built using .build() before it can \
-                be updated."
+                "Config must first be built using .build() before hyperparameters \
+                can be set to different values using .set()."
             )
         for name, param_value in kwargs.items():
             if name in list(self._config.keys()):
@@ -93,7 +93,7 @@ class Config:
                 )
 
     def get(self) -> SimpleNamespace:
-        """Get built (and possibly updated) config for feeding to a Mava system.
+        """Get built config for feeding to a Mava system.
 
         Raises:
             Exception: if trying to get without having first built the config
