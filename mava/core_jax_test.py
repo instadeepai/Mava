@@ -24,6 +24,7 @@ import pytest
 
 from mava.core_jax import BaseSystem
 
+# TODO(Arnu): update to use Mava config class for Jax systems when possible
 # Dummy config and component
 CONFIG = SimpleNamespace()
 COMPONENT = None
