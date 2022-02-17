@@ -68,9 +68,8 @@ def test_main() -> None:
         policy_optimizer=policy_optimizer,
         critic_optimizer=critic_optimizer,
     )
-    system_config = config.get()
 
     # Launch system
     system.launch(
-        config=system_config, num_executors=2, nodes_on_gpu=["trainer"], name="maddpg"
+        config=config, num_executors=2, nodes_on_gpu=["trainer"], name="maddpg"
     )
