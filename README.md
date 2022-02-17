@@ -134,7 +134,7 @@ For example, this will pull the latest mava tensorflow core image and run the `e
 docker run --gpus all -it --rm  -v $(pwd):/home/app/mava -w /home/app/mava instadeepct/mava:tf-core-latest python examples/debugging/simple_spread/feedforward/decentralised/run_maddpg.py --base_dir /home/app/mava/logs/
 ```
 
-- For windows, replace `$(pwd)` with `$(curdir)`.
+* For windows, replace `$(pwd)` with `$(curdir)`.
 
 * You can replace the example with your custom python file.
 
@@ -425,7 +425,7 @@ If you use Mava in your work, please cite the accompanying
 [roadmap]: https://github.com/instadeepai/Mava/issues/246
 [wishlist]: https://github.com/instadeepai/Mava/issues/247
 [bsuite]: https://github.com/deepmind/bsuite
-[quickstart]: https://github.com/instadeepai/Mava/blob/develop/tf/examples/quickstart.ipynb
+[quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/quickstart.ipynb
 [blog]: https://medium.com/instadeep/mava-a-new-framework-for-multi-agent-reinforcement-learning-5dcc158e104e
 [release]: https://www.instadeep.com/2021/07/mava-a-new-framework-for-distributed-multi-agent-reinforcement-learning/
 [documentation]: https://id-mava.readthedocs.io/
