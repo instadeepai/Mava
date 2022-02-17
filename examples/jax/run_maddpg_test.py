@@ -70,7 +70,7 @@ def test_main() -> None:
     )
     system_config = config.get()
 
-    # Build system
+    # Launch system
     system.launch(
         config=system_config, num_executors=2, nodes_on_gpu=["trainer"], name="maddpg"
     )
