@@ -37,14 +37,15 @@ class Config:
         Raises:
             Exception: if a config for an identically named component already exists
             Exception: if a config shares a parameter name with another config
+            Exception: if a config is not a dataclass object
         """
         for name, dataclass in kwargs.items():
             if is_dataclass(dataclass):
                 if name in list(self._config.keys()):
                     raise Exception(
                         "The given component config is already part of the current \
-                        system. Perhaps try updating it instead using .update() \
-                        in the system builder."
+                        system. Perhaps try updating the component instead using \
+                        .update() in the system builder."
                     )
                 else:
                     new_param_names = list(dataclass.__dict__.keys())
@@ -52,11 +53,41 @@ class Config:
                         raise Exception(
                             "Component configs share a common parameter name. \
                             This is not allowed, please ensure config \
-                            names are unique."
+                            parameter names are unique."
                         )
                     else:
                         self._current_params.extend(new_param_names)
                     self._config[name] = dataclass
+            else:
+                raise Exception("Component configs must be a dataclass.")
+
+    def update(self, **kwargs: Any) -> None:
+        """Update a component config dataclass.
+
+        Raises:
+            Exception: if a config shares a parameter name with another config
+            Exception: if a config is not already part of the system
+            Exception: if a config is not a dataclass object
+        """
+        for name, dataclass in kwargs.items():
+            if is_dataclass(dataclass):
+                if name in list(self._config.keys()):
+                    new_param_names = list(dataclass.__dict__.keys())
+                    if set(self._current_params) & set(new_param_names):
+                        raise Exception(
+                            "Component configs share a common parameter name. \
+                            This is not allowed, please ensure config \
+                            parameter names are unique."
+                        )
+                    else:
+                        self._current_params.extend(new_param_names)
+                    self._config[name] = dataclass
+                else:
+                    raise Exception(
+                        "The given component config is not part of the current \
+                        system. Perhaps try adding the component using .add() \
+                        in the system builder."
+                    )
             else:
                 raise Exception("Component configs must be a dataclass.")
 
