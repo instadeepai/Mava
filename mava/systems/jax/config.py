@@ -23,20 +23,20 @@ from mava.utils.config_utils import flatten_dict
 
 
 class Config:
-    """_summary_"""
+    """Config handler for Mava systems."""
 
     def __init__(self) -> None:
-        """_summary_"""
+        """Initialise config"""
         self._config: Dict = {}
         self._current_params: List = []
         self._built = False
 
     def add(self, **kwargs: Any) -> None:
-        """_summary_
+        """Add a component config dataclass.
 
         Raises:
-            Exception: _description_
-            Exception: _description_
+            Exception: if a config for an identically named component already exists
+            Exception: if a config shares a parameter name with another config
         """
         for name, dataclass in kwargs.items():
             if is_dataclass(dataclass):
@@ -61,11 +61,7 @@ class Config:
                 raise Exception("Component configs must be a dataclass.")
 
     def build(self) -> None:
-        """_summary_
-
-        Returns:
-            _description_
-        """
+        """Build the config file, i.e. unwrap dataclass nested dictionaries"""
         config_unwrapped: Dict = {}
         for param in self._config.values():
             config_unwrapped.update(flatten_dict(param.__dict__))
@@ -73,10 +69,12 @@ class Config:
         self._built = True
 
     def update(self, **kwargs: Any) -> None:
-        """_summary_
+        """Update a specific hyperparameter of a built config.
 
         Raises:
-            Exception: _description_
+            Exception: if an update is attempted on a config not yet built.
+            Exception: if an update is attempted for a hyperparameter that is not part \
+                of the built config.
         """
 
         if not self._built:
@@ -95,9 +93,16 @@ class Config:
                 )
 
     def get(self) -> SimpleNamespace:
-        """_summary_
+        """Get built (and possibly updated) config for feeding to a Mava system.
 
+        Raises:
+            Exception: if trying to get without having first built the config
         Returns:
-            _description_
+            built config
         """
-        return SimpleNamespace(**self._config)
+        if self._built:
+            return SimpleNamespace(**self._config)
+        else:
+            raise Exception(
+                "The config must first be built using .build() before calling .get()."
+            )
