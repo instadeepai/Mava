@@ -41,13 +41,19 @@ flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
+    """Run example.
+
+    Args:
+        _ (Any): None
+    """
+
     # Environment.
     environment_factory = lp_utils.partial_kwargs(robocup_utils.make_environment)
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
         mad4pg.make_default_networks,
-        archecture_type=ArchitectureType.recurrent,
+        architecture_type=ArchitectureType.recurrent,
         vmin=-5,
         vmax=5,
     )

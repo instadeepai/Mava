@@ -48,6 +48,11 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
+    """Run example.
+
+    Args:
+        _ (Any): None
+    """
 
     # Environment.
     environment_factory = functools.partial(
@@ -58,7 +63,7 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        maddpg.make_default_networks, archecture_type=ArchitectureType.recurrent
+        maddpg.make_default_networks, architecture_type=ArchitectureType.recurrent
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
