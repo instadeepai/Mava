@@ -34,42 +34,48 @@ class HyperparameterConfig:
     param_1: float
 
 
+@dataclass
+class SameParameterNameConfig:
+    param_0: int
+    param_2: str
+
+
 @pytest.fixture
 def dummy_component_config() -> ComponentConfig:
-    """_summary_
+    """Dummy config dataclass for a component.
 
     Returns:
-        _description_
+        config dataclass
     """
     return ComponentConfig(name="component", setting=5)
 
 
 @pytest.fixture
 def dummy_hyperparameter_config() -> HyperparameterConfig:
-    """_summary_
+    """Dummy config dataclass for component hyperparameters.
 
     Returns:
-        _description_
+        config dataclass
     """
     return HyperparameterConfig(param_0=2.7, param_1=3.8)
 
 
 @pytest.fixture
 def config() -> Config:
-    """_summary_
+    """Config instance.
 
     Returns:
-        _description_
+        instantiation of a Mava Config class
     """
     return Config()
 
 
 def test_add_single_config(config: Config, dummy_component_config: type) -> None:
-    """_summary_
+    """Test adding a single config.
 
     Args:
-        config : _description_
-        dummy_component_config : _description_
+        config : Mava config
+        dummy_component_config : component config dataclass
     """
     config.add(component=dummy_component_config)
     config.build()
@@ -82,12 +88,12 @@ def test_add_single_config(config: Config, dummy_component_config: type) -> None
 def test_add_multiple_configs(
     config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
 ) -> None:
-    """_summary_
+    """Test adding multiple configs at the same time.
 
     Args:
-        config : _description_
-        dummy_component_config : _description_
-        dummy_hyperparameter_config : _description_
+        config : Mava config
+        dummy_component_config : component config dataclass
+        dummy_hyperparameter_config : component config dataclass of hyperparameters
     """
     config.add(
         component=dummy_component_config, hyperparameter=dummy_hyperparameter_config
@@ -104,12 +110,12 @@ def test_add_multiple_configs(
 def test_add_configs_twice(
     config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
 ) -> None:
-    """_summary_
+    """Test add two configs, one after the other.
 
     Args:
-        config : _description_
-        dummy_component_config : _description_
-        dummy_hyperparameter_config : _description_
+        config : Mava config
+        dummy_component_config : component config dataclass
+        dummy_hyperparameter_config : component config dataclass of hyperparameters
     """
     config.add(component=dummy_component_config)
     config.add(hyperparameter=dummy_hyperparameter_config)
@@ -125,11 +131,11 @@ def test_add_configs_twice(
 def test_update_existing_parameter_on_the_fly(
     config: Config, dummy_component_config: type
 ) -> None:
-    """_summary_
+    """Test updating a hyperparameter on the fly after the config has been built.
 
     Args:
-        config : _description_
-        dummy_component_config : _description_
+        config : Mava config
+        dummy_component_config : component config dataclass
     """
 
     # add component dataclasses and build config
@@ -144,13 +150,61 @@ def test_update_existing_parameter_on_the_fly(
     assert conf.setting == 5
 
 
-# TODO (Arnu): add more specific tests
+def test_update_before_build_exception(
+    config: Config, dummy_component_config: type
+) -> None:
+    """Test that exception is thrown if it is attempted to update a hyperparameter \
+        before the config has been built.
 
-# def test_update_new_parameter_on_the_fly(config, dummy_component_config) -> None:
-#     # add component dataclasses and build config
-#     config.add(component=dummy_component_config)
-#     config.build()
+    Args:
+        config : Mava config
+        dummy_component_config : component config dataclass
+    """
 
-#     # update config on the fly
-#     config.update(new_param="new_value")
-#     conf = config.get()
+    with pytest.raises(Exception):
+        # add component dataclasses and build config
+        config.add(component=dummy_component_config)
+
+        # Try updating without having built first
+        config.update(name="new_component_name")
+
+
+def test_parameter_update_that_does_not_exist_exception(
+    config: Config, dummy_component_config: type
+) -> None:
+    """Test that exception is thrown if it is attempted to update a hyperparameter \
+        that does not exist.
+
+    Args:
+        config : Mava config
+        dummy_component_config : component config dataclass
+    """
+
+    with pytest.raises(Exception):
+        # add component dataclasses and build config
+        config.add(component=dummy_component_config)
+        config.build()
+
+        # Try updating a parameter that does not exist
+        config.update(unknown_param="new_value")
+
+
+def test_accidental_parameter_override_exception(
+    config: Config, dummy_hyperparameter_config: type
+) -> None:
+    """Test that exception is thrown when two component config dataclasses share the \
+        same name for a specific hyperparameter.
+
+    Args:
+        config : Mava config
+        dummy_hyperparameter_config : component config dataclass of hyperparameters
+    """
+
+    with pytest.raises(Exception):
+        # add component dataclasses and build config
+        config.add(hyperparameter=dummy_hyperparameter_config)
+
+        # add new component dataclass with a parameter of the same name
+        # as an already existing component parameter name
+        other_hyperparamter_config = SameParameterNameConfig(param_0=2, param_2="param")
+        config.add(other_hyperparameter=other_hyperparamter_config)

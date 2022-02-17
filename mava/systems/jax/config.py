@@ -17,7 +17,7 @@
 
 from dataclasses import is_dataclass
 from types import SimpleNamespace
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from mava.utils.config_utils import flatten_dict
 
@@ -28,9 +28,10 @@ class Config:
     def __init__(self) -> None:
         """_summary_"""
         self._config: Dict = {}
+        self._current_params: List = []
         self._built = False
 
-    def add(self, **kwargs: type) -> None:
+    def add(self, **kwargs: Any) -> None:
         """_summary_
 
         Raises:
@@ -42,9 +43,19 @@ class Config:
                 if name in list(self._config.keys()):
                     raise Exception(
                         "The given component config is already part of the current \
-                        system. Perhaps try updating it instead using .update()."
+                        system. Perhaps try updating it instead using .update() \
+                        in the system builder."
                     )
                 else:
+                    new_param_names = list(dataclass.__dict__.keys())
+                    if set(self._current_params) & set(new_param_names):
+                        raise Exception(
+                            "Component configs share a common parameter name. \
+                            This is not allowed, please ensure config \
+                            names are unique."
+                        )
+                    else:
+                        self._current_params.extend(new_param_names)
                     self._config[name] = dataclass
             else:
                 raise Exception("Component configs must be a dataclass.")
