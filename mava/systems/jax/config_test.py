@@ -128,7 +128,7 @@ def test_add_configs_twice(
     assert conf.param_1 == 3.8
 
 
-def test_update_existing_parameter_on_the_fly(
+def test_set_existing_parameter_on_the_fly(
     config: Config, dummy_component_config: type
 ) -> None:
     """Test updating a hyperparameter on the fly after the config has been built.
@@ -143,14 +143,14 @@ def test_update_existing_parameter_on_the_fly(
     config.build()
 
     # update config on the fly
-    config.update(name="new_component_name")
+    config.set(name="new_component_name")
     conf = config.get()
 
     assert conf.name == "new_component_name"
     assert conf.setting == 5
 
 
-def test_update_before_build_exception(
+def test_set_before_build_exception(
     config: Config, dummy_component_config: type
 ) -> None:
     """Test that exception is thrown if it is attempted to update a hyperparameter \
@@ -165,8 +165,8 @@ def test_update_before_build_exception(
         # add component dataclasses and build config
         config.add(component=dummy_component_config)
 
-        # Try updating without having built first
-        config.update(name="new_component_name")
+        # Try setting without having built first
+        config.set(name="new_component_name")
 
 
 def test_get_before_build_exception(
@@ -188,7 +188,7 @@ def test_get_before_build_exception(
         config.get()
 
 
-def test_parameter_update_that_does_not_exist_exception(
+def test_parameter_setting_that_does_not_exist_exception(
     config: Config, dummy_component_config: type
 ) -> None:
     """Test that exception is thrown if it is attempted to update a hyperparameter \
@@ -204,7 +204,7 @@ def test_parameter_update_that_does_not_exist_exception(
         config.add(component=dummy_component_config)
         config.build()
 
-        # Try updating a parameter that does not exist
+        # Try setting a parameter that does not exist
         config.update(unknown_param="new_value")
 
 
