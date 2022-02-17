@@ -61,7 +61,7 @@ def test_main() -> None:
     )
 
     # update default config
-    config.update(
+    config.set(
         environment_factory=environment_factory,
         logger_factory=logger_factory,
         network_factory=network_factory,
