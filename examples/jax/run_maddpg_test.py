@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO(Arnu): remove mypy ignore when the system is running
 # type: ignore
 
 """Test for running Jax MADDPG on debug MPE environment."""
