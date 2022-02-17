@@ -43,38 +43,21 @@ class BaseSystem(abc.ABC):
         """
 
     @abc.abstractmethod
-    def build(self, config: SimpleNamespace) -> SimpleNamespace:
-        """Build system by constructing system components.
-
-        Args:
-            config : system configuration including
-        Returns:
-            System components
-        """
-
-    @abc.abstractmethod
-    def distribute(
-        self,
-        num_executors: int,
-        nodes_on_gpu: List[str],
-        distributor: Any = None,
-    ) -> None:
-        """Distribute system across multiple processes.
-
-        Args:
-            num_executors : number of executor processes to run in parallel
-            multi_process : whether to run locally or distributed
-            nodes_on_gpu : which processes to run on gpu
-            distributor : custom distributor component
-        """
-
-    @abc.abstractmethod
     def launch(
         self,
+        config: SimpleNamespace,
+        num_executors: int,
+        nodes_on_gpu: List[str],
+        multi_process: bool = True,
         name: str = "system",
     ) -> None:
         """Run the system.
 
         Args:
+            config : system configuration including
+            num_executors : number of executor processes to run in parallel
+            nodes_on_gpu : which processes to run on gpu
+            multi_process : whether to run locally or distributed, local runs are
+                for debugging
             name : name of the system
         """

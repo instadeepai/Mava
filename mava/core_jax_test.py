@@ -58,29 +58,22 @@ class TestDummySystem(BaseSystem):
         assert component is None
         assert name == "add"
 
-    def build(self, config: SimpleNamespace) -> SimpleNamespace:
-        """Dummy build"""
+    def launch(
+        self,
+        config: SimpleNamespace,
+        num_executors: int,
+        nodes_on_gpu: List[str],
+        multi_process: bool = True,
+        name: str = "system",
+    ) -> None:
+        """Dummy launch"""
         assert config.set_1.str_param == "param"
         assert config.set_2.int_param == 4
         assert config.set_2.float_param == 5.4
 
-        # hypothetical system components
-        components = SimpleNamespace()
-        return components
-
-    def distribute(
-        self,
-        num_executors: int,
-        nodes_on_gpu: List[str],
-        distributor: Any = None,
-    ) -> None:
-        """Dummy distribute"""
         assert num_executors == 1
+        assert multi_process is True
         assert nodes_on_gpu[0] == "process"
-        assert distributor is None
-
-    def launch(self, name: str = "system") -> None:
-        """Dummy launch"""
         assert name == "system"
 
 
@@ -98,11 +91,5 @@ def test_dummy_system(dummy_system: TestDummySystem) -> None:
     # add component
     dummy_system.add(COMPONENT, "add")
 
-    # build system
-    dummy_system.build(CONFIG)
-
-    # distribute system
-    dummy_system.distribute(num_executors=1, nodes_on_gpu=["process"])
-
     # launch system
-    dummy_system.launch()
+    dummy_system.launch(CONFIG, num_executors=1, nodes_on_gpu=["process"])
