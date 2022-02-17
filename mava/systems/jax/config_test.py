@@ -169,6 +169,25 @@ def test_update_before_build_exception(
         config.update(name="new_component_name")
 
 
+def test_get_before_build_exception(
+    config: Config, dummy_component_config: type
+) -> None:
+    """Test that exception is thrown if it is attempted to call .get() \
+        before the config has been built.
+
+    Args:
+        config : Mava config
+        dummy_component_config : component config dataclass
+    """
+
+    with pytest.raises(Exception):
+        # add component dataclasses and build config
+        config.add(component=dummy_component_config)
+
+        # Try getting without having built first
+        config.get()
+
+
 def test_parameter_update_that_does_not_exist_exception(
     config: Config, dummy_component_config: type
 ) -> None:
