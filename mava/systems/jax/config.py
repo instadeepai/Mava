@@ -68,7 +68,7 @@ class Config:
         self._config = config_unwrapped
         self._built = True
 
-    def update(self, **kwargs: Any) -> None:
+    def set(self, **kwargs: Any) -> None:
         """Update a specific hyperparameter of a built config.
 
         Raises:
