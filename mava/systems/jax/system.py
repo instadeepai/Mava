@@ -118,3 +118,6 @@ class System(BaseSystem):
         # Build system
         self._builder = Builder(components=self.components)
         self._builder.build()
+
+        # Launch system
+        self._builder.launch()
