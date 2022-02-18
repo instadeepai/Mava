@@ -96,7 +96,7 @@ class Config:
         config_unwrapped: Dict = {}
         for param in self._config.values():
             config_unwrapped.update(flatten_dict(param.__dict__))
-        self._config = config_unwrapped
+        self._built_config = config_unwrapped
         self._built = True
 
     def set(self, **kwargs: Any) -> None:
@@ -114,8 +114,8 @@ class Config:
                 can be set to different values using .set()."
             )
         for name, param_value in kwargs.items():
-            if name in list(self._config.keys()):
-                self._config[name] = param_value
+            if name in list(self._built_config.keys()):
+                self._built_config[name] = param_value
             else:
                 raise Exception(
                     "The given parameter is not part of the current system. \
@@ -132,7 +132,7 @@ class Config:
             built config
         """
         if self._built:
-            return SimpleNamespace(**self._config)
+            return SimpleNamespace(**self._built_config)
         else:
             raise Exception(
                 "The config must first be built using .build() before calling .get()."
