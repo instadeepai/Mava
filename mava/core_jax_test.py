@@ -16,33 +16,14 @@
 
 """Tests for core Mava interfaces for Jax systems."""
 
-from dataclasses import dataclass
-from types import SimpleNamespace
 from typing import Any, List
 
 import pytest
 
 from mava.core_jax import BaseSystem
 
-# TODO(Arnu): update to use Mava config class for Jax systems when possible
-# Dummy config and component
-CONFIG = SimpleNamespace()
+# Dummy component
 COMPONENT = None
-
-
-@dataclass
-class parameter_set_1:
-    str_param: str
-
-
-@dataclass
-class parameter_set_2:
-    int_param: int
-    float_param: float
-
-
-CONFIG.set_1 = parameter_set_1(str_param="param")
-CONFIG.set_2 = parameter_set_2(int_param=4, float_param=5.4)
 
 
 class TestDummySystem(BaseSystem):
@@ -60,16 +41,12 @@ class TestDummySystem(BaseSystem):
 
     def launch(
         self,
-        config: SimpleNamespace,
         num_executors: int,
         nodes_on_gpu: List[str],
         multi_process: bool = True,
         name: str = "system",
     ) -> None:
         """Dummy launch"""
-        assert config.set_1.str_param == "param"
-        assert config.set_2.int_param == 4
-        assert config.set_2.float_param == 5.4
 
         assert num_executors == 1
         assert multi_process is True
@@ -92,4 +69,4 @@ def test_dummy_system(dummy_system: TestDummySystem) -> None:
     dummy_system.add(COMPONENT, "add")
 
     # launch system
-    dummy_system.launch(CONFIG, num_executors=1, nodes_on_gpu=["process"])
+    dummy_system.launch(num_executors=1, nodes_on_gpu=["process"])

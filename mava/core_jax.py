@@ -17,7 +17,6 @@
 """Core Mava interfaces for Jax systems."""
 
 import abc
-from types import SimpleNamespace
 from typing import Any, List
 
 
@@ -45,7 +44,6 @@ class BaseSystem(abc.ABC):
     @abc.abstractmethod
     def launch(
         self,
-        config: SimpleNamespace,
         num_executors: int,
         nodes_on_gpu: List[str],
         multi_process: bool = True,
@@ -54,7 +52,6 @@ class BaseSystem(abc.ABC):
         """Run the system.
 
         Args:
-            config : system configuration including
             num_executors : number of executor processes to run in parallel
             nodes_on_gpu : which processes to run on gpu
             multi_process : whether to run locally or distributed, local runs are
