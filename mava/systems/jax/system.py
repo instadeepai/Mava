@@ -18,7 +18,6 @@
 
 """Jax-based Mava system implementation."""
 
-from types import SimpleNamespace
 from typing import Any, List
 
 from mava.core_jax import BaseSystem
@@ -86,7 +85,6 @@ class System(BaseSystem):
 
     def launch(
         self,
-        config: SimpleNamespace,
         num_executors: int,
         nodes_on_gpu: List[str],
         multi_process: bool = True,
@@ -103,13 +101,13 @@ class System(BaseSystem):
             name : name of the system
         """
         # update distributor config
-        config.set(
+        self.config.set(
             num_executors=num_executors,
             nodes_on_gpu=nodes_on_gpu,
             multi_process=multi_process,
             name=name,
         )
-        system_config = config.get()
+        system_config = self.config.get()
 
         # update default system component configs
         for component in self._design.components:
