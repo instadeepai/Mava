@@ -50,6 +50,10 @@ class BaseSystem(abc.ABC):
         """
 
     @abc.abstractmethod
+    def configure(self, **kwargs: Any) -> None:
+        """Configure system hyperparameters."""
+
+    @abc.abstractmethod
     def launch(
         self,
         num_executors: int,

@@ -45,6 +45,11 @@ class TestDummySystem(BaseSystem):
         assert component is None
         assert name == "add"
 
+    def configure(self, **kwargs: Any) -> None:
+        """Dummy configure"""
+        assert kwargs["param_0"] == 0
+        assert kwargs["param_1"] == 1
+
     def launch(
         self,
         num_executors: int,
@@ -53,7 +58,6 @@ class TestDummySystem(BaseSystem):
         name: str = "system",
     ) -> None:
         """Dummy launch"""
-
         assert num_executors == 1
         assert multi_process is True
         assert nodes_on_gpu[0] == "process"
@@ -76,6 +80,9 @@ def test_dummy_system(dummy_system: TestDummySystem) -> None:
 
     # add component
     dummy_system.add(COMPONENT, "add")
+
+    # configure system
+    dummy_system.configure(param_0=0, param_1=1)
 
     # launch system
     dummy_system.launch(num_executors=1, nodes_on_gpu=["process"])
