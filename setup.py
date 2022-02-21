@@ -104,7 +104,7 @@ setup(
         "matplotlib",
         "dataclasses",
         "box2d-py",
-        "gym",
+        "gym==0.21.0",
     ],
     extras_require={
         "tf": tf_requirements,
