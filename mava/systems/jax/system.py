@@ -26,12 +26,10 @@ from mava.systems.jax import Builder, Config
 
 # TODO(Arnu): replace component types with Callback when class is ready.
 class System(BaseSystem):
-    def __init__(self) -> None:
-        """_summary_
+    """General Mava system class for Jax-based systems."""
 
-        Args:
-            design : _description_
-        """
+    def __init__(self) -> None:
+        """System Initialisation"""
         self._design = self.design()
         self.config = Config()  # Mava config
         self.components: List = []
@@ -40,7 +38,7 @@ class System(BaseSystem):
         self._make_config()
 
     def _make_config(self) -> None:
-        """_summary_"""
+        """Private method to construct system config upon initialisation."""
         for component in self._design.components:
             comp = component()
             # note this requires default dataclasses for components
@@ -51,7 +49,11 @@ class System(BaseSystem):
 
     @abc.abstractmethod
     def design(self) -> List[Any]:
-        """System design specifying the list of components to use."""
+        """System design specifying the list of components to use.
+
+        Returns:
+            system callback components
+        """
 
     def update(self, component: Any, name: str) -> None:
         """Update a component that has already been added to the system.
