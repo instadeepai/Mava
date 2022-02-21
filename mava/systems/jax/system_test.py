@@ -19,7 +19,7 @@
 
 # import pytest
 
-# from mava.systems.jax import System
+# from mava.systems.jax.system import System
 
 
 # # test components
@@ -88,17 +88,13 @@
 #     return TestSystem()
 
 
-# def test_default_config(system) -> None:
-#     pass
-
-
 # def test_system_update(system) -> None:
-#     pass
+#     system = system.update(ComponentTwo)
 
 
-# def test_system_add(system) -> None:
-#     pass
+# # def test_system_add(system) -> None:
+# #     pass
 
 
-# def test_system_launch(system) -> None:
-#     pass
+# # def test_system_launch(system) -> None:
+# #     pass
