@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for QMIX."""
 
 import functools
 
@@ -22,18 +21,21 @@ import sonnet as snt
 
 import mava
 from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationTimestepScheduler,
+    LinearExplorationScheduler,
 )
-from mava.systems.tf import qmix
+from mava.systems.tf import value_decomposition
 from mava.utils import lp_utils
 from mava.utils.environments import debugging_utils
 
+"""Test for QMIX System"""
 
-class TestQmix:
-    """Simple integration/smoke test for qmix."""
 
-    def test_qmix_on_debugging_env(self) -> None:
-        """Test feedforward qmix."""
+class TestQMIX:
+    """Simple integration test for QMIX on Simple Spread enviromnent"""
+
+    def test_qmix_on_debug_simple_spread(self) -> None:
+        """Test recurrent QMIX."""
+
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -42,24 +44,32 @@ class TestQmix:
             return_state_info=True,
         )
 
-        # networks
+        # Networks.
         network_factory = lp_utils.partial_kwargs(
-            qmix.make_default_networks, policy_networks_layer_sizes=(64, 64)
+            value_decomposition.make_default_networks,
         )
 
         # system
-        system = qmix.QMIX(
+        system = value_decomposition.ValueDecomposition(
             environment_factory=environment_factory,
             network_factory=network_factory,
+            mixer="qmix",
             num_executors=1,
-            batch_size=32,
-            min_replay_size=32,
-            max_replay_size=1000,
-            optimizer=snt.optimizers.Adam(learning_rate=1e-3),
-            checkpoint=False,
-            exploration_scheduler_fn=LinearExplorationTimestepScheduler(
-                epsilon_start=1.0, epsilon_min=0.05, epsilon_decay_steps=500
+            exploration_scheduler_fn=LinearExplorationScheduler(
+                epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-5
             ),
+            optimizer=snt.optimizers.RMSProp(
+                learning_rate=0.0005, epsilon=0.00001, decay=0.99
+            ),
+            batch_size=1,
+            executor_variable_update_period=200,
+            target_update_period=200,
+            max_gradient_norm=20.0,
+            min_replay_size=1,
+            max_replay_size=10000,
+            samples_per_insert=None,
+            evaluator_interval={"executor_episodes": 2},
+            checkpoint=False,
         )
 
         program = system.build()

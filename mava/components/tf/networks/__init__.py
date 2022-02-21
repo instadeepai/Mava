@@ -20,7 +20,6 @@ from acme.tf.networks.multiplexers import CriticMultiplexer
 from acme.tf.networks.noise import ClippedGaussian
 from acme.tf.networks.rescaling import ClipToSpec, RescaleToSpec, TanhToSpec
 
-from mava.components.tf.networks.additive import AdditiveMixingNetwork
 from mava.components.tf.networks.communication import CommunicationNetwork
 from mava.components.tf.networks.continuous import (
     LayerNormAndResidualMLP,
@@ -28,9 +27,7 @@ from mava.components.tf.networks.continuous import (
     NearZeroInitializedLinear,
 )
 from mava.components.tf.networks.convolution import Conv1DNetwork
-from mava.components.tf.networks.fingerprints import ObservationNetworkWithFingerprint
 from mava.components.tf.networks.mad4pg import (
     DiscreteValuedDistribution,
     DiscreteValuedHead,
 )
-from mava.components.tf.networks.monotonic import MonotonicMixingNetwork

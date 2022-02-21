@@ -25,7 +25,7 @@ SeqTimestepDict = TypedDict(
 
 
 def convert_dm_compatible_observations(
-    observes: Dict[str, np.ndarray],
+    observes: Dict,
     dones: Dict[str, bool],
     observation_spec: Dict[str, types.OLT],
     env_done: bool,
