@@ -30,7 +30,6 @@ def test_main() -> None:
 
     # Create system and config
     system = maddpg.MADDPG()
-    config = system.config
 
     # Environment.
     environment_factory = utils.make_factory(
@@ -61,7 +60,7 @@ def test_main() -> None:
     )
 
     # update default config
-    config.set(
+    system.config.set(
         environment_factory=environment_factory,
         logger_factory=logger_factory,
         network_factory=network_factory,
@@ -70,6 +69,4 @@ def test_main() -> None:
     )
 
     # Launch system
-    system.launch(
-        config=config, num_executors=2, nodes_on_gpu=["trainer"], name="maddpg"
-    )
+    system.launch(num_executors=2, nodes_on_gpu=["trainer"], name="maddpg")
