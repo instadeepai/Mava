@@ -45,7 +45,6 @@ class System(BaseSystem):
             # note this requires "name" properties for components
             input = {comp.name: comp.config}
             self.config.add(**input)
-        self.config.build()
 
     @abc.abstractmethod
     def design(self) -> List[Any]:
@@ -89,6 +88,11 @@ class System(BaseSystem):
             self._design.components.__dict__[name] = component
             self.config.add(name=component().config)
 
+    def configure(self, **kwargs: Any) -> None:
+        """Configure system hyperparameters."""
+        self.config.build()
+        self.config.set(**kwargs)
+
     def launch(
         self,
         num_executors: int,
@@ -113,9 +117,6 @@ class System(BaseSystem):
             multi_process=multi_process,
             name=name,
         )
-
-        # rebuild in case new component config were added
-        self.config.build()
 
         # get system config to feed to component list to update hyperparamete settings
         system_config = self.config.get()
