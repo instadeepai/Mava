@@ -720,7 +720,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                     policy_mask
                 )
                 # Critic loss accounts for padding so no masking is needed.
-                self.critic_losses[agent] = tf.reduce_sum(critic_loss)
+                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
         self.tape = tape
 
 
