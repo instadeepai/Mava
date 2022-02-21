@@ -17,22 +17,22 @@
 # type: ignore
 
 """Jax-based Mava system implementation."""
-
+import abc
 from typing import Any, List
 
 from mava.core_jax import BaseSystem
-from mava.systems.jax import Builder, Config, Design
+from mava.systems.jax import Builder, Config
 
 
 # TODO(Arnu): replace component types with Callback when class is ready.
 class System(BaseSystem):
-    def __init__(self, design: Design) -> None:
+    def __init__(self) -> None:
         """_summary_
 
         Args:
             design : _description_
         """
-        self._design = design
+        self._design = self.design()
         self.config = Config()  # Mava config
         self.components: List = []
 
@@ -48,6 +48,10 @@ class System(BaseSystem):
             input = {comp.name: comp.config}
             self.config.add(**input)
         self.config.build()
+
+    @abc.abstractmethod
+    def design(self) -> List[Any]:
+        """System design specifying the list of components to use."""
 
     def update(self, component: Any, name: str) -> None:
         """Update a component that has already been added to the system.
@@ -107,6 +111,11 @@ class System(BaseSystem):
             multi_process=multi_process,
             name=name,
         )
+
+        # rebuild in case new component config were added
+        self.config.build()
+
+        # get system config to feed to component list to update hyperparamete settings
         system_config = self.config.get()
 
         # update default system component configs
