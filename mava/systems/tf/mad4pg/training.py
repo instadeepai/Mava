@@ -671,6 +671,9 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                     end_of_episode=agent_discount,
                     bootstrap_n=self._bootstrap_n,
                 )
+                # Critic loss accounts for padding so no masking is needed.
+                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
+
                 # Actor learning.
                 obs_agent_feed = target_obs_trans[agent]
                 agent_core_state = core_state[agent][0]
@@ -719,8 +722,6 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
                     policy_mask
                 )
-                # Critic loss accounts for padding so no masking is needed.
-                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
         self.tape = tape
 
 
