@@ -60,7 +60,7 @@ def test_main() -> None:
     )
 
     # update default config
-    system.config.set(
+    system.configure(
         environment_factory=environment_factory,
         logger_factory=logger_factory,
         network_factory=network_factory,
