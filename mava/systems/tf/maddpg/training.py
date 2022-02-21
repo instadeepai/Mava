@@ -418,6 +418,7 @@ class MADDPGBaseTrainer(mava.Trainer):
                 critic_loss = trfl.td_learning(
                     q_tm1, r_t[agent], discount * d_t[agent], q_t
                 ).loss
+                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
 
                 # Actor learning.
                 o_t_agent_feed = o_t_trans[agent]
@@ -442,7 +443,6 @@ class MADDPGBaseTrainer(mava.Trainer):
                 )
 
                 self.policy_losses[agent] = tf.reduce_mean(policy_loss)
-                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
@@ -1342,6 +1342,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                     end_of_episode=agent_discount,
                     bootstrap_n=self._bootstrap_n,
                 )
+                # Critic loss accounts for padding so no masking is needed.
+                self.critic_losses[agent] = tf.reduce_sum(critic_loss)
 
                 # Actor learning.
                 obs_agent_feed = target_obs_trans[agent]
@@ -1392,8 +1394,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
                     policy_mask
                 )
-                # Critic loss accounts for padding so no masking is needed.
-                self.critic_losses[agent] = tf.reduce_sum(critic_loss)
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
