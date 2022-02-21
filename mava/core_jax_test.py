@@ -16,32 +16,14 @@
 
 """Tests for core Mava interfaces for Jax systems."""
 
-from dataclasses import dataclass
-from types import SimpleNamespace
 from typing import Any, List
 
 import pytest
 
 from mava.core_jax import BaseSystem
 
-# Dummy config and component
-CONFIG = SimpleNamespace()
+# Dummy component
 COMPONENT = None
-
-
-@dataclass
-class parameter_set_1:
-    str_param: str
-
-
-@dataclass
-class parameter_set_2:
-    int_param: int
-    float_param: float
-
-
-CONFIG.set_1 = parameter_set_1(str_param="param")
-CONFIG.set_2 = parameter_set_2(int_param=4, float_param=5.4)
 
 
 class TestDummySystem(BaseSystem):
@@ -57,29 +39,18 @@ class TestDummySystem(BaseSystem):
         assert component is None
         assert name == "add"
 
-    def build(self, config: SimpleNamespace) -> SimpleNamespace:
-        """Dummy build"""
-        assert config.set_1.str_param == "param"
-        assert config.set_2.int_param == 4
-        assert config.set_2.float_param == 5.4
-
-        # hypothetical system components
-        components = SimpleNamespace()
-        return components
-
-    def distribute(
+    def launch(
         self,
         num_executors: int,
         nodes_on_gpu: List[str],
-        distributor: Any = None,
+        multi_process: bool = True,
+        name: str = "system",
     ) -> None:
-        """Dummy distribute"""
-        assert num_executors == 1
-        assert nodes_on_gpu[0] == "process"
-        assert distributor is None
-
-    def launch(self, name: str = "system") -> None:
         """Dummy launch"""
+
+        assert num_executors == 1
+        assert multi_process is True
+        assert nodes_on_gpu[0] == "process"
         assert name == "system"
 
 
@@ -97,11 +68,5 @@ def test_dummy_system(dummy_system: TestDummySystem) -> None:
     # add component
     dummy_system.add(COMPONENT, "add")
 
-    # build system
-    dummy_system.build(CONFIG)
-
-    # distribute system
-    dummy_system.distribute(num_executors=1, nodes_on_gpu=["process"])
-
     # launch system
-    dummy_system.launch()
+    dummy_system.launch(num_executors=1, nodes_on_gpu=["process"])

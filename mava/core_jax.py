@@ -17,7 +17,6 @@
 """Core Mava interfaces for Jax systems."""
 
 import abc
-from types import SimpleNamespace
 from typing import Any, List
 
 
@@ -43,38 +42,19 @@ class BaseSystem(abc.ABC):
         """
 
     @abc.abstractmethod
-    def build(self, config: SimpleNamespace) -> SimpleNamespace:
-        """Build system by constructing system components.
-
-        Args:
-            config : system configuration including
-        Returns:
-            System components
-        """
-
-    @abc.abstractmethod
-    def distribute(
+    def launch(
         self,
         num_executors: int,
         nodes_on_gpu: List[str],
-        distributor: Any = None,
-    ) -> None:
-        """Distribute system across multiple processes.
-
-        Args:
-            num_executors : number of executor processes to run in parallel
-            multi_process : whether to run locally or distributed
-            nodes_on_gpu : which processes to run on gpu
-            distributor : custom distributor component
-        """
-
-    @abc.abstractmethod
-    def launch(
-        self,
+        multi_process: bool = True,
         name: str = "system",
     ) -> None:
         """Run the system.
 
         Args:
+            num_executors : number of executor processes to run in parallel
+            nodes_on_gpu : which processes to run on gpu
+            multi_process : whether to run locally or distributed, local runs are
+                for debugging
             name : name of the system
         """
