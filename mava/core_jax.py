@@ -24,6 +24,14 @@ class BaseSystem(abc.ABC):
     """Abstract system object."""
 
     @abc.abstractmethod
+    def design(self) -> List[Any]:
+        """System design specifying the list of components to use.
+
+        Returns:
+            system callback components
+        """
+
+    @abc.abstractmethod
     def update(self, component: Any, name: str) -> None:
         """Update a component that has already been added to the system.
 
