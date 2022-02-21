@@ -123,10 +123,18 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 # TODO Handle legal actions better for continuous envs,
                 #  maybe have min and max for each action and clip the agents actions
                 #  accordingly
-                legals = np.ones(
-                    _convert_to_spec(self._environment.action_spaces[agent]).shape,
-                    dtype=self._environment.action_spaces[agent].dtype,
-                )
+                if isinstance(self._environment.action_spaces[agent], spaces.Discrete):
+                    legals = np.ones(
+                        _convert_to_spec(
+                            self._environment.action_spaces[agent]
+                        ).num_values,
+                        dtype=self._environment.action_spaces[agent].dtype,
+                    )
+                else:
+                    legals = np.ones(
+                        _convert_to_spec(self._environment.action_spaces[agent]).shape,
+                        dtype=self._environment.action_spaces[agent].dtype,
+                    )
 
             observation = np.array(observation, dtype=np.float32)
             observations[agent] = OLT(
@@ -140,11 +148,24 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
     def observation_spec(self) -> Dict[str, OLT]:
         observation_specs = {}
         for agent in self._environment.agent_ids:
+
+            # Legals spec
+            if isinstance(self._environment.action_spaces[agent], spaces.Discrete):
+                legals = np.ones(
+                    _convert_to_spec(self._environment.action_spaces[agent]).num_values,
+                    dtype=self._environment.action_spaces[agent].dtype,
+                )
+            else:
+                legals = np.ones(
+                    _convert_to_spec(self._environment.action_spaces[agent]).shape,
+                    dtype=self._environment.action_spaces[agent].dtype,
+                )
+
             observation_specs[agent] = OLT(
                 observation=_convert_to_spec(
                     self._environment.observation_spaces[agent]
                 ),
-                legal_actions=_convert_to_spec(self._environment.action_spaces[agent]),
+                legal_actions=legals,
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs

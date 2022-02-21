@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """MAD4PG system implementation."""
 
 from typing import Callable, Dict, List, Optional, Type, Union
@@ -35,8 +34,8 @@ from mava.utils.loggers import MavaLogger
 class MAD4PG(MADDPG):
     """MAD4PG system."""
 
-    """TODO: Implement faster adders to speed up training times when
-    using multiple trainers with non-shared weights."""
+    # TODO: Implement faster adders to speed up training times when
+    # using multiple trainers with non-shared weights.
 
     def __init__(
         self,

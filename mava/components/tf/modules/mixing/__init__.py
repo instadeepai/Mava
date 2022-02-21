@@ -13,8 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MARL system mixing modules."""
-
-from mava.components.tf.modules.mixing.additive import AdditiveMixing
-from mava.components.tf.modules.mixing.base import BaseMixingModule
-from mava.components.tf.modules.mixing.monotonic import MonotonicMixing
+"""Value decomposition mixing modules."""
+from mava.components.tf.modules.mixing.mixers import QMIX, VDN, BaseMixer

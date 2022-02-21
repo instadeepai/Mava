@@ -25,6 +25,19 @@ from mava.wrappers.pettingzoo import (
     PettingZooParallelEnvWrapper,
 )
 from mava.wrappers.robocup import RoboCupWrapper
+
+try:
+    # The user might not have installed Flatland
+    from mava.wrappers.flatland import FlatlandEnvWrapper
+except ModuleNotFoundError:
+    pass
+
+try:
+    # The user might not have installed SMAC
+    from mava.wrappers.smac import SMACWrapper
+except ModuleNotFoundError:
+    pass
+
 from mava.wrappers.system_trainer_statistics import (
     DetailedTrainerStatistics,
     NetworkStatisticsActorCritic,
