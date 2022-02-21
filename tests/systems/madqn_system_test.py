@@ -44,7 +44,7 @@ class TestMADQN:
 
         # networks
         network_factory = lp_utils.partial_kwargs(
-            madqn.make_default_networks, policy_networks_layer_sizes=(64, 64)
+            madqn.make_default_networks, value_networks_layer_sizes=(64, 64)
         )
 
         # system
@@ -83,7 +83,8 @@ class TestMADQN:
             trainer.step()
 
     def test_recurrent_madqn_on_debugging_env(self) -> None:
-        """Test recurrent maddpg."""
+        """Test recurrent madqn."""
+
         # environment
         environment_factory = functools.partial(
             debugging_utils.make_environment,
@@ -94,8 +95,8 @@ class TestMADQN:
         # networks
         network_factory = lp_utils.partial_kwargs(
             madqn.make_default_networks,
-            archecture_type=ArchitectureType.recurrent,
-            policy_networks_layer_sizes=(32, 32),
+            architecture_type=ArchitectureType.recurrent,
+            value_networks_layer_sizes=(32, 32),
         )
 
         # system

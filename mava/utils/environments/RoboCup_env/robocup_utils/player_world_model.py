@@ -362,14 +362,10 @@ class WorldModel:
 
 
 class ServerParameters:
-    """
-    A storage container for all the settings of the soccer server.
-    """
+    """A storage container for all the settings of the soccer server."""
 
     def __init__(self):
-        """
-        Initialize default parameters for a server.
-        """
+        """Initialize default parameters for a server."""
 
         self.audio_cut_dist = 50
         self.auto_mode = 0

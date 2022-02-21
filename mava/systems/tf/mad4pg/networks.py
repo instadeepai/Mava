@@ -37,7 +37,7 @@ def make_default_networks(
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     sigma: float = 0.3,
-    archecture_type: ArchitectureType = ArchitectureType.feedforward,
+    architecture_type: ArchitectureType = ArchitectureType.feedforward,
     num_atoms: int = 51,
     seed: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
@@ -54,7 +54,7 @@ def make_default_networks(
         critic_networks_layer_sizes: size of critic networks.
         sigma: hyperparameters used to add Gaussian noise
             for simple exploration. Defaults to 0.3.
-        archecture_type: archecture used
+        architecture_type: architecture used
             for agent networks. Can be feedforward or recurrent.
             Defaults to ArchitectureType.feedforward.
 
@@ -77,7 +77,7 @@ def make_default_networks(
         policy_networks_layer_sizes=policy_networks_layer_sizes,
         critic_networks_layer_sizes=critic_networks_layer_sizes,
         sigma=sigma,
-        archecture_type=archecture_type,
+        architecture_type=architecture_type,
         vmin=vmin,
         vmax=vmax,
         num_atoms=num_atoms,
