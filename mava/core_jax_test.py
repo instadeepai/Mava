@@ -29,6 +29,12 @@ COMPONENT = None
 class TestDummySystem(BaseSystem):
     """Create a complete class with all abstract method overwritten."""
 
+    def design(self) -> List[Any]:
+        """Dummy design"""
+        self.components = [COMPONENT, COMPONENT]
+        assert len(self.components) == 2
+        return self.components
+
     def update(self, component: Any, name: str) -> None:
         """Dummy update"""
         assert component is None
@@ -62,6 +68,9 @@ def dummy_system() -> TestDummySystem:
 
 def test_dummy_system(dummy_system: TestDummySystem) -> None:
     """Test complete system methods"""
+    # design system
+    dummy_system.design()
+
     # update component
     dummy_system.update(COMPONENT, "update")
 
