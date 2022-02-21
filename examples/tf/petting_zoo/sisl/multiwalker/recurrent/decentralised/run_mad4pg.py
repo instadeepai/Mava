@@ -23,7 +23,7 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.systems.tf import maddpg
+from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
 from mava.utils.enums import ArchitectureType
 from mava.utils.environments import pettingzoo_utils
@@ -66,8 +66,11 @@ def main(_: Any) -> None:
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        maddpg.make_default_networks,
+        mad4pg.make_default_networks,
         architecture_type=ArchitectureType.recurrent,
+        vmin=-150,
+        vmax=150,
+        num_atoms=101,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
@@ -85,7 +88,7 @@ def main(_: Any) -> None:
     )
 
     # Distributed program.
-    program = maddpg.MADDPG(
+    program = mad4pg.MAD4PG(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
@@ -94,15 +97,15 @@ def main(_: Any) -> None:
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
-        trainer_fn=maddpg.training.MADDPGDecentralisedRecurrentTrainer,
-        executor_fn=maddpg.execution.MADDPGRecurrentExecutor,
+        trainer_fn=mad4pg.training.MAD4PGDecentralisedRecurrentTrainer,
+        executor_fn=mad4pg.execution.MAD4PGRecurrentExecutor,
         batch_size=32,
         sequence_length=20,
         period=20,
         min_replay_size=1000,
         max_replay_size=100000,
-        n_step=5,
         prefetch_size=4,
+        n_step=5,
         samples_per_insert=None,
     ).build()
 
