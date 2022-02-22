@@ -20,9 +20,7 @@ from typing import List
 
 import pytest
 
-# TODO: figure out how to solve: Module "mava.systems.jax.system"
-# has no attribute "System" error
-from mava.systems.jax.system import System  # type: ignore
+from mava.systems.jax.system import System
 
 
 # test components
