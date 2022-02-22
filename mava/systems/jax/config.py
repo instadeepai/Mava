@@ -17,7 +17,7 @@
 
 from dataclasses import is_dataclass
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from mava.utils.config_utils import flatten_dict
 
@@ -28,7 +28,7 @@ class Config:
     def __init__(self) -> None:
         """Initialise config"""
         self._config: Dict = {}
-        self._current_params: List = []
+        self._current_params: Dict = {}
         self._built = False
 
     def add(self, **kwargs: Any) -> None:
@@ -48,18 +48,18 @@ class Config:
                         .update() in the system builder."
                     )
                 else:
-                    new_param_names = list(dataclass.__dict__.keys())
-                    if set(self._current_params) & set(new_param_names):
-                        raise Exception(
-                            "Component configs share a common parameter name. \
-                            This is not allowed, please ensure config \
-                            parameter names are unique."
-                        )
-                    else:
-                        self._current_params.extend(new_param_names)
+                    new_params = list(dataclass.__dict__.keys())
+                    for current_name, current_params in self._current_params.items():
+                        if set(current_params) & set(new_params):
+                            raise Exception(
+                                f"{name} and {current_name} configs share a common \
+                                parameter name. This is not allowed, please ensure \
+                                config parameter names are unique."
+                            )
+                    self._current_params.update({name: new_params})
                     self._config[name] = dataclass
             else:
-                raise Exception("Component configs must be a dataclass.")
+                raise Exception(f"Component {name} config must be a dataclass.")
 
     def update(self, **kwargs: Any) -> None:
         """Update a component config dataclass.
@@ -72,15 +72,15 @@ class Config:
         for name, dataclass in kwargs.items():
             if is_dataclass(dataclass):
                 if name in list(self._config.keys()):
-                    new_param_names = list(dataclass.__dict__.keys())
-                    if set(self._current_params) & set(new_param_names):
-                        raise Exception(
-                            "Component configs share a common parameter name. \
-                            This is not allowed, please ensure config \
-                            parameter names are unique."
-                        )
-                    else:
-                        self._current_params.extend(new_param_names)
+                    new_params = list(dataclass.__dict__.keys())
+                    for current_name, current_params in self._current_params.items():
+                        if set(current_params) & set(new_params):
+                            raise Exception(
+                                f"{name} and {current_name} configs share a common \
+                                parameter name. This is not allowed, please ensure \
+                                config parameter names are unique."
+                            )
+                    self._current_params.update({name: new_params})
                     self._config[name] = dataclass
                 else:
                     raise Exception(
