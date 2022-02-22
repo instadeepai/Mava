@@ -13,9 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO(Arnu): remove later
-# type: ignore
-
 """Jax-based Mava system implementation."""
 import abc
 from types import SimpleNamespace

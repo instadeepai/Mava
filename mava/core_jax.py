@@ -17,6 +17,7 @@
 """Core Mava interfaces for Jax systems."""
 
 import abc
+from types import SimpleNamespace
 from typing import Any, List
 
 
@@ -24,7 +25,7 @@ class BaseSystem(abc.ABC):
     """Abstract system object."""
 
     @abc.abstractmethod
-    def design(self) -> List[Any]:
+    def design(self) -> SimpleNamespace:
         """System design specifying the list of components to use.
 
         Returns:
@@ -32,7 +33,7 @@ class BaseSystem(abc.ABC):
         """
 
     @abc.abstractmethod
-    def update(self, component: Any, name: str) -> None:
+    def update(self, component: Any) -> None:
         """Update a component that has already been added to the system.
 
         Args:
@@ -41,7 +42,7 @@ class BaseSystem(abc.ABC):
         """
 
     @abc.abstractmethod
-    def add(self, component: Any, name: str) -> None:
+    def add(self, component: Any) -> None:
         """Add a new component to the system.
 
         Args:
