@@ -87,7 +87,6 @@ def main(_: Any) -> None:
         exploration_scheduler_fn=LinearExplorationScheduler(
             epsilon_start=1.0, epsilon_min=0.05, epsilon_decay=1e-6
         ),
-        shared_weights=False,
         batch_size=32,
         max_replay_size=5000,
         samples_per_insert=4,

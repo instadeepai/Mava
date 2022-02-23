@@ -110,6 +110,7 @@ class MADDPG:
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
     ):
         """Initialise the system
+
         Args:
             environment_factory: function to
                 instantiate an environment.
@@ -227,10 +228,12 @@ class MADDPG:
         if type(network_sampling_setup) is not list:
             if network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
                 # if no network_sampling_setup is fixed, use shared_weights to
-                # determine setup
+                # assign a single network to all agents of the same type
                 self._agent_net_keys = {
-                    agent: "network_0" if shared_weights else f"network_{i}"
-                    for i, agent in enumerate(agents)
+                    agent: f"""network_{agent.split("_")[0]}"""
+                    if shared_weights
+                    else f"network_{agent}"
+                    for agent in agents
                 }
                 self._network_sampling_setup = [
                     [
@@ -402,7 +405,8 @@ class MADDPG:
         )
 
     def _get_extra_specs(self) -> Any:
-        """helper to establish specs for extra information
+        """Helper to establish specs for extra information
+
         Returns:
             dictionary containing extra specs
         """
@@ -425,8 +429,10 @@ class MADDPG:
 
     def replay(self) -> Any:
         """Step counter
+
         Args:
             checkpoint: whether to checkpoint the counter.
+
         Returns:
             step counter object.
         """
@@ -487,11 +493,13 @@ class MADDPG:
         variable_source: acme.VariableSource,
     ) -> mava.ParallelEnvironmentLoop:
         """System executor
+
         Args:
             executor_id: id to identify the executor process for logging purposes.
             replay: replay data table to push data to.
             variable_source: variable server for updating
                 network variables.
+
         Returns:
             mava.ParallelEnvironmentLoop: environment-executor loop instance.
         """
@@ -538,10 +546,12 @@ class MADDPG:
         logger: loggers.Logger = None,
     ) -> Any:
         """System evaluator (an executor process not connected to a dataset)
+
         Args:
             variable_source: variable server for updating
                 network variables.
             logger: logger object.
+
         Returns:
             environment-executor evaluation loop instance for evaluating the
                 performance of a system.
@@ -588,11 +598,13 @@ class MADDPG:
         variable_source: MavaVariableSource,
     ) -> mava.core.Trainer:
         """System trainer
+
         Args:
             trainer_id: Id of the trainer being created.
             replay: replay data table to pull data from.
             variable_source: variable server for updating
                 network variables.
+
         Returns:
             system trainer.
         """
@@ -622,8 +634,10 @@ class MADDPG:
 
     def build(self, name: str = "maddpg") -> Any:
         """Build the distributed system as a graph program.
+
         Args:
             name: system name.
+
         Returns:
             graph program for distributed system training.
         """
