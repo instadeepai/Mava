@@ -70,10 +70,6 @@ def make_default_networks(
         value_networks_layer_sizes = {
             key: value_networks_layer_sizes for key in specs.keys()
         }
-    if isinstance(value_networks_layer_sizes, Sequence):
-        value_networks_layer_sizes = {
-            key: value_networks_layer_sizes for key in specs.keys()
-        }
 
     observation_networks = {}
     value_networks = {}
