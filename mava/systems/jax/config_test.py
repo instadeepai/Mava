@@ -246,7 +246,3 @@ def test_accidental_parameter_override_exception(
         # as an already existing component parameter name
         other_hyperparamter_config = SameParameterNameConfig(param_0=2, param_2="param")
         config.add(other_hyperparameter=other_hyperparamter_config)
-
-
-# TODO(Arnu): test interaction between add, update, set and get with respect to
-# when the config is built

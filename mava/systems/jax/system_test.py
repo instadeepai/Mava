@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO (Arnu): remove when attribute errors for builder and mixin have been figured out.
+# type: ignore
+
 """Tests for Jax-based Mava system implementation."""
 from dataclasses import dataclass, field
 from types import SimpleNamespace
@@ -20,10 +23,56 @@ from typing import List
 
 import pytest
 
+from mava.systems.jax import Builder
 from mava.systems.jax.system import System
 
 
-# test components
+# Mock callbacks
+class MockCallback:
+    def dummy_int_plus_str(self, builder: Builder) -> None:
+        """Dummy hook."""
+        pass
+
+    def dummy_float_plus_bool(self, builder: Builder) -> None:
+        """Dummy hook."""
+        pass
+
+    def dummy_str_plus_bool(self, builder: Builder) -> None:
+        """Dummy hook."""
+        pass
+
+
+class MockCallbackHookMixin:
+    def dummy_int_plus_str(self) -> None:
+        """Called when the builder calls hook."""
+        for callback in self.callbacks:
+            callback.dummy_int_plus_str(self)
+
+    def dummy_float_plus_bool(self) -> None:
+        """Called when the builder calls hook."""
+        for callback in self.callbacks:
+            callback.dummy_float_plus_bool(self)
+
+    def dummy_str_plus_bool(self) -> None:
+        """Called when the builder calls hook."""
+        for callback in self.callbacks:
+            callback.dummy_str_plus_bool(self)
+
+
+# Mock builder
+class MockBuilder(Builder, MockCallbackHookMixin):
+    def add_different_data_types(self) -> None:
+        """Hooks for adding different data types."""
+        self.int_plus_str = 0
+        self.float_plus_bool = 0
+        self.str_plus_bool = 0
+
+        self.dummy_int_plus_str()
+        self.dummy_float_plus_bool()
+        self.dummy_str_plus_bool()
+
+
+# Mock components
 class MainComponent:
     @property
     def name(self) -> str:
@@ -49,10 +98,10 @@ class SubComponent:
 @dataclass
 class ComponentZeroDefaultConfig:
     param_0: int = 1
-    param_1: str = "one"
+    param_1: str = "1"
 
 
-class ComponentZero(MainComponent):
+class ComponentZero(MockCallback, MainComponent):
     def __init__(
         self, config: ComponentZeroDefaultConfig = ComponentZeroDefaultConfig()
     ) -> None:
@@ -63,13 +112,13 @@ class ComponentZero(MainComponent):
         """
         self.config = config
 
-    def dummy_int_plus_str(self) -> int:
+    def dummy_int_plus_str(self, builder: Builder) -> None:
         """Dummy component function.
 
         Returns:
             config int plus string cast to int
         """
-        return self.config.param_0 + int(self.config.param_1)
+        builder.int_plus_str = self.config.param_0 + int(self.config.param_1)
 
 
 @dataclass
@@ -78,7 +127,7 @@ class ComponentOneDefaultConfig:
     param_3: bool = True
 
 
-class ComponentOne(SubComponent):
+class ComponentOne(MockCallback, SubComponent):
     def __init__(
         self, config: ComponentOneDefaultConfig = ComponentOneDefaultConfig()
     ) -> None:
@@ -89,22 +138,22 @@ class ComponentOne(SubComponent):
         """
         self.config = config
 
-    def dummy_float_plus_bool(self) -> float:
+    def dummy_float_plus_bool(self, builder: Builder) -> None:
         """Dummy component function.
 
         Returns:
             float plus boolean cast as float
         """
-        return self.config.param_2 + float(self.config.param_3)
+        builder.float_plus_bool = self.config.param_2 + float(self.config.param_3)
 
 
 @dataclass
 class ComponentTwoDefaultConfig:
-    param_4: str = "one"
+    param_4: str = "2"
     param_5: bool = True
 
 
-class ComponentTwo(MainComponent):
+class ComponentTwo(MockCallback, MainComponent):
     def __init__(
         self, config: ComponentTwoDefaultConfig = ComponentTwoDefaultConfig()
     ) -> None:
@@ -115,13 +164,13 @@ class ComponentTwo(MainComponent):
         """
         self.config = config
 
-    def dummy_str_plus_bool(self) -> int:
+    def dummy_str_plus_bool(self, builder: Builder) -> None:
         """Dummy component function.
 
         Returns:
             string cast as int plus boolean cast as in
         """
-        return int(self.config.param_4) + int(self.config.param_5)
+        builder.str_plus_bool = int(self.config.param_4) + int(self.config.param_5)
 
 
 @dataclass
@@ -132,7 +181,7 @@ class DistributorDefaultConfig:
     name: str = "system"
 
 
-class MockDistributorComponent:
+class MockDistributorComponent(MockCallback):
     def __init__(
         self, config: DistributorDefaultConfig = DistributorDefaultConfig()
     ) -> None:
@@ -153,44 +202,79 @@ class MockDistributorComponent:
         return "distributor"
 
 
-class TestSystemWithZeroComponents(System):
+# Test Systems
+class TestSystem(System):
+    def launch(
+        self,
+        num_executors: int,
+        nodes_on_gpu: List[str],
+        multi_process: bool = True,
+        name: str = "system",
+    ) -> None:
+        """Run the system.
+
+        Args:
+            config : system configuration including
+            num_executors : number of executor processes to run in parallel
+            nodes_on_gpu : which processes to run on gpu
+            multi_process : whether to run locally or distributed, local runs are
+                for debugging
+            name : name of the system
+        """
+        # build config is not already built
+        if not self.config._built:
+            self.config.build()
+
+        # update distributor config
+        self.config.set(
+            num_executors=num_executors,
+            nodes_on_gpu=nodes_on_gpu,
+            multi_process=multi_process,
+            name=name,
+        )
+
+        # get system config to feed to component list to update hyperparamete settings
+        system_config = self.config.get()
+
+        # update default system component configs
+        for component in self._design.__dict__.values():
+            self.components.append(component(system_config))
+
+        # Build system
+        self._builder = MockBuilder(components=self.components)
+        self._builder.build()
+
+        # Launch system
+        self._builder.launch()
+
+
+class TestSystemWithZeroComponents(TestSystem):
     def design(self) -> SimpleNamespace:
         """Mock system design with zero components.
 
         Returns:
             system callback components
         """
-        components = SimpleNamespace()
+        components = SimpleNamespace(distributor=MockDistributorComponent)
         return components
 
 
-class TestSystemWithOneComponent(System):
+class TestSystemWithOneComponent(TestSystem):
     def design(self) -> SimpleNamespace:
         """Mock system design with one component.
 
         Returns:
             system callback components
         """
-        components = SimpleNamespace(main_component=ComponentZero)
-        return components
-
-
-class TestSystemWithTwoComponents(System):
-    def design(self) -> SimpleNamespace:
-        """Mock system design with two components.
-
-        Returns:
-            system callback components
-        """
         components = SimpleNamespace(
-            main_component=ComponentZero, sub_component=ComponentOne
+            main_component=ComponentZero, distributor=MockDistributorComponent
         )
         return components
 
 
-class TestSystemWithTwoComponentsAndDistributor(System):
+class TestSystemWithTwoComponents(TestSystem):
     def design(self) -> SimpleNamespace:
-        """Mock system design with two components and a distributor component.
+        """Mock system design with two components.
 
         Returns:
             system callback components
@@ -203,6 +287,7 @@ class TestSystemWithTwoComponentsAndDistributor(System):
         return components
 
 
+# Test fixtures
 @pytest.fixture
 def system_with_zero_components() -> System:
     """Dummy system with zero components.
@@ -233,14 +318,38 @@ def system_with_two_components() -> System:
     return TestSystemWithTwoComponents()
 
 
-@pytest.fixture
-def system_with_two_components_and_distributor() -> System:
-    """Dummy system with two components and distributor.
+# Tests
+def test_system_launch_without_configure(
+    system_with_two_components: System,
+) -> None:
+    """Test if system can launch without having had changed (configured) the default \
+        config.
 
-    Returns:
-        mock system
+    Args:
+        system_with_two_components : mock system
     """
-    return TestSystemWithTwoComponentsAndDistributor()
+    system_with_two_components.launch(num_executors=1, nodes_on_gpu=["process"])
+    system_with_two_components._builder.add_different_data_types()
+    assert system_with_two_components._builder.int_plus_str == 2
+    assert system_with_two_components._builder.float_plus_bool == 2.2
+    assert system_with_two_components._builder.str_plus_bool == 0
+
+
+def test_system_launch_with_configure(
+    system_with_two_components: System,
+) -> None:
+    """Test if system can launch having had changed (configured) the default \
+        config.
+
+    Args:
+        system_with_two_components : mock system
+    """
+    system_with_two_components.configure(param_0=2, param_3=False)
+    system_with_two_components.launch(num_executors=1, nodes_on_gpu=["process"])
+    system_with_two_components._builder.add_different_data_types()
+    assert system_with_two_components._builder.int_plus_str == 3
+    assert system_with_two_components._builder.float_plus_bool == 1.2
+    assert system_with_two_components._builder.str_plus_bool == 0
 
 
 def test_system_update_with_existing_component(
@@ -252,6 +361,11 @@ def test_system_update_with_existing_component(
         system_with_two_components : mock system
     """
     system_with_two_components.update(ComponentTwo)
+    system_with_two_components.launch(num_executors=1, nodes_on_gpu=["process"])
+    system_with_two_components._builder.add_different_data_types()
+    assert system_with_two_components._builder.int_plus_str == 0
+    assert system_with_two_components._builder.float_plus_bool == 2.2
+    assert system_with_two_components._builder.str_plus_bool == 3
 
 
 def test_system_update_with_non_existing_component(
@@ -288,6 +402,11 @@ def test_system_add_with_non_existing_component(
         system_with_one_component : mock system
     """
     system_with_one_component.add(ComponentOne)
+    system_with_one_component.launch(num_executors=1, nodes_on_gpu=["process"])
+    system_with_one_component._builder.add_different_data_types()
+    assert system_with_one_component._builder.int_plus_str == 2
+    assert system_with_one_component._builder.float_plus_bool == 2.2
+    assert system_with_one_component._builder.str_plus_bool == 0
 
 
 def test_system_update_twice(system_with_two_components: System) -> None:
@@ -298,6 +417,11 @@ def test_system_update_twice(system_with_two_components: System) -> None:
     """
     system_with_two_components.update(ComponentTwo)
     system_with_two_components.update(ComponentZero)
+    system_with_two_components.launch(num_executors=1, nodes_on_gpu=["process"])
+    system_with_two_components._builder.add_different_data_types()
+    assert system_with_two_components._builder.int_plus_str == 2
+    assert system_with_two_components._builder.float_plus_bool == 2.2
+    assert system_with_two_components._builder.str_plus_bool == 0
 
 
 def test_system_add_twice(system_with_zero_components: System) -> None:
@@ -306,8 +430,13 @@ def test_system_add_twice(system_with_zero_components: System) -> None:
     Args:
         system_with_zero_components : mock system
     """
-    system_with_zero_components.add(ComponentZero)
     system_with_zero_components.add(ComponentOne)
+    system_with_zero_components.add(ComponentTwo)
+    system_with_zero_components.launch(num_executors=1, nodes_on_gpu=["process"])
+    system_with_zero_components._builder.add_different_data_types()
+    assert system_with_zero_components._builder.int_plus_str == 0
+    assert system_with_zero_components._builder.float_plus_bool == 2.2
+    assert system_with_zero_components._builder.str_plus_bool == 3
 
 
 def test_system_add_and_update(system_with_zero_components: System) -> None:
@@ -318,6 +447,11 @@ def test_system_add_and_update(system_with_zero_components: System) -> None:
     """
     system_with_zero_components.add(ComponentZero)
     system_with_zero_components.update(ComponentTwo)
+    system_with_zero_components.launch(num_executors=1, nodes_on_gpu=["process"])
+    system_with_zero_components._builder.add_different_data_types()
+    assert system_with_zero_components._builder.int_plus_str == 0
+    assert system_with_zero_components._builder.float_plus_bool == 0
+    assert system_with_zero_components._builder.str_plus_bool == 3
 
 
 def test_system_configure_one_component_params(
@@ -328,12 +462,12 @@ def test_system_configure_one_component_params(
     Args:
         system_with_two_components : mock system
     """
-    system_with_two_components.configure(param_0=2, param_1="two")
-    config = system_with_two_components.config.get()
-    assert config.param_0 == 2
-    assert config.param_1 == "two"
-    assert config.param_2 == 1.2
-    assert config.param_3 is True
+    system_with_two_components.configure(param_0=2, param_1="2")
+    system_with_two_components.launch(num_executors=1, nodes_on_gpu=["process"])
+    system_with_two_components._builder.add_different_data_types()
+    assert system_with_two_components._builder.int_plus_str == 4
+    assert system_with_two_components._builder.float_plus_bool == 2.2
+    assert system_with_two_components._builder.str_plus_bool == 0
 
 
 def test_system_configure_two_component_params(
@@ -345,37 +479,8 @@ def test_system_configure_two_component_params(
         system_with_two_components : mock system
     """
     system_with_two_components.configure(param_0=2, param_3=False)
-    config = system_with_two_components.config.get()
-    assert config.param_0 == 2
-    assert config.param_1 == "one"
-    assert config.param_2 == 1.2
-    assert config.param_3 is False
-
-
-def test_system_launch_without_configure(
-    system_with_two_components_and_distributor: System,
-) -> None:
-    """Test if system can launch without having had changed (configured) the default \
-        config.
-
-    Args:
-        system_with_two_components_and_distributor : mock system
-    """
-    system_with_two_components_and_distributor.launch(
-        num_executors=1, nodes_on_gpu=["process"]
-    )
-
-
-def test_system_launch_with_configure(
-    system_with_two_components_and_distributor: System,
-) -> None:
-    """Test if system can launch having had changed (configured) the default \
-        config.
-
-    Args:
-        system_with_two_components_and_distributor : mock system
-    """
-    system_with_two_components_and_distributor.configure(param_0=2, param_3=False)
-    system_with_two_components_and_distributor.launch(
-        num_executors=1, nodes_on_gpu=["process"]
-    )
+    system_with_two_components.launch(num_executors=1, nodes_on_gpu=["process"])
+    system_with_two_components._builder.add_different_data_types()
+    assert system_with_two_components._builder.int_plus_str == 3
+    assert system_with_two_components._builder.float_plus_bool == 1.2
+    assert system_with_two_components._builder.str_plus_bool == 0
