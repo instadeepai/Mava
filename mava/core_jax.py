@@ -17,14 +17,15 @@
 """Core Mava interfaces for Jax systems."""
 
 import abc
-from typing import Any, List
+from types import SimpleNamespace
+from typing import Any, Dict, List
 
 
 class BaseSystem(abc.ABC):
     """Abstract system object."""
 
     @abc.abstractmethod
-    def design(self) -> List[Any]:
+    def design(self) -> SimpleNamespace:
         """System design specifying the list of components to use.
 
         Returns:
@@ -32,21 +33,19 @@ class BaseSystem(abc.ABC):
         """
 
     @abc.abstractmethod
-    def update(self, component: Any, name: str) -> None:
+    def update(self, component: Any) -> None:
         """Update a component that has already been added to the system.
 
         Args:
             component : system callback component
-            name : component name
         """
 
     @abc.abstractmethod
-    def add(self, component: Any, name: str) -> None:
+    def add(self, component: Any) -> None:
         """Add a new component to the system.
 
         Args:
             component : system callback component
-            name : component name
         """
 
     @abc.abstractmethod
@@ -69,4 +68,54 @@ class BaseSystem(abc.ABC):
             multi_process : whether to run locally or distributed, local runs are
                 for debugging
             name : name of the system
+        """
+
+
+class SystemBuilder(abc.ABC):
+    """Abstract system builder."""
+
+    @abc.abstractmethod
+    def data_server(self) -> List[Any]:
+        """Data server to store and serve transition data from and to system.
+
+        Returns:
+            System data server
+        """
+
+    @abc.abstractmethod
+    def parameter_server(self, extra_nodes: Dict = {}) -> Any:
+        """Parameter server to store and serve system network parameters.
+
+        Args:
+            extra_nodes : additional nodes to add to a launchpad program build
+        Returns:
+            System parameter server
+        """
+
+    @abc.abstractmethod
+    def executor(
+        self, executor_id: str, data_server_client: Any, parameter_server_client: Any
+    ) -> Any:
+        """Executor, a collection of agents in an environment to gather experience.
+
+        Args:
+            executor_id : id to identify the executor process for logging purposes
+            data_server_client : data server client for pushing transition data
+            parameter_server_client : parameter server client for pulling parameters
+        Returns:
+            System executor
+        """
+
+    @abc.abstractmethod
+    def trainer(
+        self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
+    ) -> Any:
+        """Trainer, a system process for updating agent specific network parameters.
+
+        Args:
+            trainer_id : id to identify the trainer process for logging purposes
+            data_server_client : data server client for pulling transition data
+            parameter_server_client : parameter server client for pushing parameters
+        Returns:
+            System trainer
         """
