@@ -17,11 +17,11 @@
 """Tests for core Mava interfaces for Jax systems."""
 
 from types import SimpleNamespace
-from typing import Any, List
+from typing import Any, Dict, List
 
 import pytest
 
-from mava.core_jax import BaseSystem
+from mava.core_jax import BaseSystem, SystemBuilder
 
 # Dummy component
 COMPONENT = None
@@ -86,3 +86,76 @@ def test_dummy_system(dummy_system: TestDummySystem) -> None:
 
     # launch system
     dummy_system.launch(num_executors=1, nodes_on_gpu=["process"])
+
+
+# Dummy variables
+DATA_CLIENT = "data_client"
+PARAMETER_CLIENT = "parameter_client"
+
+
+class TestDummySystemBuilder(SystemBuilder):
+    """Create a complete class with all abstract method overwritten."""
+
+    def data_server(self) -> List[Any]:
+        """Dummy Data server."""
+        data_server = ["data_server"]
+        return data_server
+
+    def parameter_server(self, extra_nodes: Dict = {}) -> Any:
+        """Dummy Parameter server."""
+        parameter_server = ("parameter_server", extra_nodes)
+        return parameter_server
+
+    def executor(
+        self, executor_id: Any, data_server_client: Any, parameter_server_client: Any
+    ) -> Any:
+        """Dummy Executor."""
+        executor = (executor_id, data_server_client, parameter_server_client)
+        return executor
+
+    def trainer(
+        self, trainer_id: Any, data_server_client: Any, parameter_server_client: Any
+    ) -> Any:
+        """Dummy Trainer"""
+        trainer = (trainer_id, data_server_client, parameter_server_client)
+        return trainer
+
+
+@pytest.fixture
+def dummy_system_builder() -> TestDummySystemBuilder:
+    """Create complete system for use in tests"""
+    return TestDummySystemBuilder()
+
+
+def test_dummy_system_builder(dummy_system_builder: TestDummySystemBuilder) -> None:
+    """Test complete system methods"""
+    # build data server
+    data_server = dummy_system_builder.data_server()
+    assert data_server[0] == "data_server"
+
+    # build parameter server
+    parameter_server, extra_nodes = dummy_system_builder.parameter_server()
+    assert parameter_server == "parameter_server"
+    assert extra_nodes == {}
+
+    # build executor
+    exec_id, exec_data_client, exec_param_client = dummy_system_builder.executor(
+        executor_id="executor",
+        data_server_client=DATA_CLIENT,
+        parameter_server_client=PARAMETER_CLIENT,
+    )
+
+    assert exec_id == "executor"
+    assert exec_data_client == "data_client"
+    assert exec_param_client == "parameter_client"
+
+    # build trainer
+    train_id, train_data_client, train_param_client = dummy_system_builder.trainer(
+        trainer_id="trainer",
+        data_server_client=DATA_CLIENT,
+        parameter_server_client=PARAMETER_CLIENT,
+    )
+
+    assert train_id == "trainer"
+    assert train_data_client == "data_client"
+    assert train_param_client == "parameter_client"
