@@ -21,6 +21,7 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tree
 from acme import types
 from acme.specs import EnvironmentSpec
 
@@ -93,7 +94,6 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             variable_client=variable_client,
         )
 
-    @tf.function
     def _policy(
         self, agent: str, observation: types.NestedTensor
     ) -> types.NestedTensor:
@@ -147,11 +147,18 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         # Step the recurrent policy/value network forward
         # given the current observation and state.
         action, policy = self._policy(agent, observation.observation)
-
-        # Return a numpy array with squeezed out batch dimension.
-        action = tf2_utils.to_numpy_squeeze(action)
-        policy = tf2_utils.to_numpy_squeeze(policy)
         return action, policy
+
+    @tf.function
+    def _select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+        """Select the actions for all agents in the system"""
+        actions = {}
+        policies = {}
+        for agent, observation in observations.items():
+            actions[agent], policies[agent] = self.select_action(agent, observation)
+        return actions, policies
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
@@ -166,10 +173,9 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             actions and policies for all agents in the system.
         """
 
-        actions = {}
-        policies = {}
-        for agent, observation in observations.items():
-            actions[agent], policies[agent] = self.select_action(agent, observation)
+        actions, policies = self._select_actions(observations)
+        actions = tree.map_structure(tf2_utils.to_numpy_squeeze, actions)
+        policies = tree.map_structure(tf2_utils.to_numpy_squeeze, policies)
         return actions, policies
 
     def observe_first(
@@ -284,7 +290,6 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             store_recurrent_state=store_recurrent_state,
         )
 
-    @tf.function
     def _policy(
         self,
         agent: str,
@@ -322,6 +327,42 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             raise NotImplementedError
         return action, policy, new_state
 
+    def select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+        """select the actions for all agents in the system
+
+        Args:
+            observations: agent observations from the
+                environment.
+
+        Returns:
+            actions and policies for all agents in the system.
+        """
+
+        actions, policies = self._select_actions(observations)
+        actions = tree.map_structure(tf2_utils.to_numpy_squeeze, actions)
+        policies = tree.map_structure(tf2_utils.to_numpy_squeeze, policies)
+        return actions, policies
+
+    @staticmethod
+    def _select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+        """select the actions for all agents in the system
+        Args:
+            observations: agent observations from the
+                environment.
+        Returns:
+            actions and policies for all agents in the system.
+        """
+
+        actions = {}
+        policies = {}
+        for agent, observation in observations.items():
+            actions[agent], policies[agent] = self.select_action(agent, observation)
+        return actions, policies
+
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
@@ -348,28 +389,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
 
         # Bookkeeping of recurrent states for the observe method.
         self._update_state(agent, new_state)
-
-        # Return a numpy array with squeezed out batch dimension.
-        action = tf2_utils.to_numpy_squeeze(action)
-        policy = tf2_utils.to_numpy_squeeze(policy)
         return action, policy
-
-    def select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
-        """select the actions for all agents in the system
-        Args:
-            observations: agent observations from the
-                environment.
-        Returns:
-            actions and policies for all agents in the system.
-        """
-
-        actions = {}
-        policies = {}
-        for agent, observation in observations.items():
-            actions[agent], policies[agent] = self.select_action(agent, observation)
-        return actions, policies
 
     def observe_first(
         self,
