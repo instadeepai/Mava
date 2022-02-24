@@ -119,3 +119,11 @@ class SystemBuilder(abc.ABC):
         Returns:
             System trainer
         """
+
+    @abc.abstractmethod
+    def build(self) -> None:
+        """Construct program nodes."""
+
+    @abc.abstractmethod
+    def launch(self) -> None:
+        """Run the graph program."""

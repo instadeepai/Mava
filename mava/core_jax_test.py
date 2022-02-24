@@ -97,28 +97,36 @@ class TestDummySystemBuilder(SystemBuilder):
     """Create a complete class with all abstract method overwritten."""
 
     def data_server(self) -> List[Any]:
-        """Dummy Data server."""
+        """Dummy data server."""
         data_server = ["data_server"]
         return data_server
 
     def parameter_server(self, extra_nodes: Dict = {}) -> Any:
-        """Dummy Parameter server."""
+        """Dummy parameter server."""
         parameter_server = ("parameter_server", extra_nodes)
         return parameter_server
 
     def executor(
         self, executor_id: Any, data_server_client: Any, parameter_server_client: Any
     ) -> Any:
-        """Dummy Executor."""
+        """Dummy executor."""
         executor = (executor_id, data_server_client, parameter_server_client)
         return executor
 
     def trainer(
         self, trainer_id: Any, data_server_client: Any, parameter_server_client: Any
     ) -> Any:
-        """Dummy Trainer"""
+        """Dummy trainer"""
         trainer = (trainer_id, data_server_client, parameter_server_client)
         return trainer
+
+    def build(self) -> None:
+        """Dummy build"""
+        pass
+
+    def launch(self) -> None:
+        """Dummy launch"""
+        pass
 
 
 @pytest.fixture
@@ -159,3 +167,6 @@ def test_dummy_system_builder(dummy_system_builder: TestDummySystemBuilder) -> N
     assert train_id == "trainer"
     assert train_data_client == "data_client"
     assert train_param_client == "parameter_client"
+
+    dummy_system_builder.build()
+    dummy_system_builder.launch()
