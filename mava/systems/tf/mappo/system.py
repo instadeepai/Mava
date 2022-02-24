@@ -57,13 +57,9 @@ class MAPPO:
         shared_weights: bool = True,
         agent_net_keys: Dict[str, str] = {},
         executor_variable_update_period: int = 100,
-        policy_optimizer: Union[
-            snt.Optimizer, Dict[str, snt.Optimizer]
-        ] = snt.optimizers.Adam(learning_rate=5e-4),
-        critic_optimizer: Optional[snt.Optimizer] = snt.optimizers.Adam(
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
             learning_rate=5e-4
         ),
-        use_single_optimizer: bool = True,
         discount: float = 0.99,
         lambda_gae: float = 0.95,
         clipping_epsilon: float = 0.2,
@@ -86,7 +82,7 @@ class MAPPO:
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         evaluator_interval: Optional[dict] = None,
-        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
         normalize_advantage: bool = False,
     ):
         """Initialise the system
@@ -118,16 +114,8 @@ class MAPPO:
                 Defaults to {}.
             executor_variable_update_period : number of steps before
                 updating executor variables from the variable source. Defaults to 100.
-            policy_optimizer : optimizer(s) for updating policy networks.
+            optimizer : optimizer(s) for updating networks.
                 Defaults to snt.optimizers.Adam(learning_rate=5e-4).
-            critic_optimizer : optimizer for updating critic
-                networks. This is not used if using single optim.
-            use_single_optimizer : boolean to decide
-                whether or not the critic, policy and observation networks are
-                optimized jointly by a single optimizer. If true, all networks
-                are optimized by the policy_optimizer. If False, the observation and
-                policy network are optimized by the policy optimizer and the
-                critic network by the critic optimizer.
             discount : discount factor to use for TD updates. Defaults
                 to 0.99.
             lambda_gae : scalar determining the mix of bootstrapping
@@ -172,13 +160,8 @@ class MAPPO:
                 to the training loop. Defaults to {}.
             eval_loop_fn_kwargs: possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
-            learning_rate_scheduler_fn: dict with two functions/classes (one for the
-                policy and one for the critic optimizer), that takes in a trainer
-                step t and returns the current learning rate,
-                e.g. {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
-                See
-                examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
-                for an example.
+            learning_rate_scheduler_fn: an optional learning rate scheduler for
+                the optimiser.
             evaluator_interval: An optional condition that is used to
                 evaluate/test system performance after [evaluator_interval]
                 condition has been met. If None, evaluation will
@@ -281,9 +264,7 @@ class MAPPO:
                 sequence_length=self._sequence_length,
                 sequence_period=self._sequence_period,
                 checkpoint=checkpoint,
-                policy_optimizer=policy_optimizer,
-                critic_optimizer=critic_optimizer,
-                use_single_optimizer=use_single_optimizer,
+                optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
                 evaluator_interval=evaluator_interval,
