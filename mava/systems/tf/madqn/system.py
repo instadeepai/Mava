@@ -258,7 +258,6 @@ class MADQN:
                 agents,
                 self._network_sampling_setup,  # type: ignore
             )
-        print(self._agent_net_keys)
         # Check that the environment and agent_net_keys has the same amount of agents
         sample_length = len(self._network_sampling_setup[0])  # type: ignore
         assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
