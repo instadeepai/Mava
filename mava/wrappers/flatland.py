@@ -22,10 +22,18 @@ import dm_env
 import numpy as np
 from acme import specs
 from acme.wrappers.gym_wrapper import _convert_to_spec
-from flatland.envs.observations import GlobalObsForRailEnv, Node, TreeObsForRailEnv
-from flatland.envs.rail_env import RailEnv
-from flatland.envs.step_utils.states import TrainState
-from flatland.utils.rendertools import AgentRenderVariant, RenderTool
+
+try:
+    from flatland.envs.observations import GlobalObsForRailEnv, Node, TreeObsForRailEnv
+    from flatland.envs.rail_env import RailEnv
+    from flatland.envs.step_utils.states import TrainState
+    from flatland.utils.rendertools import AgentRenderVariant, RenderTool
+except ModuleNotFoundError:
+    # Without these types - the docs fail.
+    # TODO(Kale-ab): Remove this hack.
+    RailEnv = Any
+    Node = Any
+    pass
 from gym.spaces import Discrete
 from gym.spaces.box import Box
 
