@@ -145,6 +145,8 @@ def test_update_config(
 
     assert conf.param_0 == 2.7
     assert conf.param_1 == 3.8
+    assert not hasattr(config, "name")
+    assert not hasattr(config, "setting")
 
 
 def test_set_existing_parameter_on_the_fly(
@@ -246,7 +248,3 @@ def test_accidental_parameter_override_exception(
         # as an already existing component parameter name
         other_hyperparamter_config = SameParameterNameConfig(param_0=2, param_2="param")
         config.add(other_hyperparameter=other_hyperparamter_config)
-
-
-# TODO(Arnu): test interaction between add, update, set and get with respect to
-# when the config is built
