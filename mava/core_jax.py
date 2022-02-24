@@ -65,7 +65,7 @@ class BaseSystem(abc.ABC):
         Args:
             num_executors : number of executor processes to run in parallel
             nodes_on_gpu : which processes to run on gpu
-            multi_process : whether to run locally or distributed, local runs are
-                for debugging
+            multi_process : whether to run single or multi process, single process runs
+                are primarily for debugging
             name : name of the system
         """
