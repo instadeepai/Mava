@@ -348,7 +348,7 @@ class TestEnvWrapper:
 
         # Seed environment since we are sampling actions.
         # We need to seed env and action space.
-        random_seed = 42
+        random_seed = 84
         wrapped_env.seed(random_seed)
         helpers.seed_action_space(wrapped_env, random_seed)
 

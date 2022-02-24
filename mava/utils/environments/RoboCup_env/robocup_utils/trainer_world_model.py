@@ -15,8 +15,9 @@
 
 # type: ignore
 class WorldModel:
-    """
-    Holds and updates the model of the world as known from current and past
+    """Holds and updates the model of the world
+
+    As known from current and past
     data.
     """
 
@@ -50,8 +51,9 @@ class WorldModel:
             )
 
     class RefereeMessages:
-        """
-        Static class containing possible non-mode messages sent by a referee.
+        """Static class containing possible non-mode
+
+        messages sent by a referee.
         """
 
         # these are referee messages, not play modes
@@ -108,8 +110,9 @@ class WorldModel:
         self.server_parameters = ServerParameters()
 
     def process_new_info(self, ball, goals, players):
-        """
-        Update any internal variables based on the currently available
+        """Update any internal variables.
+
+        Based on the currently available
         information.  This also calculates information not available directly
         from server-reported messages, such as player coordinates.
         """
@@ -149,6 +152,7 @@ class WorldModel:
         self.players = players
 
     def get_state(self):
+        """Get state."""
         return {"ball": self.ball, "players": self.players}
 
     def is_playon(self):
