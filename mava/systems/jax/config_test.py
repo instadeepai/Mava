@@ -163,8 +163,8 @@ def test_set_existing_parameter_on_the_fly(
     config.add(component=dummy_component_config)
     config.build()
 
-    # set config on the fly
-    config.set(name="new_component_name")
+    # set config parameters on the fly
+    config.set_parameters(name="new_component_name")
     conf = config.get()
 
     assert conf.name == "new_component_name"
@@ -186,8 +186,8 @@ def test_set_before_build_exception(
         # add component dataclasses and build config
         config.add(component=dummy_component_config)
 
-        # Try setting without having built first
-        config.set(name="new_component_name")
+        # Try setting parameters without having built first
+        config.set_parameters(name="new_component_name")
 
 
 def test_get_before_build_exception(
@@ -226,7 +226,7 @@ def test_parameter_setting_that_does_not_exist_exception(
         config.build()
 
         # Try setting a parameter that does not exist
-        config.set(unknown_param="new_value")
+        config.set_parameters(unknown_param="new_value")
 
 
 def test_accidental_parameter_override_exception(

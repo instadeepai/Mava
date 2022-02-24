@@ -112,7 +112,7 @@ class Config:
         else:
             raise Exception("Config has already been built, this can only happen once.")
 
-    def set(self, **kwargs: Any) -> None:
+    def set_parameters(self, **kwargs: Any) -> None:
         """Set a specific hyperparameter of a built config.
 
         Raises:
