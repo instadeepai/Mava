@@ -38,7 +38,7 @@ def make_default_networks(
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     sigma: float = 0.3,
-    archecture_type: ArchitectureType = ArchitectureType.feedforward,
+    architecture_type: ArchitectureType = ArchitectureType.feedforward,
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
     num_atoms: Optional[int] = None,
@@ -57,7 +57,7 @@ def make_default_networks(
         critic_networks_layer_sizes: size of critic networks.
         sigma: hyperparameters used to add Gaussian noise
             for simple exploration. Defaults to 0.3.
-        archecture_type: archecture used
+        architecture_type: architecture used
             for agent networks. Can be feedforward or recurrent.
             Defaults to ArchitectureType.feedforward.
 
@@ -70,7 +70,7 @@ def make_default_networks(
     """
     # Set Policy function and layer size
     # Default size per arch type.
-    if archecture_type == ArchitectureType.feedforward:
+    if architecture_type == ArchitectureType.feedforward:
         if not policy_networks_layer_sizes:
             policy_networks_layer_sizes = (
                 256,
@@ -78,7 +78,7 @@ def make_default_networks(
                 256,
             )
         policy_network_func = snt.Sequential
-    elif archecture_type == ArchitectureType.recurrent:
+    elif architecture_type == ArchitectureType.recurrent:
         if not policy_networks_layer_sizes:
             policy_networks_layer_sizes = (128, 128)
         policy_network_func = snt.DeepRNN
@@ -130,13 +130,13 @@ def make_default_networks(
         # An optional network to process observations
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
         # Create the policy network.
-        if archecture_type == ArchitectureType.feedforward:
+        if architecture_type == ArchitectureType.feedforward:
             policy_network = [
                 networks.LayerNormMLP(
                     policy_networks_layer_sizes[key], activate_final=True, seed=seed
                 ),
             ]
-        elif archecture_type == ArchitectureType.recurrent:
+        elif architecture_type == ArchitectureType.recurrent:
             policy_network = [
                 networks.LayerNormMLP(
                     policy_networks_layer_sizes[key][:-1],
