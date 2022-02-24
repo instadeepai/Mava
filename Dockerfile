@@ -6,7 +6,7 @@ ARG record
 # Ensure no installs try launch interactive screen
 ARG DEBIAN_FRONTEND=noninteractive
 # Update packages
-RUN apt-get update -y && apt-get install -y python3-pip && apt-get install -y python3-venv
+RUN apt-get update --fix-missing -y && apt-get install -y python3-pip && apt-get install -y python3-venv
 # Update python path
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 10 &&\
     rm -rf /root/.cache && apt-get clean

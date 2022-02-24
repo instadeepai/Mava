@@ -27,7 +27,6 @@ from mava.wrappers.env_wrappers import ParallelEnvWrapper
 
 try:
     import pygame  # type: ignore
-
     from meltingpot.python.scenario import Scenario  # type: ignore
     from meltingpot.python.substrate import Substrate  # type: ignore
 except ModuleNotFoundError:
