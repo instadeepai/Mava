@@ -227,10 +227,11 @@ class MADDPG:
 
         if type(network_sampling_setup) is not list:
             if network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
-                # if no network_sampling_setup is fixed, use shared_weights to
-                # assign a single network to all agents of the same type
+                # if no network_sampling_setup is specified, assign a single network
+                # to all agents of the same type if weights are shared
+                # else assign seperate networks to each agent
                 self._agent_net_keys = {
-                    agent: f"""network_{agent.split("_")[0]}"""
+                    agent: f"network_{agent.split('_')[0]}"
                     if shared_weights
                     else f"network_{agent}"
                     for agent in agents
@@ -263,7 +264,6 @@ class MADDPG:
                 raise ValueError(
                     "network_sampling_setup must be a dict or fixed_agent_networks"
                 )
-
         else:
             # if a dictionary is provided, use network_sampling_setup to determine setup
             _, self._agent_net_keys = sample_new_agent_keys(

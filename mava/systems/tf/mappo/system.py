@@ -190,13 +190,13 @@ class MAPPO:
         self._network_factory = network_factory
         self._logger_factory = logger_factory
         self._environment_spec = environment_spec
-        # Setup agent networks assign a single network to all agents of the same type
-        # if weights are shared
+        # Setup agent networks to assign a single network to all agents of the same type
+        # if weights are shared else assign separate networks to each agent
         self._agent_net_keys = agent_net_keys
         if not agent_net_keys:
             agents = environment_spec.get_agent_ids()
             self._agent_net_keys = {
-                agent: f"""network_{agent.split("_")[0]}"""
+                agent: f"network_{agent.split('_')[0]}"
                 if shared_weights
                 else f"network_{agent}"
                 for agent in agents
