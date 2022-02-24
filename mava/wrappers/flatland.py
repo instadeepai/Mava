@@ -33,7 +33,6 @@ except ModuleNotFoundError:
     # TODO(Kale-ab): Remove this hack.
     RailEnv = Any
     Node = Any
-    pass
 from gym.spaces import Discrete
 from gym.spaces.box import Box
 
