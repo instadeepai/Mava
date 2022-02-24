@@ -39,27 +39,32 @@ class Config:
             Exception: if a config shares a parameter name with another config
             Exception: if a config is not a dataclass object
         """
-        for name, dataclass in kwargs.items():
-            if is_dataclass(dataclass):
-                if name in list(self._config.keys()):
-                    raise Exception(
-                        "The given component config is already part of the current \
-                        system. Perhaps try updating the component instead using \
-                        .update() in the system builder."
-                    )
-                else:
-                    new_param_names = list(dataclass.__dict__.keys())
-                    if set(self._current_params) & set(new_param_names):
+        if not self._built:
+            for name, dataclass in kwargs.items():
+                if is_dataclass(dataclass):
+                    if name in list(self._config.keys()):
                         raise Exception(
-                            "Component configs share a common parameter name. \
-                            This is not allowed, please ensure config \
-                            parameter names are unique."
+                            "The given component config is already part of the current \
+                            system. Perhaps try updating the component instead using \
+                            .update() in the system builder."
                         )
                     else:
-                        self._current_params.extend(new_param_names)
-                    self._config[name] = dataclass
-            else:
-                raise Exception("Component configs must be a dataclass.")
+                        new_param_names = list(dataclass.__dict__.keys())
+                        if set(self._current_params) & set(new_param_names):
+                            raise Exception(
+                                "Component configs share a common parameter name. \
+                                This is not allowed, please ensure config \
+                                parameter names are unique."
+                            )
+                        else:
+                            self._current_params.extend(new_param_names)
+                        self._config[name] = dataclass
+                else:
+                    raise Exception("Component configs must be a dataclass.")
+        else:
+            raise Exception(
+                "Component configs cannot be added to an already built config."
+            )
 
     def update(self, **kwargs: Any) -> None:
         """Update a component config dataclass.
@@ -69,35 +74,43 @@ class Config:
             Exception: if a config is not already part of the system
             Exception: if a config is not a dataclass object
         """
-        for name, dataclass in kwargs.items():
-            if is_dataclass(dataclass):
-                if name in list(self._config.keys()):
-                    new_param_names = list(dataclass.__dict__.keys())
-                    if set(self._current_params) & set(new_param_names):
-                        raise Exception(
-                            "Component configs share a common parameter name. \
-                            This is not allowed, please ensure config \
-                            parameter names are unique."
-                        )
+        if not self._built:
+            for name, dataclass in kwargs.items():
+                if is_dataclass(dataclass):
+                    if name in list(self._config.keys()):
+                        new_param_names = list(dataclass.__dict__.keys())
+                        if set(self._current_params) & set(new_param_names):
+                            raise Exception(
+                                "Component configs share a common parameter name. \
+                                This is not allowed, please ensure config \
+                                parameter names are unique."
+                            )
+                        else:
+                            self._current_params.extend(new_param_names)
+                        self._config[name] = dataclass
                     else:
-                        self._current_params.extend(new_param_names)
-                    self._config[name] = dataclass
+                        raise Exception(
+                            "The given component config is not part of the current \
+                            system. Perhaps try adding the component using .add() \
+                            in the system builder."
+                        )
                 else:
-                    raise Exception(
-                        "The given component config is not part of the current \
-                        system. Perhaps try adding the component using .add() \
-                        in the system builder."
-                    )
-            else:
-                raise Exception("Component configs must be a dataclass.")
+                    raise Exception("Component configs must be a dataclass.")
+        else:
+            raise Exception(
+                "Component configs cannot be updated if config has already been built."
+            )
 
     def build(self) -> None:
         """Build the config file, i.e. unwrap dataclass nested dictionaries"""
-        config_unwrapped: Dict = {}
-        for param in self._config.values():
-            config_unwrapped.update(flatten_dict(param.__dict__))
-        self._built_config = config_unwrapped
-        self._built = True
+        if not self._built:
+            config_unwrapped: Dict = {}
+            for param in self._config.values():
+                config_unwrapped.update(flatten_dict(param.__dict__))
+            self._built_config = config_unwrapped
+            self._built = True
+        else:
+            raise Exception("Config has already been built, this can only happen once.")
 
     def set(self, **kwargs: Any) -> None:
         """Set a specific hyperparameter of a built config.
@@ -113,15 +126,16 @@ class Config:
                 "Config must first be built using .build() before hyperparameters \
                 can be set to different values using .set()."
             )
-        for name, param_value in kwargs.items():
-            if name in list(self._built_config.keys()):
-                self._built_config[name] = param_value
-            else:
-                raise Exception(
-                    "The given parameter is not part of the current system. \
-                    This should have been added first via a component .add() \
-                    during system building."
-                )
+        else:
+            for name, param_value in kwargs.items():
+                if name in list(self._built_config.keys()):
+                    self._built_config[name] = param_value
+                else:
+                    raise Exception(
+                        "The given parameter is not part of the current system. \
+                        This should have been added first via a component .add() \
+                        during system building."
+                    )
 
     def get(self) -> SimpleNamespace:
         """Get built config for feeding to a Mava system.
