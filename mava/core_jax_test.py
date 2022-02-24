@@ -27,6 +27,26 @@ from mava.core_jax import BaseSystem
 COMPONENT = None
 
 
+def test_exception_for_incomplete_child_class() -> None:
+    """Test if error is thrown for missing abstract class overwrites."""
+    with pytest.raises(TypeError):
+
+        class TestIncompleteDummySystem(BaseSystem):
+            def update(self, component: Any) -> None:
+                """Dummy update"""
+                pass
+
+            def add(self, component: Any) -> None:
+                """Dummy add"""
+                pass
+
+            def configure(self, **kwargs: Any) -> None:
+                """Dummy configure"""
+                pass
+
+        TestIncompleteDummySystem()  # type: ignore
+
+
 class TestDummySystem(BaseSystem):
     """Create a complete class with all abstract method overwritten."""
 
