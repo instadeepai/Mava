@@ -244,7 +244,7 @@ def set_growing_gpu_memory() -> None:
 
 # Map critic and polic losses to dict, grouped by agent.
 def map_losses_per_agent_ac(
-    critic_losses: Dict, policy_losses: Dict, total_losses: Optional[Dict]
+    critic_losses: Dict, policy_losses: Dict, total_losses: Optional[Dict] = None
 ) -> Dict:
     """Map seperate losses dict to loss per agent.
 
