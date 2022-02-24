@@ -70,6 +70,9 @@ ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 ##########################################################
 # Flatland Image
 FROM tf-core AS flatland
+# Currently mava relies on gym~=0.22.0, while flatland relies gym==0.14.0.
+# This uses flatland's requirement.
+RUN pip uninstall gym -y
 RUN pip install -e .[flatland]
 ##########################################################
 
