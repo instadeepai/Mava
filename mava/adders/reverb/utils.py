@@ -123,4 +123,4 @@ def trajectory_signature(
         extras=extras_spec,
     )
 
-    return tree.map_structure_with_path(base.spec_like_to_tensor_spec, spec_step)
+    return spec_step
