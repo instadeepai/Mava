@@ -24,7 +24,7 @@ from mava.utils.wrapper_utils import RunningMeanStd
 from mava.wrappers.env_wrappers import ParallelEnvWrapper, SequentialEnvWrapper
 
 try:
-    import supersuit
+    from supersuit.utils.base_aec_wrapper import BaseWrapper
 
     _has_supersuit = True
 except ModuleNotFoundError:
@@ -51,9 +51,6 @@ if _has_petting_zoo:
         )
 
 PettingZooEnv = Union["PettingZooAECEnvWrapper", "PettingZooParallelEnvWrapper"]
-
-if _has_supersuit:
-    from supersuit.utils.base_aec_wrapper import BaseWrapper
 
 
 # TODO(Kale-ab): Make wrapper more general

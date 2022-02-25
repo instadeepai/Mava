@@ -47,6 +47,10 @@ We include a number of systems running on continuous control tasks.
   - *Feedforward*
     - [decentralised][pz_mad4pg_ff_dec] and [decentralised record agents][pz_mad4pg_ff_dec_record] (***recording agents acting in the environment***).
 
+  - **MAPPO**
+      - *Feedforward*
+        - [decentralised][pz_mappo_ff_dec].
+
 ### 2D RoboCup
 
 - **MAD4PG**:
@@ -143,7 +147,9 @@ We also include a number of systems running on discrete action space environment
 [pz_mad4pg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py
 [pz_mad4pg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py
 
-[robocup_mad4pg_ff_state_based]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/robocup/recurrent/state_based/run_mad4pg.py
+[pz_mad4pg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py
+[pz_mad4pg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py
+[pz_mappo_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mappo.py
 
 <!-- Discrete -->
 [debug_mappo_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/debugging/simple_spread/feedforward/decentralised/run_mappo.py

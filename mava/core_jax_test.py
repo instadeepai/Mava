@@ -16,73 +16,28 @@
 
 """Tests for core Mava interfaces for Jax systems."""
 
-from types import SimpleNamespace
-from typing import Any, List
+from typing import Any
 
 import pytest
 
 from mava.core_jax import BaseSystem
 
-# Dummy component
-COMPONENT = None
 
+def test_exception_for_incomplete_child_class() -> None:
+    """Test if error is thrown for missing abstract class overwrites."""
+    with pytest.raises(TypeError):
 
-class TestDummySystem(BaseSystem):
-    """Create a complete class with all abstract method overwritten."""
+        class TestIncompleteDummySystem(BaseSystem):
+            def update(self, component: Any) -> None:
+                """Dummy update"""
+                pass
 
-    def design(self) -> SimpleNamespace:
-        """Dummy design"""
-        self.components = SimpleNamespace(component_0=COMPONENT, component_1=COMPONENT)
-        assert self.components.component_0 is None
-        assert self.components.component_1 is None
-        return self.components
+            def add(self, component: Any) -> None:
+                """Dummy add"""
+                pass
 
-    def update(self, component: Any) -> None:
-        """Dummy update"""
-        assert component is None
+            def configure(self, **kwargs: Any) -> None:
+                """Dummy configure"""
+                pass
 
-    def add(self, component: Any) -> None:
-        """Dummy add"""
-        assert component is None
-
-    def configure(self, **kwargs: Any) -> None:
-        """Dummy configure"""
-        assert kwargs["param_0"] == 0
-        assert kwargs["param_1"] == 1
-
-    def launch(
-        self,
-        num_executors: int,
-        nodes_on_gpu: List[str],
-        multi_process: bool = True,
-        name: str = "system",
-    ) -> None:
-        """Dummy launch"""
-        assert num_executors == 1
-        assert multi_process is True
-        assert nodes_on_gpu[0] == "process"
-        assert name == "system"
-
-
-@pytest.fixture
-def dummy_system() -> TestDummySystem:
-    """Create complete system for use in tests"""
-    return TestDummySystem()
-
-
-def test_dummy_system(dummy_system: TestDummySystem) -> None:
-    """Test complete system methods"""
-    # design system
-    dummy_system.design()
-
-    # update component
-    dummy_system.update(COMPONENT)
-
-    # add component
-    dummy_system.add(COMPONENT)
-
-    # configure system
-    dummy_system.configure(param_0=0, param_1=1)
-
-    # launch system
-    dummy_system.launch(num_executors=1, nodes_on_gpu=["process"])
+        TestIncompleteDummySystem()  # type: ignore

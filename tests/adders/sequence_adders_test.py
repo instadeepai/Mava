@@ -2,16 +2,11 @@ from typing import Dict, Tuple, Union
 
 import dm_env
 from absl.testing import parameterized
+from acme.adders.reverb.sequence import EndBehavior
 
 from mava.adders import reverb as reverb_adders
 from tests.adders.adders_utils import MultiAgentAdderTestMixin
 from tests.adders.sequence_adders_test_data import TEST_CASES
-
-# TODO Clean this up, when using newer versions of acme.
-try:
-    from acme.adders.reverb.sequence import EndBehavior
-except ImportError:
-    from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
 
 
 class SequenceAdderTest(MultiAgentAdderTestMixin, parameterized.TestCase):

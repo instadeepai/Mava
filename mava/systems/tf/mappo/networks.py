@@ -18,7 +18,6 @@ import dm_env
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-import tensorflow_probability as tfp
 from acme.tf import utils as tf2_utils
 from dm_env import specs
 
@@ -90,12 +89,12 @@ def make_default_networks(
             policy_network = snt.Sequential(
                 [
                     networks.LayerNormMLP(
-                        tuple(policy_networks_layer_sizes[key]) + (num_actions,),
+                        policy_networks_layer_sizes[key],
                         activate_final=False,
                         seed=seed,
                     ),
-                    tf.keras.layers.Lambda(
-                        lambda logits: tfp.distributions.Categorical(logits=logits)
+                    networks.CategoricalHead(
+                        num_values=num_actions, dtype=specs[key].actions.dtype
                     ),
                 ]
             )

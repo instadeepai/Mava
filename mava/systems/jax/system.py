@@ -91,7 +91,7 @@ class System(BaseSystem):
     def configure(self, **kwargs: Any) -> None:
         """Configure system hyperparameters."""
         self.config.build()
-        self.config.set(**kwargs)
+        self.config.set_parameters(**kwargs)
 
     def launch(
         self,
@@ -115,7 +115,7 @@ class System(BaseSystem):
             self.config.build()
 
         # update distributor config
-        self.config.set(
+        self.config.set_parameters(
             num_executors=num_executors,
             nodes_on_gpu=nodes_on_gpu,
             multi_process=multi_process,
