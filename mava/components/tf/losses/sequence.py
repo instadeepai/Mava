@@ -13,14 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import math
 
 import tensorflow as tf
 import trfl
-from acme.tf import losses
 
-from mava.components.tf.networks import DiscreteValuedDistribution
 from mava.utils.training_utils import check_rank, combine_dim
 
 
@@ -40,28 +37,15 @@ def recurrent_n_step_critic_loss(
 
     seq_len = len(rewards[0])
     assert 0 < bootstrap_n <= seq_len
-
-    if not isinstance(q_values, DiscreteValuedDistribution):
-        # TODO (dries): Implement this test for MAD4PG as well.
-        check_rank([q_values, target_q_values, rewards], [2, 2, 2])
+    check_rank([q_values, target_q_values, rewards], [3, 3, 2])
 
     # The last values that rolled over do not matter because a
     # mask is applied to it.
-    if not isinstance(q_values, DiscreteValuedDistribution):
-        # Construct arguments to compute bootstrap target.
-        q_tm1, _ = combine_dim(q_values)
-        q_t, _ = combine_dim(tf.roll(target_q_values, shift=-bootstrap_n, axis=1))
-    else:
-        q_tm1 = q_values
-        q_t = copy.copy(q_values)
+    # tf.print("q_values: ", q_values.shape)
+    num_atoms = q_values.shape[-1]
 
-        # Roll the logits inside the tfp distribution
-        # Question (dries): Is there a more elegant way to do this that working with
-        # _logits directly?
-        last_dim_shape = (q_t._logits.shape[-1],)
-        reshaped_logits = tf.reshape(q_t._logits, (rewards.shape + last_dim_shape))
-        rolled_logits = tf.roll(reshaped_logits, shift=-bootstrap_n, axis=1)
-        q_t._logits, _ = combine_dim(rolled_logits)
+    q_tm1, _ = combine_dim(q_values)
+    q_t, _ = combine_dim(tf.roll(target_q_values, shift=-bootstrap_n, axis=1))
 
     # Pad the rewards so that rewards at the end can also be calculated.
     r_shape = rewards.shape
@@ -81,13 +65,42 @@ def recurrent_n_step_critic_loss(
     done_masking, _ = combine_dim(tf.roll(end_of_episode, shift=-bootstrap_n, axis=1))
 
     flat_mask = end_of_episode_mask * done_masking * math.pow(discount, bootstrap_n)
-    if isinstance(q_values, DiscreteValuedDistribution):
-        critic_loss = losses.categorical(
-            q_tm1=q_tm1,
-            r_t=n_step_rewards,
-            d_t=flat_mask,
-            q_t=q_t,
+    # tf.print("q_tm1: ", q_tm1.shape)
+    # tf.print("n_step_rewards: ", n_step_rewards.shape)
+    # tf.print("q_t: ", q_t.shape)
+    # tf.print("flat_mask: ", flat_mask.shape)
+
+    if num_atoms > 1:
+        tau = tf.convert_to_tensor(
+            [(2 * (i - 1) + 1) / (2 * num_atoms) for i in range(1, num_atoms + 1)]
         )
+        # See https://github.com/marload/DistRL-TensorFlow2/blob/master/QR-DQN/QR-DQN.py
+        target = (
+            tf.expand_dims(n_step_rewards, axis=-1)
+            + discount * tf.expand_dims(flat_mask, axis=-1) * q_tm1
+        )
+        target = tf.stop_gradient(target)
+        pred = q_tm1
+        # tf.print("pred: ", pred.shape)
+        pred_tile = tf.tile(tf.expand_dims(pred, axis=2), [1, 1, num_atoms])
+        target_tile = tf.tile(tf.expand_dims(target, axis=1), [1, num_atoms, 1])
+        huber_loss = tf.compat.v1.losses.huber_loss(target_tile, pred_tile)
+        tau = tf.cast(tf.reshape(tau, [1, num_atoms]), dtype="float32")
+        inv_tau = 1.0 - tau
+        tau = tf.tile(tf.expand_dims(tau, axis=1), [1, num_atoms, 1])
+        inv_tau = tf.tile(tf.expand_dims(inv_tau, axis=1), [1, num_atoms, 1])
+        error_loss = tf.math.subtract(target_tile, pred_tile)
+        loss = tf.where(
+            tf.less(error_loss, 0.0), inv_tau * huber_loss, tau * huber_loss
+        )
+        critic_loss = tf.reduce_sum(tf.reduce_mean(loss, axis=2), axis=1)
+
+        # critic_loss = losses.categorical(
+        #     q_tm1=q_tm1,
+        #     r_t=n_step_rewards,
+        #     d_t=flat_mask,
+        #     q_t=q_t,
+        # )
     else:
         critic_loss = trfl.td_learning(
             v_tm1=q_tm1,

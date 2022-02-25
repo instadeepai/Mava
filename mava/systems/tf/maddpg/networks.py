@@ -23,7 +23,6 @@ from dm_env import specs
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
-from mava.components.tf.networks import DiscreteValuedHead
 from mava.utils.enums import ArchitectureType
 
 Array = specs.Array
@@ -167,14 +166,14 @@ def make_default_networks(
         ]
 
         # Only for mad4pg
-        if vmin and vmax and num_atoms:
+        if num_atoms:
             critic_network += [
                 networks.LayerNormMLP(
                     critic_networks_layer_sizes[key],
                     activate_final=False,
                     seed=seed,
                 ),
-                DiscreteValuedHead(vmin, vmax, num_atoms),
+                snt.Linear(num_atoms),
             ]
         # maddpg
         else:

@@ -1314,7 +1314,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 obs_comb, dims = train_utils.combine_dim(obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(action_feed)
                 flat_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
-                q_values = train_utils.extract_dim(flat_q_values, dims)[:, :, 0]
+                q_values = train_utils.extract_dim(flat_q_values, dims)
 
                 # Remove first sequence step for the target
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
@@ -1322,9 +1322,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 flat_target_q_values = self._target_critic_networks[agent_key](
                     obs_comb, act_comb
                 )
-                target_q_values = train_utils.extract_dim(flat_target_q_values, dims)[
-                    :, :, 0
-                ]
+                target_q_values = train_utils.extract_dim(flat_target_q_values, dims)
 
                 # Critic loss.
                 # Compute the transformed n-step loss.

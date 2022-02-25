@@ -647,22 +647,23 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 # Remove the last sequence step for the normal network
                 obs_comb, dims = train_utils.combine_dim(obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(action_feed)
-                q_values = self._critic_networks[agent_key](obs_comb, act_comb)
-                q_values.set_dimensions(dims)
+                flat_q_values = self._critic_networks[agent_key](obs_comb, act_comb)
+                q_values = train_utils.extract_dim(flat_q_values, dims)
 
                 # Remove first sequence step for the target
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(target_actions_feed)
-                target_q_values = self._target_critic_networks[agent_key](
+                flat_target_q_values = self._target_critic_networks[agent_key](
                     obs_comb, act_comb
                 )
-                target_q_values.set_dimensions(dims)
+                target_q_values = train_utils.extract_dim(flat_target_q_values, dims)
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
                 agent_discount = discounts[agent]
 
                 # Critic loss.
+
                 critic_loss = recurrent_n_step_critic_loss(
                     q_values=q_values,
                     target_q_values=target_q_values,
@@ -704,7 +705,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 obs_comb, _ = train_utils.combine_dim(target_obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(dpg_actions_feed)
                 dpg_z_values = self._critic_networks[agent_key](obs_comb, act_comb)
-                dpg_q_values = dpg_z_values.mean()
+                dpg_q_values = tf.reduce_mean(dpg_z_values, axis=-1)
 
                 # Actor loss. If clipping is true use dqda clipping and clip the norm.
                 dqda_clipping = 1.0 if self._max_gradient_norm is not None else None
