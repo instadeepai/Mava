@@ -1,1 +1,1 @@
-Currently supported through the [PettingZoo Wrapper](pettingzoo).
+::: mava.wrappers.smac
