@@ -13,35 +13,35 @@ setting:
 
 System                                                                | Paper                    | Code
 -------------------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Deep Deterministic Policy Gradient (MADDPG)             | [Lowe et al., 2017]   | [![TF](../../docs/images/tf-small.png)][MADDPG_TF2]
-Multi-Agent Distributed Distributional DDPG (MAD4PG)    | [Barth-Maron et al., 2018] | [![TF](../../docs/images/tf-small.png)][MAD4PG_TF2]
+Multi-Agent Deep Deterministic Policy Gradient (MADDPG)             | [Lowe et al., 2017]   | [![TF][TF Logo]][MADDPG_TF2]
+Multi-Agent Distributed Distributional DDPG (MAD4PG)    | [Barth-Maron et al., 2018] | [![TF][TF Logo]][MAD4PG_TF2]
 
 ### Discrete control
 We also include a number of systems built with discrete action-spaces in mind listed below:
 
 System                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
-Deep Q-Networks (DQN)                                    | [Horgan et al., 2018]      | [![TF](../../docs/images/tf-small.png)][DQN_TF2]
-Differentiable Inter-Agent Learning (DIAL)               | [Foerster et al., 2016]    | [![TF](../../docs/images/tf-small.png)][DIAL_TF2]
-QMIX                                                     | [Rashid et al., 2018]      | [![TF](../../docs/images/tf-small.png)][QMIX_TF2]
+Deep Q-Networks (DQN)                                    | [Horgan et al., 2018]      | [![TF][TF Logo]][DQN_TF2]
+Differentiable Inter-Agent Learning (DIAL)               | [Foerster et al., 2016]    | [![TF][TF Logo]][DIAL_TF2]
+QMIX                                                     | [Rashid et al., 2018]      | [![TF][TF Logo]][QMIX_TF2]
 
 ### Mixed
 We also have a system that works with either discrete or continuous action-spaces:
 
 System                                                    | Paper                    | Code
 -------------------------------------------------------- | :----------------------: | :--:
-Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![TF](../../docs/images/tf-small.png)][MAPPO_TF2]
+Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Schroeder et al., 2020]      | [![TF][TF Logo]][MAPPO_TF2]
 
 <!-- TF agents -->
 
-[MADDPG_TF2]: tf/maddpg/
-[MAD4PG_TF2]: tf/mad4pg/
+[MADDPG_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/maddpg/
+[MAD4PG_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/mad4pg/
 
-[DQN_TF2]: tf/madqn/
-[DIAL_TF2]: tf/dial/
-[QMIX_TF2]: tf/qmix/
+[DQN_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/madqn/
+[DIAL_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/dial/
+[QMIX_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/qmix/
 
-[MAPPO_TF2]: tf/mappo/
+[MAPPO_TF2]: https://github.com/instadeepai/Mava/tree/main/mava/systems/tf/mappo/
 
 <!-- Papers -->
 [Lowe et al., 2017]: https://arxiv.org/abs/1706.02275
@@ -53,3 +53,5 @@ Multi-Agent Proximal Policy Optimization (MAPPO)        | [Yu et al., 2021], [Sc
 
 [Yu et al., 2021]: https://arxiv.org/abs/2103.01955
 [Schroeder et al., 2020]: https://arxiv.org/abs/2011.09533
+
+[TF Logo]: https://raw.githubusercontent.com/instadeepai/Mava/main/docs/images/tf-small.png

@@ -15,11 +15,18 @@
 
 """Common types used throughout Mava."""
 
-from typing import Dict, NamedTuple, Union
+from typing import Any, Dict, NamedTuple, Union
 
 import numpy as np
 from acme import types
 from acme.utils import loggers
+
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    BaseExplorationScheduler,
+    BaseExplorationTimestepScheduler,
+)
+
+NestedArray = Any
 
 
 class OLT(NamedTuple):
@@ -32,11 +39,28 @@ class OLT(NamedTuple):
 
 NestedLogger = Union[loggers.Logger, Dict[str, loggers.Logger]]
 
-SingleAgentAction = Union[int, float, np.array]
+SingleAgentAction = Union[int, float, np.ndarray]
 Action = Union[SingleAgentAction, Dict[str, SingleAgentAction]]
 
 SingleAgentReward = Union[int, float]
 Reward = Union[SingleAgentReward, Dict[str, SingleAgentReward]]
 Discount = Reward
 
-Observation = Union[OLT, Dict[str, OLT]]
+Observation = Union[OLT, Dict[str, OLT], Dict[str, np.ndarray]]
+
+EpsilonScheduler = Union[
+    BaseExplorationTimestepScheduler,
+    BaseExplorationScheduler,
+]
+
+
+class Transition(NamedTuple):
+    """Container for a transition."""
+
+    observations: NestedArray
+    actions: NestedArray
+    rewards: NestedArray
+    discounts: NestedArray
+    next_observations: NestedArray
+    extras: NestedArray = ()
+    next_extras: NestedArray = ()

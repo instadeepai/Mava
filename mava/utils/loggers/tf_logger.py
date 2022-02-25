@@ -15,8 +15,10 @@
 
 """Utilities for logging to the terminal."""
 import time
-from typing import Dict, List, Optional, Type
+import warnings
+from typing import Dict, List
 
+import numpy as np
 import tensorflow as tf
 from acme.utils.loggers import base
 from tensorflow import Tensor
@@ -45,32 +47,52 @@ class TFSummaryLogger(base.Logger):
             label: label string to use when logging. Default to 'Logs'.
         """
         self._time = time.time()
-        self.label = label
+        self._label = label
         self._iter = 0
-        self._summary: Optional[Type[tf.summary.SummaryWriter]] = None
         self._logdir = logdir
+        self._summary = tf.summary.create_file_writer(self._logdir)
 
     def write(self, values: base.LoggingData) -> None:
-        # If this is in init, launchpad fails,
-        # Error: tensorflow.python.framework.errors_impl.InvalidArgumentError:
-        #   Cannot convert a Tensor of dtype resource to a NumPy array.
-        # Line: CloudPickler(file, protocol=protocol, buffer_callback
-        #   =buffer_callback).dump(obj)
-        if self._summary is None:
-            self._summary = tf.summary.create_file_writer(self._logdir)
 
         with self._summary.as_default():
-            for key, value in values.items():
-                if hasattr(value, "shape") and len(value.shape) > 0:
-                    self.histogram_summary(key, value)
-                elif hasattr(value, "shape") or not isinstance(value, dict):
-                    self.scalar_summary(key, value)
+            try:
+                if isinstance(values, dict):
+                    for key, value in values.items():
+                        is_scalar_array = hasattr(value, "shape") and (
+                            value.shape == [1] or value.shape == 1 or value.shape == ()
+                        )
+                        if np.isscalar(value) or is_scalar_array:
+                            self.scalar_summary(key, value)
+                        elif hasattr(value, "shape"):
+                            self.histogram_summary(key, value)
+                        elif isinstance(value, dict):
+                            flatten_dict = self._flatten_dict(
+                                parent_key=key, dict_info=value
+                            )
+                            self.write(flatten_dict)
+                        elif isinstance(value, tuple) or isinstance(value, list):
+                            for index, elements in enumerate(value):
+                                self.write({f"{key}_info_{index}": elements})
+                        else:
+                            warnings.warn(
+                                f"Unable to log: {key}, unknown type: {type(value)}"
+                            )
+                elif isinstance(values, tuple) or isinstance(value, list):
+                    for elements in values:
+                        self.write(elements)
                 else:
-                    self.dict_summary(key, value)
+                    warnings.warn(
+                        f"Unable to log: {values}, unknown type: {type(values)}"
+                    )
+            except Exception as ex:
+                warnings.warn(
+                    f"Unable to log: {key}, type: {type(value)} , value: {value}"
+                    + f"ex: {ex}"
+                )
             self._iter += 1
 
     def scalar_summary(self, key: str, value: float) -> None:
-        tf.summary.scalar(f"{self.label}/{format_key(key)}", value, step=self._iter)
+        tf.summary.scalar(f"{self._label}/{format_key(key)}", value, step=self._iter)
 
     def dict_summary(self, key: str, value: Dict) -> None:
         dict_info = self._flatten_dict(parent_key=key, dict_info=value)
@@ -79,7 +101,7 @@ class TFSummaryLogger(base.Logger):
 
     def histogram_summary(self, key: str, value: Tensor) -> None:
         tf.summary.histogram(
-            f"{self.label}/{format_key_histograms(key)}", value, step=self._iter
+            f"{self._label}/{format_key_histograms(key)}", value, step=self._iter
         )
 
     # Flatten dict, adapted from
@@ -100,3 +122,6 @@ class TFSummaryLogger(base.Logger):
             else:
                 items.append((new_key, v))
         return dict(items)
+
+    def close(self) -> None:
+        self._summary.close()

@@ -13,45 +13,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Starcraft 2 environment factory."""
+"""Utils for SMAC environment."""
+from typing import Any, Optional
 
-from typing import Any, Dict, Optional
+try:
+    from smac.env import StarCraft2Env
 
-import dm_env
-from smac.env import StarCraft2Env
+    _found_smac = True
+except ModuleNotFoundError:
+    _found_smac = False
 
-from mava.wrappers import SMACEnvWrapper  # type:ignore
+from mava.wrappers import SMACWrapper
+from mava.wrappers.env_preprocess_wrappers import (
+    ConcatAgentIdToObservation,
+    ConcatPrevActionToObservation,
+)
 
+if _found_smac:
 
-def load_smac_env(env_config: Dict[str, Any]) -> StarCraft2Env:
-    """Loads a smac environment given a config dict. Also, the possible agents in the
-    environment are set"""
+    def make_environment(
+        map_name: str = "3m",
+        concat_prev_actions: bool = True,
+        concat_agent_id: bool = True,
+        evaluation: bool = False,
+        random_seed: Optional[int] = None,
+    ) -> Any:
+        env = StarCraft2Env(map_name=map_name, seed=random_seed)
 
-    env = StarCraft2Env(**env_config)
-    env.possible_agents = list(range(env.n_agents))
+        env = SMACWrapper(env)
 
-    return env
+        if concat_prev_actions:
+            env = ConcatPrevActionToObservation(env)
 
+        if concat_agent_id:
+            env = ConcatAgentIdToObservation(env)
 
-def make_environment(
-    evaluation: bool = False,
-    map_name: str = "3m",
-    random_seed: Optional[int] = None,
-    **kwargs: Any,
-) -> dm_env.Environment:
-    """Wraps an starcraft 2 environment.
-
-    Args:
-        map_name: str, name of micromanagement level.
-
-    Returns:
-        A starcraft 2 smac environment wrapped as a DeepMind environment.
-    """
-    del evaluation
-
-    env = StarCraft2Env(map_name=map_name, seed=random_seed, **kwargs)
-
-    # wrap starcraft 2 environment
-    environment = SMACEnvWrapper(env)
-
-    return environment
+        return env

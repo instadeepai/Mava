@@ -108,6 +108,7 @@ class TestEnvPreprocessWrapper:
                 (StandardizeObservation, None),
             ],
         )
+
         _ = wrapped_env.reset()
 
         agents = wrapped_env.agents

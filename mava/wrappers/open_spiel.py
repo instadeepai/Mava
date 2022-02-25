@@ -17,11 +17,15 @@ from typing import Any, Dict, Iterator, List, Tuple, Union
 
 import dm_env
 import numpy as np
-import pyspiel  # type: ignore
+
+try:
+    import pyspiel  # type: ignore
+    from open_spiel.python import rl_environment  # type: ignore
+except ModuleNotFoundError:
+    pass
 from acme import specs
 from gym.spaces import Discrete
 from gym.spaces.box import Box
-from open_spiel.python import rl_environment  # type: ignore
 
 from mava import types
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
@@ -31,7 +35,7 @@ from mava.wrappers.env_wrappers import SequentialEnvWrapper
 class OpenSpielSequentialWrapper(SequentialEnvWrapper):
     def __init__(
         self,
-        environment: rl_environment.Environment,
+        environment: "rl_environment.Environment",
     ):
         self._environment = environment
         self._possible_agents = [
@@ -79,8 +83,16 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
 
     def _to_observation(
         self,
-        timestep: rl_environment.TimeStep,
+        timestep: "rl_environment.TimeStep",
     ) -> Dict[str, np.ndarray]:
+        """Convert OpenSpiel timestep to supported observation.
+
+        Args:
+            timestep : timestep from OpenSpiel.
+
+        Returns:
+            converted observation.
+        """
 
         obs = np.array(
             timestep.observations["info_state"][self.current_player_id], np.float32
@@ -172,9 +184,23 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         )
 
     def env_done(self) -> bool:
+        """Check if env is done.
+
+        Returns:
+            bool: bool indicating if env is done.
+        """
         return not self.agents
 
     def agent_iter(self, max_iter: int = 2 ** 63) -> Iterator:
+        """Agent iterator to loop through agents.
+
+        Args:
+            max_iter (int, optional): max iterations. Defaults to 2**63.
+
+        Returns:
+            Iterator: agent iter.
+
+        """
         return AgentIterator(self, max_iter)
 
     # Convert OpenSpiel observation so it's dm_env compatible. Also, the list
@@ -184,13 +210,13 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
     ) -> types.OLT:
         if isinstance(observe, dict):
             legals = np.array(observe["action_mask"], np.float32)
-            observation = np.array(observe["observation"])
+            observation_data = np.array(observe["observation"])
         else:
             legals = np.ones(self.num_actions, np.float32)
-            observation = np.array(observe)
+            observation_data = np.array(observe)
 
         observation = types.OLT(
-            observation=observation,
+            observation=observation_data,
             legal_actions=legals,
             terminal=np.asarray([done], dtype=np.float32),
         )
@@ -198,6 +224,11 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         return observation
 
     def observation_spec(self) -> types.Observation:
+        """Observations spec.
+
+        Returns:
+            types.Observation: spec for observations.
+        """
         observation_specs = {}
         for agent in self.possible_agents:
             spec = self._environment.observation_spec()
@@ -209,6 +240,11 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         return observation_specs
 
     def action_spec(self) -> Dict[str, specs.DiscreteArray]:
+        """Action spec.
+
+        Returns:
+            Dict[str, specs.DiscreteArray]: spec for actions.
+        """
         action_specs = {}
         for agent in self.possible_agents:
             spec = self._environment.action_spec()
@@ -216,6 +252,11 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         return action_specs
 
     def reward_spec(self) -> Dict[str, specs.Array]:
+        """Reward spec.
+
+        Returns:
+            Dict[str, specs.Array]: Spec for rewards.
+        """
         reward_specs = {}
         for agent in self.possible_agents:
             reward_specs[agent] = specs.Array((), np.float32)
@@ -223,6 +264,11 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         return reward_specs
 
     def discount_spec(self) -> Dict[str, specs.BoundedArray]:
+        """Discount spec.
+
+        Returns:
+            Dict[str, specs.BoundedArray]: spec for discounts.
+        """
         discount_specs = {}
         for agent in self.possible_agents:
             discount_specs[agent] = specs.BoundedArray(
@@ -231,6 +277,11 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         return discount_specs
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
+        """Extra data spec.
+
+        Returns:
+            Dict[str, specs.BoundedArray]: spec for extras.
+        """
         return {}
 
     @property
@@ -242,7 +293,7 @@ class OpenSpielSequentialWrapper(SequentialEnvWrapper):
         return self._possible_agents
 
     @property
-    def environment(self) -> rl_environment.Environment:
+    def environment(self) -> "rl_environment.Environment":
         """Returns the wrapped environment."""
         return self._environment
 

@@ -14,8 +14,9 @@
 # limitations under the License.
 
 # Adapted from https://github.com/openai/multiagent-particle-envs.
-
-from typing import List
+# type: ignore
+import typing
+from typing import Optional
 
 import numpy as np
 
@@ -24,8 +25,13 @@ from mava.utils.debugging.scenario import BaseScenario
 
 
 class Scenario(BaseScenario):
+    def __init__(self) -> None:
+        super().__init__()
+        self.np_rnd = np.random.RandomState()
+
     def make_world(self, num_agents: int) -> World:
         world = World()
+
         # set any world properties first
         num_landmarks = num_agents
         # add agents
@@ -44,6 +50,7 @@ class Scenario(BaseScenario):
         self.reset_world(world)
         return world
 
+    @typing.no_type_check
     def reset_world(self, world: World) -> None:
         # random properties for agents
         for i, agent in enumerate(world.agents):
@@ -53,10 +60,10 @@ class Scenario(BaseScenario):
             landmark.color = np.array([0.25, 0.25, 0.25])
         # set random initial states
         for agent in world.agents:
-            agent.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
+            agent.state.p_pos = self.np_rnd.uniform(-1, +1, world.dim_p)
             agent.state.p_vel = np.zeros(world.dim_p)
         for i, landmark in enumerate(world.landmarks):
-            landmark.state.p_pos = np.random.uniform(-1, +1, world.dim_p)
+            landmark.state.p_pos = self.np_rnd.uniform(-1, +1, world.dim_p)
             landmark.state.p_vel = np.zeros(world.dim_p)
 
         # Reset step counter
@@ -69,9 +76,10 @@ class Scenario(BaseScenario):
         return True if dist < dist_min else False
 
     @staticmethod
-    def dist(pt1: np.array, pt2: np.array) -> float:
+    def dist(pt1: np.ndarray, pt2: np.ndarray) -> float:
         return np.sqrt(np.sum(np.square(pt1 - pt2)))
 
+    @typing.no_type_check
     def reward(self, agent: Agent, a_i: int, world: World) -> float:
         # Agents are rewarded based on agent distance to its corresponding
         # landmark, penalized for collisions
@@ -95,31 +103,28 @@ class Scenario(BaseScenario):
 
         return rew
 
-    def observation(self, agent: Agent, a_i: int, world: World) -> np.array:
-        # get positions of all entities in this agent's reference frame
-        entity_pos = []
-        for entity in world.landmarks:  # world.entities:
-            entity_pos.append(entity.state.p_pos - agent.state.p_pos)
-        # entity colors
-        entity_color: List[np.array] = []
-        for entity in world.landmarks:  # world.entities:
-            entity_color.append(entity.color)
-        other_pos = []
-        other_landmarks = []
-        for i, other in enumerate(world.agents):
-            if other is agent:
+    def observation(self, agent: Agent, a_i: int, world: World) -> np.ndarray:
+        # get the position of the agent's target landmark
+        target_landmark = world.landmarks[a_i].state.p_pos - agent.state.p_pos
+
+        # Get the other agent and landmark positions
+        other_agents_pos = []
+        other_landmarks_pos = []
+        for i, other_agent in enumerate(world.agents):
+            if other_agent is agent:
                 continue
-            landmark = world.landmarks[i]
-            other_landmarks.append(landmark.state.p_pos - landmark.state.p_pos)
-            other_pos.append(other.state.p_pos - agent.state.p_pos)
+            other_agents_pos.append(other_agent.state.p_pos - agent.state.p_pos)
+            other_landmarks_pos.append(
+                world.landmarks[i].state.p_pos - agent.state.p_pos
+            )
 
         return np.concatenate(
             [agent.state.p_vel]
             + [agent.state.p_pos]
             + [[world.current_step / 50]]
-            + [entity_pos[a_i]]
-            + other_pos
-            + other_landmarks  # + comm
+            + [target_landmark]
+            + other_agents_pos
+            + other_landmarks_pos  # + comm
         )
 
     def done(self, agent: Agent, world: World) -> bool:
@@ -127,3 +132,6 @@ class Scenario(BaseScenario):
             return False
         else:
             return True
+
+    def seed(self, seed: Optional[int] = None) -> None:
+        self.np_rnd.seed(seed)

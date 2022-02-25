@@ -15,6 +15,5 @@
 
 """Adders for sending data from actors to replay buffers."""
 
-# pylint: disable=unused-import
 
-from mava.adders.base import ParallelAdder
+from mava.adders.reverb.base import ReverbParallelAdder

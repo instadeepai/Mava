@@ -22,9 +22,11 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
 from mava import types
+from mava.utils.environments.flatland_utils import check_flatland_import
 from tests.conftest import EnvSpec, EnvType, Helpers
 from tests.enums import EnvSource
 
+_has_flatland = check_flatland_import()
 """
 TestEnvWrapper is a general purpose test class that runs tests for environment wrappers.
 This is meant to flexibily test various environments wrappers.
@@ -47,7 +49,9 @@ This is meant to flexibily test various environments wrappers.
         EnvSpec("pettingzoo.mpe.simple_spread_v2", EnvType.Sequential),
         EnvSpec("pettingzoo.sisl.multiwalker_v7", EnvType.Parallel),
         EnvSpec("pettingzoo.sisl.multiwalker_v7", EnvType.Sequential),
-        EnvSpec("flatland", EnvType.Parallel, EnvSource.Flatland),
+        EnvSpec("flatland", EnvType.Parallel, EnvSource.Flatland)
+        if _has_flatland
+        else None,
         EnvSpec("tic_tac_toe", EnvType.Sequential, EnvSource.OpenSpiel),
     ],
 )
@@ -55,6 +59,8 @@ class TestEnvWrapper:
     # Test that we can load a env module and that it contains agents,
     #   agents and possible_agents.
     def test_loadmodule(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+        if env_spec is None:
+            pytest.skip()
         env = helpers.get_env(env_spec)
         props_which_should_not_be_none = [env, env.agents, env.possible_agents]
         assert helpers.verify_all_props_not_none(
@@ -64,6 +70,8 @@ class TestEnvWrapper:
     #  Test initialization of env wrapper, which should have
     #   a nested environment, an observation and action space for each agent.
     def test_wrapper_initialization(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+        if env_spec is None:
+            pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
         num_agents = len(wrapped_env.agents)
 
@@ -94,6 +102,8 @@ class TestEnvWrapper:
 
     # Test of reset of wrapper and that dm_env_timestep has basic props.
     def test_wrapper_env_reset(self, env_spec: EnvSpec, helpers: Helpers) -> None:
+        if env_spec is None:
+            pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
         num_agents = len(wrapped_env.agents)
 
@@ -133,6 +143,8 @@ class TestEnvWrapper:
     def test_covert_env_to_dm_env_0_no_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
+        if env_spec is None:
+            pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
 
         # Does the wrapper have the functions we want to test
@@ -141,10 +153,18 @@ class TestEnvWrapper:
         ):
             #  Get agent names from env and mock out data
             agents = wrapped_env.agents
-            test_agents_observations = {
-                agent: np.random.rand(*wrapped_env.observation_spaces[agent].shape)
-                for agent in agents
-            }
+            test_agents_observations = {}
+            for agent in agents:
+                observation_spec = wrapped_env.observation_spec()
+                if isinstance(observation_spec[agent].observation, tuple):
+                    # Using the first dim for mock observation
+                    observation_shape = observation_spec[agent].observation[0].shape
+                else:
+                    observation_shape = observation_spec[agent].observation.shape
+
+                test_agents_observations[agent] = np.random.rand(
+                    *observation_shape
+                ).astype(np.float32)
 
             # Parallel env_types
             if env_spec.env_type == EnvType.Parallel:
@@ -177,12 +197,75 @@ class TestEnvWrapper:
                         bool(dm_env_timestep.terminal) is False
                     ), "Failed to set terminal."
 
+    # Test that observations from petting zoo get converted to
+    #   dm observations correctly when empty obs are returned.
+    def test_covert_env_to_dm_env_0_empty_obs(
+        self, env_spec: EnvSpec, helpers: Helpers
+    ) -> None:
+        if env_spec is None:
+            pytest.skip()
+        wrapped_env, _ = helpers.get_wrapped_env(env_spec)
+
+        # Does the wrapper have the functions we want to test
+        if hasattr(wrapped_env, "_convert_observations") or hasattr(
+            wrapped_env, "_convert_observation"
+        ):
+            #  Get agent names from env and mock out data
+            agents = wrapped_env.agents
+            test_agents_observations: Dict = {}
+
+            # Parallel env_types
+            if env_spec.env_type == EnvType.Parallel:
+                dm_env_timestep = wrapped_env._convert_observations(
+                    test_agents_observations, dones={agent: False for agent in agents}
+                )
+
+                # We have empty OLT for all agents
+                for agent in wrapped_env.agents:
+                    observation_spec = wrapped_env.observation_spec()
+                    if isinstance(observation_spec[agent].observation, tuple):
+                        observation_spec_list = []
+                        for obs_spec in observation_spec[agent].observation:
+                            observation_spec_list.append(
+                                np.zeros(
+                                    obs_spec.shape,
+                                    dtype=obs_spec.dtype,
+                                )
+                            )
+
+                        for i, obs in enumerate(observation_spec_list):
+                            np.testing.assert_array_equal(
+                                dm_env_timestep[agent].observation[i],
+                                obs,
+                            )
+                    else:
+                        observation = np.zeros(
+                            observation_spec[agent].observation.shape,
+                            dtype=observation_spec[agent].observation.dtype,
+                        )
+
+                        np.testing.assert_array_equal(
+                            dm_env_timestep[agent].observation,
+                            observation,
+                        )
+
+                    np.testing.assert_array_equal(
+                        dm_env_timestep[agent].legal_actions,
+                        np.ones(
+                            wrapped_env.action_spaces[agent].shape,
+                            dtype=wrapped_env.action_spaces[agent].dtype,
+                        ),
+                    )
+
     # Test that observations **with actions masked** from petting zoo get
     #   converted to dm observations correctly. This only runs
     #   if wrapper has a _convert_observations or _convert_observation functions.
-    def test_covert_env_to_dm_env_1_with_action_mask(
+    def test_covert_env_to_dm_env_2_with_action_mask(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
+        if env_spec is None:
+            pytest.skip()
+
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
 
         # Does the wrapper have the functions we want to test
@@ -193,14 +276,21 @@ class TestEnvWrapper:
             agents = wrapped_env.agents
             test_agents_observations = {}
             for agent in agents:
+                observation_spec = wrapped_env.observation_spec()
+                if isinstance(observation_spec[agent].observation, tuple):
+                    # Using the first dim for mock observation
+                    observation_shape = observation_spec[agent].observation[0].shape
+                else:
+                    observation_shape = observation_spec[agent].observation.shape
+
                 # TODO If cont action space masking is implemented - Update
                 test_agents_observations[agent] = {
-                    "observation": np.random.rand(
-                        *wrapped_env.observation_spaces[agent].shape
+                    "observation": np.random.rand(*observation_shape).astype(
+                        np.float32
                     ),
                     "action_mask": np.random.randint(
                         2, size=wrapped_env.action_spaces[agent].shape
-                    ),
+                    ).astype(int),
                 }
             # Parallel env_types
             if env_spec.env_type == EnvType.Parallel:
@@ -246,11 +336,14 @@ class TestEnvWrapper:
     def test_step_0_valid_when_env_not_done(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
+        if env_spec is None:
+            pytest.skip()
+
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
 
         # Seed environment since we are sampling actions.
         # We need to seed env and action space.
-        random_seed = 42
+        random_seed = 84
         wrapped_env.seed(random_seed)
         helpers.seed_action_space(wrapped_env, random_seed)
 
@@ -305,6 +398,8 @@ class TestEnvWrapper:
     def test_step_1_valid_when_env_not_done(
         self, env_spec: EnvSpec, helpers: Helpers
     ) -> None:
+        if env_spec is None:
+            pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
 
         # Seed environment since we are sampling actions.
@@ -339,6 +434,8 @@ class TestEnvWrapper:
     def test_step_2_invalid_when_env_done(
         self, env_spec: EnvSpec, helpers: Helpers, monkeypatch: MonkeyPatch
     ) -> None:
+        if env_spec is None:
+            pytest.skip()
         wrapped_env, _ = helpers.get_wrapped_env(env_spec)
 
         if env_spec.env_source == EnvSource.OpenSpiel:

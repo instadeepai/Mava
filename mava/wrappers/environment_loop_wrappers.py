@@ -16,13 +16,13 @@
 """Generic environment loop wrapper to track system statistics"""
 
 import time
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dm_env
 import matplotlib.pyplot as plt
 import numpy as np
 from acme.utils import counting, loggers, paths
-from acme.wrappers.video import _make_animation
+from acme.wrappers.video import make_animation
 
 try:
     from array2gif import write_gif
@@ -87,10 +87,11 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
         self,
         environment_loop: Union[ParallelEnvironmentLoop, SequentialEnvironmentLoop],
         summary_stats: List = ["mean", "max", "min", "var", "std", "raw"],
+        metrics: List = ["episode_length", "episode_return", "steps_per_second"],
     ):
         super().__init__(environment_loop)
         self._summary_stats = summary_stats
-        self._metrics = ["episode_length", "episode_return", "steps_per_second"]
+        self._metrics = metrics
         self._running_statistics: Dict[str, float] = {}
         for metric in self._metrics:
             self.__setattr__(f"_{metric}_stats", RunningStatistics(metric))
@@ -112,7 +113,22 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
         mean_episode_return = np.mean(np.array(list(episode_returns.values())))
 
         # Record counts.
-        counts = self._counter.increment(episodes=1, steps=episode_steps)
+        if hasattr(self._executor, "_counts"):
+            loop_type = "executor"
+            if "_" not in self._loop_label:
+                loop_type = "evaluator"
+            if hasattr(self._executor, "_variable_client"):
+                self._executor._variable_client.add_async(
+                    [f"{loop_type}_episodes", f"{loop_type}_steps"],
+                    {f"{loop_type}_episodes": 1, f"{loop_type}_steps": episode_steps},
+                )
+            else:
+                self._executor._counts[f"{loop_type}_episodes"] += 1
+                self._executor._counts[f"{loop_type}_steps"] += episode_steps
+
+            counts = self._executor._counts
+        else:
+            counts = self._counter.increment(episodes=1, steps=episode_steps)
 
         self._episode_length_stats.push(episode_steps)
         self._episode_return_stats.push(mean_episode_return)
@@ -126,6 +142,20 @@ class DetailedEpisodeStatistics(EnvironmentLoopStatisticsBase):
 
         self._running_statistics.update({"episode_length": episode_steps})
         self._running_statistics.update(counts)
+
+        # Log extra env stats, e.g. for smac.
+        extra_env_stats = getattr(
+            self._environment_loop._environment, "get_stats", None
+        )
+        if callable(extra_env_stats):
+            self._running_statistics.update(
+                self._environment_loop._environment.get_stats()
+            )
+
+        # Log extra executor stats, e.g. epsilon for madqn
+        extra_executor_stats = getattr(self._executor, "get_stats", None)
+        if extra_executor_stats:
+            self._running_statistics.update(self._executor.get_stats())
 
 
 class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
@@ -141,7 +171,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         super().__init__(environment_loop)
 
         # get loop logger data
-        loop_label = self._logger._label
+        self._loop_label = self._logger._label
         base_dir = self._logger._directory
         (
             to_terminal,
@@ -159,7 +189,7 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
 
         # statistics dictionary
         for agent in self._environment.possible_agents:
-            agent_label = loop_label + "_" + agent
+            agent_label = self._loop_label + "_" + agent
             self._agent_loggers[agent] = Logger(
                 label=agent_label,
                 directory=base_dir,
@@ -174,18 +204,12 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                 f"{agent}_episode_return"
             )
             self._agents_stats[agent]["reward"] = RunningStatistics(
-                f"{agent}_episode_reward"
+                f"{agent}_step_reward"
             )
 
     def _compute_step_statistics(self, rewards: Dict[str, float]) -> None:
         for agent, reward in rewards.items():
-            agent_running_statistics: Dict[str, float] = {}
             self._agents_stats[agent]["reward"].push(reward)
-            for stat in self._summary_stats:
-                agent_running_statistics[
-                    f"{agent}_{stat}_step_reward"
-                ] = self._agents_stats[agent]["reward"].__getattribute__(stat)()
-            self._agent_loggers[agent].write(agent_running_statistics)
 
     def _compute_episode_statistics(
         self,
@@ -199,8 +223,22 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         mean_episode_return = np.mean(np.array(list(episode_returns.values())))
 
         # Record counts.
-        counts = self._counter.increment(episodes=1, steps=episode_steps)
+        if hasattr(self._executor, "_counts"):
+            loop_type = "executor"
+            if "_" not in self._loop_label:
+                loop_type = "evaluator"
+            if hasattr(self._executor, "_variable_client"):
+                self._executor._variable_client.add_async(
+                    [f"{loop_type}_episodes", f"{loop_type}_steps"],
+                    {f"{loop_type}_episodes": 1, f"{loop_type}_steps": episode_steps},
+                )
+            else:
+                self._executor._counts[f"{loop_type}_episodes"] += 1
+                self._executor._counts[f"{loop_type}_steps"] += episode_steps
 
+            counts = self._executor._counts
+        else:
+            counts = self._counter.increment(episodes=1, steps=episode_steps)
         self._episode_length_stats.push(episode_steps)
         self._episode_return_stats.push(mean_episode_return)
         self._steps_per_second_stats.push(steps_per_second)
@@ -211,17 +249,36 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                     f"_{metric}_stats"
                 ).__getattribute__(stat)()
 
+        self._running_statistics.update({"episode_length": episode_steps})
+        self._running_statistics.update(counts)
+
+        # Write per agent statistics
         for agent, agent_return in episode_returns.items():
             agent_running_statistics: Dict[str, float] = {}
             self._agents_stats[agent]["return"].push(agent_return)
             for stat in self._summary_stats:
+                # Episode return
                 agent_running_statistics[f"{agent}_{stat}_return"] = self._agents_stats[
                     agent
                 ]["return"].__getattribute__(stat)()
+
+                # Step rewards
+                agent_running_statistics[
+                    f"{agent}_{stat}_step_reward"
+                ] = self._agents_stats[agent]["reward"].__getattribute__(stat)()
             self._agent_loggers[agent].write(agent_running_statistics)
 
-        self._running_statistics.update({"episode_length": episode_steps})
-        self._running_statistics.update(counts)
+        # Log extra env stats, e.g. for smac.
+        extra_stats = getattr(self._environment_loop._environment, "get_stats", None)
+        if callable(extra_stats) and self._environment_loop._environment.get_stats():
+            self._running_statistics.update(
+                self._environment_loop._environment.get_stats()
+            )
+
+        # Log extra executor stats, e.g. epsilon for madqn
+        extra_executor_stats = getattr(self._executor, "get_stats", None)
+        if extra_executor_stats:
+            self._running_statistics.update(self._executor.get_stats())
 
 
 class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
@@ -281,7 +338,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         self._append_frame()
         return timestep
 
-    def _retrieve_render(self) -> np.ndarray:
+    def _retrieve_render(self) -> Optional[np.ndarray]:
         render = None
         try:
             if self._format == "video":
@@ -297,7 +354,10 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
 
     def _append_frame(self) -> None:
         """Appends a frame to the sequence of frames."""
-        counts = self._counter.get_counts()
+        if hasattr(self._executor, "_counts"):
+            counts = self._executor._counts
+        else:
+            counts = self._counter.get_counts()
         counter = counts.get(self._counter_str)
         if counter and (counter % self._record_every == 0):
             self._frames.append(self._retrieve_render())
@@ -309,8 +369,11 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         return timestep
 
     def _write_frames(self) -> None:
-        counts = self._counter.get_counts()
-        counter = counts.get(self._counter_str)
+        if hasattr(self._executor, "_counts"):
+            counts = self._executor._counts
+        else:
+            counts = self._counter.get_counts()
+        counter = int(counts.get(self._counter_str))
         path = f"{self._path}/{self._filename}_{counter}_eval_episode"
         try:
             if self._format == "video":
@@ -325,7 +388,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         plt.close("all")
 
     def _save_video(self, path: str) -> None:
-        video = _make_animation(self._frames, self._fps, self._figsize).to_html5_video()
+        video = make_animation(self._frames, self._fps, self._figsize).to_html5_video()
         with open(f"{path}.html", "w") as f:
             f.write(video)
 

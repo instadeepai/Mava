@@ -4,9 +4,15 @@ from typing import Any, Dict, List, Tuple, Union
 import dm_env
 import numpy as np
 from dm_env import specs
-from pettingzoo.utils.conversions import ParallelEnv
-from pettingzoo.utils.env import AECEnv
 
+try:
+    from pettingzoo.utils.conversions import ParallelEnv
+    from pettingzoo.utils.env import AECEnv
+
+    _has_petting_zoo = True
+except ModuleNotFoundError:
+    _has_petting_zoo = False
+    pass
 # Need to install typing_extensions since we support pre python 3.8
 from typing_extensions import TypedDict
 
@@ -18,11 +24,109 @@ SeqTimestepDict = TypedDict(
 )
 
 
+def convert_dm_compatible_observations(
+    observes: Dict,
+    dones: Dict[str, bool],
+    observation_spec: Dict[str, types.OLT],
+    env_done: bool,
+    possible_agents: List,
+) -> Dict[str, types.OLT]:
+    """Convert Parallel observation so it's dm_env compatible.
+
+    Args:
+        observes : observations per agent.
+        dones : dones per agent.
+        observation_spec : env observation spec.
+        env_done : is env done.
+        possible_agents : possible agents in env.
+
+    Returns:
+        a dm compatible observation.
+    """
+    observations: Dict[str, types.OLT] = {}
+    for agent in possible_agents:
+
+        # If we have a valid observation for this agent.
+        if agent in observes:
+            observation = observes[agent]
+            if isinstance(observation, dict) and "action_mask" in observation:
+                legals = observation["action_mask"].astype(
+                    observation_spec[agent].legal_actions.dtype
+                )
+
+                # Environments like flatland can return tuples for observations
+                if isinstance(observation_spec[agent].observation, tuple):
+                    # Assuming tuples all have same type.
+                    observation_dtype = observation_spec[agent].observation[0].dtype
+                else:
+                    observation_dtype = observation_spec[agent].observation.dtype
+                observation = observation["observation"].astype(observation_dtype)
+            else:
+                # TODO Handle legal actions better for continous envs,
+                # maybe have min and max for each action and clip the
+                # agents actions  accordingly
+                legals = np.ones(
+                    observation_spec[agent].legal_actions.shape,
+                    dtype=observation_spec[agent].legal_actions.dtype,
+                )
+
+        # If we have no observation, we need to use the default.
+        else:
+            # Handle tuple observations
+            if isinstance(observation_spec[agent].observation, tuple):
+                observation_spec_list = []
+                for obs_spec in observation_spec[agent].observation:
+                    observation_spec_list.append(
+                        np.zeros(
+                            obs_spec.shape,
+                            dtype=obs_spec.dtype,
+                        )
+                    )
+                observation = tuple(observation_spec_list)  # type: ignore
+            else:
+                observation = np.zeros(
+                    observation_spec[agent].observation.shape,
+                    dtype=observation_spec[agent].observation.dtype,
+                )
+            legals = np.ones(
+                observation_spec[agent].legal_actions.shape,
+                dtype=observation_spec[agent].legal_actions.dtype,
+            )
+        if agent in dones:
+            terminal = dones[agent]
+        else:
+            terminal = env_done
+
+        observations[agent] = types.OLT(
+            observation=observation,
+            legal_actions=legals,
+            terminal=np.asarray([terminal], dtype=np.float32),
+        )
+    return observations
+
+
 def generate_zeros_from_spec(spec: specs.Array) -> np.ndarray:
+    """Generate zeros following a specific spec.
+
+    Args:
+        spec : data spec.
+
+    Returns:
+        a numpy array with all zeros according to spec.
+    """
     return np.zeros(spec.shape, spec.dtype)
 
 
 def convert_np_type(dtype: np.dtype, value: Union[int, float]) -> Union[int, float]:
+    """Converts value to np dtype.
+
+    Args:
+        dtype : numpy dtype.
+        value : value.
+
+    Returns:
+        converted value.
+    """
     return np.dtype(dtype).type(value)
 
 
@@ -31,18 +135,43 @@ def parameterized_restart(
     discount: types.Discount,
     observation: types.Observation,
 ) -> dm_env.TimeStep:
-    """Returns a `TimeStep` with `step_type` set to `StepType.FIRST`.
-    Differs from dm_env.restart, since reward and discount can be set to
-    initial types."""
+    """Returns an initial dm.TimeStep with `step_type` set to `StepType.FIRST`.
+
+    Differs from dm_env.restart, since reward and discount can be set to initial types.
+
+    Args:
+        reward : reward at restart.
+        discount : discount at restart.
+        observation : observation at restart.
+
+    Returns:
+        a dm.Timestep used for restarts.
+    """
     return dm_env.TimeStep(dm_env.StepType.FIRST, reward, discount, observation)
 
 
-"""Project single timestep to all agents."""
+def parameterized_termination(
+    reward: types.Reward,
+    discount: types.Discount,
+    observation: types.Observation,
+) -> dm_env.TimeStep:
+    """Return a terminal dm.Timestep, with `step_type` set to `StepType.LAST`.
+
+    Args:
+        reward : reward at termination.
+        discount : discount at termination.
+        observation : observation at termination.
+
+    Returns:
+        a dm.Timestep used for terminal states.
+    """
+    return dm_env.TimeStep(dm_env.StepType.LAST, reward, discount, observation)
 
 
 def broadcast_timestep_to_all_agents(
     timestep: dm_env.TimeStep, possible_agents: list
 ) -> dm_env.TimeStep:
+    """Project single timestep to all agents."""
     parallel_timestep = dm_env.TimeStep(
         observation={agent: timestep.observation for agent in possible_agents},
         reward={agent: timestep.reward for agent in possible_agents},
@@ -53,12 +182,10 @@ def broadcast_timestep_to_all_agents(
     return parallel_timestep
 
 
-"""Convert dict of seq timestep and actions to parallel"""
-
-
 def convert_seq_timestep_and_actions_to_parallel(
     timesteps: Dict[str, SeqTimestepDict], possible_agents: list
 ) -> Tuple[dict, dm_env.TimeStep]:
+    """Convert dict of seq timestep and actions to parallel"""
 
     step_types = [timesteps[agent]["timestep"].step_type for agent in possible_agents]
     assert all(
@@ -82,12 +209,23 @@ def convert_seq_timestep_and_actions_to_parallel(
     return parallel_actions, parallel_timestep
 
 
-def apply_env_wrapper_preprocessers(
+def apply_env_wrapper_preprocessors(
     environment: Any,
     env_preprocess_wrappers: List,
 ) -> Any:
+    """Apply env preprocessors to env.
+
+    Args:
+        environment : env.
+        env_preprocess_wrappers : env preprocessors.
+
+    Returns:
+        env after the preprocessors have been applied.
+    """
     # Currently only supports PZ envs.
-    if isinstance(environment, ParallelEnv) or isinstance(environment, AECEnv):
+    if _has_petting_zoo and (
+        isinstance(environment, ParallelEnv) or isinstance(environment, AECEnv)
+    ):
         if env_preprocess_wrappers and isinstance(env_preprocess_wrappers, List):
             for (env_wrapper, params) in env_preprocess_wrappers:
                 if params:
@@ -103,6 +241,7 @@ class RunningStatistics:
     a specific quantity.
     """
 
+    # The queue_size is used to estimate a moving mean and variance value.
     def __init__(self, label: str, queue_size: int = 100) -> None:
 
         self.queue: collections.deque = collections.deque(maxlen=queue_size)
@@ -179,7 +318,10 @@ class RunningMeanStd(object):
         self.update_from_moments(batch_mean, batch_var, batch_count)
 
     def update_from_moments(
-        self, batch_mean: np.ndarray, batch_var: np.ndarray, batch_count: int
+        self,
+        batch_mean: np.ndarray,
+        batch_var: np.ndarray,
+        batch_count: int,
     ) -> None:
         delta = batch_mean - self.mean
         tot_count = self.count + batch_count

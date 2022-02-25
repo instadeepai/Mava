@@ -12,17 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, Mapping, Sequence, Union
+from typing import Dict, Mapping, Optional, Sequence, Union
 
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 from acme import types
-from acme.tf import networks
 from acme.tf import utils as tf2_utils
 from dm_env import specs
 
 from mava import specs as mava_specs
+from mava.components.tf import networks
+from mava.components.tf.networks import DiscreteValuedHead
 from mava.utils.enums import ArchitectureType
 
 Array = specs.Array
@@ -32,46 +33,66 @@ DiscreteArray = specs.DiscreteArray
 
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
+    agent_net_keys: Dict[str, str],
+    net_spec_keys: Dict[str, str] = {},
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
-    shared_weights: bool = True,
     sigma: float = 0.3,
-    archecture_type: ArchitectureType = ArchitectureType.feedforward,
+    architecture_type: ArchitectureType = ArchitectureType.feedforward,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    num_atoms: Optional[int] = None,
+    seed: Optional[int] = None,
 ) -> Mapping[str, types.TensorTransformation]:
     """Default networks for maddpg.
 
     Args:
-        environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
+        environment_spec: description of the action and
             observation spaces etc. for each agent in the system.
-        policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
-            size of policy networks. Defaults to (256, 256, 256).
-        critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
-            size of critic networks. Defaults to (512, 512, 256).
-        shared_weights (bool, optional): whether agents should share weights or not.
-            Defaults to True.
-        sigma (float, optional): hyperparameters used to add Gaussian noise for
-            simple exploration. Defaults to 0.3.
-        archecture_type (ArchitectureType, optional): archecture used for
-            agent networks. Can be feedforward or recurrent. Defaults to
-            ArchitectureType.feedforward.
+        agent_net_keys: specifies what network each agent uses.
+        vmin: hyperparameters for the distributional critic in mad4pg.
+        vmax: hyperparameters for the distributional critic in mad4pg.
+        net_spec_keys: specifies the specs of each network.
+        policy_networks_layer_sizes: size of policy networks.
+        critic_networks_layer_sizes: size of critic networks.
+        sigma: hyperparameters used to add Gaussian noise
+            for simple exploration. Defaults to 0.3.
+        architecture_type: architecture used
+            for agent networks. Can be feedforward or recurrent.
+            Defaults to ArchitectureType.feedforward.
+
+        num_atoms:  hyperparameters for the distributional critic in
+            mad4pg.
+        seed: random seed for network initialization.
 
     Returns:
-        Mapping[str, types.TensorTransformation]: returned agent networks.
+        returned agent networks.
     """
-
     # Set Policy function and layer size
-    if archecture_type == ArchitectureType.feedforward:
+    # Default size per arch type.
+    if architecture_type == ArchitectureType.feedforward:
+        if not policy_networks_layer_sizes:
+            policy_networks_layer_sizes = (
+                256,
+                256,
+                256,
+            )
         policy_network_func = snt.Sequential
-    elif archecture_type == ArchitectureType.recurrent:
-        policy_networks_layer_sizes = (128, 128)
+    elif architecture_type == ArchitectureType.recurrent:
+        if not policy_networks_layer_sizes:
+            policy_networks_layer_sizes = (128, 128)
         policy_network_func = snt.DeepRNN
+
+    assert policy_networks_layer_sizes is not None
+    assert policy_network_func is not None
 
     specs = environment_spec.get_agent_specs()
 
     # Create agent_type specs
-    if shared_weights:
-        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-        specs = type_specs
+    if not net_spec_keys:
+        specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+    else:
+        specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
@@ -90,8 +111,9 @@ def make_default_networks(
         #  return a list of specs for hybrid action space
         # Get total number of action dimensions from action spec.
         agent_act_spec = specs[key].actions
-        if type(specs[key].actions) == DiscreteArray:
+        if type(agent_act_spec) == DiscreteArray:
             num_actions = agent_act_spec.num_values
+            # Question (dries): Why is the minimum -1 and not 0?
             minimum = [-1.0] * num_actions
             maximum = [1.0] * num_actions
             agent_act_spec = BoundedArray(
@@ -108,22 +130,24 @@ def make_default_networks(
         # An optional network to process observations
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
         # Create the policy network.
-        if archecture_type == ArchitectureType.feedforward:
+        if architecture_type == ArchitectureType.feedforward:
             policy_network = [
                 networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key], activate_final=True
+                    policy_networks_layer_sizes[key], activate_final=True, seed=seed
                 ),
             ]
-        elif archecture_type == ArchitectureType.recurrent:
+        elif architecture_type == ArchitectureType.recurrent:
             policy_network = [
                 networks.LayerNormMLP(
-                    policy_networks_layer_sizes[key][:-1], activate_final=True
+                    policy_networks_layer_sizes[key][:-1],
+                    activate_final=True,
+                    seed=seed,
                 ),
                 snt.LSTM(policy_networks_layer_sizes[key][-1]),
             ]
 
         policy_network += [
-            networks.NearZeroInitializedLinear(num_dimensions),
+            networks.NearZeroInitializedLinear(num_dimensions, seed=seed),
             networks.TanhToSpec(agent_act_spec),
         ]
 
@@ -137,15 +161,33 @@ def make_default_networks(
         policy_network = policy_network_func(policy_network)
 
         # Create the critic network.
-        critic_network = snt.Sequential(
-            [
-                # The multiplexer concatenates the observations/actions.
-                networks.CriticMultiplexer(),
+        critic_network = [
+            # The multiplexer concatenates the observations/actions.
+            networks.CriticMultiplexer()
+        ]
+
+        # Only for mad4pg
+        if vmin and vmax and num_atoms:
+            critic_network += [
                 networks.LayerNormMLP(
-                    list(critic_networks_layer_sizes[key]) + [1], activate_final=False
+                    critic_networks_layer_sizes[key],
+                    activate_final=False,
+                    seed=seed,
                 ),
+                DiscreteValuedHead(vmin, vmax, num_atoms),
             ]
-        )
+        # maddpg
+        else:
+            critic_network += [
+                networks.LayerNormMLP(
+                    list(critic_networks_layer_sizes[key]) + [1],
+                    activate_final=False,
+                    seed=seed,
+                )
+            ]
+
+        critic_network = snt.Sequential(critic_network)
+
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network
         critic_networks[key] = critic_network

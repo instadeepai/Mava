@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """MAD4PG system builder implementation."""
 
 from typing import Any, Dict, Type, Union
@@ -39,17 +38,15 @@ class MAD4PGBuilder(MADDPGBuilder):
         """Initialise the system.
 
         Args:
-            config (MADDPGConfig): system configuration specifying hyperparameters and
+            config: system configuration specifying hyperparameters and
                 additional information for constructing the system.
-            trainer_fn (Union[ Type[training.MAD4PGBaseTrainer],
-                Type[training.MAD4PGBaseRecurrentTrainer], ], optional): Trainer
+            trainer_fn: Trainer
                 function, of a correpsonding type to work with the selected system
                 architecture. Defaults to training.MAD4PGDecentralisedTrainer.
-            executor_fn (Type[core.Executor], optional): Executor function, of a
+            executor_fn: Executor function, of a
                 corresponding type to work with the selected system architecture.
-                Defaults to executors.FeedForwardExecutor.
-            extra_specs (Dict[str, Any], optional): defines the specifications of extra
-                information used by the system. Defaults to {}.
+            extra_specs: defines the specifications of extra
+                information used by the system.
         """
 
         super().__init__(

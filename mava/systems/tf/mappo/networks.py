@@ -12,41 +12,47 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, Sequence, Union
+from typing import Dict, Optional, Sequence, Union
 
 import dm_env
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-import tensorflow_probability as tfp
-from acme.tf import networks
 from acme.tf import utils as tf2_utils
 from dm_env import specs
 
 from mava import specs as mava_specs
+from mava.components.tf import networks
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
 
 
+# TODO Update for recurrent version.
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
-    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (256, 256, 256),
+    agent_net_keys: Dict[str, str],
+    policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (
+        256,
+        256,
+        256,
+    ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
-    shared_weights: bool = True,
+    seed: Optional[int] = None,
 ) -> Dict[str, snt.Module]:
     """Default networks for mappo.
 
     Args:
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
             observation spaces etc. for each agent in the system.
+        agent_net_keys: (dict, optional): specifies what network each agent uses.
+            Defaults to {}.
         policy_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of policy networks. Defaults to (256, 256, 256).
         critic_networks_layer_sizes (Union[Dict[str, Sequence], Sequence], optional):
             size of critic networks. Defaults to (512, 512, 256).
-        shared_weights (bool, optional): whether agents should share weights or not.
-            Defaults to True.
+        seed (int, optional): random seed for network initialization.
 
     Raises:
         ValueError: Unknown action_spec type, if actions aren't DiscreteArray
@@ -58,9 +64,7 @@ def make_default_networks(
 
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
-    if shared_weights:
-        type_specs = {key.split("_")[0]: specs[key] for key in specs.keys()}
-        specs = type_specs
+    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
 
     if isinstance(policy_networks_layer_sizes, Sequence):
         policy_networks_layer_sizes = {
@@ -85,11 +89,12 @@ def make_default_networks(
             policy_network = snt.Sequential(
                 [
                     networks.LayerNormMLP(
-                        tuple(policy_networks_layer_sizes[key]) + (num_actions,),
+                        policy_networks_layer_sizes[key],
                         activate_final=False,
+                        seed=seed,
                     ),
-                    tf.keras.layers.Lambda(
-                        lambda logits: tfp.distributions.Categorical(logits=logits)
+                    networks.CategoricalHead(
+                        num_values=num_actions, dtype=specs[key].actions.dtype
                     ),
                 ]
             )
@@ -98,9 +103,13 @@ def make_default_networks(
             policy_network = snt.Sequential(
                 [
                     networks.LayerNormMLP(
-                        policy_networks_layer_sizes[key], activate_final=True
+                        policy_networks_layer_sizes[key], activate_final=True, seed=seed
                     ),
-                    networks.MultivariateNormalDiagHead(num_dimensions=num_actions),
+                    networks.MultivariateNormalDiagHead(
+                        num_dimensions=num_actions,
+                        w_init=tf.initializers.VarianceScaling(1e-4, seed=seed),
+                        b_init=tf.initializers.Zeros(),
+                    ),
                     networks.TanhToSpec(specs[key].actions),
                 ]
             )
@@ -110,7 +119,9 @@ def make_default_networks(
         critic_network = snt.Sequential(
             [
                 networks.LayerNormMLP(
-                    list(critic_networks_layer_sizes[key]) + [1], activate_final=False
+                    list(critic_networks_layer_sizes[key]) + [1],
+                    activate_final=False,
+                    seed=seed,
                 ),
             ]
         )

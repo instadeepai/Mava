@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""MADDPG system builder implementation."""
+"""MADDPG scaled system builder implementation."""
 
 import copy
 import dataclasses
@@ -21,18 +21,21 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union
 
 import reverb
 import sonnet as snt
+import tensorflow as tf
 from acme import datasets
 from acme.specs import EnvironmentSpec
-from acme.tf import variable_utils
-from acme.utils import counting
+from acme.tf import utils as tf2_utils
+from acme.utils import counting, loggers
 from dm_env import specs as dm_specs
 
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
-from mava.systems.tf import executors
+from mava.systems.tf import executors, variable_utils
 from mava.systems.tf.maddpg import training
 from mava.systems.tf.maddpg.execution import MADDPGFeedForwardExecutor
-from mava.wrappers import DetailedTrainerStatistics
+from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils.sort_utils import sort_str_num
+from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerStatistics
 
 BoundedArray = dm_specs.BoundedArray
 DiscreteArray = dm_specs.DiscreteArray
@@ -41,12 +44,22 @@ DiscreteArray = dm_specs.DiscreteArray
 @dataclasses.dataclass
 class MADDPGConfig:
     """Configuration options for the MADDPG system.
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
         policy_optimizer: optimizer(s) for updating policy networks.
         critic_optimizer: optimizer for updating critic networks.
-        shared_weights: boolean indicating whether agents should share weights.
+        num_executors: number of parallel executors to use.
+        agent_net_keys: specifies what network each agent uses.
+        trainer_networks: networks each trainer trains on.
+        table_network_config: Networks each table (trainer) expects.
+        network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+        net_keys_to_ids: mapping from net_key to network id.
+        unique_net_keys: list of unique net_keys.
+        checkpoint_minute_interval: The number of minutes to wait between
+            checkpoints.
         discount: discount to use for TD updates.
         batch_size: batch size for updates.
         prefetch_size: size to prefetch from replay.
@@ -64,15 +77,37 @@ class MADDPGConfig:
         period: consecutive starting points for overlapping rollouts across a sequence.
         max_gradient_norm: value to specify the maximum clipping value for the gradient
             norm during optimization.
-        sigma: Gaussian sigma parameter.
+        logger: logger to use.
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
-        replay_table_name: string indicating what name to give the replay table."""
+        termination_condition: An optional terminal condition can be provided
+            that stops the program once the condition is satisfied. Available options
+            include specifying maximum values for trainer_steps, trainer_walltime,
+            evaluator_steps, evaluator_episodes, executor_episodes or executor_steps.
+            E.g. termination_condition = {'trainer_steps': 100000}.
+        learning_rate_scheduler_fn: dict with two functions/classes (one for the
+                policy and one for the critic optimizer), that takes in a trainer
+                step t and returns the current learning rate,
+                e.g. {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
+                See
+                examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
+                for an example.
+        evaluator_interval: An optional condition that is used to
+            evaluate/test system performance after [evaluator_interval]
+            condition has been met.
+    """
 
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     critic_optimizer: snt.Optimizer
-    shared_weights: bool = True
+    num_executors: int
+    agent_net_keys: Dict[str, str]
+    trainer_networks: Dict[str, List]
+    table_network_config: Dict[str, List]
+    network_sampling_setup: List
+    net_keys_to_ids: Dict[str, int]
+    unique_net_keys: List[str]
+    checkpoint_minute_interval: int
     discount: float = 0.99
     batch_size: int = 256
     prefetch_size: int = 4
@@ -86,15 +121,20 @@ class MADDPGConfig:
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
+    bootstrap_n: int = 10
     max_gradient_norm: Optional[float] = None
-    sigma: float = 0.3
+    logger: loggers.Logger = None
+    counter: counting.Counter = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
-    replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
+    termination_condition: Optional[Dict[str, int]] = None
+    evaluator_interval: Optional[dict] = None
+    learning_rate_scheduler_fn: Optional[Any] = None
 
 
 class MADDPGBuilder:
-    """Builder for MADDPG which constructs individual components of the system."""
+    """Builder for scaled MADDPG which constructs individual components of the
+    system."""
 
     def __init__(
         self,
@@ -107,24 +147,19 @@ class MADDPGBuilder:
         extra_specs: Dict[str, Any] = {},
     ):
         """Initialise the system.
-
         Args:
-            config (MADDPGConfig): system configuration specifying hyperparameters and
+            config: system configuration specifying hyperparameters and
                 additional information for constructing the system.
-            trainer_fn (Union[ Type[training.MADDPGBaseTrainer],
-                Type[training.MADDPGBaseRecurrentTrainer], ], optional): Trainer
-                function, of a correpsonding type to work with the selected system
-                architecture. Defaults to training.MADDPGDecentralisedTrainer.
-            executor_fn (Type[core.Executor], optional): Executor function, of a
-                corresponding type to work with the selected system architecture.
-                Defaults to MADDPGFeedForwardExecutor.
-            extra_specs (Dict[str, Any], optional): defines the specifications of extra
-                information used by the system. Defaults to {}.
+            trainer_fn: Trainer function, of a correpsonding type to work with
+                the selected system architecture.
+            executor_fn: Executor function, of a corresponding type to work with
+                the selected system architecture.
+            extra_specs: defines the specifications of extra
+                information used by the system.
         """
 
         self._config = config
         self._extra_specs = extra_specs
-
         self._agents = self._config.environment_spec.get_agent_ids()
         self._agent_types = self._config.environment_spec.get_agent_types()
         self._trainer_fn = trainer_fn
@@ -134,13 +169,11 @@ class MADDPGBuilder:
         self, environment_spec: specs.MAEnvironmentSpec
     ) -> specs.MAEnvironmentSpec:
         """convert discrete action space to bounded continuous action space
-
         Args:
-            environment_spec (specs.MAEnvironmentSpec): description of
+            environment_spec: description of
                 the action, observation spaces etc. for each agent in the system.
-
         Returns:
-            specs.MAEnvironmentSpec: updated environment spec.
+            updated environment spec.
         """
 
         env_adder_spec: specs.MAEnvironmentSpec = copy.deepcopy(environment_spec)
@@ -167,78 +200,121 @@ class MADDPGBuilder:
                 )
         return env_adder_spec
 
+    def covert_specs(self, spec: Dict[str, Any], num_networks: int) -> Dict[str, Any]:
+        if type(spec) is not dict:
+            return spec
+
+        agents = sort_str_num(self._config.agent_net_keys.keys())[:num_networks]
+        converted_spec: Dict[str, Any] = {}
+        if agents[0] in spec.keys():
+            for agent in agents:
+                converted_spec[agent] = spec[agent]
+        else:
+            # For the extras
+            for key in spec.keys():
+                converted_spec[key] = self.covert_specs(spec[key], num_networks)
+        return converted_spec
+
     def make_replay_tables(
         self,
         environment_spec: specs.MAEnvironmentSpec,
     ) -> List[reverb.Table]:
-        """Create tables to insert data into.
-
+        """ "Create tables to insert data into.
         Args:
-            environment_spec (specs.MAEnvironmentSpec): description of the action and
+            environment_spec: description of the action and
                 observation spaces etc. for each agent in the system.
-
         Raises:
             NotImplementedError: unknown executor type.
-
         Returns:
-            List[reverb.Table]: a list of data tables for inserting data.
+            a list of data tables for inserting data.
         """
 
+        # Select adder
         env_adder_spec = self.convert_discrete_to_bounded(environment_spec)
 
-        # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
-            adder_sig = reverb_adders.ParallelNStepTransitionAdder.signature(
-                env_adder_spec, self._extra_specs
-            )
+
+            def adder_sig_fn(
+                env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
+            ) -> Any:
+                return reverb_adders.ParallelNStepTransitionAdder.signature(
+                    env_spec, extra_specs
+                )
+
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
-            adder_sig = reverb_adders.ParallelSequenceAdder.signature(
-                env_adder_spec, self._extra_specs
-            )
+
+            def adder_sig_fn(
+                env_spec: specs.MAEnvironmentSpec, extra_specs: Dict[str, Any]
+            ) -> Any:
+                return reverb_adders.ParallelSequenceAdder.signature(
+                    env_spec, self._config.sequence_length, extra_specs
+                )
+
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
 
         if self._config.samples_per_insert is None:
             # We will take a samples_per_insert ratio of None to mean that there is
             # no limit, i.e. this only implies a min size limit.
-            limiter = reverb.rate_limiters.MinSize(self._config.min_replay_size)
+            def limiter_fn() -> reverb.rate_limiters:
+                return reverb.rate_limiters.MinSize(self._config.min_replay_size)
 
         else:
             # Create enough of an error buffer to give a 10% tolerance in rate.
             samples_per_insert_tolerance = 0.1 * self._config.samples_per_insert
             error_buffer = self._config.min_replay_size * samples_per_insert_tolerance
-            limiter = reverb.rate_limiters.SampleToInsertRatio(
-                min_size_to_sample=self._config.min_replay_size,
-                samples_per_insert=self._config.samples_per_insert,
-                error_buffer=error_buffer,
+
+            def limiter_fn() -> reverb.rate_limiters:
+                return reverb.rate_limiters.SampleToInsertRatio(
+                    min_size_to_sample=self._config.min_replay_size,
+                    samples_per_insert=self._config.samples_per_insert,
+                    error_buffer=error_buffer,
+                )
+
+        # Create table per trainer
+        replay_tables = []
+        for table_key in self._config.table_network_config.keys():
+            # TODO (dries): Clean the below coverter code up.
+            # Convert a Mava spec
+            num_networks = len(self._config.table_network_config[table_key])
+            env_spec = copy.deepcopy(env_adder_spec)
+            env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
+
+            env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
+            if env_spec.extra_specs is not None:
+                env_spec.extra_specs = self.covert_specs(
+                    env_spec.extra_specs, num_networks
+                )
+            extra_specs = self.covert_specs(
+                self._extra_specs,
+                num_networks,
             )
 
-        replay_table = reverb.Table(
-            name=self._config.replay_table_name,
-            sampler=reverb.selectors.Uniform(),
-            remover=reverb.selectors.Fifo(),
-            max_size=self._config.max_replay_size,
-            rate_limiter=limiter,
-            signature=adder_sig,
-        )
-
-        return [replay_table]
+            replay_tables.append(
+                reverb.Table(
+                    name=table_key,
+                    sampler=reverb.selectors.Uniform(),
+                    remover=reverb.selectors.Fifo(),
+                    max_size=self._config.max_replay_size,
+                    rate_limiter=limiter_fn(),
+                    signature=adder_sig_fn(env_spec, extra_specs),
+                )
+            )
+        return replay_tables
 
     def make_dataset_iterator(
         self,
         replay_client: reverb.Client,
+        table_name: str,
     ) -> Iterator[reverb.ReplaySample]:
         """Create a dataset iterator to use for training/updating the system.
-
         Args:
-            replay_client (reverb.Client): Reverb Client which points to the
+            replay_client: Reverb Client which points to the
                 replay server.
-
         Returns:
             [type]: dataset iterator.
-
         Yields:
-            Iterator[reverb.ReplaySample]: data samples from the dataset.
+            data samples from the dataset.
         """
 
         sequence_length = (
@@ -247,8 +323,9 @@ class MADDPGBuilder:
             else None
         )
 
+        """Create a dataset iterator to use for learning/updating the system."""
         dataset = datasets.make_reverb_dataset(
-            table=self._config.replay_table_name,
+            table=table_name,
             server_address=replay_client.server_address,
             batch_size=self._config.batch_size,
             prefetch_size=self._config.prefetch_size,
@@ -259,129 +336,254 @@ class MADDPGBuilder:
     def make_adder(
         self,
         replay_client: reverb.Client,
-    ) -> Optional[adders.ParallelAdder]:
+    ) -> Optional[adders.ReverbParallelAdder]:
         """Create an adder which records data generated by the executor/environment.
-
         Args:
-            replay_client (reverb.Client): Reverb Client which points to the
+            replay_client: Reverb Client which points to the
                 replay server.
-
         Raises:
             NotImplementedError: unknown executor type.
-
         Returns:
-            Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
+            adder which sends data to a replay buffer.
         """
+        # Create custom priority functons for the adder
+        priority_fns = {
+            table_key: lambda x: 1.0
+            for table_key in self._config.table_network_config.keys()
+        }
 
         # Select adder
         if issubclass(self._executor_fn, executors.FeedForwardExecutor):
             adder = reverb_adders.ParallelNStepTransitionAdder(
-                priority_fns=None,
+                priority_fns=priority_fns,
                 client=replay_client,
+                net_ids_to_keys=self._config.unique_net_keys,
                 n_step=self._config.n_step,
+                table_network_config=self._config.table_network_config,
                 discount=self._config.discount,
             )
         elif issubclass(self._executor_fn, executors.RecurrentExecutor):
             adder = reverb_adders.ParallelSequenceAdder(
-                priority_fns=None,
+                priority_fns=priority_fns,
                 client=replay_client,
+                net_ids_to_keys=self._config.unique_net_keys,
                 sequence_length=self._config.sequence_length,
+                table_network_config=self._config.table_network_config,
                 period=self._config.period,
             )
         else:
             raise NotImplementedError("Unknown executor type: ", self._executor_fn)
         return adder
 
+    def create_counter_variables(
+        self, variables: Dict[str, tf.Variable]
+    ) -> Dict[str, tf.Variable]:
+        """Create counter variables.
+        Args:
+            variables: dictionary with variable_source
+            variables in.
+        Returns:
+            variables: dictionary with variable_source
+            variables in.
+        """
+        variables["trainer_steps"] = tf.Variable(0, dtype=tf.int32)
+        variables["trainer_walltime"] = tf.Variable(0, dtype=tf.float32)
+        variables["evaluator_steps"] = tf.Variable(0, dtype=tf.int32)
+        variables["evaluator_episodes"] = tf.Variable(0, dtype=tf.int32)
+        variables["executor_episodes"] = tf.Variable(0, dtype=tf.int32)
+        variables["executor_steps"] = tf.Variable(0, dtype=tf.int32)
+        return variables
+
+    def make_variable_server(
+        self,
+        networks: Dict[str, Dict[str, snt.Module]],
+    ) -> MavaVariableSource:
+        """Create the variable server.
+        Args:
+            networks: dictionary with the
+            system's networks in.
+        Returns:
+            variable_source: A Mava variable source object.
+        """
+        # Create variables
+        variables = {}
+        # Network variables
+        for net_type_key in networks.keys():
+            for net_key in networks[net_type_key].keys():
+                # Ensure obs and target networks are sonnet modules
+                variables[f"{net_key}_{net_type_key}"] = tf2_utils.to_sonnet_module(
+                    networks[net_type_key][net_key]
+                ).variables
+
+        variables = self.create_counter_variables(variables)
+
+        # Create variable source
+        variable_source = MavaVariableSource(
+            variables,
+            self._config.checkpoint,
+            self._config.checkpoint_subpath,
+            self._config.checkpoint_minute_interval,
+            self._config.termination_condition,
+        )
+        return variable_source
+
     def make_executor(
         self,
+        networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
-        adder: Optional[adders.ParallelAdder] = None,
-        variable_source: Optional[core.VariableSource] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
+        variable_source: Optional[MavaVariableSource] = None,
+        evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
-
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            networks: dictionary with the system's networks in.
+            policy_networks: policy networks for each agent in
                 the system.
-            adder (Optional[adders.ParallelAdder], optional): adder to send data to
+            adder: adder to send data to
                 a replay buffer. Defaults to None.
-            variable_source (Optional[core.VariableSource], optional): variables server.
+            variable_source: variables server.
                 Defaults to None.
-
+            evaluator: boolean indicator if the executor is used for
+                for evaluation only.
         Returns:
-            core.Executor: system executor, a collection of agents making up the part
+            system executor, a collection of agents making up the part
                 of the system generating data by interacting the environment.
         """
+        # Create policy variables
+        variables = {}
+        get_keys = []
+        for net_type_key in ["observations", "policies"]:
+            for net_key in networks[net_type_key].keys():
+                var_key = f"{net_key}_{net_type_key}"
+                variables[var_key] = networks[net_type_key][net_key].variables
+                get_keys.append(var_key)
+        variables = self.create_counter_variables(variables)
 
-        shared_weights = self._config.shared_weights
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        get_keys.extend(count_names)
+        counts = {name: variables[name] for name in count_names}
 
+        evaluator_interval = self._config.evaluator_interval if evaluator else None
         variable_client = None
         if variable_source:
-            agent_keys = self._agent_types if shared_weights else self._agents
-
-            # Create policy variables
-            variables = {}
-            for agent in agent_keys:
-                variables[agent] = policy_networks[agent].variables
-
             # Get new policy variables
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
-                variables={"policy": variables},
-                update_period=self._config.executor_variable_update_period,
+                variables=variables,
+                get_keys=get_keys,
+                # If we are using evaluator_intervals,
+                # we should always get the latest variables.
+                update_period=0
+                if evaluator_interval
+                else self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
-            variable_client.update_and_wait()
+            variable_client.get_and_wait()
 
         # Create the actor which defines how we take actions.
         return self._executor_fn(
             policy_networks=policy_networks,
+            counts=counts,
+            net_keys_to_ids=self._config.net_keys_to_ids,
             agent_specs=self._config.environment_spec.get_agent_specs(),
-            shared_weights=shared_weights,
+            agent_net_keys=self._config.agent_net_keys,
+            network_sampling_setup=self._config.network_sampling_setup,
             variable_client=variable_client,
             adder=adder,
+            evaluator=evaluator,
+            interval=evaluator_interval,
         )
 
     def make_trainer(
         self,
         networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
-        counter: Optional[counting.Counter] = None,
+        variable_source: MavaVariableSource,
+        trainer_networks: List[Any],
+        trainer_table_entry: List[Any],
         logger: Optional[types.NestedLogger] = None,
         connection_spec: Dict[str, List[str]] = None,
     ) -> core.Trainer:
         """Create a trainer instance.
-
         Args:
-            networks (Dict[str, Dict[str, snt.Module]]): system networks.
-            dataset (Iterator[reverb.ReplaySample]): dataset iterator to feed data to
+            networks: system networks.
+            dataset: dataset iterator to feed data to
                 the trainer networks.
-            counter (Optional[counting.Counter], optional): a Counter which allows for
-                recording of counts, e.g. trainer steps. Defaults to None.
-            logger (Optional[types.NestedLogger], optional): Logger object for logging
-                metadata. Defaults to None.
-            connection_spec (Dict[str, List[str]], optional): connection topology used
+            variable_source: Source with variables in.
+            trainer_networks: Set of unique network keys to train on..
+            trainer_table_entry: List of networks per agent to train on.
+            logger: Logger object for logging  metadata.
+            connection_spec: connection topology used
                 for networked system architectures. Defaults to None.
-
         Returns:
-            core.Trainer: system trainer, that uses the collected data from the
+            system trainer, that uses the collected data from the
                 executors to update the parameters of the agent networks in the system.
         """
-
-        agents = self._agents
+        # This assumes agents are sort_str_num in the other methods
         agent_types = self._agent_types
-        shared_weights = self._config.shared_weights
         max_gradient_norm = self._config.max_gradient_norm
         discount = self._config.discount
         target_update_period = self._config.target_update_period
         target_averaging = self._config.target_averaging
         target_update_rate = self._config.target_update_rate
 
-        # trainer args
+        # Create variable client
+        variables = {}
+        set_keys = []
+        get_keys = []
+        # TODO (dries): Only add the networks this trainer is working with.
+        # Not all of them.
+        for net_type_key in networks.keys():
+            for net_key in networks[net_type_key].keys():
+                variables[f"{net_key}_{net_type_key}"] = networks[net_type_key][
+                    net_key
+                ].variables
+                if net_key in set(trainer_networks):
+                    set_keys.append(f"{net_key}_{net_type_key}")
+                else:
+                    get_keys.append(f"{net_key}_{net_type_key}")
+
+        variables = self.create_counter_variables(variables)
+        count_names = [
+            "trainer_steps",
+            "trainer_walltime",
+            "evaluator_steps",
+            "evaluator_episodes",
+            "executor_episodes",
+            "executor_steps",
+        ]
+        get_keys.extend(count_names)
+        counts = {name: variables[name] for name in count_names}
+
+        variable_client = variable_utils.VariableClient(
+            client=variable_source,
+            variables=variables,
+            get_keys=get_keys,
+            set_keys=set_keys,
+            update_period=10,
+        )
+
+        # Get all the initial variables
+        variable_client.get_all_and_wait()
+
+        # Convert network keys for the trainer.
+        trainer_agents = self._agents[: len(trainer_table_entry)]
+        trainer_agent_net_keys = {
+            agent: trainer_table_entry[a_i] for a_i, agent in enumerate(trainer_agents)
+        }
+
         trainer_config: Dict[str, Any] = {
-            "agents": agents,
+            "agents": trainer_agents,
             "agent_types": agent_types,
             "policy_networks": networks["policies"],
             "critic_networks": networks["critics"],
@@ -389,7 +591,7 @@ class MADDPGBuilder:
             "target_policy_networks": networks["target_policies"],
             "target_critic_networks": networks["target_critics"],
             "target_observation_networks": networks["target_observations"],
-            "shared_weights": shared_weights,
+            "agent_net_keys": trainer_agent_net_keys,
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
             "max_gradient_norm": max_gradient_norm,
@@ -397,19 +599,27 @@ class MADDPGBuilder:
             "target_averaging": target_averaging,
             "target_update_period": target_update_period,
             "target_update_rate": target_update_rate,
+            "variable_client": variable_client,
             "dataset": dataset,
-            "counter": counter,
+            "counts": counts,
             "logger": logger,
-            "checkpoint": self._config.checkpoint,
-            "checkpoint_subpath": self._config.checkpoint_subpath,
+            "learning_rate_scheduler_fn": self._config.learning_rate_scheduler_fn,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
 
+        if issubclass(self._trainer_fn, training.MADDPGBaseRecurrentTrainer):
+            trainer_config["bootstrap_n"] = self._config.bootstrap_n
+
         # The learner updates the parameters (and initializes them).
         trainer = self._trainer_fn(**trainer_config)
 
-        trainer = DetailedTrainerStatistics(  # type: ignore
+        # NB If using both NetworkStatistics and TrainerStatistics, order is important.
+        # NetworkStatistics needs to appear before TrainerStatistics.
+        # TODO(Kale-ab/Arnu): need to fix wrapper type issues
+        trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
+
+        trainer = ScaledDetailedTrainerStatistics(  # type: ignore
             trainer, metrics=["policy_loss", "critic_loss"]
         )
 

@@ -14,26 +14,28 @@
 # limitations under the License.
 
 """MADDPG system executor implementation."""
-
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dm_env
+import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
 from acme import types
 from acme.specs import EnvironmentSpec
+
+# Internal imports.
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 from dm_env import specs
 
 from mava import adders
 from mava.systems.tf import executors
+from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
 Array = specs.Array
 BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
-
 tfd = tfp.distributions
 
 
@@ -46,30 +48,47 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
-        adder: Optional[adders.ParallelAdder] = None,
+        agent_net_keys: Dict[str, str],
+        network_sampling_setup: List,
+        net_keys_to_ids: Dict[str, int],
+        evaluator: bool = False,
+        adder: Optional[adders.ReverbParallelAdder] = None,
+        counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
+        interval: Optional[dict] = None,
     ):
-        """Initialise the system executor
 
+        """Initialise the system executor
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            policy_networks: policy networks for each agent in
                 the system.
-            agent_specs (Dict[str, EnvironmentSpec]): agent observation and action
+            agent_specs: agent observation and action
                 space specifications.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+            agent_net_keys: specifies what network each agent uses.
+            network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+            net_keys_to_ids: Specifies a mapping from network keys to their integer id.
+            adder: adder which sends data
                 to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+            counts: Count values used to record excutor episode and steps.
+            variable_client:
                 client to copy weights from the trainer. Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
+            evaluator: whether the executor will be used for
+                evaluation.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
         self._agent_specs = agent_specs
+        self._network_sampling_setup = network_sampling_setup
+        self._counts = counts
+        self._network_int_keys_extras: Dict[str, np.ndarray] = {}
+        self._net_keys_to_ids = net_keys_to_ids
+        self._evaluator = evaluator
+        self._interval = interval
         super().__init__(
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             adder=adder,
             variable_client=variable_client,
         )
@@ -81,8 +100,8 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         """Agent specific policy function
 
         Args:
-            agent (str): agent id
-            observation (types.NestedTensor): observation tensor received from the
+            agent: agent id
+            observation: observation tensor received from the
                 environment.
 
         Raises:
@@ -96,7 +115,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         batched_observation = tf2_utils.add_batch_dim(observation)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
         policy = self._policy_networks[agent_key](batched_observation)
@@ -118,14 +137,13 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         """select an action for a single agent in the system
 
         Args:
-            agent (str): agent id.
-            observation (types.NestedArray): observation tensor received from the
-                environment.
+            agent: agent id.
+            observation: observation tensor received
+            from the environment.
 
         Returns:
-            Tuple[types.NestedArray, types.NestedArray]: agent action and policy.
+            agent action and policy.
         """
-
         # Step the recurrent policy/value network forward
         # given the current observation and state.
         action, policy = self._policy(agent, observation.observation)
@@ -141,12 +159,11 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         """select the actions for all agents in the system
 
         Args:
-            observations (Dict[str, types.NestedArray]): agent observations from the
+            observations: agent observations from the
                 environment.
 
         Returns:
-            Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
-                actions and policies for all agents in the system.
+            actions and policies for all agents in the system.
         """
 
         actions = {}
@@ -154,6 +171,32 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         for agent, observation in observations.items():
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
+
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
+        """record first observed timestep from the environment
+        Args:
+            timestep: data emitted by an environment at first step of
+                interaction.
+            extras: possible extra information
+                to record during the first step. Defaults to {}.
+        """
+        if not self._adder:
+            return
+
+        "Select new networks from the sampler at the start of each episode."
+        agents = sort_str_num(list(self._agent_net_keys.keys()))
+        self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+            agents,
+            self._network_sampling_setup,
+            self._net_keys_to_ids,
+        )
+
+        extras["network_int_keys"] = self._network_int_keys_extras
+        self._adder.add_first(timestep, extras)
 
     def observe(
         self,
@@ -164,20 +207,24 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """record observed timestep from the environment
-
         Args:
-            actions (Union[ Dict[str, types.NestedArray], List[Dict[str,
-                types.NestedArray]] ]): system agents' actions.
-            next_timestep (dm_env.TimeStep): data emitted by an environment during
+            actions: system agents' actions.
+            next_timestep: data emitted by an environment during
                 interaction.
-            next_extras (Dict[str, types.NestedArray], optional): possible extra
+            next_extras: possible extra
                 information to record during the transition. Defaults to {}.
         """
+        if not self._adder:
+            return
+        _, policy = actions
+        next_extras["network_int_keys"] = self._network_int_keys_extras
+        # TODO (dries): Sort out this mypy issue.
+        self._adder.add(policy, next_timestep, next_extras)  # type: ignore
 
-        if self._adder:
-            _, policy = actions
-            # TODO (dries): Sort out this mypy issue.
-            self._adder.add(policy, next_timestep, next_extras)  # type: ignore
+    def update(self, wait: bool = False) -> None:
+        """Update the policy variables."""
+        if self._variable_client:
+            self._variable_client.get_async()
 
 
 class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
@@ -189,34 +236,49 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_specs: Dict[str, EnvironmentSpec],
-        adder: Optional[adders.ParallelAdder] = None,
+        agent_net_keys: Dict[str, str],
+        network_sampling_setup: List,
+        net_keys_to_ids: Dict[str, int],
+        evaluator: bool = False,
+        adder: Optional[adders.ReverbParallelAdder] = None,
+        counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        shared_weights: bool = True,
         store_recurrent_state: bool = True,
+        interval: Optional[dict] = None,
     ):
         """Initialise the system executor
-
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            policy_networks: policy networks for each agent in
                 the system.
-            agent_specs (Dict[str, EnvironmentSpec]): agent observation and action
+            agent_specs: agent observation and action
                 space specifications.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+            agent_net_keys: specifies what network each agent uses.
+            network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+            net_keys_to_ids: Specifies a mapping from network keys to their integer id.
+            adder: adder which sends data
                 to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
+            counts: Count values used to record excutor episode and steps.
+            variable_client:
                 client to copy weights from the trainer. Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
-                Defaults to True.
-            store_recurrent_state (bool, optional): boolean to store the recurrent
+            store_recurrent_state: boolean to store the recurrent
                 network hidden state. Defaults to True.
+            evaluator: whether the executor will be used for
+                evaluation.
+            interval: interval that evaluations are run at.
         """
 
         # Store these for later use.
         self._agent_specs = agent_specs
-
+        self._network_sampling_setup = network_sampling_setup
+        self._counts = counts
+        self._net_keys_to_ids = net_keys_to_ids
+        self._network_int_keys_extras: Dict[str, np.ndarray] = {}
+        self._evaluator = evaluator
+        self._interval = interval
         super().__init__(
             policy_networks=policy_networks,
-            shared_weights=shared_weights,
+            agent_net_keys=agent_net_keys,
             adder=adder,
             variable_client=variable_client,
             store_recurrent_state=store_recurrent_state,
@@ -230,26 +292,22 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         state: types.NestedTensor,
     ) -> Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
         """Agent specific policy function
-
         Args:
-            agent (str): agent id
-            observation (types.NestedTensor): observation tensor received from the
+            agent: agent id
+            observation: observation tensor received from the
                 environment.
-            state (types.NestedTensor): recurrent network state.
-
+            state: recurrent network state.
         Raises:
             NotImplementedError: unknown action space
-
         Returns:
-            Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
-                action, policy and new recurrent hidden state
+            action, policy and new recurrent hidden state
         """
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
 
         # index network either on agent type or on agent id
-        agent_key = agent.split("_")[0] if self._shared_weights else agent
+        agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
         policy, new_state = self._policy_networks[agent_key](batched_observation, state)
@@ -262,28 +320,25 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             action = tf.math.argmax(policy, axis=1)
         else:
             raise NotImplementedError
-
         return action, policy, new_state
 
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
         """select an action for a single agent in the system
-
         Args:
-            agent (str): agent id
-            observation (types.NestedArray): observation tensor received from the
+            agent: agent id
+            observation: observation tensor received from the
                 environment.
-
         Returns:
-            types.NestedArray: action and policy.
+            action and policy.
         """
 
         # TODO Mask actions here using observation.legal_actions
         # Initialize the RNN state if necessary.
         if self._states[agent] is None:
             # index network either on agent type or on agent id
-            agent_key = agent.split("_")[0] if self._shared_weights else agent
+            agent_key = self._agent_net_keys[agent]
             self._states[agent] = self._policy_networks[agent_key].initia_state(1)
 
         # Step the recurrent policy forward given the current observation and state.
@@ -303,14 +358,11 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         self, observations: Dict[str, types.NestedArray]
     ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
         """select the actions for all agents in the system
-
         Args:
-            observations (Dict[str, types.NestedArray]): agent observations from the
+            observations: agent observations from the
                 environment.
-
         Returns:
-            Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
-                actions and policies for all agents in the system.
+            actions and policies for all agents in the system.
         """
 
         actions = {}
@@ -319,39 +371,75 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             actions[agent], policies[agent] = self.select_action(agent, observation)
         return actions, policies
 
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
+        """record first observed timestep from the environment
+
+        Args:
+            timestep: data emitted by an environment at first step of
+                interaction.
+            extras: possible extra information
+                to record during the first step.
+        """
+
+        # Re-initialize the RNN state.
+        for agent, _ in timestep.observation.items():
+            # index network either on agent type or on agent id
+            agent_key = self._agent_net_keys[agent]
+            self._states[agent] = self._policy_networks[agent_key].initial_state(1)
+
+        if not self._adder:
+            return
+
+        # Sample new agent_net_keys.
+        agents = sort_str_num(list(self._agent_net_keys.keys()))
+        self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
+            agents,
+            self._network_sampling_setup,
+            self._net_keys_to_ids,
+        )
+
+        if self._store_recurrent_state:
+            numpy_states = {
+                agent: tf2_utils.to_numpy_squeeze(_state)
+                for agent, _state in self._states.items()
+            }
+            extras.update({"core_states": numpy_states})
+        extras["network_int_keys"] = self._network_int_keys_extras
+        self._adder.add_first(timestep, extras)
+
     def observe(
         self,
         actions: Dict[str, types.NestedArray],
         next_timestep: dm_env.TimeStep,
-        next_extras: Optional[Dict[str, types.NestedArray]] = {},
+        next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
         """record observed timestep from the environment
-
         Args:
-            actions (Dict[str, types.NestedArray]): system agents' actions.
-            next_timestep (dm_env.TimeStep): data emitted by an environment during
+            actions: system agents' actions.
+            next_timestep: data emitted by an environment during
                 interaction.
-            next_extras (Dict[str, types.NestedArray], optional): possible extra
-                information to record during the transition. Defaults to {}.
+            next_extras: possible extra
+                information to record during the transition.
         """
 
         if not self._adder:
             return
         _, policy = actions
-        if not self._store_recurrent_state:
-            if next_extras:
-                # TODO (dries): Sort out this mypy issue.
-                self._adder.add(policy, next_timestep, next_extras)  # type: ignore
-            else:
-                self._adder.add(policy, next_timestep)  # type: ignore
-            return
 
-        numpy_states = {
-            agent: tf2_utils.to_numpy_squeeze(_state)
-            for agent, _state in self._states.items()
-        }
-        if next_extras:
+        if self._store_recurrent_state:
+            numpy_states = {
+                agent: tf2_utils.to_numpy_squeeze(_state)
+                for agent, _state in self._states.items()
+            }
             next_extras.update({"core_states": numpy_states})
-            self._adder.add(policy, next_timestep, next_extras)  # type: ignore
-        else:
-            self._adder.add(policy, next_timestep, numpy_states)  # type: ignore
+        next_extras["network_int_keys"] = self._network_int_keys_extras
+        self._adder.add(policy, next_timestep, next_extras)  # type: ignore
+
+    def update(self, wait: bool = False) -> None:
+        """Update the policy variables."""
+        if self._variable_client:
+            self._variable_client.get_async()

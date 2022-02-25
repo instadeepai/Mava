@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Wraps a Debugging MARL environment to be used as a dm_env environment."""
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 
 import dm_env
 import numpy as np
@@ -23,7 +23,7 @@ from acme.wrappers.gym_wrapper import _convert_to_spec
 from gym import spaces
 
 from mava.types import OLT
-from mava.utils.debugging.environment import MultiAgentEnv
+from mava.utils.debugging.environment import MultiAgentEnv  # type: ignore
 from mava.utils.debugging.environments.switch_game import MultiAgentSwitchGame
 from mava.utils.debugging.environments.two_step import TwoStepEnv
 from mava.utils.wrapper_utils import convert_np_type, parameterized_restart
@@ -66,7 +66,9 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
 
         return parameterized_restart(rewards, self._discounts, observations), env_extras
 
-    def step(self, actions: Dict[str, np.ndarray]) -> Tuple[dm_env.TimeStep, np.array]:
+    def step(
+        self, actions: Dict[str, np.ndarray]
+    ) -> Union[dm_env.TimeStep, Tuple[dm_env.TimeStep, Dict[str, np.ndarray]]]:
         """Steps the environment."""
 
         if self._reset_next_step:
@@ -121,10 +123,18 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
                 # TODO Handle legal actions better for continuous envs,
                 #  maybe have min and max for each action and clip the agents actions
                 #  accordingly
-                legals = np.ones(
-                    _convert_to_spec(self._environment.action_spaces[agent]).shape,
-                    dtype=self._environment.action_spaces[agent].dtype,
-                )
+                if isinstance(self._environment.action_spaces[agent], spaces.Discrete):
+                    legals = np.ones(
+                        _convert_to_spec(
+                            self._environment.action_spaces[agent]
+                        ).num_values,
+                        dtype=self._environment.action_spaces[agent].dtype,
+                    )
+                else:
+                    legals = np.ones(
+                        _convert_to_spec(self._environment.action_spaces[agent]).shape,
+                        dtype=self._environment.action_spaces[agent].dtype,
+                    )
 
             observation = np.array(observation, dtype=np.float32)
             observations[agent] = OLT(
@@ -138,11 +148,24 @@ class DebuggingEnvWrapper(PettingZooParallelEnvWrapper):
     def observation_spec(self) -> Dict[str, OLT]:
         observation_specs = {}
         for agent in self._environment.agent_ids:
+
+            # Legals spec
+            if isinstance(self._environment.action_spaces[agent], spaces.Discrete):
+                legals = np.ones(
+                    _convert_to_spec(self._environment.action_spaces[agent]).num_values,
+                    dtype=self._environment.action_spaces[agent].dtype,
+                )
+            else:
+                legals = np.ones(
+                    _convert_to_spec(self._environment.action_spaces[agent]).shape,
+                    dtype=self._environment.action_spaces[agent].dtype,
+                )
+
             observation_specs[agent] = OLT(
                 observation=_convert_to_spec(
                     self._environment.observation_spaces[agent]
                 ),
-                legal_actions=_convert_to_spec(self._environment.action_spaces[agent]),
+                legal_actions=legals,
                 terminal=specs.Array((1,), np.float32),
             )
         return observation_specs
@@ -216,7 +239,9 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
 
         self.reset()
 
-    def step(self, actions: Dict[str, np.array]) -> Tuple[dm_env.TimeStep, np.array]:
+    def step(
+        self, actions: Dict[str, np.ndarray]
+    ) -> Tuple[dm_env.TimeStep, np.ndarray]:
         """Steps the environment."""
         if self._reset_next_step:
             self._reset_next_step = False
@@ -242,7 +267,7 @@ class TwoStepWrapper(PettingZooParallelEnvWrapper):
             state_infos,
         )
 
-    def reset(self) -> Tuple[dm_env.TimeStep, np.array]:
+    def reset(self) -> Tuple[dm_env.TimeStep, np.ndarray]:
         """Resets the episode."""
         self._reset_next_step = False
         self._step_type = dm_env.StepType.FIRST
