@@ -18,14 +18,12 @@ import numpy as np
 import pytest
 
 from mava.utils.environments import debugging_utils, pettingzoo_utils
+from mava.utils.environments.flatland_utils import check_flatland_import
 
-try:
+_has_flatland = check_flatland_import()
+
+if _has_flatland:
     from mava.utils.environments import flatland_utils
-
-    _has_flatland = True
-except (ModuleNotFoundError, ImportError):
-    _has_flatland = False
-    pass
 
 
 @pytest.mark.parametrize(

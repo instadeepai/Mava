@@ -22,7 +22,27 @@ from mava.wrappers.env_preprocess_wrappers import (
 )
 from mava.wrappers.flatland import FlatlandEnvWrapper
 
-try:
+
+def check_flatland_import() -> bool:
+    """Consistent way to check if flatland has been installed.
+
+    Returns:
+        whether flatland exists or not.
+    """
+    try:
+        from flatland.envs.line_generators import sparse_line_generator
+
+        # Delete unused var
+        del sparse_line_generator
+        _found_flatland = True
+
+    except ModuleNotFoundError:
+        _found_flatland = False
+    return _found_flatland
+
+
+_found_flatland = check_flatland_import()
+if _found_flatland:
     from flatland.envs.line_generators import sparse_line_generator
     from flatland.envs.malfunction_generators import (
         MalfunctionParameters,
@@ -32,13 +52,6 @@ try:
     from flatland.envs.predictions import ShortestPathPredictorForRailEnv
     from flatland.envs.rail_env import RailEnv
     from flatland.envs.rail_generators import sparse_rail_generator
-
-    _found_flatland = True
-
-except ModuleNotFoundError:
-    _found_flatland = False
-
-if _found_flatland:
 
     def _create_rail_env_with_tree_obs(
         n_agents: int = 5,
