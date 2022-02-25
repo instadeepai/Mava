@@ -28,18 +28,12 @@ import tensorflow as tf
 import tree
 from acme import specs
 from acme.adders.reverb import utils as acme_utils
-from acme.adders.reverb.sequence import SequenceAdder
+from acme.adders.reverb.sequence import EndBehavior, SequenceAdder
 from acme.types import NestedSpec
 
 from mava.adders.reverb import base
 from mava.adders.reverb.base import ReverbParallelAdder
 from mava.adders.reverb.utils import trajectory_signature
-
-# TODO Clean this up, when using newer versions of acme.
-try:
-    from acme.adders.reverb.sequence import EndBehavior
-except ImportError:
-    from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
 
 
 class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
