@@ -107,7 +107,7 @@ def test_add_multiple_configs(
     assert conf.param_1 == 3.8
 
 
-def test_add_configs_twice(
+def test_add_config_twice(
     config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
 ) -> None:
     """Test add two configs, one after the other.
@@ -145,6 +145,30 @@ def test_update_config(
 
     assert conf.param_0 == 2.7
     assert conf.param_1 == 3.8
+    assert not hasattr(config, "name")
+    assert not hasattr(config, "setting")
+
+
+def test_update_config_twice(
+    config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
+) -> None:
+    """Test add two configs, one after the other.
+
+    Args:
+        config : Mava config
+        dummy_component_config : component config dataclass
+        dummy_hyperparameter_config : component config dataclass of hyperparameters
+    """
+    config.add(component=dummy_component_config)
+    config.update(component=dummy_hyperparameter_config)
+    config.update(component=dummy_component_config)
+    config.build()
+    conf = config.get()
+
+    assert conf.name == "component"
+    assert conf.setting == 5
+    assert not hasattr(config, "param_0")
+    assert not hasattr(config, "param_1")
 
 
 def test_set_existing_parameter_on_the_fly(
@@ -161,8 +185,8 @@ def test_set_existing_parameter_on_the_fly(
     config.add(component=dummy_component_config)
     config.build()
 
-    # set config on the fly
-    config.set(name="new_component_name")
+    # set config parameters on the fly
+    config.set_parameters(name="new_component_name")
     conf = config.get()
 
     assert conf.name == "new_component_name"
@@ -184,8 +208,8 @@ def test_set_before_build_exception(
         # add component dataclasses and build config
         config.add(component=dummy_component_config)
 
-        # Try setting without having built first
-        config.set(name="new_component_name")
+        # Try setting parameters without having built first
+        config.set_parameters(name="new_component_name")
 
 
 def test_get_before_build_exception(
@@ -224,14 +248,14 @@ def test_parameter_setting_that_does_not_exist_exception(
         config.build()
 
         # Try setting a parameter that does not exist
-        config.set(unknown_param="new_value")
+        config.set_parameters(unknown_param="new_value")
 
 
-def test_accidental_parameter_override_exception(
+def test_accidental_parameter_override_with_add_exception(
     config: Config, dummy_hyperparameter_config: type
 ) -> None:
     """Test that exception is thrown when two component config dataclasses share the \
-        same name for a specific hyperparameter.
+        same name for a specific hyperparameter when adding a new config.
 
     Args:
         config : Mava config
@@ -246,3 +270,28 @@ def test_accidental_parameter_override_exception(
         # as an already existing component parameter name
         other_hyperparamter_config = SameParameterNameConfig(param_0=2, param_2="param")
         config.add(other_hyperparameter=other_hyperparamter_config)
+
+
+def test_accidental_parameter_override_with_update_exception(
+    config: Config, dummy_component_config: type, dummy_hyperparameter_config: type
+) -> None:
+    """Test that exception is thrown when two component config dataclasses share the \
+        same name for a specific hyperparameter when updating an existing config.
+
+    Args:
+        config : Mava config
+        dummy_component_config : component config dataclass
+        dummy_hyperparameter_config : component config dataclass of hyperparameters
+    """
+
+    with pytest.raises(Exception):
+        # add component dataclasses and build config
+        config.add(component_0=dummy_component_config)
+        config.add(component_1=dummy_hyperparameter_config)
+
+        # add new component dataclass with a parameter of the same name
+        # as an already existing component parameter name
+        other_hyperparameter_config = SameParameterNameConfig(
+            param_0=2, param_2="param"
+        )
+        config.update(component_0=other_hyperparameter_config)

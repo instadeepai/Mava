@@ -208,6 +208,14 @@ class MADQNFeedForwardExecutor(executors.FeedForwardExecutor, DQNExecutor):
             )
         return actions
 
+    def select_action(
+        self, agent: str, observation: types.NestedArray
+    ) -> types.NestedArray:
+        """Select action for single agent"""
+        action = self._policy(agent, observation.observation, observation.legal_actions)
+
+        return tf2_utils.to_numpy_squeeze(action)
+
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> types.NestedArray:
@@ -407,6 +415,21 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
                 states[agent],
             )
         return actions, new_states
+
+    def select_action(
+        self, agent: str, observation: types.NestedArray
+    ) -> types.NestedArray:
+        """Select action for single agent"""
+        action, new_state = self._policy(
+            agent,
+            observation.observation,
+            observation.legal_actions,
+            self._states[agent],
+        )
+
+        self._states[agent] = new_state
+
+        return tf2_utils.to_numpy_squeeze(action)
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
