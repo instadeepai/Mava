@@ -57,20 +57,21 @@ class MAPPO:
         shared_weights: bool = True,
         agent_net_keys: Dict[str, str] = {},
         executor_variable_update_period: int = 100,
-        policy_optimizer: Union[
-            snt.Optimizer, Dict[str, snt.Optimizer]
-        ] = snt.optimizers.Adam(learning_rate=5e-4),
-        critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-5),
+        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]] = snt.optimizers.Adam(
+            learning_rate=5e-4
+        ),
         discount: float = 0.99,
-        lambda_gae: float = 0.99,
+        lambda_gae: float = 0.95,
         clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.01,
-        baseline_cost: float = 0.5,
-        max_gradient_norm: Optional[float] = None,
-        max_queue_size: int = 100000,
-        batch_size: int = 256,
+        baseline_cost: float = 1.0,
+        max_gradient_norm: Optional[float] = 0.5,
+        max_queue_size: Optional[int] = None,
+        batch_size: int = 512,
+        minibatch_size: int = None,
+        num_epochs: int = 10,
         sequence_length: int = 10,
-        sequence_period: int = 5,
+        sequence_period: Optional[int] = None,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
@@ -81,95 +82,129 @@ class MAPPO:
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
         evaluator_interval: Optional[dict] = None,
-        learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
+        learning_rate_scheduler_fn: Optional[Callable[[int], None]] = None,
+        normalize_advantage: bool = False,
     ):
         """Initialise the system
 
         Args:
-            environment_factory (Callable[[bool], dm_env.Environment]): function to
+            environment_factory: function to
                 instantiate an environment.
-            network_factory (Callable[[acme_specs.BoundedArray],
-                Dict[str, snt.Module]]): function to instantiate system networks.
-            logger_factory (Callable[[str], MavaLogger], optional): function to
+            network_factory : function to instantiate system networks.
+            logger_factory : function to
                 instantiate a system logger. Defaults to None.
-            architecture (Type[ DecentralisedValueActorCritic ], optional): system
+            architecture : system
                 architecture, e.g. decentralised or centralised. Defaults to
                 DecentralisedValueActorCritic.
-            trainer_fn (Type[training.MAPPOTrainer], optional): training type
+            trainer_fn : training type
                 associated with executor and architecture, e.g. centralised training.
                 Defaults to training.MAPPOTrainer.
-            executor_fn (Type[core.Executor], optional): executor type, e.g. feedforward
+            executor_fn : executor type, e.g. feedforward
                 or recurrent. Defaults to execution.MAPPOFeedForwardExecutor.
-            num_executors (int, optional): number of executor processes to run in
+            num_executors : number of executor processes to run in
                 parallel. Defaults to 1.
-            num_caches (int, optional): number of trainer node caches. Defaults to 0.
-            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
+            num_caches : number of trainer node caches. Defaults to 0.
+            environment_spec : description of
                 the action, observation spaces etc. for each agent in the system.
                 Defaults to None.
-            shared_weights (bool, optional): whether agents should share weights or not.
+            shared_weights : whether agents should share weights or not.
                 When agent_net_keys are provided the value of shared_weights is ignored.
                 Defaults to True.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: : specifies what network each agent uses.
                 Defaults to {}.
-            executor_variable_update_period (int, optional): number of steps before
+            executor_variable_update_period : number of steps before
                 updating executor variables from the variable source. Defaults to 100.
-            policy_optimizer (Union[ snt.Optimizer, Dict[str, snt.Optimizer] ],
-                optional): optimizer(s) for updating policy networks.
+            optimizer : optimizer(s) for updating networks.
                 Defaults to snt.optimizers.Adam(learning_rate=5e-4).
-            critic_optimizer (snt.Optimizer, optional): optimizer for updating critic
-                networks. Defaults to snt.optimizers.Adam(learning_rate=1e-5).
-            discount (float, optional): discount factor to use for TD updates. Defaults
+            discount : discount factor to use for TD updates. Defaults
                 to 0.99.
-            lambda_gae (float, optional): scalar determining the mix of bootstrapping
+            lambda_gae : scalar determining the mix of bootstrapping
                 vs further accumulation of multi-step returns at each timestep.
                 Defaults to 0.99.
-            clipping_epsilon (float, optional): Hyper-parameter for clipping in the
+            clipping_epsilon : Hyper-parameter for clipping in the
                 policy objective. Defaults to 0.2.
-            entropy_cost (float, optional): contribution of entropy regularization to
+            entropy_cost : contribution of entropy regularization to
                 the total loss. Defaults to 0.01.
-            baseline_cost (float, optional): contribution of the value loss to the
+            baseline_cost : contribution of the value loss to the
                 total loss. Defaults to 0.5.
             max_gradient_norm: value to specify the maximum clipping value for the
             gradient norm during optimization.
-            max_queue_size (int, optional): maximum number of items in the queue.
-                Defaults to 100000.
-            batch_size (int, optional): sample batch size for updates. Defaults to 256.
-            sequence_length (int, optional): recurrent sequence rollout length. Defaults
+            max_queue_size : maximum number of items in the queue.
+                Should be larger than batch size.
+            batch_size: sample batch size for updates.
+                Defaults to 512. Minibatches are sampled from this data.
+            minibatch_size: size of minibatch that is sampled
+                from the training batch. Minibatches are used for each gradient step.
+            num_epochs: number of epochs every training step.
+                Recommendation as per https://arxiv.org/pdf/2103.01955.pdf, "15
+                epochs for easy tasks,and 10 or 5 epochs for difficult tasks."
+            sequence_length: sequence rollout length. Defaults
                 to 10.
-            sequence_period (int, optional): consecutive starting points for
-                overlapping rollouts across a sequence. Defaults to 5.
-            max_executor_steps (int, optional): maximum number of steps and executor
+            sequence_period: consecutive starting points for
+                overlapping rollouts across a sequence. Defaults to sequence length -1.
+            max_executor_steps: maximum number of steps and executor
                 can in an episode. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint models. Defaults to
+            checkpoint : whether to checkpoint models. Defaults to
                 False.
-            checkpoint_subpath (str, optional): subdirectory specifying where to store
+            checkpoint_subpath: subdirectory specifying where to store
                 checkpoints. Defaults to "~/mava/".
-            checkpoint_minute_interval (int): The number of minutes to wait between
+            checkpoint_minute_interval: The number of minutes to wait between
                 checkpoints.
-            logger_config (Dict, optional): additional configuration settings for the
+            logger_config: additional configuration settings for the
                 logger factory. Defaults to {}.
-            train_loop_fn (Callable, optional): function to instantiate a train loop.
+            train_loop_fn: function to instantiate a train loop.
                 Defaults to ParallelEnvironmentLoop.
-            eval_loop_fn (Callable, optional): function to instantiate an evaluation
+            eval_loop_fn: function to instantiate an evaluation
                 loop. Defaults to ParallelEnvironmentLoop.
-            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
+            train_loop_fn_kwargs: possible keyword arguments to send
                 to the training loop. Defaults to {}.
-            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
+            eval_loop_fn_kwargs: possible keyword arguments to send to
                 the evaluation loop. Defaults to {}.
-            learning_rate_scheduler_fn: dict with two functions/classes (one for the
-                policy and one for the critic optimizer), that takes in a trainer
-                step t and returns the current learning rate,
-                e.g. {"policy": policy_lr_schedule ,"critic": critic_lr_schedule}.
-                See
-                examples/debugging/simple_spread/feedforward/decentralised/run_maddpg_lr_schedule.py
-                for an example.
+            learning_rate_scheduler_fn: an optional learning rate scheduler for
+                the optimiser.
             evaluator_interval: An optional condition that is used to
                 evaluate/test system performance after [evaluator_interval]
                 condition has been met. If None, evaluation will
                 happen at every timestep.
                 E.g. to evaluate a system after every 100 executor episodes,
                 evaluator_interval = {"executor_episodes": 100}.
+            normalize_advantage: whether to normalize the advantage estimate. This can
+                hurt peformance when shared weights are used.
         """
+        # minibatch size defaults to train batch size
+        if minibatch_size:
+            self._minibatch_size = minibatch_size
+        else:
+            self._minibatch_size = batch_size
+
+        assert batch_size % self._minibatch_size == 0, (
+            "batch_size must be divisible by minibatch_size."
+            + f"Got batch_size={batch_size},"
+            + f"minibatch_size={self._minibatch_size}"
+        )
+
+        if max_queue_size:
+            self._max_queue_size = max_queue_size
+        else:
+            # NOTE: Based on https://github.com/deepmind/acme/blob/6bf350df1d9dd16cd85217908ec9f47553278976/acme/agents/jax/ppo/builder.py#L75 # noqa: E501
+            extra_capacity_to_avoid_single_machine_deadlocks = 1000
+            self._max_queue_size = (
+                batch_size + extra_capacity_to_avoid_single_machine_deadlocks
+            )
+
+        assert self._max_queue_size > batch_size, (
+            "Max queue size should be larger than batch size."
+            + f"Got max_queue_size={self._max_queue_size},"
+            + f"batch_size={batch_size}"
+        )
+
+        # An extra step is used for bootstrapping when computing advantages.
+        self._sequence_length = sequence_length + 1
+
+        if sequence_period:
+            self._sequence_period = sequence_period
+        else:
+            self._sequence_period = self._sequence_length - 1
 
         if not environment_spec:
             environment_spec = mava_specs.MAEnvironmentSpec(
@@ -225,17 +260,19 @@ class MAPPO:
                 entropy_cost=entropy_cost,
                 baseline_cost=baseline_cost,
                 max_gradient_norm=max_gradient_norm,
-                max_queue_size=max_queue_size,
+                max_queue_size=self._max_queue_size,
                 batch_size=batch_size,
-                sequence_length=sequence_length,
-                sequence_period=sequence_period,
+                minibatch_size=self._minibatch_size,
+                num_epochs=num_epochs,
+                sequence_length=self._sequence_length,
+                sequence_period=self._sequence_period,
                 checkpoint=checkpoint,
-                policy_optimizer=policy_optimizer,
-                critic_optimizer=critic_optimizer,
+                optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
                 evaluator_interval=evaluator_interval,
                 learning_rate_scheduler_fn=learning_rate_scheduler_fn,
+                normalize_advantage=normalize_advantage,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -254,7 +291,7 @@ class MAPPO:
         """Step counter
 
         Args:
-            checkpoint (bool): whether to checkpoint the counter.
+            checkpoint : whether to checkpoint the counter.
 
         Returns:
             Any: step counter object.
@@ -274,7 +311,7 @@ class MAPPO:
         """Coordination helper for a distributed program
 
         Args:
-            counter (counting.Counter): step counter object.
+            counter: step counter object.
 
         Returns:
             Any: step limiter object.
@@ -290,8 +327,8 @@ class MAPPO:
         """System trainer
 
         Args:
-            replay (reverb.Client): replay data table to pull data from.
-            counter (counting.Counter): step counter object.
+            replay: replay data table to pull data from.
+            counter: step counter object.
 
         Returns:
             mava.core.Trainer: system trainer.
@@ -341,11 +378,11 @@ class MAPPO:
         """System executor
 
         Args:
-            executor_id (str): id to identify the executor process for logging purposes.
-            replay (reverb.Client): replay data table to push data to.
+            executor_id: id to identify the executor process for logging purposes.
+            replay: replay data table to push data to.
             variable_source (acme.VariableSource): variable server for updating
                 network variables.
-            counter (counting.Counter): step counter object.
+            counter: step counter object.
 
         Returns:
             mava.ParallelEnvironmentLoop: environment-executor loop instance.
@@ -415,16 +452,15 @@ class MAPPO:
         counter: counting.Counter,
         logger: loggers.Logger = None,
     ) -> Any:
-        """System evaluator (an executor process not connected to a dataset)
+        """System evaluator - an executor process not connected to a dataset.
 
         Args:
-            variable_source (acme.VariableSource): variable server for updating
-                network variables.
-            counter (counting.Counter): step counter object.
-            logger (loggers.Logger, optional): logger object. Defaults to None.
+            variable_source : variable server for updating network variables.
+            counter : step counter object.
+            logger : logger object. Defaults to None.
 
         Returns:
-            Any: environment-executor evaluation loop instance for evaluating the
+            environment-executor evaluation loop instance for evaluating the
                 performance of a system.
         """
 
@@ -486,7 +522,7 @@ class MAPPO:
         """Build the distributed system as a graph program.
 
         Args:
-            name (str, optional): system name. Defaults to "mappo".
+            name : system name. Defaults to "mappo".
 
         Returns:
             Any: graph program for distributed system training.
