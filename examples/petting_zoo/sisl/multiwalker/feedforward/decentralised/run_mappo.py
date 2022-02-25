@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MAPPO on debug MPE environments."""
+"""Example running continous MAPPO on pettinzoo SISL environments."""
 
 import functools
 from datetime import datetime
@@ -24,21 +24,22 @@ from absl import app, flags
 
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
+
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "env_class",
+    "sisl",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 
+flags.DEFINE_string(
+    "env_name",
+    "multiwalker_v7",
+    "Pettingzoo environment name, e.g. pong (str).",
+)
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
@@ -48,23 +49,18 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
-
-    Args:
-        _ : _
-    """
-
     # Environment.
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        remove_on_fall=False,
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(mappo.make_default_networks)
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    # Checkpointer appends "Checkpoints" to checkpoint_dir.
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
@@ -78,14 +74,14 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Distributed program
+    # Distributed program.
     program = mappo.MAPPO(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
         checkpoint_subpath=checkpoint_dir,
-        num_epochs=15,
+        num_epochs=5,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

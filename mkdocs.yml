@@ -46,9 +46,7 @@ nav:
       - mad4pg: systems/tf/mad4pg.md
       - mappo: systems/tf/mappo.md
       - madqn: systems/tf/madqn.md
-      - vdn: systems/tf/vdn.md
-      - qmix: systems/tf/qmix.md
-      - dial: systems/tf/dial.md
+      - vdn and qmix: systems/tf/value_decomposition.md
   - Environments:
     - General: environments/general.md
     - Supported Environments:

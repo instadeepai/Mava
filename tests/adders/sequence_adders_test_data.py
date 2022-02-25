@@ -1,14 +1,9 @@
 import dm_env
 import numpy as np
+from acme.adders.reverb.sequence import EndBehavior
 
 from mava.adders.reverb import base
 from mava.utils.wrapper_utils import parameterized_restart, parameterized_termination
-
-# TODO Clean this up, when using newer versions of acme.
-try:
-    from acme.adders.reverb.sequence import EndBehavior
-except ImportError:
-    from acme.adders.reverb.sequence import EndOfEpisodeBehavior as EndBehavior
 
 agents = {"agent_0", "agent_1", "agent_2"}
 reward_step1 = {"agent_0": 0.0, "agent_1": 0.0, "agent_2": 1.0}
