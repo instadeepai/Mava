@@ -32,10 +32,11 @@ def recurrent_n_step_critic_loss(
     discount: float,
     end_of_episode: tf.Tensor,
 ) -> tf.Tensor:
-
-    # d: discount * done
-    # bootstrap_n=1 is the normal return of Q_t-1 = R_t-1 + d * Q_t
-    # bootstrap_n=seq_len is the Q_t_1 = discounted sum of rewards return
+    """
+    Note:
+    bootstrap_n=1 is the normal return of Q_t-1 = R_t-1 + d * Q_t
+    bootstrap_n=seq_len is the Q_t_1 = discounted sum of rewards return
+    """
 
     seq_len = len(rewards[0])
     assert 0 < bootstrap_n <= seq_len

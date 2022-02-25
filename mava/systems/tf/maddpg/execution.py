@@ -340,15 +340,23 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             actions and policies for all agents in the system.
         """
 
-        actions, policies = self._select_actions(observations)
+        actions, policies, self._states = self._select_actions(
+            observations, self._states
+        )
         actions = tree.map_structure(tf2_utils.to_numpy_squeeze, actions)
         policies = tree.map_structure(tf2_utils.to_numpy_squeeze, policies)
         return actions, policies
 
-    @staticmethod
+    @tf.function
     def _select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+        self,
+        observations: Dict[str, types.NestedArray],
+        states: Dict[str, types.NestedArray],
+    ) -> Tuple[
+        Dict[str, types.NestedArray],
+        Dict[str, types.NestedArray],
+        Dict[str, types.NestedArray],
+    ]:
         """select the actions for all agents in the system
         Args:
             observations: agent observations from the
@@ -359,13 +367,19 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
 
         actions = {}
         policies = {}
+        new_states = {}
         for agent, observation in observations.items():
-            actions[agent], policies[agent] = self.select_action(agent, observation)
-        return actions, policies
+            actions[agent], policies[agent], new_states[agent] = self.select_action(
+                agent, observation, states[agent]
+            )
+        return actions, policies, new_states
 
-    def select_action(
-        self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
+    def select_action(  # type: ignore
+        self,
+        agent: str,
+        observation: types.NestedArray,
+        agent_state: types.NestedArray,
+    ) -> Tuple[types.NestedArray, types.NestedArray, types.NestedArray]:
         """select an action for a single agent in the system
         Args:
             agent: agent id
@@ -374,22 +388,11 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         Returns:
             action and policy.
         """
-
-        # TODO Mask actions here using observation.legal_actions
-        # Initialize the RNN state if necessary.
-        if self._states[agent] is None:
-            # index network either on agent type or on agent id
-            agent_key = self._agent_net_keys[agent]
-            self._states[agent] = self._policy_networks[agent_key].initia_state(1)
-
         # Step the recurrent policy forward given the current observation and state.
         action, policy, new_state = self._policy(
-            agent, observation.observation, self._states[agent]
+            agent, observation.observation, agent_state
         )
-
-        # Bookkeeping of recurrent states for the observe method.
-        self._update_state(agent, new_state)
-        return action, policy
+        return action, policy, new_state
 
     def observe_first(
         self,
