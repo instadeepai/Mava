@@ -77,14 +77,14 @@ class Builder(SystemBuilder):
             System parameter server
         """
 
-        # start of make variable server
-        self.on_building_variable_server_start()
+        # start of make parameter server
+        self.on_building_parameter_server_start()
 
-        # make variable server
-        self.on_building_variable_server_make_variable_server()
+        # make parameter server
+        self.on_building_parameter_server_make_parameter_server()
 
-        # end of make variable server
-        self.on_building_variable_server_end()
+        # end of make parameter server
+        self.on_building_parameter_server_end()
 
         return self.system_parameter_server
 
