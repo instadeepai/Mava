@@ -18,7 +18,7 @@
 
 import abc
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any, List
 
 
 class BaseSystem(abc.ABC):
@@ -83,11 +83,9 @@ class SystemBuilder(abc.ABC):
         """
 
     @abc.abstractmethod
-    def parameter_server(self, extra_nodes: Dict = {}) -> Any:
+    def parameter_server(self) -> Any:
         """Parameter server to store and serve system network parameters.
 
-        Args:
-            extra_nodes : additional nodes to add to a launchpad program build
         Returns:
             System parameter server
         """
