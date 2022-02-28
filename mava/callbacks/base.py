@@ -55,7 +55,7 @@ class Callback(abc.ABC):
         pass
 
     def on_building_tables_make_tables(self, builder: SystemBuilder) -> None:
-        """Building data server table."""
+        """Building system data server tables."""
         pass
 
     def on_building_tables_end(self, builder: SystemBuilder) -> None:
@@ -64,87 +64,83 @@ class Callback(abc.ABC):
 
     # PARAMETER SERVER
     def on_building_parameter_server_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Start of building parameter server."""
         pass
 
     def on_building_parameter_server_make_parameter_server(
         self, builder: SystemBuilder
     ) -> None:
-        """[summary]"""
+        """Building system parameter server."""
         pass
 
     def on_building_parameter_server_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """End of building parameter server."""
         pass
 
     # EXECUTOR
     def on_building_adder_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Start of building executor adder."""
         pass
 
     def on_building_adder_set_priority(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building adder priority function."""
         pass
 
     def on_building_adder_make_adder(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building executor adder."""
         pass
 
     def on_building_adder_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """End of building executor adder."""
         pass
 
     def on_building_executor_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Start of building executor."""
         pass
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building executor logger."""
         pass
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building executor parameter server client."""
         pass
 
     def on_building_executor_make_executor(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building system executor."""
         pass
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building executor environment copy."""
         pass
 
     def on_building_executor_loop(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building executor system-environment loop."""
         pass
 
     def on_building_executor_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """End of building executor."""
         pass
 
     # TRAINER
     def on_building_dataset_start(self, builder: SystemBuilder) -> None:
-        """Start of trainer dataset building."""
+        """Start of building trainer dataset."""
         pass
 
     def on_building_dataset_make_dataset(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building training dataset."""
         pass
 
     def on_building_dataset_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """End of building trainer dataset."""
         pass
 
     def on_building_trainer_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Start of building trainer."""
         pass
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building trainer logger."""
         pass
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
