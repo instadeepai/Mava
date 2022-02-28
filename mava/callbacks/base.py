@@ -42,23 +42,23 @@ class Callback(abc.ABC):
         pass
 
     # DATA SERVER
-    def on_building_tables_start(self, builder: SystemBuilder) -> None:
+    def on_building_data_server_start(self, builder: SystemBuilder) -> None:
         """Start of data server table building."""
         pass
 
-    def on_building_tables_adder_signature(self, builder: SystemBuilder) -> None:
+    def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
         """Building of table adder signature."""
         pass
 
-    def on_building_tables_rate_limiter(self, builder: SystemBuilder) -> None:
+    def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
         """Building of table rate limiter."""
         pass
 
-    def on_building_tables_make_tables(self, builder: SystemBuilder) -> None:
+    def on_building_data_server(self, builder: SystemBuilder) -> None:
         """Building system data server tables."""
         pass
 
-    def on_building_tables_end(self, builder: SystemBuilder) -> None:
+    def on_building_data_server_end(self, builder: SystemBuilder) -> None:
         """End of data server table building."""
         pass
 
@@ -67,9 +67,7 @@ class Callback(abc.ABC):
         """Start of building parameter server."""
         pass
 
-    def on_building_parameter_server_make_parameter_server(
-        self, builder: SystemBuilder
-    ) -> None:
+    def on_building_parameter_server(self, builder: SystemBuilder) -> None:
         """Building system parameter server."""
         pass
 
@@ -78,24 +76,16 @@ class Callback(abc.ABC):
         pass
 
     # EXECUTOR
-    def on_building_adder_start(self, builder: SystemBuilder) -> None:
-        """Start of building executor adder."""
+    def on_building_executor_start(self, builder: SystemBuilder) -> None:
+        """Start of building executor."""
         pass
 
-    def on_building_adder_set_priority(self, builder: SystemBuilder) -> None:
+    def on_building_adder_priority(self, builder: SystemBuilder) -> None:
         """Building adder priority function."""
         pass
 
-    def on_building_adder_make_adder(self, builder: SystemBuilder) -> None:
+    def on_building_adder(self, builder: SystemBuilder) -> None:
         """Building executor adder."""
-        pass
-
-    def on_building_adder_end(self, builder: SystemBuilder) -> None:
-        """End of building executor adder."""
-        pass
-
-    def on_building_executor_start(self, builder: SystemBuilder) -> None:
-        """Start of building executor."""
         pass
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
@@ -106,7 +96,7 @@ class Callback(abc.ABC):
         """Building executor parameter server client."""
         pass
 
-    def on_building_executor_make_executor(self, builder: SystemBuilder) -> None:
+    def on_building_executor(self, builder: SystemBuilder) -> None:
         """Building system executor."""
         pass
 
@@ -123,18 +113,6 @@ class Callback(abc.ABC):
         pass
 
     # TRAINER
-    def on_building_dataset_start(self, builder: SystemBuilder) -> None:
-        """Start of building trainer dataset."""
-        pass
-
-    def on_building_dataset_make_dataset(self, builder: SystemBuilder) -> None:
-        """Building training dataset."""
-        pass
-
-    def on_building_dataset_end(self, builder: SystemBuilder) -> None:
-        """End of building trainer dataset."""
-        pass
-
     def on_building_trainer_start(self, builder: SystemBuilder) -> None:
         """Start of building trainer."""
         pass
@@ -143,11 +121,15 @@ class Callback(abc.ABC):
         """Building trainer logger."""
         pass
 
+    def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
+        """Building training dataset."""
+        pass
+
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_trainer_make_trainer(self, builder: SystemBuilder) -> None:
+    def on_building_trainer(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
