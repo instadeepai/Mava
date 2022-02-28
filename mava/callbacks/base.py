@@ -22,7 +22,8 @@ from mava.core_jax import SystemBuilder
 
 class Callback(abc.ABC):
     """Abstract base class used to build new components. \
-        Subclass this class and override any of the relevant hooks."""
+        Subclass this class and override any of the relevant hooks \
+        to create a new system component."""
 
     ######################
     # system builder hooks
