@@ -27,12 +27,17 @@ def recurrent_n_step_critic_loss(
     rewards: tf.Tensor,
     bootstrap_n: int,
     discount: float,
-    end_of_episode: tf.Tensor,
+    step_not_padded: tf.Tensor,
 ) -> tf.Tensor:
     """
     Note:
     bootstrap_n=1 is the normal return of Q_t-1 = R_t-1 + d * Q_t
     bootstrap_n=seq_len is the Q_t_1 = discounted sum of rewards return
+
+    step_not_padded: Indicates whether each step is not padded (0: padded, 1: not padded).
+
+    step_not_padded = tf.roll(dm_end_of_episode[agent], shift=2, axis=1)
+    step_not_padded[:,0] = 1.0
     """
 
     seq_len = len(rewards[0])
@@ -59,16 +64,12 @@ def recurrent_n_step_critic_loss(
     # Create the end of episode mask.
     ones_mask = tf.ones(shape=r_shape[:-1] + (r_shape[-1] - bootstrap_n,))
     zeros_mask = tf.zeros(shape=r_shape[:-1] + (bootstrap_n,))
-    end_of_episode_mask, _ = combine_dim(tf.concat([ones_mask, zeros_mask], axis=1))
+    fake_experience_mask, _ = combine_dim(tf.concat([ones_mask, zeros_mask], axis=1))
 
     # Role episode done masking
-    done_masking, _ = combine_dim(tf.roll(end_of_episode, shift=-bootstrap_n, axis=1))
+    step_not_padded_mask, _ = combine_dim(tf.roll(step_not_padded, shift=-bootstrap_n, axis=1))
 
-    flat_mask = end_of_episode_mask * done_masking * math.pow(discount, bootstrap_n)
-    # tf.print("q_tm1: ", q_tm1.shape)
-    # tf.print("n_step_rewards: ", n_step_rewards.shape)
-    # tf.print("q_t: ", q_t.shape)
-    # tf.print("flat_mask: ", flat_mask.shape)
+    flat_mask = fake_experience_mask * step_not_padded_mask * math.pow(discount, bootstrap_n)
 
     if num_atoms > 1:
         tau = tf.convert_to_tensor(
@@ -81,7 +82,6 @@ def recurrent_n_step_critic_loss(
         )
         target = tf.stop_gradient(target)
         pred = q_tm1
-        # tf.print("pred: ", pred.shape)
         pred_tile = tf.tile(tf.expand_dims(pred, axis=2), [1, 1, num_atoms])
         target_tile = tf.tile(tf.expand_dims(target, axis=1), [1, num_atoms, 1])
         huber_loss = tf.compat.v1.losses.huber_loss(target_tile, pred_tile)
@@ -94,6 +94,15 @@ def recurrent_n_step_critic_loss(
             tf.less(error_loss, 0.0), inv_tau * huber_loss, tau * huber_loss
         )
         critic_loss = tf.reduce_sum(tf.reduce_mean(loss, axis=2), axis=1)
+
+        # TODO (dries): This is still incorrect! The masking needs to not be 
+        # zero in the case that the episode has already ended and only be zero
+        # when the episode has not ended yet.
+        ones_mask = tf.ones(shape=r_shape[:-1] + (r_shape[-1] - bootstrap_n,))
+        zeros_mask = tf.zeros(shape=r_shape[:-1] + (bootstrap_n,))
+        critic_mask, _ = combine_dim(tf.concat([ones_mask, zeros_mask], axis=1))
+        critic_loss = critic_loss*critic_mask
+        critic_loss = tf.reduce_sum(critic_loss)/tf.reduce_sum(critic_mask)
 
         # critic_loss = losses.categorical(
         #     q_tm1=q_tm1,

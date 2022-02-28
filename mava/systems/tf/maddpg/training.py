@@ -1260,7 +1260,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         data: Trajectory = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
-        observations, actions, rewards, discounts, _, extras = (
+        observations, actions, rewards, end_of_episode, _, extras = (
             data.observations,
             data.actions,
             data.rewards,
@@ -1329,7 +1329,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
-                agent_discount = discounts[agent]
+                step_is_padded = tf.roll(end_of_episode[agent], shift=2, axis=1)
+                step_is_padded[:,0] = 1.0
 
                 # Critic loss.
                 critic_loss = recurrent_n_step_critic_loss(
@@ -1337,11 +1338,11 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                     target_q_values=target_q_values,
                     rewards=rewards[agent],
                     discount=self._discount,
-                    end_of_episode=agent_discount,
+                    step_is_padded=step_is_padded,
                     bootstrap_n=self._bootstrap_n,
                 )
                 # Critic loss accounts for padding so no masking is needed.
-                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
+                self.critic_losses[agent] = critic_loss
 
                 # Actor learning.
                 obs_agent_feed = target_obs_trans[agent]
@@ -1387,7 +1388,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                     clip_norm=clip_norm,
                 )
                 # Multiply by discounts to not train on padded data.
-                policy_mask = tf.reshape(agent_discount, policy_loss.shape)
+                policy_mask = tf.reshape(step_is_padded, policy_loss.shape)
                 policy_loss = policy_loss * policy_mask
                 self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
                     policy_mask

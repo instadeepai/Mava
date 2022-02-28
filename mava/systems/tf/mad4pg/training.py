@@ -594,7 +594,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         data: Trajectory = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
-        observations, actions, rewards, discounts, _, extras = (
+        observations, actions, rewards, end_of_episode, _, extras = (
             data.observations,
             data.actions,
             data.rewards,
@@ -660,7 +660,8 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
-                agent_discount = discounts[agent]
+                step_not_padded = tf.roll(end_of_episode[agent], shift=2, axis=1)
+                step_not_padded[:,0] = 1.0
 
                 # Critic loss.
 
@@ -669,7 +670,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                     target_q_values=target_q_values,
                     rewards=rewards[agent],
                     discount=self._discount,
-                    end_of_episode=agent_discount,
+                    step_not_padded=step_not_padded,
                     bootstrap_n=self._bootstrap_n,
                 )
                 # Critic loss accounts for padding so no masking is needed.
@@ -718,7 +719,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
-                policy_mask = tf.reshape(agent_discount, policy_loss.shape)
+                policy_mask = tf.reshape(step_not_padded, policy_loss.shape)
                 policy_loss = policy_loss * policy_mask
                 self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
                     policy_mask
