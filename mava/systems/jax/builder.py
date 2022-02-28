@@ -104,27 +104,18 @@ class Builder(SystemBuilder):
         self._executor_id = executor_id
         self._data_server_client = data_server_client
         self._parameter_server_client = parameter_server_client
-        self._evaluator = False
+        self._evaluator = self._executor_id == "evaluator"
 
-        if self._executor_id == "evaluator":
-            self._evaluator = True
-        else:
-            # ADDER
-            # start of make adder
-            self.on_building_adder_start()
-
-            # make adder signature
-            self.on_building_adder_set_priority()
-
-            # make rate limiter
-            self.on_building_adder_make_adder()
-
-            # end of make adder
-            self.on_building_adder_end()
-
-        # EXECUTOR
         # start of making the executor
         self.on_building_executor_start()
+
+        # make adder if required
+        if not self._evaluator:
+            # make adder signature
+            self.on_building_executor_adder_priority()
+
+            # make rate limiter
+            self.on_building_executor_adder()
 
         # make executor logger
         self.on_building_executor_logger()
@@ -139,7 +130,7 @@ class Builder(SystemBuilder):
         self.on_building_executor_environment()
 
         # make train loop
-        self.on_building_executor_train_loop()
+        self.on_building_executor_environment_loop()
 
         # end of making the executor
         self.on_building_executor_end()
@@ -164,17 +155,6 @@ class Builder(SystemBuilder):
         self._table_name = f"table_{trainer_id}"
         self._parameter_server_client = parameter_server_client
 
-        # DATASET
-        # start of make dataset iterator
-        self.on_building_dataset_start()
-
-        # make dataset
-        self.on_building_dataset_make_dataset()
-
-        # end of make dataset iterator
-        self.on_building_dataset_end()
-
-        # TRAINER
         # start of making the trainer
         self.on_building_trainer_start()
 
@@ -197,6 +177,7 @@ class Builder(SystemBuilder):
 
     def build(self) -> None:
         """Construct program nodes."""
+
         # start of system building
         self.on_building_start()
 
@@ -208,6 +189,7 @@ class Builder(SystemBuilder):
 
     def launch(self) -> None:
         """Run the graph program."""
+
         # start of system launch
         self.on_building_launch_start()
 
