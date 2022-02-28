@@ -80,11 +80,11 @@ class Callback(abc.ABC):
         """Start of building executor."""
         pass
 
-    def on_building_adder_priority(self, builder: SystemBuilder) -> None:
+    def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
         """Building adder priority function."""
         pass
 
-    def on_building_adder(self, builder: SystemBuilder) -> None:
+    def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """Building executor adder."""
         pass
 
