@@ -1329,8 +1329,11 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
-                step_is_padded = tf.roll(end_of_episode[agent], shift=2, axis=1)
-                step_is_padded[:,0] = 1.0
+                agent_end_of_episode = end_of_episode[agent]
+                ones_mask = tf.ones(shape=(agent_end_of_episode.shape[0], 1))
+                step_not_padded = tf.concat(
+                    [ones_mask, agent_end_of_episode[:, :-1]], axis=1
+                )
 
                 # Critic loss.
                 critic_loss = recurrent_n_step_critic_loss(
@@ -1338,7 +1341,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                     target_q_values=target_q_values,
                     rewards=rewards[agent],
                     discount=self._discount,
-                    step_is_padded=step_is_padded,
+                    step_not_padded=step_not_padded,
                     bootstrap_n=self._bootstrap_n,
                 )
                 # Critic loss accounts for padding so no masking is needed.
@@ -1388,7 +1391,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                     clip_norm=clip_norm,
                 )
                 # Multiply by discounts to not train on padded data.
-                policy_mask = tf.reshape(step_is_padded, policy_loss.shape)
+                policy_mask = tf.reshape(step_not_padded, policy_loss.shape)
                 policy_loss = policy_loss * policy_mask
                 self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
                     policy_mask

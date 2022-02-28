@@ -34,19 +34,20 @@ def recurrent_n_step_critic_loss(
     bootstrap_n=1 is the normal return of Q_t-1 = R_t-1 + d * Q_t
     bootstrap_n=seq_len is the Q_t_1 = discounted sum of rewards return
 
-    step_not_padded: Indicates whether each step is not padded (0: padded, 1: not padded).
+    step_not_padded: Indicates whether each step is not padded(0: padded,
+                                                               1: not padded).
 
-    step_not_padded = tf.roll(dm_end_of_episode[agent], shift=2, axis=1)
-    step_not_padded[:,0] = 1.0
+    agent_end_of_episode = end_of_episode[agent]
+    ones_mask = tf.ones(shape=(agent_end_of_episode.shape[0], 1))
+    step_not_padded = tf.concat([ones_mask, agent_end_of_episode[:, :-1]], axis=1)
     """
 
     seq_len = len(rewards[0])
-    assert 0 < bootstrap_n <= seq_len
-    check_rank([q_values, target_q_values, rewards], [3, 3, 2])
+    assert 1 <= bootstrap_n <= seq_len
+    check_rank([q_values, target_q_values, rewards, step_not_padded], [3, 3, 2, 2])
 
     # The last values that rolled over do not matter because a
     # mask is applied to it.
-    # tf.print("q_values: ", q_values.shape)
     num_atoms = q_values.shape[-1]
 
     q_tm1, _ = combine_dim(q_values)
@@ -67,9 +68,13 @@ def recurrent_n_step_critic_loss(
     fake_experience_mask, _ = combine_dim(tf.concat([ones_mask, zeros_mask], axis=1))
 
     # Role episode done masking
-    step_not_padded_mask, _ = combine_dim(tf.roll(step_not_padded, shift=-bootstrap_n, axis=1))
+    step_not_padded_mask, _ = combine_dim(
+        tf.roll(step_not_padded, shift=-bootstrap_n, axis=1)
+    )
 
-    flat_mask = fake_experience_mask * step_not_padded_mask * math.pow(discount, bootstrap_n)
+    flat_mask = (
+        fake_experience_mask * step_not_padded_mask * math.pow(discount, bootstrap_n)
+    )
 
     if num_atoms > 1:
         tau = tf.convert_to_tensor(
@@ -95,14 +100,15 @@ def recurrent_n_step_critic_loss(
         )
         critic_loss = tf.reduce_sum(tf.reduce_mean(loss, axis=2), axis=1)
 
-        # TODO (dries): This is still incorrect! The masking needs to not be 
+        # TODO (dries): This is still incorrect! The masking needs to not be
         # zero in the case that the episode has already ended and only be zero
         # when the episode has not ended yet.
         ones_mask = tf.ones(shape=r_shape[:-1] + (r_shape[-1] - bootstrap_n,))
         zeros_mask = tf.zeros(shape=r_shape[:-1] + (bootstrap_n,))
         critic_mask, _ = combine_dim(tf.concat([ones_mask, zeros_mask], axis=1))
-        critic_loss = critic_loss*critic_mask
-        critic_loss = tf.reduce_sum(critic_loss)/tf.reduce_sum(critic_mask)
+        critic_loss = tf.reduce_sum(critic_loss * critic_mask) / tf.reduce_sum(
+            critic_mask
+        )
 
         # critic_loss = losses.categorical(
         #     q_tm1=q_tm1,

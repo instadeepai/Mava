@@ -660,8 +660,11 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
-                step_not_padded = tf.roll(end_of_episode[agent], shift=2, axis=1)
-                step_not_padded[:,0] = 1.0
+                agent_end_of_episode = end_of_episode[agent]
+                ones_mask = tf.ones(shape=(agent_end_of_episode.shape[0], 1))
+                step_not_padded = tf.concat(
+                    [ones_mask, agent_end_of_episode[:, :-1]], axis=1
+                )
 
                 # Critic loss.
 
