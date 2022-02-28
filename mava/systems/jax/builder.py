@@ -52,19 +52,19 @@ class Builder(SystemBuilder):
         """
 
         # start of make replay tables
-        self.on_building_tables_start()
+        self.on_building_data_server_start()
 
         # make adder signature
-        self.on_building_tables_adder_signature()
+        self.on_building_data_server_adder_signature()
 
         # make rate limiter
-        self.on_building_tables_rate_limiter()
+        self.on_building_data_server_rate_limiter()
 
         # make tables
-        self.on_building_tables_make_tables()
+        self.on_building_data_server()
 
         # end of make replay tables
-        self.on_building_tables_end()
+        self.on_building_data_server_end()
 
         return self.system_data_server
 
@@ -81,7 +81,7 @@ class Builder(SystemBuilder):
         self.on_building_parameter_server_start()
 
         # make parameter server
-        self.on_building_parameter_server_make_parameter_server()
+        self.on_building_parameter_server()
 
         # end of make parameter server
         self.on_building_parameter_server_end()
@@ -124,7 +124,7 @@ class Builder(SystemBuilder):
         self.on_building_executor_parameter_client()
 
         # make executor
-        self.on_building_executor_make_executor()
+        self.on_building_executor()
 
         # make copy of environment
         self.on_building_executor_environment()
@@ -168,7 +168,7 @@ class Builder(SystemBuilder):
         self.on_building_trainer_parameter_client()
 
         # make trainer
-        self.on_building_trainer_make_trainer()
+        self.on_building_trainer()
 
         # end of making the trainer
         self.on_building_trainer_end()
