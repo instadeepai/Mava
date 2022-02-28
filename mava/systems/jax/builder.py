@@ -212,7 +212,7 @@ class Builder(SystemBuilder):
         self.on_building_launch_start()
 
         # launch system
-        self.on_building_launch_distributor()
+        self.on_building_launch()
 
         # end of system launch
         self.on_building_launch_end()

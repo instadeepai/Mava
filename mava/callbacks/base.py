@@ -160,11 +160,27 @@ class Callback(abc.ABC):
         pass
 
     # BUILD
+    def on_building_start(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
+    def on_building_end(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
     # LAUNCH
+    def on_building_launch_start(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
     def on_building_launch(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_launch_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
