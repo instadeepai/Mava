@@ -105,7 +105,7 @@ class Callback(abc.ABC):
         """Building executor environment copy."""
         pass
 
-    def on_building_executor_loop(self, builder: SystemBuilder) -> None:
+    def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """Building executor system-environment loop."""
         pass
 
