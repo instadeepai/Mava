@@ -123,43 +123,43 @@ class Callback(abc.ABC):
         pass
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """Building training dataset."""
+        """Building trainer dataset."""
         pass
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building trainer parameter server client."""
         pass
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building trainer."""
         pass
 
     def on_building_trainer_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """End of building trainer."""
         pass
 
     # BUILD
     def on_building_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Start of system graph program build."""
         pass
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building system graph program nodes."""
         pass
 
     def on_building_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """End of system graph program build."""
         pass
 
     # LAUNCH
     def on_building_launch_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Start of system launch."""
         pass
 
     def on_building_launch(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """System launch."""
         pass
 
     def on_building_launch_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """End of system launch."""
         pass
