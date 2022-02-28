@@ -28,54 +28,56 @@ class Callback(abc.ABC):
     # system builder hooks
     ######################
 
-    # initialisation
+    # BUILDER INITIAlISATION
     def on_building_init_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Start of builder initialisation."""
         pass
 
     def on_building_init(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Builder initialisation."""
         pass
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """End of builder initialisation."""
         pass
 
-    # tables
+    # DATA SERVER
     def on_building_tables_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Start of data server table building."""
         pass
 
     def on_building_tables_adder_signature(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building of table adder signature."""
         pass
 
     def on_building_tables_rate_limiter(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building of table rate limiter."""
         pass
 
     def on_building_tables_make_tables(self, builder: SystemBuilder) -> None:
-        """[summary]"""
+        """Building data server table."""
         pass
 
     def on_building_tables_end(self, builder: SystemBuilder) -> None:
+        """End of data server table building."""
+        pass
+
+    # PARAMETER SERVER
+    def on_building_parameter_server_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
-    # dataset
-    def on_building_dataset_start(self, builder: SystemBuilder) -> None:
+    def on_building_parameter_server_make_parameter_server(
+        self, builder: SystemBuilder
+    ) -> None:
         """[summary]"""
         pass
 
-    def on_building_dataset_make_dataset(self, builder: SystemBuilder) -> None:
+    def on_building_parameter_server_end(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
-    def on_building_dataset_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    # adder
+    # EXECUTOR
     def on_building_adder_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
@@ -92,22 +94,6 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    # parameter server
-    def on_building_parameter_server_start(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_parameter_server_make_parameter_server(
-        self, builder: SystemBuilder
-    ) -> None:
-        """[summary]"""
-        pass
-
-    def on_building_parameter_server_end(self, builder: SystemBuilder) -> None:
-        """[summary]"""
-        pass
-
-    # executor
     def on_building_executor_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
@@ -136,7 +122,19 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    # trainer
+    # TRAINER
+    def on_building_dataset_start(self, builder: SystemBuilder) -> None:
+        """Start of trainer dataset building."""
+        pass
+
+    def on_building_dataset_make_dataset(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
+    def on_building_dataset_end(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        pass
+
     def on_building_trainer_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
@@ -161,11 +159,12 @@ class Callback(abc.ABC):
         """[summary]"""
         pass
 
-    # distributor
+    # BUILD
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
 
+    # LAUNCH
     def on_building_launch(self, builder: SystemBuilder) -> None:
         """[summary]"""
         pass
