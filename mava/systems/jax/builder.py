@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Arnu): remove once we figure out the no attribute error.
+# TODO (Arnu): remove once we figured out the no attribute error.
 # TODO (Arnu): reintroduce proper return types, e.g. data/parameter server once those
 # have been created.
 # type: ignore
