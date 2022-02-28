@@ -14,11 +14,13 @@
 # limitations under the License.
 
 # TODO (Arnu): remove once we figure out the no attribute error.
+# TODO (Arnu): reintroduce proper return types, e.g. data/parameter server once those
+# have been created.
 # type: ignore
 
 """Jax-based Mava system builder implementation."""
 
-from typing import Any, Dict, List
+from typing import Any, List
 
 from mava.core_jax import SystemBuilder
 
@@ -66,7 +68,7 @@ class Builder(SystemBuilder):
 
         return self.system_data_server
 
-    def parameter_server(self, extra_nodes: Dict = {}) -> Any:
+    def parameter_server(self) -> Any:
         """Parameter server to store and serve system network parameters.
 
         Args:
@@ -75,18 +77,14 @@ class Builder(SystemBuilder):
             System parameter server
         """
 
-        # Extra nodes
-        # TODO (dries): Remove this again if it is not necessary.
-        self._extra_nodes = extra_nodes
+        # start of make parameter server
+        self.on_building_parameter_server_start()
 
-        # start of make variable server
-        self.on_building_variable_server_start()
+        # make parameter server
+        self.on_building_parameter_server_make_parameter_server()
 
-        # make variable server
-        self.on_building_variable_server_make_variable_server()
-
-        # end of make variable server
-        self.on_building_variable_server_end()
+        # end of make parameter server
+        self.on_building_parameter_server_end()
 
         return self.system_parameter_server
 
