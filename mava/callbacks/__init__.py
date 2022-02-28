@@ -16,3 +16,4 @@
 """Mava callbacks for component creation."""
 
 from mava.callbacks.base import Callback
+from mava.callbacks.hook_mixin import CallbackHookMixin  # type: ignore

@@ -16,7 +16,7 @@
 # TODO (Arnu): remove once we figured out the no attribute error.
 # type: ignore
 
-"""Abstract base class used to build new system components."""
+"""Abstract mixin class used to call system component hooks."""
 
 from abc import ABC
 
