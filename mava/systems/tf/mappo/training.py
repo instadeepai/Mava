@@ -369,8 +369,8 @@ class MAPPOTrainer(mava.Trainer):
                     log_probs[agent],
                 )  
 
-                loss_mask = [1]+termination[:-1]
-
+                loss_mask = tf.concat((tf.ones((1,termination.shape[1])),termination[:-1]), 0)
+                
                 actor_observation = observations_trans[agent]
                 critic_observation = self._get_critic_feed(observations_trans, agent)
 
