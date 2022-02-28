@@ -155,7 +155,6 @@ class Builder(SystemBuilder):
         self._table_name = f"table_{trainer_id}"
         self._parameter_server_client = parameter_server_client
 
-        # TRAINER
         # start of making the trainer
         self.on_building_trainer_start()
 
@@ -178,6 +177,7 @@ class Builder(SystemBuilder):
 
     def build(self) -> None:
         """Construct program nodes."""
+
         # start of system building
         self.on_building_start()
 
@@ -189,6 +189,7 @@ class Builder(SystemBuilder):
 
     def launch(self) -> None:
         """Run the graph program."""
+
         # start of system launch
         self.on_building_launch_start()
 
