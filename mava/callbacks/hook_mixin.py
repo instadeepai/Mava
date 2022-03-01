@@ -29,167 +29,167 @@ class CallbackHookMixin(ABC):
 
     # INITIALISATION
     def on_building_init_start(self) -> None:
-        """[summary]"""
+        """Start of builder initialisation."""
         for callback in self.callbacks:
             callback.on_building_init_start(self)
 
     def on_building_init(self) -> None:
-        """[summary]"""
+        """Builder initialisation."""
         for callback in self.callbacks:
             callback.on_building_init(self)
 
     def on_building_init_end(self) -> None:
-        """[summary]"""
+        """End of builder initialisation."""
         for callback in self.callbacks:
             callback.on_building_init_end(self)
 
     # DATA SERVER
     def on_building_data_server_start(self) -> None:
-        """[summary]"""
+        """Start of data server table building."""
         for callback in self.callbacks:
             callback.on_building_data_server_start(self)
 
     def on_building_data_server_adder_signature(self) -> None:
-        """[summary]"""
+        """Building of table adder signature."""
         for callback in self.callbacks:
             callback.on_building_data_server_adder_signature(self)
 
     def on_building_data_server_rate_limiter(self) -> None:
-        """[summary]"""
+        """Building of table rate limiter."""
         for callback in self.callbacks:
             callback.on_building_data_server_rate_limiter(self)
 
     def on_building_data_server(self) -> None:
-        """[summary]"""
+        """Building system data server tables."""
         for callback in self.callbacks:
             callback.on_building_data_server(self)
 
     def on_building_data_server_end(self) -> None:
-        """[summary]"""
+        """End of data server table building."""
         for callback in self.callbacks:
             callback.on_building_data_server_end(self)
 
     # PARAMETER SERVER
     def on_building_parameter_server_start(self) -> None:
-        """[summary]"""
+        """Start of building parameter server."""
         for callback in self.callbacks:
             callback.on_building_parameter_server_start(self)
 
     def on_building_parameter_server(self) -> None:
-        """[summary]"""
+        """Building system parameter server."""
         for callback in self.callbacks:
             callback.on_building_parameter_server_make_parameter_server(self)
 
     def on_building_parameter_server_end(self) -> None:
-        """[summary]"""
+        """End of building parameter server."""
         for callback in self.callbacks:
             callback.on_building_parameter_server_end(self)
 
     # EXECUTOR
     def on_building_executor_start(self) -> None:
-        """[summary]"""
+        """Start of building executor."""
         for callback in self.callbacks:
             callback.on_building_executor_start(self)
 
     def on_building_executor_adder_priority(self) -> None:
-        """[summary]"""
+        """Building adder priority function."""
         for callback in self.callbacks:
             callback.on_building_executor_adder_priority(self)
 
     def on_building_executor_adder(self) -> None:
-        """[summary]"""
+        """Building executor adder."""
         for callback in self.callbacks:
             callback.on_building_executor_adder(self)
 
     def on_building_executor_logger(self) -> None:
-        """[summary]"""
+        """Building executor logger."""
         for callback in self.callbacks:
             callback.on_building_executor_logger(self)
 
     def on_building_executor_parameter_client(self) -> None:
-        """[summary]"""
+        """Building executor parameter server client."""
         for callback in self.callbacks:
             callback.on_building_executor_parameter_client(self)
 
     def on_building_executor(self) -> None:
-        """[summary]"""
+        """Building system executor."""
         for callback in self.callbacks:
             callback.on_building_executor(self)
 
     def on_building_executor_environment(self) -> None:
-        """[summary]"""
+        """Building executor environment copy."""
         for callback in self.callbacks:
             callback.on_building_executor_environment(self)
 
     def on_building_executor_environment_loop(self) -> None:
-        """[summary]"""
+        """Building executor system-environment loop."""
         for callback in self.callbacks:
             callback.on_building_executor_train_loop(self)
 
     def on_building_executor_end(self) -> None:
-        """[summary]"""
+        """End of building executor."""
         for callback in self.callbacks:
             callback.on_building_executor_end(self)
 
     # TRAINER
     def on_building_trainer_start(self) -> None:
-        """[summary]"""
+        """Start of building trainer."""
         for callback in self.callbacks:
             callback.on_building_trainer_start(self)
 
     def on_building_trainer_logger(self) -> None:
-        """[summary]"""
+        """Building trainer logger."""
         for callback in self.callbacks:
             callback.on_building_trainer_logger(self)
 
     def on_building_trainer_dataset(self) -> None:
-        """[summary]"""
+        """Building trainer dataset."""
         for callback in self.callbacks:
             callback.on_building_trainer_dataset(self)
 
     def on_building_trainer_parameter_client(self) -> None:
-        """[summary]"""
+        """Building trainer parameter server client."""
         for callback in self.callbacks:
             callback.on_building_trainer_parameter_client(self)
 
     def on_building_trainer(self) -> None:
-        """[summary]"""
+        """Building trainer."""
         for callback in self.callbacks:
             callback.on_building_trainer(self)
 
     def on_building_trainer_end(self) -> None:
-        """[summary]"""
+        """End of building trainer."""
         for callback in self.callbacks:
             callback.on_building_trainer_end(self)
 
     # BUILD
-    def on_building_program_start(self) -> None:
-        """[summary]"""
+    def on_building_start(self) -> None:
+        """Start of system graph program build."""
         for callback in self.callbacks:
             callback.on_building_start(self)
 
     def on_building_program_nodes(self) -> None:
-        """[summary]"""
+        """Building system graph program nodes."""
         for callback in self.callbacks:
             callback.on_building_program_nodes(self)
 
     def on_building_end(self) -> None:
-        """[summary]"""
+        """End of system graph program build."""
         for callback in self.callbacks:
             callback.on_building_end(self)
 
     # LAUNCH
     def on_building_launch_start(self) -> None:
-        """[summary]"""
+        """Start of system launch."""
         for callback in self.callbacks:
             callback.on_building_launch_start(self)
 
     def on_building_launch(self) -> None:
-        """[summary]"""
+        """System launch."""
         for callback in self.callbacks:
             callback.on_building_launch(self)
 
     def on_building_launch_end(self) -> None:
-        """[summary]"""
+        """End of system launch."""
         for callback in self.callbacks:
             callback.on_building_launch_end(self)
