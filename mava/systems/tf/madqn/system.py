@@ -214,11 +214,14 @@ class MADQN:
 
         if type(network_sampling_setup) is not list:
             if network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
-                # if no network_sampling_setup is fixed, use shared_weights to
-                # determine setup
+                # if no network_sampling_setup is specified, assign a single network
+                # to all agents of the same type if weights are shared
+                # else assign seperate networks to each agent
                 self._agent_net_keys = {
-                    agent: "network_0" if shared_weights else f"network_{i}"
-                    for i, agent in enumerate(agents)
+                    agent: f"network_{agent.split('_')[0]}"
+                    if shared_weights
+                    else f"network_{agent}"
+                    for agent in agents
                 }
                 self._network_sampling_setup = [
                     [
@@ -255,7 +258,6 @@ class MADQN:
                 agents,
                 self._network_sampling_setup,  # type: ignore
             )
-
         # Check that the environment and agent_net_keys has the same amount of agents
         sample_length = len(self._network_sampling_setup[0])  # type: ignore
         assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
