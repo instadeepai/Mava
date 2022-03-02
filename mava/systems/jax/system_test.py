@@ -19,25 +19,25 @@
 """Tests for Jax-based Mava system implementation."""
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import List
+from typing import Any, List
 
 import pytest
 
-from mava.systems.jax import Builder
+from mava.core_jax import SystemBuilder
 from mava.systems.jax.system import System
 
 
 # Mock callbacks
 class MockCallback:
-    def dummy_int_plus_str(self, builder: Builder) -> None:
+    def dummy_int_plus_str(self, builder: SystemBuilder) -> None:
         """Dummy hook."""
         pass
 
-    def dummy_float_plus_bool(self, builder: Builder) -> None:
+    def dummy_float_plus_bool(self, builder: SystemBuilder) -> None:
         """Dummy hook."""
         pass
 
-    def dummy_str_plus_bool(self, builder: Builder) -> None:
+    def dummy_str_plus_bool(self, builder: SystemBuilder) -> None:
         """Dummy hook."""
         pass
 
@@ -60,7 +60,19 @@ class MockCallbackHookMixin:
 
 
 # Mock builder
-class MockBuilder(Builder, MockCallbackHookMixin):
+class MockBuilder(MockCallbackHookMixin):
+    def __init__(
+        self,
+        components: List[Any],
+    ) -> None:
+        """System building init
+
+        Args:
+            components: system callback components
+        """
+
+        self.callbacks = components
+
     def add_different_data_types(self) -> None:
         """Hooks for adding different data types."""
         self.int_plus_str = 0
@@ -70,6 +82,14 @@ class MockBuilder(Builder, MockCallbackHookMixin):
         self.dummy_int_plus_str()
         self.dummy_float_plus_bool()
         self.dummy_str_plus_bool()
+
+    def build(self) -> None:
+        """Construct program nodes."""
+        pass
+
+    def launch(self) -> None:
+        """Run the graph program."""
+        pass
 
 
 # Mock components
@@ -112,7 +132,7 @@ class ComponentZero(MockCallback, MainComponent):
         """
         self.config = config
 
-    def dummy_int_plus_str(self, builder: Builder) -> None:
+    def dummy_int_plus_str(self, builder: SystemBuilder) -> None:
         """Dummy component function.
 
         Returns:
@@ -138,7 +158,7 @@ class ComponentOne(MockCallback, SubComponent):
         """
         self.config = config
 
-    def dummy_float_plus_bool(self, builder: Builder) -> None:
+    def dummy_float_plus_bool(self, builder: SystemBuilder) -> None:
         """Dummy component function.
 
         Returns:
@@ -164,7 +184,7 @@ class ComponentTwo(MockCallback, MainComponent):
         """
         self.config = config
 
-    def dummy_str_plus_bool(self, builder: Builder) -> None:
+    def dummy_str_plus_bool(self, builder: SystemBuilder) -> None:
         """Dummy component function.
 
         Returns:
