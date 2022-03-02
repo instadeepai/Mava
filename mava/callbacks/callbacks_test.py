@@ -25,36 +25,29 @@ import pytest
 from mava.callbacks import Callback, CallbackHookMixin
 from mava.core_jax import SystemBuilder
 
-
 # TODO (Arnu): create reusable mocked classes and fixtures using conftest
+
+
 # Mock Mixin
 class MockDataServerBuilder(SystemBuilder, CallbackHookMixin):
     def __init__(
         self,
-        components: List[Any],
+        components: List[Callback],
     ) -> None:
-        """System building init
-
-        Args:
-            components: system callback components
-        """
+        """System building init."""
 
         self.callbacks = components
 
     def data_server(self) -> List[Any]:
-        """Data server to store and serve transition data from and to system.
+        """Data server to store and serve transition data from and to system."""
 
-        Returns:
-            System data server
-        """
-
-        # start of make replay tables
+        # start of make data server tables
         self.on_building_data_server_start()
 
-        # make tables
+        # make data server
         self.on_building_data_server()
 
-        # end of make replay tables
+        # end of make data server tables
         self.on_building_data_server_end()
 
         return self.system_data_server
@@ -121,7 +114,7 @@ class MockDataServerComponent(Callback):
         )
         builder.system_data_server = data_server
 
-    def on_building_data_end(self, builder: SystemBuilder) -> None:
+    def on_building_data_server_end(self, builder: SystemBuilder) -> None:
         """Dummy component function.
 
         Returns:
@@ -142,7 +135,7 @@ class MockDataServerComponent(Callback):
 @pytest.fixture
 def mock_data_server_builder():
     """Mock builder with data server component."""
-    components = [MockDataServerComponent]
+    components = [MockDataServerComponent()]
     return MockDataServerBuilder(components=components)
 
 
