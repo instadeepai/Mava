@@ -369,6 +369,10 @@ class MAPPOTrainer(mava.Trainer):
                     log_probs[agent],
                 )
 
+                loss_mask = tf.concat(
+                    (tf.ones((1, termination.shape[1])), termination[:-1]), 0
+                )
+
                 actor_observation = observations_trans[agent]
                 critic_observation = self._get_critic_feed(observations_trans, agent)
 
@@ -425,9 +429,9 @@ class MAPPOTrainer(mava.Trainer):
                 # TODO Clip values to reduce variablility
                 # Need to keep track of old value estimates (either in replay or in
                 # training state) and clip them.
-                masked_critic_loss = unclipped_critic_loss * termination[:-1]
+                masked_critic_loss = unclipped_critic_loss * loss_mask[:-1]
                 critic_loss = tf.reduce_sum(masked_critic_loss) / tf.reduce_sum(
-                    termination[:-1]
+                    loss_mask[:-1]
                 )
 
                 critic_loss = critic_loss * self._baseline_cost
@@ -445,16 +449,16 @@ class MAPPOTrainer(mava.Trainer):
                     rhos * advantages, clipped_rhos * advantages
                 )
 
-                masked_policy_grad_loss = clipped_objective * termination[:-1]
+                masked_policy_grad_loss = clipped_objective * loss_mask[:-1]
                 policy_gradient_loss = tf.reduce_sum(
                     masked_policy_grad_loss
-                ) / tf.reduce_sum(termination[:-1])
+                ) / tf.reduce_sum(loss_mask[:-1])
 
                 # Entropy regularization. Only implemented for categorical dist.
                 try:
-                    masked_entropy_loss = policy.entropy()[:-1] * termination[:-1]
+                    masked_entropy_loss = policy.entropy()[:-1] * loss_mask[:-1]
                     entropy_loss = -tf.reduce_sum(masked_entropy_loss) / tf.reduce_sum(
-                        termination[:-1]
+                        loss_mask[:-1]
                     )
 
                 except NotImplementedError:
