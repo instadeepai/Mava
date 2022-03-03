@@ -361,9 +361,6 @@ class MAPPOTrainer(mava.Trainer):
             data.extras,
         )
 
-        # transform observation using observation networks
-        observations_trans = self._transform_observations(observations)
-
         # Get log_probs.
         log_probs = extras["log_probs"]
 
@@ -373,6 +370,8 @@ class MAPPOTrainer(mava.Trainer):
         total_losses: Dict[str, Any] = {}
 
         with tf.GradientTape(persistent=True) as tape:
+            # transform observation using observation networks
+            observations_trans = self._transform_observations(observations)
             for agent in self._agents:
                 action, reward, termination, behaviour_log_prob = (
                     actions[agent],
@@ -385,12 +384,7 @@ class MAPPOTrainer(mava.Trainer):
                     (tf.ones((1, termination.shape[1])), termination[:-1]), 0
                 )
 
-                if not self._use_single_optimizer:
-                    # Only use critic network to update obs network variable
-                    actor_observation = tf.stop_gradient(observations_trans[agent])
-                else:
-                    actor_observation = observations_trans[agent]
-
+                actor_observation = observations_trans[agent]
                 critic_observation = self._get_critic_feed(observations_trans, agent)
 
                 # Get agent network
@@ -527,10 +521,13 @@ class MAPPOTrainer(mava.Trainer):
                 self._policy_optimizers[agent_key].apply(grads, variables)
             else:
                 policy_variables = self._policy_networks[agent_key].trainable_variables
+                # Only use critic vars to update the observation network
+                # if we have two optims.
                 critic_variables = (
                     self._critic_networks[agent_key].trainable_variables
                     + self._observation_networks[agent_key].trainable_variables
                 )
+
                 # Get gradients.
                 critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
                 # Optionally apply clipping.
