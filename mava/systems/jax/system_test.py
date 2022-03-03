@@ -13,36 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Arnu): remove when attribute errors for builder and mixin have been figured out.
-# type: ignore
 
 """Tests for Jax-based Mava system implementation."""
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import List
+from typing import Any, Callable, List
 
 import pytest
 
 from mava.systems.jax import Builder
 from mava.systems.jax.system import System
 
-
 # Mock callbacks
-class MockCallback:
-    def dummy_int_plus_str(self, builder: Builder) -> None:
-        """Dummy hook."""
-        pass
-
-    def dummy_float_plus_bool(self, builder: Builder) -> None:
-        """Dummy hook."""
-        pass
-
-    def dummy_str_plus_bool(self, builder: Builder) -> None:
-        """Dummy hook."""
-        pass
 
 
 class MockCallbackHookMixin:
+
+    callbacks: List
+
     def dummy_int_plus_str(self) -> None:
         """Called when the builder calls hook."""
         for callback in self.callbacks:
@@ -61,15 +49,37 @@ class MockCallbackHookMixin:
 
 # Mock builder
 class MockBuilder(Builder, MockCallbackHookMixin):
+    def __init__(self, components: List[Any]) -> None:
+        """Init for mock builder.
+
+        Args:
+            components : List of components.
+        """
+        super().__init__(components)
+        self.int_plus_str = 0
+        self.float_plus_bool = 0.0
+        self.str_plus_bool = 0
+
     def add_different_data_types(self) -> None:
         """Hooks for adding different data types."""
-        self.int_plus_str = 0
-        self.float_plus_bool = 0
-        self.str_plus_bool = 0
 
         self.dummy_int_plus_str()
         self.dummy_float_plus_bool()
         self.dummy_str_plus_bool()
+
+
+class MockCallback:
+    def dummy_int_plus_str(self, builder: MockBuilder) -> None:
+        """Dummy hook."""
+        pass
+
+    def dummy_float_plus_bool(self, builder: MockBuilder) -> None:
+        """Dummy hook."""
+        pass
+
+    def dummy_str_plus_bool(self, builder: MockBuilder) -> None:
+        """Dummy hook."""
+        pass
 
 
 # Mock components
@@ -112,7 +122,7 @@ class ComponentZero(MockCallback, MainComponent):
         """
         self.config = config
 
-    def dummy_int_plus_str(self, builder: Builder) -> None:
+    def dummy_int_plus_str(self, builder: MockBuilder) -> None:
         """Dummy component function.
 
         Returns:
@@ -138,7 +148,7 @@ class ComponentOne(MockCallback, SubComponent):
         """
         self.config = config
 
-    def dummy_float_plus_bool(self, builder: Builder) -> None:
+    def dummy_float_plus_bool(self, builder: MockBuilder) -> None:
         """Dummy component function.
 
         Returns:
@@ -164,7 +174,7 @@ class ComponentTwo(MockCallback, MainComponent):
         """
         self.config = config
 
-    def dummy_str_plus_bool(self, builder: Builder) -> None:
+    def dummy_str_plus_bool(self, builder: MockBuilder) -> None:
         """Dummy component function.
 
         Returns:
@@ -210,6 +220,7 @@ class TestSystem(System):
         nodes_on_gpu: List[str],
         multi_process: bool = True,
         name: str = "system",
+        builder_class: Callable = MockBuilder,
     ) -> None:
         """Run the system.
 
@@ -220,32 +231,11 @@ class TestSystem(System):
             multi_process : whether to run locally or distributed, local runs are
                 for debugging
             name : name of the system
+            builder_class: callable builder class.
         """
-        # build config is not already built
-        if not self.config._built:
-            self.config.build()
-
-        # update distributor config
-        self.config.set_parameters(
-            num_executors=num_executors,
-            nodes_on_gpu=nodes_on_gpu,
-            multi_process=multi_process,
-            name=name,
+        return super().launch(
+            num_executors, nodes_on_gpu, multi_process, name, builder_class
         )
-
-        # get system config to feed to component list to update hyperparamete settings
-        system_config = self.config.get()
-
-        # update default system component configs
-        for component in self._design.__dict__.values():
-            self.components.append(component(system_config))
-
-        # Build system
-        self._builder = MockBuilder(components=self.components)
-        self._builder.build()
-
-        # Launch system
-        self._builder.launch()
 
 
 class TestSystemWithZeroComponents(TestSystem):
