@@ -56,7 +56,7 @@ We include a number of systems running on continuous control tasks.
 
 - **MAD4PG**:
     a MAD4PG system running on the RoboCup environment.
-  - *Recurrent* 
+  - *Recurrent*
     - [state_based][robocup_mad4pg_ff_state_based].
 
 ## Discrete control
@@ -83,26 +83,31 @@ We also include a number of systems running on discrete action space environment
 
 - **VDN**:
       a VDN system running on the discrete action space simple_spread MPE environment.
-  - *Recurrent* 
+  - *Recurrent*
     - [centralised][debug_vdn_rec_cen].
 
 ### PettingZoo - Multi-Agent Atari
 
 - **MADQN**:
    a MADQN system running on the two-player competitive Atari Pong environment.
-  - *Recurrent* 
+  - *Recurrent*
     - [decentralised][pz_madqn_pong_rec_dec].
+
+- **MAPPO**:
+    a MAPPO system running on two-player cooperative Atari Pong.
+    - *feedforward*
+        - [decentralised][pz_mappo_coop_pong_ff_dec].
 
 ### PettingZoo - Multi-Agent Particle Environment
 
 - **MADDPG**:
       a MADDPG system running on the Simple Speaker Listener environment.
-  - *Feedforward* 
+  - *Feedforward*
     - [decentralised][pz_maddpg_mpe_ssl_ff_dec].
 
 - **MADDPG**:
       a MADDPG system running on the Simple Spread environment.
-  - *Feedforward* 
+  - *Feedforward*
     - [decentralised][pz_maddpg_mpe_ss_ff_dec].
 
 ### SMAC - StarCraft Multi-Agent Challenge
@@ -116,19 +121,19 @@ We also include a number of systems running on discrete action space environment
 
 - **QMIX**:
     a QMIX system running on the SMAC environment.
-  - *Recurrent* 
+  - *Recurrent*
     - [centralised][smac_qmix_rec_cen].
 
 - **VDN**:
     a VDN system running on the SMAC environment.
-  - *Recurrent* 
+  - *Recurrent*
     - [centralised][smac_vdn_rec_cen].
 
 ### OpenSpiel - Tic Tac Toe
 
 - **MADQN**:
       a MADQN system running on the OpenSpiel environment.
-  - *Feedforward* 
+  - *Feedforward*
     - [decentralised][openspiel_madqn_ff_dec].
 
 <!-- Examples -->
@@ -178,6 +183,8 @@ We also include a number of systems running on discrete action space environment
 [debug_vdn_rec_cen]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/debugging/simple_spread/recurrent/centralised/run_vdn.py
 
 [pz_madqn_pong_rec_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/atari/pong/recurrent/decentralised/run_madqn.py
+
+[pz_mappo_coop_pong_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/atari/pong/feedforward/decentralised/run_mappo.py
 
 [pz_maddpg_mpe_ssl_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/mpe/simple_speaker_listener/feedforward/decentralised/run_maddpg.py
 
