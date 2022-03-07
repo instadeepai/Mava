@@ -21,7 +21,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import launchpad as lp
 from absl import flags, logging
-from acme.utils import counting
+from acme.utils import counting, signals
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava.utils.training_utils import non_blocking_sleep
@@ -57,9 +57,11 @@ def partial_kwargs(function: Callable[..., Any], **kwargs: Any) -> Callable[...,
     are not defined by `function` or if they do not have defaults.
     This is useful as a way to define a factory function with default parameters
     and then to override them in a safe way.
+
     Args:
       function: the base function before partial application.
       **kwargs: keyword argument overrides.
+
     Returns:
       A function.
     """
@@ -84,15 +86,15 @@ def partial_kwargs(function: Callable[..., Any], **kwargs: Any) -> Callable[...,
     return functools.partial(function, **kwargs)
 
 
+# TODO Remove once all systems using scaling implementation.
 class StepsLimiter:
-    """Process that terminates an experiment when `max_steps` is reached."""
-
     def __init__(
         self,
         counter: counting.Counter,
         max_steps: Optional[int],
         steps_key: str = "executor_steps",
     ):
+        """Process that terminates an experiment when `max_steps` is reached."""
         self._counter = counter
         self._max_steps = max_steps
         self._steps_key = steps_key
@@ -105,19 +107,20 @@ class StepsLimiter:
             self._max_steps,
             self._steps_key,
         )
-        while True:
-            # Update the counts.
-            counts = self._counter.get_counts()
-            num_steps = counts.get(self._steps_key, 0)
+        with signals.runtime_terminator():
+            while True:
+                # Update the counts.
+                counts = self._counter.get_counts()
+                num_steps = counts.get(self._steps_key, 0)
 
-            logging.info("StepsLimiter: Reached %d recorded steps", num_steps)
+                logging.info("StepsLimiter: Reached %d recorded steps", num_steps)
 
-            if num_steps > self._max_steps:
-                logging.info(
-                    "StepsLimiter: Max steps of %d was reached, terminating",
-                    self._max_steps,
-                )
-                lp.stop()
+                if num_steps > self._max_steps:
+                    logging.info(
+                        "StepsLimiter: Max steps of %d was reached, terminating",
+                        self._max_steps,
+                    )
+                    lp.stop()
 
-            # Don't spam the counter.
-            non_blocking_sleep(10)
+                # Don't spam the counter.
+                non_blocking_sleep(10)
