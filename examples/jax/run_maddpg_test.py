@@ -22,7 +22,7 @@ from datetime import datetime
 import optax
 
 import mava.utils as utils
-from mava.systems.tf import maddpg
+from mava.systems.jax import maddpg
 
 
 def test_main() -> None:
