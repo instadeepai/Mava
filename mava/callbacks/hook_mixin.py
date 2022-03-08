@@ -124,7 +124,7 @@ class CallbackHookMixin(ABC):
     def on_building_executor_environment_loop(self) -> None:
         """Building executor system-environment loop."""
         for callback in self.callbacks:
-            callback.on_building_executor_train_loop(self)
+            callback.on_building_executor_environment_loop(self)
 
     def on_building_executor_end(self) -> None:
         """End of building executor."""
