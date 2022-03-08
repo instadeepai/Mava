@@ -69,3 +69,59 @@ class BaseSystem(abc.ABC):
                 are primarily for debugging
             name : name of the system
         """
+
+
+class SystemBuilder(abc.ABC):
+    """Abstract system builder."""
+
+    @abc.abstractmethod
+    def data_server(self) -> List[Any]:
+        """Data server to store and serve transition data from and to system.
+
+        Returns:
+            System data server
+        """
+
+    @abc.abstractmethod
+    def parameter_server(self) -> Any:
+        """Parameter server to store and serve system network parameters.
+
+        Returns:
+            System parameter server
+        """
+
+    @abc.abstractmethod
+    def executor(
+        self, executor_id: str, data_server_client: Any, parameter_server_client: Any
+    ) -> Any:
+        """Executor, a collection of agents in an environment to gather experience.
+
+        Args:
+            executor_id : id to identify the executor process for logging purposes
+            data_server_client : data server client for pushing transition data
+            parameter_server_client : parameter server client for pulling parameters
+        Returns:
+            System executor
+        """
+
+    @abc.abstractmethod
+    def trainer(
+        self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
+    ) -> Any:
+        """Trainer, a system process for updating agent specific network parameters.
+
+        Args:
+            trainer_id : id to identify the trainer process for logging purposes
+            data_server_client : data server client for pulling transition data
+            parameter_server_client : parameter server client for pushing parameters
+        Returns:
+            System trainer
+        """
+
+    @abc.abstractmethod
+    def build(self) -> None:
+        """Construct program nodes."""
+
+    @abc.abstractmethod
+    def launch(self) -> None:
+        """Run the graph program."""
