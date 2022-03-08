@@ -78,6 +78,11 @@ class Config:
             for name, dataclass in kwargs.items():
                 if is_dataclass(dataclass):
                     if name in list(self._config.keys()):
+                        # When updating a component, the list of current params
+                        # might have similar parameter names as the previous component
+                        # but with additional new parameter names that still need to be
+                        # checked. Therefore, we first take the difference between the
+                        # current set and the component being updated.
                         self._current_params = list(
                             set(self._current_params).difference(
                                 list(self._config[name].__dict__.keys())
