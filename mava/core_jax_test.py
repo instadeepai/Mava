@@ -16,14 +16,14 @@
 
 """Tests for core Mava interfaces for Jax systems."""
 
-from typing import Any
+from typing import Any, List
 
 import pytest
 
-from mava.core_jax import BaseSystem
+from mava.core_jax import BaseSystem, SystemBuilder
 
 
-def test_exception_for_incomplete_child_class() -> None:
+def test_exception_for_incomplete_child_system_class() -> None:
     """Test if error is thrown for missing abstract class overwrites."""
     with pytest.raises(TypeError):
 
@@ -41,3 +41,22 @@ def test_exception_for_incomplete_child_class() -> None:
                 pass
 
         TestIncompleteDummySystem()  # type: ignore
+
+
+def test_exception_for_incomplete_child_builder_class() -> None:
+    """Test if error is thrown for missing abstract class overwrites."""
+    with pytest.raises(TypeError):
+
+        class TestIncompleteDummySystemBuilder(SystemBuilder):
+            def data_server(self) -> List[Any]:
+                pass
+
+            def executor(
+                self,
+                executor_id: str,
+                data_server_client: Any,
+                parameter_server_client: Any,
+            ) -> Any:
+                pass
+
+        TestIncompleteDummySystemBuilder()  # type: ignore

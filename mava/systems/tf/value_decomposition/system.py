@@ -47,7 +47,7 @@ class ValueDecomposition(MADQN):
         self,
         environment_factory: Callable[[bool], dm_env.Environment],
         network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
-        mixer: snt.Module,
+        mixer: Union[snt.Module, str],
         exploration_scheduler_fn: Union[
             EpsilonScheduler,
             Mapping[str, EpsilonScheduler],
@@ -97,7 +97,7 @@ class ValueDecomposition(MADQN):
             environment_factory: function to
                 instantiate an environment.
             network_factory: function to instantiate system networks.
-            mixer: mixing network
+            mixer: mixing network. Either a sonnet module or the strings "qmix"/"vdn"
             exploration_scheduler_fn: function to schedule
                 exploration. e.g. epsilon greedy
             logger_factory: function to
