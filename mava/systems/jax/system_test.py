@@ -56,12 +56,13 @@ class MockBuilder(Builder, MockCallbackHookMixin):
             components : List of components.
         """
         super().__init__(components)
-        self.int_plus_str = 0
-        self.float_plus_bool = 0.0
-        self.str_plus_bool = 0
 
     def add_different_data_types(self) -> None:
         """Hooks for adding different data types."""
+
+        self.int_plus_str = 0
+        self.float_plus_bool = 0.0
+        self.str_plus_bool = 0
 
         self.dummy_int_plus_str()
         self.dummy_float_plus_bool()
