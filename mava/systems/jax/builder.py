@@ -13,19 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Arnu): remove once we figured out the no attribute error.
 # TODO (Arnu): reintroduce proper return types, e.g. data/parameter server once those
 # have been created.
-# type: ignore
 
 """Jax-based Mava system builder implementation."""
 
 from typing import Any, List
 
+from mava.callbacks import CallbackHookMixin
 from mava.core_jax import SystemBuilder
 
 
-class Builder(SystemBuilder):
+class Builder(SystemBuilder, CallbackHookMixin):
     def __init__(
         self,
         components: List[Any],
