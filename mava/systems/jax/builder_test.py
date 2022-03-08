@@ -289,16 +289,24 @@ class MockProgramConstructor(Callback):
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.data_server()
-        builder.parameter_server()
-        builder.executor()
-        builder.trainer()
+        data_server = builder.data_server()
+        parameter_server = builder.parameter_server()
+        executor = builder.executor(
+            executor_id="executor",
+            data_server_client=data_server,
+            parameter_server_client=parameter_server,
+        )
+        trainer = builder.trainer(
+            trainer_id="trainer",
+            data_server_client=data_server,
+            parameter_server_client=parameter_server,
+        )
         builder.system_build = {
             "system": (
-                builder.system_executor,
-                builder.system_trainer,
-                builder.system_data_server,
-                builder.system_parameter_server,
+                data_server,
+                parameter_server,
+                executor,
+                trainer,
                 self.config.program_param_0,
                 self.config.program_param_1,
             )
