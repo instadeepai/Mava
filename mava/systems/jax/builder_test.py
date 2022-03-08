@@ -13,17 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO(Arnu): remove at a later stage
+# type: ignore
+
 """Tests for config class for Jax-based Mava systems"""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from types import SimpleNamespace
+from typing import List
+
+import pytest
 
 from mava.callbacks import Callback
 from mava.core_jax import SystemBuilder
-
-# import pytest
-
-
-# from mava.systems.jax import Builder, Config
+from mava.systems.jax.system import System
 
 
 # Mock components to feed to the builder
@@ -38,28 +41,21 @@ class MockDataServerAdder(Callback):
         self,
         config: MockDataServerAdderDefaultConfig = MockDataServerAdderDefaultConfig(),
     ) -> None:
-        """Mock system component.
-
-        Args:
-            config : dataclass configuration for setting component hyperparameters
-        """
+        """Mock system component."""
         self.config = config
 
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        pass
+        """_summary_"""
+        builder.adder_signature = {"adder_signature": self.config.adder_param_0}
 
     def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """_summary_"""
+        builder.rate_limiter = {"rate_limiter": self.config.adder_param_1}
 
-        Args:
-            builder : _description_
-        """
-        pass
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "data_server_adder"
 
 
 @dataclass
@@ -72,20 +68,24 @@ class MockDataServer(Callback):
     def __init__(
         self, config: MockDataServerDefaultConfig = MockDataServerDefaultConfig()
     ) -> None:
-        """Mock system component.
-
-        Args:
-            config : dataclass configuration for setting component hyperparameters
-        """
+        """Mock system component."""
         self.config = config
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """_summary_"""
+        builder.system_data_server = {
+            "data_server": (
+                builder.adder_signature,
+                builder.rate_limiter,
+                self.config.data_server_param_0,
+                self.config.data_server_param_1,
+            )
+        }
 
-        Args:
-            builder : _description_
-        """
-        pass
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "data_server"
 
 
 @dataclass
@@ -94,25 +94,27 @@ class MockParameterServerDefaultConfig:
     parameter_server_param_1: str = "1"
 
 
-class MockParameterServerAdder(Callback):
+class MockParameterServer(Callback):
     def __init__(
         self,
         config: MockParameterServerDefaultConfig = MockParameterServerDefaultConfig(),
     ) -> None:
-        """Mock system component.
-
-        Args:
-            config : dataclass configuration for setting component hyperparameters
-        """
+        """Mock system component."""
         self.config = config
 
     def on_building_parameter_server(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """_summary_"""
+        builder.system_parameter_server = {
+            "parameter_server": (
+                self.config.parameter_server_param_0,
+                self.config.parameter_server_param_1,
+            )
+        }
 
-        Args:
-            builder : _description_
-        """
-        pass
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "parameter_server"
 
 
 @dataclass
@@ -126,28 +128,23 @@ class MockExecutorAdder(Callback):
         self,
         config: MockExecutorAdderDefaultConfig = MockExecutorAdderDefaultConfig(),
     ) -> None:
-        """Mock system component.
-
-        Args:
-            config : dataclass configuration for setting component hyperparameters
-        """
+        """Mock system component."""
         self.config = config
 
     def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        pass
+        """_summary_"""
+        builder.adder_priority = {"adder_priority": self.config.executor_adder_param_0}
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """_summary_"""
+        builder.adder = {
+            "adder": (builder.adder_priority, self.config.executor_adder_param_1)
+        }
 
-        Args:
-            builder : _description_
-        """
-        pass
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "executor_adder"
 
 
 @dataclass
@@ -161,58 +158,38 @@ class MockExecutor(Callback):
         self,
         config: MockExecutorDefaultConfig = MockExecutorDefaultConfig(),
     ) -> None:
-        """Mock system component.
-
-        Args:
-            config : dataclass configuration for setting component hyperparameters
-        """
+        """Mock system component."""
         self.config = config
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        pass
+        """_summary_"""
+        builder.exec_logger = {"exec_logger": self.config.executor_param_0}
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        pass
+        """_summary_"""
+        builder.exec_param_client = {"exec_param_client": self.config.executor_param_1}
 
     def on_building_executor(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        pass
+        """_summary_"""
+        builder.exec = {"exec": (builder.adder, builder.exec_param_client)}
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        pass
+        """_summary_"""
+        builder.env = {"env": builder.exec_logger}
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """_summary_"""
+        builder.system_executor = {"executor": (builder.env, builder.exec)}
 
-        Args:
-            builder : _description_
-        """
-        pass
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "executor"
 
 
 @dataclass
 class MockTrainerDatasetDefaultConfig:
     trainer_dataset_param_0: int = 1
-    trainer_dataset_param_1: str = "1"
 
 
 class MockTrainerDataset(Callback):
@@ -220,20 +197,17 @@ class MockTrainerDataset(Callback):
         self,
         config: MockTrainerDatasetDefaultConfig = MockTrainerDatasetDefaultConfig(),
     ) -> None:
-        """Mock system component.
-
-        Args:
-            config : dataclass configuration for setting component hyperparameters
-        """
+        """Mock system component."""
         self.config = config
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """_summary_"""
+        builder.dataset = {"dataset": self.config.trainer_dataset_param_0}
 
-        Args:
-            builder : _description_
-        """
-        pass
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "trainer_dataset"
 
 
 @dataclass
@@ -247,36 +221,56 @@ class MockTrainer(Callback):
         self,
         config: MockTrainerDefaultConfig = MockTrainerDefaultConfig(),
     ) -> None:
-        """Mock system component.
+        """Mock system component."""
+        self.config = config
+
+    def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        builder.train_logger = {"train_logger": self.config.trainer_param_0}
+
+    def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        builder.train_param_client = {"train_param_client": self.config.trainer_param_1}
+
+    def on_building_trainer(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        builder.system_trainer = {
+            "trainer": (builder.train_logger, builder.train_param_client)
+        }
+
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "trainer"
+
+
+@dataclass
+class DistributorDefaultConfig:
+    num_executors: int = 1
+    nodes_on_gpu: List[str] = field(default_factory=list)
+    multi_process: bool = True
+    name: str = "system"
+
+
+class MockDistributor(Callback):
+    def __init__(
+        self, config: DistributorDefaultConfig = DistributorDefaultConfig()
+    ) -> None:
+        """Mock system distributor component.
 
         Args:
             config : dataclass configuration for setting component hyperparameters
         """
         self.config = config
 
-    def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
-        """_summary_
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'.
 
-        Args:
-            builder : _description_
+        Returns:
+            Component type name
         """
-        pass
-
-    def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        pass
-
-    def on_building_trainer(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        pass
+        return "distributor"
 
 
 @dataclass
@@ -290,20 +284,30 @@ class MockProgramConstructor(Callback):
         self,
         config: MockProgramDefaultConfig = MockProgramDefaultConfig(),
     ) -> None:
-        """Mock system component.
-
-        Args:
-            config : dataclass configuration for setting component hyperparameters
-        """
+        """Mock system component."""
         self.config = config
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """_summary_"""
+        builder.data_server()
+        builder.parameter_server()
+        builder.executor()
+        builder.trainer()
+        builder.system_build = {
+            "system": (
+                builder.system_executor,
+                builder.system_trainer,
+                builder.system_data_server,
+                builder.system_parameter_server,
+                self.config.program_param_0,
+                self.config.program_param_1,
+            )
+        }
 
-        Args:
-            builder : _description_
-        """
-        pass
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "program"
 
 
 @dataclass
@@ -317,17 +321,56 @@ class MockLauncher(Callback):
         self,
         config: MockLauncherDefaultConfig = MockLauncherDefaultConfig(),
     ) -> None:
-        """Mock system component.
-
-        Args:
-            config : dataclass configuration for setting component hyperparameters
-        """
+        """Mock system component."""
         self.config = config
 
     def on_building_launch(self, builder: SystemBuilder) -> None:
-        """_summary_
+        """_summary_"""
+        builder.system_launcher = {
+            "launcher": (
+                builder.system_build,
+                self.config.launcher_param_0,
+                self.config.launcher_param_1,
+            )
+        }
 
-        Args:
-            builder : _description_
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "launcher"
+
+
+class TestSystem(System):
+    def design(self) -> SimpleNamespace:
+        """Mock system design with zero components.
+
+        Returns:
+            system callback components
         """
-        pass
+        components = SimpleNamespace(
+            data_server_adder=MockDataServerAdder,
+            data_server=MockDataServer,
+            parameter_server=MockParameterServer,
+            executor_adder=MockExecutorAdder,
+            executor=MockExecutor,
+            trainer_dataset=MockTrainerDataset,
+            trainer=MockTrainer,
+            distributor=MockDistributor,
+            program=MockProgramConstructor,
+            launcher=MockLauncher,
+        )
+        return components
+
+
+@pytest.fixture
+def test_system() -> System:
+    """Dummy system with zero components."""
+    return TestSystem()
+
+
+def test_builder(
+    test_system: System,
+) -> None:
+    """Test if system can launch without having had changed (configured) the default \
+        config."""
+    test_system.launch(num_executors=1, nodes_on_gpu=["process"])
