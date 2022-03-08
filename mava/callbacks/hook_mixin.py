@@ -78,7 +78,7 @@ class CallbackHookMixin(ABC):
     def on_building_parameter_server(self) -> None:
         """Building system parameter server."""
         for callback in self.callbacks:
-            callback.on_building_parameter_server_make_parameter_server(self)
+            callback.on_building_parameter_server(self)
 
     def on_building_parameter_server_end(self) -> None:
         """End of building parameter server."""
