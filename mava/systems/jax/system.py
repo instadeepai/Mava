@@ -16,7 +16,7 @@
 """Jax-based Mava system implementation."""
 import abc
 from types import SimpleNamespace
-from typing import Any, List
+from typing import Any, Callable, List
 
 from mava.core_jax import BaseSystem
 from mava.systems.jax import Builder, Config
@@ -99,16 +99,17 @@ class System(BaseSystem):
         nodes_on_gpu: List[str],
         multi_process: bool = True,
         name: str = "system",
+        builder_class: Callable = Builder,
     ) -> None:
         """Run the system.
 
-        Args:
-            config : system configuration including
+        Args
             num_executors : number of executor processes to run in parallel
             nodes_on_gpu : which processes to run on gpu
             multi_process : whether to run locally or distributed, local runs are
                 for debugging
             name : name of the system
+            builder_class: callable builder class.
         """
         # build config is not already built
         if not self.config._built:
@@ -130,7 +131,7 @@ class System(BaseSystem):
             self.components.append(component(system_config))
 
         # Build system
-        self._builder = Builder(components=self.components)
+        self._builder = builder_class(components=self.components)
         self._builder.build()
 
         # Launch system
