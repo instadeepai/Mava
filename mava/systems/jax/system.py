@@ -103,8 +103,7 @@ class System(BaseSystem):
     ) -> None:
         """Run the system.
 
-        Args:
-            config : system configuration including
+        Args
             num_executors : number of executor processes to run in parallel
             nodes_on_gpu : which processes to run on gpu
             multi_process : whether to run locally or distributed, local runs are
