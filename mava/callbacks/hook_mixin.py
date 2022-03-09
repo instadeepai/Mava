@@ -13,12 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO (Arnu): remove once we figured out the no attribute error.
-# type: ignore
-
 """Abstract mixin class used to call system component hooks."""
 
 from abc import ABC
+from typing import List
 
 
 class CallbackHookMixin(ABC):
@@ -26,6 +24,8 @@ class CallbackHookMixin(ABC):
     ######################
     # system builder hooks
     ######################
+
+    callbacks: List
 
     # INITIALISATION
     def on_building_init_start(self) -> None:
