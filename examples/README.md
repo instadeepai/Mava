@@ -56,7 +56,7 @@ We include a number of systems running on continuous control tasks.
 
 - **MAD4PG**:
     a MAD4PG system running on the RoboCup environment.
-  - *Recurrent* 
+  - *Recurrent*
     - [state_based][robocup_mad4pg_ff_state_based].
 
 ## Discrete control
@@ -83,26 +83,26 @@ We also include a number of systems running on discrete action space environment
 
 - **VDN**:
       a VDN system running on the discrete action space simple_spread MPE environment.
-  - *Recurrent* 
+  - *Recurrent*
     - [centralised][debug_vdn_rec_cen].
 
 ### PettingZoo - Multi-Agent Atari
 
 - **MADQN**:
    a MADQN system running on the two-player competitive Atari Pong environment.
-  - *Recurrent* 
+  - *Recurrent*
     - [decentralised][pz_madqn_pong_rec_dec].
 
 ### PettingZoo - Multi-Agent Particle Environment
 
 - **MADDPG**:
       a MADDPG system running on the Simple Speaker Listener environment.
-  - *Feedforward* 
+  - *Feedforward*
     - [decentralised][pz_maddpg_mpe_ssl_ff_dec].
 
 - **MADDPG**:
       a MADDPG system running on the Simple Spread environment.
-  - *Feedforward* 
+  - *Feedforward*
     - [decentralised][pz_maddpg_mpe_ss_ff_dec].
 
 ### SMAC - StarCraft Multi-Agent Challenge
@@ -116,19 +116,19 @@ We also include a number of systems running on discrete action space environment
 
 - **QMIX**:
     a QMIX system running on the SMAC environment.
-  - *Recurrent* 
+  - *Recurrent*
     - [centralised][smac_qmix_rec_cen].
 
 - **VDN**:
     a VDN system running on the SMAC environment.
-  - *Recurrent* 
+  - *Recurrent*
     - [centralised][smac_vdn_rec_cen].
 
 ### OpenSpiel - Tic Tac Toe
 
 - **MADQN**:
       a MADQN system running on the OpenSpiel environment.
-  - *Feedforward* 
+  - *Feedforward*
     - [decentralised][openspiel_madqn_ff_dec].
 
 <!-- Examples -->

@@ -16,7 +16,6 @@
 """Adders that use Reverb (github.com/deepmind/reverb) as a backend."""
 
 import copy
-import time
 from typing import (
     Any,
     Callable,
@@ -38,8 +37,6 @@ import tree
 from acme import specs as acme_specs
 from acme import types
 from acme.adders.reverb.base import ReverbAdder
-
-_MIN_WRITER_LIFESPAN_SECONDS = 60
 
 from mava import types as mava_types
 from mava.adders.base import ParallelAdder
@@ -392,7 +389,7 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         )
         self._add_first_called = True
 
-    def reset_here(self, timeout_ms: Optional[int] = None):
+    def reset_writer(self, timeout_ms: Optional[int] = None) -> None:
         """Resets the adder's buffer."""
         if self._writer:
             # Flush all appended data and clear the buffers.
@@ -444,4 +441,4 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             dummy_step = tree.map_structure(np.zeros_like, current_step)
             self._writer.append(dummy_step)
             self._write_last()
-            self.reset_here()
+            self.reset_writer()

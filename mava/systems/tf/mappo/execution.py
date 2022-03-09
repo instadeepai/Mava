@@ -29,7 +29,7 @@ from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders
 from mava.systems.tf import executors
-from mava.types import OLT, NestedArray
+from mava.types import OLT
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 from mava.utils.training_utils import action_mask_categorical_policies
 
@@ -353,7 +353,11 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
         self,
         observations: Dict[str, types.NestedArray],
         states: Dict[str, types.NestedArray],
-    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+    ) -> Tuple[
+        Dict[str, types.NestedArray],
+        Dict[str, types.NestedArray],
+        Dict[str, types.NestedArray],
+    ]:
         """select the actions for all agents in the system
 
         Args:
