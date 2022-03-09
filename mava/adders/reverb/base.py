@@ -16,6 +16,7 @@
 """Adders that use Reverb (github.com/deepmind/reverb) as a backend."""
 
 import copy
+import time
 from typing import (
     Any,
     Callable,
@@ -38,7 +39,10 @@ from acme import specs as acme_specs
 from acme import types
 from acme.adders.reverb.base import ReverbAdder
 
+_MIN_WRITER_LIFESPAN_SECONDS = 60
+
 from mava import types as mava_types
+from mava.adders.base import ParallelAdder
 from mava.utils.sort_utils import sort_str_num
 
 DEFAULT_PRIORITY_TABLE = "priority_table"
@@ -93,13 +97,14 @@ def get_trajectory_net_agents(
     trajectory: Union[Trajectory, mava_types.Transition],
     trajectory_net_keys: Dict[str, str],
 ) -> Tuple[List, Dict[str, List]]:
-    """Returns a dictionary that maps network_keys to a list of agents using that specific
-    network.
+    """Returns a dictionary that maps network_keys to a list of agents using that
+    specific network.
 
     Args:
         trajectory: Episode experience recorded by
         the adders.
         trajectory_net_keys: The network_keys used by each agent in the trajectory.
+
     Returns:
         agents: A sorted list of all the agent_keys.
         agents_per_network: A dictionary that maps network_keys to
@@ -113,7 +118,7 @@ def get_trajectory_net_agents(
     return agents, agents_per_network
 
 
-class ReverbParallelAdder(ReverbAdder):
+class ReverbParallelAdder(ReverbAdder, ParallelAdder):
     """Base reverb class."""
 
     def __init__(
@@ -159,11 +164,13 @@ class ReverbParallelAdder(ReverbAdder):
         trajectory: Union[Trajectory, mava_types.Transition],
         table_priorities: Dict[str, Any],
     ) -> None:
-        """Write an episode experience (trajectory) to the reverb tables. Each
-        table represents experience used by each of the trainers. Therefore
+        """Write an episode experience (trajectory) to the reverb tables.
+
+        Each table represents experience used by each of the trainers. Therefore
         this function dynamically determines to which table(s) to write
         parts of the trajectory based on what networks where used by
         the agents in the episode run.
+
         Args:
             trajectory: Trajectory to be
                 written to the reverb tables.
@@ -379,12 +386,18 @@ class ReverbParallelAdder(ReverbAdder):
 
         if self._use_next_extras:
             add_dict["extras"] = extras
-
         self._writer.append(
             add_dict,
             partial_step=True,
         )
         self._add_first_called = True
+
+    def reset_here(self, timeout_ms: Optional[int] = None):
+        """Resets the adder's buffer."""
+        if self._writer:
+            # Flush all appended data and clear the buffers.
+            self._writer.end_episode(clear_buffers=True, timeout_ms=timeout_ms)
+        self._add_first_called = False
 
     def add(
         self,
@@ -418,7 +431,6 @@ class ReverbParallelAdder(ReverbAdder):
 
         if self._use_next_extras:
             next_step["extras"] = next_extras
-
         self._writer.append(
             next_step,
             partial_step=True,
@@ -432,4 +444,4 @@ class ReverbParallelAdder(ReverbAdder):
             dummy_step = tree.map_structure(np.zeros_like, current_step)
             self._writer.append(dummy_step)
             self._write_last()
-            self.reset()
+            self.reset_here()

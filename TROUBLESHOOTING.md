@@ -8,4 +8,5 @@
 | GPU crashes immeditely due to a lack of memory. Add this to the top of the main file, before any other code. | import tensorflow as tf<br/>import os<br/>physical_devices = tf.config.list_physical_devices("GPU")<br/>if physical_devices:<br/>    tf.config.experimental.set_memory_growth(physical_devices[0], True)<br/>os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true" |
 | `make: 'build' is up to date.` | Use `-B` option |
 | Docker container not using gpu. | Download latest [nvidia cuda drivers](https://developer.nvidia.com/cuda-downloads).|
+
 ## Frequently Asked Questions

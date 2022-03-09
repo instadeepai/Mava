@@ -26,13 +26,13 @@ from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
 
 from mava import adders, core
-from mava.components.tf.modules.communication import BaseCommunicationModule
 
 tfd = tfp.distributions
 
 
 class FeedForwardExecutor(core.Executor):
     """A generic feed-forward executor.
+
     An executor based on a feed-forward policy for each agent in the system.
     """
 
@@ -40,20 +40,19 @@ class FeedForwardExecutor(core.Executor):
         self,
         policy_networks: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
     ):
         """Initialise the system executor
 
         Args:
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            policy_networks: policy networks for each agent in
                 the system.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
-                client to copy weights from the trainer. Defaults to None.
+            adder: adder which sends
+                data to a replay buffer. Defaults to None.
+            variable_client: client to copy weights from the trainer. Defaults to None.
         """
 
         # Store these for later use.
@@ -94,7 +93,7 @@ class FeedForwardExecutor(core.Executor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> Union[types.NestedArray, Tuple[types.NestedArray, types.NestedArray]]:
-        """select an action for a single agent in the system
+        """Select an action for a single agent in the system
 
         Args:
             agent (str): agent id.
@@ -120,7 +119,7 @@ class FeedForwardExecutor(core.Executor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record first observed timestep from the environment
+        """Record first observed timestep from the environment
 
         Args:
             timestep (dm_env.TimeStep): data emitted by an environment at first step of
@@ -138,7 +137,7 @@ class FeedForwardExecutor(core.Executor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record observed timestep from the environment
+        """Record observed timestep from the environment
 
         Args:
             actions (Dict[str, types.NestedArray]): system agents' actions.
@@ -157,7 +156,7 @@ class FeedForwardExecutor(core.Executor):
         Dict[str, types.NestedArray],
         Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
     ]:
-        """select the actions for all agents in the system
+        """Select the actions for all agents in the system
 
         Args:
             observations (Dict[str, types.NestedArray]): agent observations from the
@@ -180,7 +179,7 @@ class FeedForwardExecutor(core.Executor):
         return actions
 
     def update(self, wait: bool = False) -> None:
-        """update executor variables
+        """Update executor variables
 
         Args:
             wait (bool, optional): whether to stall the executor's request for new
@@ -193,6 +192,7 @@ class FeedForwardExecutor(core.Executor):
 
 class RecurrentExecutor(core.Executor):
     """A generic recurrent Executor.
+
     An executor based on a recurrent policy for each agent in the system.
     """
 
@@ -200,22 +200,22 @@ class RecurrentExecutor(core.Executor):
         self,
         policy_networks: Dict[str, snt.RNNCore],
         agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
     ):
         """Initialise the system executor
 
         Args:
-            policy_networks (Dict[str, snt.RNNCore]): policy networks for each agent in
+            policy_networks: policy networks for each agent in
                 the system.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
-                client to copy weights from the trainer. Defaults to None.
-            store_recurrent_state (bool, optional): boolean to store the recurrent
+            adder: adder which sends
+                data to a replay buffer. Defaults to None.
+            variable_client: client to copy weights from the trainer.
+                Defaults to None.
+            store_recurrent_state: boolean to store the recurrent
                 network hidden state. Defaults to True.
         """
 
@@ -266,7 +266,7 @@ class RecurrentExecutor(core.Executor):
         return action, new_state
 
     def _update_state(self, agent: str, new_state: types.NestedArray) -> None:
-        """update recurrent hidden state
+        """Update recurrent hidden state
 
         Args:
             agent (str): agent id.
@@ -279,7 +279,7 @@ class RecurrentExecutor(core.Executor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
-        """select an action for a single agent in the system
+        """Select an action for a single agent in the system
 
         Args:
             agent (str): agent id
@@ -315,7 +315,7 @@ class RecurrentExecutor(core.Executor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record first observed timestep from the environment
+        """Record first observed timestep from the environment
 
         Args:
             timestep (dm_env.TimeStep): data emitted by an environment at first step of
@@ -348,7 +348,7 @@ class RecurrentExecutor(core.Executor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record observed timestep from the environment
+        """Record observed timestep from the environment
 
         Args:
             actions (Dict[str, types.NestedArray]): system agents' actions.
@@ -384,7 +384,7 @@ class RecurrentExecutor(core.Executor):
         Dict[str, types.NestedArray],
         Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
     ]:
-        """select the actions for all agents in the system
+        """Select the actions for all agents in the system
 
         Args:
             observations (Dict[str, types.NestedArray]): agent observations from the
@@ -402,7 +402,7 @@ class RecurrentExecutor(core.Executor):
         return actions
 
     def update(self, wait: bool = False) -> None:
-        """update executor variables
+        """Update executor variables
 
         Args:
             wait (bool, optional): whether to stall the executor's request for new
@@ -411,269 +411,3 @@ class RecurrentExecutor(core.Executor):
 
         if self._variable_client:
             self._variable_client.update(wait)
-
-
-class RecurrentCommExecutor(RecurrentExecutor):
-    """Generic recurrent executor with communicate."""
-
-    def __init__(
-        self,
-        policy_networks: Dict[str, snt.RNNCore],
-        communication_module: BaseCommunicationModule,
-        agent_net_keys: Dict[str, str],
-        adder: Optional[adders.ParallelAdder] = None,
-        variable_client: Optional[tf2_variable_utils.VariableClient] = None,
-        store_recurrent_state: bool = True,
-    ):
-        """Initialise the system executor
-
-        Args:
-            policy_networks (Dict[str, snt.RNNCore]): policy networks for each agent in
-                the system.
-            communication_module (BaseCommunicationModule): module for enabling
-                communication protocols between agents.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
-                to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
-                client to copy weights from the trainer. Defaults to None.
-            store_recurrent_state (bool, optional): boolean to store the recurrent
-                network hidden state. Defaults to True.
-        """
-
-        # Store these for later use.
-
-        self._adder = adder
-        self._variable_client = variable_client
-        self._policy_networks = policy_networks
-        self._states: Dict[str, Any] = {}
-        self._messages: Dict[str, Any] = {}
-        self._store_recurrent_state = store_recurrent_state
-        self._communication_module = communication_module
-        self._agent_net_keys = agent_net_keys
-
-    def _sample_action(
-        self, action_policy: types.NestedTensor, agent: str
-    ) -> types.NestedTensor:
-        """sample an action from an agent's policy distribution
-
-        Args:
-            action_policy (types.NestedTensor): agent policy.
-            agent (str): agent id.
-
-        Returns:
-            types.NestedTensor: agent action
-        """
-
-        # Sample from the policy if it is stochastic.
-        return (
-            action_policy.sample()
-            if isinstance(action_policy, tfd.Distribution)
-            else action_policy
-        )
-
-    def _process_message(
-        self, observation: types.NestedTensor, message_policy: types.NestedTensor
-    ) -> types.NestedTensor:
-        """process agent messages
-
-        Args:
-            observation (types.NestedTensor): observation tensor received from the
-                environment.
-            message_policy (types.NestedTensor): message policy.
-
-        Returns:
-            types.NestedTensor: processed message.
-        """
-
-        # Only one agent can message at each timestep
-        return message_policy
-
-    @tf.function
-    def _policy(
-        self,
-        agent: str,
-        observation: types.NestedTensor,
-        state: types.NestedTensor,
-        message: types.NestedTensor,
-    ) -> Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]:
-        """Agent specific policy function
-
-        Args:
-            agent (str): agent id
-            observation (types.NestedTensor): observation tensor received from the
-                environment.
-            state (types.NestedTensor): recurrent network state.
-            message (types.NestedTensor): agent message.
-
-        Returns:
-            Tuple[types.NestedTensor, types.NestedTensor, types.NestedTensor]: action,
-                message and new recurrent hidden state
-        """
-
-        # Add a dummy batch dimension and as a side effect convert numpy to TF.
-        batched_observation = tf2_utils.add_batch_dim(observation)
-
-        # index network either on agent type or on agent id
-        agent_key = self._agent_net_keys[agent]
-
-        # Compute the policy, conditioned on the observation.
-        (action_policy, message_policy), new_state = self._policy_networks[agent_key](
-            batched_observation, state, message
-        )
-
-        action = self._sample_action(action_policy, agent)
-
-        message = self._process_message(observation, message_policy)
-
-        return action, message, new_state
-
-    def observe_first(
-        self,
-        timestep: dm_env.TimeStep,
-        extras: Optional[Dict[str, types.NestedArray]] = {},
-    ) -> None:
-        """record first observed timestep from the environment
-
-        Args:
-            timestep (dm_env.TimeStep): data emitted by an environment at first step of
-                interaction.
-            extras (Dict[str, types.NestedArray], optional): possible extra information
-                to record during the first step. Defaults to {}.
-
-        Raises:
-            NotImplementedError: check for extras that are 'None'.
-        """
-
-        # Re-initialize the RNN state.
-        for agent, _ in timestep.observation.items():
-            # index network either on agent type or on agent id
-            agent_key = self._agent_net_keys[agent]
-            self._states[agent] = self._policy_networks[agent_key].initial_state(1)
-            self._messages[agent] = self._policy_networks[agent_key].initial_message(1)
-
-        if self._adder is not None:
-            numpy_states = {
-                agent: tf2_utils.to_numpy_squeeze(_state)
-                for agent, _state in self._states.items()
-            }
-            numpy_messages = {
-                agent: tf2_utils.to_numpy_squeeze(_message)
-                for agent, _message in self._messages.items()
-            }
-            if extras is not None:
-                extras.update(
-                    {
-                        "core_states": numpy_states,
-                        "core_messages": numpy_messages,
-                    }
-                )
-                self._adder.add_first(timestep, extras)
-            else:
-                raise NotImplementedError("Why is extras None?")
-
-    def observe(
-        self,
-        actions: Dict[str, types.NestedArray],
-        next_timestep: dm_env.TimeStep,
-        next_extras: Optional[Dict[str, types.NestedArray]] = {},
-    ) -> None:
-        """record observed timestep from the environment
-
-        Args:
-            actions (Dict[str, types.NestedArray]): system agents' actions.
-            next_timestep (dm_env.TimeStep): data emitted by an environment during
-                interaction.
-            next_extras (Dict[str, types.NestedArray], optional): possible extra
-                information to record during the transition. Defaults to {}.
-        """
-
-        if not self._adder:
-            return
-
-        if not self._store_recurrent_state:
-            if next_extras:
-                self._adder.add(actions, next_timestep, next_extras)
-            else:
-                self._adder.add(actions, next_timestep)
-            return
-
-        numpy_states = {
-            agent: tf2_utils.to_numpy_squeeze(_state)
-            for agent, _state in self._states.items()
-        }
-        numpy_messages = {
-            agent: tf2_utils.to_numpy_squeeze(_message)
-            for agent, _message in self._messages.items()
-        }
-
-        if next_extras:
-            next_extras.update(
-                {
-                    "core_states": numpy_states,
-                    "core_messages": numpy_messages,
-                }
-            )
-            self._adder.add(actions, next_timestep, next_extras)
-        else:
-            next_extras = {
-                "core_states": numpy_states,
-                "core_messages": numpy_messages,
-            }
-            self._adder.add(actions, next_timestep, next_extras)
-
-    def select_action(
-        self,
-        agent: str,
-        observation: types.NestedArray,
-    ) -> Tuple[types.NestedArray, types.NestedArray]:
-        """select an action for a single agent in the system
-
-        Args:
-            agent (str): agent id
-            observation (types.NestedArray): observation tensor received from the
-                environment.
-
-        Returns:
-            Tuple[types.NestedArray, types.NestedArray]: agent action.
-        """
-
-        # Initialize the RNN state if necessary.
-        if self._states[agent] is None:
-            self._states[agent] = self._networks[agent].initial_state(1)
-
-        message_inputs = self._communication_module.process_messages(self._messages)
-        # Step the recurrent policy forward given the current observation and state.
-        policy_output, message, new_state = self._policy(
-            agent,
-            observation.observation,
-            self._states[agent],
-            message_inputs[agent],
-        )
-
-        # Bookkeeping of recurrent states for the observe method.
-        self._states[agent] = new_state
-        self._messages[agent] = message
-
-        # Return a numpy array with squeezed out batch dimension.
-        return tf2_utils.to_numpy_squeeze(policy_output)
-
-    def select_actions(
-        self, observations: Dict[str, types.NestedArray]
-    ) -> Dict[str, types.NestedArray]:
-        """select the actions for all agents in the system
-
-        Args:
-            observations (Dict[str, types.NestedArray]): agent observations from the
-                environment.
-
-        Returns:
-            Dict[str, types.NestedArray]: actions for all agents in the system.
-        """
-
-        actions = {}
-        for agent, observation in observations.items():
-            actions[agent] = self._select_action(agent, observation)
-        # Return a numpy array with squeezed out batch dimension.
-        return actions

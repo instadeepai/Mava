@@ -22,6 +22,7 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union
 import reverb
 import sonnet as snt
 import tensorflow as tf
+from acme.adders.reverb.sequence import EndBehavior
 from acme.specs import EnvironmentSpec
 from acme.tf import utils as tf2_utils
 
@@ -37,23 +38,24 @@ from mava.wrappers import NetworkStatisticsActorCritic, ScaledDetailedTrainerSta
 @dataclasses.dataclass
 class MAPPOConfig:
     """Configuration options for the MAPPO system
+
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
-        policy_optimizer: optimizer(s) for updating policy networks.
-        critic_optimizer: optimizer for updating critic networks.
+        optimizer: optimizer(s) for updating networks.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         checkpoint_minute_interval (int): The number of minutes to wait between
             checkpoints.
         sequence_length: recurrent sequence rollout length.
         sequence_period: consecutive starting points for overlapping rollouts across a
-            sequence.
+            sequence. Defaults to sequence length -1.
         discount: discount to use for TD updates.
         lambda_gae: scalar determining the mix of bootstrapping vs further accumulation
             of multi-step returns at each timestep. See `High-Dimensional Continuous
             Control Using Generalized Advantage Estimation` for more information.
-        max_queue_size: maximum number of items in the queue.
+        max_queue_size: maximum number of items in the queue. Should be
+            larger than batch size.
         executor_variable_update_period: the rate at which executors sync their
             paramters with the trainer.
         batch_size: batch size for updates.
@@ -61,7 +63,7 @@ class MAPPOConfig:
         baseline_cost: contribution of the value loss to the total loss.
         clipping_epsilon: Hyper-parameter for clipping in the policy objective. Roughly:
             how far can the new policy go from the old policy while still profiting?
-            The new policy can still go farther than the clip_ratio says, but it doesn’t
+            The new policy can still go farther than the clip_ratio says, but it doesn't
             help on the objective anymore.
         max_gradient_norm: value to specify the maximum clipping value for the gradient
             norm during optimization.
@@ -79,9 +81,7 @@ class MAPPOConfig:
     """
 
     environment_spec: specs.EnvironmentSpec
-    policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
-    critic_optimizer: snt.Optimizer
-    num_executors: int
+    optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     agent_net_keys: Dict[str, str]
     trainer_networks: Dict[str, List]
     table_network_config: Dict[str, List]
@@ -90,22 +90,24 @@ class MAPPOConfig:
     unique_net_keys: List[str]
     checkpoint_minute_interval: int
     sequence_length: int = 10
-    sequence_period: int = 5
+    sequence_period: int = 9
     discount: float = 0.99
     lambda_gae: float = 0.95
-    max_queue_size: int = 1000
+    max_queue_size: Optional[int] = 1000
     executor_variable_update_period: int = 100
     batch_size: int = 32
+    minibatch_size: Optional[int] = None
+    num_epochs: int = 10
     entropy_cost: float = 0.01
-    baseline_cost: float = 0.5
-    clipping_epsilon: float = 0.1
+    baseline_cost: float = 1.0
+    clipping_epsilon: float = 0.2
     max_gradient_norm: Optional[float] = None
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
-    replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     termination_condition: Optional[Dict[str, int]] = None
     learning_rate_scheduler_fn: Optional[Any] = None
     evaluator_interval: Optional[dict] = None
+    normalize_advantage: bool = False
 
 
 class MAPPOBuilder:
@@ -137,7 +139,7 @@ class MAPPOBuilder:
         self._executor_fn = executor_fn
         self._extra_specs = extra_specs
 
-    def add_logits_to_spec(
+    def add_log_prob_to_spec(
         self, environment_spec: specs.MAEnvironmentSpec
     ) -> specs.MAEnvironmentSpec:
         """convert discrete action space to bounded continuous action space
@@ -195,7 +197,7 @@ class MAPPOBuilder:
         """
 
         # Create system architecture with target networks.
-        adder_env_spec = self.add_logits_to_spec(environment_spec)
+        adder_env_spec = self.add_log_prob_to_spec(environment_spec)
 
         # Create table per trainer
         replay_tables = []
@@ -215,16 +217,17 @@ class MAPPOBuilder:
                 self._extra_specs,
                 num_networks,
             )
+            signature = reverb_adders.ParallelSequenceAdder.signature(
+                env_spec,
+                sequence_length=self._config.sequence_length,
+                extras_spec=extra_specs,
+            )
 
             replay_tables.append(
                 reverb.Table.queue(
                     name=table_key,
                     max_size=self._config.max_queue_size,
-                    signature=reverb_adders.ParallelSequenceAdder.signature(
-                        env_spec,
-                        sequence_length=self._config.sequence_length,
-                        extras_spec=extra_specs,
-                    ),
+                    signature=signature,
                 )
             )
 
@@ -248,22 +251,23 @@ class MAPPOBuilder:
             Iterator[reverb.ReplaySample]: data samples from the dataset.
         """
 
-        # Create tensorflow dataset to interface with reverb
+        # NOTE: From https://github.com/deepmind/acme/blob/6bf350df1d9dd16cd85217908ec9f47553278976/acme/agents/jax/ppo/builder.py#L89  # noqa: E501
+        # We don't use datasets.make_reverb_dataset() here to avoid interleaving
+        # and prefetching, that doesn't work well with can_sample() check on update.
+
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=replay_client.server_address,
             table=table_name,
             max_in_flight_samples_per_worker=2 * self._config.batch_size,
-        ).batch(
-            self._config.batch_size, drop_remainder=True
-        )  # .prefetch(self._config.prefetch_size)
-        # .as_numpy_iterator()
-
-        return iter(dataset)
+        )
+        # Add batch dimension.
+        dataset = dataset.batch(self._config.batch_size, drop_remainder=True)
+        return dataset.as_numpy_iterator()
 
     def make_adder(
         self,
         replay_client: reverb.Client,
-    ) -> Optional[adders.ParallelAdder]:
+    ) -> Optional[adders.ReverbParallelAdder]:
         """Create an adder which records data generated by the executor/environment.
 
         Args:
@@ -274,7 +278,8 @@ class MAPPOBuilder:
             NotImplementedError: unknown executor type.
 
         Returns:
-            Optional[adders.ParallelAdder]: adder which sends data to a replay buffer.
+            Optional[adders.ReverbParallelAdder]: adder which sends data to a
+            replay buffer.
         """
 
         # Create custom priority functons for the adder
@@ -288,9 +293,10 @@ class MAPPOBuilder:
             client=replay_client,
             net_ids_to_keys=self._config.unique_net_keys,
             table_network_config=self._config.table_network_config,
-            sequence_length=self._config.sequence_length,
             period=self._config.sequence_period,
-            use_next_extras=True,
+            sequence_length=self._config.sequence_length,
+            use_next_extras=False,
+            end_of_episode_behavior=EndBehavior.CONTINUE,
         )
 
     def create_counter_variables(
@@ -350,7 +356,7 @@ class MAPPOBuilder:
         # executor_id: str,
         networks: Dict[str, snt.Module],
         policy_networks: Dict[str, snt.Module],
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         variable_source: Optional[MavaVariableSource] = None,
         evaluator: bool = False,
     ) -> core.Executor:
@@ -502,15 +508,16 @@ class MAPPOBuilder:
             "critic_networks": networks["critics"],
             "observation_networks": networks["observations"],
             "agent_net_keys": trainer_agent_net_keys,
-            "policy_optimizer": self._config.policy_optimizer,
-            "critic_optimizer": self._config.critic_optimizer,
+            "optimizer": self._config.optimizer,
             "max_gradient_norm": max_gradient_norm,
             "discount": self._config.discount,
+            "minibatch_size": self._config.minibatch_size,
+            "num_epochs": self._config.num_epochs,
             "variable_client": variable_client,
             "dataset": dataset,
             "counts": counts,
             "logger": logger,
-            "lambda_gae": self._config.lambda_gae,
+            "normalize_advantage": self._config.lambda_gae,
             "entropy_cost": self._config.entropy_cost,
             "baseline_cost": self._config.baseline_cost,
             "clipping_epsilon": self._config.clipping_epsilon,
@@ -526,7 +533,7 @@ class MAPPOBuilder:
         trainer = NetworkStatisticsActorCritic(trainer)  # type: ignore
 
         trainer = ScaledDetailedTrainerStatistics(  # type: ignore
-            trainer, metrics=["policy_loss", "critic_loss"]
+            trainer, metrics=["policy_loss", "critic_loss", "total_loss"]
         )
 
         return trainer

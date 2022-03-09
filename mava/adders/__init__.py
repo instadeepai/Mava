@@ -16,4 +16,4 @@
 """Adders for sending data from actors to replay buffers."""
 
 
-from mava.adders.base import ParallelAdder
+from mava.adders.reverb.base import ReverbParallelAdder

@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """MAD4PG system executor implementation."""
 
 from typing import Any, Dict, List, Optional
@@ -30,6 +29,7 @@ from mava.systems.tf.maddpg.execution import (
 
 class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
     """A feed-forward executor for MAD4PG.
+
     An executor based on a feed-forward policy for each agent in the system.
     """
 
@@ -41,13 +41,14 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
         network_sampling_setup: List,
         net_keys_to_ids: Dict[str, int],
         evaluator: bool = False,
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         interval: Optional[dict] = None,
     ):
 
         """Initialise the system executor
+
         Args:
             policy_networks: policy networks for each agent in
                 the system.
@@ -83,6 +84,7 @@ class MAD4PGFeedForwardExecutor(MADDPGFeedForwardExecutor):
 
 class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
     """A recurrent executor for MAD4PG.
+
     An executor based on a recurrent policy for each agent in the system.
     """
 
@@ -94,12 +96,13 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         network_sampling_setup: List,
         net_keys_to_ids: Dict[str, int],
         evaluator: bool = False,
-        adder: Optional[adders.ParallelAdder] = None,
+        adder: Optional[adders.ReverbParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         interval: Optional[dict] = None,
     ):
         """Initialise the system executor
+
         Args:
             policy_networks: policy networks for each agent in
                 the system.

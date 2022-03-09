@@ -112,7 +112,7 @@ def make_default_networks(
             if archecture_type == ArchitectureType.feedforward:
                 policy_layers = [
                     networks.LayerNormMLP(
-                        tuple(policy_networks_layer_sizes[key]) + (num_actions,),
+                        policy_networks_layer_sizes[key],
                         activate_final=False,
                         seed=seed,
                     ),

@@ -371,6 +371,8 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
         Args:
             environment (ParallelEnv): parallel PZ env.
+            return_state_info: whether or not the wrapper should return
+                extra state info.
             env_preprocess_wrappers (Optional[List], optional): Wrappers
                 that preprocess envs.
                 Format (env_preprocessor, dict_with_preprocessor_params).
@@ -475,6 +477,7 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
 
     def extra_spec(self) -> Dict[str, specs.BoundedArray]:
         """Function returns extra spec (format) of the env.
+
         Returns:
             Dict[str, specs.BoundedArray]: extra spec.
         """
@@ -556,7 +559,21 @@ class PettingZooParallelEnvWrapper(ParallelEnvWrapper):
                 observation = _convert_to_spec(
                     self._environment.observation_spaces[agent]
                 )
-                legal_actions = _convert_to_spec(self._environment.action_spaces[agent])
+
+                action_space = self._environment.action_spaces[agent]
+                if type(action_space) == spaces.Discrete:
+                    # legal action mask should be a vector of ones and zeros
+                    legal_actions = specs.BoundedArray(
+                        shape=(action_space.n,),
+                        dtype=action_space.dtype,
+                        minimum=np.zeros(action_space.shape),
+                        maximum=np.zeros(action_space.shape) + 1,
+                        name=None,
+                    )
+                else:
+                    legal_actions = _convert_to_spec(
+                        self._environment.action_spaces[agent]
+                    )
             else:
                 # For env like SC2 with action mask spec
                 observation = _convert_to_spec(
