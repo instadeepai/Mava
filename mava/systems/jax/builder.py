@@ -34,6 +34,7 @@ class Builder(SystemBuilder, CallbackHookMixin):
         Args:
             components: system callback components
         """
+        super().__init__()
 
         self.callbacks = components
 
@@ -65,7 +66,7 @@ class Builder(SystemBuilder, CallbackHookMixin):
         # end of make replay tables
         self.on_building_data_server_end()
 
-        return self.system_data_server
+        return self.attributes.system_data_server
 
     def parameter_server(self) -> Any:
         """Parameter server to store and serve system network parameters.
@@ -85,7 +86,7 @@ class Builder(SystemBuilder, CallbackHookMixin):
         # end of make parameter server
         self.on_building_parameter_server_end()
 
-        return self.system_parameter_server
+        return self.attributes.system_parameter_server
 
     def executor(
         self, executor_id: str, data_server_client: Any, parameter_server_client: Any
@@ -134,7 +135,7 @@ class Builder(SystemBuilder, CallbackHookMixin):
         # end of making the executor
         self.on_building_executor_end()
 
-        return self.system_executor
+        return self.attributes.system_executor
 
     def trainer(
         self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
@@ -172,7 +173,7 @@ class Builder(SystemBuilder, CallbackHookMixin):
         # end of making the trainer
         self.on_building_trainer_end()
 
-        return self.system_trainer
+        return self.attributes.system_trainer
 
     def build(self) -> None:
         """Construct program nodes."""

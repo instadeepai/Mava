@@ -14,7 +14,6 @@
 # limitations under the License.
 
 # TODO(Arnu): remove at a later stage
-# type: ignore
 
 """Tests for config class for Jax-based Mava systems"""
 
@@ -46,11 +45,11 @@ class MockDataServerAdder(Callback):
 
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.adder_signature = {"adder_signature": self.config.adder_param_0}
+        builder.attributes.adder_signature = self.config.adder_param_0
 
     def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.rate_limiter = {"rate_limiter": self.config.adder_param_1}
+        builder.attributes.rate_limiter = self.config.adder_param_1
 
     @property
     def name(self) -> str:
@@ -73,14 +72,12 @@ class MockDataServer(Callback):
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.system_data_server = {
-            "data_server": (
-                builder.adder_signature,
-                builder.rate_limiter,
-                self.config.data_server_param_0,
-                self.config.data_server_param_1,
-            )
-        }
+        builder.attributes.system_data_server = (
+            builder.attributes.adder_signature,
+            builder.attributes.rate_limiter,
+            self.config.data_server_param_0,
+            self.config.data_server_param_1,
+        )
 
     @property
     def name(self) -> str:
@@ -104,12 +101,10 @@ class MockParameterServer(Callback):
 
     def on_building_parameter_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.system_parameter_server = {
-            "parameter_server": (
-                self.config.parameter_server_param_0,
-                self.config.parameter_server_param_1,
-            )
-        }
+        builder.attributes.system_parameter_server = (
+            self.config.parameter_server_param_0,
+            self.config.parameter_server_param_1,
+        )
 
     @property
     def name(self) -> str:
@@ -133,13 +128,14 @@ class MockExecutorAdder(Callback):
 
     def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.adder_priority = {"adder_priority": self.config.executor_adder_param_0}
+        builder.attributes.adder_priority = self.config.executor_adder_param_0
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.adder = {
-            "adder": (builder.adder_priority, self.config.executor_adder_param_1)
-        }
+        builder.attributes.adder = (
+            builder.attributes.adder_priority,
+            self.config.executor_adder_param_1,
+        )
 
     @property
     def name(self) -> str:
@@ -151,6 +147,7 @@ class MockExecutorAdder(Callback):
 class MockExecutorDefaultConfig:
     executor_param_0: int = 1
     executor_param_1: str = "1"
+    executor_param_2: bool = True
 
 
 class MockExecutor(Callback):
@@ -163,23 +160,32 @@ class MockExecutor(Callback):
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.exec_logger = {"exec_logger": self.config.executor_param_0}
+        builder.attributes.exec_logger = self.config.executor_param_0
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.exec_param_client = {"exec_param_client": self.config.executor_param_1}
+        builder.attributes.exec_param_client = self.config.executor_param_1
 
     def on_building_executor(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.exec = {"exec": (builder.adder, builder.exec_param_client)}
+        builder.attributes.exec = (
+            builder.attributes.adder,
+            builder.attributes.exec_param_client,
+        )
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.env = {"env": builder.exec_logger}
+        builder.attributes.env = (
+            builder.attributes.exec_logger,
+            self.config.executor_param_2,
+        )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.system_executor = {"executor": (builder.env, builder.exec)}
+        builder.attributes.system_executor = (
+            builder.attributes.env,
+            builder.attributes.exec,
+        )
 
     @property
     def name(self) -> str:
@@ -202,7 +208,7 @@ class MockTrainerDataset(Callback):
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.dataset = {"dataset": self.config.trainer_dataset_param_0}
+        builder.attributes.dataset = self.config.trainer_dataset_param_0
 
     @property
     def name(self) -> str:
@@ -226,17 +232,18 @@ class MockTrainer(Callback):
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.train_logger = {"train_logger": self.config.trainer_param_0}
+        builder.attributes.train_logger = self.config.trainer_param_0
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.train_param_client = {"train_param_client": self.config.trainer_param_1}
+        builder.attributes.train_param_client = self.config.trainer_param_1
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.system_trainer = {
-            "trainer": (builder.train_logger, builder.train_param_client)
-        }
+        builder.attributes.system_trainer = (
+            builder.attributes.train_logger,
+            builder.attributes.train_param_client,
+        )
 
     @property
     def name(self) -> str:
@@ -301,16 +308,14 @@ class MockProgramConstructor(Callback):
             data_server_client=data_server,
             parameter_server_client=parameter_server,
         )
-        builder.system_build = {
-            "system": (
-                data_server,
-                parameter_server,
-                executor,
-                trainer,
-                self.config.program_param_0,
-                self.config.program_param_1,
-            )
-        }
+        builder.attributes.system_build = (
+            data_server,
+            parameter_server,
+            executor,
+            trainer,
+            self.config.program_param_0,
+            self.config.program_param_1,
+        )
 
     @property
     def name(self) -> str:
@@ -334,13 +339,11 @@ class MockLauncher(Callback):
 
     def on_building_launch(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.system_launcher = {
-            "launcher": (
-                builder.system_build,
-                self.config.launcher_param_0,
-                self.config.launcher_param_1,
-            )
-        }
+        builder.attributes.system_launcher = (
+            builder.attributes.system_build,
+            self.config.launcher_param_0,
+            self.config.launcher_param_1,
+        )
 
     @property
     def name(self) -> str:
@@ -382,3 +385,42 @@ def test_builder(
     """Test if system can launch without having had changed (configured) the default \
         config."""
     test_system.launch(num_executors=1, nodes_on_gpu=["process"])
+    (
+        data_server,
+        parameter_server,
+        executor,
+        trainer,
+        build_param_0,
+        build_param_1,
+    ) = test_system._builder.attributes.system_build
+    assert build_param_0 == 1
+    assert build_param_1 == "1"
+
+    (
+        adder_signature,
+        rate_limiter,
+        data_server_param_0,
+        data_server_param_1,
+    ) = data_server
+    assert adder_signature == 1
+    assert rate_limiter == "1"
+    assert data_server_param_0 == 1
+    assert data_server_param_1 == "1"
+
+    param_server_param_0, param_server_param_1 = parameter_server
+    assert param_server_param_0 == 1
+    assert param_server_param_1 == "1"
+
+    env, exec = executor
+    exec_logger, exec_logger_param = env
+    assert exec_logger_param is True
+    assert exec_logger == 1
+    exec_adder, exec_param_client = exec
+    assert exec_param_client == "1"
+    adder_priority, adder_param = exec_adder
+    assert adder_param == "1"
+    assert adder_priority == 1
+
+    train_logger, train_param_client = trainer
+    assert train_logger == 1
+    assert train_param_client == "1"
