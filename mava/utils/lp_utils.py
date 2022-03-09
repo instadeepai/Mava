@@ -21,7 +21,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import launchpad as lp
 from absl import flags, logging
-from acme.utils import counting, signals
+from acme.utils import counting
 from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava.utils.training_utils import non_blocking_sleep
@@ -86,7 +86,6 @@ def partial_kwargs(function: Callable[..., Any], **kwargs: Any) -> Callable[...,
     return functools.partial(function, **kwargs)
 
 
-# TODO Remove once all systems using scaling implementation.
 class StepsLimiter:
     def __init__(
         self,
@@ -107,20 +106,19 @@ class StepsLimiter:
             self._max_steps,
             self._steps_key,
         )
-        with signals.runtime_terminator():
-            while True:
-                # Update the counts.
-                counts = self._counter.get_counts()
-                num_steps = counts.get(self._steps_key, 0)
+        while True:
+            # Update the counts.
+            counts = self._counter.get_counts()
+            num_steps = counts.get(self._steps_key, 0)
 
-                logging.info("StepsLimiter: Reached %d recorded steps", num_steps)
+            logging.info("StepsLimiter: Reached %d recorded steps", num_steps)
 
-                if num_steps > self._max_steps:
-                    logging.info(
-                        "StepsLimiter: Max steps of %d was reached, terminating",
-                        self._max_steps,
-                    )
-                    lp.stop()
+            if num_steps > self._max_steps:
+                logging.info(
+                    "StepsLimiter: Max steps of %d was reached, terminating",
+                    self._max_steps,
+                )
+                lp.stop()
 
-                # Don't spam the counter.
-                non_blocking_sleep(10)
+            # Don't spam the counter.
+            non_blocking_sleep(10)
