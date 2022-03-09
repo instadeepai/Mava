@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO(Arnu): remove at a later stage
-
 """Tests for config class for Jax-based Mava systems"""
 
 from dataclasses import dataclass, field
@@ -32,7 +30,7 @@ from mava.systems.jax.system import System
 @dataclass
 class MockDataServerAdderDefaultConfig:
     adder_param_0: int = 1
-    adder_param_1: str = "1"
+    adder_param_1: str = "default"
 
 
 class MockDataServerAdder(Callback):
@@ -59,8 +57,8 @@ class MockDataServerAdder(Callback):
 
 @dataclass
 class MockDataServerDefaultConfig:
-    data_server_param_0: int = 1
-    data_server_param_1: str = "1"
+    data_server_param_0: float = 2.7
+    data_server_param_1: bool = False
 
 
 class MockDataServer(Callback):
@@ -87,8 +85,8 @@ class MockDataServer(Callback):
 
 @dataclass
 class MockParameterServerDefaultConfig:
-    parameter_server_param_0: int = 1
-    parameter_server_param_1: str = "1"
+    parameter_server_param_0: int = 2
+    parameter_server_param_1: str = "setting"
 
 
 class MockParameterServer(Callback):
@@ -114,8 +112,8 @@ class MockParameterServer(Callback):
 
 @dataclass
 class MockExecutorAdderDefaultConfig:
-    executor_adder_param_0: int = 1
-    executor_adder_param_1: str = "1"
+    executor_adder_param_0: float = 23.2
+    executor_adder_param_1: str = "random"
 
 
 class MockExecutorAdder(Callback):
@@ -146,7 +144,7 @@ class MockExecutorAdder(Callback):
 @dataclass
 class MockExecutorDefaultConfig:
     executor_param_0: int = 1
-    executor_param_1: str = "1"
+    executor_param_1: str = "param"
     executor_param_2: bool = True
 
 
@@ -164,14 +162,22 @@ class MockExecutor(Callback):
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.blocks.exec_param_client = self.config.executor_param_1
+        builder.blocks.exec_param_client = builder._parameter_server_client
 
+    # TODO(Arnu): handle this using a decorator
     def on_building_executor(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.blocks.exec = (
-            builder.blocks.adder,
-            builder.blocks.exec_param_client,
-        )
+        if builder._executor_id != "evaluator":
+            builder.blocks.exec = (
+                builder._executor_id,
+                builder.blocks.adder,
+                builder.blocks.exec_param_client,
+            )
+        else:
+            builder.blocks.exec = (
+                builder._executor_id,
+                builder.blocks.exec_param_client,
+            )
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -182,10 +188,17 @@ class MockExecutor(Callback):
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.blocks.system_executor = (
-            builder.blocks.env,
-            builder.blocks.exec,
-        )
+        if builder._executor_id != "evaluator":
+            builder.blocks.system_executor = (
+                builder._data_server_client,
+                builder.blocks.env,
+                builder.blocks.exec,
+            )
+        else:
+            builder.blocks.system_executor = (
+                builder.blocks.env,
+                builder.blocks.exec,
+            )
 
     @property
     def name(self) -> str:
@@ -195,7 +208,7 @@ class MockExecutor(Callback):
 
 @dataclass
 class MockTrainerDatasetDefaultConfig:
-    trainer_dataset_param_0: int = 1
+    trainer_dataset_param_0: int = 5
 
 
 class MockTrainerDataset(Callback):
@@ -208,7 +221,10 @@ class MockTrainerDataset(Callback):
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.blocks.dataset = self.config.trainer_dataset_param_0
+        builder.blocks.dataset = (
+            builder._table_name,
+            self.config.trainer_dataset_param_0,
+        )
 
     @property
     def name(self) -> str:
@@ -218,8 +234,8 @@ class MockTrainerDataset(Callback):
 
 @dataclass
 class MockTrainerDefaultConfig:
-    trainer_param_0: int = 1
-    trainer_param_1: str = "1"
+    trainer_param_0: int = 2
+    trainer_param_1: str = "train"
 
 
 class MockTrainer(Callback):
@@ -236,12 +252,14 @@ class MockTrainer(Callback):
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.blocks.train_param_client = self.config.trainer_param_1
+        builder.blocks.train_param_client = builder._parameter_server_client
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
         builder.blocks.system_trainer = (
+            builder._trainer_id,
             builder.blocks.train_logger,
+            builder.blocks.dataset,
             builder.blocks.train_param_client,
         )
 
@@ -282,8 +300,7 @@ class MockDistributor(Callback):
 
 @dataclass
 class MockProgramDefaultConfig:
-    program_param_0: int = 1
-    program_param_1: str = "1"
+    program_param: str = "name"
 
 
 class MockProgramConstructor(Callback):
@@ -303,6 +320,11 @@ class MockProgramConstructor(Callback):
             data_server_client=data_server,
             parameter_server_client=parameter_server,
         )
+        evaluator = builder.executor(
+            executor_id="evaluator",
+            data_server_client=None,
+            parameter_server_client=parameter_server,
+        )
         trainer = builder.trainer(
             trainer_id="trainer",
             data_server_client=data_server,
@@ -312,9 +334,9 @@ class MockProgramConstructor(Callback):
             data_server,
             parameter_server,
             executor,
+            evaluator,
             trainer,
-            self.config.program_param_0,
-            self.config.program_param_1,
+            self.config.program_param,
         )
 
     @property
@@ -325,8 +347,7 @@ class MockProgramConstructor(Callback):
 
 @dataclass
 class MockLauncherDefaultConfig:
-    launcher_param_0: int = 1
-    launcher_param_1: str = "1"
+    launcher_param: str = "name"
 
 
 class MockLauncher(Callback):
@@ -341,8 +362,7 @@ class MockLauncher(Callback):
         """_summary_"""
         builder.blocks.system_launcher = (
             builder.blocks.system_build,
-            self.config.launcher_param_0,
-            self.config.launcher_param_1,
+            self.config.launcher_param,
         )
 
     @property
@@ -382,45 +402,39 @@ def test_system() -> System:
 def test_builder(
     test_system: System,
 ) -> None:
-    """Test if system can launch without having had changed (configured) the default \
-        config."""
+    """Test if system builder instantiates processes as expected."""
     test_system.launch(num_executors=1, nodes_on_gpu=["process"])
     (
         data_server,
         parameter_server,
         executor,
+        evaluator,
         trainer,
-        build_param_0,
-        build_param_1,
+        build_param,
     ) = test_system._builder.blocks.system_build
-    assert build_param_0 == 1
-    assert build_param_1 == "1"
+    assert build_param == "name"
+    assert data_server == (1, "default", 2.7, False)
+    assert parameter_server == (2, "setting")
 
-    (
-        adder_signature,
-        rate_limiter,
-        data_server_param_0,
-        data_server_param_1,
-    ) = data_server
-    assert adder_signature == 1
-    assert rate_limiter == "1"
-    assert data_server_param_0 == 1
-    assert data_server_param_1 == "1"
-
-    param_server_param_0, param_server_param_1 = parameter_server
-    assert param_server_param_0 == 1
-    assert param_server_param_1 == "1"
-
-    env, exec = executor
+    exec_data_client, env, exec = executor
     exec_logger, exec_logger_param = env
+    assert exec_data_client == data_server
     assert exec_logger_param is True
     assert exec_logger == 1
-    exec_adder, exec_param_client = exec
-    assert exec_param_client == "1"
-    adder_priority, adder_param = exec_adder
-    assert adder_param == "1"
-    assert adder_priority == 1
 
-    train_logger, train_param_client = trainer
-    assert train_logger == 1
-    assert train_param_client == "1"
+    exec_id, exec_adder, exec_param_client = exec
+    assert exec_id == "executor"
+    assert exec_param_client == parameter_server
+    assert exec_adder == (23.2, "random")
+
+    eval_env, eval_exec = evaluator
+    eval_id, eval_param_client = eval_exec
+    assert eval_env == env
+    assert eval_id == "evaluator"
+    assert eval_param_client == exec_param_client
+
+    train_id, train_logger, train_dataset, train_param_client = trainer
+    assert train_id == "trainer"
+    assert train_logger == 2
+    assert train_dataset == ("table_trainer", 5)
+    assert train_param_client == parameter_server

@@ -81,6 +81,12 @@ class SystemBuilder(abc.ABC):
 
         self.blocks = SimpleNamespace()
 
+        self._executor_id: str
+        self._trainer_id: str
+        self._table_name: str
+        self._data_server_client: Any
+        self._parameter_server_client: Any
+
     @abc.abstractmethod
     def data_server(self) -> List[Any]:
         """Data server to store and serve transition data from and to system.
