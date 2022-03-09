@@ -15,5 +15,5 @@
 
 """Jax-based Mava system implementation."""
 
-from mava.systems.jax.builder import Builder  # type: ignore
+from mava.systems.jax.builder import Builder
 from mava.systems.jax.config import Config
