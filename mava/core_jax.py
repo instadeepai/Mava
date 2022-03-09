@@ -79,7 +79,7 @@ class SystemBuilder(abc.ABC):
     ) -> None:
         """System building init"""
 
-        self.attributes = SimpleNamespace()
+        self.blocks = SimpleNamespace()
 
     @abc.abstractmethod
     def data_server(self) -> List[Any]:

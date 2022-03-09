@@ -45,11 +45,11 @@ class MockDataServerAdder(Callback):
 
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.adder_signature = self.config.adder_param_0
+        builder.blocks.adder_signature = self.config.adder_param_0
 
     def on_building_data_server_rate_limiter(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.rate_limiter = self.config.adder_param_1
+        builder.blocks.rate_limiter = self.config.adder_param_1
 
     @property
     def name(self) -> str:
@@ -72,9 +72,9 @@ class MockDataServer(Callback):
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.system_data_server = (
-            builder.attributes.adder_signature,
-            builder.attributes.rate_limiter,
+        builder.blocks.system_data_server = (
+            builder.blocks.adder_signature,
+            builder.blocks.rate_limiter,
             self.config.data_server_param_0,
             self.config.data_server_param_1,
         )
@@ -101,7 +101,7 @@ class MockParameterServer(Callback):
 
     def on_building_parameter_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.system_parameter_server = (
+        builder.blocks.system_parameter_server = (
             self.config.parameter_server_param_0,
             self.config.parameter_server_param_1,
         )
@@ -128,12 +128,12 @@ class MockExecutorAdder(Callback):
 
     def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.adder_priority = self.config.executor_adder_param_0
+        builder.blocks.adder_priority = self.config.executor_adder_param_0
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.adder = (
-            builder.attributes.adder_priority,
+        builder.blocks.adder = (
+            builder.blocks.adder_priority,
             self.config.executor_adder_param_1,
         )
 
@@ -160,31 +160,31 @@ class MockExecutor(Callback):
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.exec_logger = self.config.executor_param_0
+        builder.blocks.exec_logger = self.config.executor_param_0
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.exec_param_client = self.config.executor_param_1
+        builder.blocks.exec_param_client = self.config.executor_param_1
 
     def on_building_executor(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.exec = (
-            builder.attributes.adder,
-            builder.attributes.exec_param_client,
+        builder.blocks.exec = (
+            builder.blocks.adder,
+            builder.blocks.exec_param_client,
         )
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.env = (
-            builder.attributes.exec_logger,
+        builder.blocks.env = (
+            builder.blocks.exec_logger,
             self.config.executor_param_2,
         )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.system_executor = (
-            builder.attributes.env,
-            builder.attributes.exec,
+        builder.blocks.system_executor = (
+            builder.blocks.env,
+            builder.blocks.exec,
         )
 
     @property
@@ -208,7 +208,7 @@ class MockTrainerDataset(Callback):
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.dataset = self.config.trainer_dataset_param_0
+        builder.blocks.dataset = self.config.trainer_dataset_param_0
 
     @property
     def name(self) -> str:
@@ -232,17 +232,17 @@ class MockTrainer(Callback):
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.train_logger = self.config.trainer_param_0
+        builder.blocks.train_logger = self.config.trainer_param_0
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.train_param_client = self.config.trainer_param_1
+        builder.blocks.train_param_client = self.config.trainer_param_1
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.system_trainer = (
-            builder.attributes.train_logger,
-            builder.attributes.train_param_client,
+        builder.blocks.system_trainer = (
+            builder.blocks.train_logger,
+            builder.blocks.train_param_client,
         )
 
     @property
@@ -308,7 +308,7 @@ class MockProgramConstructor(Callback):
             data_server_client=data_server,
             parameter_server_client=parameter_server,
         )
-        builder.attributes.system_build = (
+        builder.blocks.system_build = (
             data_server,
             parameter_server,
             executor,
@@ -339,8 +339,8 @@ class MockLauncher(Callback):
 
     def on_building_launch(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attributes.system_launcher = (
-            builder.attributes.system_build,
+        builder.blocks.system_launcher = (
+            builder.blocks.system_build,
             self.config.launcher_param_0,
             self.config.launcher_param_1,
         )
@@ -392,7 +392,7 @@ def test_builder(
         trainer,
         build_param_0,
         build_param_1,
-    ) = test_system._builder.attributes.system_build
+    ) = test_system._builder.blocks.system_build
     assert build_param_0 == 1
     assert build_param_1 == "1"
 
