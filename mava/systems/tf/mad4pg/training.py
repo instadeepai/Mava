@@ -728,10 +728,10 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
-                agent_end_of_episode = end_of_episode[agent]
-                ones_mask = tf.ones(shape=(agent_end_of_episode.shape[0], 1))
-                step_not_padded = tf.concat(
-                    [ones_mask, agent_end_of_episode[:, :-1]], axis=1
+                policy_mask = tf.reshape(step_not_padded, policy_loss.shape)
+                policy_loss = policy_loss * policy_mask
+                self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
+                    policy_mask
                 )
         self.tape = tape
 
