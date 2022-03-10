@@ -13,7 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Jax-based Mava system implementation."""
+"""Jax-based Mava system builder implementation."""
 
-from mava.systems.jax.builder import Builder
-from mava.systems.jax.config import Config
+from typing import Any, List
+
+
+class Builder:
+    def __init__(
+        self,
+        components: List[Any],
+    ) -> None:
+        """System building init
+
+        Args:
+            components: system callback components
+        """
+
+        self.callbacks = components
+
+    def build(self) -> None:
+        """Build the system."""
+        pass
+
+    def launch(self) -> None:
+        """Launch the system"""
+        pass
