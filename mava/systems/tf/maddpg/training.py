@@ -418,7 +418,7 @@ class MADDPGBaseTrainer(mava.Trainer):
                 critic_loss = trfl.td_learning(
                     q_tm1, r_t[agent], discount * d_t[agent], q_t
                 ).loss
-                self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
+                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
 
                 # Actor learning.
                 o_t_agent_feed = o_t_trans[agent]
@@ -442,7 +442,7 @@ class MADDPGBaseTrainer(mava.Trainer):
                     clip_norm=clip_norm,
                 )
 
-                self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
+                self.policy_losses[agent] = tf.reduce_mean(policy_loss)
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
@@ -1338,15 +1338,15 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
                 # Critic loss.
                 critic_loss = recurrent_n_step_critic_loss(
-                    q_values,
-                    rewards[agent],
-                    discount * agent_discount,
-                    target_q_values,
+                    q_values=q_values,
+                    target_q_values=target_q_values,
+                    rewards=rewards[agent],
+                    discounts=discount * agent_discount,
                     bootstrap_n=self._bootstrap_n,
                     loss_fn=trfl.td_learning,
                 )
 
-                self.critic_losses[agent] = tf.reduce_mean(critic_loss, axis=0)
+                self.critic_losses[agent] = tf.reduce_mean(critic_loss)
 
                 # Actor learning.
                 obs_agent_feed = target_obs_trans[agent]
@@ -1386,13 +1386,13 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 clip_norm = True if self._max_gradient_norm is not None else False
 
                 policy_loss = losses.dpg(
-                    dpg_q_values,
-                    dpg_actions_comb,
+                    q_max=dpg_q_values,
+                    a_max=dpg_actions_comb,
                     tape=tape,
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
-                self.policy_losses[agent] = tf.reduce_mean(policy_loss, axis=0)
+                self.policy_losses[agent] = tf.reduce_mean(policy_loss)
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
