@@ -1262,7 +1262,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         data: Trajectory = inputs.data
 
         # Note (dries): The unused variable is start_of_episodes.
-        observations, actions, rewards, discounts, _, extras = (
+        observations, actions, rewards, end_of_episode, _, extras = (
             data.observations,
             data.actions,
             data.rewards,
@@ -1333,8 +1333,13 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
                 # Cast the additional discount to match
                 # the environment discount dtype.
-                agent_discount = discounts[agent]
+                agent_discount = end_of_episode[agent]
                 discount = tf.cast(self._discount, dtype=agent_discount.dtype)
+                agent_end_of_episode = end_of_episode[agent]
+                ones_mask = tf.ones(shape=(agent_end_of_episode.shape[0], 1))
+                step_not_padded = tf.concat(
+                    [ones_mask, agent_end_of_episode[:, :-1]], axis=1
+                )
 
                 # Critic loss.
                 critic_loss = recurrent_n_step_critic_loss(
@@ -1392,7 +1397,13 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
-                self.policy_losses[agent] = tf.reduce_mean(policy_loss)
+
+                # Multiply by discounts to not train on padded data.
+                policy_mask = tf.reshape(step_not_padded, policy_loss.shape)
+                policy_loss = policy_loss * policy_mask
+                self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
+                    policy_mask
+                )
         self.tape = tape
 
     # Backward pass that calculates gradients and updates network.
