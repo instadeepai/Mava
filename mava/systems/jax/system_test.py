@@ -21,7 +21,6 @@ from typing import Any, Callable, List
 
 import pytest
 
-from mava.systems.jax import Builder
 from mava.systems.jax.system import System
 
 # Mock callbacks
@@ -48,14 +47,18 @@ class MockCallbackHookMixin:
 
 
 # Mock builder
-class MockBuilder(Builder, MockCallbackHookMixin):
-    def __init__(self, components: List[Any]) -> None:
-        """Init for mock builder.
+class MockBuilder(MockCallbackHookMixin):
+    def __init__(
+        self,
+        components: List[Any],
+    ) -> None:
+        """System building init
 
         Args:
-            components : List of components.
+            components: system callback components
         """
-        super().__init__(components)
+
+        self.callbacks = components
 
     def add_different_data_types(self) -> None:
         """Hooks for adding different data types."""
@@ -67,6 +70,14 @@ class MockBuilder(Builder, MockCallbackHookMixin):
         self.dummy_int_plus_str()
         self.dummy_float_plus_bool()
         self.dummy_str_plus_bool()
+
+    def build(self) -> None:
+        """Construct program nodes."""
+        pass
+
+    def launch(self) -> None:
+        """Run the graph program."""
+        pass
 
 
 class MockCallback:

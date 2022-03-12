@@ -74,6 +74,14 @@ class BaseSystem(abc.ABC):
 class SystemBuilder(abc.ABC):
     """Abstract system builder."""
 
+    def __init__(
+        self,
+    ) -> None:
+        """System building init"""
+
+        # Simple namespace for assigning system builder attributes dynamically
+        self.attr = SimpleNamespace()
+
     @abc.abstractmethod
     def data_server(self) -> List[Any]:
         """Data server to store and serve transition data from and to system.
