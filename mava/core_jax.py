@@ -79,7 +79,8 @@ class SystemBuilder(abc.ABC):
     ) -> None:
         """System building init"""
 
-        self.blocks = SimpleNamespace()
+        # Simple namespace for assigning system builder attributes dynamically
+        self.attr = SimpleNamespace()
 
     @abc.abstractmethod
     def data_server(self) -> List[Any]:
