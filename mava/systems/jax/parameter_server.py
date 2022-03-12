@@ -101,7 +101,6 @@ class ParameterServer(SystemParameterServer, CallbackHookMixin):
 
         self.on_parameter_server_run_start()
 
-        # Checkpoints every 5 minutes
         while True:
             # Wait 10 seconds before checking again
             non_blocking_sleep(10)
