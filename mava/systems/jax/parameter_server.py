@@ -18,21 +18,19 @@
 """Jax systems parameter server."""
 
 
-from typing import Any, Dict, List, Sequence, Union
+from typing import Dict, List, Sequence, Union
 
 import jax.numpy as jnp
 
+from mava.callbacks import Callback, CallbackHookMixin
 from mava.core_jax import SystemParameterServer
-
-# from mava.callbacks import Callback
-# from mava.callbacks import CallbackHookMixin
 from mava.utils.training_utils import non_blocking_sleep
 
 
-class ParameterServer(SystemParameterServer):
+class ParameterServer(SystemParameterServer, CallbackHookMixin):
     def __init__(
         self,
-        components: List[Any],
+        components: List[Callback],
     ) -> None:
         """Initialise the parameter server."""
         self.callbacks = components
