@@ -65,9 +65,7 @@ class ParameterServer(SystemParameterServer, CallbackHookMixin):
             self.system_parameters = {}
             for var_key in names:
                 self._var_key = var_key
-                # TODO (dries): Do we really have to convert the parameters to
-                # numpy each time. Can we not keep the parameters in numpy form
-                # without the checkpointer complaining?
+
                 self.on_parameter_server_get_parameters()
 
         self.on_parameter_server_get_parameters_end()
