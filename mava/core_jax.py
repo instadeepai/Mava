@@ -132,12 +132,12 @@ class SystemParemeterServer(abc.ABC):
     def get_parameters(
         self, names: Union[str, Sequence[str]]
     ) -> Dict[str, Dict[str, Any]]:
-        """_summary_
+        """Get parameters from the parameter server.
 
         Args:
-            names : _description_
+            names : Names of the parameters to get
         Returns:
-            _description_
+            The parameters that were requested
         """
 
     @abc.abstractmethod
@@ -145,8 +145,8 @@ class SystemParemeterServer(abc.ABC):
         """Set parameters in the parameter server.
 
         Args:
-            names : Names of the parameters to set.
-            vars : The values to set the parameters to.
+            names : Names of the parameters to set
+            vars : The values to set the parameters to
         """
 
     @abc.abstractmethod
@@ -154,8 +154,8 @@ class SystemParemeterServer(abc.ABC):
         """Add to the parameters in the parameter server.
 
         Args:
-            names : Names of the parameters to add to.
-            vars : The values to add to the parameters to.
+            names : Names of the parameters to add to
+            vars : The values to add to the parameters to
         """
 
     def run(self) -> None:
