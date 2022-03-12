@@ -17,7 +17,7 @@
 
 from abc import ABC
 
-from mava.core_jax import SystemBuilder, SystemParameterServer
+from mava.core_jax import SystemBuilder, SystemParameterClient, SystemParameterServer
 
 
 class Callback(ABC):
@@ -164,9 +164,9 @@ class Callback(ABC):
         """End of system launch."""
         pass
 
-    ##############################
-    # system variable server hooks
-    ##############################
+    ###############################
+    # system parameter server hooks
+    ###############################
 
     def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
         """[summary]"""
@@ -261,5 +261,139 @@ class Callback(ABC):
         pass
 
     def on_parameter_server_run_loop_end(self, server: SystemParameterServer) -> None:
+        """[summary]"""
+        pass
+
+    ###############################
+    # system parameter client hooks
+    ###############################
+
+    def on_parameter_client_init_start(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_init(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_init_end(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_get_start(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_get(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_get_end(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_set_start(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_set(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_set_end(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_set_and_get_start(
+        self, client: SystemParameterClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_set_and_get(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_set_and_get_end(
+        self, client: SystemParameterClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_add_start(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_add(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_add_end(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_add_and_wait_start(
+        self, client: SystemParameterClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_add_and_wait(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_add_and_wait_end(
+        self, client: SystemParameterClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_get_and_wait_start(
+        self, client: SystemParameterClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_get_and_wait(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_get_and_wait_end(
+        self, client: SystemParameterClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_get_all_and_wait_start(
+        self, client: SystemParameterClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_get_all_and_wait(
+        self, client: SystemParameterClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_get_all_and_wait_end(
+        self, client: SystemParameterClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_set_and_wait_start(
+        self, client: SystemParameterClient
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_set_and_wait(self, client: SystemParameterClient) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_client_set_and_wait_end(
+        self, client: SystemParameterClient
+    ) -> None:
         """[summary]"""
         pass

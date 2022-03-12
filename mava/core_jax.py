@@ -141,7 +141,7 @@ class SystemParameterServer(abc.ABC):
     ) -> None:
         """System parameter server init"""
 
-        # Simple namespace for assigning system parameter server attributes dynamically
+        # Simple namespace for assigning parameter server attributes dynamically
         self.attr = SimpleNamespace()
 
     @abc.abstractmethod
@@ -177,3 +177,51 @@ class SystemParameterServer(abc.ABC):
     def run(self) -> None:
         """Run the parameter server. This function allows for checkpointing and other \
         centralised computations to be performed by the parameter server."""
+
+
+class SystemParameterClient(abc.ABC):
+    """A variable client for updating variables from a remote source."""
+
+    def __init__(
+        self,
+    ) -> None:
+        """System parameter server init"""
+
+        # Simple namespace for assigning parameter client attributes dynamically
+        self.attr = SimpleNamespace()
+
+    @abc.abstractmethod
+    def get_async(self) -> None:
+        """Asynchronously updates the get variables with the latest copy from source."""
+
+    @abc.abstractmethod
+    def set_async(self) -> None:
+        """Asynchronously updates source with the set variables."""
+
+    @abc.abstractmethod
+    def set_and_get_async(self) -> None:
+        """Asynchronously updates source and gets from source."""
+
+    @abc.abstractmethod
+    def add_async(self, names: List[str], vars: Dict[str, Any]) -> None:
+        """Asynchronously adds to source variables."""
+
+    @abc.abstractmethod
+    def add_and_wait(self, names: List[str], vars: Dict[str, Any]) -> None:
+        """Adds the specified variables to the corresponding variables in source \
+        and waits for the process to complete before continuing."""
+
+    @abc.abstractmethod
+    def get_and_wait(self) -> None:
+        """Updates the get variables with the latest copy from source \
+        and waits for the process to complete before continuing."""
+
+    @abc.abstractmethod
+    def get_all_and_wait(self) -> None:
+        """Updates all the variables with the latest copy from source \
+        and waits for the process to complete before continuing."""
+
+    @abc.abstractmethod
+    def set_and_wait(self) -> None:
+        """Updates source with the set variables \
+        and waits for the process to complete before continuing."""
