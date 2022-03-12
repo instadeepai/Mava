@@ -34,6 +34,7 @@ class ParameterServer(SystemParameterServer, CallbackHookMixin):
     ) -> None:
         """Initialise the parameter server."""
         self.callbacks = components
+        self.parameters: Dict[str, Dict[str, jnp.ndarray]]
 
         self.on_parameter_server_init_start()
 
@@ -60,9 +61,9 @@ class ParameterServer(SystemParameterServer, CallbackHookMixin):
         self.on_parameter_server_get_parameters_start()
 
         if isinstance(names, str):
-            self.system_parameters = self.parameters[names]
+            parameters = self.parameters[names]
         else:
-            self.system_parameters = {}
+            parameters = {}
             for var_key in names:
                 self._var_key = var_key
 
@@ -70,7 +71,7 @@ class ParameterServer(SystemParameterServer, CallbackHookMixin):
 
         self.on_parameter_server_get_parameters_end()
 
-        return self.system_parameters
+        return parameters
 
     def set_parameters(
         self, names: Sequence[str], vars: Dict[str, jnp.ndarray]
