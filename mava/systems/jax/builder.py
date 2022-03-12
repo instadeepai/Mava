@@ -20,14 +20,14 @@
 
 from typing import Any, List
 
-from mava.callbacks import CallbackHookMixin
+from mava.callbacks import Callback, CallbackHookMixin
 from mava.core_jax import SystemBuilder
 
 
 class Builder(SystemBuilder, CallbackHookMixin):
     def __init__(
         self,
-        components: List[Any],
+        components: List[Callback],
     ) -> None:
         """System building init
 
