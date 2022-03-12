@@ -18,7 +18,7 @@
 
 import abc
 from types import SimpleNamespace
-from typing import Any, List
+from typing import Any, Dict, List, Sequence, Union
 
 
 class BaseSystem(abc.ABC):
@@ -125,3 +125,39 @@ class SystemBuilder(abc.ABC):
     @abc.abstractmethod
     def launch(self) -> None:
         """Run the graph program."""
+
+
+class SystemParemeterServer(abc.ABC):
+    @abc.abstractmethod
+    def get_parameters(
+        self, names: Union[str, Sequence[str]]
+    ) -> Dict[str, Dict[str, Any]]:
+        """_summary_
+
+        Args:
+            names : _description_
+        Returns:
+            _description_
+        """
+
+    @abc.abstractmethod
+    def set_parameters(self, names: Sequence[str], vars: Dict[str, Any]) -> None:
+        """Set parameters in the parameter server.
+
+        Args:
+            names : Names of the parameters to set.
+            vars : The values to set the parameters to.
+        """
+
+    @abc.abstractmethod
+    def add_to_parameters(self, names: Sequence[str], vars: Dict[str, Any]) -> None:
+        """Add to the parameters in the parameter server.
+
+        Args:
+            names : Names of the parameters to add to.
+            vars : The values to add to the parameters to.
+        """
+
+    def run(self) -> None:
+        """Run the parameter server. This function allows for checkpointing and other \
+        centralised computations to be performed by the parameter server."""
