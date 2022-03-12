@@ -193,3 +193,102 @@ class CallbackHookMixin(ABC):
         """End of system launch."""
         for callback in self.callbacks:
             callback.on_building_launch_end(self)
+
+    ##############################
+    # system variable server hooks
+    ##############################
+
+    def on_parameter_server_init_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_init_start(self)
+
+    def on_parameter_server_init(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_init(self)
+
+    def on_parameter_server_init_checkpointer(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_init_checkpointer(self)
+
+    def on_parameter_server_init_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_init_end(self)
+
+    def on_parameter_server_get_parameters_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_get_parameters_start(self)
+
+    def on_parameter_server_get_parameters(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_get_parameters(self)
+
+    def on_parameter_server_get_parameters_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_get_parameters_end(self)
+
+    def on_parameter_server_set_parameters_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_set_parameters_start(self)
+
+    def on_parameter_server_set_parameters(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_set_parameters(self)
+
+    def on_parameter_server_set_parameters_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_set_parameters_end(self)
+
+    def on_parameter_server_add_to_parameters_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_add_to_parameters_start(self)
+
+    def on_parameter_server_add_to_parameters(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_add_to_parameters(self)
+
+    def on_parameter_server_add_to_parameters_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_add_to_parameters_end(self)
+
+    def on_parameter_server_run_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_run_start(self)
+
+    def on_parameter_server_run_loop_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_run_loop_start(self)
+
+    def on_parameter_server_run_loop_checkpoint(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_run_loop_checkpoint(self)
+
+    def on_parameter_server_run_loop(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_run_loop(self)
+
+    def on_parameter_server_run_loop_termination(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_run_loop_termination(self)
+
+    def on_parameter_server_run_loop_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_parameter_server_run_loop_end(self)
