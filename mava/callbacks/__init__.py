@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Jax-based Mava system implementation."""
+"""Mava callbacks for component creation."""
 
-from mava.systems.jax.builder import Builder
-from mava.systems.jax.config import Config
+from mava.callbacks.base import Callback
+from mava.callbacks.hook_mixin import CallbackHookMixin  # type: ignore
