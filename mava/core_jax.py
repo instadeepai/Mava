@@ -127,7 +127,7 @@ class SystemBuilder(abc.ABC):
         """Run the graph program."""
 
 
-class SystemParemeterServer(abc.ABC):
+class SystemParameterServer(abc.ABC):
     @abc.abstractmethod
     def get_parameters(
         self, names: Union[str, Sequence[str]]
