@@ -17,7 +17,7 @@
 
 from abc import ABC
 
-from mava.core_jax import SystemBuilder
+from mava.core_jax import SystemBuilder, SystemParameterServer
 
 
 class Callback(ABC):
@@ -162,4 +162,104 @@ class Callback(ABC):
 
     def on_building_launch_end(self, builder: SystemBuilder) -> None:
         """End of system launch."""
+        pass
+
+    ##############################
+    # system variable server hooks
+    ##############################
+
+    def on_parameter_server_init_start(self, server: SystemParameterServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_init(self, server: SystemParameterServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_init_checkpointer(
+        self, server: SystemParameterServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_init_end(self, server: SystemParameterServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_get_parameters_start(
+        self, server: SystemParameterServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_get_parameters_end(
+        self, server: SystemParameterServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_set_parameters_start(
+        self, server: SystemParameterServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_set_parameters_end(
+        self, server: SystemParameterServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_add_to_parameters_start(
+        self, server: SystemParameterServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_add_to_parameters(
+        self, server: SystemParameterServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_add_to_parameters_end(
+        self, server: SystemParameterServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_run_start(self, server: SystemParameterServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_run_loop_start(self, server: SystemParameterServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_run_loop_checkpoint(
+        self, server: SystemParameterServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_run_loop_termination(
+        self, server: SystemParameterServer
+    ) -> None:
+        """[summary]"""
+        pass
+
+    def on_parameter_server_run_loop_end(self, server: SystemParameterServer) -> None:
+        """[summary]"""
         pass

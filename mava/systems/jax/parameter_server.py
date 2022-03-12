@@ -36,15 +36,12 @@ class ParameterServer(SystemParameterServer, CallbackHookMixin):
         super().__init__()
 
         self.callbacks = components
-        self.parameters: Dict[str, Dict[str, jnp.ndarray]]
 
         self.on_parameter_server_init_start()
 
         self.on_parameter_server_init()
 
-        self.on_parameter_server_init_checkpointing()
-
-        self.on_parameter_server_checkpointer()
+        self.on_parameter_server_init_checkpointer()
 
         self.on_parameter_server_init_end()
 
@@ -62,18 +59,11 @@ class ParameterServer(SystemParameterServer, CallbackHookMixin):
 
         self.on_parameter_server_get_parameters_start()
 
-        if isinstance(names, str):
-            parameters = self.parameters[names]
-        else:
-            parameters = {}
-            for var_key in names:
-                self._var_key = var_key
-
-                self.on_parameter_server_get_parameters()
+        self.on_parameter_server_get_parameters()
 
         self.on_parameter_server_get_parameters_end()
 
-        return parameters
+        return self.attr.parameters
 
     def set_parameters(
         self, names: Sequence[str], vars: Dict[str, jnp.ndarray]
@@ -85,26 +75,9 @@ class ParameterServer(SystemParameterServer, CallbackHookMixin):
             vars : The values to set the parameters to
         """
 
-        if isinstance(names, str):
-            self._names = [names]
-            self._vars = {names: vars}
-        else:
-            self._names = names
-            self._vars = vars
-
         self.on_parameter_server_set_parameters_start()
 
-        for var_key in names:
-            self._var_key = var_key
-            assert var_key in self.parameters
-            if isinstance(self.parameters[var_key], tuple):
-                # Loop through tuple
-                for var_i in range(len(self.parameters[var_key])):
-                    self._var_i = var_i
-
-                    self.on_parameter_server_set_parameters_if_tuple()
-            else:
-                self.on_parameter_server_set_parameters_if_dict()
+        self.on_parameter_server_set_parameters()
 
         self.on_parameter_server_set_parameters_end()
 
@@ -117,20 +90,10 @@ class ParameterServer(SystemParameterServer, CallbackHookMixin):
             names : Names of the parameters to add to
             vars : The values to add to the parameters to
         """
-        if isinstance(names, str):
-            self._names = [names]
-            self._vars = {names: vars}
-        else:
-            self._names = names
-            self._vars = vars
 
         self.on_parameter_server_add_to_parameters_start()
 
-        for var_key in names:
-            assert var_key in self.parameters
-            self._var_key = var_key
-
-            self.on_parameter_server_add_to_parameters()
+        self.on_parameter_server_add_to_parameters()
 
         self.on_parameter_server_add_to_parameters_end()
 
