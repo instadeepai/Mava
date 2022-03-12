@@ -33,6 +33,8 @@ class ParameterServer(SystemParameterServer, CallbackHookMixin):
         components: List[Callback],
     ) -> None:
         """Initialise the parameter server."""
+        super().__init__()
+
         self.callbacks = components
         self.parameters: Dict[str, Dict[str, jnp.ndarray]]
 

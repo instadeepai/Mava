@@ -136,6 +136,14 @@ class SystemBuilder(abc.ABC):
 
 
 class SystemParameterServer(abc.ABC):
+    def __init__(
+        self,
+    ) -> None:
+        """System parameter server init"""
+
+        # Simple namespace for assigning system parameter server attributes dynamically
+        self.attr = SimpleNamespace()
+
     @abc.abstractmethod
     def get_parameters(
         self, names: Union[str, Sequence[str]]
