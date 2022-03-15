@@ -63,7 +63,6 @@ class MAPPO:
         critic_optimizer: Optional[snt.Optimizer] = snt.optimizers.Adam(
             learning_rate=5e-4
         ),
-        use_single_optimizer: bool = True,
         discount: float = 0.99,
         lambda_gae: float = 0.95,
         clipping_epsilon: float = 0.2,
@@ -122,12 +121,6 @@ class MAPPO:
                 Defaults to snt.optimizers.Adam(learning_rate=5e-4).
             critic_optimizer : optimizer for updating critic
                 networks. This is not used if using single optim.
-            use_single_optimizer : boolean to decide
-                whether or not the critic, policy and observation networks are
-                optimized jointly by a single optimizer. If true, all networks
-                are optimized by the policy_optimizer. If False, the observation and
-                policy network are optimized by the policy optimizer and the
-                critic network by the critic optimizer.
             discount : discount factor to use for TD updates. Defaults
                 to 0.99.
             lambda_gae : scalar determining the mix of bootstrapping
@@ -286,7 +279,6 @@ class MAPPO:
                 checkpoint=checkpoint,
                 policy_optimizer=policy_optimizer,
                 critic_optimizer=critic_optimizer,
-                use_single_optimizer=use_single_optimizer,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
                 evaluator_interval=evaluator_interval,

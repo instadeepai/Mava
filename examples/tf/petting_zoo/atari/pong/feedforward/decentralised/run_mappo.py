@@ -88,7 +88,6 @@ def main(_: Any) -> None:
         checkpoint_subpath=checkpoint_dir,
         num_epochs=5,
         batch_size=32,
-        use_single_optimizer=True,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

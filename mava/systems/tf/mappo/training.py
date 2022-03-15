@@ -55,7 +55,6 @@ class MAPPOTrainer(mava.Trainer):
         dataset: tf.data.Dataset,
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Optional[Union[snt.Optimizer, Dict[str, snt.Optimizer]]],
-        use_single_optimizer: bool,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
         minibatch_size: Optional[int] = None,
@@ -90,12 +89,6 @@ class MAPPOTrainer(mava.Trainer):
             critic_optimizer: optimizer
                 for updating critic networks. This is not used if using
                 single optim.
-            use_single_optimizer: boolean to decide
-                whether or not the critic, policy and observation networks are
-                optimized jointly by a single optimizer. If true, all networks
-                are optimized by the policy_optimizer. If False, the observation and
-                policy network are optimized by the policy optimizer and the
-                critic network by the critic optimizer.
             agent_net_keys: specifies what network each agent uses.
                 Defaults to {}.
             checkpoint_minute_interval: The number of minutes to wait between
@@ -182,7 +175,6 @@ class MAPPOTrainer(mava.Trainer):
             ] = policy_network_to_expose.variables
 
         # Other trainer parameters.
-        self._use_single_optimizer = use_single_optimizer
         self._minibatch_size = minibatch_size
         self._num_epochs = num_epochs
         self._discount = discount
@@ -497,56 +489,38 @@ class MAPPOTrainer(mava.Trainer):
         policy_losses = self.policy_losses
         critic_losses = self.critic_losses
         tape = self.tape
-        total_loss = self.total_losses
 
         for agent in self._agents:
             # Get agent_key.
             agent_key = self._agent_net_keys[agent]
 
-            # Get trainable variables.
-            if self._use_single_optimizer:
-                variables = (
-                    self._policy_networks[agent_key].trainable_variables
-                    + self._critic_networks[agent_key].trainable_variables
-                    + self._observation_networks[agent_key].trainable_variables
-                )
+            policy_variables = self._policy_networks[agent_key].trainable_variables
+            # Only use critic vars to update the observation network
+            # if we have two optims.
+            critic_variables = (
+                self._critic_networks[agent_key].trainable_variables
+                + self._observation_networks[agent_key].trainable_variables
+            )
 
-                # Get gradients.
-                gradients = tape.gradient(total_loss[agent], variables)
+            # Get gradients.
+            critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
+            # Optionally apply clipping.
+            critic_grads = tf.clip_by_global_norm(
+                critic_gradients, self._max_gradient_norm
+            )[0]
+            # Apply gradients.
+            self._critic_optimizers[agent_key].apply(critic_grads, critic_variables)
 
-                # Optionally apply clipping.
-                grads = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
+            # Get gradients.
+            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
 
-                # Apply gradients.
-                self._policy_optimizers[agent_key].apply(grads, variables)
-            else:
-                policy_variables = self._policy_networks[agent_key].trainable_variables
-                # Only use critic vars to update the observation network
-                # if we have two optims.
-                critic_variables = (
-                    self._critic_networks[agent_key].trainable_variables
-                    + self._observation_networks[agent_key].trainable_variables
-                )
+            # Optionally apply clipping.
+            policy_grads = tf.clip_by_global_norm(
+                policy_gradients, self._max_gradient_norm
+            )[0]
 
-                # Get gradients.
-                critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
-                # Optionally apply clipping.
-                critic_grads = tf.clip_by_global_norm(
-                    critic_gradients, self._max_gradient_norm
-                )[0]
-                # Apply gradients.
-                self._critic_optimizers[agent_key].apply(critic_grads, critic_variables)
-
-                # Get gradients.
-                policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
-
-                # Optionally apply clipping.
-                policy_grads = tf.clip_by_global_norm(
-                    policy_gradients, self._max_gradient_norm
-                )[0]
-
-                # Apply gradients.
-                self._policy_optimizers[agent_key].apply(policy_grads, policy_variables)
+            # Apply gradients.
+            self._policy_optimizers[agent_key].apply(policy_grads, policy_variables)
 
         train_utils.safe_del(self, "tape")
 
@@ -635,7 +609,6 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         dataset: tf.data.Dataset,
         policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         critic_optimizer: Optional[Union[snt.Optimizer, Dict[str, snt.Optimizer]]],
-        use_single_optimizer: bool,
         agent_net_keys: Dict[str, str],
         checkpoint_minute_interval: int,
         minibatch_size: Optional[int] = None,
@@ -665,12 +638,6 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             policy_optimizer : optimizer for updating policy networks.
             critic_optimizer : optimizer for updating critic networks. This is not
                 necessary if using single optim.
-            use_single_optimizer : boolean to decide
-                whether or not the critic, policy and observation networks are
-                optimized jointly by a single optimizer. If true, all networks
-                are optimized by the policy_optimizer. If False, the observation and
-                policy network are optimized by the policy optimizer and the
-                critic network by the critic optimizer.
             agent_net_keys : specifies what network each agent uses.
             checkpoint_minute_interval : The number of minutes to wait between
                 checkpoints.
@@ -714,7 +681,6 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             checkpoint_minute_interval=checkpoint_minute_interval,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
-            use_single_optimizer=use_single_optimizer,
             minibatch_size=minibatch_size,
             num_epochs=num_epochs,
             discount=discount,
