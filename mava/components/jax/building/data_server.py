@@ -134,7 +134,7 @@ class OffPolicyDataServer(DataServer):
 
 
 @dataclass
-class OnPolicyDataTablesConfig:
+class OnPolicyDataServerConfig:
     max_queue_size: int = 1000
     data_server_name: str = "on_policy_table"
 
@@ -142,7 +142,7 @@ class OnPolicyDataTablesConfig:
 class OnPolicyDataServer(DataServer):
     def __init__(
         self,
-        config: OnPolicyDataTablesConfig = OnPolicyDataTablesConfig(),
+        config: OnPolicyDataServerConfig = OnPolicyDataServerConfig(),
     ) -> None:
         """_summary_
 
