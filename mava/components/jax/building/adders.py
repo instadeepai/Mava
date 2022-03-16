@@ -29,11 +29,45 @@ class Adder(Callback):
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """[summary]"""
 
+    @property
+    def name(self) -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "adder"
+
+
+@dataclass
+class AdderSignatureConfig:
+    pass
+
 
 class AdderSignature(Callback):
+    def __init__(
+        self,
+        config: AdderSignatureConfig = AdderSignatureConfig(),
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
     @abc.abstractmethod
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
         """[summary]"""
+
+    @property
+    def name(self) -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "adder_signature"
 
 
 @dataclass
@@ -53,6 +87,17 @@ class ParallelTransitionAdder(Adder):
             config : _description_.
         """
         self.config = config
+
+    def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
+        """_summary_
+
+        Args:
+            builder : _description_
+        """
+        builder.attr.priority_fns = {
+            table_key: lambda x: 1.0
+            for table_key in builder.attr.table_network_config.keys()
+        }
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -114,6 +159,17 @@ class ParallelSequenceAdder(Adder):
             builder : _description_
         """
         builder.attr.sequence_length = self.config.sequence_length
+
+    def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
+        """_summary_
+
+        Args:
+            builder : _description_
+        """
+        builder.attr.priority_fns = {
+            table_key: lambda x: 1.0
+            for table_key in builder.attr.table_network_config.keys()
+        }
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_
