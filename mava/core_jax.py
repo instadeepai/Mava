@@ -82,6 +82,12 @@ class SystemBuilder(abc.ABC):
         # Simple namespace for assigning system builder attributes dynamically
         self.attr = SimpleNamespace()
 
+        self._executor_id: str
+        self._trainer_id: str
+        self._data_server_client: Any
+        self._parameter_server_client: Any
+        self._evaluator: bool
+
     @abc.abstractmethod
     def data_server(self) -> List[Any]:
         """Data server to store and serve transition data from and to system.
