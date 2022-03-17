@@ -20,12 +20,12 @@ from typing import Dict, List, Sequence, Union
 
 import jax.numpy as jnp
 
-from mava.callbacks import Callback, CallbackHookMixin
+from mava.callbacks import Callback, ParameterServerHookMixin
 from mava.core_jax import SystemParameterServer
 from mava.utils.training_utils import non_blocking_sleep
 
 
-class ParameterServer(SystemParameterServer, CallbackHookMixin):
+class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
     def __init__(
         self,
         components: List[Callback],
