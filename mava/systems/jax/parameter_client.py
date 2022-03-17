@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import jax
 
-from mava.systems.jax import ParameterServer
+from mava.systems.jax.parameter_server import ParameterServer
 from mava.utils.sort_utils import sort_str_num
 
 
