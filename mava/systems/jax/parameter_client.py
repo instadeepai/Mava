@@ -74,7 +74,7 @@ class ParameterClient:
         self._async_adjust_and_request = lambda: self._executor.submit(
             self._adjust_and_request
         )
-        self._async_add = lambda names, Params: self._executor.submit(  # type: ignore
+        self._async_add: Any = lambda names, Params: self._executor.submit(
             self._add(names, Params)  # type: ignore
         )
 
@@ -104,7 +104,7 @@ class ParameterClient:
         if period_reached and self._get_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            self._get_future = self._async_request()  # type: ignore
+            self._get_future = self._async_request()
             self._get_call_counter = 0
 
         if self._get_future is not None and self._get_future.done():
@@ -120,14 +120,14 @@ class ParameterClient:
 
         period_reached: bool = self._set_call_counter >= self._update_period
 
-        if period_reached and self._set_future is None:  # type: ignore
+        if period_reached and self._set_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            self._set_future = self._async_adjust()  # type: ignore
+            self._set_future = self._async_adjust()
             self._set_call_counter = 0
             return
         if self._set_future is not None and self._set_future.done():
-            self._set_future = None  # type: ignore
+            self._set_future = None
 
     def set_and_get_async(self) -> None:
         """Asynchronously updates server and gets from server."""
@@ -136,14 +136,14 @@ class ParameterClient:
             self._set_get_call_counter += 1
         period_reached: bool = self._set_get_call_counter >= self._update_period
 
-        if period_reached and self._set_get_future is None:  # type: ignore
+        if period_reached and self._set_get_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            self._set_get_future = self._async_adjust_and_request()  # type: ignore
+            self._set_get_future = self._async_adjust_and_request()
             self._set_get_call_counter = 0
             return
         if self._set_get_future is not None and self._set_get_future.done():
-            self._set_get_future = None  # type: ignore
+            self._set_get_future = None
 
     def add_async(self, names: List[str], Params: Dict[str, Any]) -> None:
         """Asynchronously adds to server parameters."""
@@ -154,13 +154,11 @@ class ParameterClient:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
             if not self._async_add_buffer:
-                self._add_future = self._async_add(names, Params)  # type: ignore
+                self._add_future = self._async_add(names, Params)
             else:
                 for name in names:
                     self._async_add_buffer[name] += Params[name]
-                self._add_future = self._async_add(  # type: ignore
-                    names, self._async_add_buffer
-                )  # type: ignore
+                self._add_future = self._async_add(names, self._async_add_buffer)
                 self._async_add_buffer = {}
             return
         else:
@@ -182,17 +180,17 @@ class ParameterClient:
     def get_and_wait(self) -> None:
         """Updates the get parameters with the latest copy from server \
         and waits for the process to complete before continuing."""
-        self._copy(self._request())  # type: ignore
+        self._copy(self._request())
 
     def get_all_and_wait(self) -> None:
         """Updates all the parameters with the latest copy from server \
         and waits for the process to complete before continuing."""
-        self._copy(self._request_all())  # type: ignore
+        self._copy(self._request_all())
 
     def set_and_wait(self) -> None:
         """Updates server with the set parameters \
         and waits for the process to complete before continuing."""
-        self._adjust()  # type: ignore
+        self._adjust()
 
     # TODO(Dries/Arnu): this needs a bit of a cleanup
     def _copy(self, new_parameters: Dict[str, Any]) -> None:

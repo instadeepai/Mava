@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# type: ignore
-
 """Mava callbacks for component creation."""
 
 from mava.callbacks.base import Callback
