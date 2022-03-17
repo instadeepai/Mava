@@ -19,7 +19,7 @@ from abc import ABC
 from typing import List
 
 
-class CallbackHookMixin(ABC):
+class BuilderHookMixin(ABC):
 
     ######################
     # system builder hooks
