@@ -18,7 +18,7 @@
 
 import abc
 from types import SimpleNamespace
-from typing import Any, Dict, List, Sequence, Union
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
 
 class BaseSystem(abc.ABC):
@@ -139,6 +139,51 @@ class SystemBuilder(abc.ABC):
     @abc.abstractmethod
     def launch(self) -> None:
         """Run the graph program."""
+
+
+class SystemExecutor(abc.ABC):
+    """Abstract system executor object."""
+
+    def __init__(
+        self,
+    ) -> None:
+        """System building init"""
+
+        # Simple namespace for assigning system executor attributes dynamically
+        self.attr = SimpleNamespace()
+
+        self._agent: str
+        self._observation: Any
+        self._timestep: Any
+        self._state: Any
+        self._observations: Dict[str, Any]
+        self._actions: Dict[str, Any]
+        self._extras: Dict[str, Any]
+
+    @abc.abstractmethod
+    def select_action(
+        self, agent: str, observation: Any
+    ) -> Union[Any, Tuple[Any, Any]]:
+        """Select an action for a single agent in the system."""
+
+    @abc.abstractmethod
+    def select_actions(
+        self, observations: Dict[str, Any]
+    ) -> Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
+        """Select the actions for all agents in the system."""
+
+    @abc.abstractmethod
+    def observe(
+        self,
+        actions: Dict[str, Any],
+        timestep: Any,
+        extras: Dict[str, Any] = {},
+    ) -> None:
+        """Record observed timestep from the environment."""
+
+    @abc.abstractmethod
+    def update(self, wait: bool = False) -> None:
+        """Update executor parameters."""
 
 
 class SystemParameterServer(abc.ABC):
