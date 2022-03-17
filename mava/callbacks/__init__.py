@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# type: ignore
+
 """Mava callbacks for component creation."""
 
 from mava.callbacks.base import Callback
 from mava.callbacks.builder_mixin import BuilderHookMixin
-from mava.callbacks.executor_mixin import ExecutorHookMixin  # type: ignore
+from mava.callbacks.executor_mixin import ExecutorHookMixin
 from mava.callbacks.parameter_server_mixin import ParameterServerHookMixin

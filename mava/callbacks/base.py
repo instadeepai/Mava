@@ -17,7 +17,7 @@
 
 from abc import ABC
 
-from mava.core_jax import SystemBuilder, SystemParameterServer
+from mava.core_jax import SystemBuilder, SystemExecutor, SystemParameterServer
 
 
 class Callback(ABC):
@@ -162,6 +162,78 @@ class Callback(ABC):
 
     def on_building_launch_end(self, builder: SystemBuilder) -> None:
         """End of system launch."""
+        pass
+
+    #######################
+    # system executor hooks
+    #######################
+
+    def on_execution_init_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_init(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_init_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_action_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_action_preprocess(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_action_sample(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_action_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_actions_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_select_actions_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_update_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_update(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_update_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
         pass
 
     ###############################
