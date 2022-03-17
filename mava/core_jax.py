@@ -142,12 +142,12 @@ class SystemBuilder(abc.ABC):
 
 
 class SystemExecutor(abc.ABC):
-    """Abstract system executor object."""
+    """Abstract system executor."""
 
     def __init__(
         self,
     ) -> None:
-        """System building init"""
+        """System executor init"""
 
         # Simple namespace for assigning system executor attributes dynamically
         self.attr = SimpleNamespace()
@@ -184,6 +184,42 @@ class SystemExecutor(abc.ABC):
     @abc.abstractmethod
     def update(self, wait: bool = False) -> None:
         """Update executor parameters."""
+
+
+class SystemTrainer(abc.ABC):
+    """Abstract system trainer."""
+
+    def __init__(
+        self,
+    ) -> None:
+        """System trainer init"""
+
+        # Simple namespace for assigning system executor attributes dynamically
+        self.attr = SimpleNamespace()
+
+        self._inputs: Any
+
+    @abc.abstractmethod
+    def _forward(self, inputs: Any) -> None:
+        """Trainer forward pass"""
+
+    @abc.abstractmethod
+    def _backward(self) -> None:
+        """Trainer backward pass updating network parameters"""
+
+    @abc.abstractmethod
+    def _step(
+        self,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Trainer forward and backward passes.
+
+        Returns:
+            losses
+        """
+
+    @abc.abstractmethod
+    def step(self) -> Dict:
+        """Trainer forward and backward passes."""
 
 
 class SystemParameterServer(abc.ABC):
