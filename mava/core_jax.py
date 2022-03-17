@@ -82,6 +82,8 @@ class SystemBuilder(abc.ABC):
         # Simple namespace for assigning system builder attributes dynamically
         self.attr = SimpleNamespace()
 
+        self.callbacks: Any
+
         self._executor_id: str
         self._trainer_id: str
         self._data_server_client: Any

@@ -17,6 +17,7 @@
 
 from mava.components.jax.building.base import BaseParameterServerProcess
 from mava.core_jax import SystemBuilder
+from mava.systems.jax import ParameterServer
 
 
 class ParameterServerProcess(BaseParameterServerProcess):
@@ -26,4 +27,4 @@ class ParameterServerProcess(BaseParameterServerProcess):
         Args:
             builder : _description_
         """
-        # builder.parameter_server = ParameterServer(builder.components)
+        builder.attr.system_parameter_server = ParameterServer(builder.callbacks)

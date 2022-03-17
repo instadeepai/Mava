@@ -17,6 +17,7 @@
 
 from mava.components.jax.building.base import BaseTrainerProcess
 from mava.core_jax import SystemBuilder
+from mava.systems.jax import Trainer
 
 
 class TrainerProcess(BaseTrainerProcess):
@@ -26,4 +27,4 @@ class TrainerProcess(BaseTrainerProcess):
         Args:
             builder : _description_
         """
-        # builder.trainer_fn = Trainer(builder.components)
+        builder.attr.trainer_fn = Trainer(builder.callbacks)

@@ -17,6 +17,7 @@
 
 from mava.components.jax.building.base import BaseExecutorProcess
 from mava.core_jax import SystemBuilder
+from mava.systems.jax import Executor
 
 
 class ExecutorProcess(BaseExecutorProcess):
@@ -26,4 +27,4 @@ class ExecutorProcess(BaseExecutorProcess):
         Args:
             builder : _description_
         """
-        # builder.executor_fn = Executor(builder.components)
+        builder.attr.executor_fn = Executor(builder.callbacks)
