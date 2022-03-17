@@ -17,3 +17,4 @@
 
 from mava.systems.jax.builder import Builder
 from mava.systems.jax.config import Config
+from mava.systems.jax.parameter_server import ParameterServer
