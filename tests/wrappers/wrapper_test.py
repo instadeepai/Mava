@@ -22,16 +22,11 @@ import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
 from mava import types
+from mava.utils.environments.flatland_utils import check_flatland_import
 from tests.conftest import EnvSpec, EnvType, Helpers
 from tests.enums import EnvSource
 
-try:
-    import flatland  # noqa: F401
-
-    _has_flatland = True
-except (ModuleNotFoundError, ImportError):
-    _has_flatland = False
-    pass
+_has_flatland = check_flatland_import()
 """
 TestEnvWrapper is a general purpose test class that runs tests for environment wrappers.
 This is meant to flexibily test various environments wrappers.

@@ -11,7 +11,7 @@ We include a number of systems running on continuous control tasks.
 - **MADDPG**:
     a MADDPG system running on the continuous action space simple_spread MPE environment.
   - *Feedforward*:
-    - decentralised
+    - Decentralised
       - [decentralised][debug_maddpg_ff_dec]
       - [decentralised record agents][debug_maddpg_ff_dec_record]  (***recording agents acting in the environment***)
       - [decentralised executor scaling][debug_maddpg_ff_dec_scaling_executors] (***scaling to 4 executors***)
@@ -20,7 +20,7 @@ We include a number of systems running on continuous control tasks.
       - [decentralised lr scheduling][debug_maddpg_ff_dec_lr_scheduling](***using lr schedule***)
       - [decentralised evaluator intervals][debug_maddpg_ff_dec_eval_intervals](***running the evaluation loop at intervals***)
 
-  - [centralised][debug_maddpg_cen] , [networked][debug_maddpg_networked] (***using a fully-connected, networked architecture***), [networked with custom architecture][debug_maddpg_networked_custom] (***using a custom, sparse, networked architecture***) and [state_based][debug_maddpg_state_based].
+    - [centralised][debug_maddpg_cen] , [networked][debug_maddpg_networked] (***using a fully-connected, networked architecture***), [networked with custom architecture][debug_maddpg_networked_custom] (***using a custom, sparse, networked architecture***) and [state_based][debug_maddpg_state_based].
 
   - *Recurrent*
     - [decentralised][debug_maddpg_rec_dec] and [state_based][debug_maddpg_state_based].
@@ -45,13 +45,19 @@ We include a number of systems running on continuous control tasks.
 - **MAD4PG**:
       a MAD4PG system running on the Multiwalker environment.
   - *Feedforward*
-    - [decentralised][pz_mad4pg_ff_dec] and [decentralised record agents][pz_mad4pg_ff_dec_record] (***recording agents acting in the environment***).
+    - [decentralised][pz_mad4pg_ff_dec]
+    - [decentralised record agents][pz_mad4pg_ff_dec_record] (***recording agents acting in the environment***).
+
+- **MAPPO**
+    - *Feedforward*
+        - [decentralised][pz_mappo_ff_dec].
 
 ### 2D RoboCup
 
 - **MAD4PG**:
     a MAD4PG system running on the RoboCup environment.
-  - *Recurrent* [state_based][robocup_mad4pg_ff_state_based].
+  - *Recurrent* 
+    - [state_based][robocup_mad4pg_ff_state_based].
 
 ## Discrete control
 
@@ -67,29 +73,37 @@ We also include a number of systems running on discrete action space environment
 - **MADQN**:
       a MADQN system running on the discrete action space simple_spread MPE environment.
   - *Feedforward*
-    - [decentralised][debug_madqn_ff_dec], [decentralised lr scheduling][debug_madqn_ff_dec_lr_schedule] (***using lr schedule***), [decentralised custom lr scheduling][debug_madqn_ff_dec_custom_lr_schedule] (***using custom lr schedule***) and [decentralised custom epsilon decay scheduling][debug_madqn_ff_dec_custom_eps_schedule] (***using configurable epsilon scheduling***).
+    - Decentralised
+        - [decentralised][debug_madqn_ff_dec]
+        - [decentralised lr scheduling][debug_madqn_ff_dec_lr_schedule] (***using lr schedule***)
+        - [decentralised custom lr scheduling][debug_madqn_ff_dec_custom_lr_schedule] (***using custom lr schedule***)
+        - [decentralised custom epsilon decay scheduling][debug_madqn_ff_dec_custom_eps_schedule] (***using configurable epsilon scheduling***).
   - *Recurrent*
     - [decentralised][debug_madqn_rec_dec].
 
 - **VDN**:
       a VDN system running on the discrete action space simple_spread MPE environment.
-  - *Recurrent* [centralised][debug_vdn_rec_cen].
+  - *Recurrent* 
+    - [centralised][debug_vdn_rec_cen].
 
 ### PettingZoo - Multi-Agent Atari
 
 - **MADQN**:
    a MADQN system running on the two-player competitive Atari Pong environment.
-  - *Recurrent* [decentralised][pz_madqn_pong_ff_dec].
+  - *Recurrent* 
+    - [decentralised][pz_madqn_pong_rec_dec].
 
 ### PettingZoo - Multi-Agent Particle Environment
 
 - **MADDPG**:
       a MADDPG system running on the Simple Speaker Listener environment.
-  - *Feedforward* [decentralised][pz_maddpg_mpe_ssl_ff_dec].
+  - *Feedforward* 
+    - [decentralised][pz_maddpg_mpe_ssl_ff_dec].
 
 - **MADDPG**:
       a MADDPG system running on the Simple Spread environment.
-  - *Feedforward* [decentralised][pz_maddpg_mpe_ss_ff_dec].
+  - *Feedforward* 
+    - [decentralised][pz_maddpg_mpe_ss_ff_dec].
 
 ### SMAC - StarCraft Multi-Agent Challenge
 
@@ -102,17 +116,20 @@ We also include a number of systems running on discrete action space environment
 
 - **QMIX**:
     a QMIX system running on the SMAC environment.
-  - *Recurrent* [centralised][smac_qmix_rec_cen].
+  - *Recurrent* 
+    - [centralised][smac_qmix_rec_cen].
 
 - **VDN**:
     a VDN system running on the SMAC environment.
-  - *Recurrent* [centralised][smac_vdn_rec_cen].
+  - *Recurrent* 
+    - [centralised][smac_vdn_rec_cen].
 
 ### OpenSpiel - Tic Tac Toe
 
 - **MADQN**:
       a MADQN system running on the OpenSpiel environment.
-  - *Feedforward* [decentralised][openspiel_madqn_ff_dec].
+  - *Feedforward* 
+    - [decentralised][openspiel_madqn_ff_dec].
 
 <!-- Examples -->
 [quickstart]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/quickstart.ipynb
@@ -143,8 +160,11 @@ We also include a number of systems running on discrete action space environment
 [pz_mad4pg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py
 [pz_mad4pg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py
 
-[robocup_mad4pg_ff_state_based]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/robocup/recurrent/state_based/run_mad4pg.py
+[pz_mad4pg_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg.py
+[pz_mad4pg_ff_dec_record]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mad4pg_record.py
+[pz_mappo_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/petting_zoo/sisl/multiwalker/feedforward/decentralised/run_mappo.py
 
+[robocup_mad4pg_ff_state_based]:https://github.com/instadeepai/Mava/blob/develop/examples/tf/robocup/recurrent/state_based/run_mad4pg.py
 <!-- Discrete -->
 [debug_mappo_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/debugging/simple_spread/feedforward/decentralised/run_mappo.py
 [debug_mappo_ff_cen]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/debugging/simple_spread/feedforward/centralised/run_mappo.py
@@ -157,12 +177,13 @@ We also include a number of systems running on discrete action space environment
 
 [debug_vdn_rec_cen]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/debugging/simple_spread/recurrent/centralised/run_vdn.py
 
-[pz_madqn_pong_rec_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/atari/pong/recurrent/centralised/run_madqn.py
+[pz_madqn_pong_rec_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/atari/pong/recurrent/decentralised/run_madqn.py
 
 [pz_maddpg_mpe_ssl_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/mpe/simple_speaker_listener/feedforward/decentralised/run_maddpg.py
 
 [pz_maddpg_mpe_ss_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/mpe/simple_spread/feedforward/decentralised/run_maddpg.py
 
+[smac_madqn_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/smac/feedforward/decentralised/run_madqn.py
 [smac_madqn_rec_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/smac/recurrent/decentralised/run_madqn.py
 
 [smac_qmix_rec_cen]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/smac/recurrent/centralised/run_qmix.py
