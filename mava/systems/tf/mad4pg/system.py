@@ -73,6 +73,7 @@ class MAD4PG(MADDPG):
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer: snt.Optimizer = snt.optimizers.Adam(learning_rate=1e-4),
+        use_single_optimizer: bool=False,
         n_step: int = 5,
         sequence_length: int = 20,
         period: int = 20,
@@ -143,6 +144,10 @@ class MAD4PG(MADDPG):
             policy_optimizer: optimizer(s) for updating policy networks.
             critic_optimizer: optimizer for updating critic
                 networks.
+            use_single_optimizer: boolean to decide whether or 
+                not to use a single optimizer for policy, critic 
+                and observation network. If using a single optimizer,
+                the policy optimizer is used.
             n_step: number of steps to include prior to boostrapping.
             sequence_length: recurrent sequence rollout length.
             period: Consecutive starting points for overlapping
@@ -210,6 +215,7 @@ class MAD4PG(MADDPG):
             samples_per_insert=samples_per_insert,
             policy_optimizer=policy_optimizer,
             critic_optimizer=critic_optimizer,
+            use_single_optimizer=use_single_optimizer,
             n_step=n_step,
             sequence_length=sequence_length,
             bootstrap_n=bootstrap_n,

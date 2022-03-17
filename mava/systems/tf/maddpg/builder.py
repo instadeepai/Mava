@@ -118,6 +118,7 @@ class MADDPGConfig:
     min_replay_size: int = 1000
     max_replay_size: int = 1000000
     samples_per_insert: Optional[float] = 32.0
+    use_single_optimizer: bool=False
     n_step: int = 5
     sequence_length: int = 20
     period: int = 20
@@ -594,6 +595,7 @@ class MADDPGBuilder:
             "agent_net_keys": trainer_agent_net_keys,
             "policy_optimizer": self._config.policy_optimizer,
             "critic_optimizer": self._config.critic_optimizer,
+            "use_single_optimizer": self._config.use_single_optimizer,
             "max_gradient_norm": max_gradient_norm,
             "discount": discount,
             "target_averaging": target_averaging,
