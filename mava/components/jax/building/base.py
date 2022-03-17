@@ -270,6 +270,3 @@ class BaseParameterServerProcess(Callback):
         Args:
             builder : _description_
         """
-        # builder.attr.system_parameter_server = ParameterServer(
-        # builder.attr.components
-        # )
