@@ -17,7 +17,12 @@
 
 from abc import ABC
 
-from mava.core_jax import SystemBuilder, SystemExecutor, SystemParameterServer
+from mava.core_jax import (
+    SystemBuilder,
+    SystemExecutor,
+    SystemParameterServer,
+    SystemTrainer,
+)
 
 
 class Callback(ABC):
@@ -233,6 +238,70 @@ class Callback(ABC):
         pass
 
     def on_execution_update_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    ######################
+    # system trainer hooks
+    ######################
+
+    def on_training_init_start(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_init_end(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_forward_start(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_forward(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_forward_end(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_backward_start(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_backward(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_backward_end(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_compute_step_start(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_compute_step(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_compute_step_end(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_step_start(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_step(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_step_end(self, trainer: SystemTrainer) -> None:
         """[summary]"""
         pass
 
