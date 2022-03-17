@@ -218,7 +218,7 @@ class SystemTrainer(abc.ABC):
         """
 
     @abc.abstractmethod
-    def step(self) -> Dict:
+    def step(self) -> None:
         """Trainer forward and backward passes."""
 
 

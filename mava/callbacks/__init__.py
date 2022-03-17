@@ -19,3 +19,4 @@ from mava.callbacks.base import Callback
 from mava.callbacks.builder_mixin import BuilderHookMixin
 from mava.callbacks.executor_mixin import ExecutorHookMixin
 from mava.callbacks.parameter_server_mixin import ParameterServerHookMixin
+from mava.callbacks.trainer_mixin import TrainerHookMixin
