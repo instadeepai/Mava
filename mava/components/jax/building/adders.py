@@ -40,6 +40,37 @@ class Adder(Callback):
 
 
 @dataclass
+class AdderPriorityConfig:
+    pass
+
+
+class AdderPriority(Callback):
+    def __init__(
+        self,
+        config: AdderPriorityConfig = AdderPriorityConfig(),
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    @abc.abstractmethod
+    def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+
+    @property
+    def name(self) -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "adder_priority"
+
+
+@dataclass
 class AdderSignatureConfig:
     pass
 
@@ -88,17 +119,6 @@ class ParallelTransitionAdder(Adder):
         """
         self.config = config
 
-    def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        builder.attr.priority_fns = {
-            table_key: lambda x: 1.0
-            for table_key in builder.attr.table_network_config.keys()
-        }
-
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_
 
@@ -115,6 +135,19 @@ class ParallelTransitionAdder(Adder):
         )
 
         builder.attr.adder = adder
+
+
+class UniformAdderPriority(AdderPriority):
+    def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
+        """_summary_
+
+        Args:
+            builder : _description_
+        """
+        builder.attr.priority_fns = {
+            table_key: lambda x: 1.0
+            for table_key in builder.attr.table_network_config.keys()
+        }
 
 
 class ParallelTransitionAdderSignature(AdderSignature):
@@ -159,17 +192,6 @@ class ParallelSequenceAdder(Adder):
             builder : _description_
         """
         builder.attr.sequence_length = self.config.sequence_length
-
-    def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        builder.attr.priority_fns = {
-            table_key: lambda x: 1.0
-            for table_key in builder.attr.table_network_config.keys()
-        }
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_
