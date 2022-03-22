@@ -71,6 +71,7 @@ class MADDPGBaseTrainer(mava.Trainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
+        update_obs_once: bool = False,
     ):
         """Initialise MADDPG trainer
 
@@ -108,12 +109,14 @@ class MADDPGBaseTrainer(mava.Trainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
+            update_obs_once: bool = use only critic gradients to update shared observatipon network
         """
 
         self._agents = agents
         self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
         self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
+        self._update_obs_once = update_obs_once
 
         # Setup counts
         self._counts = counts
@@ -936,6 +939,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
+        update_obs_once: bool = False,
     ):
         """Initialise Recurrent MADDPG trainer
 
@@ -973,6 +977,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
+            update_obs_once: bool = use only critic gradients to update shared observatipon network
         """
         self._bootstrap_n = bootstrap_n
 
@@ -980,6 +985,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
         self._agent_net_keys = agent_net_keys
         self._variable_client = variable_client
         self._learning_rate_scheduler_fn = learning_rate_scheduler_fn
+        self._update_obs_once = update_obs_once
 
         # Setup counts
         self._counts = counts
