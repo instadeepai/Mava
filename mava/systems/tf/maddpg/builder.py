@@ -130,6 +130,7 @@ class MADDPGConfig:
     termination_condition: Optional[Dict[str, int]] = None
     evaluator_interval: Optional[dict] = None
     learning_rate_scheduler_fn: Optional[Any] = None
+    update_obs_once: bool = False
 
 
 class MADDPGBuilder:
@@ -604,6 +605,7 @@ class MADDPGBuilder:
             "counts": counts,
             "logger": logger,
             "learning_rate_scheduler_fn": self._config.learning_rate_scheduler_fn,
+            "update_obs_once": self._config.update_obs_once,
         }
         if connection_spec:
             trainer_config["connection_spec"] = connection_spec
