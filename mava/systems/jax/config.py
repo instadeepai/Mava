@@ -78,6 +78,17 @@ class Config:
             for name, dataclass in kwargs.items():
                 if is_dataclass(dataclass):
                     if name in list(self._config.keys()):
+                        # When updating a component, the list of current parameter names
+                        # might contain the parameter names of the new component
+                        # with additional new parameter names that still need to be
+                        # checked with other components. Therefore, we first take the
+                        # difference between the current set and the component being
+                        # updated.
+                        self._current_params = list(
+                            set(self._current_params).difference(
+                                list(self._config[name].__dict__.keys())
+                            )
+                        )
                         new_param_names = list(dataclass.__dict__.keys())
                         if set(self._current_params) & set(new_param_names):
                             raise Exception(
@@ -87,7 +98,7 @@ class Config:
                             )
                         else:
                             self._current_params.extend(new_param_names)
-                        self._config[name] = dataclass
+                            self._config[name] = dataclass
                     else:
                         raise Exception(
                             "The given component config is not part of the current \

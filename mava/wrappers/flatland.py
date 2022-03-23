@@ -423,7 +423,6 @@ class FlatlandEnvWrapper(ParallelEnvWrapper):
     @property
     def num_agents(self) -> int:
         """Returns the number of trains/agents in the flatland environment"""
-        print(self._environment.number_of_agents)
         return int(self._environment.number_of_agents)
 
     def __getattr__(self, name: str) -> Any:
