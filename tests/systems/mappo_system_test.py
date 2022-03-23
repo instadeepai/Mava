@@ -50,7 +50,8 @@ class TestMAPPO:
             num_executors=1,
             batch_size=32,
             max_queue_size=1000,
-            optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            policy_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
+            critic_optimizer=snt.optimizers.Adam(learning_rate=1e-3),
             checkpoint=False,
         )
         program = system.build()
