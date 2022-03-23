@@ -388,13 +388,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         )
         self._add_first_called = True
 
-    def reset_writer(self, timeout_ms: Optional[int] = None) -> None:
-        """Resets the adder's buffer."""
-        if self._writer:
-            # Flush all appended data and clear the buffers.
-            self._writer.end_episode(clear_buffers=True, timeout_ms=timeout_ms)
-        self._add_first_called = False
-
     def add(
         self,
         actions: Dict[str, types.NestedArray],
@@ -440,7 +433,4 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             dummy_step = tree.map_structure(np.zeros_like, current_step)
             self._writer.append(dummy_step)
             self._write_last()
-
             self.reset()
-            # TODO (dries): Why does reset writer not work?
-            # self.reset_writer()
