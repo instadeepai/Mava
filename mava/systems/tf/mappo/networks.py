@@ -105,44 +105,39 @@ def make_default_networks(
         # Create the shared observation network; here simply a state-less operation.
         observation_network = tf2_utils.to_sonnet_module(tf.identity)
 
+        discrete_actions = isinstance(specs[key].actions, dm_env.specs.DiscreteArray)
+
+        policy_layers = [
+            networks.LayerNormMLP(
+                policy_networks_layer_sizes[key],
+                activate_final=False,
+                seed=seed,
+            )
+        ]
+
+        # Add recurrence if the architecture is recurrent
+        if archecture_type == ArchitectureType.recurrent:
+            policy_layers.append(
+                snt.LSTM(policy_networks_layer_sizes[key][-1]),
+            )
+
+        # Get the number of actions
+        num_actions = (
+            specs[key].actions.num_values
+            if discrete_actions
+            else np.prod(specs[key].actions.shape, dtype=int)
+        )
+
         # Note: The discrete case must be placed first as it inherits from BoundedArray.
-        if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discrete
-            num_actions = specs[key].actions.num_values
-
-            if archecture_type == ArchitectureType.feedforward:
-                policy_layers = [
-                    networks.LayerNormMLP(
-                        policy_networks_layer_sizes[key],
-                        activate_final=False,
-                        seed=seed,
-                    ),
-                ]
-            elif archecture_type == ArchitectureType.recurrent:
-                policy_layers = [
-                    networks.LayerNormMLP(
-                        policy_networks_layer_sizes[key][:-1],
-                        activate_final=True,
-                        seed=seed,
-                    ),
-                    snt.LSTM(policy_networks_layer_sizes[key][-1]),
-                    networks.LayerNormMLP(
-                        (num_actions,),
-                        activate_final=False,
-                        seed=seed,
-                    ),
-                ]
-
-            policy_network = policy_network_func(policy_layers)
-
+        if discrete_actions:  # discrete
+            policy_layers.append(
+                networks.CategoricalHead(
+                    num_values=num_actions, dtype=specs[key].actions.dtype
+                ),
+            )
         elif isinstance(specs[key].actions, dm_env.specs.BoundedArray):  # continuous
-            num_actions = np.prod(specs[key].actions.shape, dtype=int)
-            # No recurrent setting implemented yet.
-            assert archecture_type == ArchitectureType.feedforward
-            policy_network = snt.Sequential(
+            policy_layers.extend(
                 [
-                    networks.LayerNormMLP(
-                        policy_networks_layer_sizes[key], activate_final=True, seed=seed
-                    ),
                     networks.MultivariateNormalDiagHead(
                         num_dimensions=num_actions,
                         w_init=tf.initializers.VarianceScaling(1e-4, seed=seed),
@@ -153,6 +148,8 @@ def make_default_networks(
             )
         else:
             raise ValueError(f"Unknown action_spec type, got {specs[key].actions}.")
+
+        policy_network = policy_network_func(policy_layers)
 
         critic_network = snt.Sequential(
             [

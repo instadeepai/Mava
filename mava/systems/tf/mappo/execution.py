@@ -115,18 +115,18 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
         # Compute the policy, conditioned on the observation.
         policy = self._policy_networks[agent_key](batched_observation)
 
-        if type(policy) == tfd.transformed_distribution.TransformedDistribution:
-            # Sample from the policy and compute the log likelihood.
-            action = policy.sample()
-        else:
-            # Sample from the policy and compute the log likelihood.
-            policy = tfd.Categorical(policy)
-            action = policy.sample()
+        # Mask categorical policies using legal actions
+        if hasattr(observation_olt, "legal_actions") and isinstance(
+            policy, tfp.distributions.Categorical
+        ):
+            batched_legals = tf2_utils.add_batch_dim(observation_olt.legal_actions)
 
-            # Cast for compatibility with reverb.
-            # sample() returns a 'int32', which is a problem.
-            action = tf.cast(action, "int64")
+            policy = action_mask_categorical_policies(
+                policy=policy, batched_legal_actions=batched_legals
+            )
 
+        # Sample from the policy and compute the log likelihood.
+        action = policy.sample()
         log_prob = policy.log_prob(action)
         return action, log_prob
 
@@ -306,18 +306,6 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
         # Compute the policy, conditioned on the observation.
         policy, new_state = self._policy_networks[agent_key](batched_observation, state)
 
-        if type(policy) == tfd.transformed_distribution.TransformedDistribution:
-            # Sample from the policy and compute the log likelihood.
-            action = policy.sample()
-        else:
-            # Sample from the policy and compute the log likelihood.
-            policy = tfd.Categorical(policy)
-            action = policy.sample()
-
-            # Cast for compatibility with reverb.
-            # sample() returns a 'int32', which is a problem.
-            action = tf.cast(action, "int64")
-
         # Mask categorical policies using legal actions
         if hasattr(observation_olt, "legal_actions") and isinstance(
             policy, tfp.distributions.Categorical
@@ -329,6 +317,7 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
             )
 
         # Sample from the policy and compute the log likelihood.
+        action = policy.sample()
         log_prob = policy.log_prob(action)
         return action, log_prob, new_state
 

@@ -386,10 +386,6 @@ class MAPPOTrainer(mava.Trainer):
                     policy = policy_network(actor_observation)
                     policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
 
-                if type(policy) != tfd.transformed_distribution.TransformedDistribution:
-                    # Sample from the policy and compute the log likelihood.
-                    policy = tfd.Categorical(policy)
-
                 critic_observation = snt.merge_leading_dims(
                     critic_observation, num_dims=2
                 )
