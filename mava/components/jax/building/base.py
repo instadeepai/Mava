@@ -41,8 +41,8 @@ class Component(Callback):
             config : _description_.
         """
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def name(self) -> str:
         """_summary_"""
 
@@ -152,6 +152,10 @@ class BaseExecutorProcess(Component):
             builder : _description_
         """
 
+    def name(self) -> str:
+        """_summary_"""
+        return "executor"
+
 
 @dataclass
 class TrainerProcessConfig:
@@ -233,6 +237,10 @@ class BaseTrainerProcess(Component):
             builder : _description_
         """
 
+    def name(self) -> str:
+        """_summary_"""
+        return "trainer"
+
 
 @dataclass
 class ParameterServerProcessConfig:
@@ -290,3 +298,7 @@ class BaseParameterServerProcess(Component):
         Args:
             builder : _description_
         """
+
+    def name(self) -> str:
+        """_summary_"""
+        return "parameter_server"
