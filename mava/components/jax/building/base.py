@@ -28,6 +28,26 @@ from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
 
 @dataclass
+class Config:
+    pass
+
+
+class Component(Callback):
+    @abc.abstractmethod
+    def __init__(self, config: Config = Config()):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+
+    @abc.abstractmethod
+    @property
+    def name(self) -> str:
+        """_summary_"""
+
+
+@dataclass
 class ExecutorProcessConfig:
     network_sampling_setup: Union[
         List, enums.NetworkSampler
@@ -35,7 +55,7 @@ class ExecutorProcessConfig:
     shared_weights: bool = True
 
 
-class BaseExecutorProcess(Callback):
+class BaseExecutorProcess(Component):
     def __init__(self, config: ExecutorProcessConfig = ExecutorProcessConfig()):
         """_summary_
 
@@ -140,7 +160,7 @@ class TrainerProcessConfig:
     ] = enums.Trainer.single_trainer
 
 
-class BaseTrainerProcess(Callback):
+class BaseTrainerProcess(Component):
     def __init__(self, config: TrainerProcessConfig = TrainerProcessConfig()):
         """_summary_
 
@@ -161,7 +181,7 @@ class BaseTrainerProcess(Callback):
         unique_net_keys = builder.attr.unique_net_keys
 
         # Setup trainer_networks
-        if type(trainer_networks) is not dict:
+        if not isinstance(trainer_networks, dict):
             if trainer_networks == enums.Trainer.single_trainer:
                 builder.attr.trainer_networks = {"trainer": unique_net_keys}
             elif trainer_networks == enums.Trainer.one_trainer_per_network:
@@ -219,7 +239,7 @@ class ParameterServerProcessConfig:
     random_param: int = 5
 
 
-class BaseParameterServerProcess(Callback):
+class BaseParameterServerProcess(Component):
     def __init__(
         self, config: ParameterServerProcessConfig = ParameterServerProcessConfig()
     ):
