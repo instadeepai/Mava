@@ -94,8 +94,7 @@ def get_trajectory_net_agents(
     trajectory: Union[Trajectory, mava_types.Transition],
     trajectory_net_keys: Dict[str, str],
 ) -> Tuple[List, Dict[str, List]]:
-    """Returns a dictionary that maps network_keys to a list of agents using that
-    specific network.
+    """Maps network_keys to a list of agents using that specific network.
 
     Args:
         trajectory: Episode experience recorded by
@@ -390,13 +389,6 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
         )
         self._add_first_called = True
 
-    def reset_writer(self, timeout_ms: Optional[int] = None) -> None:
-        """Resets the adder's buffer."""
-        if self._writer:
-            # Flush all appended data and clear the buffers.
-            self._writer.end_episode(clear_buffers=True, timeout_ms=timeout_ms)
-        self._add_first_called = False
-
     def add(
         self,
         actions: Dict[str, types.NestedArray],
@@ -443,4 +435,4 @@ class ReverbParallelAdder(ReverbAdder, ParallelAdder):
             dummy_step = tree.map_structure(np.zeros_like, current_step)
             self._writer.append(dummy_step)
             self._write_last()
-            self.reset_writer()
+            self.reset()
