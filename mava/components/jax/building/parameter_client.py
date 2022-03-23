@@ -19,12 +19,12 @@ from typing import Any, Dict, List, Tuple
 
 import jax.numpy as jnp
 
-from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.systems.jax import ParameterClient
 
 
-class BaseParameterClient(Callback):
+class BaseParameterClient(Component):
     def _set_up_count_parameters(
         self, params: Dict[str, Any]
     ) -> Tuple[List[str], Dict[str, Any]]:

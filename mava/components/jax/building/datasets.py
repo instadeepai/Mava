@@ -20,7 +20,7 @@ from typing import Callable, Optional
 import reverb
 from acme import datasets
 
-from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 
 Transform = Callable[[reverb.ReplaySample], reverb.ReplaySample]
@@ -37,7 +37,7 @@ class TransitionDatasetConfig:
     dataset_name: str = "transition_dataset"
 
 
-class TransitionDataset(Callback):
+class TransitionDataset(Component):
     def __init__(
         self,
         config: TransitionDatasetConfig = TransitionDatasetConfig(),
@@ -82,7 +82,7 @@ class TrajectoryDatasetConfig:
     dataset_name: str = "trajectory_dataset"
 
 
-class TrajectoryDataset(Callback):
+class TrajectoryDataset(Component):
     def __init__(
         self,
         config: TrajectoryDatasetConfig = TrajectoryDatasetConfig(),

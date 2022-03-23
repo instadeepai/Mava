@@ -17,7 +17,7 @@
 from dataclasses import dataclass
 from typing import List
 
-from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.systems.jax.launcher import Launcher, NodeType
 
@@ -31,7 +31,7 @@ class DistributorConfig:
     distributor_name: str = "System"
 
 
-class Distributor(Callback):
+class Distributor(Component):
     def __init__(self, config: DistributorConfig = DistributorConfig()):
         """_summary_
 
