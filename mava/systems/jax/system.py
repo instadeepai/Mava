@@ -113,7 +113,10 @@ class System(BaseSystem):
         """
         # build config is not already built
         if not self.config._built:
-            self.config.build()
+            raise ValueError(
+                "System config not built. Please call the configure\
+                function before calling this function."
+            )
 
         # update distributor config
         self.config.set_parameters(
