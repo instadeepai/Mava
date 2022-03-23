@@ -220,12 +220,7 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
                     dqda_clipping=dqda_clipping,
                     clip_norm=clip_norm,
                 )
-                # Multiply by discounts to not train on padded data.
-                policy_mask = tf.reshape(step_not_padded, policy_loss.shape)
-                policy_loss = policy_loss * policy_mask
-                self.policy_losses[agent] = tf.reduce_sum(policy_loss) / tf.reduce_sum(
-                    policy_mask
-                )
+                self.policy_losses[agent] = tf.reduce_mean(policy_loss)
         self.tape = tape
 
 
