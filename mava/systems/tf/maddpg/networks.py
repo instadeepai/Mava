@@ -37,6 +37,7 @@ def make_default_networks(
     net_spec_keys: Dict[str, str] = {},
     policy_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
+    observation_network: snt.Module = None,
     sigma: float = 0.3,
     architecture_type: ArchitectureType = ArchitectureType.feedforward,
     vmin: Optional[float] = None,
@@ -127,8 +128,11 @@ def make_default_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = np.prod(agent_act_spec.shape, dtype=int)
 
-        # An optional network to process observations
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
+        # Create the shared observation network; here simply a state-less operation.
+        if observation_network is None:
+            observation_network = tf2_utils.to_sonnet_module(tf.identity)
+        else:
+            observation_network = observation_network
         # Create the policy network.
         if architecture_type == ArchitectureType.feedforward:
             policy_network = [
