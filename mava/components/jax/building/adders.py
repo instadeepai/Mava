@@ -20,11 +20,11 @@ from typing import Any, Dict
 
 from mava import specs
 from mava.adders import reverb as reverb_adders
-from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 
 
-class Adder(Callback):
+class Adder(Component):
     @abc.abstractmethod
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """[summary]"""
@@ -44,7 +44,7 @@ class AdderPriorityConfig:
     pass
 
 
-class AdderPriority(Callback):
+class AdderPriority(Component):
     def __init__(
         self,
         config: AdderPriorityConfig = AdderPriorityConfig(),
@@ -58,7 +58,13 @@ class AdderPriority(Callback):
 
     @abc.abstractmethod
     def on_building_executor_adder_priority(self, builder: SystemBuilder) -> None:
-        """_summary_"""
+        """_summary_
+
+        Args:
+            builder : _description_
+        Returns:
+            _description_
+        """
 
     @property
     def name(self) -> str:
@@ -75,7 +81,7 @@ class AdderSignatureConfig:
     pass
 
 
-class AdderSignature(Callback):
+class AdderSignature(Component):
     def __init__(
         self,
         config: AdderSignatureConfig = AdderSignatureConfig(),
@@ -125,8 +131,11 @@ class ParallelTransitionAdder(Adder):
         Args:
             builder : _description_
         """
+        if not hasattr(builder.attr, "adder_priority_fn"):
+            builder.attr.adder_priority_fn = None
+
         adder = reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns=builder.attr.priority_fns,
+            priority_fns=builder.attr.adder_priority_fn,
             client=builder.attr.system_data_server,
             net_ids_to_keys=builder.attr.unique_net_keys,
             n_step=self.config.n_step,
@@ -199,8 +208,11 @@ class ParallelSequenceAdder(Adder):
         Args:
             builder : _description_
         """
+        if not hasattr(builder.attr, "adder_priority_fn"):
+            builder.attr.adder_priority_fn = None
+
         adder = reverb_adders.ParallelSequenceAdder(
-            priority_fns=builder.attr.priority_fns,
+            priority_fns=builder.attr.adder_priority_fn,
             client=builder.attr.system_data_server,
             net_ids_to_keys=builder.attr.unique_net_keys,
             sequence_length=self.config.sequence_length,

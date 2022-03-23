@@ -21,30 +21,10 @@ from typing import Any, Dict, List, Union
 import jax
 import jax.numpy as jnp
 
-from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
-
-
-@dataclass
-class Config:
-    pass
-
-
-class Component(Callback):
-    @abc.abstractmethod
-    def __init__(self, config: Config = Config()):
-        """_summary_
-
-        Args:
-            config : _description_.
-        """
-
-    @property
-    @abc.abstractmethod
-    def name(self) -> str:
-        """_summary_"""
 
 
 @dataclass

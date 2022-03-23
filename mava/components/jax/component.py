@@ -14,25 +14,22 @@
 # limitations under the License.
 
 """Base components for system builder"""
+
 import abc
-from dataclasses import dataclass
+from typing import Any
 
 from mava.callbacks import Callback
 
 
-@dataclass
-class Config:
-    pass
-
-
 class Component(Callback):
     @abc.abstractmethod
-    def __init__(self, config: Config = Config()):
+    def __init__(self, config: Any) -> None:
         """_summary_
 
         Args:
             config : _description_.
         """
+        self.config = config
 
     @property
     @abc.abstractmethod
