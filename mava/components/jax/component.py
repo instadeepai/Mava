@@ -13,6 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Components for Mava systems."""
+"""Base components for system builder"""
+import abc
+from dataclasses import dataclass
 
-from mava.components.jax.component import Component
+from mava.callbacks import Callback
+
+
+@dataclass
+class Config:
+    pass
+
+
+class Component(Callback):
+    @abc.abstractmethod
+    def __init__(self, config: Config = Config()):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+
+    @property
+    @abc.abstractmethod
+    def name(self) -> str:
+        """_summary_"""
