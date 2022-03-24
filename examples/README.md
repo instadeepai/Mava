@@ -184,7 +184,7 @@ We also include a number of systems running on discrete action space environment
 
 [pz_madqn_pong_rec_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/atari/pong/recurrent/decentralised/run_madqn.py
 
-[pz_mappo_coop_pong_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/atari/pong/feedforward/decentralised/run_mappo.py
+[pz_mappo_coop_pong_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/butterfly/cooperative_pong/feedforward/decentralised/run_mappo.py
 
 [pz_maddpg_mpe_ssl_ff_dec]: https://github.com/instadeepai/Mava/blob/develop/examples/tf/petting_zoo/mpe/simple_speaker_listener/feedforward/decentralised/run_maddpg.py
 
