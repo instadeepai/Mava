@@ -330,6 +330,7 @@ def test_system_launch_without_configure(
     Args:
         system_with_two_components : mock system
     """
+    system_with_two_components.configure()
     system_with_two_components.launch(num_executors=1, nodes_on_gpu=["process"])
     system_with_two_components._builder.add_different_data_types()
     assert system_with_two_components._builder.int_plus_str == 2
@@ -363,6 +364,7 @@ def test_system_update_with_existing_component(
         system_with_two_components : mock system
     """
     system_with_two_components.update(ComponentTwo)
+    system_with_two_components.configure()
     system_with_two_components.launch(num_executors=1, nodes_on_gpu=["process"])
     system_with_two_components._builder.add_different_data_types()
     assert system_with_two_components._builder.int_plus_str == 0
@@ -404,6 +406,7 @@ def test_system_add_with_non_existing_component(
         system_with_one_component : mock system
     """
     system_with_one_component.add(ComponentOne)
+    system_with_one_component.configure()
     system_with_one_component.launch(num_executors=1, nodes_on_gpu=["process"])
     system_with_one_component._builder.add_different_data_types()
     assert system_with_one_component._builder.int_plus_str == 2
@@ -419,6 +422,7 @@ def test_system_update_twice(system_with_two_components: System) -> None:
     """
     system_with_two_components.update(ComponentTwo)
     system_with_two_components.update(ComponentZero)
+    system_with_two_components.configure()
     system_with_two_components.launch(num_executors=1, nodes_on_gpu=["process"])
     system_with_two_components._builder.add_different_data_types()
     assert system_with_two_components._builder.int_plus_str == 2
@@ -434,6 +438,7 @@ def test_system_add_twice(system_with_zero_components: System) -> None:
     """
     system_with_zero_components.add(ComponentOne)
     system_with_zero_components.add(ComponentTwo)
+    system_with_zero_components.configure()
     system_with_zero_components.launch(num_executors=1, nodes_on_gpu=["process"])
     system_with_zero_components._builder.add_different_data_types()
     assert system_with_zero_components._builder.int_plus_str == 0
@@ -449,6 +454,7 @@ def test_system_add_and_update(system_with_zero_components: System) -> None:
     """
     system_with_zero_components.add(ComponentZero)
     system_with_zero_components.update(ComponentTwo)
+    system_with_zero_components.configure()
     system_with_zero_components.launch(num_executors=1, nodes_on_gpu=["process"])
     system_with_zero_components._builder.add_different_data_types()
     assert system_with_zero_components._builder.int_plus_str == 0

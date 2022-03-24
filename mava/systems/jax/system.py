@@ -103,7 +103,7 @@ class System(BaseSystem):
     ) -> None:
         """Run the system.
 
-        Args
+        Args:
             num_executors : number of executor processes to run in parallel
             nodes_on_gpu : which processes to run on gpu
             multi_process : whether to run locally or distributed, local runs are
@@ -113,7 +113,10 @@ class System(BaseSystem):
         """
         # build config is not already built
         if not self.config._built:
-            self.config.build()
+            raise ValueError(
+                "System config not built. Please call the .configure()\
+                function before calling this .launch()."
+            )
 
         # update distributor config
         self.config.set_parameters(
