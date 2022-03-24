@@ -124,6 +124,14 @@ class BaseExecutorProcess(Component):
             net_key: i for i, net_key in enumerate(builder.attr.unique_net_keys)
         }
 
+    def on_building_executor_start(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        builder.attr.networks = builder.attr.network_factory(
+            environment_spec=builder.attr.environment_spec,
+            agent_net_keys=builder.attr.agent_net_keys,
+            net_spec_keys=builder.attr.net_spec_keys,
+        )
+
     @abc.abstractmethod
     def on_building_executor(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -208,6 +216,14 @@ class BaseTrainerProcess(Component):
                 if most_matches < matches:
                     matches = most_matches
                     builder.attr.table_network_config[trainer_key] = sample
+
+    def on_building_trainer_start(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        builder.attr.networks = builder.attr.network_factory(
+            environment_spec=builder.attr.environment_spec,
+            agent_net_keys=builder.attr.agent_net_keys,
+            net_spec_keys=builder.attr.net_spec_keys,
+        )
 
     @abc.abstractmethod
     def on_building_trainer(self, builder: SystemBuilder) -> None:
