@@ -16,12 +16,14 @@
 
 """System Trainer implementation."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterator, List, Optional
 
 import reverb
 
+from mava import types
 from mava.callbacks import Callback, TrainerHookMixin
 from mava.core_jax import SystemTrainer
+from mava.systems.jax import ParameterClient
 
 
 class Trainer(SystemTrainer, TrainerHookMixin):
@@ -29,13 +31,31 @@ class Trainer(SystemTrainer, TrainerHookMixin):
 
     def __init__(
         self,
+        networks: Dict[str, Dict[str, Any]],
+        dataset: Iterator[reverb.ReplaySample],
+        parameter_client: ParameterClient,
+        trainer_networks: List[Any],
+        trainer_table_entry: List[Any],
+        logger: Optional[types.NestedLogger] = None,
         components: List[Callback] = [],
     ):
-        """Initialisation.
+        """_summary_
 
         Args:
-            components : callback components
+            networks : _description_
+            dataset : _description_
+            parameter_client : _description_
+            trainer_networks : _description_
+            trainer_table_entry : _description_
+            logger : _description_.
+            components : _description_.
         """
+        self.networks = networks
+        self.dataset = dataset
+        self.parameter_client = parameter_client
+        self.trainer_networks = trainer_networks
+        self.trainer_table_entry = trainer_table_entry
+        self.logger = logger
         self.callbacks = components
 
         self.on_training_init_start()

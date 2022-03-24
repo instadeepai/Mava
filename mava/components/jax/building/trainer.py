@@ -27,4 +27,13 @@ class TrainerProcess(BaseTrainerProcess):
         Args:
             builder : _description_
         """
-        builder.attr.trainer_fn = Trainer(builder.callbacks)
+
+        builder.attr.trainer_fn = Trainer(
+            networks=builder.attr.networks,
+            dataset=builder.attr.dataset,
+            parameter_client=builder.attr.trainer_parameter_client,
+            trainer_networks=builder.attr.trainer_networks[builder._trainer_id],
+            trainer_table_entry=builder.attr.trainer_table_entry[builder._trainer_id],
+            logger=builder.attr.trainer_logger,
+            components=builder.callbacks,
+        )
