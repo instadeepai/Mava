@@ -139,7 +139,7 @@ class MockTestSetup(Component):
         return "setup"
 
 
-class TestSystem(System):
+class TestSystemWithParallelSequenceAdder(System):
     def design(self) -> SimpleNamespace:
         """Mock system design with zero components.
 
@@ -183,19 +183,21 @@ class TestSystem(System):
 
 
 @pytest.fixture
-def test_system() -> System:
+def test_system_parallel_sequence_adder() -> System:
     """Dummy system with zero components."""
-    return TestSystem()
+    return TestSystemWithParallelSequenceAdder()
 
 
 def test_adders(
-    test_system: System,
+    test_system_parallel_sequence_adder: System,
 ) -> None:
     """Test if system builder instantiates processes as expected."""
-    test_system.launch(num_executors=1, nodes_on_gpu=["process"])
-    test_system._builder.adders()
-    test_system._builder.attr.adder.add_first(env_restart)
-    test_system._builder.attr.server.stop()
+    test_system_parallel_sequence_adder.launch(
+        num_executors=1, nodes_on_gpu=["process"]
+    )
+    test_system_parallel_sequence_adder._builder.adders()
+    test_system_parallel_sequence_adder._builder.attr.adder.add_first(env_restart)
+    test_system_parallel_sequence_adder._builder.attr.server.stop()
 
 
 # TODO (Kale-ab): test adder behaviour in more detail
