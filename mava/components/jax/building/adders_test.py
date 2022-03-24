@@ -31,17 +31,16 @@ from mava.core_jax import SystemBuilder
 from mava.specs import MAEnvironmentSpec
 from mava.systems.jax.system import System
 from mava.testing.building import mocks
+from mava.utils.wrapper_utils import parameterized_restart
 
-# from mava.utils.wrapper_utils import parameterized_restart
-
-# agents = {"agent_0", "agent_1", "agent_2"}
-# obs_first = {agent: np.array([0.0, 1.0]) for agent in agents}
-# default_discount = {agent: 1.0 for agent in agents}
-# env_restart = parameterized_restart(
-#     reward={agent: 0.0 for agent in agents},
-#     discount=default_discount,
-#     observation=obs_first,
-# )
+agents = {"agent_0", "agent_1", "agent_2"}
+obs_first = {agent: np.array([0.0, 1.0]) for agent in agents}
+default_discount = {agent: 1.0 for agent in agents}
+env_restart = parameterized_restart(
+    reward={agent: 0.0 for agent in agents},
+    discount=default_discount,
+    observation=obs_first,
+)
 
 
 def make_fake_env_specs() -> MAEnvironmentSpec:
@@ -117,12 +116,19 @@ class MockTestSetup(Component):
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
         env_spec = make_fake_env_specs()
-        builder.attr.system_data_server = reverb.Table.queue(
-            name="data_server",
-            max_size=100,
-            signature=builder.attr.adder_signature_fn(
-                env_spec, builder.attr.sequence_length, {}
-            ),
+        builder.attr.server = reverb.Server(
+            [
+                reverb.Table.queue(
+                    name="data_server",
+                    max_size=100,
+                    signature=builder.attr.adder_signature_fn(
+                        env_spec, builder.attr.sequence_length, {}
+                    ),
+                )
+            ]
+        )
+        builder.attr.system_data_server = reverb.Client(
+            f"localhost:{builder.attr.server.port}"
         )
         builder.attr.unique_net_keys = ["network_0"]
         builder.attr.table_network_config = {"table_0": "network_0"}
@@ -188,7 +194,8 @@ def test_adders(
     """Test if system builder instantiates processes as expected."""
     test_system.launch(num_executors=1, nodes_on_gpu=["process"])
     test_system._builder.adders()
-    # test_system._builder.attr.adder.add_first(env_restart)
+    test_system._builder.attr.adder.add_first(env_restart)
+    test_system._builder.attr.server.stop()
 
 
-# TODO (Kale-ab): test adder behaviour
+# TODO (Kale-ab): test adder behaviour in more detail
