@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Parameter handling utilities for Jax. Adapted from Deepmind's Acme library"""
+"""Parameter client for Jax system. Adapted from Deepmind's Acme library"""
 
 from concurrent import futures
 from typing import Any, Dict, List, Optional, Union
@@ -34,7 +34,7 @@ class ParameterClient:
         get_keys: List[str] = None,
         set_keys: List[str] = None,
         update_period: int = 1,
-        devices: Dict[str, Union[str, jax.xla.Device]] = {},
+        devices: Dict[str, Optional[Union[str, jax.xla.Device]]] = {},
     ):
         """Initialise the parameter server."""
         self._all_keys = sort_str_num(list(parameters.keys()))
@@ -203,7 +203,7 @@ class ParameterClient:
                             # Move variables to a proper device.
                             self._parameters[key][agent_key][i] = jax.device_put(
                                 new_parameters[key][agent_key][i],
-                                self._devices[key][agent_key],
+                                self._devices[key][agent_key],  # type: ignore
                             )
                         else:
                             self._parameters[key][agent_key][i] = new_parameters[key][
@@ -221,7 +221,8 @@ class ParameterClient:
                 for i in range(len(self._parameters[key])):
                     if self._devices:
                         self._parameters[key][i] = jax.device_put(
-                            new_parameters[key][i], self._devices[key][i]
+                            new_parameters[key][i],
+                            self._devices[key][i],  # type: ignore
                         )
                     else:
                         self._parameters[key][i] = new_parameters[key][i]
