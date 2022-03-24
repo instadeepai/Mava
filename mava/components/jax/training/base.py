@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Commonly used adder components for system builders"""
+"""Base Trainer components"""
 import abc
 from typing import Any, NamedTuple
 

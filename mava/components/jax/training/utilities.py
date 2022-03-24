@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Commonly used adder components for system builders"""
-import abc
+"""Trainer utility components."""
 from dataclasses import dataclass
 
 import jax
@@ -41,7 +40,6 @@ class InitialState(Utility):
         """
         self.config = config
 
-    @abc.abstractmethod
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """_summary_"""
         networks = trainer.attr.networks

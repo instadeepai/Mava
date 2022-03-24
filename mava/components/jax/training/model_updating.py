@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Commonly used adder components for system builders"""
+"""Trainer components for system updating"""
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 

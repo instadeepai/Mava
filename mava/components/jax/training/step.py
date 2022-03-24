@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Commonly used adder components for system builders"""
-import abc
+"""Trainer components for gradient step calculations"""
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
@@ -45,7 +44,6 @@ class MAPGWithTrustRegionStep(Utility):
         """
         self.config = config
 
-    @abc.abstractmethod
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """_summary_"""
 
