@@ -12,33 +12,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Example running MAPPO on debug MPE environments."""
+"""Example running MAPPO on Cooperative Atari Pong."""
 
 import functools
 from datetime import datetime
 from typing import Any
 
 import launchpad as lp
-import sonnet as snt
+import numpy as np
 from absl import app, flags
+from acme.tf.networks import AtariTorso
+from supersuit import dtype_v0
 
-from mava.components.tf import architectures
 from mava.systems.tf import mappo
 from mava.utils import lp_utils
-from mava.utils.environments import debugging_utils
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
+    "env_class",
+    "butterfly",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "env_name",
+    "cooperative_pong_v3",
+    "Pettingzoo environment name, e.g. pong (str).",
 )
 
 flags.DEFINE_string(
@@ -50,22 +50,19 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
+    """Run example."""
 
-    Args:
-        _ : _
-    """
-
-    # Environment.
+    # Environment
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
+        env_preprocess_wrappers=[(dtype_v0, {"dtype": np.float32})],
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        mappo.make_default_networks,
+        mappo.make_default_networks, observation_network=AtariTorso()
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -88,12 +85,9 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
         checkpoint_subpath=checkpoint_dir,
-        max_gradient_norm=40.0,
-        architecture=architectures.CentralisedValueCritic,
-        trainer_fn=mappo.CentralisedMAPPOTrainer,
+        num_epochs=5,
+        batch_size=32,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
