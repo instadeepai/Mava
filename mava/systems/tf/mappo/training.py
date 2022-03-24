@@ -374,15 +374,24 @@ class MAPPOTrainer(mava.Trainer):
                 policy_network = self._policy_networks[agent_key]
                 critic_network = self._critic_networks[agent_key]
                 dims = actor_observation.shape[:2]
+
                 # Do policy forward pass.
                 if "core_states" in extras:
                     # Unroll current policy over actor_observation.
                     agent_core_state = core_states[agent][0]
-                    policy, updated_states = snt.static_unroll(
-                        policy_network,
-                        actor_observation,
-                        agent_core_state,
-                    )
+
+                    # Manual perform unroll
+                    action_prob = []
+                    policy_entropy = []
+                    for t in range(len(actor_observation)):
+                        outputs, agent_core_state = policy_network(
+                            actor_observation[t], agent_core_state
+                        )
+                        action_prob.append(outputs.log_prob(action[t]))
+                        policy_entropy.append(outputs.entropy())
+
+                    action_prob = tf.stack(action_prob, axis=0)
+                    policy_entropy = tf.stack(policy_entropy, axis=0)
                 else:
                     # Reshape inputs.
                     actor_observation = snt.merge_leading_dims(
@@ -390,6 +399,8 @@ class MAPPOTrainer(mava.Trainer):
                     )
                     policy = policy_network(actor_observation)
                     policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
+                    action_prob = policy.log_prob(action)
+                    policy_entropy = policy.entropy()
 
                 critic_observation = snt.merge_leading_dims(
                     critic_observation, num_dims=2
@@ -439,7 +450,7 @@ class MAPPOTrainer(mava.Trainer):
                 critic_loss = critic_loss * self._baseline_cost
 
                 # Compute importance sampling weights: current policy / behavior policy.
-                log_rhos = policy.log_prob(action)[:-1] - behaviour_log_prob[:-1]
+                log_rhos = action_prob[:-1] - behaviour_log_prob[:-1]
                 rhos = tf.exp(log_rhos)
 
                 clipped_rhos = tf.clip_by_value(
@@ -459,7 +470,7 @@ class MAPPOTrainer(mava.Trainer):
                 # Entropy regulariser.
                 # Entropy regularization. Only implemented for categorical dist.
                 try:
-                    masked_entropy_loss = policy.entropy()[:-1] * loss_mask[:-1]
+                    masked_entropy_loss = policy_entropy[:-1] * loss_mask[:-1]
                     entropy_loss = -tf.reduce_sum(masked_entropy_loss) / tf.reduce_sum(
                         loss_mask[:-1]
                     )
