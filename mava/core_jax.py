@@ -188,24 +188,6 @@ class SystemTrainer(abc.ABC):
         self._inputs: Any
 
     @abc.abstractmethod
-    def _forward(self, inputs: Any) -> None:
-        """Trainer forward pass"""
-
-    @abc.abstractmethod
-    def _backward(self) -> None:
-        """Trainer backward pass updating network parameters"""
-
-    @abc.abstractmethod
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-        """Trainer forward and backward passes.
-
-        Returns:
-            losses
-        """
-
-    @abc.abstractmethod
     def step(self) -> None:
         """Trainer forward and backward passes."""
 

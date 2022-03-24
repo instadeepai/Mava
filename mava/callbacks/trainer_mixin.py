@@ -42,50 +42,20 @@ class TrainerHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_training_init_end(self)
 
-    def on_training_forward_start(self) -> None:
+    def on_training_utility_fns(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_training_forward_start(self)
 
-    def on_training_forward(self) -> None:
+    def on_training_loss_fns(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_training_forward(self)
 
-    def on_training_forward_end(self) -> None:
+    def on_training_step_fn(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
             callback.on_training_forward_end(self)
-
-    def on_training_backward_start(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_training_backward_start(self)
-
-    def on_training_backward(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_training_backward(self)
-
-    def on_training_backward_end(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_training_backward_end(self)
-
-    def on_training_compute_step_start(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_training_compute_step_start(self)
-
-    def on_training_compute_step(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_training_compute_step(self)
-
-    def on_training_compute_step_end(self) -> None:
-        """[summary]"""
-        for callback in self.callbacks:
-            callback.on_training_compute_step_end(self)
 
     def on_training_step_start(self) -> None:
         """[summary]"""

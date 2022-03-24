@@ -257,39 +257,15 @@ class Callback(ABC):
         """[summary]"""
         pass
 
-    def on_training_forward_start(self, trainer: SystemTrainer) -> None:
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """[summary]"""
         pass
 
-    def on_training_forward(self, trainer: SystemTrainer) -> None:
+    def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
         """[summary]"""
         pass
 
-    def on_training_forward_end(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
-        pass
-
-    def on_training_backward_start(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
-        pass
-
-    def on_training_backward(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
-        pass
-
-    def on_training_backward_end(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
-        pass
-
-    def on_training_compute_step_start(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
-        pass
-
-    def on_training_compute_step(self, trainer: SystemTrainer) -> None:
-        """[summary]"""
-        pass
-
-    def on_training_compute_step_end(self, trainer: SystemTrainer) -> None:
+    def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """[summary]"""
         pass
 
