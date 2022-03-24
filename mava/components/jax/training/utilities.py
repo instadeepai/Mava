@@ -16,22 +16,12 @@
 """Commonly used adder components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
-import optax
 
-from mava.components.jax.training import Utility
+from mava.components.jax.training import TrainingState, Utility
 from mava.core_jax import SystemTrainer
-
-
-class TrainingState(NamedTuple):
-    """Training state consists of network parameters and optimiser state."""
-
-    params: Any
-    opt_state: optax.OptState
-    random_key: jnp.ndarray
 
 
 @dataclass
