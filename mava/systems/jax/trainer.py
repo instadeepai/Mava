@@ -23,7 +23,6 @@ import reverb
 from mava import types
 from mava.callbacks import Callback, TrainerHookMixin
 from mava.core_jax import SystemTrainer
-from mava.systems.jax import ParameterClient
 
 
 class Trainer(SystemTrainer, TrainerHookMixin):
@@ -33,7 +32,7 @@ class Trainer(SystemTrainer, TrainerHookMixin):
         self,
         networks: Dict[str, Dict[str, Any]],
         dataset: Iterator[reverb.ReplaySample],
-        parameter_client: ParameterClient,
+        parameter_client: Any,
         trainer_networks: List[Any],
         trainer_table_entry: List[Any],
         logger: Optional[types.NestedLogger] = None,

@@ -22,7 +22,6 @@ import dm_env
 from mava import adders, types
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
-from mava.systems.jax import ParameterClient
 
 
 class Executor(SystemExecutor, ExecutorHookMixin):
@@ -33,7 +32,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         executor_id: str,
         networks: Dict[str, Any],
         adder: Optional[adders.ReverbParallelAdder] = None,
-        parameter_client: Optional[ParameterClient] = None,
+        parameter_client: Optional[Any] = None,
         components: List[Callback] = [],
     ):
         """_summary_

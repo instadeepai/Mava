@@ -56,8 +56,7 @@ def test_builder(
     test_system: System,
 ) -> None:
     """Test if system builder instantiates processes as expected."""
-    test_system.configure()
-    test_system.launch(num_executors=1, nodes_on_gpu=["process"])
+    test_system.build()
     (
         data_server,
         parameter_server,

@@ -15,22 +15,20 @@
 
 """Tests for config class for Jax-based Mava systems"""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any, Callable, List
+from typing import List
 
 import numpy as np
 import pytest
 import reverb
 from acme import specs
 
-from mava.callbacks import BuilderHookMixin
 from mava.components.jax import Component
 from mava.components.jax.building import adders
 from mava.core_jax import SystemBuilder
 from mava.specs import MAEnvironmentSpec
 from mava.systems.jax.system import System
-from mava.testing.building import mocks
 from mava.utils.wrapper_utils import parameterized_restart
 
 agents = {"agent_0", "agent_1", "agent_2"}
@@ -65,40 +63,6 @@ def make_fake_env_specs() -> MAEnvironmentSpec:
         specs=env_spec,
         extra_specs={"extras": specs.Array(shape=(), dtype=np.float32)},
     )
-
-
-class MockBuilder(BuilderHookMixin):
-    def __init__(
-        self,
-        components: List[Any],
-    ) -> None:
-        """System building init
-
-        Args:
-            components: system callback components
-        """
-
-        self.callbacks = components
-        self.attr = SimpleNamespace()
-
-        self.on_building_init_start()
-        self.on_building_init()
-
-    def adders(self) -> None:
-        """Hooks for adders."""
-
-        self.on_building_data_server_adder_signature()
-        self.on_building_data_server()
-        self.on_building_executor_adder_priority()
-        self.on_building_executor_adder()
-
-    def build(self) -> None:
-        """Construct program nodes."""
-        pass
-
-    def launch(self) -> None:
-        """Run the graph program."""
-        pass
 
 
 @dataclass
@@ -139,6 +103,35 @@ class MockTestSetup(Component):
         return "setup"
 
 
+@dataclass
+class DistributorDefaultConfig:
+    num_executors: int = 1
+    nodes_on_gpu: List[str] = field(default_factory=list)
+    multi_process: bool = True
+    name: str = "system"
+
+
+class MockDistributor(Component):
+    def __init__(
+        self, config: DistributorDefaultConfig = DistributorDefaultConfig()
+    ) -> None:
+        """Mock system distributor component.
+
+        Args:
+            config : dataclass configuration for setting component hyperparameters
+        """
+        self.config = config
+
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'.
+
+        Returns:
+            Component type name
+        """
+        return "distributor"
+
+
 class TestSystemWithParallelSequenceAdder(System):
     def design(self) -> SimpleNamespace:
         """Mock system design with zero components.
@@ -154,32 +147,9 @@ class TestSystemWithParallelSequenceAdder(System):
             executor_adder=executor_adder,
             executor_adder_priority=executor_adder_priority,
             setup=MockTestSetup,
-            distributor=mocks.MockDistributor,
+            distributor=MockDistributor,
         )
         return components
-
-    def launch(
-        self,
-        num_executors: int,
-        nodes_on_gpu: List[str],
-        multi_process: bool = True,
-        name: str = "system",
-        builder_class: Callable = MockBuilder,
-    ) -> None:
-        """Run the system.
-
-        Args:
-            config : system configuration including
-            num_executors : number of executor processes to run in parallel
-            nodes_on_gpu : which processes to run on gpu
-            multi_process : whether to run locally or distributed, local runs are
-                for debugging
-            name : name of the system
-            builder_class: callable builder class.
-        """
-        return super().launch(
-            num_executors, nodes_on_gpu, multi_process, name, builder_class
-        )
 
 
 @pytest.fixture
@@ -192,10 +162,12 @@ def test_adders(
     test_system_parallel_sequence_adder: System,
 ) -> None:
     """Test if system builder instantiates processes as expected."""
-    test_system_parallel_sequence_adder.launch(
-        num_executors=1, nodes_on_gpu=["process"]
+    test_system_parallel_sequence_adder.build()
+    test_system_parallel_sequence_adder._builder.data_server()
+    test_system_parallel_sequence_adder._builder.attr.system_executor = None
+    test_system_parallel_sequence_adder._builder.executor(
+        executor_id="executor", data_server_client=None, parameter_server_client=None
     )
-    test_system_parallel_sequence_adder._builder.adders()
     test_system_parallel_sequence_adder._builder.attr.adder.add_first(env_restart)
     test_system_parallel_sequence_adder._builder.attr.server.stop()
 

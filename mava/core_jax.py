@@ -49,26 +49,12 @@ class BaseSystem(abc.ABC):
         """
 
     @abc.abstractmethod
-    def configure(self, **kwargs: Any) -> None:
-        """Configure system hyperparameters."""
+    def build(self, **kwargs: Any) -> None:
+        """Configure system hyperparameters and build."""
 
     @abc.abstractmethod
-    def launch(
-        self,
-        num_executors: int,
-        nodes_on_gpu: List[str],
-        multi_process: bool = True,
-        name: str = "system",
-    ) -> None:
-        """Run the system.
-
-        Args:
-            num_executors : number of executor processes to run in parallel
-            nodes_on_gpu : which processes to run on gpu
-            multi_process : whether to run single or multi process, single process runs
-                are primarily for debugging
-            name : name of the system
-        """
+    def launch(self) -> None:
+        """Run the system."""
 
 
 class SystemBuilder(abc.ABC):
