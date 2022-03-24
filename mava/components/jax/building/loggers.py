@@ -18,7 +18,7 @@
 from dataclasses import dataclass
 from typing import Callable, Dict, Optional
 
-from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.utils.loggers import MavaLogger
 
@@ -29,7 +29,7 @@ class LoggerConfig:
     logger_config: Dict = {}
 
 
-class Logger(Callback):
+class Logger(Component):
     def __init__(
         self,
         config: LoggerConfig = LoggerConfig(),

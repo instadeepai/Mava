@@ -23,13 +23,13 @@ import reverb
 from reverb import rate_limiters, reverb_types
 
 from mava import specs
-from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.utils.builder_utils import covert_specs
 from mava.utils.sort_utils import sort_str_num
 
 
-class DataServer(Callback):
+class DataServer(Component):
     def __init__(
         self,
         config: Any,

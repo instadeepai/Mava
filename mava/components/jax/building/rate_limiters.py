@@ -20,7 +20,7 @@ from typing import Optional
 
 import reverb
 
-from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 
 
@@ -31,7 +31,7 @@ class RateLimiterConfig:
     error_buffer: Optional[float] = None
 
 
-class RateLimiter(Callback):
+class RateLimiter(Component):
     def __init__(self, config: RateLimiterConfig = RateLimiterConfig()) -> None:
         """[summary]"""
         self.config = config

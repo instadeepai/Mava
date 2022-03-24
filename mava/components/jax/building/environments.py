@@ -21,7 +21,7 @@ from typing import Callable, Dict, Optional
 import dm_env
 
 from mava import specs
-from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
 
@@ -32,7 +32,7 @@ class ExecutorEnvironmentLoopConfig:
     environment_kwargs: Dict = {}
 
 
-class ExecutorEnvironmentLoop(Callback):
+class ExecutorEnvironmentLoop(Component):
     def __init__(
         self, config: ExecutorEnvironmentLoopConfig = ExecutorEnvironmentLoopConfig()
     ):

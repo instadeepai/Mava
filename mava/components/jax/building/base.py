@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Union
 import jax
 import jax.numpy as jnp
 
-from mava.callbacks import Callback
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
@@ -35,7 +35,7 @@ class ExecutorProcessConfig:
     shared_weights: bool = True
 
 
-class BaseExecutorProcess(Callback):
+class BaseExecutorProcess(Component):
     def __init__(self, config: ExecutorProcessConfig = ExecutorProcessConfig()):
         """_summary_
 
@@ -132,6 +132,10 @@ class BaseExecutorProcess(Callback):
             builder : _description_
         """
 
+    def name(self) -> str:
+        """_summary_"""
+        return "executor"
+
 
 @dataclass
 class TrainerProcessConfig:
@@ -140,7 +144,7 @@ class TrainerProcessConfig:
     ] = enums.Trainer.single_trainer
 
 
-class BaseTrainerProcess(Callback):
+class BaseTrainerProcess(Component):
     def __init__(self, config: TrainerProcessConfig = TrainerProcessConfig()):
         """_summary_
 
@@ -161,7 +165,7 @@ class BaseTrainerProcess(Callback):
         unique_net_keys = builder.attr.unique_net_keys
 
         # Setup trainer_networks
-        if type(trainer_networks) is not dict:
+        if not isinstance(trainer_networks, dict):
             if trainer_networks == enums.Trainer.single_trainer:
                 builder.attr.trainer_networks = {"trainer": unique_net_keys}
             elif trainer_networks == enums.Trainer.one_trainer_per_network:
@@ -213,13 +217,17 @@ class BaseTrainerProcess(Callback):
             builder : _description_
         """
 
+    def name(self) -> str:
+        """_summary_"""
+        return "trainer"
+
 
 @dataclass
 class ParameterServerProcessConfig:
     random_param: int = 5
 
 
-class BaseParameterServerProcess(Callback):
+class BaseParameterServerProcess(Component):
     def __init__(
         self, config: ParameterServerProcessConfig = ParameterServerProcessConfig()
     ):
@@ -270,3 +278,7 @@ class BaseParameterServerProcess(Callback):
         Args:
             builder : _description_
         """
+
+    def name(self) -> str:
+        """_summary_"""
+        return "parameter_server"
