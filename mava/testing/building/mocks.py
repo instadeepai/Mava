@@ -322,6 +322,7 @@ class MockDistributor(Callback):
         """_summary_"""
         data_server = builder.data_server()
         parameter_server = builder.parameter_server()
+
         trainer = builder.trainer(
             trainer_id="trainer",
             data_server_client=data_server,
