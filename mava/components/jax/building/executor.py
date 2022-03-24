@@ -27,4 +27,13 @@ class ExecutorProcess(BaseExecutorProcess):
         Args:
             builder : _description_
         """
-        builder.attr.executor_fn = Executor(builder.callbacks)
+        networks = builder.attr.network_factory()
+        adder = builder.attr.adder
+
+        builder.attr.executor_fn = Executor(
+            executor_id=builder._executor_id,
+            networks=networks,
+            adder=adder,
+            parameter_client=builder._parameter_server_client,
+            components=builder.callbacks,
+        )
