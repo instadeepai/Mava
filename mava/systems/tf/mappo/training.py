@@ -53,7 +53,8 @@ class MAPPOTrainer(mava.Trainer):
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
         counts: Dict[str, Any],
-        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Optional[Union[snt.Optimizer, Dict[str, snt.Optimizer]]],
         variable_client: VariableClient,
         agent_net_keys: Dict[str, str],
         minibatch_size: Optional[int] = None,
@@ -81,7 +82,11 @@ class MAPPOTrainer(mava.Trainer):
             critic_networks: critic network(s), shared
                 or for each agent in the system.
             dataset (tf.data.Dataset): training dataset.
-            optimizer: optimizer for updating policy networks.
+            policy_optimizer: optimizer
+                for updating policy networks.
+            critic_optimizer: optimizer
+                for updating critic networks. This is not used if using
+                single optim.
             agent_net_keys: specifies what network each agent uses.
                 Defaults to {}.
             checkpoint_minute_interval: The number of minutes to wait between
@@ -141,12 +146,16 @@ class MAPPOTrainer(mava.Trainer):
         self._normalize_advantage = normalize_advantage
 
         # Create optimizers for different agent types.
-        if not isinstance(optimizer, dict):
-            self._optimizer: Dict[str, snt.Optimizer] = {}
+        if not isinstance(policy_optimizer, dict):
+            self._policy_optimizers: Dict[str, snt.Optimizer] = {}
             for agent in self.unique_net_keys:
-                self._optimizer[agent] = copy.deepcopy(optimizer)
+                self._policy_optimizers[agent] = copy.deepcopy(policy_optimizer)
         else:
-            self._optimizer = optimizer
+            self._policy_optimizers = policy_optimizer
+
+        self._critic_optimizers: Dict[str, snt.Optimizer] = {}
+        for agent in self.unique_net_keys:
+            self._critic_optimizers[agent] = copy.deepcopy(critic_optimizer)
 
         # Expose the variables.
         policy_networks_to_expose = {}
@@ -268,11 +277,7 @@ class MAPPOTrainer(mava.Trainer):
         """
 
         losses: Dict[str, NestedArray] = {
-            agent: {
-                "critic_loss": tf.zeros(()),
-                "policy_loss": tf.zeros(()),
-                "total_loss": tf.zeros(()),
-            }
+            agent: {"critic_loss": tf.zeros(()), "policy_loss": tf.zeros(())}
             for agent in self._agents
         }
         # Get data from replay.
@@ -292,8 +297,6 @@ class MAPPOTrainer(mava.Trainer):
                         + loss[agent]["critic_loss"],
                         "policy_loss": losses[agent]["policy_loss"]
                         + loss[agent]["policy_loss"],
-                        "total_loss": losses[agent]["total_loss"]
-                        + loss[agent]["total_loss"],
                     }
 
         # Log losses per agent
@@ -312,7 +315,7 @@ class MAPPOTrainer(mava.Trainer):
         self._backward_pass()
         # Log losses per agent
         return train_utils.map_losses_per_agent_ac(
-            self.critic_losses, self.policy_losses, self.total_losses
+            self.critic_losses, self.policy_losses
         )
 
     # Forward pass that calculates loss.
@@ -348,6 +351,8 @@ class MAPPOTrainer(mava.Trainer):
         total_losses: Dict[str, Any] = {}
 
         with tf.GradientTape(persistent=True) as tape:
+            # transform observation using observation networks
+            observations_trans = self._transform_observations(observations)
             for agent in self._agents:
                 action, reward, termination, behaviour_log_prob, actor_observation = (
                     actions[agent]["actions"],
@@ -481,28 +486,41 @@ class MAPPOTrainer(mava.Trainer):
         """Trainer backward pass updating network parameters"""
 
         # Calculate the gradients and update the networks
-        total_loss = self.total_losses
+        policy_losses = self.policy_losses
+        critic_losses = self.critic_losses
         tape = self.tape
 
         for agent in self._agents:
             # Get agent_key.
             agent_key = self._agent_net_keys[agent]
 
-            # Get trainable variables.
-            variables = (
-                self._policy_networks[agent_key].trainable_variables
-                + self._critic_networks[agent_key].trainable_variables
+            policy_variables = self._policy_networks[agent_key].trainable_variables
+            # Only use critic vars to update the observation network
+            # if we have two optims.
+            critic_variables = (
+                self._critic_networks[agent_key].trainable_variables
                 + self._observation_networks[agent_key].trainable_variables
             )
 
             # Get gradients.
-            gradients = tape.gradient(total_loss, variables)
+            critic_gradients = tape.gradient(critic_losses[agent], critic_variables)
+            # Optionally apply clipping.
+            critic_grads = tf.clip_by_global_norm(
+                critic_gradients, self._max_gradient_norm
+            )[0]
+            # Apply gradients.
+            self._critic_optimizers[agent_key].apply(critic_grads, critic_variables)
+
+            # Get gradients.
+            policy_gradients = tape.gradient(policy_losses[agent], policy_variables)
 
             # Optionally apply clipping.
-            grads = tf.clip_by_global_norm(gradients, self._max_gradient_norm)[0]
+            policy_grads = tf.clip_by_global_norm(
+                policy_gradients, self._max_gradient_norm
+            )[0]
 
             # Apply gradients.
-            self._optimizer[agent_key].apply(grads, variables)
+            self._policy_optimizers[agent_key].apply(policy_grads, policy_variables)
 
         train_utils.safe_del(self, "tape")
 
@@ -563,7 +581,10 @@ class MAPPOTrainer(mava.Trainer):
             info: Dict[str, Dict[str, float]] = {}
             for agent in self._agents:
                 info[agent] = {}
-                info[agent]["policy_learning_rate"] = self._optimizer[
+                info[agent]["policy_learning_rate"] = self._policy_optimizers[
+                    self._agent_net_keys[agent]
+                ].learning_rate
+                info[agent]["critic_learning_rate"] = self._critic_optimizers[
                     self._agent_net_keys[agent]
                 ].learning_rate
             if self._logger:
@@ -575,9 +596,10 @@ class MAPPOTrainer(mava.Trainer):
         Args:
             trainer_step : trainer step time t.
         """
-        train_utils.decay_lr(
-            self._learning_rate_scheduler_fn,  # type: ignore
-            self._optimizer,
+        train_utils.decay_lr_actor_critic(
+            self._learning_rate_scheduler_fn,
+            self._policy_optimizers,
+            self._critic_optimizers,
             trainer_step,
         )
 
@@ -593,7 +615,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
         counts: Dict[str, Any],
-        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Optional[Union[snt.Optimizer, Dict[str, snt.Optimizer]]],
         variable_client: VariableClient,
         agent_net_keys: Dict[str, str],
         minibatch_size: Optional[int] = None,
@@ -618,7 +641,9 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             policy_networks : policy networks for each agent in the system.
             critic_networks : critic network(s), shared or for each agent in the system.
             dataset : training dataset.
-            optimizer : optimizer for updating networks.
+            policy_optimizer : optimizer for updating policy networks.
+            critic_optimizer : optimizer for updating critic networks. This is not
+                necessary if using single optim.
             agent_net_keys : specifies what network each agent uses.
             checkpoint_minute_interval : The number of minutes to wait between
                 checkpoints.
@@ -660,7 +685,8 @@ class CentralisedMAPPOTrainer(MAPPOTrainer):
             counts=counts,
             agent_net_keys=agent_net_keys,
             variable_client=variable_client,
-            optimizer=optimizer,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             minibatch_size=minibatch_size,
             num_epochs=num_epochs,
             discount=discount,
@@ -701,7 +727,8 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
         critic_networks: Dict[str, snt.Module],
         dataset: tf.data.Dataset,
         counts: Dict[str, Any],
-        optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
+        critic_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]],
         variable_client: VariableClient,
         agent_net_keys: Dict[str, str],
         minibatch_size: Optional[int] = None,
@@ -727,7 +754,8 @@ class StateBasedMAPPOTrainer(MAPPOTrainer):
             counts=counts,
             agent_net_keys=agent_net_keys,
             variable_client=variable_client,
-            optimizer=optimizer,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             minibatch_size=minibatch_size,
             num_epochs=num_epochs,
             discount=discount,

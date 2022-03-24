@@ -57,9 +57,11 @@ def partial_kwargs(function: Callable[..., Any], **kwargs: Any) -> Callable[...,
     are not defined by `function` or if they do not have defaults.
     This is useful as a way to define a factory function with default parameters
     and then to override them in a safe way.
+
     Args:
       function: the base function before partial application.
       **kwargs: keyword argument overrides.
+
     Returns:
       A function.
     """
@@ -85,14 +87,13 @@ def partial_kwargs(function: Callable[..., Any], **kwargs: Any) -> Callable[...,
 
 
 class StepsLimiter:
-    """Process that terminates an experiment when `max_steps` is reached."""
-
     def __init__(
         self,
         counter: counting.Counter,
         max_steps: Optional[int],
         steps_key: str = "executor_steps",
     ):
+        """Process that terminates an experiment when `max_steps` is reached."""
         self._counter = counter
         self._max_steps = max_steps
         self._steps_key = steps_key

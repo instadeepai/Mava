@@ -1,5 +1,6 @@
 import os
 import time
+import warnings
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -227,10 +228,13 @@ def checkpoint_networks(system_checkpointer: Dict) -> None:
     Args:
         system_checkpointer : checkpointer used by the system.
     """
-    if system_checkpointer and len(system_checkpointer.keys()) > 0:
-        for network_key in system_checkpointer.keys():
-            checkpointer = system_checkpointer[network_key]
-            checkpointer.save()
+    try:
+        if system_checkpointer and len(system_checkpointer.keys()) > 0:
+            for network_key in system_checkpointer.keys():
+                checkpointer = system_checkpointer[network_key]
+                checkpointer.save()
+    except Exception as ex:
+        warnings.warn(f"Failed to checkpoint. Error: {ex}")
 
 
 def set_growing_gpu_memory() -> None:

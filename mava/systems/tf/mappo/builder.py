@@ -42,7 +42,9 @@ class MAPPOConfig:
     Args:
         environment_spec: description of the action and observation spaces etc. for
             each agent in the system.
-        optimizer: optimizer(s) for updating networks.
+        policy_optimizer: optimizer(s) for updating policy networks.
+        critic_optimizer: optimizer for updating critic networks. This is not
+            used if using single optim.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
         checkpoint_minute_interval (int): The number of minutes to wait between
@@ -81,7 +83,8 @@ class MAPPOConfig:
     """
 
     environment_spec: specs.EnvironmentSpec
-    optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
+    policy_optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
+    critic_optimizer: snt.Optimizer
     agent_net_keys: Dict[str, str]
     trainer_networks: Dict[str, List]
     table_network_config: Dict[str, List]
@@ -508,7 +511,8 @@ class MAPPOBuilder:
             "critic_networks": networks["critics"],
             "observation_networks": networks["observations"],
             "agent_net_keys": trainer_agent_net_keys,
-            "optimizer": self._config.optimizer,
+            "critic_optimizer": self._config.critic_optimizer,
+            "policy_optimizer": self._config.policy_optimizer,
             "max_gradient_norm": max_gradient_norm,
             "discount": self._config.discount,
             "minibatch_size": self._config.minibatch_size,
