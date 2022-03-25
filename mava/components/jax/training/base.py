@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Base Trainer components"""
+"""Base Trainer components."""
 import abc
 from typing import Any, NamedTuple
 

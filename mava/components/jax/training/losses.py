@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Trainer components for calculating losses"""
+"""Trainer components for calculating losses."""
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 

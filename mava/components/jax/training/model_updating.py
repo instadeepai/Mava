@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Trainer components for system updating"""
+"""Trainer components for system updating."""
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
@@ -153,4 +153,4 @@ class MAPGEpochUpdate(Utility):
         Returns:
             _description_
         """
-        return "minibatch_update_fn"
+        return "epoch_update_fn"
