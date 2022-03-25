@@ -126,7 +126,7 @@ def make_environment(
 
             if env_type == "parallel":
                 env = env_module.parallel_env(**kwargs)  # type: ignore
-                if env_class == "atari":
+                if env_class == "atari" or "pong" in env_name:
                     env = atari_preprocessing(env)
                 # wrap parallel environment
                 environment = PettingZooParallelEnvWrapper(
