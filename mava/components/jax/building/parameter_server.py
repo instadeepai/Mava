@@ -80,6 +80,8 @@ class ParameterServerProcess(Component):
             builder : _description_
         """
         builder.attr.system_parameter_server = ParameterServer(builder.callbacks)
+        print("Here: ")
+        exit()
 
     def name(self) -> str:
         """_summary_"""

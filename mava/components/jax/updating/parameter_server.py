@@ -34,9 +34,20 @@ class DefaultParameterServer(Callback):
         """Mock system component."""
         self.config = config
 
-    def on_building_parameter_server(self, builder: SystemBuilder) -> None:
+    # Get
+    def on_parameter_server_get_parameters(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.system_parameter_server = self.config.parameter_server_param
+        pass
+
+    # Set
+    def on_parameter_server_set_parameters(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        pass
+
+    # Add
+    def on_parameter_server_add_to_parameters(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        pass
 
     @property
     def name(self) -> str:

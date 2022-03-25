@@ -58,22 +58,21 @@ class System(BaseSystem):
             component : system callback component
             name : component name
         """
-        if not self._built:
-            comp = component()
-            name = comp.name
-            if name in list(self._design.__dict__.keys()):
-                self._design.__dict__[name] = component
-                config_feed = {name: comp.config}
-                self.config.update(**config_feed)
-            else:
-                raise Exception(
-                    "The given component is not part of the current system.\
-                    Perhaps try adding it instead using .add()."
-                )
-        else:
+        if self._built:
             raise Exception(
                 "System already built. Must call .update() on components before the \
                     system has been built."
+            )
+        comp = component()
+        name = comp.name
+        if name in list(self._design.__dict__.keys()):
+            self._design.__dict__[name] = component
+            config_feed = {name: comp.config}
+            self.config.update(**config_feed)
+        else:
+            raise Exception(
+                "The given component is not part of the current system.\
+                Perhaps try adding it instead using .add()."
             )
 
     def add(self, component: Any) -> None:
@@ -83,25 +82,26 @@ class System(BaseSystem):
             component : system callback component
             name : component name
         """
-        if not self._built:
-            comp = component()
-            name = comp.name
-            if name in list(self._design.__dict__.keys()):
-                raise Exception(
-                    "The given component is already part of the current system.\
-                    Perhaps try updating it instead using .update()."
-                )
-            else:
-                self._design.__dict__[name] = component
-                config_feed = {name: comp.config}
-                self.config.add(**config_feed)
-        else:
+        if self._built:
             raise Exception(
                 "System already built. Must call .add() on components before the \
                     system has been built."
             )
+        comp = component()
+        name = comp.name
+        if name in list(self._design.__dict__.keys()):
+            raise Exception(
+                "The given component is already part of the current system.\
+                Perhaps try updating it instead using .update()."
+            )
+        else:
+            self._design.__dict__[name] = component
+            config_feed = {name: comp.config}
+            self.config.add(**config_feed)
 
     def build(self, **kwargs: Any) -> None:
+        if self._built:
+            raise Exception("System already built.")
         """Configure system hyperparameters."""
         self.config.build()
         self.config.set_parameters(**kwargs)
