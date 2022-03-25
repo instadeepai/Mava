@@ -14,13 +14,65 @@
 # limitations under the License.
 
 """Execution components for system builders"""
+from dataclasses import dataclass
 
-from mava.components.jax.building.base import BaseParameterServerProcess
+import jax
+import jax.numpy as jnp
+
+from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.systems.jax import ParameterServer
 
 
-class ParameterServerProcess(BaseParameterServerProcess):
+@dataclass
+class ParameterServerProcessConfig:
+    random_param: int = 5
+
+
+class ParameterServerProcess(Component):
+    def __init__(
+        self, config: ParameterServerProcessConfig = ParameterServerProcessConfig()
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    def on_building_parameter_server_start(self, builder: SystemBuilder) -> None:
+        """_summary_
+
+        Args:
+            builder : _description_
+        """
+        networks = builder.attr.network_factory(
+            environment_spec=builder.attr.environment_spec,
+            agent_net_keys=builder.attr.agent_net_keys,
+        )
+
+        # Create parameters
+        parameters = {}
+        rng_key = jax.random.PRNGKey(42)
+        # Network parameters
+        for net_type_key in networks.keys():
+            for net_key in networks[net_type_key].keys():
+                # Ensure obs and target networks are sonnet modules
+
+                parameters[f"{net_key}_{net_type_key}"] = networks[net_type_key][
+                    net_key
+                ].init(rng_key)
+
+                rng_key, subkey = jax.random.split(rng_key)
+                del subkey
+
+        parameters["trainer_steps"] = jnp.int32(0)
+        parameters["trainer_walltime"] = jnp.int32(0)
+        parameters["evaluator_steps"] = jnp.int32(0)
+        parameters["evaluator_episodes"] = jnp.int32(0)
+        parameters["executor_episodes"] = jnp.int32(0)
+        parameters["executor_steps"] = jnp.int32(0)
+
     def on_building_parameter_server(self, builder: SystemBuilder) -> None:
         """_summary_
 
@@ -28,3 +80,7 @@ class ParameterServerProcess(BaseParameterServerProcess):
             builder : _description_
         """
         builder.attr.system_parameter_server = ParameterServer(builder.callbacks)
+
+    def name(self) -> str:
+        """_summary_"""
+        return "parameter_server"
