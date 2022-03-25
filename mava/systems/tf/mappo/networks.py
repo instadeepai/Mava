@@ -39,6 +39,7 @@ def make_default_networks(
         256,
     ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
+    observation_network: snt.Module = None,
     seed: Optional[int] = None,
 ) -> Dict[str, snt.Module]:
     """Default networks for mappo.
@@ -81,7 +82,10 @@ def make_default_networks(
     for key in specs.keys():
 
         # Create the shared observation network; here simply a state-less operation.
-        observation_network = tf2_utils.to_sonnet_module(tf.identity)
+        if observation_network is None:
+            observation_network = tf2_utils.to_sonnet_module(tf.identity)
+        else:
+            observation_network = observation_network
 
         # Note: The discrete case must be placed first as it inherits from BoundedArray.
         if isinstance(specs[key].actions, dm_env.specs.DiscreteArray):  # discrete

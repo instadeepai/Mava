@@ -52,7 +52,7 @@ smac_requirements = ["pysc2", "SMAC @ git+https://github.com/oxwhirl/smac.git"]
 testing_formatting_requirements = [
     "pytest==6.2.4",
     "pre-commit",
-    "mypy==0.910",
+    "mypy==0.941",
     "pytest-xdist",
     "flake8==3.8.2",
     "black==21.4b1",
@@ -104,7 +104,7 @@ setup(
         "matplotlib",
         "dataclasses",
         "box2d-py",
-        "gym",
+        "gym<=0.23.0",
     ],
     extras_require={
         "tf": tf_requirements,

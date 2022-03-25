@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example running MAPPO on debug MPE environments."""
+"""Example running MADDPG on pettinzoo MPE environments."""
 
 import functools
 from datetime import datetime
@@ -23,24 +23,25 @@ import launchpad as lp
 import sonnet as snt
 from absl import app, flags
 
-from mava.components.tf import architectures
-from mava.systems.tf import mappo
+from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
-from mava.utils.environments import debugging_utils
+from mava.utils.enums import ArchitectureType
+from mava.utils.environments import pettingzoo_utils
 from mava.utils.loggers import logger_utils
 
 FLAGS = flags.FLAGS
+
 flags.DEFINE_string(
-    "env_name",
-    "simple_spread",
-    "Debugging environment name (str).",
-)
-flags.DEFINE_string(
-    "action_space",
-    "discrete",
-    "Environment action space type (str).",
+    "env_class",
+    "sisl",
+    "Pettingzoo environment class, e.g. atari (str).",
 )
 
+flags.DEFINE_string(
+    "env_name",
+    "multiwalker_v7",
+    "Pettingzoo environment name, e.g. pong (str).",
+)
 flags.DEFINE_string(
     "mava_id",
     str(datetime.now()),
@@ -50,25 +51,29 @@ flags.DEFINE_string("base_dir", "~/mava", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
-    """Run main script
+    """Run example.
 
     Args:
-        _ : _
+        _ (Any): None
     """
 
     # Environment.
     environment_factory = functools.partial(
-        debugging_utils.make_environment,
+        pettingzoo_utils.make_environment,
+        env_class=FLAGS.env_class,
         env_name=FLAGS.env_name,
-        action_space=FLAGS.action_space,
     )
 
     # Networks.
     network_factory = lp_utils.partial_kwargs(
-        mappo.make_default_networks,
+        mad4pg.make_default_networks,
+        architecture_type=ArchitectureType.recurrent,
+        vmin=-150,
+        vmax=150,
+        num_atoms=101,
     )
 
-    # Checkpointer appends "Checkpoints" to checkpoint_dir
+    # Checkpointer appends "Checkpoints" to checkpoint_dir.
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
 
     # Log every [log_every] seconds.
@@ -82,18 +87,26 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # Distributed program
-    program = mappo.MAPPO(
+    # Distributed program.
+    program = mad4pg.MAD4PG(
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1,
-        policy_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
-        critic_optimizer=snt.optimizers.Adam(learning_rate=5e-4),
+        policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
-        architecture=architectures.CentralisedValueCritic,
-        trainer_fn=mappo.CentralisedMAPPOTrainer,
+        trainer_fn=mad4pg.training.MAD4PGDecentralisedRecurrentTrainer,
+        executor_fn=mad4pg.execution.MAD4PGRecurrentExecutor,
+        batch_size=32,
+        sequence_length=20,
+        period=20,
+        min_replay_size=1000,
+        max_replay_size=100000,
+        prefetch_size=4,
+        n_step=5,
+        samples_per_insert=None,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
