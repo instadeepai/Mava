@@ -302,8 +302,8 @@ class MAPPOBuilder:
             use_next_extras=False,
             # end_of_episode_behavior=EndBehavior.CONTINUE,
         )
-        # Note (dries) using end_of_episode_behavior=EndBehavior.CONTINUE seems
-        # to break things.
+        # Note (dries): Using end_of_episode_behavior=EndBehavior.CONTINUE can
+        # break the adders when using multiple trainers.
 
     def create_counter_variables(
         self, variables: Dict[str, tf.Variable]
