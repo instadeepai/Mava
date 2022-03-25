@@ -22,7 +22,8 @@ from typing import Any, Dict, Iterator, List, Optional, Type, Union
 import reverb
 import sonnet as snt
 import tensorflow as tf
-from acme.adders.reverb.sequence import EndBehavior
+
+# from acme.adders.reverb.sequence import EndBehavior
 from acme.specs import EnvironmentSpec
 from acme.tf import utils as tf2_utils
 
@@ -299,8 +300,10 @@ class MAPPOBuilder:
             period=self._config.sequence_period,
             sequence_length=self._config.sequence_length,
             use_next_extras=False,
-            end_of_episode_behavior=EndBehavior.CONTINUE,
+            # end_of_episode_behavior=EndBehavior.CONTINUE,
         )
+        # Note (dries) using end_of_episode_behavior=EndBehavior.CONTINUE seems
+        # to break things.
 
     def create_counter_variables(
         self, variables: Dict[str, tf.Variable]
