@@ -21,7 +21,6 @@ import jax.numpy as jnp
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
-from mava.systems.jax import ParameterServer
 
 
 @dataclass
@@ -72,16 +71,6 @@ class ParameterServerProcess(Component):
         parameters["evaluator_episodes"] = jnp.int32(0)
         parameters["executor_episodes"] = jnp.int32(0)
         parameters["executor_steps"] = jnp.int32(0)
-
-    def on_building_parameter_server(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-        builder.attr.system_parameter_server = ParameterServer(builder.callbacks)
-        print("Here: ")
-        exit()
 
     def name(self) -> str:
         """_summary_"""

@@ -19,7 +19,6 @@ from typing import Any, Dict, List, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
-from mava.systems.jax import Trainer
 from mava.utils import enums
 from mava.utils.sort_utils import sort_str_num
 
@@ -102,23 +101,6 @@ class TrainerProcess(Component):
             environment_spec=builder.attr.environment_spec,
             agent_net_keys=builder.attr.agent_net_keys,
             net_spec_keys=builder.attr.net_spec_keys,
-        )
-
-    def on_building_trainer(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-
-        builder.attr.trainer_fn = Trainer(
-            networks=builder.attr.networks,
-            dataset=builder.attr.dataset,
-            parameter_client=builder.attr.trainer_parameter_client,
-            trainer_networks=builder.attr.trainer_networks[builder._trainer_id],
-            trainer_table_entry=builder.attr.trainer_table_entry[builder._trainer_id],
-            logger=builder.attr.trainer_logger,
-            components=builder.callbacks,
         )
 
     def name(self) -> str:
