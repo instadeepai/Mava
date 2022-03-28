@@ -30,31 +30,16 @@ class Trainer(SystemTrainer, TrainerHookMixin):
 
     def __init__(
         self,
-        networks: Dict[str, Dict[str, Any]],
-        dataset: Iterator[reverb.ReplaySample],
-        parameter_client: Any,
-        trainer_networks: List[Any],
-        trainer_table_entry: List[Any],
-        logger: Optional[types.NestedLogger] = None,
+        config: Dict[str, Dict[str, Any]],
         components: List[Callback] = [],
     ):
         """_summary_
 
         Args:
-            networks : _description_
-            dataset : _description_
-            parameter_client : _description_
-            trainer_networks : _description_
-            trainer_table_entry : _description_
-            logger : _description_.
+            config : _description_
             components : _description_.
         """
-        self.networks = networks
-        self.dataset = dataset
-        self.parameter_client = parameter_client
-        self.trainer_networks = trainer_networks
-        self.trainer_table_entry = trainer_table_entry
-        self.logger = logger
+        self.config = config
         self.callbacks = components
 
         self.on_training_init_start()
