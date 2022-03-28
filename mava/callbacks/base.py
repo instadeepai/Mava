@@ -281,6 +281,18 @@ class Callback(ABC):
         """[summary]"""
         pass
 
+    def on_training_forward_start(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_forward(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
+    def on_training_forward_end(self, trainer: SystemTrainer) -> None:
+        """[summary]"""
+        pass
+
     ###############################
     # system parameter server hooks
     ###############################

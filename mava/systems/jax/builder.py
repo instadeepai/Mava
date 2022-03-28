@@ -87,7 +87,10 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of make parameter server
         self.on_building_parameter_server_end()
 
-        return ParameterServer(self.callbacks)
+        return ParameterServer(
+            config=self.attr,
+            components=self.callbacks,
+        )
 
     def executor(
         self, executor_id: str, data_server_client: Any, parameter_server_client: Any
@@ -129,7 +132,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         # create the executor
         self.attr.executor = Executor(
-            attr=self.attr,
+            config=self.attr,
             components=self.callbacks,
         )
 
@@ -183,7 +186,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         # create and rreturn the trainer
         return Trainer(
-            attr=self.attr,
+            config=self.attr,
             components=self.callbacks,
         )
 
