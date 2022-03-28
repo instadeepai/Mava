@@ -76,7 +76,7 @@ class MAPPO:
         lambda_gae: float = 0.95,
         clipping_epsilon: float = 0.2,
         entropy_cost: float = 0.01,
-        baseline_cost: float = 1.0,
+        baseline_cost: float = 0.5,
         max_gradient_norm: Optional[float] = 0.5,
         max_queue_size: Optional[int] = None,
         batch_size: int = 512,
