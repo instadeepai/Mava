@@ -12,7 +12,6 @@ try:
     _has_petting_zoo = True
 except ModuleNotFoundError:
     _has_petting_zoo = False
-    pass
 # Need to install typing_extensions since we support pre python 3.8
 from typing_extensions import TypedDict
 

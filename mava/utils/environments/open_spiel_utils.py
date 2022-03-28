@@ -19,7 +19,6 @@ try:
     _has_open_spiel = True
 except ModuleNotFoundError:
     _has_open_spiel = False
-    pass
 
 
 def load_open_spiel_env(game_name: str) -> "rl_environment.Environment":
