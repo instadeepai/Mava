@@ -129,7 +129,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         # create the executor
         self.attr.executor = Executor(
-            config=self.attr.executor_config,
+            attr=self.attr,
             components=self.callbacks,
         )
 
@@ -143,7 +143,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.on_building_executor_end()
 
         # return the environment loop
-        return self.attr.environment_loop
+        return self.attr.system_executor
 
     def trainer(
         self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
@@ -183,7 +183,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         # create and rreturn the trainer
         return Trainer(
-            config=self.attr.trainer_config,
+            attr=self.attr,
             components=self.callbacks,
         )
 

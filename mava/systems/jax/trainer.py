@@ -17,7 +17,7 @@
 """System Trainer implementation."""
 
 from typing import Any, Dict, Iterator, List, Optional
-
+from types import SimpleNamespace
 import reverb
 
 from mava import types
@@ -30,16 +30,16 @@ class Trainer(SystemTrainer, TrainerHookMixin):
 
     def __init__(
         self,
-        config: Dict[str, Dict[str, Any]],
+        attr: SimpleNamespace,
         components: List[Callback] = [],
     ):
         """_summary_
 
         Args:
-            config : _description_
+            attr : _description_
             components : _description_.
         """
-        self.config = config
+        self.attr = attr
         self.callbacks = components
 
         self.on_training_init_start()

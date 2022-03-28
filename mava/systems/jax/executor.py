@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dm_env
 
+from types import SimpleNamespace
 from mava import adders, types
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
@@ -29,25 +30,16 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
     def __init__(
         self,
-        executor_id: str,
-        networks: Dict[str, Any],
-        adder: Optional[adders.ReverbParallelAdder] = None,
-        parameter_client: Optional[Any] = None,
+        attr: SimpleNamespace,
         components: List[Callback] = [],
     ):
         """_summary_
 
         Args:
-            executor_id : _description_
-            networks : _description_
-            adder : _description_.
-            parameter_client : _description_.
+            attr : _description_
             components : _description_.
         """
-        self.executor_id = executor_id
-        self.networks = networks
-        self.adder = adder
-        self.parameter_client = parameter_client
+        self.attr = attr
         self.callbacks = components
 
         self.on_execution_init_start()
