@@ -65,7 +65,7 @@ def test_builder(
         trainer,
     ) = test_system._builder.attr.system_build
     assert data_server == 2
-    assert parameter_server == 2
+    assert parameter_server.config.parameter_server_param == 2
 
     exec_data_client, env, exec = executor
     exec_logger, exec_logger_param = env

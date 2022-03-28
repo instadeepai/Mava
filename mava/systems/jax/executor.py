@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 import dm_env
 
-from mava import types
+from types import SimpleNamespace
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
 
@@ -29,16 +29,16 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
     def __init__(
         self,
-        config: Dict[str, Any],
+        attr: SimpleNamespace,
         components: List[Callback] = [],
     ):
         """_summary_
 
         Args:
-            config : _description_.
+            attr : _description_.
             components : _description_.
         """
-        self.config = config
+        self.attr = attr
         self.callbacks = components
 
         self.on_execution_init_start()
