@@ -82,7 +82,7 @@ class MAPPO:
         batch_size: int = 512,
         minibatch_size: int = None,
         num_epochs: int = 10,
-        sequence_length: int = 10,
+        sequence_length: int = 20,
         sequence_period: Optional[int] = None,
         max_executor_steps: int = None,
         checkpoint: bool = True,
