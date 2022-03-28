@@ -127,6 +127,12 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # make executor
         self.on_building_executor()
 
+        # create the executor
+        self.attr.executor = Executor(
+            config=self.attr.executor_config,
+            components=self.callbacks,
+        )
+
         # make copy of environment
         self.on_building_executor_environment()
 
@@ -136,15 +142,8 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of making the executor
         self.on_building_executor_end()
 
-        # TODO (dries): Maybe make this more general by only providing
-        # components and config.
-        return Executor(
-            executor_id=self._executor_id,
-            networks=self.attr.networks,
-            adder=self.attr.adder,
-            parameter_client=self.executor_parameter_client,
-            components=self.callbacks,
-        )
+        # return the environment loop
+        return self.attr.environment_loop
 
     def trainer(
         self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
@@ -182,15 +181,9 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of making the trainer
         self.on_building_trainer_end()
 
-        # TODO (dries): Maybe make this more general by only providing
-        # components and config.
+        # create and rreturn the trainer
         return Trainer(
-            networks=self.attr.networks,
-            dataset=self.attr.dataset,
-            parameter_client=self.attr.trainer_parameter_client,
-            trainer_networks=self.attr.trainer_networks[self._trainer_id],
-            trainer_table_entry=self.attr.trainer_table_entry[self._trainer_id],
-            logger=self.attr.trainer_logger,
+            config=self.attr.trainer_config,
             components=self.callbacks,
         )
 

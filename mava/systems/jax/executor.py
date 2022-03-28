@@ -15,11 +15,11 @@
 
 """Jax system executor."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import dm_env
 
-from mava import adders, types
+from mava import types
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
 
@@ -29,25 +29,16 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
     def __init__(
         self,
-        executor_id: str,
-        networks: Dict[str, Any],
-        adder: Optional[adders.ReverbParallelAdder] = None,
-        parameter_client: Optional[Any] = None,
+        config: Dict[str, Any],
         components: List[Callback] = [],
     ):
         """_summary_
 
         Args:
-            executor_id : _description_
-            networks : _description_
-            adder : _description_.
-            parameter_client : _description_.
+            config : _description_.
             components : _description_.
         """
-        self.executor_id = executor_id
-        self.networks = networks
-        self.adder = adder
-        self.parameter_client = parameter_client
+        self.config = config
         self.callbacks = components
 
         self.on_execution_init_start()
