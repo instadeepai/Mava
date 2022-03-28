@@ -15,12 +15,11 @@
 
 """Jax system executor."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import dm_env
 
 from types import SimpleNamespace
-from mava import adders, types
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
 
@@ -36,7 +35,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         """_summary_
 
         Args:
-            attr : _description_
+            attr : _description_.
             components : _description_.
         """
         self.attr = attr

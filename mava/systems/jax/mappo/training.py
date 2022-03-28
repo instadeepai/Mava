@@ -15,4 +15,15 @@
 
 """Jax MAPPO system trainer."""
 
-# TODO (Arnu): make MAPPO trainer
+from mava.components.jax import training
+from mava.systems.jax.mappo import components
+
+trainer_components = [
+    training.InitialState,
+    training.GAE,
+    training.MAPGWithTrustRegionClippingLoss,
+    training.MAPGEpochUpdate,
+    training.MAPGMinibatchUpdate,
+    training.MAPGWithTrustRegionStep,
+    components.Trainer,
+]

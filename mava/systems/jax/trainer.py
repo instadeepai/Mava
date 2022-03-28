@@ -16,11 +16,8 @@
 
 """System Trainer implementation."""
 
-from typing import Any, Dict, Iterator, List, Optional
-from types import SimpleNamespace
-import reverb
+from typing import Any, Dict, List
 
-from mava import types
 from mava.callbacks import Callback, TrainerHookMixin
 from mava.core_jax import SystemTrainer
 
@@ -44,43 +41,15 @@ class Trainer(SystemTrainer, TrainerHookMixin):
 
         self.on_training_init_start()
 
+        self.on_training_utility_fns()
+
+        self.on_training_loss_fns()
+
+        self.on_training_step_fn()
+
         self.on_training_init()
 
         self.on_training_init_end()
-
-    def _forward(self, inputs: reverb.ReplaySample) -> None:
-        """Trainer forward pass"""
-        self._inputs = inputs
-
-        self.on_training_forward_start()
-
-        self.on_training_forward()
-
-        self.on_training_forward_end()
-
-    def _backward(self) -> None:
-        """Trainer backward pass updating network parameters"""
-        self.on_training_backward_start()
-
-        self.on_training_backward()
-
-        self.on_training_backward_end()
-
-    def _step(
-        self,
-    ) -> Dict[str, Dict[str, Any]]:
-        """Trainer forward and backward passes.
-
-        Returns:
-            losses
-        """
-        self.on_training_compute_step_start()
-
-        self.on_training_compute_step()
-
-        self.on_training_compute_step_end()
-
-        return self.attr.losses
 
     def step(self) -> None:
         """Trainer forward and backward passes."""
