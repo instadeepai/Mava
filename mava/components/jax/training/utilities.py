@@ -15,6 +15,7 @@
 
 """Trainer utility components."""
 from dataclasses import dataclass
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -42,13 +43,13 @@ class InitialState(Utility):
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """_summary_"""
-        networks = trainer.attr.networks
-        optimizer = trainer.attr.optimizer
 
-        def make_initial_state(key: jnp.ndarray) -> TrainingState:
+        def make_initial_state(
+            network: Any, optimizer: Any, key: jnp.ndarray
+        ) -> TrainingState:
             """Initialises the training state (parameters and optimiser state)."""
             key_init, key_state = jax.random.split(key)
-            initial_params = networks.network.init(key_init)
+            initial_params = network.init(key_init)
             initial_opt_state = optimizer.init(initial_params)
             return TrainingState(
                 params=initial_params, opt_state=initial_opt_state, random_key=key_state
