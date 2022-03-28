@@ -22,6 +22,7 @@ from typing import Any, List
 
 from mava.callbacks import BuilderHookMixin, Callback
 from mava.core_jax import SystemBuilder
+from mava.systems.jax import Executor, ParameterServer, Trainer
 
 
 class Builder(SystemBuilder, BuilderHookMixin):
@@ -86,7 +87,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of make parameter server
         self.on_building_parameter_server_end()
 
-        return self.attr.system_parameter_server
+        return ParameterServer(self.callbacks)
 
     def executor(
         self, executor_id: str, data_server_client: Any, parameter_server_client: Any
@@ -135,7 +136,15 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of making the executor
         self.on_building_executor_end()
 
-        return self.attr.system_executor
+        # TODO (dries): Maybe make this more general by only providing
+        # components and config.
+        return Executor(
+            executor_id=self._executor_id,
+            networks=self.attr.networks,
+            adder=self.attr.adder,
+            parameter_client=self.executor_parameter_client,
+            components=self.callbacks,
+        )
 
     def trainer(
         self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
@@ -173,7 +182,17 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of making the trainer
         self.on_building_trainer_end()
 
-        return self.attr.system_trainer
+        # TODO (dries): Maybe make this more general by only providing
+        # components and config.
+        return Trainer(
+            networks=self.attr.networks,
+            dataset=self.attr.dataset,
+            parameter_client=self.attr.trainer_parameter_client,
+            trainer_networks=self.attr.trainer_networks[self._trainer_id],
+            trainer_table_entry=self.attr.trainer_table_entry[self._trainer_id],
+            logger=self.attr.trainer_logger,
+            components=self.callbacks,
+        )
 
     def build(self) -> None:
         """Construct program nodes."""

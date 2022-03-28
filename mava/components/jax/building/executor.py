@@ -20,7 +20,6 @@ from typing import List, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
-from mava.systems.jax import Executor
 from mava.utils import enums
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
@@ -128,21 +127,6 @@ class ExecutorProcess(Component):
             environment_spec=builder.attr.environment_spec,
             agent_net_keys=builder.attr.agent_net_keys,
             net_spec_keys=builder.attr.net_spec_keys,
-        )
-
-    def on_building_executor(self, builder: SystemBuilder) -> None:
-        """_summary_
-
-        Args:
-            builder : _description_
-        """
-
-        builder.attr.executor_fn = Executor(
-            executor_id=builder._executor_id,
-            networks=builder.attr.networks,
-            adder=builder.attr.adder,
-            parameter_client=builder.attr.executor_parameter_client,
-            components=builder.callbacks,
         )
 
     def name(self) -> str:
