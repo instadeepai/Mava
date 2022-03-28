@@ -17,7 +17,7 @@
 from dataclasses import dataclass
 
 from mava.callbacks import Callback
-from mava.core_jax import SystemParameterServer
+from mava.core_jax import SystemBuilder, SystemParameterServer
 
 
 @dataclass
@@ -33,6 +33,40 @@ class DefaultParameterServer(Callback):
     ) -> None:
         """Mock system component."""
         self.config = config
+
+    def on_building_parameter_server_start(self, builder: SystemBuilder) -> None:
+        """_summary_
+
+        Args:
+            builder : _description_
+        """
+        pass
+        # networks = builder.attr.network_factory(
+        #     environment_spec=builder.attr.environment_spec,
+        #     agent_net_keys=builder.attr.agent_net_keys,
+        # )
+
+        # # Create parameters
+        # parameters = {}
+        # rng_key = jax.random.PRNGKey(42)
+        # # Network parameters
+        # for net_type_key in networks.keys():
+        #     for net_key in networks[net_type_key].keys():
+        #         # Ensure obs and target networks are sonnet modules
+
+        #         parameters[f"{net_key}_{net_type_key}"] = networks[net_type_key][
+        #             net_key
+        #         ].init(rng_key)
+
+        #         rng_key, subkey = jax.random.split(rng_key)
+        #         del subkey
+
+        # parameters["trainer_steps"] = jnp.int32(0)
+        # parameters["trainer_walltime"] = jnp.int32(0)
+        # parameters["evaluator_steps"] = jnp.int32(0)
+        # parameters["evaluator_episodes"] = jnp.int32(0)
+        # parameters["executor_episodes"] = jnp.int32(0)
+        # parameters["executor_steps"] = jnp.int32(0)
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:

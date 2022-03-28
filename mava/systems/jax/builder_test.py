@@ -89,6 +89,7 @@ def test_builder(
     assert eval_exec_param == exec_param
 
     assert type(trainer) == Trainer
+    # TODO (dries): What is the best way to test the trainer here?
     # train_id, train_logger, train_dataset, train_param_client = trainer
     # assert train_id == "trainer"
     # assert train_logger == 1

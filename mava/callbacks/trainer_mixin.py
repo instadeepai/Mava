@@ -45,17 +45,17 @@ class TrainerHookMixin(ABC):
     def on_training_utility_fns(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_training_forward_start(self)
+            callback.on_training_utility_fns(self)
 
     def on_training_loss_fns(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_training_forward(self)
+            callback.on_training_loss_fns(self)
 
     def on_training_step_fn(self) -> None:
         """[summary]"""
         for callback in self.callbacks:
-            callback.on_training_forward_end(self)
+            callback.on_training_step_fn(self)
 
     def on_training_step_start(self) -> None:
         """[summary]"""
