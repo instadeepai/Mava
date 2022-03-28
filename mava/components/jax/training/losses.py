@@ -48,6 +48,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
         """_summary_"""
 
         def loss(
+            network: Any,
             params: Any,
             observations: Any,
             actions: jnp.array,
@@ -58,11 +59,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
         ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
             """Surrogate loss using clipped probability ratios."""
 
-            distribution_params, values = trainer.attr.networks.apply(
-                params, observations
-            )
-            log_probs = trainer.attr.networks.log_prob(distribution_params, actions)
-            entropy = trainer.attr.networks.entropy(distribution_params)
+            distribution_params, values = network.apply(params, observations)
+            log_probs = network.log_prob(distribution_params, actions)
+            entropy = network.entropy(distribution_params)
 
             # Compute importance sampling weights: current policy / behavior policy.
             rhos = jnp.exp(log_probs - behaviour_log_probs)
