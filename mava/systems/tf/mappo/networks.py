@@ -41,7 +41,7 @@ def make_default_networks(
         256,
     ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
-    archecture_type: ArchitectureType = ArchitectureType.feedforward,
+    architecture_type: ArchitectureType = ArchitectureType.feedforward,
     observation_network: snt.Module = None,
     seed: Optional[int] = None,
 ) -> Dict[str, snt.Module]:
@@ -76,7 +76,7 @@ def make_default_networks(
 
     # Set Policy function and layer size
     # Default size per arch type.
-    if archecture_type == ArchitectureType.feedforward:
+    if architecture_type == ArchitectureType.feedforward:
         if not policy_networks_layer_sizes:
             policy_networks_layer_sizes = (
                 256,
@@ -84,7 +84,7 @@ def make_default_networks(
                 256,
             )
         policy_network_func = snt.Sequential
-    elif archecture_type == ArchitectureType.recurrent:
+    elif architecture_type == ArchitectureType.recurrent:
         if not policy_networks_layer_sizes:
             policy_networks_layer_sizes = (128, 128)
         policy_network_func = snt.DeepRNN
@@ -120,7 +120,7 @@ def make_default_networks(
         ]
 
         # Add recurrence if the architecture is recurrent
-        if archecture_type == ArchitectureType.recurrent:
+        if architecture_type == ArchitectureType.recurrent:
             policy_layers.append(
                 snt.LSTM(policy_networks_layer_sizes[key][-1]),
             )
