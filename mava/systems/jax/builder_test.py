@@ -18,6 +18,7 @@
 from types import SimpleNamespace
 
 import pytest
+
 from mava.systems.jax import ParameterServer, Trainer
 from mava.systems.jax.system import System
 from mava.testing.building import mocks

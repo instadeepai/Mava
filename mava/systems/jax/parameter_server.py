@@ -16,10 +16,10 @@
 """Jax systems parameter server."""
 
 
+from types import SimpleNamespace
 from typing import Dict, List, Sequence, Union
 
 import jax.numpy as jnp
-from types import SimpleNamespace
 
 from mava.callbacks import Callback, ParameterServerHookMixin
 from mava.core_jax import SystemParameterServer

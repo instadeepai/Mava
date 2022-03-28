@@ -15,12 +15,12 @@
 
 """Jax system executor."""
 
-from typing import Any, Dict, List, Tuple, Union
+from types import SimpleNamespace
+from typing import Dict, List, Tuple, Union
 
 import dm_env
-
-from types import SimpleNamespace
 from acme.types import NestedArray
+
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
 

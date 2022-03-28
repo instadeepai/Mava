@@ -16,8 +16,8 @@
 
 """System Trainer implementation."""
 
-from typing import Any, Dict, List
 from types import SimpleNamespace
+from typing import List
 
 from mava.callbacks import Callback, TrainerHookMixin
 from mava.core_jax import SystemTrainer

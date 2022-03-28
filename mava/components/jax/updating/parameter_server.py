@@ -17,7 +17,7 @@
 from dataclasses import dataclass
 
 from mava.callbacks import Callback
-from mava.core_jax import SystemBuilder
+from mava.core_jax import SystemParameterServer
 
 
 @dataclass
@@ -35,17 +35,19 @@ class DefaultParameterServer(Callback):
         self.config = config
 
     # Get
-    def on_parameter_server_get_parameters(self, builder: SystemBuilder) -> None:
+    def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """_summary_"""
         pass
 
     # Set
-    def on_parameter_server_set_parameters(self, builder: SystemBuilder) -> None:
+    def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
         """_summary_"""
         pass
 
     # Add
-    def on_parameter_server_add_to_parameters(self, builder: SystemBuilder) -> None:
+    def on_parameter_server_add_to_parameters(
+        self, server: SystemParameterServer
+    ) -> None:
         """_summary_"""
         pass
 
