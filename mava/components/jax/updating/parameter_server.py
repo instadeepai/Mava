@@ -46,7 +46,16 @@ class DefaultParameterServer(Callback):
         #     agent_net_keys=builder.attr.agent_net_keys,
         # )
 
-        # # Create parameters
+        # Create parameters
+        server.config.parameters = {
+            "trainer_steps": np.zeros(1, dtype=np.int32),
+            "trainer_walltime": np.zeros(1, dtype=np.float32),
+            "evaluator_steps": np.zeros(1, dtype=np.int32),
+            "evaluator_episodes": np.zeros(1, dtype=np.int32),
+            "executor_episodes": np.zeros(1, dtype=np.int32),
+            "executor_steps": np.zeros(1, dtype=np.int32),
+        }
+
         # parameters = {}
         # rng_key = jax.random.PRNGKey(42)
         # # Network parameters
@@ -60,13 +69,7 @@ class DefaultParameterServer(Callback):
 
         #         rng_key, subkey = jax.random.split(rng_key)
         #         del subkey
-        server.config.parameters = {}
-        server.config.parameters["trainer_steps"] = np.zeros(1, dtype=np.int32)
-        # parameters["trainer_walltime"] = jnp.int32(0)
-        # parameters["evaluator_steps"] = jnp.int32(0)
-        # parameters["evaluator_episodes"] = jnp.int32(0)
-        # parameters["executor_episodes"] = jnp.int32(0)
-        # parameters["executor_steps"] = jnp.int32(0)
+        
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:

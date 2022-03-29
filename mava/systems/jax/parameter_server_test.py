@@ -17,8 +17,8 @@
 
 from types import SimpleNamespace
 
-import numpy as np
 import pytest
+import numpy as np
 
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.systems.jax import ParameterServer
