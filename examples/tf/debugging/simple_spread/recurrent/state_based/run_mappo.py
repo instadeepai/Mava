@@ -67,7 +67,7 @@ def main(_: Any) -> None:
     # Networks.
     network_factory = lp_utils.partial_kwargs(
         mappo.make_default_networks,
-        archecture_type=ArchitectureType.recurrent
+        architecture_type=ArchitectureType.recurrent
         if recurrent_ppo
         else ArchitectureType.feedforward,
     )
