@@ -376,13 +376,13 @@ class MAPPOTrainer(mava.Trainer):
                 dims = actor_observation.shape[:2]
 
                 # Do policy forward pass.
+                policy_entropy = []
                 if "core_states" in extras:
                     # Unroll current policy over actor_observation.
                     agent_core_state = core_states[agent][0]
 
                     # Manual perform unroll
                     action_prob = []
-                    policy_entropy = []
                     for t in range(len(actor_observation)):
                         outputs, agent_core_state = policy_network(
                             actor_observation[t], agent_core_state
@@ -481,7 +481,7 @@ class MAPPOTrainer(mava.Trainer):
                 # TODO (dries): Get this entropy term to work with univariate gaussian
                 # distributions as well. The clipping needs to be fixed in that case.
                 # (SAC paper, Appendix C)
-                if len(policy_entropy) == 0:
+                if len(policy_entropy) > 0:
                     masked_entropy_loss = policy_entropy[:-1] * loss_mask[:-1]
                     entropy_loss = -tf.reduce_sum(masked_entropy_loss) / tf.reduce_sum(
                         loss_mask[:-1]
