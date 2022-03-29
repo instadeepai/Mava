@@ -388,10 +388,15 @@ class MAPPOTrainer(mava.Trainer):
                             actor_observation[t], agent_core_state
                         )
                         action_prob.append(outputs.log_prob(action[t]))
-                        policy_entropy.append(outputs.entropy())
+                        try:
+                            policy_entropy.append(outputs.entropy())
+                        except NotImplementedError:
+                            pass
 
                     action_prob = tf.stack(action_prob, axis=0)
-                    policy_entropy = tf.stack(policy_entropy, axis=0)
+
+                    if len(policy_entropy) > 0:
+                        policy_entropy = tf.stack(policy_entropy, axis=0)
                 else:
                     # Reshape inputs.
                     actor_observation = snt.merge_leading_dims(
@@ -400,7 +405,11 @@ class MAPPOTrainer(mava.Trainer):
                     policy = policy_network(actor_observation)
                     policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
                     action_prob = policy.log_prob(action)
-                    policy_entropy = policy.entropy()
+
+                    try:
+                        policy_entropy = policy.entropy()
+                    except NotImplementedError:
+                        pass
 
                 critic_observation = snt.merge_leading_dims(
                     critic_observation, num_dims=2
@@ -469,13 +478,16 @@ class MAPPOTrainer(mava.Trainer):
 
                 # Entropy regulariser.
                 # Entropy regularization. Only implemented for categorical dist.
-                try:
+                # TODO (dries): Get this entropy term to work with univariate gaussian
+                # distributions as well. The clipping needs to be fixed in that case.
+                # (SAC paper, Appendix C)
+                if len(policy_entropy) == 0:
                     masked_entropy_loss = policy_entropy[:-1] * loss_mask[:-1]
                     entropy_loss = -tf.reduce_sum(masked_entropy_loss) / tf.reduce_sum(
                         loss_mask[:-1]
                     )
 
-                except NotImplementedError:
+                else:
                     entropy_loss = tf.convert_to_tensor(0.0)
 
                 entropy_loss = self._entropy_cost * entropy_loss
