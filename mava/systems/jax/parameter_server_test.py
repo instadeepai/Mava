@@ -17,6 +17,7 @@
 
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
@@ -67,3 +68,13 @@ def test_parameter_server(
         trainer,
     ) = test_system._builder.attr.system_build
     assert type(parameter_server) == ParameterServer
+
+    step_var = parameter_server.get_parameters("trainer_steps")
+    assert type(step_var) == np.ndarray
+    assert step_var[0] == 0
+
+    parameter_server.set_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
+    assert parameter_server.get_parameters("trainer_steps")[0] == 1
+
+    parameter_server.add_to_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
+    assert parameter_server.get_parameters("trainer_steps")[0] == 2

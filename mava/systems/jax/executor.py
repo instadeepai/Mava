@@ -100,7 +100,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_select_action_end()
 
-        return self.attr.action_info, self.attr.policy_info
+        return self.config.action_info, self.config.policy_info
 
     def select_actions(
         self, observations: Dict[str, NestedArray]
@@ -123,7 +123,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_select_actions_end()
 
-        return self.attr.actions_info, self.attr.policies_info
+        return self.config.actions_info, self.config.policies_info
 
     def update(self, wait: bool = False) -> None:
         """Update executor parameters.

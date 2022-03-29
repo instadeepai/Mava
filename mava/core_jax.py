@@ -138,7 +138,7 @@ class SystemExecutor(abc.ABC):
         """System executor init"""
 
         # Simple namespace for assigning system executor attributes dynamically
-        self.attr = SimpleNamespace()
+        self.config = SimpleNamespace()
 
         self._agent: str
         self._observation: Any
@@ -183,7 +183,7 @@ class SystemTrainer(abc.ABC):
         """System trainer init"""
 
         # Simple namespace for assigning system executor attributes dynamically
-        self.attr = SimpleNamespace()
+        self.config = SimpleNamespace()
 
         self._inputs: Any
 
@@ -199,7 +199,7 @@ class SystemParameterServer(abc.ABC):
         """System parameter server init"""
 
         # Simple namespace for assigning parameter server attributes dynamically
-        self.attr = SimpleNamespace()
+        self.config = SimpleNamespace()
 
     @abc.abstractmethod
     def get_parameters(
@@ -214,16 +214,15 @@ class SystemParameterServer(abc.ABC):
         """
 
     @abc.abstractmethod
-    def set_parameters(self, names: Sequence[str], vars: Dict[str, Any]) -> None:
+    def set_parameters(self, set_params: Dict[str, Any]) -> None:
         """Set parameters in the parameter server.
 
         Args:
-            names : Names of the parameters to set
-            vars : The values to set the parameters to
+            set_params : The values to set the parameters to
         """
 
     @abc.abstractmethod
-    def add_to_parameters(self, names: Sequence[str], vars: Dict[str, Any]) -> None:
+    def add_to_parameters(self, add_to_params: Dict[str, Any]) -> None:
         """Add to the parameters in the parameter server.
 
         Args:

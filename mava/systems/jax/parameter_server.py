@@ -17,9 +17,7 @@
 
 
 from types import SimpleNamespace
-from typing import Dict, List, Sequence, Union
-
-import jax.numpy as jnp
+from typing import Any, Dict, List, Sequence, Union
 
 from mava.callbacks import Callback, ParameterServerHookMixin
 from mava.core_jax import SystemParameterServer
@@ -46,9 +44,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
 
         self.on_parameter_server_init_end()
 
-    def get_parameters(
-        self, names: Union[str, Sequence[str]]
-    ) -> Dict[str, Dict[str, jnp.ndarray]]:
+    def get_parameters(self, names: Union[str, Sequence[str]]) -> Any:
         """Get parameters from the parameter server.
 
         Args:
@@ -56,7 +52,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         Returns:
             The parameters that were requested
         """
-        self._names = names
+        self.config._param_names = names
 
         self.on_parameter_server_get_parameters_start()
 
@@ -64,17 +60,15 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
 
         self.on_parameter_server_get_parameters_end()
 
-        return self.attr.parameters
+        return self.config.get_parameters
 
-    def set_parameters(
-        self, names: Sequence[str], vars: Dict[str, jnp.ndarray]
-    ) -> None:
+    def set_parameters(self, set_params: Dict[str, Any]) -> None:
         """Set parameters in the parameter server.
 
         Args:
-            names : Names of the parameters to set
-            vars : The values to set the parameters to
+            set_params : The values to set the parameters to
         """
+        self.config._set_params = set_params
 
         self.on_parameter_server_set_parameters_start()
 
@@ -82,15 +76,13 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
 
         self.on_parameter_server_set_parameters_end()
 
-    def add_to_parameters(
-        self, names: Sequence[str], vars: Dict[str, jnp.ndarray]
-    ) -> None:
+    def add_to_parameters(self, add_to_params: Dict[str, Any]) -> None:
         """Add to the parameters in the parameter server.
 
         Args:
-            names : Names of the parameters to add to
-            vars : The values to add to the parameters to
+            add_to_params : The values to add to the parameters to
         """
+        self.config._add_to_params = add_to_params
 
         self.on_parameter_server_add_to_parameters_start()
 
