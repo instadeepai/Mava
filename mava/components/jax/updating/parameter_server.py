@@ -69,7 +69,6 @@ class DefaultParameterServer(Callback):
 
         #         rng_key, subkey = jax.random.split(rng_key)
         #         del subkey
-        
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:

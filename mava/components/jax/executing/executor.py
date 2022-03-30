@@ -16,9 +16,8 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Any, List, Union
+from typing import List, Union
 
-from mava import specs as mava_specs
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
@@ -118,35 +117,6 @@ class DefaultExecutor(Component):
         builder.attr.net_keys_to_ids = {
             net_key: i for i, net_key in enumerate(builder.attr.unique_net_keys)
         }
-
-    def on_building_executor_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.attr.networks = builder.attr.network_factory(
-            environment_spec=builder.attr.environment_spec,
-            agent_net_keys=builder.attr.agent_net_keys,
-            net_spec_keys=builder.attr.net_spec_keys,
-        )
-
-    def on_building_executor_environment(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.attr.environment = (
-            builder.attr.executor_logger,
-            self.config.environment_factory,
-        )
-
-    def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        if builder._executor_id != "evaluator":
-            builder.attr.system_executor = (
-                builder._data_server_client,
-                builder.attr.environment,
-                builder.attr.exec,
-            )
-        else:
-            builder.attr.system_executor = (
-                builder.attr.environment,
-                builder.attr.exec,
-            )
 
     @property
     def name(self) -> str:

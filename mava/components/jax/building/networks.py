@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional
+from typing import Callable, Optional
 
 import dm_env
 
@@ -42,6 +42,14 @@ class DefaultNetworks(Component):
         """Summary"""
         builder.attr.network_factory = self.config.network_factory
         builder.attr.shared_networks = self.config.shared_weights
+
+    # def on_building_executor_start(self, builder: SystemBuilder) -> None:
+    #     """_summary_"""
+    #     builder.attr.networks = builder.attr.network_factory(
+    #         environment_spec=builder.attr.environment_spec,
+    #         agent_net_keys=builder.attr.agent_net_keys,
+    #         net_spec_keys=builder.attr.net_spec_keys,
+    #     ),
 
     @property
     def name(self) -> str:

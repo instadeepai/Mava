@@ -18,12 +18,11 @@
 import functools
 from types import SimpleNamespace
 
-import numpy as np
+import acme
 import pytest
 
-from mava.components.jax.building.networks import DefaultNetworks
 from mava.components.jax.executing.executor import DefaultExecutor
-from mava.systems.jax import Executor, mappo
+from mava.systems.jax import mappo
 from mava.systems.jax.system import System
 from mava.testing.building import mocks
 from mava.utils.environments import debugging_utils
@@ -53,68 +52,39 @@ class TestSystem(System):
         return components
 
 
-# # Executor example
-# system = TestSystem()
-
-# # Environment.
-# environment_factory = functools.partial(
-#     debugging_utils.make_environment,
-#     env_name="simple_spread",
-#     action_space="discrete",
-# )
-
-# # Networks.
-# network_factory = mappo.make_default_networks
-
-# # Build the system
-# system.build(
-#     environment_factory=environment_factory,
-#     network_factory=network_factory
-#     ),
+@pytest.fixture
+def test_system() -> System:
+    """Dummy system with zero components."""
+    return TestSystem()
 
 
-# (
-#     data_server,
-#     parameter_server,
-#     executor,
-#     evaluator,
-#     trainer,
-# ) = test_system._builder.attr.system_build
+def test_executor(
+    test_system: System,
+) -> None:
+    """Test if the parameter server instantiates processes as expected."""
+    system = TestSystem()
 
-# assert type(executor) == Executor
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
 
-# print("executor: ", executor)
+    # Networks.
+    network_factory = mappo.make_default_networks
 
-# # Executor example
-# exit()
+    # Build the system
+    system.build(
+        environment_factory=environment_factory, network_factory=network_factory
+    )
 
+    (
+        data_server,
+        parameter_server,
+        executor,
+        evaluator,
+        trainer,
+    ) = system._builder.attr.system_build
 
-# @pytest.fixture
-# def test_system() -> System:
-#     """Dummy system with zero components."""
-#     return TestSystem()
-
-
-# def test_executor(
-#     test_system: System,
-# ) -> None:
-#     """Test if the parameter server instantiates processes as expected."""
-#     test_system.build()
-#     (
-#         data_server,
-#         parameter_server,
-#         executor,
-#         evaluator,
-#         trainer,
-#     ) = test_system._builder.attr.system_build
-#     assert type(parameter_server) == ParameterServer
-
-#     step_var = parameter_server.get_parameters("trainer_steps")
-#     assert type(step_var) == np.ndarray
-#     assert step_var[0] == 0
-
-#     parameter_server.set_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
-#     assert parameter_server.get_parameters("trainer_steps")[0] == 1
-
-#     parameter_server.add_to_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
-#     assert parameter_server.get_parameters("trainer_steps")[0] == 2
+    assert isinstance(executor, acme.core.Worker)

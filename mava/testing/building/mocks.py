@@ -23,6 +23,7 @@ import dm_env
 from mava import specs
 from mava.callbacks import Callback
 from mava.core_jax import SystemBuilder
+from mava.environment_loop import ParallelEnvironmentLoop
 
 
 # Mock components to feed to the builder
@@ -214,6 +215,7 @@ class MockExecutor(Callback):
 @dataclass
 class MockExecutorEnvironmentLoopConfig:
     environment_factory: str = "param"
+    should_update: bool = True
 
 
 class MockExecutorEnvironmentLoop(Callback):
@@ -233,24 +235,24 @@ class MockExecutorEnvironmentLoop(Callback):
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.environment = (
+        builder.attr.executor_environment = (
             builder.attr.executor_logger,
             self.config.environment_factory,
         )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        if builder._executor_id != "evaluator":
-            builder.attr.system_executor = (
-                builder._data_server_client,
-                builder.attr.environment,
-                builder.attr.exec,
-            )
+
+        executor_environment_loop = ParallelEnvironmentLoop(
+            environment=builder.attr.executor_environment,
+            executor=builder.attr.executor,
+            logger=builder.attr.executor_logger,
+            should_update=self.config.should_update,
+        )
+        if builder._executor_id == "evaluator":
+            builder.attr.system_evaluator = executor_environment_loop
         else:
-            builder.attr.system_executor = (
-                builder.attr.environment,
-                builder.attr.exec,
-            )
+            builder.attr.system_executor = executor_environment_loop
 
     @property
     def name(self) -> str:
@@ -295,6 +297,9 @@ class MockTrainerDataset(Callback):
     ) -> None:
         """Mock system component."""
         self.config = config
+
+    def on_building_init_end(self, builder: SystemBuilder) -> None:
+        builder.attr.net_spec_keys = {"network_0": "agent_0"}
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_"""
