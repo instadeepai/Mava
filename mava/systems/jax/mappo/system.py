@@ -15,4 +15,20 @@
 
 """Jax MAPPO system."""
 
-# TODO: (Arnu) make MAPPO system
+from mava.specs import DesignSpec
+from mava.systems.jax import System
+from mava.systems.jax.mappo import TRAINER_SPEC
+
+
+class TestSystem(System):
+    def design(self) -> DesignSpec:
+        """Mock system design with zero components.
+
+        Returns:
+            system callback components
+        """
+        trainer = TRAINER_SPEC.get()
+        system_design = DesignSpec(
+            **trainer,
+        )
+        return system_design

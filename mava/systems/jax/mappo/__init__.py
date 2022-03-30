@@ -15,3 +15,4 @@
 
 """Jax MAPPO system."""
 from mava.systems.jax.mappo.networks import make_default_networks
+from mava.systems.jax.mappo.training import TRAINER_SPEC

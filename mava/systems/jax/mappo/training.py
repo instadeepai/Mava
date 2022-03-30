@@ -14,16 +14,15 @@
 # limitations under the License.
 
 """Jax MAPPO system trainer."""
-
 from mava.components.jax import training
-from mava.systems.jax.mappo import components
+from mava.specs import DesignSpec
 
-trainer_components = [
-    training.InitialState,
-    training.GAE,
-    training.MAPGWithTrustRegionClippingLoss,
-    training.MAPGEpochUpdate,
-    training.MAPGMinibatchUpdate,
-    training.MAPGWithTrustRegionStep,
-    components.Trainer,
-]
+TRAINER_SPEC = DesignSpec(
+    initial_state_fn=training.InitialState,
+    gae_fn=training.GAE,
+    loss=training.MAPGWithTrustRegionClippingLoss,
+    epoch_update=training.MAPGEpochUpdate,
+    minibatch_update=training.MAPGMinibatchUpdate,
+    sgd_step=training.MAPGWithTrustRegionStep,
+    step=training.DefaultStep,
+)
