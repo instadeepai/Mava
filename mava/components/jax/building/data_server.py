@@ -47,20 +47,20 @@ class DataServer(Component):
         for table_key in self.config.table_network_config.keys():
             # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
-            num_networks = len(builder.attr.table_network_config[table_key])
-            env_spec = copy.deepcopy(builder.attr.environment_spec)
+            num_networks = len(builder.config.table_network_config[table_key])
+            env_spec = copy.deepcopy(builder.config.environment_spec)
             env_spec._specs = covert_specs(
-                builder.attr.agent_net_keys, env_spec._specs, num_networks
+                builder.config.agent_net_keys, env_spec._specs, num_networks
             )
 
             env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
             if env_spec.extra_specs is not None:
                 env_spec.extra_specs = covert_specs(
-                    builder.attr.agent_net_keys, env_spec.extra_specs, num_networks
+                    builder.config.agent_net_keys, env_spec.extra_specs, num_networks
                 )
             extras_spec = covert_specs(
-                builder.attr.agent_net_keys,
-                builder.attr.extras_spec,
+                builder.config.agent_net_keys,
+                builder.config.extras_spec,
                 num_networks,
             )
             table = self.table(table_key, env_spec, extras_spec, builder)
@@ -79,7 +79,7 @@ class DataServer(Component):
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        builder.attr.system_data_server = self._create_table_per_trainer(builder)
+        builder.config.system_data_server = self._create_table_per_trainer(builder)
 
 
 @dataclass
@@ -127,8 +127,8 @@ class OffPolicyDataServer(DataServer):
             sampler=self.config.sampler,
             remover=self.config.remover,
             max_size=self.config.max_size,
-            rate_limiter=builder.attr.rate_limiter_fn(),
-            signature=builder.attr.adder_signature_fn(environment_spec, extras_spec),
+            rate_limiter=builder.config.rate_limiter_fn(),
+            signature=builder.config.adder_signature_fn(environment_spec, extras_spec),
         )
         return table
 
@@ -172,8 +172,8 @@ class OnPolicyDataServer(DataServer):
         table = reverb.Table.queue(
             name=f"{self.config.data_server_name}_{table_key}",
             max_size=self.config.max_queue_size,
-            signature=builder.attr.adder_signature_fn(
-                environment_spec, builder.attr.sequence_length, extras_spec
+            signature=builder.config.adder_signature_fn(
+                environment_spec, builder.config.sequence_length, extras_spec
             ),
         )
         return table

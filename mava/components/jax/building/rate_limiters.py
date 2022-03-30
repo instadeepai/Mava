@@ -52,7 +52,7 @@ class MinSizeRateLimiter(RateLimiter):
         def rate_limiter_fn() -> reverb.rate_limiters:
             return reverb.rate_limiters.MinSize(self.config.min_data_server_size)
 
-        builder.attr.rate_limiter_fn = rate_limiter_fn
+        builder.config.rate_limiter_fn = rate_limiter_fn
 
 
 class SampleToInsertRateLimiter(RateLimiter):
@@ -80,4 +80,4 @@ class SampleToInsertRateLimiter(RateLimiter):
                 error_buffer=error_buffer,
             )
 
-        builder.attr.rate_limiter_fn = rate_limiter_fn
+        builder.config.rate_limiter_fn = rate_limiter_fn

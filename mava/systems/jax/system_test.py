@@ -72,7 +72,7 @@ class ComponentZero(MainComponent):
         Returns:
             config int plus string cast to int
         """
-        builder.attr.int_plus_str = self.config.param_0 + int(self.config.param_1)
+        builder.config.int_plus_str = self.config.param_0 + int(self.config.param_1)
 
 
 @dataclass
@@ -98,7 +98,9 @@ class ComponentOne(SubComponent):
         Returns:
             float plus boolean cast as float
         """
-        builder.attr.float_plus_bool = self.config.param_2 + float(self.config.param_3)
+        builder.config.float_plus_bool = self.config.param_2 + float(
+            self.config.param_3
+        )
 
 
 @dataclass
@@ -124,7 +126,9 @@ class ComponentTwo(MainComponent):
         Returns:
             string cast as int plus boolean cast as in
         """
-        builder.attr.str_plus_bool = int(self.config.param_4) + int(self.config.param_5)
+        builder.config.str_plus_bool = int(self.config.param_4) + int(
+            self.config.param_5
+        )
 
 
 @dataclass
@@ -237,8 +241,8 @@ def test_system_launch_with_build(
         system_with_two_components : mock system
     """
     system_with_two_components.build(param_0=2, param_3=False)
-    assert system_with_two_components._builder.attr.int_plus_str == 3
-    assert system_with_two_components._builder.attr.float_plus_bool == 1.2
+    assert system_with_two_components._builder.config.int_plus_str == 3
+    assert system_with_two_components._builder.config.float_plus_bool == 1.2
     system_with_two_components.launch()
 
 
@@ -252,8 +256,8 @@ def test_system_update_with_existing_component(
     """
     system_with_two_components.update(ComponentTwo)
     system_with_two_components.build()
-    assert system_with_two_components._builder.attr.float_plus_bool == 2.2
-    assert system_with_two_components._builder.attr.str_plus_bool == 3
+    assert system_with_two_components._builder.config.float_plus_bool == 2.2
+    assert system_with_two_components._builder.config.str_plus_bool == 3
 
 
 def test_system_update_with_non_existing_component(
@@ -291,8 +295,8 @@ def test_system_add_with_non_existing_component(
     """
     system_with_one_component.add(ComponentOne)
     system_with_one_component.build()
-    assert system_with_one_component._builder.attr.int_plus_str == 2
-    assert system_with_one_component._builder.attr.float_plus_bool == 2.2
+    assert system_with_one_component._builder.config.int_plus_str == 2
+    assert system_with_one_component._builder.config.float_plus_bool == 2.2
 
 
 def test_system_update_twice(system_with_two_components: System) -> None:
@@ -304,8 +308,8 @@ def test_system_update_twice(system_with_two_components: System) -> None:
     system_with_two_components.update(ComponentTwo)
     system_with_two_components.update(ComponentZero)
     system_with_two_components.build()
-    assert system_with_two_components._builder.attr.int_plus_str == 2
-    assert system_with_two_components._builder.attr.float_plus_bool == 2.2
+    assert system_with_two_components._builder.config.int_plus_str == 2
+    assert system_with_two_components._builder.config.float_plus_bool == 2.2
 
 
 def test_system_add_twice(system_with_zero_components: System) -> None:
@@ -317,8 +321,8 @@ def test_system_add_twice(system_with_zero_components: System) -> None:
     system_with_zero_components.add(ComponentOne)
     system_with_zero_components.add(ComponentTwo)
     system_with_zero_components.build()
-    assert system_with_zero_components._builder.attr.float_plus_bool == 2.2
-    assert system_with_zero_components._builder.attr.str_plus_bool == 3
+    assert system_with_zero_components._builder.config.float_plus_bool == 2.2
+    assert system_with_zero_components._builder.config.str_plus_bool == 3
 
 
 def test_system_add_and_update(system_with_zero_components: System) -> None:
@@ -330,7 +334,7 @@ def test_system_add_and_update(system_with_zero_components: System) -> None:
     system_with_zero_components.add(ComponentZero)
     system_with_zero_components.update(ComponentTwo)
     system_with_zero_components.build()
-    assert system_with_zero_components._builder.attr.str_plus_bool == 3
+    assert system_with_zero_components._builder.config.str_plus_bool == 3
 
 
 def test_system_build_one_component_params(
@@ -342,8 +346,8 @@ def test_system_build_one_component_params(
         system_with_two_components : mock system
     """
     system_with_two_components.build(param_0=2, param_1="2")
-    assert system_with_two_components._builder.attr.int_plus_str == 4
-    assert system_with_two_components._builder.attr.float_plus_bool == 2.2
+    assert system_with_two_components._builder.config.int_plus_str == 4
+    assert system_with_two_components._builder.config.float_plus_bool == 2.2
 
 
 def test_system_build_two_component_params(
@@ -355,5 +359,5 @@ def test_system_build_two_component_params(
         system_with_two_components : mock system
     """
     system_with_two_components.build(param_0=2, param_3=False)
-    assert system_with_two_components._builder.attr.int_plus_str == 3
-    assert system_with_two_components._builder.attr.float_plus_bool == 1.2
+    assert system_with_two_components._builder.config.int_plus_str == 3
+    assert system_with_two_components._builder.config.float_plus_bool == 1.2

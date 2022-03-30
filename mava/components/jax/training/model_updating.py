@@ -46,7 +46,7 @@ class MAPGMinibatchUpdate(Utility):
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """_summary_"""
-        grad_fn = trainer.attr.grad_fn
+        grad_fn = trainer.config.grad_fn
         optimizer = optax.chain(
             optax.clip_by_global_norm(self.config.max_gradient_norm),
             optax.scale_by_adam(eps=self.config.adam_epsilon),
@@ -80,7 +80,7 @@ class MAPGMinibatchUpdate(Utility):
             metrics["norm_updates"] = optax.global_norm(updates)
             return (params, opt_state), metrics
 
-        trainer.attr.minibatch_update_fn = model_update_minibatch
+        trainer.config.minibatch_update_fn = model_update_minibatch
 
     @property
     def name(self) -> str:
@@ -136,7 +136,7 @@ class MAPGEpochUpdate(Utility):
             )
 
             (params, opt_state), metrics = jax.lax.scan(
-                trainer.attr.model_update_minibatch,
+                trainer.config.model_update_minibatch,
                 (params, opt_state),
                 minibatches,
                 length=self.config.num_minibatches,
@@ -144,7 +144,7 @@ class MAPGEpochUpdate(Utility):
 
             return (key, params, opt_state, batch), metrics
 
-        trainer.attr.epoch_update_fn = model_update_epoch
+        trainer.config.epoch_update_fn = model_update_epoch
 
     @property
     def name(self) -> str:

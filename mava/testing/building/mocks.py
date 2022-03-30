@@ -38,7 +38,7 @@ class MockAdderSignature(Callback):
 
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.adder_signature_fn = self.config.adder_signature_param
+        builder.config.adder_signature_fn = self.config.adder_signature_param
 
     @property
     def name(self) -> str:
@@ -58,7 +58,7 @@ class MockAdder(Callback):
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.adder = self.config.adder_param
+        builder.config.adder = self.config.adder_param
 
     @property
     def name(self) -> str:
@@ -81,7 +81,7 @@ class MockDataServer(Callback):
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.system_data_server = self.config.data_server_param
+        builder.config.system_data_server = self.config.data_server_param
 
     @property
     def name(self) -> str:
@@ -127,11 +127,11 @@ class MockLogger(Callback):
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.executor_logger = self.config.logger_param_0
+        builder.config.executor_logger = self.config.logger_param_0
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.trainer_logger = self.config.logger_param_0
+        builder.config.trainer_logger = self.config.logger_param_0
 
     @property
     def name(self) -> str:
@@ -155,14 +155,14 @@ class MockParameterClient(Callback):
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.executor_parameter_client = (
+        builder.config.executor_parameter_client = (
             builder._parameter_server_client,
             self.config.parameter_client_param_0,
         )
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.trainer_parameter_client = (
+        builder.config.trainer_parameter_client = (
             builder._parameter_server_client,
             self.config.parameter_client_param_1,
         )
@@ -189,16 +189,16 @@ class MockExecutor(Callback):
     def on_building_executor(self, builder: SystemBuilder) -> None:
         """_summary_"""
         if builder._executor_id != "evaluator":
-            builder.attr.exec = (
+            builder.config.exec = (
                 builder._executor_id,
-                builder.attr.adder,
-                builder.attr.executor_parameter_client,
+                builder.config.adder,
+                builder.config.executor_parameter_client,
                 self.config.executor_param,
             )
         else:
-            builder.attr.exec = (
+            builder.config.exec = (
                 builder._executor_id,
-                builder.attr.executor_parameter_client,
+                builder.config.executor_parameter_client,
                 self.config.executor_param,
             )
 
@@ -223,23 +223,23 @@ class MockExecutorEnvironmentLoop(Callback):
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.environment = (
-            builder.attr.executor_logger,
+        builder.config.environment = (
+            builder.config.executor_logger,
             self.config.executor_environment_loop_param,
         )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """_summary_"""
         if builder._executor_id != "evaluator":
-            builder.attr.system_executor = (
+            builder.config.system_executor = (
                 builder._data_server_client,
-                builder.attr.environment,
-                builder.attr.exec,
+                builder.config.environment,
+                builder.config.exec,
             )
         else:
-            builder.attr.system_executor = (
-                builder.attr.environment,
-                builder.attr.exec,
+            builder.config.system_executor = (
+                builder.config.environment,
+                builder.config.exec,
             )
 
     @property
@@ -263,7 +263,7 @@ class MockTrainerDataset(Callback):
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.dataset = self.config.trainer_dataset_param
+        builder.config.dataset = self.config.trainer_dataset_param
 
     @property
     def name(self) -> str:
@@ -287,11 +287,11 @@ class MockTrainer(Callback):
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.system_trainer = (
+        builder.config.system_trainer = (
             builder._trainer_id,
-            builder.attr.trainer_logger,
-            builder.attr.dataset,
-            builder.attr.trainer_parameter_client,
+            builder.config.trainer_logger,
+            builder.config.dataset,
+            builder.config.trainer_parameter_client,
         )
 
     @property
@@ -337,7 +337,7 @@ class MockDistributor(Callback):
             data_server_client=None,
             parameter_server_client=parameter_server,
         )
-        builder.attr.system_build = (
+        builder.config.system_build = (
             data_server,
             parameter_server,
             executor,

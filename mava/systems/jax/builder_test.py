@@ -64,7 +64,7 @@ def test_builder(
         executor,
         evaluator,
         trainer,
-    ) = test_system._builder.attr.system_build
+    ) = test_system._builder.config.system_build
     assert data_server == 2
     assert type(parameter_server) == ParameterServer
 

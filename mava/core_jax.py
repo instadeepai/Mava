@@ -66,7 +66,7 @@ class SystemBuilder(abc.ABC):
         """System building init"""
 
         # Simple namespace for assigning system builder attributes dynamically
-        self.attr = SimpleNamespace()
+        self.config = SimpleNamespace()
 
         self.callbacks: Any
 
@@ -226,8 +226,7 @@ class SystemParameterServer(abc.ABC):
         """Add to the parameters in the parameter server.
 
         Args:
-            names : Names of the parameters to add to
-            vars : The values to add to the parameters to
+            add_to_params : values to add to the parameters
         """
 
     def run(self) -> None:
@@ -244,7 +243,7 @@ class SystemParameterClient(abc.ABC):
         """System parameter server init"""
 
         # Simple namespace for assigning parameter client attributes dynamically
-        self.attr = SimpleNamespace()
+        self.config = SimpleNamespace()
 
     @abc.abstractmethod
     def get_async(self) -> None:

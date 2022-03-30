@@ -48,14 +48,14 @@ class TrainerProcess(Component):
             ValueError: _description_
         """
         trainer_networks = self.config.trainer_networks
-        unique_net_keys = builder.attr.unique_net_keys
+        unique_net_keys = builder.config.unique_net_keys
 
         # Setup trainer_networks
         if not isinstance(trainer_networks, dict):
             if trainer_networks == enums.Trainer.single_trainer:
-                builder.attr.trainer_networks = {"trainer": unique_net_keys}
+                builder.config.trainer_networks = {"trainer": unique_net_keys}
             elif trainer_networks == enums.Trainer.one_trainer_per_network:
-                builder.attr.trainer_networks = {
+                builder.config.trainer_networks = {
                     f"trainer_{i}": [unique_net_keys[i]]
                     for i in range(len(unique_net_keys))
                 }
@@ -64,11 +64,11 @@ class TrainerProcess(Component):
                     "trainer_networks does not support this enums setting."
                 )
         else:
-            builder.attr.trainer_networks = trainer_networks
+            builder.config.trainer_networks = trainer_networks
 
         # Get all the unique trainer network keys
         all_trainer_net_keys = []
-        for trainer_nets in builder.attr.trainer_networks.values():
+        for trainer_nets in builder.config.trainer_networks.values():
             all_trainer_net_keys.extend(trainer_nets)
         unique_trainer_net_keys = sort_str_num(list(set(all_trainer_net_keys)))
 
@@ -77,30 +77,30 @@ class TrainerProcess(Component):
         # Setup specs for each network
         self._net_spec_keys: Dict[str, Any] = {}
         for i in range(len(unique_net_keys)):
-            builder.attr.net_spec_keys[unique_net_keys[i]] = builder.attr.agents[
-                i % len(builder.attr.agents)
+            builder.config.net_spec_keys[unique_net_keys[i]] = builder.config.agents[
+                i % len(builder.config.agents)
             ]
 
         # Setup table_network_config
-        builder.attr.table_network_config = {}
-        for trainer_key in builder.attr.trainer_networks.keys():
+        builder.config.table_network_config = {}
+        for trainer_key in builder.config.trainer_networks.keys():
             most_matches = 0
-            trainer_nets = builder.attr.trainer_networks[trainer_key]
-            for sample in builder.attr.network_sampling_setup:
+            trainer_nets = builder.config.trainer_networks[trainer_key]
+            for sample in builder.config.network_sampling_setup:
                 matches = 0
                 for entry in sample:
                     if entry in trainer_nets:
                         matches += 1
                 if most_matches < matches:
                     matches = most_matches
-                    builder.attr.table_network_config[trainer_key] = sample
+                    builder.config.table_network_config[trainer_key] = sample
 
     def on_building_trainer_start(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.networks = builder.attr.network_factory(
-            environment_spec=builder.attr.environment_spec,
-            agent_net_keys=builder.attr.agent_net_keys,
-            net_spec_keys=builder.attr.net_spec_keys,
+        builder.config.networks = builder.config.network_factory(
+            environment_spec=builder.config.environment_spec,
+            agent_net_keys=builder.config.agent_net_keys,
+            net_spec_keys=builder.config.net_spec_keys,
         )
 
     def name(self) -> str:

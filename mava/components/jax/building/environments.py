@@ -41,7 +41,7 @@ class ExecutorEnvironmentLoop(Component):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        builder.attr.environment_spec = specs.MAEnvironmentSpec(
+        builder.config.environment_spec = specs.MAEnvironmentSpec(
             self.config.environment_factory(evaluation=False)  # type: ignore
         )
 
@@ -51,7 +51,7 @@ class ExecutorEnvironmentLoop(Component):
         Args:
             builder : _description_
         """
-        builder.attr.executor_environment = self.config.environment_factory(
+        builder.config.executor_environment = self.config.environment_factory(
             evaluation=False  # type: ignore
         )
 
@@ -68,12 +68,12 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
             builder : _description_
         """
         executor_environment_loop = ParallelEnvironmentLoop(
-            builder.attr.executor_environment,
-            builder.attr.executor_fn,
-            logger=builder.attr.executor_logger,
+            builder.config.executor_environment,
+            builder.config.executor_fn,
+            logger=builder.config.executor_logger,
             **self.config.environment_kwargs,
         )
         if builder._executor_id == "evaluator":
-            builder.attr.system_evaluator = executor_environment_loop
+            builder.config.system_evaluator = executor_environment_loop
         else:
-            builder.attr.system_executor = executor_environment_loop
+            builder.config.system_executor = executor_environment_loop

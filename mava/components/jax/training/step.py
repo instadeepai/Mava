@@ -23,8 +23,55 @@ import optax
 import reverb
 from acme.jax import utils
 
+from mava.components.jax import Component
 from mava.components.jax.training import Batch, TrainingState, Utility
 from mava.core_jax import SystemTrainer
+
+
+@dataclass
+class DefaultStepConfig:
+    random_key: jnp.ndarray = 42
+
+
+class DefaultStep(Component):
+    def __init__(
+        self,
+        config: DefaultStepConfig = DefaultStepConfig(),
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    def on_training_init(self, trainer: SystemTrainer) -> None:
+        """_summary_"""
+        # Initialise training state (parameters and optimiser state).
+        trainer.config.state = trainer.config.make_initial_state(self.config.random_key)
+
+    def on_training_step(self, trainer: SystemTrainer) -> None:
+        """Does a step of SGD and logs the results."""
+
+        # Do a batch of SGD.
+        sample = next(trainer.config.iterator)
+        self._state, results = trainer.config.sgd_step(trainer.config.state, sample)
+
+        # Update our counts and record it.
+        # counts = self._counter.increment(steps=1) # TODO: add back in later
+
+        # Snapshot and attempt to write logs.
+        # self._logger.write({**results, **counts})
+        trainer.config.logger.write({**results})
+
+    @property
+    def name(self) -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "step"
 
 
 @dataclass
@@ -54,7 +101,6 @@ class MAPGWithTrustRegionStep(Utility):
 
             # Extract the data.
             data = sample.data
-            # TODO(sinopalnikov): replace it with namedtuple unpacking
             observations, actions, rewards, termination, extra = (
                 data.observation,
                 data.action,
@@ -69,14 +115,14 @@ class MAPGWithTrustRegionStep(Utility):
                 o = jax.tree_map(
                     lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observations
                 )
-                _, behavior_values = trainer.attr.networks.network.apply(params, o)
+                _, behavior_values = trainer.config.networks.network.apply(params, o)
                 behavior_values = jnp.reshape(behavior_values, rewards.shape[0:2])
                 return behavior_values
 
             behavior_values = get_behavior_values(state.params, observations)
 
             # Vmap over batch dimension
-            batch_gae_advantages = jax.vmap(trainer.attr.gae_fn, in_axes=0)
+            batch_gae_advantages = jax.vmap(trainer.config.gae_fn, in_axes=0)
             advantages, target_values = batch_gae_advantages(
                 rewards, discounts, behavior_values
             )
@@ -101,26 +147,26 @@ class MAPGWithTrustRegionStep(Utility):
             num_sequences = target_values.shape[0]
             num_steps = target_values.shape[1]
             batch_size = num_sequences * num_steps
-            assert batch_size % trainer.attr.num_minibatches == 0, (
+            assert batch_size % trainer.config.num_minibatches == 0, (
                 "Num minibatches must divide batch size. Got batch_size={}"
                 " num_minibatches={}."
-            ).format(batch_size, trainer.attr.num_minibatches)
+            ).format(batch_size, trainer.config.num_minibatches)
             batch = jax.tree_map(
                 lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
             )
 
             # Compute gradients.
-            trainer.attr.grad_fn = jax.grad(trainer.attr.loss_fn, has_aux=True)
+            trainer.config.grad_fn = jax.grad(trainer.config.loss_fn, has_aux=True)
 
             params = state.params
             opt_state = state.opt_state
             # Repeat training for the given number of epoch, taking a random
             # permutation for every epoch.
             (key, params, opt_state, _), metrics = jax.lax.scan(
-                trainer.attr.epoch_update_fn,
+                trainer.config.epoch_update_fn,
                 (state.random_key, params, opt_state, batch),
                 (),
-                length=trainer.attr.num_epochs,
+                length=trainer.config.num_epochs,
             )
 
             metrics = jax.tree_map(jnp.mean, metrics)
@@ -146,7 +192,7 @@ class MAPGWithTrustRegionStep(Utility):
             )
             return new_state, metrics
 
-        trainer.attr.step_fn = sgd_step
+        trainer.config.step_fn = sgd_step
 
     @property
     def name(self) -> str:
@@ -155,4 +201,4 @@ class MAPGWithTrustRegionStep(Utility):
         Returns:
             _description_
         """
-        return "advantage_estimator"
+        return "step_fn"

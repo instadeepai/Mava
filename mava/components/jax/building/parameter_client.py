@@ -70,9 +70,9 @@ class ExecutorParameterClient(BaseParameterClient):
         params = {}
         get_keys = []
         for net_type_key in ["observations", "policies"]:
-            for net_key in builder.attr.networks[net_type_key].keys():
+            for net_key in builder.config.networks[net_type_key].keys():
                 param_key = f"{net_key}_{net_type_key}"
-                params[param_key] = builder.attr.networks[net_type_key][
+                params[param_key] = builder.config.networks[net_type_key][
                     net_key
                 ].parameters
                 get_keys.append(param_key)
@@ -80,13 +80,13 @@ class ExecutorParameterClient(BaseParameterClient):
         count_names, params = self._set_up_count_parameters(params=params)
 
         get_keys.extend(count_names)
-        builder.attr.executor_counts = {name: params[name] for name in count_names}
+        builder.config.executor_counts = {name: params[name] for name in count_names}
 
         parameter_client = None
-        if builder.attr.system_parameter_server:
+        if builder.config.system_parameter_server:
             # Create parameter client
             parameter_client = ParameterClient(
-                client=builder.attr.system_parameter_server,
+                client=builder.config.system_parameter_server,
                 parameters=params,
                 get_keys=get_keys,
                 update_period=self.config.executor_parameter_update_period,
@@ -96,7 +96,7 @@ class ExecutorParameterClient(BaseParameterClient):
             # assigning parameters before running the environment loop.
             parameter_client.get_and_wait()
 
-        builder.attr.executor_parameter_client = parameter_client
+        builder.config.executor_parameter_client = parameter_client
 
 
 @dataclass
@@ -129,12 +129,12 @@ class TrainerParameterClient(BaseParameterClient):
         get_keys = []
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
-        for net_type_key in builder.attr.networks.keys():
-            for net_key in builder.attr.networks[net_type_key].keys():
-                params[f"{net_key}_{net_type_key}"] = builder.attr.networks[
+        for net_type_key in builder.config.networks.keys():
+            for net_key in builder.config.networks[net_type_key].keys():
+                params[f"{net_key}_{net_type_key}"] = builder.config.networks[
                     net_type_key
                 ][net_key].parameters
-                if net_key in set(builder.attr.trainer_networks):
+                if net_key in set(builder.config.trainer_networks):
                     set_keys.append(f"{net_key}_{net_type_key}")
                 else:
                     get_keys.append(f"{net_key}_{net_type_key}")
@@ -142,11 +142,11 @@ class TrainerParameterClient(BaseParameterClient):
         count_names, params = self._set_up_count_parameters(params=params)
 
         get_keys.extend(count_names)
-        builder.attr.trainer_counts = {name: params[name] for name in count_names}
+        builder.config.trainer_counts = {name: params[name] for name in count_names}
 
         # Create parameter client
         parameter_client = ParameterClient(
-            client=builder.attr.system_parameter_server,
+            client=builder.config.system_parameter_server,
             parameters=params,
             get_keys=get_keys,
             set_keys=set_keys,
@@ -155,4 +155,4 @@ class TrainerParameterClient(BaseParameterClient):
         # Get all the initial parameters
         parameter_client.get_all_and_wait()
 
-        builder.attr.trainer_parameter_client = parameter_client
+        builder.config.trainer_parameter_client = parameter_client
