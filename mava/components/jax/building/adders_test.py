@@ -16,7 +16,6 @@
 """Tests for config class for Jax-based Mava systems"""
 
 from dataclasses import dataclass, field
-from types import SimpleNamespace
 from typing import List
 
 import numpy as np
@@ -27,7 +26,7 @@ from acme import specs
 from mava.components.jax import Component
 from mava.components.jax.building import adders
 from mava.core_jax import SystemBuilder
-from mava.specs import MAEnvironmentSpec
+from mava.specs import DesignSpec, MAEnvironmentSpec
 from mava.systems.jax.system import System
 from mava.utils.wrapper_utils import parameterized_restart
 
@@ -133,7 +132,7 @@ class MockDistributor(Component):
 
 
 class TestSystemWithParallelSequenceAdder(System):
-    def design(self) -> SimpleNamespace:
+    def design(self) -> DesignSpec:
         """Mock system design with zero components.
 
         Returns:
@@ -142,7 +141,7 @@ class TestSystemWithParallelSequenceAdder(System):
         executor_adder = adders.ParallelSequenceAdder
         executor_adder_priority = adders.UniformAdderPriority
         data_server_adder = adders.ParallelSequenceAdderSignature
-        components = SimpleNamespace(
+        components = DesignSpec(
             data_server_adder=data_server_adder,
             executor_adder=executor_adder,
             executor_adder_priority=executor_adder_priority,

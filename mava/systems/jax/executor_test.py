@@ -16,12 +16,12 @@
 """Tests for executor class for Jax-based Mava systems"""
 
 import functools
-from types import SimpleNamespace
 
 import acme
 import pytest
 
 from mava.components.jax.executing.executor import DefaultExecutor
+from mava.specs import DesignSpec
 from mava.systems.jax import mappo
 from mava.systems.jax.system import System
 from mava.testing.building import mocks
@@ -29,13 +29,13 @@ from mava.utils.environments import debugging_utils
 
 
 class TestSystem(System):
-    def design(self) -> SimpleNamespace:
+    def design(self) -> DesignSpec:
         """Mock system design with zero components.
 
         Returns:
             system callback components
         """
-        components = SimpleNamespace(
+        components = DesignSpec(
             data_server=mocks.MockDataServer,
             data_server_adder=mocks.MockAdderSignature,
             parameter_server=mocks.MockParameterServer,

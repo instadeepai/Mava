@@ -15,25 +15,24 @@
 
 """Tests for parameter server class for Jax-based Mava systems"""
 
-from types import SimpleNamespace
-
 import numpy as np
 import pytest
 
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
+from mava.specs import DesignSpec
 from mava.systems.jax import ParameterServer
 from mava.systems.jax.system import System
 from mava.testing.building import mocks
 
 
 class TestSystem(System):
-    def design(self) -> SimpleNamespace:
+    def design(self) -> DesignSpec:
         """Mock system design with zero components.
 
         Returns:
             system callback components
         """
-        components = SimpleNamespace(
+        components = DesignSpec(
             data_server=mocks.MockDataServer,
             data_server_adder=mocks.MockAdderSignature,
             parameter_server=DefaultParameterServer,

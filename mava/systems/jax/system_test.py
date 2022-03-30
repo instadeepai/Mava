@@ -16,13 +16,13 @@
 
 """Tests for Jax-based Mava system implementation."""
 from dataclasses import dataclass, field
-from types import SimpleNamespace
 from typing import List
 
 import pytest
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
+from mava.specs import DesignSpec
 from mava.systems.jax.system import System
 
 
@@ -161,37 +161,37 @@ class MockDistributorComponent(Component):
 
 
 class TestSystemWithZeroComponents(System):
-    def design(self) -> SimpleNamespace:
+    def design(self) -> DesignSpec:
         """Mock system design with zero components.
 
         Returns:
             system callback components
         """
-        components = SimpleNamespace(distributor=MockDistributorComponent)
+        components = DesignSpec(distributor=MockDistributorComponent)
         return components
 
 
 class TestSystemWithOneComponent(System):
-    def design(self) -> SimpleNamespace:
+    def design(self) -> DesignSpec:
         """Mock system design with one component.
 
         Returns:
             system callback components
         """
-        components = SimpleNamespace(
+        components = DesignSpec(
             main_component=ComponentZero, distributor=MockDistributorComponent
         )
         return components
 
 
 class TestSystemWithTwoComponents(System):
-    def design(self) -> SimpleNamespace:
+    def design(self) -> DesignSpec:
         """Mock system design with two components.
 
         Returns:
             system callback components
         """
-        components = SimpleNamespace(
+        components = DesignSpec(
             main_component=ComponentZero,
             sub_component=ComponentOne,
             distributor=MockDistributorComponent,
