@@ -20,12 +20,14 @@ import abc
 from types import SimpleNamespace
 from typing import Any, Dict, List, Sequence, Tuple, Union
 
+from mava.specs import DesignSpec
+
 
 class BaseSystem(abc.ABC):
     """Abstract system object."""
 
     @abc.abstractmethod
-    def design(self) -> SimpleNamespace:
+    def design(self) -> DesignSpec:
         """System design specifying the list of components to use.
 
         Returns:
