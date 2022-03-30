@@ -59,11 +59,10 @@ class ParameterClient:
         self._request_all = lambda: client.get_parameters(self._all_keys)
 
         self._adjust = lambda: client.set_parameters(
-            self._set_keys,
-            self._parameters,
+            {key: self._parameters[key] for key in self._set_keys},
         )
 
-        self._add = lambda names, Params: client.add_to_parameters(names, Params)
+        self._add = lambda params: client.add_to_parameters(params)
 
         # Create a single background thread to fetch parameters without necessarily
         # blocking the actor.
@@ -74,8 +73,8 @@ class ParameterClient:
         self._async_adjust_and_request = lambda: self._executor.submit(
             self._adjust_and_request
         )
-        self._async_add: Any = lambda names, Params: self._executor.submit(
-            self._add(names, Params)  # type: ignore
+        self._async_add: Any = lambda params: self._executor.submit(
+            self._add(params)  # type: ignore
         )
 
         # Initialize this client's future to None to indicate to the `update()`
@@ -87,8 +86,7 @@ class ParameterClient:
 
     def _adjust_and_request(self) -> None:
         self._client.set_parameters(
-            self._set_keys,
-            self._parameters,
+            {key: self._parameters[key] for key in self._set_keys},
         )
         self._copy(self._client.get_parameters(self._get_keys))
 
@@ -145,7 +143,7 @@ class ParameterClient:
         if self._set_get_future is not None and self._set_get_future.done():
             self._set_get_future = None
 
-    def add_async(self, names: List[str], Params: Dict[str, Any]) -> None:
+    def add_async(self, params: Dict[str, Any]) -> None:
         """Asynchronously adds to server parameters."""
         if self._add_future is not None and self._add_future.done():
             self._add_future = None
@@ -153,12 +151,17 @@ class ParameterClient:
         if self._add_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
+            names = params.keys()
             if not self._async_add_buffer:
-                self._add_future = self._async_add(names, Params)
+                self._add_future = self._async_add(params)
             else:
                 for name in names:
-                    self._async_add_buffer[name] += Params[name]
-                self._add_future = self._async_add(names, self._async_add_buffer)
+                    self._async_add_buffer[name] += params[name]
+
+                raise NotImplementedError("Is the below line correct?")
+                self._add_future = self._async_add(
+                    params.keys(), self._async_add_buffer
+                )
                 self._async_add_buffer = {}
             return
         else:
@@ -167,15 +170,15 @@ class ParameterClient:
             # process is ready.
             if self._async_add_buffer:
                 for name in names:
-                    self._async_add_buffer[name] += Params[name]
+                    self._async_add_buffer[name] += params[name]
             else:
                 for name in names:
-                    self._async_add_buffer[name] = Params[name]
+                    self._async_add_buffer[name] = params[name]
 
-    def add_and_wait(self, names: List[str], Params: Dict[str, Any]) -> None:
+    def add_and_wait(self, params: Dict[str, Any]) -> None:
         """Adds the specified parameters to the corresponding parameters in server \
         and waits for the process to complete before continuing."""
-        self._client.add_to_parameters(names, Params)
+        self._client.add_to_parameters(params)
 
     def get_and_wait(self) -> None:
         """Updates the get parameters with the latest copy from server \

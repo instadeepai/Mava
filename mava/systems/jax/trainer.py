@@ -16,7 +16,8 @@
 
 """System Trainer implementation."""
 
-from typing import Any, Dict, List
+from types import SimpleNamespace
+from typing import List
 
 from mava.callbacks import Callback, TrainerHookMixin
 from mava.core_jax import SystemTrainer
@@ -27,16 +28,16 @@ class Trainer(SystemTrainer, TrainerHookMixin):
 
     def __init__(
         self,
-        attr: SimpleNamespace,
+        config: SimpleNamespace,
         components: List[Callback] = [],
     ):
         """_summary_
 
         Args:
-            attr : _description_
+            config : _description_
             components : _description_.
         """
-        self.attr = attr
+        self.config = config
         self.callbacks = components
 
         self.on_training_init_start()

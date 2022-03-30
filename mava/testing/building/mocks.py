@@ -104,7 +104,6 @@ class MockParameterServer(Callback):
 
     def on_building_parameter_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.attr.system_parameter_server = self.config.parameter_server_param
 
     @property
     def name(self) -> str:

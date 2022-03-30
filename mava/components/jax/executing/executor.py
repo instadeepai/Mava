@@ -32,7 +32,7 @@ class ExecutorProcessConfig:
     shared_weights: bool = True
 
 
-class ExecutorProcess(Component):
+class DefaultExecutor(Component):
     def __init__(self, config: ExecutorProcessConfig = ExecutorProcessConfig()):
         """_summary_
 
@@ -128,7 +128,8 @@ class ExecutorProcess(Component):
             agent_net_keys=builder.attr.agent_net_keys,
             net_spec_keys=builder.attr.net_spec_keys,
         )
-
+        
+    @property
     def name(self) -> str:
         """_summary_"""
         return "executor"

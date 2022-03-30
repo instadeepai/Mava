@@ -15,11 +15,12 @@
 
 """Jax system executor."""
 
-from typing import Any, Dict, List, Tuple, Union
+from types import SimpleNamespace
+from typing import Dict, List, Tuple, Union
 
 import dm_env
+from acme.types import NestedArray
 
-from types import SimpleNamespace
 from mava.callbacks import Callback, ExecutorHookMixin
 from mava.core_jax import SystemExecutor
 
@@ -29,16 +30,16 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
     def __init__(
         self,
-        attr: SimpleNamespace,
+        config: SimpleNamespace,
         components: List[Callback] = [],
     ):
         """_summary_
 
         Args:
-            attr : _description_.
+            config : _description_.
             components : _description_.
         """
-        self.attr = attr
+        self.config = config
         self.callbacks = components
 
         self.on_execution_init_start()
@@ -49,9 +50,9 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
     def observe(
         self,
-        actions: Dict[str, types.NestedArray],
+        actions: Dict[str, NestedArray],
         timestep: dm_env.TimeStep,
-        extras: Dict[str, types.NestedArray] = {},
+        extras: Dict[str, NestedArray] = {},
     ) -> None:
         """Record observed timestep from the environment.
 
@@ -73,9 +74,9 @@ class Executor(SystemExecutor, ExecutorHookMixin):
     def select_action(
         self,
         agent: str,
-        observation: types.NestedArray,
-        state: types.NestedArray = None,
-    ) -> types.NestedArray:
+        observation: NestedArray,
+        state: NestedArray = None,
+    ) -> NestedArray:
         """Agent specific policy function.
 
         Args:
@@ -99,13 +100,13 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_select_action_end()
 
-        return self.attr.action_info, self.attr.policy_info
+        return self.config.action_info, self.config.policy_info
 
     def select_actions(
-        self, observations: Dict[str, types.NestedArray]
+        self, observations: Dict[str, NestedArray]
     ) -> Union[
-        Dict[str, types.NestedArray],
-        Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]],
+        Dict[str, NestedArray],
+        Tuple[Dict[str, NestedArray], Dict[str, NestedArray]],
     ]:
         """Select the actions for all agents in the system.
 
@@ -122,7 +123,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_select_actions_end()
 
-        return self.attr.actions_info, self.attr.policies_info
+        return self.config.actions_info, self.config.policies_info
 
     def update(self, wait: bool = False) -> None:
         """Update executor parameters.

@@ -19,6 +19,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from mava.systems.jax import ParameterServer, Trainer
 from mava.systems.jax.system import System
 from mava.testing.building import mocks
 
@@ -65,7 +66,7 @@ def test_builder(
         trainer,
     ) = test_system._builder.attr.system_build
     assert data_server == 2
-    assert parameter_server.config.parameter_server_param == 2
+    assert type(parameter_server) == ParameterServer
 
     exec_data_client, env, exec = executor
     exec_logger, exec_logger_param = env
@@ -75,7 +76,8 @@ def test_builder(
 
     exec_id, exec_adder, exec_param_client, exec_param = exec
     assert exec_id == "executor"
-    assert exec_param_client == (2, 1)
+    assert type(exec_param_client[0]) == ParameterServer
+    assert exec_param_client[1] == 1
     assert exec_adder == 2.7
     assert exec_param == 1
 
@@ -86,8 +88,10 @@ def test_builder(
     assert eval_param_client == exec_param_client
     assert eval_exec_param == exec_param
 
-    train_id, train_logger, train_dataset, train_param_client = trainer
-    assert train_id == "trainer"
-    assert train_logger == 1
-    assert train_dataset == 5
-    assert train_param_client == (2, "param")
+    assert type(trainer) == Trainer
+    # TODO (dries): What is the best way to test the trainer here?
+    # train_id, train_logger, train_dataset, train_param_client = trainer
+    # assert train_id == "trainer"
+    # assert train_logger == 1
+    # assert train_dataset == 5
+    # assert train_param_client == (2, "param")
