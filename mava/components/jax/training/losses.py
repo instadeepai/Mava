@@ -20,7 +20,7 @@ from typing import Any, Dict, Tuple
 import jax.numpy as jnp
 import rlax
 
-from mava.components.jax.training import Loss
+from mava.components.jax.training.base import Loss
 from mava.core_jax import SystemTrainer
 
 

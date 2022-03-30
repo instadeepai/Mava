@@ -22,7 +22,7 @@ import jax.numpy as jnp
 import numpy as np
 import rlax
 
-from mava.components.jax.training import Utility
+from mava.components.jax.training.base import Utility
 from mava.core_jax import SystemTrainer
 
 

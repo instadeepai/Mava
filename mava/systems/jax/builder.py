@@ -22,7 +22,9 @@ from typing import Any, List
 
 from mava.callbacks import BuilderHookMixin, Callback
 from mava.core_jax import SystemBuilder
-from mava.systems.jax import Executor, ParameterServer, Trainer
+from mava.systems.jax.executor import Executor
+from mava.systems.jax.parameter_server import ParameterServer
+from mava.systems.jax.trainer import Trainer
 
 
 class Builder(SystemBuilder, BuilderHookMixin):
