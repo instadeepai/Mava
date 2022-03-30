@@ -15,10 +15,10 @@
 
 """Jax-based Mava system implementation."""
 import abc
-from types import SimpleNamespace
 from typing import Any, List
 
 from mava.core_jax import BaseSystem
+from mava.specs import DesignSpec
 from mava.systems.jax import Builder, Config
 
 
@@ -38,13 +38,13 @@ class System(BaseSystem):
 
     def _make_config(self) -> None:
         """Private method to construct system config upon initialisation."""
-        for component in self._design.__dict__.values():
+        for component in self._design.get().values():
             comp = component()
             input = {comp.name: comp.config}
             self.config.add(**input)
 
     @abc.abstractmethod
-    def design(self) -> SimpleNamespace:
+    def design(self) -> DesignSpec:
         """System design specifying the list of components to use.
 
         Returns:
@@ -65,8 +65,8 @@ class System(BaseSystem):
             )
         comp = component()
         name = comp.name
-        if name in list(self._design.__dict__.keys()):
-            self._design.__dict__[name] = component
+        if name in list(self._design.get().keys()):
+            self._design.get()[name] = component
             config_feed = {name: comp.config}
             self.config.update(**config_feed)
         else:
@@ -89,20 +89,22 @@ class System(BaseSystem):
             )
         comp = component()
         name = comp.name
-        if name in list(self._design.__dict__.keys()):
+        if name in list(self._design.get().keys()):
             raise Exception(
                 "The given component is already part of the current system.\
                 Perhaps try updating it instead using .update()."
             )
         else:
-            self._design.__dict__[name] = component
+            self._design.get()[name] = component
             config_feed = {name: comp.config}
             self.config.add(**config_feed)
 
     def build(self, **kwargs: Any) -> None:
+        """Configure system hyperparameters."""
+
         if self._built:
             raise Exception("System already built.")
-        """Configure system hyperparameters."""
+
         self.config.build()
         self.config.set_parameters(**kwargs)
 
@@ -111,7 +113,7 @@ class System(BaseSystem):
 
         # update default system component configs
         assert len(self.components) == 0
-        for component in self._design.__dict__.values():
+        for component in self._design.get().values():
             self.components.append(component(system_config))
 
         # Build system
