@@ -349,7 +349,6 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
                 )
         except Exception as ex:
             print(f"Render frames exception: {ex}")
-            pass
         return render
 
     def _append_frame(self) -> None:
@@ -382,7 +381,6 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
                 self._save_gif(path)
         except Exception as ex:
             print(f"Write frames exception: {ex}")
-            pass
         self._frames = []
         # Clear matplotlib figures in memory
         plt.close("all")
