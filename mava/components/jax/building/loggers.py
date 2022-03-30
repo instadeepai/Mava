@@ -56,3 +56,8 @@ class Logger(Component):
         builder.trainer_logger = self.config.logger_factory(  # type: ignore
             f"{name}_{builder._trainer_id}", **logger_config
         )
+
+    @property
+    def name(self) -> str:
+        """_summary_"""
+        return "executor"

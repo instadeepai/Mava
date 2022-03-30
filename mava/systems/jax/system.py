@@ -71,7 +71,7 @@ class System(BaseSystem):
             self.config.update(**config_feed)
         else:
             raise Exception(
-                "The given component is not part of the current system.\
+                f"The given component ({name}) is not part of the current system.\
                 Perhaps try adding it instead using .add()."
             )
 
@@ -106,10 +106,11 @@ class System(BaseSystem):
         self.config.build()
         self.config.set_parameters(**kwargs)
 
-        # get system config to feed to component list to update hyperparamete settings
+        # get system config to feed to component list to update hyperparameter settings
         system_config = self.config.get()
 
         # update default system component configs
+        assert len(self.components) == 0
         for component in self._design.__dict__.values():
             self.components.append(component(system_config))
 

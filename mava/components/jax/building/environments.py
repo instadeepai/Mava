@@ -39,7 +39,7 @@ class ExecutorEnvironmentLoop(Component):
         """[summary]"""
         self.config = config
 
-    def on_building_init(self, builder: SystemBuilder) -> None:
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
         builder.attr.environment_spec = specs.MAEnvironmentSpec(
             self.config.environment_factory(evaluation=False)  # type: ignore

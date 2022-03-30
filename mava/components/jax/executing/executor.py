@@ -16,8 +16,9 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import List, Union
+from typing import Any, List, Union
 
+from mava import specs as mava_specs
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
 from mava.utils import enums
@@ -29,7 +30,6 @@ class ExecutorProcessConfig:
     network_sampling_setup: Union[
         List, enums.NetworkSampler
     ] = enums.NetworkSampler.fixed_agent_networks
-    shared_weights: bool = True
 
 
 class DefaultExecutor(Component):
@@ -43,13 +43,11 @@ class DefaultExecutor(Component):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Summary"""
-
         # Setup agent networks and network sampling setup
         network_sampling_setup = self.config.network_sampling_setup
         builder.attr.agents = sort_str_num(
             builder.attr.environment_spec.get_agent_ids()
         )
-        builder.attr.shared_weights = self.config.shared_weights
 
         if not isinstance(network_sampling_setup, list):
             if network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
@@ -128,7 +126,28 @@ class DefaultExecutor(Component):
             agent_net_keys=builder.attr.agent_net_keys,
             net_spec_keys=builder.attr.net_spec_keys,
         )
-        
+
+    def on_building_executor_environment(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        builder.attr.environment = (
+            builder.attr.executor_logger,
+            self.config.environment_factory,
+        )
+
+    def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        if builder._executor_id != "evaluator":
+            builder.attr.system_executor = (
+                builder._data_server_client,
+                builder.attr.environment,
+                builder.attr.exec,
+            )
+        else:
+            builder.attr.system_executor = (
+                builder.attr.environment,
+                builder.attr.exec,
+            )
+
     @property
     def name(self) -> str:
         """_summary_"""

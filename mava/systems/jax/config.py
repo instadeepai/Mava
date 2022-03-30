@@ -48,7 +48,7 @@ class Config:
             if is_dataclass(dataclass):
                 if name in list(self._config.keys()):
                     raise Exception(
-                        "The given component config is already part of the current \
+                        f"The given component ({name}) config is already part of the current \
                         system. Perhaps try updating the component instead using \
                         .update() in the system builder."
                     )
@@ -120,8 +120,9 @@ class Config:
         config_unwrapped: Dict = {}
         for param in self._config.values():
             config_unwrapped.update(flatten_dict(param.__dict__))
+
         self._built_config = config_unwrapped
-        self._built = True    
+        self._built = True
 
     def set_parameters(self, **kwargs: Any) -> None:
         """Set a specific hyperparameter of a built config.
@@ -143,7 +144,7 @@ class Config:
                 self._built_config[name] = param_value
             else:
                 raise Exception(
-                    "The given parameter is not part of the current system. \
+                    f"The given parameter ({name}) is not part of the current system. \
                     This should have been added first via a component .add() \
                     during system building."
                 )
@@ -160,6 +161,5 @@ class Config:
             raise Exception(
                 "The config must first be built using .build() before calling .get()."
             )
-        
+
         return SimpleNamespace(**self._built_config)
-            

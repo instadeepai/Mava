@@ -16,8 +16,11 @@
 """Tests for config class for Jax-based Mava systems"""
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import Callable, List, Optional
 
+import dm_env
+
+from mava import specs
 from mava.callbacks import Callback
 from mava.core_jax import SystemBuilder
 
@@ -210,7 +213,7 @@ class MockExecutor(Callback):
 
 @dataclass
 class MockExecutorEnvironmentLoopConfig:
-    executor_environment_loop_param: str = "param"
+    environment_factory: str = "param"
 
 
 class MockExecutorEnvironmentLoop(Callback):
@@ -221,11 +224,18 @@ class MockExecutorEnvironmentLoop(Callback):
         """Mock system component."""
         self.config = config
 
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        if not isinstance(self.config.environment_factory, str):
+            builder.attr.environment_spec = specs.MAEnvironmentSpec(
+                self.config.environment_factory(evaluation=False)  # type: ignore
+            )
+
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
         builder.attr.environment = (
             builder.attr.executor_logger,
-            self.config.executor_environment_loop_param,
+            self.config.environment_factory,
         )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
@@ -246,6 +256,31 @@ class MockExecutorEnvironmentLoop(Callback):
     def name(self) -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor_environment_loop"
+
+
+@dataclass
+class MockNetworksConfig:
+    network_factory: Optional[Callable[[str], dm_env.Environment]] = None
+    shared_weights: bool = True
+
+
+class MockNetworks(Callback):
+    def __init__(
+        self,
+        config: MockNetworksConfig = MockNetworksConfig(),
+    ):
+        """[summary]"""
+        self.config = config
+
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
+        """Summary"""
+        builder.attr.network_factory = self.config.network_factory
+        builder.attr.shared_networks = self.config.shared_weights
+
+    @property
+    def name(self) -> str:
+        """_summary_"""
+        return "networks"
 
 
 @dataclass
