@@ -16,10 +16,14 @@
 """Tests for config class for Jax-based Mava systems"""
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import Callable, List, Optional
 
+import dm_env
+
+from mava import specs
 from mava.callbacks import Callback
 from mava.core_jax import SystemBuilder
+from mava.environment_loop import ParallelEnvironmentLoop
 
 
 # Mock components to feed to the builder
@@ -210,7 +214,8 @@ class MockExecutor(Callback):
 
 @dataclass
 class MockExecutorEnvironmentLoopConfig:
-    executor_environment_loop_param: str = "param"
+    environment_factory: str = "param"
+    should_update: bool = True
 
 
 class MockExecutorEnvironmentLoop(Callback):
@@ -221,31 +226,63 @@ class MockExecutorEnvironmentLoop(Callback):
         """Mock system component."""
         self.config = config
 
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
+        """[summary]"""
+        if not isinstance(self.config.environment_factory, str):
+            builder.config.environment_spec = specs.MAEnvironmentSpec(
+                self.config.environment_factory(evaluation=False)  # type: ignore
+            )
+
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.environment = (
+        builder.config.executor_environment = (
             builder.config.executor_logger,
-            self.config.executor_environment_loop_param,
+            self.config.environment_factory,
         )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        if builder._executor_id != "evaluator":
-            builder.config.system_executor = (
-                builder._data_server_client,
-                builder.config.environment,
-                builder.config.exec,
-            )
+
+        executor_environment_loop = ParallelEnvironmentLoop(
+            environment=builder.config.executor_environment,
+            executor=builder.config.executor,
+            logger=builder.config.executor_logger,
+            should_update=self.config.should_update,
+        )
+        if builder._executor_id == "evaluator":
+            builder.config.system_evaluator = executor_environment_loop
         else:
-            builder.config.system_executor = (
-                builder.config.environment,
-                builder.config.exec,
-            )
+            builder.config.system_executor = executor_environment_loop
 
     @property
     def name(self) -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
         return "executor_environment_loop"
+
+
+@dataclass
+class MockNetworksConfig:
+    network_factory: Optional[Callable[[str], dm_env.Environment]] = None
+    shared_weights: bool = True
+
+
+class MockNetworks(Callback):
+    def __init__(
+        self,
+        config: MockNetworksConfig = MockNetworksConfig(),
+    ):
+        """[summary]"""
+        self.config = config
+
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
+        """Summary"""
+        builder.config.network_factory = self.config.network_factory
+        builder.config.shared_networks = self.config.shared_weights
+
+    @property
+    def name(self) -> str:
+        """_summary_"""
+        return "networks"
 
 
 @dataclass
@@ -260,6 +297,10 @@ class MockTrainerDataset(Callback):
     ) -> None:
         """Mock system component."""
         self.config = config
+
+    def on_building_init_end(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        builder.config.net_spec_keys = {"network_0": "agent_0"}
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_"""

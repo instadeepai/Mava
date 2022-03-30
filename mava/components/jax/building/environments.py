@@ -16,9 +16,9 @@
 """Execution components for system builders"""
 import abc
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional
+from typing import Callable, Optional
 
-import dm_env
+import acme
 
 from mava import specs
 from mava.components.jax import Component
@@ -28,8 +28,8 @@ from mava.environment_loop import ParallelEnvironmentLoop
 
 @dataclass
 class ExecutorEnvironmentLoopConfig:
-    environment_factory: Optional[Callable[[bool], dm_env.Environment]] = None
-    environment_kwargs: Dict = {}
+    environment_factory: Optional[Callable[[bool], acme.core.Worker]] = None
+    should_update: bool = True
 
 
 class ExecutorEnvironmentLoop(Component):
@@ -39,7 +39,7 @@ class ExecutorEnvironmentLoop(Component):
         """[summary]"""
         self.config = config
 
-    def on_building_init(self, builder: SystemBuilder) -> None:
+    def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
         builder.config.environment_spec = specs.MAEnvironmentSpec(
             self.config.environment_factory(evaluation=False)  # type: ignore
@@ -71,7 +71,7 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
             builder.config.executor_environment,
             builder.config.executor_fn,
             logger=builder.config.executor_logger,
-            **self.config.environment_kwargs,
+            should_update=self.config.should_update,
         )
         if builder._executor_id == "evaluator":
             builder.config.system_evaluator = executor_environment_loop

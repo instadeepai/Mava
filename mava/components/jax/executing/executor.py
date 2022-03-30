@@ -29,7 +29,6 @@ class ExecutorProcessConfig:
     network_sampling_setup: Union[
         List, enums.NetworkSampler
     ] = enums.NetworkSampler.fixed_agent_networks
-    shared_weights: bool = True
 
 
 class DefaultExecutor(Component):
@@ -43,29 +42,27 @@ class DefaultExecutor(Component):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """Summary"""
-
         # Setup agent networks and network sampling setup
         network_sampling_setup = self.config.network_sampling_setup
-        builder.attr.agents = sort_str_num(
-            builder.attr.environment_spec.get_agent_ids()
+        builder.config.agents = sort_str_num(
+            builder.config.environment_spec.get_agent_ids()
         )
-        builder.attr.shared_weights = self.config.shared_weights
 
         if not isinstance(network_sampling_setup, list):
             if network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
                 # if no network_sampling_setup is specified, assign a single network
                 # to all agents of the same type if weights are shared
                 # else assign seperate networks to each agent
-                builder.attr.agent_net_keys = {
+                builder.config.agent_net_keys = {
                     agent: f"network_{agent.split('_')[0]}"
                     if self.config.shared_weights
                     else f"network_{agent}"
-                    for agent in builder.attr.agents
+                    for agent in builder.config.agents
                 }
-                builder.attr.network_sampling_setup = [
+                builder.config.network_sampling_setup = [
                     [
-                        builder.attr.agent_net_keys[key]
-                        for key in sort_str_num(builder.attr.agent_net_keys.keys())
+                        builder.config.agent_net_keys[key]
+                        for key in sort_str_num(builder.config.agent_net_keys.keys())
                     ]
                 ]
             elif network_sampling_setup == enums.NetworkSampler.random_agent_networks:
@@ -73,19 +70,19 @@ class DefaultExecutor(Component):
                 select policies from this sets for each agent at the start of a
                 episode. This sampling is done with replacement so the same policy
                 can be selected for more than one agent for a given episode."""
-                if builder.attr.shared_weights:
+                if builder.config.shared_weights:
                     raise ValueError(
                         "Shared weights cannot be used with random policy per agent"
                     )
-                builder.attr.agent_net_keys = {
-                    builder.attr.agents[i]: f"network_{i}"
-                    for i in range(len(builder.attr.agents))
+                builder.config.agent_net_keys = {
+                    builder.config.agents[i]: f"network_{i}"
+                    for i in range(len(builder.config.agents))
                 }
 
-                builder.attr.network_sampling_setup = [
+                builder.config.network_sampling_setup = [
                     [
-                        [builder.attr.agent_net_keys[key]]
-                        for key in sort_str_num(builder.attr.agent_net_keys.keys())
+                        [builder.config.agent_net_keys[key]]
+                        for key in sort_str_num(builder.config.agent_net_keys.keys())
                     ]
                 ]
             else:
@@ -94,41 +91,33 @@ class DefaultExecutor(Component):
                 )
         else:
             # if a dictionary is provided, use network_sampling_setup to determine setup
-            _, builder.attr.agent_net_keys = sample_new_agent_keys(
-                builder.attr.agents,
-                builder.attr.network_sampling_setup,
+            _, builder.config.agent_net_keys = sample_new_agent_keys(
+                builder.config.agents,
+                builder.config.network_sampling_setup,
             )
 
         # Check that the environment and agent_net_keys has the same amount of agents
-        sample_length = len(builder.attr.network_sampling_setup[0])
-        agent_ids = builder.attr.environment_spec.get_agent_ids()
-        assert len(agent_ids) == len(builder.attr.agent_net_keys.keys())
+        sample_length = len(builder.config.network_sampling_setup[0])
+        agent_ids = builder.config.environment_spec.get_agent_ids()
+        assert len(agent_ids) == len(builder.config.agent_net_keys.keys())
 
         # Check if the samples are of the same length and that they perfectly fit
         # into the total number of agents
-        assert len(builder.attr.agent_net_keys.keys()) % sample_length == 0
-        for i in range(1, len(builder.attr.network_sampling_setup)):
-            assert len(builder.attr.network_sampling_setup[i]) == sample_length
+        assert len(builder.config.agent_net_keys.keys()) % sample_length == 0
+        for i in range(1, len(builder.config.network_sampling_setup)):
+            assert len(builder.config.network_sampling_setup[i]) == sample_length
 
         # Get all the unique agent network keys
         all_samples = []
-        for sample in builder.attr.network_sampling_setup:
+        for sample in builder.config.network_sampling_setup:
             all_samples.extend(sample)
-        builder.attr.unique_net_keys = list(sort_str_num(list(set(all_samples))))
+        builder.config.unique_net_keys = list(sort_str_num(list(set(all_samples))))
 
         # Create mapping from ints to networks
-        builder.attr.net_keys_to_ids = {
-            net_key: i for i, net_key in enumerate(builder.attr.unique_net_keys)
+        builder.config.net_keys_to_ids = {
+            net_key: i for i, net_key in enumerate(builder.config.unique_net_keys)
         }
 
-    def on_building_executor_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.attr.networks = builder.attr.network_factory(
-            environment_spec=builder.attr.environment_spec,
-            agent_net_keys=builder.attr.agent_net_keys,
-            net_spec_keys=builder.attr.net_spec_keys,
-        )
-        
     @property
     def name(self) -> str:
         """_summary_"""

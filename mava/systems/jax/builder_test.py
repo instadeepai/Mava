@@ -17,6 +17,7 @@
 
 from types import SimpleNamespace
 
+import acme
 import pytest
 
 from mava.systems.jax import ParameterServer, Trainer
@@ -66,31 +67,32 @@ def test_builder(
         trainer,
     ) = test_system._builder.config.system_build
     assert data_server == 2
-    assert type(parameter_server) == ParameterServer
 
-    exec_data_client, env, exec = executor
-    exec_logger, exec_logger_param = env
-    assert exec_data_client == data_server
-    assert exec_logger_param == "param"
-    assert exec_logger == 1
+    assert isinstance(parameter_server, ParameterServer)
 
-    exec_id, exec_adder, exec_param_client, exec_param = exec
-    assert exec_id == "executor"
-    assert type(exec_param_client[0]) == ParameterServer
-    assert exec_param_client[1] == 1
-    assert exec_adder == 2.7
-    assert exec_param == 1
+    assert isinstance(executor, acme.core.Worker)
+    # exec_data_client, env, exec = executor
+    # exec_logger, exec_logger_param = env
+    # assert exec_data_client == data_server
+    # assert exec_logger_param == "param"
+    # assert exec_logger == 1
 
-    eval_env, eval_exec = evaluator
-    eval_id, eval_param_client, eval_exec_param = eval_exec
-    assert eval_env == env
-    assert eval_id == "evaluator"
-    assert eval_param_client == exec_param_client
-    assert eval_exec_param == exec_param
+    # exec_id, exec_adder, exec_param_client, exec_param = exec
+    # assert exec_id == "executor"
+    # assert type(exec_param_client[0]) == ParameterServer
+    # assert exec_param_client[1] == 1
+    # assert exec_adder == 2.7
+    # assert exec_param == 1
 
-    assert type(trainer) == Trainer
-    # TODO (dries): What is the best way to test the trainer here?
-    # train_id, train_logger, train_dataset, train_param_client = trainer
+    assert isinstance(evaluator, acme.core.Worker)
+    # eval_env, eval_exec = evaluator
+    # eval_id, eval_param_client, eval_exec_param = eval_exec
+    # assert eval_env == env
+    # assert eval_id == "evaluator"
+    # assert eval_param_client == exec_param_client
+    # assert eval_exec_param == exec_param
+
+    assert isinstance(trainer, Trainer)
     # assert train_id == "trainer"
     # assert train_logger == 1
     # assert train_dataset == 5

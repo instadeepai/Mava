@@ -15,104 +15,76 @@
 
 """Tests for executor class for Jax-based Mava systems"""
 
+import functools
 from types import SimpleNamespace
 
-from mava.utils.environments import debugging_utils
-import functools
-import numpy as np
+import acme
 import pytest
 
 from mava.components.jax.executing.executor import DefaultExecutor
-from mava.systems.jax import Executor
+from mava.systems.jax import mappo
 from mava.systems.jax.system import System
 from mava.testing.building import mocks
-from mava.systems.jax import mappo
-
-# class TestSystem(System):
-#     def design(self) -> SimpleNamespace:
-#         """Mock system design with zero components.
-
-#         Returns:
-#             system callback components
-#         """
-#         components = SimpleNamespace(
-#             data_server=mocks.MockDataServer,
-#             data_server_adder=mocks.MockAdderSignature,
-#             parameter_server=mocks.MockParameterServer,
-#             parameter_client=mocks.MockParameterClient,
-#             logger=mocks.MockLogger,
-#             executor=DefaultExecutor,
-#             executor_adder=mocks.MockAdder,
-#             executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
-#             trainer=mocks.MockTrainer,
-#             trainer_dataset=mocks.MockTrainerDataset,
-#             distributor=mocks.MockDistributor,
-#         )
-#         return components
-
-# # Executor example
-# system = TestSystem()
-
-# # Environment.
-# environment_factory = functools.partial(
-#     debugging_utils.make_environment,
-#     env_name="simple_spread",
-#     action_space="discrete",
-# )
-
-# # Networks.
-# network_factory = mappo.make_default_networks
-
-# # Build the system
-# system.build(
-#     environment_factory=environment_factory,
-#     network_factory=network_factory
-#     ),
+from mava.utils.environments import debugging_utils
 
 
-# (
-#     data_server,
-#     parameter_server,
-#     executor,
-#     evaluator,
-#     trainer,
-# ) = test_system._builder.attr.system_build
+class TestSystem(System):
+    def design(self) -> SimpleNamespace:
+        """Mock system design with zero components.
 
-# assert type(executor) == Executor
+        Returns:
+            system callback components
+        """
+        components = SimpleNamespace(
+            data_server=mocks.MockDataServer,
+            data_server_adder=mocks.MockAdderSignature,
+            parameter_server=mocks.MockParameterServer,
+            parameter_client=mocks.MockParameterClient,
+            logger=mocks.MockLogger,
+            executor=DefaultExecutor,
+            executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
+            executor_adder=mocks.MockAdder,
+            networks=mocks.MockNetworks,
+            trainer=mocks.MockTrainer,
+            trainer_dataset=mocks.MockTrainerDataset,
+            distributor=mocks.MockDistributor,
+        )
+        return components
 
-# print("executor: ", executor)
 
-# # Executor example
-# exit()
-
-
-# @pytest.fixture
-# def test_system() -> System:
-#     """Dummy system with zero components."""
-#     return TestSystem()
+@pytest.fixture
+def test_system() -> System:
+    """Dummy system with zero components."""
+    return TestSystem()
 
 
-# def test_executor(
-#     test_system: System,
-# ) -> None:
-#     """Test if the parameter server instantiates processes as expected."""
-#     test_system.build()
-#     (
-#         data_server,
-#         parameter_server,
-#         executor,
-#         evaluator,
-#         trainer,
-#     ) = test_system._builder.attr.system_build
-#     assert type(parameter_server) == ParameterServer
+def test_executor(
+    test_system: System,
+) -> None:
+    """Test if the parameter server instantiates processes as expected."""
+    system = TestSystem()
 
-#     step_var = parameter_server.get_parameters("trainer_steps")
-#     assert type(step_var) == np.ndarray
-#     assert step_var[0] == 0
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
 
-#     parameter_server.set_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
-#     assert parameter_server.get_parameters("trainer_steps")[0] == 1
+    # Networks.
+    network_factory = mappo.make_default_networks
 
-#     parameter_server.add_to_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
-#     assert parameter_server.get_parameters("trainer_steps")[0] == 2
+    # Build the system
+    system.build(
+        environment_factory=environment_factory, network_factory=network_factory
+    )
 
+    (
+        data_server,
+        parameter_server,
+        executor,
+        evaluator,
+        trainer,
+    ) = system._builder.config.system_build
+
+    assert isinstance(executor, acme.core.Worker)

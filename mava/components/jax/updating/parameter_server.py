@@ -39,11 +39,11 @@ class DefaultParameterServer(Callback):
         """_summary_
 
         Args:
-            builder : _description_
+            server : _description_
         """
-        # networks = builder.attr.network_factory(
-        #     environment_spec=builder.attr.environment_spec,
-        #     agent_net_keys=builder.attr.agent_net_keys,
+        # networks = builder.config.network_factory(
+        #     environment_spec=builder.config.environment_spec,
+        #     agent_net_keys=builder.config.agent_net_keys,
         # )
 
         # Create parameters
@@ -69,7 +69,6 @@ class DefaultParameterServer(Callback):
 
         #         rng_key, subkey = jax.random.split(rng_key)
         #         del subkey
-        
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:

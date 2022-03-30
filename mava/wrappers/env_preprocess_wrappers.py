@@ -29,7 +29,6 @@ try:
     _has_supersuit = True
 except ModuleNotFoundError:
     _has_supersuit = False
-    pass
 
 
 try:
@@ -38,7 +37,6 @@ try:
     _has_petting_zoo = True
 except ModuleNotFoundError:
     _has_petting_zoo = False
-    pass
 
 if _has_petting_zoo:
     from pettingzoo.utils import BaseParallelWraper
