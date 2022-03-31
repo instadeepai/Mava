@@ -187,7 +187,8 @@ class MAD4PG(MADDPG):
                 happen at every timestep.
                 E.g. to evaluate a system after every 100 executor episodes,
                 evaluator_interval = {"executor_episodes": 100}.
-            update_obs_once: bool = use only critic gradients to update shared observation network
+            update_obs_once: bool = use only critic gradients to update shared
+                observation network
         """
 
         super().__init__(

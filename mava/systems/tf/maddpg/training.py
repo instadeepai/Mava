@@ -109,7 +109,8 @@ class MADDPGBaseTrainer(mava.Trainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared observation network
+            update_obs_once: bool = use only critic gradients to update shared
+                observation network
         """
 
         self._agents = agents
@@ -451,10 +452,6 @@ class MADDPGBaseTrainer(mava.Trainer):
     # Backward pass that calculates gradients and updates network.
     def _backward(self) -> None:
         """Trainer backward pass updating network parameters"""
-
-        # print("CHECK: ", self._update_obs_once)
-        # tf.print("CHECK TF", self._update_obs_once)
-        # exit()
 
         # Calculate the gradients and update the networks
         policy_losses = self.policy_losses
@@ -990,7 +987,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             learning_rate_scheduler_fn: dict with two functions (one for the policy and
                 one for the critic optimizer), that takes in a trainer step t and
                 returns the current learning rate.
-            update_obs_once: bool = use only critic gradients to update shared observation network
+            update_obs_once: bool = use only critic gradients to update shared
+                observation network
         """
         self._bootstrap_n = bootstrap_n
 
