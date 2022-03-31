@@ -54,7 +54,7 @@ class Distributor(Component):
 
         # tables node
         data_server = builder.config.program.add(
-            builder.config.system_data_server,
+            builder.config.system_data_client,
             node_type=NodeType.reverb,
             name="data_server",
         )

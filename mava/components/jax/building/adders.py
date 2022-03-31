@@ -136,7 +136,7 @@ class ParallelTransitionAdder(Adder):
 
         adder = reverb_adders.ParallelNStepTransitionAdder(
             priority_fns=builder.config.adder_priority_fn,
-            client=builder.config.system_data_server,
+            client=builder.config.system_data_client,
             net_ids_to_keys=builder.config.unique_net_keys,
             n_step=self.config.n_step,
             table_network_config=builder.config.table_network_config,
@@ -213,7 +213,7 @@ class ParallelSequenceAdder(Adder):
 
         adder = reverb_adders.ParallelSequenceAdder(
             priority_fns=builder.config.adder_priority_fn,
-            client=builder.config.system_data_server,
+            client=builder.config.system_data_client,
             net_ids_to_keys=builder.config.unique_net_keys,
             sequence_length=self.config.sequence_length,
             table_network_config=builder.config.table_network_config,

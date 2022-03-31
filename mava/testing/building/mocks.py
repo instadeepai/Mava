@@ -85,7 +85,7 @@ class MockDataServer(Callback):
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.system_data_server = self.config.data_server_param
+        builder.config.system_data_client = self.config.data_server_param
 
     @property
     def name(self) -> str:

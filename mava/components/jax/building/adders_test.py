@@ -90,7 +90,7 @@ class MockTestSetup(Component):
                 )
             ]
         )
-        builder.config.system_data_server = reverb.Client(
+        builder.config.system_data_client = reverb.Client(
             f"localhost:{builder.config.server.port}"
         )
         builder.config.unique_net_keys = ["network_0"]

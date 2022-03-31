@@ -79,7 +79,7 @@ class DataServer(Component):
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        builder.config.system_data_server = self._create_table_per_trainer(builder)
+        builder.config.system_data_client = self._create_table_per_trainer(builder)
 
 
 @dataclass

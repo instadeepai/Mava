@@ -69,7 +69,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of make replay tables
         self.on_building_data_server_end()
 
-        return self.config.system_data_server
+        return self.config.system_data_client
 
     def parameter_server(self) -> Any:
         """Parameter server to store and serve system network parameters.
