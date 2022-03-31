@@ -89,6 +89,7 @@ class MAD4PG(MADDPG):
         learning_rate_scheduler_fn: Optional[Dict[str, Callable[[int], None]]] = None,
         termination_condition: Optional[Dict[str, int]] = None,
         evaluator_interval: Optional[dict] = None,
+        update_obs_once: bool = False,
     ):
         """Initialise the system
 
@@ -186,6 +187,7 @@ class MAD4PG(MADDPG):
                 happen at every timestep.
                 E.g. to evaluate a system after every 100 executor episodes,
                 evaluator_interval = {"executor_episodes": 100}.
+            update_obs_once: bool = use only critic gradients to update shared observation network
         """
 
         super().__init__(
@@ -228,4 +230,5 @@ class MAD4PG(MADDPG):
             learning_rate_scheduler_fn=learning_rate_scheduler_fn,
             termination_condition=termination_condition,
             evaluator_interval=evaluator_interval,
+            update_obs_once=update_obs_once,
         )
