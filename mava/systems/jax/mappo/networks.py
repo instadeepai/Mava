@@ -32,7 +32,11 @@ BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
 
 
-# TODO Update for recurrent version.
+def softmax(x: np.ndarray) -> np.ndarray:
+    f_x = np.exp(x) / np.sum(np.exp(x))
+    return f_x
+
+
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
@@ -45,7 +49,7 @@ def make_default_networks(
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     architecture_type: ArchitectureType = ArchitectureType.feedforward,
     observation_network: Any = None,
-    seed: Optional[int] = None,
+    seed: Optional[int] = 423,
 ) -> Dict[str, Any]:
     """Default networks for mappo.
     Args:
@@ -65,40 +69,67 @@ def make_default_networks(
     Returns:
         Dict[str, snt.Module]: returned agent networks.
     """
-
-    # TODO (dries): This only creates one policy network for debugging at the moment.
-    # Make this more general.
-
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
-    key = "network_0"
     if not net_spec_keys:
         specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
     else:
         specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
+    # Set Policy function and layer size
+    # Default size per arch type.
+    if architecture_type == ArchitectureType.feedforward:
+        if not policy_networks_layer_sizes:
+            policy_networks_layer_sizes = (
+                256,
+                256,
+                256,
+            )
+    elif architecture_type == ArchitectureType.recurrent:
+        if not policy_networks_layer_sizes:
+            policy_networks_layer_sizes = (128, 128)
 
-    # Get the number of actions
-    num_actions = (
-        specs[key].actions.num_values
-        if isinstance(specs[key].actions, dm_env.specs.DiscreteArray)
-        else np.prod(specs[key].actions.shape, dtype=int)
-    )
+    if isinstance(policy_networks_layer_sizes, Sequence):
+        policy_networks_layer_sizes = {
+            key: policy_networks_layer_sizes for key in specs.keys()
+        }
+    if isinstance(critic_networks_layer_sizes, Sequence):
+        critic_networks_layer_sizes = {
+            key: critic_networks_layer_sizes for key in specs.keys()
+        }
 
-    obs_size = specs[key].observations.observation.shape[0]
-    obs = np.random.normal(size=(1, obs_size))
+    observation_networks: Dict[str, Any] = {}
+    policy_networks: Dict[str, Any] = {}
+    critic_networks: Dict[str, Any] = {}
+    for key in specs.keys():
+        observation_network = None
+        critic_network = None
 
-    def softmax(x: np.ndarray) -> np.ndarray:
-        f_x = np.exp(x) / np.sum(np.exp(x))
-        return f_x
+        # Get the number of actions
+        num_actions = (
+            specs[key].actions.num_values
+            if isinstance(specs[key].actions, dm_env.specs.DiscreteArray)
+            else np.prod(specs[key].actions.shape, dtype=int)
+        )
 
-    def FeedForward(x: np.ndarray) -> np.ndarray:
-        mlp = hk.nets.MLP(output_sizes=[5, 10, 15, num_actions])
-        return softmax(mlp(x))
+        def policy_net(x: np.ndarray) -> np.ndarray:
+            mlp = hk.nets.MLP(
+                output_sizes=policy_networks_layer_sizes[key]  # type: ignore
+                + (num_actions,)
+            )
+            return softmax(mlp(x))
 
-    model = hk.transform(FeedForward)
-    rng = jax.random.PRNGKey(423)
-    params = model.init(rng, obs)
+        model = hk.transform(policy_net)
+        rng = jax.random.PRNGKey(seed)
+        obs_size = specs[key].observations.observation.shape[0]
+        params = model.init(rng, np.random.normal(size=(1, obs_size)))
+        policy_network = (model, rng, params)
+
+        observation_networks[key] = observation_network
+        policy_networks[key] = policy_network
+        critic_networks[key] = critic_network
 
     return {
-        "policy": (model, rng, params),
+        "observation_networks": observation_networks,
+        "policy_networks": policy_networks,
+        "critic_networks": critic_networks,
     }

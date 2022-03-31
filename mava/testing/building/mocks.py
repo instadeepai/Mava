@@ -16,9 +16,10 @@
 """Tests for config class for Jax-based Mava systems"""
 
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import dm_env
+from acme import types
 
 from mava import specs
 from mava.callbacks import Callback
@@ -55,6 +56,26 @@ class MockAdderConfig:
     adder_param: float = 2.7
 
 
+class MockAdderClass:
+    def __init__(
+        self,
+    ) -> None:
+        pass
+
+    def add_first(
+        self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
+    ) -> None:
+        pass
+
+    def add(
+        self,
+        actions: Dict[str, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
+        next_extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
+        pass
+
+
 class MockAdder(Callback):
     def __init__(self, config: MockAdderConfig = MockAdderConfig()) -> None:
         """Mock system component."""
@@ -62,7 +83,7 @@ class MockAdder(Callback):
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.adder = self.config.adder_param
+        builder.config.adder = MockAdderClass()
 
     @property
     def name(self) -> str:
@@ -159,17 +180,11 @@ class MockParameterClient(Callback):
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.executor_parameter_client = (
-            builder._parameter_server_client,
-            self.config.parameter_client_param_0,
-        )
+        builder.config.executor_parameter_client = None
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.trainer_parameter_client = (
-            builder._parameter_server_client,
-            self.config.parameter_client_param_1,
-        )
+        builder.config.trainer_parameter_client = None
 
     @property
     def name(self) -> str:
@@ -302,7 +317,7 @@ class MockTrainerDataset(Callback):
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.net_spec_keys = {"network_0": "agent_0"}
+        builder.config.net_spec_keys = {"network_agent": "agent_0"}
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_"""

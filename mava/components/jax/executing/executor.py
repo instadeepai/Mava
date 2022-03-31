@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import List, Union
+from typing import Any, Dict, List, Union
 
 import numpy as np
 
@@ -120,16 +120,63 @@ class DefaultFeedforwardExecutor(Component):
             net_key: i for i, net_key in enumerate(builder.config.unique_net_keys)
         }
 
+    # Start executor
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
-        networks = executor.config.network_factory(
+        executor.config.policy_networks = executor.config.network_factory(
             environment_spec=executor.config.environment_spec,
             agent_net_keys=executor.config.agent_net_keys,
             net_spec_keys=executor.config.net_spec_keys,
+        )["policy_networks"]
+
+    # Observe first
+    def on_execution_observe_first(self, executor: SystemExecutor) -> None:
+        if not executor.config.adder:
+            return
+
+        "Select new networks from the sampler at the start of each episode."
+        agents = sort_str_num(list(executor.config.agent_net_keys.keys()))
+        (
+            executor.config.network_int_keys_extras,
+            executor.config.agent_net_keys,
+        ) = sample_new_agent_keys(
+            agents,
+            executor.config.network_sampling_setup,
+            executor.config.net_keys_to_ids,
+        )
+        executor.config.extras[
+            "network_int_keys"
+        ] = executor.config.network_int_keys_extras
+        executor.config.adder.add_first(
+            executor.config.timestep, executor.config.extras
         )
 
-        executor.config.model, executor.config.rng, executor.config.params = networks[
-            "policy"
-        ]
+    # Observe
+    def on_execution_observe(self, executor: SystemExecutor) -> None:
+        if not executor.config.adder:
+            return
+
+        actions_info = executor.config.actions_info
+        policies_info = executor.config.policies_info
+
+        adder_actions: Dict[str, Any] = {}
+        for agent in actions_info.keys():
+            adder_actions[agent] = {
+                "actions_info": actions_info[agent],
+                "policy_info": policies_info[agent],
+            }
+
+        executor.config.next_extras[
+            "network_int_keys"
+        ] = executor.config.network_int_keys_extras
+        executor.config.adder.add(
+            adder_actions, executor.config.next_timestep, executor.config.next_extras
+        )
+
+    # Update the executor variables.
+    def on_execution_update(self, executor: SystemExecutor) -> None:
+        """Update the policy variables."""
+        if executor.config.executor_parameter_client:
+            executor.config.executor_parameter_client.get_async()
 
     # Select actions
     def on_execution_select_actions(self, executor: SystemExecutor) -> None:
@@ -144,11 +191,13 @@ class DefaultFeedforwardExecutor(Component):
     # Select action
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
         """Summary"""
-        # agent = executor.config.agent
+        agent = executor.config.agent
+        model, rng, params = executor.config.policy_networks[
+            executor.config.agent_net_keys[agent]
+        ]
+
         observation = executor.config.observation.observation
-        probs = executor.config.model.apply(
-            executor.config.params, executor.config.rng, observation
-        )
+        probs = model.apply(params, rng, observation)
 
         # TODO (dries): This is for categorical distributions. Make this more
         # general.

@@ -82,8 +82,8 @@ class Executor(SystemExecutor, ExecutorHookMixin):
             extras : possible extra information to record during the transition
         """
         self.config.actions = actions
-        self.config.timestep = next_timestep
-        self.config.extras = next_extras
+        self.config.next_timestep = next_timestep
+        self.config.next_extras = next_extras
 
         self.on_execution_observe_start()
 
