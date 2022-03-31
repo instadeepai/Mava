@@ -35,7 +35,7 @@ tfd = tfp.distributions
 class ClippedGaussianDistribution:
     def __init__(self, guassian_dist: Any, action_specs: Any):
         self._guassian_dist = guassian_dist
-        self.clip_fn = networks.ClipToSpec(action_specs)
+        self.clip_fn = networks.TanhToSpec(action_specs)
 
     def entropy(self) -> tf.Tensor:
         # Note (dries): This calculates the approximate entropy of the
@@ -45,11 +45,11 @@ class ClippedGaussianDistribution:
 
     def sample(self) -> tf.Tensor:
         # TODO: Add range specs clipping here.
-        return self.clip_fn(self._guassian_dist.sample())
+        return self.clip_fn(self._guassian_dist).sample()
 
     def log_prob(self, action: tf.Tensor) -> tf.Tensor:
         # This calculates the approximate log prob of the action.
-        return self._guassian_dist.log_prob(action)
+        return self.clip_fn(self._guassian_dist).log_prob(action)
 
     def batch_reshape(self, dims: tf.Tensor, name: str = "reshaped") -> None:
         self._guassian_dist = tfd.BatchReshape(
