@@ -44,7 +44,6 @@ class ClippedGaussianDistribution:
         return self._guassian_dist.entropy()
 
     def sample(self) -> tf.Tensor:
-        # TODO: Add range specs clipping here.
         return self.clip_fn(self._guassian_dist).sample()
 
     def log_prob(self, action: tf.Tensor) -> tf.Tensor:
