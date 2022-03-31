@@ -1424,8 +1424,7 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
             agent_key = self._agent_net_keys[agent]
 
             # Get trainable variables.
-            print("CHECK: ", self._update_obs_once)
-            exit()
+
             if self._update_obs_once:
                 policy_variables = self._policy_networks[agent_key].trainable_variables
             else:
