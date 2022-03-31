@@ -127,6 +127,7 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
 
         # Sample from the policy and compute the log likelihood.
         action = policy.sample()
+
         log_prob = policy.log_prob(action)
         return action, log_prob
 

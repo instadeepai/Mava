@@ -22,7 +22,6 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
-import tensorflow_probability as tfp
 import tree
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
@@ -34,8 +33,6 @@ from mava.utils import training_utils as train_utils
 from mava.utils.sort_utils import sort_str_num
 
 train_utils.set_growing_gpu_memory()
-
-tfd = tfp.distributions
 
 
 class MAPPOTrainer(mava.Trainer):
@@ -388,28 +385,21 @@ class MAPPOTrainer(mava.Trainer):
                             actor_observation[t], agent_core_state
                         )
                         action_prob.append(outputs.log_prob(action[t]))
-                        try:
-                            policy_entropy.append(outputs.entropy())
-                        except NotImplementedError:
-                            pass
+                        policy_entropy.append(outputs.entropy())
 
                     action_prob = tf.stack(action_prob, axis=0)
-
-                    if len(policy_entropy) > 0:
-                        policy_entropy = tf.stack(policy_entropy, axis=0)
+                    policy_entropy = tf.stack(policy_entropy, axis=0)
                 else:
                     # Reshape inputs.
                     actor_observation = snt.merge_leading_dims(
                         actor_observation, num_dims=2
                     )
                     policy = policy_network(actor_observation)
-                    policy = tfd.BatchReshape(policy, batch_shape=dims, name="policy")
+
+                    policy.batch_reshape(dims, name="policy")
                     action_prob = policy.log_prob(action)
 
-                    try:
-                        policy_entropy = policy.entropy()
-                    except NotImplementedError:
-                        pass
+                    policy_entropy = policy.entropy()
 
                 critic_observation = snt.merge_leading_dims(
                     critic_observation, num_dims=2
@@ -481,15 +471,10 @@ class MAPPOTrainer(mava.Trainer):
                 # TODO (dries): Get this entropy term to work with univariate gaussian
                 # distributions as well. The clipping needs to be fixed in that case.
                 # (SAC paper, Appendix C)
-                if len(policy_entropy) > 0:
-                    masked_entropy_loss = policy_entropy[:-1] * loss_mask[:-1]
-                    entropy_loss = -tf.reduce_sum(masked_entropy_loss) / tf.reduce_sum(
-                        loss_mask[:-1]
-                    )
-
-                else:
-                    entropy_loss = tf.convert_to_tensor(0.0)
-
+                masked_entropy_loss = policy_entropy[:-1] * loss_mask[:-1]
+                entropy_loss = -tf.reduce_sum(masked_entropy_loss) / tf.reduce_sum(
+                    loss_mask[:-1]
+                )
                 entropy_loss = self._entropy_cost * entropy_loss
 
                 # Combine weighted sum of actor & entropy regularization.

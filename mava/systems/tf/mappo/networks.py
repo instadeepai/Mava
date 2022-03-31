@@ -12,12 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, Optional, Sequence, Union
+from typing import Any, Dict, Optional, Sequence, Union
 
 import dm_env
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
+import tensorflow_probability as tfp
 from acme.tf import utils as tf2_utils
 from dm_env import specs
 
@@ -28,6 +29,44 @@ from mava.utils.enums import ArchitectureType
 Array = specs.Array
 BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
+tfd = tfp.distributions
+
+
+class ClippedGaussianDistribution:
+    def __init__(self, guassian_dist: Any, action_specs: Any):
+        self._guassian_dist = guassian_dist
+        self.clip_fn = networks.ClipToSpec(action_specs)
+
+    def entropy(self) -> tf.Tensor:
+        # Note (dires): This calculates the approximate entropy of the
+        # clipped Gaussian distribution by setting it to the
+        # unclipped guassian entropy.
+        return self._guassian_dist.entropy()
+
+    def sample(self) -> tf.Tensor:
+        # TODO: Add range specs clipping here.
+        return self.clip_fn(self._guassian_dist.sample())
+
+    def log_prob(self, action: tf.Tensor) -> tf.Tensor:
+        return self._guassian_dist.log_prob(action)
+
+    def batch_reshape(self, dims: tf.Tensor, name: str = "reshaped") -> None:
+        self._guassian_dist = tfd.BatchReshape(
+            self._guassian_dist, batch_shape=dims, name=name
+        )
+
+
+class ClippedGaussianHead(snt.Module):
+    def __init__(
+        self,
+        action_specs: Any,
+        name: Optional[str] = None,
+    ):
+        super().__init__(name=name)
+        self._action_specs = action_specs
+
+    def __call__(self, x: Any) -> ClippedGaussianDistribution:
+        return ClippedGaussianDistribution(x, action_specs=self._action_specs)
 
 
 # TODO Update for recurrent version.
@@ -147,7 +186,7 @@ def make_default_networks(
                         w_init=tf.initializers.VarianceScaling(1e-4, seed=seed),
                         b_init=tf.initializers.Zeros(),
                     ),
-                    networks.TanhToSpec(specs[key].actions),
+                    ClippedGaussianHead(specs[key].actions),
                 ]
             )
         else:
