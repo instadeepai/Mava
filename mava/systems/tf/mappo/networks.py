@@ -48,7 +48,6 @@ class ClippedGaussianDistribution:
         return self.clip_fn(self._guassian_dist).sample()
 
     def log_prob(self, action: tf.Tensor) -> tf.Tensor:
-        # This calculates the approximate log prob of the action.
         return self.clip_fn(self._guassian_dist).log_prob(action)
 
     def batch_reshape(self, dims: tf.Tensor, name: str = "reshaped") -> None:
