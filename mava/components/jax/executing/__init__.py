@@ -14,5 +14,4 @@
 # limitations under the License.
 
 """Executor components for Mava systems."""
-
-# TODO (Dries): components for building executors
+from mava.components.jax.executing.executor import DefaultFeedforwardExecutor

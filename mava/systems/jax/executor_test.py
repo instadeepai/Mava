@@ -20,9 +20,9 @@ import functools
 import acme
 import pytest
 
-from mava.components.jax.executing.executor import DefaultExecutor
 from mava.specs import DesignSpec
 from mava.systems.jax import mappo
+from mava.systems.jax.mappo import EXECUTOR_SPEC
 from mava.systems.jax.system import System
 from mava.testing.building import mocks
 from mava.utils.environments import debugging_utils
@@ -35,13 +35,14 @@ class TestSystem(System):
         Returns:
             system callback components
         """
+        executor = EXECUTOR_SPEC.get()
         components = DesignSpec(
             data_server=mocks.MockDataServer,
             data_server_adder=mocks.MockAdderSignature,
             parameter_server=mocks.MockParameterServer,
             parameter_client=mocks.MockParameterClient,
             logger=mocks.MockLogger,
-            executor=DefaultExecutor,
+            **executor,
             executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
             executor_adder=mocks.MockAdder,
             networks=mocks.MockNetworks,
@@ -88,3 +89,6 @@ def test_executor(
     ) = system._builder.config.system_build
 
     assert isinstance(executor, acme.core.Worker)
+
+    # Run an episode
+    executor.run_episode()

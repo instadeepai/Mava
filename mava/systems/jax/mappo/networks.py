@@ -16,17 +16,15 @@
 """Jax MAPPO system networks."""
 
 # TODO (Dries): make MAPPO networks
-from typing import Dict, Optional, Sequence, Union
+from typing import Any, Dict, Optional, Sequence, Union
 
 import dm_env
+import haiku as hk  # type: ignore
+import jax
 import numpy as np
-import sonnet as snt
-import tensorflow as tf
-from acme.tf import utils as tf2_utils
 from dm_env import specs
 
 from mava import specs as mava_specs
-from mava.components.tf import networks
 from mava.utils.enums import ArchitectureType
 
 Array = specs.Array
@@ -46,9 +44,9 @@ def make_default_networks(
     ),
     critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
     architecture_type: ArchitectureType = ArchitectureType.feedforward,
-    observation_network: snt.Module = None,
+    observation_network: Any = None,
     seed: Optional[int] = None,
-) -> Dict[str, snt.Module]:
+) -> Dict[str, Any]:
     """Default networks for mappo.
     Args:
         environment_spec (mava_specs.MAEnvironmentSpec): description of the action and
@@ -68,109 +66,39 @@ def make_default_networks(
         Dict[str, snt.Module]: returned agent networks.
     """
 
+    # TODO (dries): This only creates one policy network for debugging at the moment.
+    # Make this more general.
+
     # Create agent_type specs.
     specs = environment_spec.get_agent_specs()
+    key = "network_0"
     if not net_spec_keys:
         specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
     else:
         specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
-    # Set Policy function and layer size
-    # Default size per arch type.
-    if architecture_type == ArchitectureType.feedforward:
-        if not policy_networks_layer_sizes:
-            policy_networks_layer_sizes = (
-                256,
-                256,
-                256,
-            )
-        policy_network_func = snt.Sequential
-    elif architecture_type == ArchitectureType.recurrent:
-        if not policy_networks_layer_sizes:
-            policy_networks_layer_sizes = (128, 128)
-        policy_network_func = snt.DeepRNN
+    # Get the number of actions
+    num_actions = (
+        specs[key].actions.num_values
+        if isinstance(specs[key].actions, dm_env.specs.DiscreteArray)
+        else np.prod(specs[key].actions.shape, dtype=int)
+    )
 
-    if isinstance(policy_networks_layer_sizes, Sequence):
-        policy_networks_layer_sizes = {
-            key: policy_networks_layer_sizes for key in specs.keys()
-        }
-    if isinstance(critic_networks_layer_sizes, Sequence):
-        critic_networks_layer_sizes = {
-            key: critic_networks_layer_sizes for key in specs.keys()
-        }
+    obs_size = specs[key].observations.observation.shape[0]
+    obs = np.random.normal(size=(1, obs_size))
 
-    observation_networks = {}
-    policy_networks = {}
-    critic_networks = {}
-    for key in specs.keys():
+    def softmax(x: np.ndarray) -> np.ndarray:
+        f_x = np.exp(x) / np.sum(np.exp(x))
+        return f_x
 
-        # Create the shared observation network; here simply a state-less operation.
-        if observation_network is None:
-            observation_network = tf2_utils.to_sonnet_module(tf.identity)
-        else:
-            observation_network = observation_network
+    def FeedForward(x: np.ndarray) -> np.ndarray:
+        mlp = hk.nets.MLP(output_sizes=[5, 10, 15, num_actions])
+        return softmax(mlp(x))
 
-        discrete_actions = isinstance(specs[key].actions, dm_env.specs.DiscreteArray)
+    model = hk.transform(FeedForward)
+    rng = jax.random.PRNGKey(423)
+    params = model.init(rng, obs)
 
-        policy_layers = [
-            networks.LayerNormMLP(
-                policy_networks_layer_sizes[key],
-                activate_final=False,
-                seed=seed,
-            )
-        ]
-
-        # Add recurrence if the architecture is recurrent
-        if architecture_type == ArchitectureType.recurrent:
-            policy_layers.append(
-                snt.LSTM(policy_networks_layer_sizes[key][-1]),
-            )
-
-        # Get the number of actions
-        num_actions = (
-            specs[key].actions.num_values
-            if discrete_actions
-            else np.prod(specs[key].actions.shape, dtype=int)
-        )
-
-        # Note: The discrete case must be placed first as it inherits from BoundedArray.
-        if discrete_actions:  # discrete
-            policy_layers.append(
-                networks.CategoricalHead(
-                    num_values=num_actions, dtype=specs[key].actions.dtype
-                ),
-            )
-        elif isinstance(specs[key].actions, dm_env.specs.BoundedArray):  # continuous
-            policy_layers.extend(
-                [
-                    networks.MultivariateNormalDiagHead(
-                        num_dimensions=num_actions,
-                        w_init=tf.initializers.VarianceScaling(1e-4, seed=seed),
-                        b_init=tf.initializers.Zeros(),
-                    ),
-                    networks.TanhToSpec(specs[key].actions),
-                ]
-            )
-        else:
-            raise ValueError(f"Unknown action_spec type, got {specs[key].actions}.")
-
-        policy_network = policy_network_func(policy_layers)
-
-        critic_network = snt.Sequential(
-            [
-                networks.LayerNormMLP(
-                    list(critic_networks_layer_sizes[key]) + [1],
-                    activate_final=False,
-                    seed=seed,
-                ),
-            ]
-        )
-
-        observation_networks[key] = observation_network
-        policy_networks[key] = policy_network
-        critic_networks[key] = critic_network
     return {
-        "policies": policy_networks,
-        "critics": critic_networks,
-        "observations": observation_networks,
+        "policy": (model, rng, params),
     }

@@ -48,11 +48,31 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_init_end()
 
+    def observe_first(
+        self,
+        timestep: dm_env.TimeStep,
+        extras: Dict[str, NestedArray] = {},
+    ) -> None:
+        """Record observed timestep from the environment.
+
+        Args:
+            timestep : data emitted by an environment during interaction
+            extras : possible extra information to record during the transition
+        """
+        self.config.timestep = timestep
+        self.config.extras = extras
+
+        self.on_execution_observe_first_start()
+
+        self.on_execution_observe_first()
+
+        self.on_execution_observe_first_end()
+
     def observe(
         self,
         actions: Dict[str, NestedArray],
-        timestep: dm_env.TimeStep,
-        extras: Dict[str, NestedArray] = {},
+        next_timestep: dm_env.TimeStep,
+        next_extras: Dict[str, NestedArray] = {},
     ) -> None:
         """Record observed timestep from the environment.
 
@@ -61,9 +81,9 @@ class Executor(SystemExecutor, ExecutorHookMixin):
             timestep : data emitted by an environment during interaction
             extras : possible extra information to record during the transition
         """
-        self._actions = actions
-        self._timestep = timestep
-        self._extras = extras
+        self.config.actions = actions
+        self.config.timestep = next_timestep
+        self.config.extras = next_extras
 
         self.on_execution_observe_start()
 
@@ -86,9 +106,9 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         Returns:
             agent action
         """
-        self._agent = agent
-        self._observation = observation
-        self._state = state
+        self.config.agent = agent
+        self.config.observation = observation
+        self.config.state = state
 
         self.on_execution_select_action_start()
 
@@ -115,7 +135,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         Returns:
             actions for all agents in the system.
         """
-        self._observations = observations
+        self.config.observations = observations
 
         self.on_execution_select_actions_start()
 
@@ -131,7 +151,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         Args:
             wait : whether to stall the executor's request for new parameter
         """
-        self._wait = wait
+        self.config._wait = wait
 
         self.on_execution_update_start()
 

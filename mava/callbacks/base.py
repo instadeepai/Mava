@@ -205,6 +205,18 @@ class Callback(ABC):
         """[summary]"""
         pass
 
+    def on_execution_observe_first_start(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe_first(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
+    def on_execution_observe_first_end(self, executor: SystemExecutor) -> None:
+        """[summary]"""
+        pass
+
     def on_execution_observe_start(self, executor: SystemExecutor) -> None:
         """[summary]"""
         pass

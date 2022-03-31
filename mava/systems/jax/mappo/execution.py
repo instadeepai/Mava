@@ -14,5 +14,9 @@
 # limitations under the License.
 
 """Jax MAPPO system executor."""
+from mava.components.jax.executing.executor import DefaultFeedforwardExecutor
+from mava.specs import DesignSpec
 
-# TODO (Dries): make MAPPO executor
+EXECUTOR_SPEC = DesignSpec(
+    executor=DefaultFeedforwardExecutor,
+)

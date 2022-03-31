@@ -18,8 +18,10 @@
 from dataclasses import dataclass
 from typing import List, Union
 
+import numpy as np
+
 from mava.components.jax import Component
-from mava.core_jax import SystemBuilder
+from mava.core_jax import SystemBuilder, SystemExecutor
 from mava.utils import enums
 from mava.utils.sort_utils import sample_new_agent_keys, sort_str_num
 
@@ -31,7 +33,7 @@ class ExecutorProcessConfig:
     ] = enums.NetworkSampler.fixed_agent_networks
 
 
-class DefaultExecutor(Component):
+class DefaultFeedforwardExecutor(Component):
     def __init__(self, config: ExecutorProcessConfig = ExecutorProcessConfig()):
         """_summary_
 
@@ -117,6 +119,42 @@ class DefaultExecutor(Component):
         builder.config.net_keys_to_ids = {
             net_key: i for i, net_key in enumerate(builder.config.unique_net_keys)
         }
+
+    def on_execution_init_start(self, executor: SystemExecutor) -> None:
+        networks = executor.config.network_factory(
+            environment_spec=executor.config.environment_spec,
+            agent_net_keys=executor.config.agent_net_keys,
+            net_spec_keys=executor.config.net_spec_keys,
+        )
+
+        executor.config.model, executor.config.rng, executor.config.params = networks[
+            "policy"
+        ]
+
+    # Select actions
+    def on_execution_select_actions(self, executor: SystemExecutor) -> None:
+        """Summary"""
+        executor.config.actions_info = {}
+        executor.config.policies_info = {}
+        for agent, observation in executor.config.observations.items():
+            action_info, policy_info = executor.select_action(agent, observation)
+            executor.config.actions_info[agent] = action_info
+            executor.config.policies_info[agent] = policy_info
+
+    # Select action
+    def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
+        """Summary"""
+        # agent = executor.config.agent
+        observation = executor.config.observation.observation
+        probs = executor.config.model.apply(
+            executor.config.params, executor.config.rng, observation
+        )
+
+        # TODO (dries): This is for categorical distributions. Make this more
+        # general.
+        action = np.random.choice(range(len(probs)), p=probs)
+        executor.config.action_info = action
+        executor.config.policy_info = np.zeros(1)
 
     @property
     def name(self) -> str:

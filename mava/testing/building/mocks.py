@@ -229,16 +229,18 @@ class MockExecutorEnvironmentLoop(Callback):
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
         if not isinstance(self.config.environment_factory, str):
+            builder.config.executor_environment = self.config.environment_factory(
+                evaluation=False
+            )  # type: ignore
             builder.config.environment_spec = specs.MAEnvironmentSpec(
-                self.config.environment_factory(evaluation=False)  # type: ignore
+                builder.config.executor_environment
             )
+        else:
+            # Just assign a None for the environment for testing.
+            builder.config.executor_environment = None
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.executor_environment = (
-            builder.config.executor_logger,
-            self.config.environment_factory,
-        )
 
     def on_building_executor_environment_loop(self, builder: SystemBuilder) -> None:
         """_summary_"""

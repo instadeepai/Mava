@@ -67,6 +67,21 @@ class ExecutorHookMixin(ABC):
         for callback in self.callbacks:
             callback.on_execution_select_action_end(self)
 
+    def on_execution_observe_first_start(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_observe_first_start(self)
+
+    def on_execution_observe_first(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_observe_first(self)
+
+    def on_execution_observe_first_end(self) -> None:
+        """[summary]"""
+        for callback in self.callbacks:
+            callback.on_execution_observe_first_end(self)
+
     def on_execution_observe_start(self) -> None:
         """[summary]"""
         for callback in self.callbacks:

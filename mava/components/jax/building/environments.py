@@ -52,7 +52,10 @@ class ExecutorEnvironmentLoop(Component):
             builder : _description_
         """
         builder.config.executor_environment = self.config.environment_factory(
-            evaluation=False  # type: ignore
+            evaluation=False
+        )  # type: ignore
+        builder.config.environment_spec = specs.MAEnvironmentSpec(
+            builder.config.executor_environment
         )
 
     @abc.abstractmethod
@@ -68,8 +71,8 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
             builder : _description_
         """
         executor_environment_loop = ParallelEnvironmentLoop(
-            builder.config.executor_environment,
-            builder.config.executor_fn,
+            environment=builder.config.executor_environment,
+            executor=builder.config.executor_fn,
             logger=builder.config.executor_logger,
             should_update=self.config.should_update,
         )

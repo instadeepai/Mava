@@ -17,18 +17,20 @@
 
 from mava.specs import DesignSpec
 from mava.systems.jax import System
-from mava.systems.jax.mappo import TRAINER_SPEC
+from mava.systems.jax.mappo import EXECUTOR_SPEC, TRAINER_SPEC
 
 
-class TestSystem(System):
+class PPOSystem(System):
     def design(self) -> DesignSpec:
         """Mock system design with zero components.
 
         Returns:
             system callback components
         """
+        executor = EXECUTOR_SPEC.get()
         trainer = TRAINER_SPEC.get()
         system_design = DesignSpec(
+            **executor,
             **trainer,
         )
         return system_design
