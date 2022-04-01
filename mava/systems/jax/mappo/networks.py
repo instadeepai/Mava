@@ -97,6 +97,8 @@ def make_default_networks(
             key: critic_networks_layer_sizes for key in specs.keys()
         }
 
+    rng_key = jax.random.PRNGKey(seed)
+
     observation_networks: Dict[str, Any] = {}
     policy_networks: Dict[str, Any] = {}
     critic_networks: Dict[str, Any] = {}
@@ -119,10 +121,11 @@ def make_default_networks(
             return softmax(mlp(x))
 
         model = hk.transform(policy_net)
-        rng = jax.random.PRNGKey(seed)
         obs_size = specs[key].observations.observation.shape[0]
-        params = model.init(rng, np.random.normal(size=(1, obs_size)))
-        policy_network = (model, rng, params)
+        params = model.init(rng_key, np.random.normal(size=(1, obs_size)))
+        policy_network = (model, rng_key, params)
+        rng_key, subkey = jax.random.split(rng_key)
+        del subkey
 
         observation_networks[key] = observation_network
         policy_networks[key] = policy_network

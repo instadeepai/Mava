@@ -205,21 +205,13 @@ class MockExecutor(Callback):
         """Mock system component."""
         self.config = config
 
-    def on_building_executor(self, builder: SystemBuilder) -> None:
+    def on_building_init(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        if builder._executor_id != "evaluator":
-            builder.config.exec = (
-                builder._executor_id,
-                builder.config.adder,
-                builder.config.executor_parameter_client,
-                self.config.executor_param,
-            )
-        else:
-            builder.config.exec = (
-                builder._executor_id,
-                builder.config.executor_parameter_client,
-                self.config.executor_param,
-            )
+        builder.config.agent_net_keys = {
+            "agent_0": "network_agent",
+            "agent_1": "network_agent",
+            "agent_2": "network_agent",
+        }
 
     @property
     def name(self) -> str:

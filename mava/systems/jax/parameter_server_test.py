@@ -15,14 +15,17 @@
 
 """Tests for parameter server class for Jax-based Mava systems"""
 
+import functools
+
 import numpy as np
 import pytest
 
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
-from mava.systems.jax import ParameterServer
+from mava.systems.jax import ParameterServer, mappo
 from mava.systems.jax.system import System
 from mava.testing.building import mocks
+from mava.utils.environments import debugging_utils
 
 
 class TestSystem(System):
@@ -41,6 +44,7 @@ class TestSystem(System):
             executor=mocks.MockExecutor,
             executor_adder=mocks.MockAdder,
             executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
+            networks=mocks.MockNetworks,
             trainer=mocks.MockTrainer,
             trainer_dataset=mocks.MockTrainerDataset,
             distributor=mocks.MockDistributor,
@@ -58,7 +62,19 @@ def test_parameter_server(
     test_system: System,
 ) -> None:
     """Test if the parameter server instantiates processes as expected."""
-    test_system.build()
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
+
+    # Networks.
+    network_factory = mappo.make_default_networks
+
+    test_system.build(
+        environment_factory=environment_factory, network_factory=network_factory
+    )
     (
         data_server,
         parameter_server,

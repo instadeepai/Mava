@@ -47,7 +47,7 @@ class ExecutorParameterClientConfig:
     executor_parameter_update_period: int = 1000
 
 
-class ExecutorParameterClient(BaseParameterClient):
+class DefaultParameterClient(BaseParameterClient):
     def __init__(
         self,
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),

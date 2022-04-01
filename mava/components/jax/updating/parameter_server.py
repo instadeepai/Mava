@@ -14,9 +14,12 @@
 # limitations under the License.
 
 """Parameter server component for Mava systems."""
+import time
 from dataclasses import dataclass
 
+import jax
 import numpy as np
+from acme.jax import savers
 
 from mava.callbacks import Callback
 from mava.core_jax import SystemParameterServer
@@ -24,7 +27,10 @@ from mava.core_jax import SystemParameterServer
 
 @dataclass
 class ParameterServerConfig:
-    pass
+    checkpoint: bool = True
+    checkpoint_subpath: str = "~/mava/"
+    checkpoint_minute_interval: int = 5
+    seed: int = 42
 
 
 class DefaultParameterServer(Callback):
@@ -41,12 +47,9 @@ class DefaultParameterServer(Callback):
         Args:
             server : _description_
         """
-        # networks = builder.config.network_factory(
-        #     environment_spec=builder.config.environment_spec,
-        #     agent_net_keys=builder.config.agent_net_keys,
-        # )
+        networks = server.config.network_factory()
 
-        # Create parameters
+        # # Create parameters
         server.config.parameters = {
             "trainer_steps": np.zeros(1, dtype=np.int32),
             "trainer_walltime": np.zeros(1, dtype=np.float32),
@@ -56,19 +59,32 @@ class DefaultParameterServer(Callback):
             "executor_steps": np.zeros(1, dtype=np.int32),
         }
 
-        # parameters = {}
-        # rng_key = jax.random.PRNGKey(42)
+        # network_parameters = {}
+        # rng_key = jax.random.PRNGKey(self.config.seed)
         # # Network parameters
         # for net_type_key in networks.keys():
         #     for net_key in networks[net_type_key].keys():
         #         # Ensure obs and target networks are sonnet modules
 
-        #         parameters[f"{net_key}_{net_type_key}"] = networks[net_type_key][
-        #             net_key
-        #         ].init(rng_key)
+        #         network_parameters[f"{net_key}_{net_type_key}"] = networks[net_type_key][net_key]
 
-        #         rng_key, subkey = jax.random.split(rng_key)
-        #         del subkey
+        # server.config.parameters["networks"] = network_parameters
+        # print("server.config.parameters: ", server.config.parameters)
+        # exit()
+
+        # # Create the checkpointer
+        # if self.config.checkpoint:
+        #     server.config.checkpoint_minute_interval = 0
+        #     server.config.checkpoint_minute_interval = self.config.checkpoint_minute_interval
+
+        #     # Only save variables that are not empty.
+        #     save_variables = {}
+        #     for key in server.config.parameters.keys():
+        #         var = server.config.parameters[key]
+        #         # Don't store empty tuple (e.g. empty observation_network) variables
+        #         if not (type(var) == tuple and len(var) == 0):
+        #             save_variables[key] = var
+        #     server.config.system_checkpointer = savers.Checkpointer(save_variables, self.config.checkpoint_subpath, time_delta_minutes=0)
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
@@ -118,6 +134,19 @@ class DefaultParameterServer(Callback):
         for var_key in names:
             assert var_key in server.config.parameters
             server.config.parameters[var_key] += params[var_key]
+
+    # Save variables using checkpointer
+    def on_parameter_server_run_loop(self, server: SystemParameterServer):
+        if (
+            server.config.system_checkpointer
+            and server.config.last_checkpoint_time
+            + server.config.checkpoint_minute_interval * 60
+            + 1
+            < time.time()
+        ):
+            server.config.system_checkpointer.save()
+            server.config.last_checkpoint_time = time.time()
+            print("Updated variables checkpoint.")
 
     @property
     def name(self) -> str:
