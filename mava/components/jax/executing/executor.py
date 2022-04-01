@@ -122,11 +122,7 @@ class DefaultFeedforwardExecutor(Component):
 
     # Start executor
     def on_execution_init_start(self, executor: SystemExecutor) -> None:
-        executor.config.policy_networks = executor.config.network_factory(
-            environment_spec=executor.config.environment_spec,
-            agent_net_keys=executor.config.agent_net_keys,
-            net_spec_keys=executor.config.net_spec_keys,
-        )["policy_networks"]
+        executor.config.policy_networks = executor.config.network_factory()["policy_networks"]
 
     # Observe first
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:

@@ -40,7 +40,13 @@ class DefaultNetworks(Component):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
-        builder.config.network_factory = self.config.network_factory
+
+        # Build network function here
+        builder.config.network_factory = lambda: self.config.network_factory(
+            environment_spec=builder.config.environment_spec,
+            agent_net_keys=builder.config.agent_net_keys,
+        )
+
         builder.config.shared_networks = self.config.shared_weights
 
     # def on_building_executor_start(self, builder: SystemBuilder) -> None:
