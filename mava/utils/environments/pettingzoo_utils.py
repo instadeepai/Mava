@@ -27,7 +27,6 @@ try:
     _has_supersuit = True
 except ModuleNotFoundError:
     _has_supersuit = False
-    pass
 
 try:
     from smac.env.pettingzoo import StarCraft2PZEnv
@@ -35,7 +34,6 @@ try:
     _has_smac = True
 except ModuleNotFoundError:
     _has_smac = False
-    pass
 
 try:
     import pettingzoo  # noqa: F401
@@ -43,7 +41,6 @@ try:
     _has_petting_zoo = True
 except ModuleNotFoundError:
     _has_petting_zoo = False
-    pass
 
 from mava.wrappers import (
     ParallelEnvWrapper,
