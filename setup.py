@@ -55,7 +55,7 @@ testing_formatting_requirements = [
     "mypy==0.941",
     "pytest-xdist",
     "flake8==3.8.2",
-    "black==21.4b1",
+    "black==22.3.0",
     "pytest-cov",
     "interrogate",
     "pydocstyle",
