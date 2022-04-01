@@ -184,6 +184,9 @@ def make_default_networks(
                         num_dimensions=num_actions,
                         w_init=tf.initializers.VarianceScaling(1e-4, seed=seed),
                         b_init=tf.initializers.Zeros(),
+                        min_scale=1e-4,
+                        tanh_mean=True,
+                        use_tfd_independent=True,
                     ),
                     ClippedGaussianHead(specs[key].actions),
                 ]
