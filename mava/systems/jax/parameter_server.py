@@ -90,6 +90,21 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
 
         self.on_parameter_server_add_to_parameters_end()
 
+    def step(self) -> None:
+        # Wait {non_blocking_sleep_seconds} seconds before checking again
+        non_blocking_sleep(self.config.non_blocking_sleep_seconds)
+
+        self.on_parameter_server_run_loop_start()
+
+        self.on_parameter_server_run_loop_checkpoint()
+
+        self.on_parameter_server_run_loop()
+
+        self.on_parameter_server_run_loop_termination()
+
+        self.on_parameter_server_run_loop_end()
+
+
     def run(self) -> None:
         """Run the parameter server. This function allows for checkpointing and other \
             centralised computations to be performed by the parameter server."""
@@ -97,15 +112,4 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         self.on_parameter_server_run_start()
 
         while True:
-            # Wait 10 seconds before checking again
-            non_blocking_sleep(10)
-
-            self.on_parameter_server_run_loop_start()
-
-            self.on_parameter_server_run_loop_checkpoint()
-
-            self.on_parameter_server_run_loop()
-
-            self.on_parameter_server_run_loop_termination()
-
-            self.on_parameter_server_run_loop_end()
+            self.step()

@@ -30,7 +30,8 @@ class ParameterServerConfig:
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     checkpoint_minute_interval: int = 5
-    seed: int = 42
+    non_blocking_sleep_seconds: int = 10
+    
 
 
 class DefaultParameterServer(Callback):
@@ -47,6 +48,8 @@ class DefaultParameterServer(Callback):
         Args:
             server : _description_
         """
+
+        server.config.non_blocking_sleep_seconds = self.config.non_blocking_sleep_seconds
         networks = server.config.network_factory()
 
         # # Create parameters
@@ -59,32 +62,28 @@ class DefaultParameterServer(Callback):
             "executor_steps": np.zeros(1, dtype=np.int32),
         }
 
-        # network_parameters = {}
-        # rng_key = jax.random.PRNGKey(self.config.seed)
-        # # Network parameters
-        # for net_type_key in networks.keys():
-        #     for net_key in networks[net_type_key].keys():
-        #         # Ensure obs and target networks are sonnet modules
+        network_parameters = {}
+        # Network parameters
+        for net_type_key in networks.keys():
+            for net_key in networks[net_type_key].keys():
+                # Ensure obs and target networks are sonnet modules
+                network_parameters[f"{net_key}_{net_type_key}"] = networks[net_type_key][net_key]
 
-        #         network_parameters[f"{net_key}_{net_type_key}"] = networks[net_type_key][net_key]
+        server.config.parameters["networks"] = network_parameters
 
-        # server.config.parameters["networks"] = network_parameters
-        # print("server.config.parameters: ", server.config.parameters)
-        # exit()
+        # Create the checkpointer
+        if self.config.checkpoint:
+            server.config.last_checkpoint_time = 0
+            server.config.checkpoint_minute_interval = self.config.checkpoint_minute_interval
 
-        # # Create the checkpointer
-        # if self.config.checkpoint:
-        #     server.config.checkpoint_minute_interval = 0
-        #     server.config.checkpoint_minute_interval = self.config.checkpoint_minute_interval
-
-        #     # Only save variables that are not empty.
-        #     save_variables = {}
-        #     for key in server.config.parameters.keys():
-        #         var = server.config.parameters[key]
-        #         # Don't store empty tuple (e.g. empty observation_network) variables
-        #         if not (type(var) == tuple and len(var) == 0):
-        #             save_variables[key] = var
-        #     server.config.system_checkpointer = savers.Checkpointer(save_variables, self.config.checkpoint_subpath, time_delta_minutes=0)
+            # Only save variables that are not empty.
+            save_variables = {}
+            for key in server.config.parameters.keys():
+                var = server.config.parameters[key]
+                # Don't store empty tuple (e.g. empty observation_network) variables
+                if not (type(var) == tuple and len(var) == 0):
+                    save_variables[key] = var
+            server.config.system_checkpointer = savers.Checkpointer(save_variables, self.config.checkpoint_subpath, time_delta_minutes=0)
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
