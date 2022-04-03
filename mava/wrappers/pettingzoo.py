@@ -141,7 +141,7 @@ class PettingZooAECEnvWrapper(SequentialEnvWrapper):
         """
         return not self.agents
 
-    def agent_iter(self, max_iter: int = 2 ** 63) -> Iterator:
+    def agent_iter(self, max_iter: int = 2**63) -> Iterator:
         """Agent iterator to loop through agents.
 
         Args:
