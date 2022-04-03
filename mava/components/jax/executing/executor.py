@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
 import numpy as np
+import jax
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder, SystemExecutor
@@ -190,18 +191,13 @@ class DefaultFeedforwardExecutor(Component):
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
         """Summary"""
         agent = executor.config.agent
-        model, rng, params = executor.config.policy_networks[
+        policy = executor.config.policy_networks[
             executor.config.agent_net_keys[agent]
         ]
 
-        observation = executor.config.observation.observation
-        probs = model.apply(params, rng, observation)
-
-        # TODO (dries): This is for categorical distributions. Make this more
-        # general.
-        action = np.random.choice(range(len(probs)), p=probs)
-        executor.config.action_info = action
-        executor.config.policy_info = np.zeros(1)
+        observation = executor.config.observation.observation.reshape((1, -1))
+        rng_key, executor.config.key = jax.random.split(executor.config.key)
+        executor.config.action_info, executor.config.policy_info = policy.get_action(observation, rng_key)
 
     @property
     def name(self) -> str:

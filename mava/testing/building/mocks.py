@@ -22,6 +22,7 @@ import dm_env
 from acme import types
 
 from mava import specs
+import jax
 from mava.callbacks import Callback
 from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
@@ -273,6 +274,7 @@ class MockExecutorEnvironmentLoop(Callback):
 class MockNetworksConfig:
     network_factory: Optional[Callable[[str], dm_env.Environment]] = None
     shared_weights: bool = True
+    seed: int = 1234
 
 
 class MockNetworks(Callback):
@@ -285,11 +287,19 @@ class MockNetworks(Callback):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
+        # Set the shared weights
+        builder.config.shared_networks = self.config.shared_weights
+        
+        # Setup the jax key for network initialisations
+        builder.config.key = jax.random.PRNGKey(self.config.seed)
+
+        # Build network function here
+        network_key, builder.config.key = jax.random.split(builder.config.key)
         builder.config.network_factory = lambda: self.config.network_factory(
             environment_spec=builder.config.environment_spec,
             agent_net_keys=builder.config.agent_net_keys,
+            rng_key=network_key,
         )
-        builder.config.shared_networks = self.config.shared_weights
 
     @property
     def name(self) -> str:
