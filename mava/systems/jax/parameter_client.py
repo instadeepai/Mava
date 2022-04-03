@@ -19,6 +19,7 @@ from concurrent import futures
 from typing import Any, Dict, List, Optional, Union
 
 import jax
+import numpy as np
 
 from mava.systems.jax.parameter_server import ParameterServer
 from mava.utils.sort_utils import sort_str_num
@@ -51,7 +52,7 @@ class ParameterClient:
         # note below it is assumed that if one device is specified with a string
         # they all are - need to test this works
         # TODO: (Dries/Arnu): check this
-        if isinstance(list(self._devices.values())[0], str):
+        if len(self._devices) and isinstance(list(self._devices.values())[0], str):
             for key, device in self._devices.items():
                 self._devices[key] = jax.devices(device)[0]
 
@@ -98,7 +99,6 @@ class ParameterClient:
             self._get_call_counter += 1
 
         period_reached: bool = self._get_call_counter >= self._update_period
-
         if period_reached and self._get_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
@@ -201,18 +201,18 @@ class ParameterClient:
         for key in new_parameters.keys():
             if isinstance(new_parameters[key], dict):
                 for agent_key in new_parameters[key].keys():
-                    for i in range(len(self._parameters[key][agent_key])):
+                    for type_key in self._parameters[key][agent_key].keys():
                         if self._devices:
                             # Move variables to a proper device.
-                            self._parameters[key][agent_key][i] = jax.device_put(
-                                new_parameters[key][agent_key][i],
+                            self._parameters[key][agent_key][type_key] = jax.device_put(
+                                new_parameters[key][agent_key][type_key],
                                 self._devices[key][agent_key],  # type: ignore
                             )
                         else:
-                            self._parameters[key][agent_key][i] = new_parameters[key][
-                                agent_key
-                            ][i]
-            elif isinstance(new_parameters[key], jax.numpy.ndarray):
+                            self._parameters[key][agent_key][type_key] = new_parameters[
+                                key
+                            ][agent_key][type_key]
+            elif isinstance(new_parameters[key], np.ndarray):
                 if self._devices:
                     self._parameters[key] = jax.device_put(
                         new_parameters[key], self._devices[key]

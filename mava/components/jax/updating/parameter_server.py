@@ -17,7 +17,6 @@
 import time
 from dataclasses import dataclass
 
-import jax
 import numpy as np
 from acme.jax import savers
 
@@ -31,7 +30,6 @@ class ParameterServerConfig:
     checkpoint_subpath: str = "~/mava/"
     checkpoint_minute_interval: int = 5
     non_blocking_sleep_seconds: int = 10
-    
 
 
 class DefaultParameterServer(Callback):
@@ -49,7 +47,9 @@ class DefaultParameterServer(Callback):
             server : _description_
         """
 
-        server.config.non_blocking_sleep_seconds = self.config.non_blocking_sleep_seconds
+        server.config.non_blocking_sleep_seconds = (
+            self.config.non_blocking_sleep_seconds
+        )
         networks = server.config.network_factory()
 
         # # Create parameters
@@ -62,19 +62,20 @@ class DefaultParameterServer(Callback):
             "executor_steps": np.zeros(1, dtype=np.int32),
         }
 
-        network_parameters = {}
         # Network parameters
         for net_type_key in networks.keys():
             for net_key in networks[net_type_key].keys():
                 # Ensure obs and target networks are sonnet modules
-                network_parameters[f"{net_key}_{net_type_key}"] = networks[net_type_key][net_key]
-
-        server.config.parameters["networks"] = network_parameters
+                server.config.parameters[f"{net_key}_{net_type_key}"] = networks[
+                    net_type_key
+                ][net_key].params
 
         # Create the checkpointer
         if self.config.checkpoint:
             server.config.last_checkpoint_time = 0
-            server.config.checkpoint_minute_interval = self.config.checkpoint_minute_interval
+            server.config.checkpoint_minute_interval = (
+                self.config.checkpoint_minute_interval
+            )
 
             # Only save variables that are not empty.
             save_variables = {}
@@ -83,7 +84,9 @@ class DefaultParameterServer(Callback):
                 # Don't store empty tuple (e.g. empty observation_network) variables
                 if not (type(var) == tuple and len(var) == 0):
                     save_variables[key] = var
-            server.config.system_checkpointer = savers.Checkpointer(save_variables, self.config.checkpoint_subpath, time_delta_minutes=0)
+            server.config.system_checkpointer = savers.Checkpointer(
+                save_variables, self.config.checkpoint_subpath, time_delta_minutes=0
+            )
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:

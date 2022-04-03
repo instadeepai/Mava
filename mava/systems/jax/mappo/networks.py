@@ -33,53 +33,60 @@ DiscreteArray = specs.DiscreteArray
 import dataclasses
 from typing import Any, Callable, Optional, Sequence
 
-from acme import specs
 import jax
+from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
 
 EntropyFn = Callable[[Any], jnp.ndarray]
 
+
 @dataclasses.dataclass
 class PPONetworks:
     """TODO: Add description here."""
-    def __init__(self,
+
+    def __init__(
+        self,
         network: networks_lib.FeedForwardNetwork,
         params: networks_lib.Params,
         log_prob: Optional[networks_lib.LogProbFn] = None,
         entropy: Optional[EntropyFn] = None,
-        sample: Optional[networks_lib.SampleFn] = None) -> None:
+        sample: Optional[networks_lib.SampleFn] = None,
+    ) -> None:
         self.network = network
         self.params = params
         self.log_prob = log_prob
         self.entropy = entropy
         self.sample = sample
 
-    def get_action(self, observations: networks_lib.Observation,
-                   key: networks_lib.PRNGKey):
+    def get_action(
+        self, observations: networks_lib.Observation, key: networks_lib.PRNGKey
+    ):
         distribution, _ = self.network.apply(self.params, observations)
         actions = distribution.sample(seed=key)
         log_prob = distribution.log_prob(actions)
-        return actions, {'log_prob': log_prob}
-    
+        return actions, {"log_prob": log_prob}
+
     def get_value(self, observations: networks_lib.Observation):
         value, _ = self.network.apply(self.params, observations)
         return value
 
+
 def make_ppo_polcy_network(network, params) -> PPONetworks:
-  """TODO: Add description here."""
-  return PPONetworks(
-      network=network,
-      params=params,
-      log_prob=lambda distribution, action: distribution.log_prob(action),
-      entropy=lambda distribution: distribution.entropy(),
-      sample=lambda distribution, key: distribution.sample(seed=key))
+    """TODO: Add description here."""
+    return PPONetworks(
+        network=network,
+        params=params,
+        log_prob=lambda distribution, action: distribution.log_prob(action),
+        entropy=lambda distribution: distribution.entropy(),
+        sample=lambda distribution, key: distribution.sample(seed=key),
+    )
+
 
 def make_ppo_critic_network(network, params) -> PPONetworks:
-  """TODO: Add description here."""
-  return PPONetworks(
-      network=network,
-      params=params)
+    """TODO: Add description here."""
+    return PPONetworks(network=network, params=params)
+
 
 def make_networks(
     spec: specs.EnvironmentSpec,
@@ -90,13 +97,16 @@ def make_networks(
     """TODO: Add description here."""
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
-            environment_spec=spec, key=key,
+            environment_spec=spec,
+            key=key,
             policy_layer_sizes=policy_layer_sizes,
-            value_layer_sizes=value_layer_sizes)
+            value_layer_sizes=value_layer_sizes,
+        )
     else:
-        raise NotImplementedError("Continuous networks not implemented yet."+
-        "See: https://github.com/deepmind/acme/blob/master/acme/agents/jax/ppo/networks.py")
-
+        raise NotImplementedError(
+            "Continuous networks not implemented yet."
+            + "See: https://github.com/deepmind/acme/blob/master/acme/agents/jax/ppo/networks.py"
+        )
 
 
 def make_discrete_networks(
@@ -110,21 +120,25 @@ def make_discrete_networks(
     num_actions = environment_spec.actions.num_values
 
     def policy_fn(inputs):
-        policy_network = hk.Sequential([
-            utils.batch_concat,
-            hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-            networks_lib.CategoricalValueHead(num_values=num_actions)
-        ])
+        policy_network = hk.Sequential(
+            [
+                utils.batch_concat,
+                hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
+                networks_lib.CategoricalValueHead(num_values=num_actions),
+            ]
+        )
         return policy_network(inputs)
-    
-    def critic_fn(inputs):
-        value_network = hk.Sequential([
-            utils.batch_concat,
-            hk.nets.MLP(value_layer_sizes, activation=jnp.tanh),
-            hk.Linear(1), lambda x: jnp.squeeze(x, axis=-1)
-        ])
-        return value_network(inputs)
 
+    def critic_fn(inputs):
+        value_network = hk.Sequential(
+            [
+                utils.batch_concat,
+                hk.nets.MLP(value_layer_sizes, activation=jnp.tanh),
+                hk.Linear(1),
+                lambda x: jnp.squeeze(x, axis=-1),
+            ]
+        )
+        return value_network(inputs)
 
     # Transform into pure functions.
     policy_fn = hk.without_apply_rng(hk.transform(policy_fn))
@@ -142,7 +156,6 @@ def make_discrete_networks(
     policy_network = make_ppo_polcy_network(network=policy_fn, params=policy_params)
     critic_network = make_ppo_critic_network(network=critic_fn, params=critic_params)
     return policy_network, critic_network
-    
 
 
 def make_default_networks(
@@ -198,7 +211,9 @@ def make_default_networks(
         #     if isinstance(specs[net_key].actions, dm_env.specs.DiscreteArray)
         #     else np.prod(specs[net_key].actions.shape, dtype=int)
         # )
-        policy_networks[net_key], critic_networks[net_key] = make_networks(specs[net_key], key=rng_key)
+        policy_networks[net_key], critic_networks[net_key] = make_networks(
+            specs[net_key], key=rng_key
+        )
 
     return {
         "policy_networks": policy_networks,

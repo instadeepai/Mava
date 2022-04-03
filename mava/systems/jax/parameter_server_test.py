@@ -39,7 +39,8 @@ class TestSystem(System):
             data_server=mocks.MockDataServer,
             data_server_adder=mocks.MockAdderSignature,
             parameter_server=DefaultParameterServer,
-            parameter_client=mocks.MockParameterClient,
+            executor_parameter_client=mocks.MockExecutorParameterClient,
+            trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,
             executor=mocks.MockExecutor,
             executor_adder=mocks.MockAdder,
@@ -58,46 +59,43 @@ def test_system() -> System:
     return TestSystem()
 
 
-# def test_parameter_server(
-#     test_system: System,
-# ) -> None:
-#     """Test if the parameter server instantiates processes as expected."""
-#     # Environment.
-#     environment_factory = functools.partial(
-#         debugging_utils.make_environment,
-#         env_name="simple_spread",
-#         action_space="discrete",
-#     )
+def test_parameter_server(
+    test_system: System,
+) -> None:
+    """Test if the parameter server instantiates processes as expected."""
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
 
-#     # Networks.
-#     network_factory = mappo.make_default_networks
-    
-#     test_system.build(
-#         environment_factory=environment_factory,
-#         network_factory=network_factory,
-#         non_blocking_sleep_seconds=0,
-#     )
-#     (
-#         data_server,
-#         parameter_server,
-#         executor,
-#         evaluator,
-#         trainer,
-#     ) = test_system._builder.config.system_build
-#     assert type(parameter_server) == ParameterServer
+    # Networks.
+    network_factory = mappo.make_default_networks
 
-#     step_var = parameter_server.get_parameters("trainer_steps")
-#     assert type(step_var) == np.ndarray
-#     assert step_var[0] == 0
+    test_system.build(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        non_blocking_sleep_seconds=0,
+    )
+    (
+        data_server,
+        parameter_server,
+        executor,
+        evaluator,
+        trainer,
+    ) = test_system._builder.config.system_build
+    assert type(parameter_server) == ParameterServer
 
-#     parameter_server.set_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
-#     assert parameter_server.get_parameters("trainer_steps")[0] == 1
+    step_var = parameter_server.get_parameters("trainer_steps")
+    assert type(step_var) == np.ndarray
+    assert step_var[0] == 0
 
-#     parameter_server.add_to_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
-#     assert parameter_server.get_parameters("trainer_steps")[0] == 2
+    parameter_server.set_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
+    assert parameter_server.get_parameters("trainer_steps")[0] == 1
 
-#     # Step the parameter sever
-#     parameter_server.step()
+    parameter_server.add_to_parameters({"trainer_steps": np.ones(1, dtype=np.int32)})
+    assert parameter_server.get_parameters("trainer_steps")[0] == 2
 
-#     exit()
-
+    # Step the parameter sever
+    parameter_server.step()

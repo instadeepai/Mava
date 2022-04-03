@@ -17,7 +17,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
 
-import jax.numpy as jnp
+import numpy as np
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
@@ -28,18 +28,16 @@ class BaseParameterClient(Component):
     def _set_up_count_parameters(
         self, params: Dict[str, Any]
     ) -> Tuple[List[str], Dict[str, Any]]:
-        count_names = [
-            "trainer_steps",
-            "trainer_walltime",
-            "evaluator_steps",
-            "evaluator_episodes",
-            "executor_episodes",
-            "executor_steps",
-        ]
-        for name in count_names:
-            params[name] = jnp.int32(0)
-
-        return count_names, params
+        add_params = {
+            "trainer_steps": np.zeros(1, dtype=np.int32),
+            "trainer_walltime": np.zeros(1, dtype=np.float32),
+            "evaluator_steps": np.zeros(1, dtype=np.int32),
+            "evaluator_episodes": np.zeros(1, dtype=np.int32),
+            "executor_episodes": np.zeros(1, dtype=np.int32),
+            "executor_steps": np.zeros(1, dtype=np.int32),
+        }
+        params.update(add_params)
+        return add_params.keys(), params
 
 
 @dataclass
@@ -47,7 +45,7 @@ class ExecutorParameterClientConfig:
     executor_parameter_update_period: int = 1000
 
 
-class DefaultParameterClient(BaseParameterClient):
+class ExecutorParameterClient(BaseParameterClient):
     def __init__(
         self,
         config: ExecutorParameterClientConfig = ExecutorParameterClientConfig(),
@@ -69,17 +67,15 @@ class DefaultParameterClient(BaseParameterClient):
         # Create policy parameters
         params = {}
         get_keys = []
-        for net_type_key in ["observations", "policies"]:
-            for net_key in builder.config.networks[net_type_key].keys():
-                param_key = f"{net_key}_{net_type_key}"
-                params[param_key] = builder.config.networks[net_type_key][
-                    net_key
-                ].parameters
-                get_keys.append(param_key)
+        net_type_key = "policy_networks"
+        for net_key in builder.config.policy_networks.keys():
+            param_key = f"{net_key}_{net_type_key}"
+            params[param_key] = builder.config.policy_networks[net_key].params
+            get_keys.append(param_key)
 
         count_names, params = self._set_up_count_parameters(params=params)
-
         get_keys.extend(count_names)
+
         builder.config.executor_counts = {name: params[name] for name in count_names}
 
         parameter_client = None
@@ -97,6 +93,11 @@ class DefaultParameterClient(BaseParameterClient):
             parameter_client.get_and_wait()
 
         builder.config.executor_parameter_client = parameter_client
+
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "executor_parameter_client"
 
 
 @dataclass

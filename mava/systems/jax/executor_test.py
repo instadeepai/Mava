@@ -18,9 +18,10 @@
 import functools
 
 import acme
+import numpy as np
 import pytest
 
-from mava.components.jax.building.parameter_client import DefaultParameterClient
+from mava.components.jax.building.parameter_client import ExecutorParameterClient
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
 from mava.systems.jax import mappo
@@ -43,7 +44,8 @@ class TestSystem(System):
             data_server=mocks.MockDataServer,
             data_server_adder=mocks.MockAdderSignature,
             parameter_server=mocks.MockParameterServer,
-            parameter_client=mocks.MockParameterClient,
+            executor_parameter_client=mocks.MockExecutorParameterClient,
+            trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,
             **executor,
             executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
@@ -97,68 +99,86 @@ def test_executor(
     executor.run_episode()
 
 
-# Intergration test between the executor, variable_client and variable_server.
-# class TestSystem(System):
-#     def design(self) -> DesignSpec:
-#         """Mock system design with zero components.
+# Intergration test for the executor, variable_client and variable_server.
+class TestSystem(System):
+    def design(self) -> DesignSpec:
+        """Mock system design with zero components.
 
-#         Returns:
-#             system callback components
-#         """
-#         executor = EXECUTOR_SPEC.get()
-#         components = DesignSpec(
-#             data_server=mocks.MockDataServer,
-#             data_server_adder=mocks.MockAdderSignature,
-#             parameter_server=DefaultParameterServer,
-#             parameter_client=DefaultParameterClient,
-#             logger=mocks.MockLogger,
-#             **executor,
-#             executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
-#             executor_adder=mocks.MockAdder,
-#             networks=mocks.MockNetworks,
-#             trainer=mocks.MockTrainer,
-#             trainer_dataset=mocks.MockTrainerDataset,
-#             distributor=mocks.MockDistributor,
-#         )
-#         return components
-
-
-# @pytest.fixture
-# def test_system() -> System:
-#     """Dummy system with zero components."""
-#     return TestSystem()
+        Returns:
+            system callback components
+        """
+        executor = EXECUTOR_SPEC.get()
+        components = DesignSpec(
+            data_server=mocks.MockDataServer,
+            data_server_adder=mocks.MockAdderSignature,
+            parameter_server=DefaultParameterServer,
+            executor_parameter_client=ExecutorParameterClient,
+            trainer_parameter_client=mocks.MockTrainerParameterClient,
+            logger=mocks.MockLogger,
+            **executor,
+            executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
+            executor_adder=mocks.MockAdder,
+            networks=mocks.MockNetworks,
+            trainer=mocks.MockTrainer,
+            trainer_dataset=mocks.MockTrainerDataset,
+            distributor=mocks.MockDistributor,
+        )
+        return components
 
 
-# def test_executor(
-#     test_system: System,
-# ) -> None:
-#     """Test if the parameter server instantiates processes as expected."""
-#     system = TestSystem()
+@pytest.fixture
+def test_system() -> System:
+    """Dummy system with zero components."""
+    return TestSystem()
 
-#     # Environment.
-#     environment_factory = functools.partial(
-#         debugging_utils.make_environment,
-#         env_name="simple_spread",
-#         action_space="discrete",
-#     )
 
-#     # Networks.
-#     network_factory = mappo.make_default_networks
+def test_executor(
+    test_system: System,
+) -> None:
+    """Test if the parameter server instantiates processes as expected."""
+    system = TestSystem()
 
-#     # Build the system
-#     system.build(
-#         environment_factory=environment_factory, network_factory=network_factory
-#     )
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
 
-#     (
-#         data_server,
-#         parameter_server,
-#         executor,
-#         evaluator,
-#         trainer,
-#     ) = system._builder.config.system_build
+    # Networks.
+    network_factory = mappo.make_default_networks
 
-#     assert isinstance(executor, acme.core.Worker)
+    # Build the system
+    system.build(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        executor_parameter_update_period=20,
+    )
 
-#     # Run an episode
-#     executor.run_episode()
+    (
+        data_server,
+        parameter_server,
+        executor,
+        evaluator,
+        trainer,
+    ) = system._builder.config.system_build
+
+    assert isinstance(executor, acme.core.Worker)
+
+    # Save the executor policy
+
+    parameters = executor._executor.config.executor_parameter_client._parameters
+
+    print("Before evaluator_steps: ", parameters["evaluator_steps"])
+
+    # Change a variable in the policy network
+    parameter_server.set_parameters(
+        {"evaluator_steps": np.full(1, 1234, dtype=np.int32)}
+    )
+
+    # Step the executor
+    executor.run_episode()
+
+    # Check if the executor variable has changed.
+    parameters = executor._executor.config.executor_parameter_client._parameters
+    assert parameters["evaluator_steps"][0] == 1234

@@ -18,7 +18,6 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
-import numpy as np
 import jax
 
 from mava.components.jax import Component
@@ -121,9 +120,7 @@ class DefaultFeedforwardExecutor(Component):
             net_key: i for i, net_key in enumerate(builder.config.unique_net_keys)
         }
 
-    # Start executor
-    def on_execution_init_start(self, executor: SystemExecutor) -> None:
-        executor.config.policy_networks = executor.config.network_factory()[
+        builder.config.policy_networks = builder.config.network_factory()[
             "policy_networks"
         ]
 
@@ -191,13 +188,13 @@ class DefaultFeedforwardExecutor(Component):
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
         """Summary"""
         agent = executor.config.agent
-        policy = executor.config.policy_networks[
-            executor.config.agent_net_keys[agent]
-        ]
+        policy = executor.config.policy_networks[executor.config.agent_net_keys[agent]]
 
         observation = executor.config.observation.observation.reshape((1, -1))
         rng_key, executor.config.key = jax.random.split(executor.config.key)
-        executor.config.action_info, executor.config.policy_info = policy.get_action(observation, rng_key)
+        executor.config.action_info, executor.config.policy_info = policy.get_action(
+            observation, rng_key
+        )
 
     @property
     def name(self) -> str:

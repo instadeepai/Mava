@@ -104,7 +104,6 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
 
         self.on_parameter_server_run_loop_end()
 
-
     def run(self) -> None:
         """Run the parameter server. This function allows for checkpointing and other \
             centralised computations to be performed by the parameter server."""

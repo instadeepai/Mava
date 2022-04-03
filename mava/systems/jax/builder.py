@@ -89,10 +89,12 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of make parameter server
         self.on_building_parameter_server_end()
 
-        return ParameterServer(
+        self.config.system_parameter_server = ParameterServer(
             config=self.config,
             components=self.callbacks,
         )
+
+        return self.config.system_parameter_server
 
     def executor(
         self, executor_id: str, data_server_client: Any, parameter_server_client: Any

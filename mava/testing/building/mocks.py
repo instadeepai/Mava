@@ -19,10 +19,10 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
 import dm_env
+import jax
 from acme import types
 
 from mava import specs
-import jax
 from mava.callbacks import Callback
 from mava.core_jax import SystemBuilder
 from mava.environment_loop import ParallelEnvironmentLoop
@@ -166,15 +166,15 @@ class MockLogger(Callback):
 
 
 @dataclass
-class MockParameterClientConfig:
-    parameter_client_param_0: int = 1
-    parameter_client_param_1: str = "param"
+class MockExecutorParameterClientConfig:
+    executor_parameter_client_param_0: int = 1
+    executor_parameter_client_param_1: str = "param"
 
 
-class MockParameterClient(Callback):
+class MockExecutorParameterClient(Callback):
     def __init__(
         self,
-        config: MockParameterClientConfig = MockParameterClientConfig(),
+        config: MockExecutorParameterClientConfig = MockExecutorParameterClientConfig(),
     ) -> None:
         """Mock system component."""
         self.config = config
@@ -183,6 +183,26 @@ class MockParameterClient(Callback):
         """_summary_"""
         builder.config.executor_parameter_client = None
 
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "executor_parameter_client"
+
+
+@dataclass
+class MockTrainerParameterClientConfig:
+    trainer_parameter_client_param_0: int = 1
+    trainer_parameter_client_param_1: str = "param"
+
+
+class MockTrainerParameterClient(Callback):
+    def __init__(
+        self,
+        config: MockTrainerParameterClientConfig = MockTrainerParameterClientConfig(),
+    ) -> None:
+        """Mock system component."""
+        self.config = config
+
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
         builder.config.trainer_parameter_client = None
@@ -190,7 +210,7 @@ class MockParameterClient(Callback):
     @property
     def name(self) -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
-        return "parameter_client"
+        return "trainer_parameter_client"
 
 
 @dataclass
@@ -289,7 +309,7 @@ class MockNetworks(Callback):
         """Summary"""
         # Set the shared weights
         builder.config.shared_networks = self.config.shared_weights
-        
+
         # Setup the jax key for network initialisations
         builder.config.key = jax.random.PRNGKey(self.config.seed)
 

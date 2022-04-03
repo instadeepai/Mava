@@ -45,7 +45,7 @@ class DefaultNetworks(Component):
 
         # Set the shared weights
         builder.config.shared_networks = self.config.shared_weights
-        
+
         # Setup the jax key for network initialisations
         builder.config.key = jax.random.PRNGKey(self.config.seed)
 
