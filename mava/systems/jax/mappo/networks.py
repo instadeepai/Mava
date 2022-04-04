@@ -14,11 +14,14 @@
 # limitations under the License.
 
 """Jax MAPPO system networks."""
-
-from typing import Any, Dict, List, Sequence, Tuple
+import dataclasses
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import haiku as hk  # type: ignore
+import jax
 import jax.numpy as jnp
+from acme.jax import networks as networks_lib
+from acme.jax import utils
 from dm_env import specs
 
 from mava import specs as mava_specs
@@ -26,18 +29,6 @@ from mava import specs as mava_specs
 Array = specs.Array
 BoundedArray = specs.BoundedArray
 DiscreteArray = specs.DiscreteArray
-
-
-"""PPO network definitions."""
-
-import dataclasses
-from typing import Any, Callable, Optional, Sequence
-
-import jax
-from acme import specs
-from acme.jax import networks as networks_lib
-from acme.jax import utils
-
 EntropyFn = Callable[[Any], jnp.ndarray]
 
 
@@ -61,18 +52,20 @@ class PPONetworks:
 
     def get_action(
         self, observations: networks_lib.Observation, key: networks_lib.PRNGKey
-    ):
+    ) -> Tuple[Dict, Dict]:
         distribution, _ = self.network.apply(self.params, observations)
         actions = distribution.sample(seed=key)
         log_prob = distribution.log_prob(actions)
         return actions, {"log_prob": log_prob}
 
-    def get_value(self, observations: networks_lib.Observation):
+    def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
         value, _ = self.network.apply(self.params, observations)
         return value
 
 
-def make_ppo_polcy_network(network, params) -> PPONetworks:
+def make_ppo_polcy_network(
+    network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
+) -> PPONetworks:
     """TODO: Add description here."""
     return PPONetworks(
         network=network,
@@ -83,7 +76,9 @@ def make_ppo_polcy_network(network, params) -> PPONetworks:
     )
 
 
-def make_ppo_critic_network(network, params) -> PPONetworks:
+def make_ppo_critic_network(
+    network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
+) -> PPONetworks:
     """TODO: Add description here."""
     return PPONetworks(network=network, params=params)
 
@@ -93,7 +88,7 @@ def make_networks(
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int] = (64, 64),
     value_layer_sizes: Sequence[int] = (64, 64),
-) -> Tuple[make_ppo_polcy_network, make_ppo_critic_network]:
+) -> Tuple[PPONetworks, PPONetworks]:
     """TODO: Add description here."""
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
@@ -105,7 +100,8 @@ def make_networks(
     else:
         raise NotImplementedError(
             "Continuous networks not implemented yet."
-            + "See: https://github.com/deepmind/acme/blob/master/acme/agents/jax/ppo/networks.py"
+            + "See: https://github.com/deepmind/acme/blob/"
+            + "master/acme/agents/jax/ppo/networks.py"
         )
 
 
@@ -114,12 +110,12 @@ def make_discrete_networks(
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     value_layer_sizes: Sequence[int],
-) -> Tuple[make_ppo_polcy_network, make_ppo_critic_network]:
+) -> Tuple[PPONetworks, PPONetworks]:
     """TODO: Add description here."""
 
     num_actions = environment_spec.actions.num_values
 
-    def policy_fn(inputs):
+    def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         policy_network = hk.Sequential(
             [
                 utils.batch_concat,
@@ -129,7 +125,7 @@ def make_discrete_networks(
         )
         return policy_network(inputs)
 
-    def critic_fn(inputs):
+    def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         value_network = hk.Sequential(
             [
                 utils.batch_concat,
@@ -148,9 +144,9 @@ def make_discrete_networks(
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
 
     policy_key, key = jax.random.split(key)
-    policy_params = policy_fn.init(policy_key, dummy_obs)
+    policy_params = policy_fn.init(policy_key, dummy_obs)  # type: ignore
     critic_key, key = jax.random.split(key)
-    critic_params = critic_fn.init(critic_key, dummy_obs)
+    critic_params = critic_fn.init(critic_key, dummy_obs)  # type: ignore
 
     # Create PPONetworks to add functionality required by the agent.
     policy_network = make_ppo_polcy_network(network=policy_fn, params=policy_params)
@@ -168,7 +164,8 @@ def make_default_networks(
     #     256,
     #     256,
     # ),
-    # critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = (512, 512, 256),
+    # critic_networks_layer_sizes: Union[Dict[str, Sequence], Sequence]
+    # = (512, 512, 256),
     # architecture_type: ArchitectureType = ArchitectureType.feedforward,
     # observation_network: Any = None,
 ) -> Dict[str, Any]:

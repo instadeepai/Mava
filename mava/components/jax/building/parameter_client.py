@@ -37,7 +37,7 @@ class BaseParameterClient(Component):
             "executor_steps": np.zeros(1, dtype=np.int32),
         }
         params.update(add_params)
-        return add_params.keys(), params
+        return list(add_params.keys()), params
 
 
 @dataclass

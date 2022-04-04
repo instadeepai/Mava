@@ -32,7 +32,7 @@ from mava.utils.environments import debugging_utils
 
 
 # Test executor in isolation.
-class TestSystem(System):
+class TestSystemExecutor(System):
     def design(self) -> DesignSpec:
         """Mock system design with zero components.
 
@@ -59,16 +59,15 @@ class TestSystem(System):
 
 
 @pytest.fixture
-def test_system() -> System:
+def test_exector_system() -> System:
     """Dummy system with zero components."""
-    return TestSystem()
+    return TestSystemExecutor()
 
 
 def test_executor(
-    test_system: System,
+    test_exector_system: System,
 ) -> None:
     """Test if the parameter server instantiates processes as expected."""
-    system = TestSystem()
 
     # Environment.
     environment_factory = functools.partial(
@@ -81,7 +80,7 @@ def test_executor(
     network_factory = mappo.make_default_networks
 
     # Build the system
-    system.build(
+    test_exector_system.build(
         environment_factory=environment_factory, network_factory=network_factory
     )
 
@@ -91,7 +90,7 @@ def test_executor(
         executor,
         evaluator,
         trainer,
-    ) = system._builder.config.system_build
+    ) = test_exector_system._builder.config.system_build
 
     assert isinstance(executor, acme.core.Worker)
 
@@ -100,7 +99,7 @@ def test_executor(
 
 
 # Intergration test for the executor, variable_client and variable_server.
-class TestSystem(System):
+class TestSystemExecutorAndParameterSever(System):
     def design(self) -> DesignSpec:
         """Mock system design with zero components.
 
@@ -127,16 +126,15 @@ class TestSystem(System):
 
 
 @pytest.fixture
-def test_system() -> System:
+def test_executor_parameter_server_system() -> System:
     """Dummy system with zero components."""
-    return TestSystem()
+    return TestSystemExecutorAndParameterSever()
 
 
-def test_executor(
-    test_system: System,
+def test_executor_parameter_server(
+    test_executor_parameter_server_system: System,
 ) -> None:
     """Test if the parameter server instantiates processes as expected."""
-    system = TestSystem()
 
     # Environment.
     environment_factory = functools.partial(
@@ -149,7 +147,7 @@ def test_executor(
     network_factory = mappo.make_default_networks
 
     # Build the system
-    system.build(
+    test_executor_parameter_server_system.build(
         environment_factory=environment_factory,
         network_factory=network_factory,
         executor_parameter_update_period=20,
@@ -161,7 +159,7 @@ def test_executor(
         executor,
         evaluator,
         trainer,
-    ) = system._builder.config.system_build
+    ) = test_executor_parameter_server_system._builder.config.system_build
 
     assert isinstance(executor, acme.core.Worker)
 

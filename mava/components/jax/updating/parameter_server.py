@@ -138,7 +138,7 @@ class DefaultParameterServer(Callback):
             server.config.parameters[var_key] += params[var_key]
 
     # Save variables using checkpointer
-    def on_parameter_server_run_loop(self, server: SystemParameterServer):
+    def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
         if (
             server.config.system_checkpointer
             and server.config.last_checkpoint_time

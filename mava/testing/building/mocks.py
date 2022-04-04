@@ -315,10 +315,12 @@ class MockNetworks(Callback):
 
         # Build network function here
         network_key, builder.config.key = jax.random.split(builder.config.key)
-        builder.config.network_factory = lambda: self.config.network_factory(
-            environment_spec=builder.config.environment_spec,
-            agent_net_keys=builder.config.agent_net_keys,
-            rng_key=network_key,
+        builder.config.network_factory = (
+            lambda: self.config.network_factory(  # type: ignore
+                environment_spec=builder.config.environment_spec,
+                agent_net_keys=builder.config.agent_net_keys,
+                rng_key=network_key,
+            )
         )
 
     @property
