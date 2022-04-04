@@ -144,8 +144,6 @@ def make_default_networks(
         # Create the shared observation network; here simply a state-less operation.
         if observation_network is None:
             observation_network = tf2_utils.to_sonnet_module(tf.identity)
-        else:
-            observation_network = observation_network
 
         discrete_actions = isinstance(specs[key].actions, dm_env.specs.DiscreteArray)
 

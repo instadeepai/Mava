@@ -21,6 +21,7 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 import tensorflow_probability as tfp
+import tree
 from acme import types
 from acme.specs import EnvironmentSpec
 
@@ -93,7 +94,6 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             variable_client=variable_client,
         )
 
-    @tf.function
     def _policy(
         self, agent: str, observation: types.NestedTensor
     ) -> types.NestedTensor:
@@ -147,11 +147,18 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         # Step the recurrent policy/value network forward
         # given the current observation and state.
         action, policy = self._policy(agent, observation.observation)
-
-        # Return a numpy array with squeezed out batch dimension.
-        action = tf2_utils.to_numpy_squeeze(action)
-        policy = tf2_utils.to_numpy_squeeze(policy)
         return action, policy
+
+    @tf.function
+    def _select_actions(
+        self, observations: Dict[str, types.NestedArray]
+    ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+        """Select the actions for all agents in the system"""
+        actions = {}
+        policies = {}
+        for agent, observation in observations.items():
+            actions[agent], policies[agent] = self.select_action(agent, observation)
+        return actions, policies
 
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
@@ -166,10 +173,9 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
             actions and policies for all agents in the system.
         """
 
-        actions = {}
-        policies = {}
-        for agent, observation in observations.items():
-            actions[agent], policies[agent] = self.select_action(agent, observation)
+        actions, policies = self._select_actions(observations)
+        actions = tree.map_structure(tf2_utils.to_numpy_squeeze, actions)
+        policies = tree.map_structure(tf2_utils.to_numpy_squeeze, policies)
         return actions, policies
 
     def observe_first(
@@ -284,7 +290,6 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             store_recurrent_state=store_recurrent_state,
         )
 
-    @tf.function
     def _policy(
         self,
         agent: str,
@@ -322,41 +327,36 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
             raise NotImplementedError
         return action, policy, new_state
 
-    def select_action(
-        self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
-        """select an action for a single agent in the system
-        Args:
-            agent: agent id
-            observation: observation tensor received from the
-                environment.
-        Returns:
-            action and policy.
-        """
-
-        # TODO Mask actions here using observation.legal_actions
-        # Initialize the RNN state if necessary.
-        if self._states[agent] is None:
-            # index network either on agent type or on agent id
-            agent_key = self._agent_net_keys[agent]
-            self._states[agent] = self._policy_networks[agent_key].initia_state(1)
-
-        # Step the recurrent policy forward given the current observation and state.
-        action, policy, new_state = self._policy(
-            agent, observation.observation, self._states[agent]
-        )
-
-        # Bookkeeping of recurrent states for the observe method.
-        self._update_state(agent, new_state)
-
-        # Return a numpy array with squeezed out batch dimension.
-        action = tf2_utils.to_numpy_squeeze(action)
-        policy = tf2_utils.to_numpy_squeeze(policy)
-        return action, policy
-
     def select_actions(
         self, observations: Dict[str, types.NestedArray]
     ) -> Tuple[Dict[str, types.NestedArray], Dict[str, types.NestedArray]]:
+        """select the actions for all agents in the system
+
+        Args:
+            observations: agent observations from the
+                environment.
+
+        Returns:
+            actions and policies for all agents in the system.
+        """
+
+        actions, policies, self._states = self._select_actions(
+            observations, self._states
+        )
+        actions = tree.map_structure(tf2_utils.to_numpy_squeeze, actions)
+        policies = tree.map_structure(tf2_utils.to_numpy_squeeze, policies)
+        return actions, policies
+
+    @tf.function
+    def _select_actions(
+        self,
+        observations: Dict[str, types.NestedArray],
+        states: Dict[str, types.NestedArray],
+    ) -> Tuple[
+        Dict[str, types.NestedArray],
+        Dict[str, types.NestedArray],
+        Dict[str, types.NestedArray],
+    ]:
         """select the actions for all agents in the system
         Args:
             observations: agent observations from the
@@ -367,9 +367,32 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
 
         actions = {}
         policies = {}
+        new_states = {}
         for agent, observation in observations.items():
-            actions[agent], policies[agent] = self.select_action(agent, observation)
-        return actions, policies
+            actions[agent], policies[agent], new_states[agent] = self.select_action(
+                agent, observation, states[agent]
+            )
+        return actions, policies, new_states
+
+    def select_action(  # type: ignore
+        self,
+        agent: str,
+        observation: types.NestedArray,
+        agent_state: types.NestedArray,
+    ) -> Tuple[types.NestedArray, types.NestedArray, types.NestedArray]:
+        """select an action for a single agent in the system
+        Args:
+            agent: agent id
+            observation: observation tensor received from the
+                environment.
+        Returns:
+            action and policy.
+        """
+        # Step the recurrent policy forward given the current observation and state.
+        action, policy, new_state = self._policy(
+            agent, observation.observation, agent_state
+        )
+        return action, policy, new_state
 
     def observe_first(
         self,
