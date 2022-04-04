@@ -33,7 +33,7 @@ class ExecutorProcessConfig:
     ] = enums.NetworkSampler.fixed_agent_networks
 
 
-class DefaultFeedforwardExecutor(Component):
+class ExecutorInit(Component):
     def __init__(self, config: ExecutorProcessConfig = ExecutorProcessConfig()):
         """_summary_
 
@@ -124,6 +124,28 @@ class DefaultFeedforwardExecutor(Component):
             "policy_networks"
         ]
 
+    @property
+    def name(self) -> str:
+        """_summary_"""
+        return "executor_init"
+
+
+@dataclass
+class ExecutorObserveProcessConfig:
+    pass
+
+
+class FeedforwardExecutorObserve(Component):
+    def __init__(
+        self, config: ExecutorObserveProcessConfig = ExecutorObserveProcessConfig()
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
     # Observe first
     def on_execution_observe_first(self, executor: SystemExecutor) -> None:
         """_summary_
@@ -181,6 +203,29 @@ class DefaultFeedforwardExecutor(Component):
         """Update the policy variables."""
         if executor.store.executor_parameter_client:
             executor.store.executor_parameter_client.get_async()
+
+    @property
+    def name(self) -> str:
+        """_summary_"""
+        return "executor_observe"
+
+
+@dataclass
+class ExecutorSelectActionProcessConfig:
+    pass
+
+
+class FeedforwardExecutorSelectAction(Component):
+    def __init__(
+        self,
+        config: ExecutorSelectActionProcessConfig = ExecutorSelectActionProcessConfig(),
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
 
     # Select actions
     def on_execution_select_actions(self, executor: SystemExecutor) -> None:
