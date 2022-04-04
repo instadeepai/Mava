@@ -84,7 +84,7 @@ def test_parameter_server(
         executor,
         evaluator,
         trainer,
-    ) = test_system._builder.config.system_build
+    ) = test_system._builder.store.system_build
     assert type(parameter_server) == ParameterServer
 
     step_var = parameter_server.get_parameters("trainer_steps")

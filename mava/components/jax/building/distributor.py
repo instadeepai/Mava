@@ -46,30 +46,30 @@ class Distributor(Component):
         Args:
             builder : _description_
         """
-        builder.config.program = Launcher(
+        builder.store.program = Launcher(
             multi_process=self.config.multi_process,
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
         )
 
         # tables node
-        data_server = builder.config.program.add(
-            builder.config.system_data_server,
+        data_server = builder.store.program.add(
+            builder.store.system_data_server,
             node_type=NodeType.reverb,
             name="data_server",
         )
 
         # variable server node
-        parameter_server = builder.config.program.add(
-            builder.config.system_parameter_server,
+        parameter_server = builder.store.program.add(
+            builder.store.system_parameter_server,
             node_type=NodeType.corrier,
             name="parameter_server",
         )
 
         # trainer nodes
-        for trainer_id in builder.config.trainer_networks.keys():
-            builder.config.program.add(
-                builder.config.system_trainer,
+        for trainer_id in builder.store.trainer_networks.keys():
+            builder.store.program.add(
+                builder.store.system_trainer,
                 [trainer_id, data_server, parameter_server],
                 node_type=NodeType.corrier,
                 name="trainer",
@@ -77,8 +77,8 @@ class Distributor(Component):
 
         # executor nodes
         for executor_id in range(self.config.num_executors):
-            builder.config.program.add(
-                builder.config.system_executor,
+            builder.store.program.add(
+                builder.store.system_executor,
                 [executor_id, data_server, parameter_server],
                 node_type=NodeType.corrier,
                 name="executor",
@@ -86,8 +86,8 @@ class Distributor(Component):
 
         if self.config.run_evaluator:
             # evaluator node
-            builder.config.program.add(
-                builder.config.system_evaluator,
+            builder.store.program.add(
+                builder.store.system_evaluator,
                 parameter_server,
                 node_type=NodeType.corrier,
                 name="evaluator",
@@ -99,4 +99,4 @@ class Distributor(Component):
         Args:
             builder : _description_
         """
-        builder.config.program.launch()
+        builder.store.program.launch()

@@ -44,7 +44,7 @@ class MockAdderSignature(Callback):
 
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.adder_signature_fn = self.config.adder_signature_param
+        builder.store.adder_signature_fn = self.config.adder_signature_param
 
     @property
     def name(self) -> str:
@@ -61,11 +61,18 @@ class MockAdderClass:
     def __init__(
         self,
     ) -> None:
+        """_summary_"""
         pass
 
     def add_first(
         self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
     ) -> None:
+        """_summary_
+
+        Args:
+            timestep : _description_
+            extras : _description_.
+        """
         pass
 
     def add(
@@ -74,6 +81,13 @@ class MockAdderClass:
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
+        """_summary_
+
+        Args:
+            actions : _description_
+            next_timestep : _description_
+            next_extras : _description_.
+        """
         pass
 
 
@@ -84,7 +98,7 @@ class MockAdder(Callback):
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.adder = MockAdderClass()
+        builder.store.adder = MockAdderClass()
 
     @property
     def name(self) -> str:
@@ -107,7 +121,7 @@ class MockDataServer(Callback):
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.system_data_server = self.config.data_server_param
+        builder.store.system_data_server = self.config.data_server_param
 
     @property
     def name(self) -> str:
@@ -153,11 +167,11 @@ class MockLogger(Callback):
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.executor_logger = self.config.logger_param_0
+        builder.store.executor_logger = self.config.logger_param_0
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.trainer_logger = self.config.logger_param_0
+        builder.store.trainer_logger = self.config.logger_param_0
 
     @property
     def name(self) -> str:
@@ -181,7 +195,7 @@ class MockExecutorParameterClient(Callback):
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.executor_parameter_client = None
+        builder.store.executor_parameter_client = None
 
     @property
     def name(self) -> str:
@@ -205,7 +219,7 @@ class MockTrainerParameterClient(Callback):
 
     def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.trainer_parameter_client = None
+        builder.store.trainer_parameter_client = None
 
     @property
     def name(self) -> str:
@@ -228,7 +242,7 @@ class MockExecutor(Callback):
 
     def on_building_init(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.agent_net_keys = {
+        builder.store.agent_net_keys = {
             "agent_0": "network_agent",
             "agent_1": "network_agent",
             "agent_2": "network_agent",
@@ -257,15 +271,15 @@ class MockExecutorEnvironmentLoop(Callback):
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
         if not isinstance(self.config.environment_factory, str):
-            builder.config.executor_environment = self.config.environment_factory(
+            builder.store.executor_environment = self.config.environment_factory(
                 evaluation=False
             )  # type: ignore
-            builder.config.environment_spec = specs.MAEnvironmentSpec(
-                builder.config.executor_environment
+            builder.store.environment_spec = specs.MAEnvironmentSpec(
+                builder.store.executor_environment
             )
         else:
             # Just assign a None for the environment for testing.
-            builder.config.executor_environment = None
+            builder.store.executor_environment = None
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -274,15 +288,15 @@ class MockExecutorEnvironmentLoop(Callback):
         """_summary_"""
 
         executor_environment_loop = ParallelEnvironmentLoop(
-            environment=builder.config.executor_environment,
-            executor=builder.config.executor,
-            logger=builder.config.executor_logger,
+            environment=builder.store.executor_environment,
+            executor=builder.store.executor,
+            logger=builder.store.executor_logger,
             should_update=self.config.should_update,
         )
         if builder._executor_id == "evaluator":
-            builder.config.system_evaluator = executor_environment_loop
+            builder.store.system_evaluator = executor_environment_loop
         else:
-            builder.config.system_executor = executor_environment_loop
+            builder.store.system_executor = executor_environment_loop
 
     @property
     def name(self) -> str:
@@ -308,17 +322,17 @@ class MockNetworks(Callback):
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
         # Set the shared weights
-        builder.config.shared_networks = self.config.shared_weights
+        builder.store.shared_networks = self.config.shared_weights
 
         # Setup the jax key for network initialisations
-        builder.config.key = jax.random.PRNGKey(self.config.seed)
+        builder.store.key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.config.key = jax.random.split(builder.config.key)
-        builder.config.network_factory = (
+        network_key, builder.store.key = jax.random.split(builder.store.key)
+        builder.store.network_factory = (
             lambda: self.config.network_factory(  # type: ignore
-                environment_spec=builder.config.environment_spec,
-                agent_net_keys=builder.config.agent_net_keys,
+                environment_spec=builder.store.environment_spec,
+                agent_net_keys=builder.store.agent_net_keys,
                 rng_key=network_key,
             )
         )
@@ -344,11 +358,11 @@ class MockTrainerDataset(Callback):
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.net_spec_keys = {"network_agent": "agent_0"}
+        builder.store.net_spec_keys = {"network_agent": "agent_0"}
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.dataset = self.config.trainer_dataset_param
+        builder.store.dataset = self.config.trainer_dataset_param
 
     @property
     def name(self) -> str:
@@ -372,11 +386,11 @@ class MockTrainer(Callback):
 
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.system_trainer = (
+        builder.store.system_trainer = (
             builder._trainer_id,
-            builder.config.trainer_logger,
-            builder.config.dataset,
-            builder.config.trainer_parameter_client,
+            builder.store.trainer_logger,
+            builder.store.dataset,
+            builder.store.trainer_parameter_client,
         )
 
     @property
@@ -422,7 +436,7 @@ class MockDistributor(Callback):
             data_server_client=None,
             parameter_server_client=parameter_server,
         )
-        builder.config.system_build = (
+        builder.store.system_build = (
             data_server,
             parameter_server,
             executor,

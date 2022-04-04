@@ -44,16 +44,16 @@ class DefaultNetworks(Component):
         """Summary"""
 
         # Set the shared weights
-        builder.config.shared_networks = self.config.shared_weights
+        builder.store.shared_networks = self.config.shared_weights
 
         # Setup the jax key for network initialisations
-        builder.config.key = jax.random.PRNGKey(self.config.seed)
+        builder.store.key = jax.random.PRNGKey(self.config.seed)
 
         # Build network function here
-        network_key, builder.config.key = jax.random.split(builder.config.key)
-        builder.config.network_factory = lambda: self.config.network_factory(
-            environment_spec=builder.config.environment_spec,
-            agent_net_keys=builder.config.agent_net_keys,
+        network_key, builder.store.key = jax.random.split(builder.store.key)
+        builder.store.network_factory = lambda: self.config.network_factory(
+            environment_spec=builder.store.environment_spec,
+            agent_net_keys=builder.store.agent_net_keys,
             rng_key=network_key,
         )
 

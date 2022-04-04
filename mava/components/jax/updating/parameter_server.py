@@ -47,13 +47,11 @@ class DefaultParameterServer(Callback):
             server : _description_
         """
 
-        server.config.non_blocking_sleep_seconds = (
-            self.config.non_blocking_sleep_seconds
-        )
-        networks = server.config.network_factory()
+        server.store.non_blocking_sleep_seconds = self.config.non_blocking_sleep_seconds
+        networks = server.store.network_factory()
 
         # # Create parameters
-        server.config.parameters = {
+        server.store.parameters = {
             "trainer_steps": np.zeros(1, dtype=np.int32),
             "trainer_walltime": np.zeros(1, dtype=np.float32),
             "evaluator_steps": np.zeros(1, dtype=np.int32),
@@ -66,45 +64,45 @@ class DefaultParameterServer(Callback):
         for net_type_key in networks.keys():
             for net_key in networks[net_type_key].keys():
                 # Ensure obs and target networks are sonnet modules
-                server.config.parameters[f"{net_key}_{net_type_key}"] = networks[
+                server.store.parameters[f"{net_key}_{net_type_key}"] = networks[
                     net_type_key
                 ][net_key].params
 
         # Create the checkpointer
         if self.config.checkpoint:
-            server.config.last_checkpoint_time = 0
-            server.config.checkpoint_minute_interval = (
+            server.store.last_checkpoint_time = 0
+            server.store.checkpoint_minute_interval = (
                 self.config.checkpoint_minute_interval
             )
 
             # Only save variables that are not empty.
             save_variables = {}
-            for key in server.config.parameters.keys():
-                var = server.config.parameters[key]
+            for key in server.store.parameters.keys():
+                var = server.store.parameters[key]
                 # Don't store empty tuple (e.g. empty observation_network) variables
                 if not (type(var) == tuple and len(var) == 0):
                     save_variables[key] = var
-            server.config.system_checkpointer = savers.Checkpointer(
+            server.store.system_checkpointer = savers.Checkpointer(
                 save_variables, self.config.checkpoint_subpath, time_delta_minutes=0
             )
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """_summary_"""
-        names = server.config._param_names
+        names = server.store._param_names
 
         if type(names) == str:
-            get_params = server.config.parameters[names]  # type: ignore
+            get_params = server.store.parameters[names]  # type: ignore
         else:
             get_params = {}
             for var_key in names:
-                get_params[var_key] = server.config.parameters[var_key]
-        server.config.get_parameters = get_params
+                get_params[var_key] = server.store.parameters[var_key]
+        server.store.get_parameters = get_params
 
     # Set
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
         """_summary_"""
-        params = server.config._set_params
+        params = server.store._set_params
         names = params.keys()
 
         if type(names) == str:
@@ -112,21 +110,21 @@ class DefaultParameterServer(Callback):
             names = [names]  # type: ignore
 
         for var_key in names:
-            assert var_key in server.config.parameters
-            if type(server.config.parameters[var_key]) == tuple:
+            assert var_key in server.store.parameters
+            if type(server.store.parameters[var_key]) == tuple:
                 raise NotImplementedError
                 # # Loop through tuple
-                # for var_i in range(len(server.config.parameters[var_key])):
-                #     server.config.parameters[var_key][var_i].assign(params[var_key][var_i])
+                # for var_i in range(len(server.store.parameters[var_key])):
+                #     server.store.parameters[var_key][var_i].assign(params[var_key][var_i])
             else:
-                server.config.parameters[var_key] = params[var_key]
+                server.store.parameters[var_key] = params[var_key]
 
     # Add
     def on_parameter_server_add_to_parameters(
         self, server: SystemParameterServer
     ) -> None:
         """_summary_"""
-        params = server.config._add_to_params
+        params = server.store._add_to_params
         names = params.keys()
 
         if type(names) == str:
@@ -134,20 +132,25 @@ class DefaultParameterServer(Callback):
             names = [names]  # type: ignore
 
         for var_key in names:
-            assert var_key in server.config.parameters
-            server.config.parameters[var_key] += params[var_key]
+            assert var_key in server.store.parameters
+            server.store.parameters[var_key] += params[var_key]
 
     # Save variables using checkpointer
     def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
+        """_summary_
+
+        Args:
+            server : _description_
+        """
         if (
-            server.config.system_checkpointer
-            and server.config.last_checkpoint_time
-            + server.config.checkpoint_minute_interval * 60
+            server.store.system_checkpointer
+            and server.store.last_checkpoint_time
+            + server.store.checkpoint_minute_interval * 60
             + 1
             < time.time()
         ):
-            server.config.system_checkpointer.save()
-            server.config.last_checkpoint_time = time.time()
+            server.store.system_checkpointer.save()
+            server.store.last_checkpoint_time = time.time()
             print("Updated variables checkpoint.")
 
     @property

@@ -105,4 +105,4 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 "loss_entropy": entropy_loss,
             }
 
-        trainer.config.loss_fn = loss
+        trainer.store.loss_fn = loss

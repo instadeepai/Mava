@@ -90,7 +90,7 @@ def test_executor(
         executor,
         evaluator,
         trainer,
-    ) = test_exector_system._builder.config.system_build
+    ) = test_exector_system._builder.store.system_build
 
     assert isinstance(executor, acme.core.Worker)
 
@@ -159,13 +159,13 @@ def test_executor_parameter_server(
         executor,
         evaluator,
         trainer,
-    ) = test_executor_parameter_server_system._builder.config.system_build
+    ) = test_executor_parameter_server_system._builder.store.system_build
 
     assert isinstance(executor, acme.core.Worker)
 
     # Save the executor policy
 
-    parameters = executor._executor.config.executor_parameter_client._parameters
+    parameters = executor._executor.store.executor_parameter_client._parameters
 
     print("Before evaluator_steps: ", parameters["evaluator_steps"])
 
@@ -178,5 +178,5 @@ def test_executor_parameter_server(
     executor.run_episode()
 
     # Check if the executor variable has changed.
-    parameters = executor._executor.config.executor_parameter_client._parameters
+    parameters = executor._executor.store.executor_parameter_client._parameters
     assert parameters["evaluator_steps"][0] == 1234

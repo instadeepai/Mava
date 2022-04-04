@@ -65,7 +65,7 @@ def test_builder(
         executor,
         evaluator,
         trainer,
-    ) = test_system._builder.config.system_build
+    ) = test_system._builder.store.system_build
     assert data_server == 2
 
     assert isinstance(parameter_server, ParameterServer)

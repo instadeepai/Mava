@@ -39,7 +39,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
             config : _description_.
             components : _description_.
         """
-        self.config = config
+        self.store = config
         self.callbacks = components
 
         self.on_execution_init_start()
@@ -59,8 +59,8 @@ class Executor(SystemExecutor, ExecutorHookMixin):
             timestep : data emitted by an environment during interaction
             extras : possible extra information to record during the transition
         """
-        self.config.timestep = timestep
-        self.config.extras = extras
+        self.store.timestep = timestep
+        self.store.extras = extras
 
         self.on_execution_observe_first_start()
 
@@ -74,16 +74,16 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, NestedArray] = {},
     ) -> None:
-        """Record observed timestep from the environment.
+        """_summary_
 
         Args:
-            actions : system agents' actions
-            timestep : data emitted by an environment during interaction
-            extras : possible extra information to record during the transition
+            actions : _description_
+            next_timestep : _description_
+            next_extras : _description_.
         """
-        self.config.actions = actions
-        self.config.next_timestep = next_timestep
-        self.config.next_extras = next_extras
+        self.store.actions = actions
+        self.store.next_timestep = next_timestep
+        self.store.next_extras = next_extras
 
         self.on_execution_observe_start()
 
@@ -106,9 +106,9 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         Returns:
             agent action
         """
-        self.config.agent = agent
-        self.config.observation = observation
-        self.config.state = state
+        self.store.agent = agent
+        self.store.observation = observation
+        self.store.state = state
 
         self.on_execution_select_action_start()
 
@@ -120,7 +120,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_select_action_end()
 
-        return self.config.action_info, self.config.policy_info
+        return self.store.action_info, self.store.policy_info
 
     def select_actions(
         self, observations: Dict[str, NestedArray]
@@ -135,7 +135,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         Returns:
             actions for all agents in the system.
         """
-        self.config.observations = observations
+        self.store.observations = observations
 
         self.on_execution_select_actions_start()
 
@@ -143,7 +143,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_select_actions_end()
 
-        return self.config.actions_info, self.config.policies_info
+        return self.store.actions_info, self.store.policies_info
 
     def update(self, wait: bool = False) -> None:
         """Update executor parameters.
@@ -151,7 +151,7 @@ class Executor(SystemExecutor, ExecutorHookMixin):
         Args:
             wait : whether to stall the executor's request for new parameter
         """
-        self.config._wait = wait
+        self.store._wait = wait
 
         self.on_execution_update_start()
 

@@ -33,7 +33,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         """Initialise the parameter server."""
         super().__init__()
 
-        self.config = config
+        self.store = config
         self.callbacks = components
 
         self.on_parameter_server_init_start()
@@ -52,7 +52,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         Returns:
             The parameters that were requested
         """
-        self.config._param_names = names
+        self.store._param_names = names
 
         self.on_parameter_server_get_parameters_start()
 
@@ -60,7 +60,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
 
         self.on_parameter_server_get_parameters_end()
 
-        return self.config.get_parameters
+        return self.store.get_parameters
 
     def set_parameters(self, set_params: Dict[str, Any]) -> None:
         """Set parameters in the parameter server.
@@ -68,7 +68,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         Args:
             set_params : The values to set the parameters to
         """
-        self.config._set_params = set_params
+        self.store._set_params = set_params
 
         self.on_parameter_server_set_parameters_start()
 
@@ -82,7 +82,7 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         Args:
             add_to_params : The values to add to the parameters to
         """
-        self.config._add_to_params = add_to_params
+        self.store._add_to_params = add_to_params
 
         self.on_parameter_server_add_to_parameters_start()
 
@@ -91,8 +91,9 @@ class ParameterServer(SystemParameterServer, ParameterServerHookMixin):
         self.on_parameter_server_add_to_parameters_end()
 
     def step(self) -> None:
+        """_summary_"""
         # Wait {non_blocking_sleep_seconds} seconds before checking again
-        non_blocking_sleep(self.config.non_blocking_sleep_seconds)
+        non_blocking_sleep(self.store.non_blocking_sleep_seconds)
 
         self.on_parameter_server_run_loop_start()
 
