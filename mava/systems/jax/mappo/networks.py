@@ -20,15 +20,16 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp
+from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
-from dm_env import specs
+from dm_env import specs as dm_specs
 
 from mava import specs as mava_specs
 
-Array = specs.Array
-BoundedArray = specs.BoundedArray
-DiscreteArray = specs.DiscreteArray
+Array = dm_specs.Array
+BoundedArray = dm_specs.BoundedArray
+DiscreteArray = dm_specs.DiscreteArray
 EntropyFn = Callable[[Any], jnp.ndarray]
 
 
