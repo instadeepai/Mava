@@ -169,6 +169,7 @@ class FeedforwardExecutorObserve(Component):
         executor.store.extras[
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
+
         executor.store.adder.add_first(executor.store.timestep, executor.store.extras)
 
     # Observe
@@ -185,15 +186,17 @@ class FeedforwardExecutorObserve(Component):
         policies_info = executor.store.policies_info
 
         adder_actions: Dict[str, Any] = {}
+        executor.store.next_extras["policy_info"] = {}
         for agent in actions_info.keys():
             adder_actions[agent] = {
                 "actions_info": actions_info[agent],
-                "policy_info": policies_info[agent],
             }
+            executor.store.next_extras["policy_info"][agent] = policies_info[agent]
 
         executor.store.next_extras[
             "network_int_keys"
         ] = executor.store.network_int_keys_extras
+
         executor.store.adder.add(
             adder_actions, executor.store.next_timestep, executor.store.next_extras
         )

@@ -69,7 +69,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of make replay tables
         self.on_building_data_server_end()
 
-        return self.store.system_data_server
+        return self.store.data_tables
 
     def parameter_server(self) -> Any:
         """Parameter server to store and serve system network parameters.
@@ -109,16 +109,16 @@ class Builder(SystemBuilder, BuilderHookMixin):
             System executor
         """
 
-        self._executor_id = executor_id
-        self._data_server_client = data_server_client
-        self._parameter_server_client = parameter_server_client
-        self._evaluator = self._executor_id == "evaluator"
+        self.store.executor_id = executor_id
+        self.store.data_server_client = data_server_client
+        self.store.parameter_server_client = parameter_server_client
+        self.store.evaluator = self.store.executor_id == "evaluator"
 
         # start of making the executor
         self.on_building_executor_start()
 
         # make adder if required
-        if not self._evaluator:
+        if not self.store.evaluator:
             # make adder signature
             self.on_building_executor_adder_priority()
 
@@ -165,10 +165,10 @@ class Builder(SystemBuilder, BuilderHookMixin):
             System trainer
         """
 
-        self._trainer_id = trainer_id
-        self._data_server_client = data_server_client
-        self._table_name = f"table_{trainer_id}"
-        self._parameter_server_client = parameter_server_client
+        self.store.trainer_id = trainer_id
+        self.store.data_server_client = data_server_client
+        self.store.table_name = f"table_{trainer_id}"
+        self.store.parameter_server_client = parameter_server_client
 
         # start of making the trainer
         self.on_building_trainer_start()

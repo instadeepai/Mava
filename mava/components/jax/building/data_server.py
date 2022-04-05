@@ -44,7 +44,7 @@ class DataServer(Component):
 
     def _create_table_per_trainer(self, builder: SystemBuilder) -> List[reverb.Table]:
         data_tables = []
-        for table_key in self.config.table_network_config.keys():
+        for table_key in builder.store.table_network_config.keys():
             # TODO (dries): Clean the below coverter code up.
             # Convert a Mava spec
             num_networks = len(builder.store.table_network_config[table_key])
@@ -79,7 +79,12 @@ class DataServer(Component):
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        builder.store.system_data_server = self._create_table_per_trainer(builder)
+        builder.store.data_tables = self._create_table_per_trainer(builder)
+
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "data_server"
 
 
 @dataclass
@@ -136,7 +141,6 @@ class OffPolicyDataServer(DataServer):
 @dataclass
 class OnPolicyDataServerConfig:
     max_queue_size: int = 1000
-    data_server_name: str = "on_policy_table"
 
 
 class OnPolicyDataServer(DataServer):
@@ -170,7 +174,7 @@ class OnPolicyDataServer(DataServer):
             _description_
         """
         table = reverb.Table.queue(
-            name=f"{self.config.data_server_name}_{table_key}",
+            name=table_key,
             max_size=self.config.max_queue_size,
             signature=builder.store.adder_signature_fn(
                 environment_spec, builder.store.sequence_length, extras_spec

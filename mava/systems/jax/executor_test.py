@@ -21,16 +21,25 @@ import acme
 import numpy as np
 import pytest
 
+from mava.components.jax.building.adders import (
+    ParallelSequenceAdder,
+    ParallelSequenceAdderSignature,
+)
+from mava.components.jax.building.data_server import OnPolicyDataServer
+from mava.components.jax.building.distributor import Distributor
+from mava.components.jax.building.networks import DefaultNetworks
 from mava.components.jax.building.parameter_client import ExecutorParameterClient
 from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
 from mava.systems.jax import mappo
 from mava.systems.jax.mappo import EXECUTOR_SPEC
+from mava.systems.jax.mappo.components import ExtrasLogProbSpec
 from mava.systems.jax.system import System
 from mava.testing.building import mocks
 from mava.utils.environments import debugging_utils
 
 
+#########################################################################
 # Test executor in isolation.
 class TestSystemExecutor(System):
     def design(self) -> DesignSpec:
@@ -60,7 +69,7 @@ class TestSystemExecutor(System):
 
 @pytest.fixture
 def test_exector_system() -> System:
-    """Dummy system with zero components."""
+    """Add description here."""
     return TestSystemExecutor()
 
 
@@ -98,6 +107,7 @@ def test_executor(
     executor.run_episode()
 
 
+#########################################################################
 # Intergration test for the executor, variable_client and variable_server.
 class TestSystemExecutorAndParameterSever(System):
     def design(self) -> DesignSpec:
@@ -127,7 +137,7 @@ class TestSystemExecutorAndParameterSever(System):
 
 @pytest.fixture
 def test_executor_parameter_server_system() -> System:
-    """Dummy system with zero components."""
+    """Add description here."""
     return TestSystemExecutorAndParameterSever()
 
 
@@ -167,7 +177,94 @@ def test_executor_parameter_server(
 
     parameters = executor._executor.store.executor_parameter_client._parameters
 
-    print("Before evaluator_steps: ", parameters["evaluator_steps"])
+    # Change a variable in the policy network
+    parameter_server.set_parameters(
+        {"evaluator_steps": np.full(1, 1234, dtype=np.int32)}
+    )
+
+    # Step the executor
+    executor.run_episode()
+
+    # Check if the executor variable has changed.
+    parameters = executor._executor.store.executor_parameter_client._parameters
+    assert parameters["evaluator_steps"][0] == 1234
+
+
+#########################################################################
+# Intergration test for the executor, adder, data_server, variable_client
+# and variable_server.
+class TestSystemExceptTrainer(System):
+    def design(self) -> DesignSpec:
+        """Mock system design with zero components.
+
+        Returns:
+            system callback components
+        """
+        executor = EXECUTOR_SPEC.get()
+        components = DesignSpec(
+            data_server=OnPolicyDataServer,
+            data_server_adder_signature=ParallelSequenceAdderSignature,
+            extras_spec=ExtrasLogProbSpec,
+            parameter_server=DefaultParameterServer,
+            executor_parameter_client=ExecutorParameterClient,
+            **executor,
+            executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
+            executor_adder=ParallelSequenceAdder,
+            networks=DefaultNetworks,
+            trainer_parameter_client=mocks.MockTrainerParameterClient,
+            distributor=Distributor,
+            logger=mocks.MockLogger,
+            trainer=mocks.MockTrainer,
+            trainer_dataset=mocks.MockTrainerDataset,
+        )
+        return components
+
+
+@pytest.fixture
+def test_system_except_trainer() -> System:
+    """Add description here."""
+    return TestSystemExceptTrainer()
+
+
+def test_except_trainer(
+    test_system_except_trainer: System,
+) -> None:
+    """Test if the parameter server instantiates processes as expected."""
+
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
+
+    # Networks.
+    network_factory = mappo.make_default_networks
+
+    # Build the system
+    test_system_except_trainer.build(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        executor_parameter_update_period=20,
+        multi_process=False,
+        run_evaluator=True,
+        num_executors=1,
+        use_next_extras=False,
+    )
+
+    (
+        data_server,
+        parameter_server,
+        executor,
+        evaluator,
+        trainer,
+    ) = test_system_except_trainer._builder.store.system_build
+
+    assert isinstance(executor, acme.core.Worker)
+
+    # Save the executor policy
+
+    parameters = executor._executor.store.executor_parameter_client._parameters
 
     # Change a variable in the policy network
     parameter_server.set_parameters(

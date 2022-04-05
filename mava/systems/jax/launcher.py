@@ -17,6 +17,7 @@
 from typing import Any, List, Union
 
 import launchpad as lp
+import reverb
 
 from mava.utils import lp_utils
 
@@ -48,6 +49,8 @@ class Launcher:
         if multi_process:
             self._program = lp.Program(name=name)
             self._nodes_on_gpu = nodes_on_gpu
+        else:
+            self._nodes: List = []
 
     def add(
         self,
@@ -78,7 +81,21 @@ class Launcher:
                 node = self._program.add_node(node_type(node_fn, *arguments))
             return node
         else:
-            raise NotImplementedError("Single process launching not implemented yet.")
+            process = node_fn(*arguments)
+            if node_type == lp.ReverbNode:
+
+                # Assigning server to self to keep it alive.
+                self._replay_server = reverb.Server(process, port=None)
+                process = reverb.Client(f"localhost:{self._replay_server.port}")
+            self._nodes.append(process)
+            return process
+
+    def get_nodes(self) -> List[Any]:
+        """TODO: Add description here."""
+        if self._multi_process:
+            raise ValueError("Get nodes only implemented for single process setups.")
+
+        return self._nodes
 
     def launch(self) -> None:
         """_summary_

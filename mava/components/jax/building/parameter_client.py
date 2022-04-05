@@ -157,3 +157,8 @@ class TrainerParameterClient(BaseParameterClient):
         parameter_client.get_all_and_wait()
 
         builder.store.trainer_parameter_client = parameter_client
+
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "trainer_parameter_client"

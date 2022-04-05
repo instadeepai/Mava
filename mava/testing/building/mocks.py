@@ -121,7 +121,7 @@ class MockDataServer(Callback):
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.store.system_data_server = self.config.data_server_param
+        builder.store.data_tables = self.config.data_server_param
 
     @property
     def name(self) -> str:
@@ -293,7 +293,7 @@ class MockExecutorEnvironmentLoop(Callback):
             logger=builder.store.executor_logger,
             should_update=self.config.should_update,
         )
-        if builder._executor_id == "evaluator":
+        if builder.store.executor_id == "evaluator":
             builder.store.system_evaluator = executor_environment_loop
         else:
             builder.store.system_executor = executor_environment_loop
@@ -384,10 +384,17 @@ class MockTrainer(Callback):
         """Mock system component."""
         self.config = config
 
+    def on_building_init_end(self, builder: SystemBuilder) -> None:
+        """TODO: Add description here."""
+        builder.store.table_network_config = {
+            "trainer": ["network_agent", "network_agent", "network_agent"]
+        }
+        builder.store.trainer_networks = {"trainer": ["network_agent"]}
+
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
         builder.store.system_trainer = (
-            builder._trainer_id,
+            builder.store.trainer_id,
             builder.store.trainer_logger,
             builder.store.dataset,
             builder.store.trainer_parameter_client,

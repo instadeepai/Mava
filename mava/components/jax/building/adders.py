@@ -181,6 +181,7 @@ class ParallelTransitionAdderSignature(AdderSignature):
 class ParallelSequenceAdderConfig:
     sequence_length: int = 20
     period: int = 20
+    use_next_extras: bool = False
 
 
 class ParallelSequenceAdder(Adder):
@@ -208,16 +209,22 @@ class ParallelSequenceAdder(Adder):
         Args:
             builder : _description_
         """
-        if not hasattr(builder.store, "adder_priority_fn"):
-            builder.store.adder_priority_fn = None
+        assert not hasattr(builder.store, "adder_priority_fn")
+
+        # Create custom priority functons for the adder
+        priority_fns = {
+            table_key: lambda x: 1.0
+            for table_key in builder.store.table_network_config.keys()
+        }
 
         adder = reverb_adders.ParallelSequenceAdder(
-            priority_fns=builder.store.adder_priority_fn,
-            client=builder.store.system_data_server,
+            priority_fns=priority_fns,
+            client=builder.store.data_server_client,
             net_ids_to_keys=builder.store.unique_net_keys,
             sequence_length=self.config.sequence_length,
             table_network_config=builder.store.table_network_config,
             period=self.config.period,
+            use_next_extras=self.config.use_next_extras,
         )
 
         builder.store.adder = adder

@@ -15,7 +15,7 @@
 
 """Commonly used distributor components for system builders"""
 from dataclasses import dataclass
-from typing import List
+from typing import List, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
@@ -26,7 +26,7 @@ from mava.systems.jax.launcher import Launcher, NodeType
 class DistributorConfig:
     num_executors: int = 1
     multi_process: bool = True
-    nodes_on_gpu: List[str] = ["trainer"]
+    nodes_on_gpu: Union[List[str], str] = "trainer"
     run_evaluator: bool = True
     distributor_name: str = "System"
 
@@ -38,6 +38,8 @@ class Distributor(Component):
         Args:
             config : _description_.
         """
+        if isinstance(config.nodes_on_gpu, str):
+            config.nodes_on_gpu = [config.nodes_on_gpu]
         self.config = config
 
     def on_building_program_nodes(self, builder: SystemBuilder) -> None:
@@ -52,33 +54,50 @@ class Distributor(Component):
             name=self.config.distributor_name,
         )
 
+        # data_server = builder.data_server()
+        # parameter_server = builder.parameter_server()
+
+        # trainer = builder.trainer(
+        #     trainer_id="trainer",
+        #     data_server_client=data_server,
+        #     parameter_server_client=parameter_server,
+        # )
+        # executor = builder.executor(
+        #     executor_id="executor",
+        #     data_server_client=data_server,
+        #     parameter_server_client=parameter_server,
+        # )
+        # evaluator = builder.executor(
+        #     executor_id="evaluator",
+        #     data_server_client=None,
+        #     parameter_server_client=parameter_server,
+        # )
+        # builder.store.system_build = (
+        #     data_server,
+        #     parameter_server,
+        #     executor,
+        #     evaluator,
+        #     trainer,
+        # )
+
         # tables node
         data_server = builder.store.program.add(
-            builder.store.system_data_server,
+            builder.data_server,
             node_type=NodeType.reverb,
             name="data_server",
         )
 
         # variable server node
         parameter_server = builder.store.program.add(
-            builder.store.system_parameter_server,
+            builder.parameter_server,
             node_type=NodeType.corrier,
             name="parameter_server",
         )
 
-        # trainer nodes
-        for trainer_id in builder.store.trainer_networks.keys():
-            builder.store.program.add(
-                builder.store.system_trainer,
-                [trainer_id, data_server, parameter_server],
-                node_type=NodeType.corrier,
-                name="trainer",
-            )
-
         # executor nodes
         for executor_id in range(self.config.num_executors):
             builder.store.program.add(
-                builder.store.system_executor,
+                builder.executor,
                 [executor_id, data_server, parameter_server],
                 node_type=NodeType.corrier,
                 name="executor",
@@ -87,11 +106,23 @@ class Distributor(Component):
         if self.config.run_evaluator:
             # evaluator node
             builder.store.program.add(
-                builder.store.system_evaluator,
-                parameter_server,
+                builder.executor,
+                ["evaluator", data_server, parameter_server],
                 node_type=NodeType.corrier,
                 name="evaluator",
             )
+
+        # trainer nodes
+        for trainer_id in builder.store.trainer_networks.keys():
+            builder.store.program.add(
+                builder.trainer,
+                [trainer_id, data_server, parameter_server],
+                node_type=NodeType.corrier,
+                name="trainer",
+            )
+
+        if not self.config.multi_process:
+            builder.store.system_build = builder.store.program.get_nodes()
 
     def on_building_launch_distributor(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -100,3 +131,8 @@ class Distributor(Component):
             builder : _description_
         """
         builder.store.program.launch()
+
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "distributor"

@@ -20,6 +20,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 import haiku as hk  # type: ignore
 import jax
 import jax.numpy as jnp
+import numpy as np
 from acme import specs
 from acme.jax import networks as networks_lib
 from acme.jax import utils
@@ -45,6 +46,7 @@ class PPONetworks:
         entropy: Optional[EntropyFn] = None,
         sample: Optional[networks_lib.SampleFn] = None,
     ) -> None:
+        """TODO: Add description here."""
         self.network = network
         self.params = params
         self.log_prob = log_prob
@@ -54,12 +56,16 @@ class PPONetworks:
     def get_action(
         self, observations: networks_lib.Observation, key: networks_lib.PRNGKey
     ) -> Tuple[Dict, Dict]:
+        """TODO: Add description here."""
         distribution, _ = self.network.apply(self.params, observations)
-        actions = distribution.sample(seed=key)
-        log_prob = distribution.log_prob(actions)
+        actions = np.array(
+            jax.numpy.squeeze(distribution.sample(seed=key)), dtype=np.int64
+        )
+        log_prob = np.array(distribution.log_prob(actions), dtype=np.float32)
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
+        """TODO: Add description here."""
         value, _ = self.network.apply(self.params, observations)
         return value
 
