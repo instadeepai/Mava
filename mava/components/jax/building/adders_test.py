@@ -79,22 +79,22 @@ class MockTestSetup(Component):
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
         env_spec = make_fake_env_specs()
-        builder.config.server = reverb.Server(
+        builder.store.server = reverb.Server(
             [
                 reverb.Table.queue(
                     name="data_server",
                     max_size=100,
-                    signature=builder.config.adder_signature_fn(
-                        env_spec, builder.config.sequence_length, {}
+                    signature=builder.store.adder_signature_fn(
+                        env_spec, builder.store.sequence_length, {}
                     ),
                 )
             ]
         )
-        builder.config.system_data_client = reverb.Client(
-            f"localhost:{builder.config.server.port}"
+        builder.store.system_data_server = reverb.Client(
+            f"localhost:{builder.store.server.port}"
         )
-        builder.config.unique_net_keys = ["network_0"]
-        builder.config.table_network_config = {"table_0": "network_0"}
+        builder.store.unique_net_keys = ["network_0"]
+        builder.store.table_network_config = {"table_0": "network_0"}
 
     @property
     def name(self) -> str:
@@ -163,12 +163,12 @@ def test_adders(
     """Test if system builder instantiates processes as expected."""
     test_system_parallel_sequence_adder.build()
     test_system_parallel_sequence_adder._builder.data_server()
-    test_system_parallel_sequence_adder._builder.config.system_executor = None
+    test_system_parallel_sequence_adder._builder.store.system_executor = None
     test_system_parallel_sequence_adder._builder.executor(
         executor_id="executor", data_server_client=None, parameter_server_client=None
     )
-    test_system_parallel_sequence_adder._builder.config.adder.add_first(env_restart)
-    test_system_parallel_sequence_adder._builder.config.server.stop()
+    test_system_parallel_sequence_adder._builder.store.adder.add_first(env_restart)
+    test_system_parallel_sequence_adder._builder.store.server.stop()
 
 
 # TODO (Kale-ab): test adder behaviour in more detail

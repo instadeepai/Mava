@@ -41,7 +41,7 @@ class ExecutorEnvironmentLoop(Component):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
-        builder.config.environment_spec = specs.MAEnvironmentSpec(
+        builder.store.environment_spec = specs.MAEnvironmentSpec(
             self.config.environment_factory(evaluation=False)  # type: ignore
         )
 
@@ -51,11 +51,11 @@ class ExecutorEnvironmentLoop(Component):
         Args:
             builder : _description_
         """
-        builder.config.executor_environment = self.config.environment_factory(
+        builder.store.executor_environment = self.config.environment_factory(
             evaluation=False
         )  # type: ignore
-        builder.config.environment_spec = specs.MAEnvironmentSpec(
-            builder.config.executor_environment
+        builder.store.environment_spec = specs.MAEnvironmentSpec(
+            builder.store.executor_environment
         )
 
     @abc.abstractmethod
@@ -71,12 +71,12 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
             builder : _description_
         """
         executor_environment_loop = ParallelEnvironmentLoop(
-            environment=builder.config.executor_environment,
-            executor=builder.config.executor_fn,
-            logger=builder.config.executor_logger,
+            environment=builder.store.executor_environment,
+            executor=builder.store.executor_fn,
+            logger=builder.store.executor_logger,
             should_update=self.config.should_update,
         )
-        if builder._executor_id == "evaluator":
-            builder.config.system_evaluator = executor_environment_loop
+        if builder.store.executor_id == "evaluator":
+            builder.store.system_evaluator = executor_environment_loop
         else:
-            builder.config.system_executor = executor_environment_loop
+            builder.store.system_executor = executor_environment_loop

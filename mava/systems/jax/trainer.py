@@ -37,7 +37,7 @@ class Trainer(SystemTrainer, TrainerHookMixin):
             config : _description_
             components : _description_.
         """
-        self.config = config
+        self.store = config
         self.callbacks = components
 
         self.on_training_init_start()

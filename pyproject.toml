@@ -26,6 +26,7 @@ exclude = '''
     | dist
     | proto
     | docs
+    | mava_testing
   )/
 )
 '''

@@ -35,7 +35,8 @@ class TestSystem(System):
             data_server=mocks.MockDataServer,
             data_server_adder=mocks.MockAdderSignature,
             parameter_server=mocks.MockParameterServer,
-            parameter_client=mocks.MockParameterClient,
+            executor_parameter_client=mocks.MockExecutorParameterClient,
+            trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,
             executor=mocks.MockExecutor,
             executor_adder=mocks.MockAdder,
@@ -64,7 +65,7 @@ def test_builder(
         executor,
         evaluator,
         trainer,
-    ) = test_system._builder.config.system_build
+    ) = test_system._builder.store.system_build
     assert data_server == 2
 
     assert isinstance(parameter_server, ParameterServer)

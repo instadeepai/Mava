@@ -131,19 +131,19 @@ class ParallelTransitionAdder(Adder):
         Args:
             builder : _description_
         """
-        if not hasattr(builder.config, "adder_priority_fn"):
-            builder.config.adder_priority_fn = None
+        if not hasattr(builder.store, "adder_priority_fn"):
+            builder.store.adder_priority_fn = None
 
         adder = reverb_adders.ParallelNStepTransitionAdder(
-            priority_fns=builder.config.adder_priority_fn,
-            client=builder.config.system_data_client,
-            net_ids_to_keys=builder.config.unique_net_keys,
+            priority_fns=builder.store.adder_priority_fn,
+            client=builder.store.system_data_server,
+            net_ids_to_keys=builder.store.unique_net_keys,
             n_step=self.config.n_step,
-            table_network_config=builder.config.table_network_config,
+            table_network_config=builder.store.table_network_config,
             discount=self.config.discount,
         )
 
-        builder.config.adder = adder
+        builder.store.adder = adder
 
 
 class UniformAdderPriority(AdderPriority):
@@ -153,9 +153,9 @@ class UniformAdderPriority(AdderPriority):
         Args:
             builder : _description_
         """
-        builder.config.priority_fns = {
+        builder.store.priority_fns = {
             table_key: lambda x: 1.0
-            for table_key in builder.config.table_network_config.keys()
+            for table_key in builder.store.table_network_config.keys()
         }
 
 
@@ -174,13 +174,14 @@ class ParallelTransitionAdderSignature(AdderSignature):
                 env_spec, extra_specs
             )
 
-        builder.config.adder_signature_fn = adder_sig_fn
+        builder.store.adder_signature_fn = adder_sig_fn
 
 
 @dataclass
 class ParallelSequenceAdderConfig:
     sequence_length: int = 20
     period: int = 20
+    use_next_extras: bool = False
 
 
 class ParallelSequenceAdder(Adder):
@@ -200,7 +201,7 @@ class ParallelSequenceAdder(Adder):
         Args:
             builder : _description_
         """
-        builder.config.sequence_length = self.config.sequence_length
+        builder.store.sequence_length = self.config.sequence_length
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_
@@ -208,19 +209,25 @@ class ParallelSequenceAdder(Adder):
         Args:
             builder : _description_
         """
-        if not hasattr(builder.config, "adder_priority_fn"):
-            builder.config.adder_priority_fn = None
+        assert not hasattr(builder.store, "adder_priority_fn")
+
+        # Create custom priority functons for the adder
+        priority_fns = {
+            table_key: lambda x: 1.0
+            for table_key in builder.store.table_network_config.keys()
+        }
 
         adder = reverb_adders.ParallelSequenceAdder(
-            priority_fns=builder.config.adder_priority_fn,
-            client=builder.config.system_data_client,
-            net_ids_to_keys=builder.config.unique_net_keys,
+            priority_fns=priority_fns,
+            client=builder.store.data_server_client,
+            net_ids_to_keys=builder.store.unique_net_keys,
             sequence_length=self.config.sequence_length,
-            table_network_config=builder.config.table_network_config,
+            table_network_config=builder.store.table_network_config,
             period=self.config.period,
+            use_next_extras=self.config.use_next_extras,
         )
 
-        builder.config.adder = adder
+        builder.store.adder = adder
 
 
 class ParallelSequenceAdderSignature(AdderSignature):
@@ -242,4 +249,4 @@ class ParallelSequenceAdderSignature(AdderSignature):
                 extras_spec=extras_spec,
             )
 
-        builder.config.adder_signature_fn = adder_sig_fn
+        builder.store.adder_signature_fn = adder_sig_fn

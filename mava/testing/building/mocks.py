@@ -16,9 +16,11 @@
 """Tests for config class for Jax-based Mava systems"""
 
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import dm_env
+import jax
+from acme import types
 
 from mava import specs
 from mava.callbacks import Callback
@@ -42,7 +44,7 @@ class MockAdderSignature(Callback):
 
     def on_building_data_server_adder_signature(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.adder_signature_fn = self.config.adder_signature_param
+        builder.store.adder_signature_fn = self.config.adder_signature_param
 
     @property
     def name(self) -> str:
@@ -55,6 +57,40 @@ class MockAdderConfig:
     adder_param: float = 2.7
 
 
+class MockAdderClass:
+    def __init__(
+        self,
+    ) -> None:
+        """_summary_"""
+        pass
+
+    def add_first(
+        self, timestep: dm_env.TimeStep, extras: Dict[str, types.NestedArray] = {}
+    ) -> None:
+        """_summary_
+
+        Args:
+            timestep : _description_
+            extras : _description_.
+        """
+        pass
+
+    def add(
+        self,
+        actions: Dict[str, types.NestedArray],
+        next_timestep: dm_env.TimeStep,
+        next_extras: Dict[str, types.NestedArray] = {},
+    ) -> None:
+        """_summary_
+
+        Args:
+            actions : _description_
+            next_timestep : _description_
+            next_extras : _description_.
+        """
+        pass
+
+
 class MockAdder(Callback):
     def __init__(self, config: MockAdderConfig = MockAdderConfig()) -> None:
         """Mock system component."""
@@ -62,7 +98,7 @@ class MockAdder(Callback):
 
     def on_building_executor_adder(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.adder = self.config.adder_param
+        builder.store.adder = MockAdderClass()
 
     @property
     def name(self) -> str:
@@ -85,7 +121,7 @@ class MockDataServer(Callback):
 
     def on_building_data_server(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.system_data_client = self.config.data_server_param
+        builder.store.data_tables = self.config.data_server_param
 
     @property
     def name(self) -> str:
@@ -131,11 +167,11 @@ class MockLogger(Callback):
 
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.executor_logger = self.config.logger_param_0
+        builder.store.executor_logger = self.config.logger_param_0
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.trainer_logger = self.config.logger_param_0
+        builder.store.trainer_logger = self.config.logger_param_0
 
     @property
     def name(self) -> str:
@@ -144,37 +180,51 @@ class MockLogger(Callback):
 
 
 @dataclass
-class MockParameterClientConfig:
-    parameter_client_param_0: int = 1
-    parameter_client_param_1: str = "param"
+class MockExecutorParameterClientConfig:
+    executor_parameter_client_param_0: int = 1
+    executor_parameter_client_param_1: str = "param"
 
 
-class MockParameterClient(Callback):
+class MockExecutorParameterClient(Callback):
     def __init__(
         self,
-        config: MockParameterClientConfig = MockParameterClientConfig(),
+        config: MockExecutorParameterClientConfig = MockExecutorParameterClientConfig(),
     ) -> None:
         """Mock system component."""
         self.config = config
 
     def on_building_executor_parameter_client(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.executor_parameter_client = (
-            builder._parameter_server_client,
-            self.config.parameter_client_param_0,
-        )
-
-    def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.config.trainer_parameter_client = (
-            builder._parameter_server_client,
-            self.config.parameter_client_param_1,
-        )
+        builder.store.executor_parameter_client = None
 
     @property
     def name(self) -> str:
         """Component type name, e.g. 'dataset' or 'executor'."""
-        return "parameter_client"
+        return "executor_parameter_client"
+
+
+@dataclass
+class MockTrainerParameterClientConfig:
+    trainer_parameter_client_param_0: int = 1
+    trainer_parameter_client_param_1: str = "param"
+
+
+class MockTrainerParameterClient(Callback):
+    def __init__(
+        self,
+        config: MockTrainerParameterClientConfig = MockTrainerParameterClientConfig(),
+    ) -> None:
+        """Mock system component."""
+        self.config = config
+
+    def on_building_trainer_parameter_client(self, builder: SystemBuilder) -> None:
+        """_summary_"""
+        builder.store.trainer_parameter_client = None
+
+    @property
+    def name(self) -> str:
+        """Component type name, e.g. 'dataset' or 'executor'."""
+        return "trainer_parameter_client"
 
 
 @dataclass
@@ -190,21 +240,13 @@ class MockExecutor(Callback):
         """Mock system component."""
         self.config = config
 
-    def on_building_executor(self, builder: SystemBuilder) -> None:
+    def on_building_init(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        if builder._executor_id != "evaluator":
-            builder.config.exec = (
-                builder._executor_id,
-                builder.config.adder,
-                builder.config.executor_parameter_client,
-                self.config.executor_param,
-            )
-        else:
-            builder.config.exec = (
-                builder._executor_id,
-                builder.config.executor_parameter_client,
-                self.config.executor_param,
-            )
+        builder.store.agent_net_keys = {
+            "agent_0": "network_agent",
+            "agent_1": "network_agent",
+            "agent_2": "network_agent",
+        }
 
     @property
     def name(self) -> str:
@@ -229,15 +271,15 @@ class MockExecutorEnvironmentLoop(Callback):
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """[summary]"""
         if not isinstance(self.config.environment_factory, str):
-            builder.config.executor_environment = self.config.environment_factory(
+            builder.store.executor_environment = self.config.environment_factory(
                 evaluation=False
             )  # type: ignore
-            builder.config.environment_spec = specs.MAEnvironmentSpec(
-                builder.config.executor_environment
+            builder.store.environment_spec = specs.MAEnvironmentSpec(
+                builder.store.executor_environment
             )
         else:
             # Just assign a None for the environment for testing.
-            builder.config.executor_environment = None
+            builder.store.executor_environment = None
 
     def on_building_executor_environment(self, builder: SystemBuilder) -> None:
         """_summary_"""
@@ -246,15 +288,15 @@ class MockExecutorEnvironmentLoop(Callback):
         """_summary_"""
 
         executor_environment_loop = ParallelEnvironmentLoop(
-            environment=builder.config.executor_environment,
-            executor=builder.config.executor,
-            logger=builder.config.executor_logger,
+            environment=builder.store.executor_environment,
+            executor=builder.store.executor,
+            logger=builder.store.executor_logger,
             should_update=self.config.should_update,
         )
-        if builder._executor_id == "evaluator":
-            builder.config.system_evaluator = executor_environment_loop
+        if builder.store.executor_id == "evaluator":
+            builder.store.system_evaluator = executor_environment_loop
         else:
-            builder.config.system_executor = executor_environment_loop
+            builder.store.system_executor = executor_environment_loop
 
     @property
     def name(self) -> str:
@@ -266,6 +308,7 @@ class MockExecutorEnvironmentLoop(Callback):
 class MockNetworksConfig:
     network_factory: Optional[Callable[[str], dm_env.Environment]] = None
     shared_weights: bool = True
+    seed: int = 1234
 
 
 class MockNetworks(Callback):
@@ -278,8 +321,21 @@ class MockNetworks(Callback):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
-        builder.config.network_factory = self.config.network_factory
-        builder.config.shared_networks = self.config.shared_weights
+        # Set the shared weights
+        builder.store.shared_networks = self.config.shared_weights
+
+        # Setup the jax key for network initialisations
+        builder.store.key = jax.random.PRNGKey(self.config.seed)
+
+        # Build network function here
+        network_key, builder.store.key = jax.random.split(builder.store.key)
+        builder.store.network_factory = (
+            lambda: self.config.network_factory(  # type: ignore
+                environment_spec=builder.store.environment_spec,
+                agent_net_keys=builder.store.agent_net_keys,
+                rng_key=network_key,
+            )
+        )
 
     @property
     def name(self) -> str:
@@ -302,11 +358,11 @@ class MockTrainerDataset(Callback):
 
     def on_building_init_end(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.net_spec_keys = {"network_0": "agent_0"}
+        builder.store.net_spec_keys = {"network_agent": "agent_0"}
 
     def on_building_trainer_dataset(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.dataset = self.config.trainer_dataset_param
+        builder.store.dataset = self.config.trainer_dataset_param
 
     @property
     def name(self) -> str:
@@ -328,13 +384,20 @@ class MockTrainer(Callback):
         """Mock system component."""
         self.config = config
 
+    def on_building_init_end(self, builder: SystemBuilder) -> None:
+        """TODO: Add description here."""
+        builder.store.table_network_config = {
+            "trainer": ["network_agent", "network_agent", "network_agent"]
+        }
+        builder.store.trainer_networks = {"trainer": ["network_agent"]}
+
     def on_building_trainer(self, builder: SystemBuilder) -> None:
         """_summary_"""
-        builder.config.system_trainer = (
-            builder._trainer_id,
-            builder.config.trainer_logger,
-            builder.config.dataset,
-            builder.config.trainer_parameter_client,
+        builder.store.system_trainer = (
+            builder.store.trainer_id,
+            builder.store.trainer_logger,
+            builder.store.dataset,
+            builder.store.trainer_parameter_client,
         )
 
     @property
@@ -380,7 +443,7 @@ class MockDistributor(Callback):
             data_server_client=None,
             parameter_server_client=parameter_server,
         )
-        builder.config.system_build = (
+        builder.store.system_build = (
             data_server,
             parameter_server,
             executor,

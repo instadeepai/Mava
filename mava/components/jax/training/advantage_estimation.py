@@ -67,7 +67,7 @@ class GAE(Utility):
 
             return advantages, target_values
 
-        trainer.config.gae_fn = gae_advantages
+        trainer.store.gae_fn = gae_advantages
 
     @property
     def name(self) -> str:

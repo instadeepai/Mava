@@ -14,4 +14,8 @@
 # limitations under the License.
 
 """Executor components for Mava systems."""
-from mava.components.jax.executing.executor import DefaultFeedforwardExecutor
+from mava.components.jax.executing.executor import (
+    ExecutorInit,
+    FeedforwardExecutorObserve,
+    FeedforwardExecutorSelectAction,
+)

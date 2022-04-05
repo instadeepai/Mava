@@ -14,9 +14,11 @@
 # limitations under the License.
 
 """Parameter server component for Mava systems."""
+import time
 from dataclasses import dataclass
 
 import numpy as np
+from acme.jax import savers
 
 from mava.callbacks import Callback
 from mava.core_jax import SystemParameterServer
@@ -24,7 +26,10 @@ from mava.core_jax import SystemParameterServer
 
 @dataclass
 class ParameterServerConfig:
-    pass
+    checkpoint: bool = True
+    checkpoint_subpath: str = "~/mava/"
+    checkpoint_minute_interval: int = 5
+    non_blocking_sleep_seconds: int = 10
 
 
 class DefaultParameterServer(Callback):
@@ -41,13 +46,12 @@ class DefaultParameterServer(Callback):
         Args:
             server : _description_
         """
-        # networks = builder.config.network_factory(
-        #     environment_spec=builder.config.environment_spec,
-        #     agent_net_keys=builder.config.agent_net_keys,
-        # )
 
-        # Create parameters
-        server.config.parameters = {
+        server.store.non_blocking_sleep_seconds = self.config.non_blocking_sleep_seconds
+        networks = server.store.network_factory()
+
+        # # Create parameters
+        server.store.parameters = {
             "trainer_steps": np.zeros(1, dtype=np.int32),
             "trainer_walltime": np.zeros(1, dtype=np.float32),
             "evaluator_steps": np.zeros(1, dtype=np.int32),
@@ -56,37 +60,49 @@ class DefaultParameterServer(Callback):
             "executor_steps": np.zeros(1, dtype=np.int32),
         }
 
-        # parameters = {}
-        # rng_key = jax.random.PRNGKey(42)
-        # # Network parameters
-        # for net_type_key in networks.keys():
-        #     for net_key in networks[net_type_key].keys():
-        #         # Ensure obs and target networks are sonnet modules
+        # Network parameters
+        for net_type_key in networks.keys():
+            for net_key in networks[net_type_key].keys():
+                # Ensure obs and target networks are sonnet modules
+                server.store.parameters[f"{net_key}_{net_type_key}"] = networks[
+                    net_type_key
+                ][net_key].params
 
-        #         parameters[f"{net_key}_{net_type_key}"] = networks[net_type_key][
-        #             net_key
-        #         ].init(rng_key)
+        # Create the checkpointer
+        if self.config.checkpoint:
+            server.store.last_checkpoint_time = 0
+            server.store.checkpoint_minute_interval = (
+                self.config.checkpoint_minute_interval
+            )
 
-        #         rng_key, subkey = jax.random.split(rng_key)
-        #         del subkey
+            # Only save variables that are not empty.
+            save_variables = {}
+            for key in server.store.parameters.keys():
+                var = server.store.parameters[key]
+                # Don't store empty tuple (e.g. empty observation_network) variables
+                if not (type(var) == tuple and len(var) == 0):
+                    save_variables[key] = var
+            server.store.system_checkpointer = savers.Checkpointer(
+                save_variables, self.config.checkpoint_subpath, time_delta_minutes=0
+            )
 
     # Get
     def on_parameter_server_get_parameters(self, server: SystemParameterServer) -> None:
         """_summary_"""
-        names = server.config._param_names
+        names = server.store._param_names
 
         if type(names) == str:
-            get_params = server.config.parameters[names]  # type: ignore
+            get_params = server.store.parameters[names]  # type: ignore
         else:
             get_params = {}
             for var_key in names:
-                get_params[var_key] = server.config.parameters[var_key]
-        server.config.get_parameters = get_params
+                get_params[var_key] = server.store.parameters[var_key]
+        server.store.get_parameters = get_params
 
     # Set
     def on_parameter_server_set_parameters(self, server: SystemParameterServer) -> None:
         """_summary_"""
-        params = server.config._set_params
+        params = server.store._set_params
         names = params.keys()
 
         if type(names) == str:
@@ -94,21 +110,21 @@ class DefaultParameterServer(Callback):
             names = [names]  # type: ignore
 
         for var_key in names:
-            assert var_key in server.config.parameters
-            if type(server.config.parameters[var_key]) == tuple:
+            assert var_key in server.store.parameters
+            if type(server.store.parameters[var_key]) == tuple:
                 raise NotImplementedError
                 # # Loop through tuple
-                # for var_i in range(len(server.config.parameters[var_key])):
-                #     server.config.parameters[var_key][var_i].assign(params[var_key][var_i])
+                # for var_i in range(len(server.store.parameters[var_key])):
+                #     server.store.parameters[var_key][var_i].assign(params[var_key][var_i])
             else:
-                server.config.parameters[var_key] = params[var_key]
+                server.store.parameters[var_key] = params[var_key]
 
     # Add
     def on_parameter_server_add_to_parameters(
         self, server: SystemParameterServer
     ) -> None:
         """_summary_"""
-        params = server.config._add_to_params
+        params = server.store._add_to_params
         names = params.keys()
 
         if type(names) == str:
@@ -116,8 +132,26 @@ class DefaultParameterServer(Callback):
             names = [names]  # type: ignore
 
         for var_key in names:
-            assert var_key in server.config.parameters
-            server.config.parameters[var_key] += params[var_key]
+            assert var_key in server.store.parameters
+            server.store.parameters[var_key] += params[var_key]
+
+    # Save variables using checkpointer
+    def on_parameter_server_run_loop(self, server: SystemParameterServer) -> None:
+        """_summary_
+
+        Args:
+            server : _description_
+        """
+        if (
+            server.store.system_checkpointer
+            and server.store.last_checkpoint_time
+            + server.store.checkpoint_minute_interval * 60
+            + 1
+            < time.time()
+        ):
+            server.store.system_checkpointer.save()
+            server.store.last_checkpoint_time = time.time()
+            print("Updated variables checkpoint.")
 
     @property
     def name(self) -> str:

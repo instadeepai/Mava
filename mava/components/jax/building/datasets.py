@@ -58,7 +58,7 @@ class TransitionDataset(Component):
         max_in_flight_samples_per_worker = self.config.max_in_flight_samples_per_worker
         dataset = datasets.make_reverb_dataset(
             table=self.config.dataset_name,
-            server_address=builder.config.data_server_client.server_address,
+            server_address=builder.store.data_server_client.server_address,
             batch_size=self.config.batch_size,
             prefetch_size=self.config.prefetch_size,
             num_parallel_calls=self.config.num_parallel_calls,
@@ -66,7 +66,7 @@ class TransitionDataset(Component):
             postprocess=self.config.postprocess,
         )
 
-        builder.config.dataset = iter(dataset)
+        builder.store.dataset = iter(dataset)
 
 
 @dataclass
@@ -101,7 +101,7 @@ class TrajectoryDataset(Component):
             builder : _description_
         """
         dataset = reverb.TrajectoryDataset.from_table_signature(
-            server_address=builder.config.data_server_client.server_address,
+            server_address=builder.store.data_server_client.server_address,
             table=self.config.dataset_name,
             max_in_flight_samples_per_worker=2 * self.config.batch_size,
             num_workers_per_iterator=self.config.num_workers_per_iterator,
@@ -114,4 +114,4 @@ class TrajectoryDataset(Component):
         # Add batch dimension.
         dataset = dataset.batch(self.config.batch_size, drop_remainder=True)
 
-        builder.config.dataset = dataset.as_numpy_iterator()
+        builder.store.dataset = dataset.as_numpy_iterator()

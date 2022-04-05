@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 import dm_env
+import jax
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
@@ -28,6 +29,7 @@ from mava.core_jax import SystemBuilder
 class NetworksConfig:
     network_factory: Optional[Callable[[str], dm_env.Environment]] = None
     shared_weights: bool = True
+    seed: int = 1234
 
 
 class DefaultNetworks(Component):
@@ -40,16 +42,20 @@ class DefaultNetworks(Component):
 
     def on_building_init_start(self, builder: SystemBuilder) -> None:
         """Summary"""
-        builder.config.network_factory = self.config.network_factory
-        builder.config.shared_networks = self.config.shared_weights
 
-    # def on_building_executor_start(self, builder: SystemBuilder) -> None:
-    #     """_summary_"""
-    #     builder.config.networks = builder.config.network_factory(
-    #         environment_spec=builder.config.environment_spec,
-    #         agent_net_keys=builder.config.agent_net_keys,
-    #         net_spec_keys=builder.config.net_spec_keys,
-    #     ),
+        # Set the shared weights
+        builder.store.shared_networks = self.config.shared_weights
+
+        # Setup the jax key for network initialisations
+        builder.store.key = jax.random.PRNGKey(self.config.seed)
+
+        # Build network function here
+        network_key, builder.store.key = jax.random.split(builder.store.key)
+        builder.store.network_factory = lambda: self.config.network_factory(
+            environment_spec=builder.store.environment_spec,
+            agent_net_keys=builder.store.agent_net_keys,
+            rng_key=network_key,
+        )
 
     @property
     def name(self) -> str:

@@ -69,7 +69,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of make replay tables
         self.on_building_data_server_end()
 
-        return self.config.system_data_client
+        return self.store.data_tables
 
     def parameter_server(self) -> Any:
         """Parameter server to store and serve system network parameters.
@@ -89,10 +89,12 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of make parameter server
         self.on_building_parameter_server_end()
 
-        return ParameterServer(
-            config=self.config,
+        self.store.system_parameter_server = ParameterServer(
+            config=self.store,
             components=self.callbacks,
         )
+
+        return self.store.system_parameter_server
 
     def executor(
         self, executor_id: str, data_server_client: Any, parameter_server_client: Any
@@ -107,16 +109,16 @@ class Builder(SystemBuilder, BuilderHookMixin):
             System executor
         """
 
-        self._executor_id = executor_id
-        self._data_server_client = data_server_client
-        self._parameter_server_client = parameter_server_client
-        self._evaluator = self._executor_id == "evaluator"
+        self.store.executor_id = executor_id
+        self.store.data_server_client = data_server_client
+        self.store.parameter_server_client = parameter_server_client
+        self.store.evaluator = self.store.executor_id == "evaluator"
 
         # start of making the executor
         self.on_building_executor_start()
 
         # make adder if required
-        if not self._evaluator:
+        if not self.store.evaluator:
             # make adder signature
             self.on_building_executor_adder_priority()
 
@@ -133,8 +135,8 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.on_building_executor()
 
         # create the executor
-        self.config.executor = Executor(
-            config=self.config,
+        self.store.executor = Executor(
+            config=self.store,
             components=self.callbacks,
         )
 
@@ -148,7 +150,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.on_building_executor_end()
 
         # return the environment loop
-        return self.config.system_executor
+        return self.store.system_executor
 
     def trainer(
         self, trainer_id: str, data_server_client: Any, parameter_server_client: Any
@@ -163,10 +165,10 @@ class Builder(SystemBuilder, BuilderHookMixin):
             System trainer
         """
 
-        self._trainer_id = trainer_id
-        self._data_server_client = data_server_client
-        self._table_name = f"table_{trainer_id}"
-        self._parameter_server_client = parameter_server_client
+        self.store.trainer_id = trainer_id
+        self.store.data_server_client = data_server_client
+        self.store.table_name = f"table_{trainer_id}"
+        self.store.parameter_server_client = parameter_server_client
 
         # start of making the trainer
         self.on_building_trainer_start()
@@ -188,7 +190,7 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
         # create and rreturn the trainer
         return Trainer(
-            config=self.config,
+            config=self.store,
             components=self.callbacks,
         )
 

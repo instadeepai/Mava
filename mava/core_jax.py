@@ -68,7 +68,7 @@ class SystemBuilder(abc.ABC):
         """System building init"""
 
         # Simple namespace for assigning system builder attributes dynamically
-        self.config = SimpleNamespace()
+        self.store = SimpleNamespace()
 
         self.callbacks: Any
 
@@ -140,7 +140,7 @@ class SystemExecutor(abc.ABC):
         """System executor init"""
 
         # Simple namespace for assigning system executor attributes dynamically
-        self.config = SimpleNamespace()
+        self.store = SimpleNamespace()
 
         self._agent: str
         self._observation: Any
@@ -185,7 +185,7 @@ class SystemTrainer(abc.ABC):
         """System trainer init"""
 
         # Simple namespace for assigning system executor attributes dynamically
-        self.config = SimpleNamespace()
+        self.store = SimpleNamespace()
 
         self._inputs: Any
 
@@ -201,7 +201,7 @@ class SystemParameterServer(abc.ABC):
         """System parameter server init"""
 
         # Simple namespace for assigning parameter server attributes dynamically
-        self.config = SimpleNamespace()
+        self.store = SimpleNamespace()
 
     @abc.abstractmethod
     def get_parameters(
@@ -245,7 +245,7 @@ class SystemParameterClient(abc.ABC):
         """System parameter server init"""
 
         # Simple namespace for assigning parameter client attributes dynamically
-        self.config = SimpleNamespace()
+        self.store = SimpleNamespace()
 
     @abc.abstractmethod
     def get_async(self) -> None:
