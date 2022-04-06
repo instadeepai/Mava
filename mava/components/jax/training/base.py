@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Base Trainer components."""
+
 import abc
 from typing import Any, NamedTuple
 

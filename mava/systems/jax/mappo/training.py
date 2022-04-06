@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Jax MAPPO system trainer."""
+
 from mava.components.jax import training
 from mava.specs import DesignSpec
 

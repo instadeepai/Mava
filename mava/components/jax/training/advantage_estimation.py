@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """Trainer components for advantage calculations."""
+
 from dataclasses import dataclass
 from typing import Tuple
 
