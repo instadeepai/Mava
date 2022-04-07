@@ -67,10 +67,10 @@ class ExecutorParameterClient(BaseParameterClient):
         # Create policy parameters
         params = {}
         get_keys = []
-        net_type_key = "policy_networks"
-        for net_key in builder.store.policy_networks.keys():
+        net_type_key = "networks"
+        for net_key in builder.store.networks.keys():
             param_key = f"{net_key}_{net_type_key}"
-            params[param_key] = builder.store.policy_networks[net_key].params
+            params[param_key] = builder.store.networks[net_key].params
             get_keys.append(param_key)
 
         count_names, params = self._set_up_count_parameters(params=params)
