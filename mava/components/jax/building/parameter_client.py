@@ -134,7 +134,7 @@ class TrainerParameterClient(BaseParameterClient):
             for net_key in builder.store.networks[net_type_key].keys():
                 params[f"{net_key}_{net_type_key}"] = builder.store.networks[
                     net_type_key
-                ][net_key].parameters
+                ][net_key].params
                 if net_key in set(builder.store.trainer_networks):
                     set_keys.append(f"{net_key}_{net_type_key}")
                 else:
@@ -146,15 +146,17 @@ class TrainerParameterClient(BaseParameterClient):
         builder.store.trainer_counts = {name: params[name] for name in count_names}
 
         # Create parameter client
-        parameter_client = ParameterClient(
-            client=builder.store.system_parameter_server,
-            parameters=params,
-            get_keys=get_keys,
-            set_keys=set_keys,
-        )
+        parameter_client = None
+        if builder.store.system_parameter_server:
+            parameter_client = ParameterClient(
+                client=builder.store.system_parameter_server,
+                parameters=params,
+                get_keys=get_keys,
+                set_keys=set_keys,
+            )
 
-        # Get all the initial parameters
-        parameter_client.get_all_and_wait()
+            # Get all the initial parameters
+            parameter_client.get_all_and_wait()
 
         builder.store.trainer_parameter_client = parameter_client
 

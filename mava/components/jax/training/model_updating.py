@@ -46,23 +46,38 @@ class MAPGMinibatchUpdate(Utility):
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """_summary_"""
-        grad_fn = trainer.store.grad_fn
         optimizer = optax.chain(
             optax.clip_by_global_norm(self.config.max_gradient_norm),
             optax.scale_by_adam(eps=self.config.adam_epsilon),
             optax.scale(-self.config.learning_rate),
         )
+        
+        # Initialize optimizers.
 
+        # TODO (drie): Implement for multiple policy and critic networks.
+        assert len(trainer.store.networks["policy_networks"]) == 1
+        assert len(trainer.store.networks["critic_networks"]) == 1
+
+        policy_net = list(trainer.store.networks["policy_networks"].values())[0]
+        critic_net = list(trainer.store.networks["critic_networks"].values())[0]
+
+        trainer.store.opt_state = optimizer.init(policy_net.params + critic_net.params)  # pytype: disable=attribute-error
+        print("trainer.store.opt_state: ", trainer.store.opt_state)
+        exit()
         def model_update_minibatch(
-            carry: Tuple[Any, optax.OptState], minibatch: Batch
+            minibatch: Batch
         ) -> Tuple[Tuple[Any, optax.OptState], Dict[str, jnp.ndarray]]:
             """Performs model update for a single minibatch."""
-            params, opt_state = carry
             # Normalize advantages at the minibatch level before using them.
             advantages = (
                 minibatch.advantages - jnp.mean(minibatch.advantages, axis=0)
             ) / (jnp.std(minibatch.advantages, axis=0) + 1e-8)
-            gradients, metrics = grad_fn(
+            
+            policy_net = list(trainer.store.networks["policy_networks"].values())[0]
+            critic_net = list(trainer.store.networks["critic_networks"].values())[0]
+            params = policy_net.params + critic_net.params
+
+            gradients, metrics = trainer.store.grad_fn(
                 params,
                 minibatch.observations,
                 minibatch.actions,
@@ -73,12 +88,13 @@ class MAPGMinibatchUpdate(Utility):
             )
 
             # Apply updates
-            updates, opt_state = optimizer.update(gradients, opt_state)
+            updates, trainer.store.opt_state = optimizer.update(gradients, trainer.store.opt_state)
             params = optax.apply_updates(params, updates)
+
 
             metrics["norm_grad"] = optax.global_norm(gradients)
             metrics["norm_updates"] = optax.global_norm(updates)
-            return (params, opt_state), metrics
+            return metrics
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 

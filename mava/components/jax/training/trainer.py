@@ -75,7 +75,7 @@ class TrainerProcess(Component):
         # Check that all agent_net_keys are in trainer_networks
         assert unique_net_keys == unique_trainer_net_keys
         # Setup specs for each network
-        self._net_spec_keys: Dict[str, Any] = {}
+        builder.store.net_spec_keys = {}
         for i in range(len(unique_net_keys)):
             builder.store.net_spec_keys[unique_net_keys[i]] = builder.store.agents[
                 i % len(builder.store.agents)
@@ -94,15 +94,9 @@ class TrainerProcess(Component):
                 if most_matches < matches:
                     matches = most_matches
                     builder.store.table_network_config[trainer_key] = sample
+        builder.store.networks = builder.store.network_factory()
 
-    def on_building_trainer_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.store.networks = builder.store.network_factory(
-            environment_spec=builder.store.environment_spec,
-            agent_net_keys=builder.store.agent_net_keys,
-            net_spec_keys=builder.store.net_spec_keys,
-        )
-
+    @property
     def name(self) -> str:
         """_summary_"""
         return "trainer"

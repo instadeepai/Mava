@@ -28,13 +28,12 @@ Transform = Callable[[reverb.ReplaySample], reverb.ReplaySample]
 
 @dataclass
 class TransitionDatasetConfig:
-    server_address: Optional[str] = None
-    batch_size: int = 256
+    sample_batch_size: int = 256
     prefetch_size: Optional[int] = None
     num_parallel_calls: int = 12
     max_in_flight_samples_per_worker: Optional[int] = None
     postprocess: Optional[Transform] = None
-    dataset_name: str = "transition_dataset"
+    # dataset_name: str = "transition_dataset"
 
 
 class TransitionDataset(Component):
@@ -57,9 +56,9 @@ class TransitionDataset(Component):
         """
         max_in_flight_samples_per_worker = self.config.max_in_flight_samples_per_worker
         dataset = datasets.make_reverb_dataset(
-            table=self.config.dataset_name,
+            table=builder.store.trainer_id,
             server_address=builder.store.data_server_client.server_address,
-            batch_size=self.config.batch_size,
+            batch_size=self.config.sample_batch_size,
             prefetch_size=self.config.prefetch_size,
             num_parallel_calls=self.config.num_parallel_calls,
             max_in_flight_samples_per_worker=max_in_flight_samples_per_worker,
@@ -71,15 +70,14 @@ class TransitionDataset(Component):
 
 @dataclass
 class TrajectoryDatasetConfig:
-    server_address: Optional[str] = None
-    batch_size: int = 256
+    sample_batch_size: int = 256
     max_in_flight_samples_per_worker: int = 512
     num_workers_per_iterator: int = -1
     max_samples_per_stream: int = -1
     rate_limiter_timeout_ms: int = -1
     get_signature_timeout_secs: Optional[int] = None
-    max_samples: int = -1
-    dataset_name: str = "trajectory_dataset"
+    # max_samples: int = -1
+    # dataset_name: str = "trajectory_dataset"
 
 
 class TrajectoryDataset(Component):
@@ -102,16 +100,25 @@ class TrajectoryDataset(Component):
         """
         dataset = reverb.TrajectoryDataset.from_table_signature(
             server_address=builder.store.data_server_client.server_address,
-            table=self.config.dataset_name,
-            max_in_flight_samples_per_worker=2 * self.config.batch_size,
+            table=builder.store.trainer_id,
+            max_in_flight_samples_per_worker=2 * self.config.sample_batch_size,
             num_workers_per_iterator=self.config.num_workers_per_iterator,
             max_samples_per_stream=self.config.max_samples_per_stream,
             rate_limiter_timeout_ms=self.config.rate_limiter_timeout_ms,
             get_signature_timeout_secs=self.config.get_signature_timeout_secs,
-            max_samples=self.config.max_samples,
+            # max_samples=self.config.max_samples,
         )
 
         # Add batch dimension.
         dataset = dataset.batch(self.config.batch_size, drop_remainder=True)
 
         builder.store.dataset = dataset.as_numpy_iterator()
+
+    @property
+    def name(self) -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "trainer_dataset"

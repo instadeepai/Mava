@@ -24,7 +24,7 @@ import reverb
 from acme.jax import utils
 
 from mava.components.jax import Component
-from mava.components.jax.training import Batch, TrainingState, Utility
+from mava.components.jax.training import Batch, TrainingState, Step
 from mava.core_jax import SystemTrainer
 
 
@@ -47,8 +47,8 @@ class DefaultStep(Component):
 
     def on_training_init(self, trainer: SystemTrainer) -> None:
         """_summary_"""
-        # Initialise training state (parameters and optimiser state).
-        trainer.store.state = trainer.store.make_initial_state(self.config.random_key)
+        # Initialise the optimiser.
+        trainer.store.state = trainer.store.make_initial_state_fn(self.config.random_key)
 
     def on_training_step(self, trainer: SystemTrainer) -> None:
         """Does a step of SGD and logs the results."""
@@ -79,7 +79,7 @@ class MAPGWithTrustRegionStepConfig:
     discount: float = 0.99
 
 
-class MAPGWithTrustRegionStep(Utility):
+class MAPGWithTrustRegionStep(Step):
     def __init__(
         self,
         config: MAPGWithTrustRegionStepConfig = MAPGWithTrustRegionStepConfig(),
@@ -108,6 +108,11 @@ class MAPGWithTrustRegionStep(Utility):
                 data.discount,
                 data.extras,
             )
+
+            # TODO: Upgrade trainer setup code from single-agent to multi-agent.
+            print("Sampled data: ", observations)
+            exit()
+
             discounts = termination * self.config.discount
             behavior_log_probs = extra["log_prob"]
 

@@ -55,7 +55,7 @@ class InitialState(Utility):
                 params=initial_params, opt_state=initial_opt_state, random_key=key_state
             )
 
-        trainer.store.initial_state_fn = make_initial_state
+        trainer.store.make_initial_state_fn = make_initial_state
 
     @property
     def name(self) -> str:

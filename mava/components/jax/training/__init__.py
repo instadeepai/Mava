@@ -23,3 +23,4 @@ from mava.components.jax.training.model_updating import (
 )
 from mava.components.jax.training.step import DefaultStep, MAPGWithTrustRegionStep
 from mava.components.jax.training.utilities import InitialState
+from mava.components.jax.training.trainer import TrainerProcess

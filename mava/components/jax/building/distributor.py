@@ -52,33 +52,7 @@ class Distributor(Component):
             multi_process=self.config.multi_process,
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
-        )
-
-        # data_server = builder.data_server()
-        # parameter_server = builder.parameter_server()
-
-        # trainer = builder.trainer(
-        #     trainer_id="trainer",
-        #     data_server_client=data_server,
-        #     parameter_server_client=parameter_server,
-        # )
-        # executor = builder.executor(
-        #     executor_id="executor",
-        #     data_server_client=data_server,
-        #     parameter_server_client=parameter_server,
-        # )
-        # evaluator = builder.executor(
-        #     executor_id="evaluator",
-        #     data_server_client=None,
-        #     parameter_server_client=parameter_server,
-        # )
-        # builder.store.system_build = (
-        #     data_server,
-        #     parameter_server,
-        #     executor,
-        #     evaluator,
-        #     trainer,
-        # )
+        ) 
 
         # tables node
         data_server = builder.store.program.add(
