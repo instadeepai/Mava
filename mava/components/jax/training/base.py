@@ -18,8 +18,6 @@
 import abc
 from typing import Any, NamedTuple
 
-import jax.numpy as jnp
-
 from mava.components.jax import Component
 from mava.core_jax import SystemTrainer
 
@@ -28,15 +26,15 @@ class Batch(NamedTuple):
     """A batch of data; all shapes are expected to be [B, ...]."""
 
     observations: Any
-    actions: jnp.ndarray
-    advantages: jnp.ndarray
+    actions: Any
+    advantages: Any
 
     # Target value estimate used to bootstrap the value function.
-    target_values: jnp.ndarray
+    target_values: Any
 
     # Value estimate and action log-prob at behavior time.
-    behavior_values: jnp.ndarray
-    behavior_log_probs: jnp.ndarray
+    behavior_values: Any
+    behavior_log_probs: Any
 
 
 # class TrainingState(NamedTuple):

@@ -22,6 +22,7 @@ import jax
 import jax.numpy as jnp
 import optax
 import reverb
+import tree
 from acme.jax import utils
 
 from mava.components.jax import Component
@@ -104,36 +105,44 @@ class MAPGWithTrustRegionStep(Step):
                 data.extras,
             )
 
-            # TODO: Upgrade trainer setup code from single-agent to multi-agent.
-            observations = observations["agent_0"].observation
-            actions = actions["agent_0"]
-            rewards = rewards["agent_0"]
-            termination = termination["agent_0"]
-            extra = {"policy_info": extra["policy_info"]["agent_0"]}
+            discounts = tree.map_structure(
+                lambda x: x * self.config.discount, termination
+            )
 
-            discounts = termination * self.config.discount
             behavior_log_probs = extra["policy_info"]
 
-            # TODO (dries): Turn this into the multi_agent equivalent.
-            agent_params = trainer.store.networks["networks"]["network_agent"].params
+            networks = trainer.store.networks["networks"]
 
-            def get_behavior_values(params: Any, observations: Any) -> jnp.ndarray:
+            def get_behavior_values(
+                net_key: Any, reward: Any, observation: Any
+            ) -> jnp.ndarray:
                 o = jax.tree_map(
-                    lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observations
+                    lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation
                 )
-                _, behavior_values = trainer.store.networks["networks"][
-                    "network_agent"
-                ].network.apply(params, o)
-                behavior_values = jnp.reshape(behavior_values, rewards.shape[0:2])
+                _, behavior_values = networks[net_key].network.apply(
+                    networks[net_key].params, o
+                )
+                behavior_values = jnp.reshape(behavior_values, reward.shape[0:2])
                 return behavior_values
 
-            behavior_values = get_behavior_values(agent_params, observations)
+            agent_nets = trainer.store.trainer_agent_net_keys
+            behavior_values = {
+                key: get_behavior_values(
+                    agent_nets[key], rewards[key], observations[key].observation
+                )
+                for key in agent_nets.keys()
+            }
 
             # Vmap over batch dimension
             batch_gae_advantages = jax.vmap(trainer.store.gae_fn, in_axes=0)
-            advantages, target_values = batch_gae_advantages(
-                rewards, discounts, behavior_values
-            )
+
+            advantages = {}
+            target_values = {}
+            for key in rewards.keys():
+                advantages[key], target_values[key] = batch_gae_advantages(
+                    rewards[key], discounts[key], behavior_values[key]
+                )
+
             # Exclude the last step - it was only used for bootstrapping.
             # The shape is [num_sequences, num_steps, ..]
             observations, actions, behavior_log_probs, behavior_values = jax.tree_map(
@@ -152,9 +161,10 @@ class MAPGWithTrustRegionStep(Step):
 
             # Concatenate all trajectories. Reshape from [num_sequences, num_steps,..]
             # to [num_sequences * num_steps,..]
-            assert len(target_values.shape) > 1
-            num_sequences = target_values.shape[0]
-            num_steps = target_values.shape[1]
+            agent_0_t_vals = list(target_values.values())[0]
+            assert len(agent_0_t_vals) > 1
+            num_sequences = agent_0_t_vals.shape[0]
+            num_steps = agent_0_t_vals.shape[1]
             batch_size = num_sequences * num_steps
             assert batch_size % trainer.store.num_minibatches == 0, (
                 "Num minibatches must divide batch size. Got batch_size={}"
@@ -173,19 +183,20 @@ class MAPGWithTrustRegionStep(Step):
             random_key, trainer.store.key = jax.random.split(trainer.store.key)
 
             # carry: Tuple[jnp.ndarray, Any, optax.OptState, Batch],
-            params = trainer.store.networks["networks"]["network_agent"].params
+            networks = trainer.store.networks["networks"]
+            params = {net_key: networks[net_key].params for net_key in networks.keys()}
             opt_state = trainer.store.opt_state
-            (
-                trainer.store.key,
-                trainer.store.networks["networks"]["network_agent"].params,
-                trainer.store.opt_state,
-                _,
-            ), metrics = jax.lax.scan(
+
+            (trainer.store.key, new_params, opt_state, _,), metrics = jax.lax.scan(
                 trainer.store.epoch_update_fn,
                 (random_key, params, opt_state, batch),
                 (),
                 length=trainer.store.num_epochs,
             )
+
+            # Update the network weights
+            for net_key in params.keys():
+                trainer.store.networks["networks"][net_key].params = new_params[net_key]
 
             metrics = jax.tree_map(jnp.mean, metrics)
             metrics["norm_params"] = optax.global_norm(params)
@@ -203,8 +214,12 @@ class MAPGWithTrustRegionStep(Step):
                     num_batch_dims=0,
                 )
             )
-            metrics["rewards_mean"] = jnp.mean(jnp.abs(jnp.mean(rewards, axis=(0, 1))))
-            metrics["rewards_std"] = jnp.std(rewards, axis=(0, 1))
+            metrics["rewards_mean"] = jax.tree_map(
+                lambda x: jnp.mean(jnp.abs(jnp.mean(x, axis=(0, 1)))), rewards
+            )
+            metrics["rewards_std"] = jax.tree_map(
+                lambda x: jnp.std(x, axis=(0, 1)), rewards
+            )
             # new_state = TrainingState(
             #     params=params, opt_state=opt_state, random_key=key
             # )

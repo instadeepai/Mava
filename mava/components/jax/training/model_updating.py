@@ -74,37 +74,49 @@ class MAPGMinibatchUpdate(Utility):
 
         def model_update_minibatch(
             carry: Tuple[networks_lib.Params, optax.OptState], minibatch: Batch
-        ) -> Tuple[Tuple[Any, optax.OptState], Dict[str, jnp.ndarray]]:
+        ) -> Tuple[Tuple[Any, optax.OptState], Dict[str, Any]]:
             """Performs model update for a single minibatch."""
             params, opt_state = carry
+
             # Normalize advantages at the minibatch level before using them.
-            advantages = (
-                minibatch.advantages - jnp.mean(minibatch.advantages, axis=0)
-            ) / (jnp.std(minibatch.advantages, axis=0) + 1e-8)
-
-            # TODO (dries): Implement this for the multiagent case.
-            net_key = list(trainer.store.networks["networks"].keys())[0]
-
-            gradients, metrics = trainer.store.grad_fn(
-                params,
-                minibatch.observations,
-                minibatch.actions,
-                minibatch.behavior_log_probs,
-                minibatch.target_values,
-                advantages,
-                minibatch.behavior_values,
+            advantages = jax.tree_map(
+                lambda x: (x - jnp.mean(x, axis=0)) / (jnp.std(x, axis=0) + 1e-8),
+                minibatch.advantages,
             )
 
-            # Apply updates
-            updates, trainer.store.opt_state = trainer.store.optimizer.update(
-                gradients, opt_state
-            )
-            trainer.store.networks["networks"][net_key].params = optax.apply_updates(
-                params, updates
-            )
+            # Calculate the gradients and agent metrics.
+            gradients = {}
+            agent_metrics = {}
+            for agent_key in trainer.store.trainer_agents:
+                agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
+                trainer.store.current_agent_net_key = agent_net_key
+                gradients[agent_key], agent_metrics[agent_key] = trainer.store.grad_fn(
+                    params[agent_net_key],
+                    minibatch.observations[agent_key].observation,
+                    minibatch.actions[agent_key],
+                    minibatch.behavior_log_probs[agent_key],
+                    minibatch.target_values[agent_key],
+                    advantages[agent_key],
+                    minibatch.behavior_values[agent_key],
+                )
 
-            metrics["norm_grad"] = optax.global_norm(gradients)
-            metrics["norm_updates"] = optax.global_norm(updates)
+            # Update the networks and optimizors.
+            metrics = {}
+            for agent_key in trainer.store.trainer_agents:
+                agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
+                # Apply updates
+                updates, trainer.store.opt_state = trainer.store.optimizer.update(
+                    gradients[agent_key], opt_state
+                )
+                params[agent_net_key] = optax.apply_updates(
+                    params[agent_net_key], updates
+                )
+
+                agent_metrics[agent_key]["norm_grad"] = optax.global_norm(
+                    gradients[agent_key]
+                )
+                agent_metrics[agent_key]["norm_updates"] = optax.global_norm(updates)
+                metrics[agent_key] = agent_metrics
             return (params, opt_state), metrics
 
         trainer.store.minibatch_update_fn = model_update_minibatch
@@ -154,6 +166,7 @@ class MAPGEpochUpdate(Utility):
             key, params, opt_state, batch = carry
             key, subkey = jax.random.split(key)
             permutation = jax.random.permutation(subkey, self.config.batch_size)
+
             shuffled_batch = jax.tree_map(
                 lambda x: jnp.take(x, permutation, axis=0), batch
             )

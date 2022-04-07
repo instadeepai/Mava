@@ -59,9 +59,11 @@ class MAPGWithTrustRegionClippingLoss(Loss):
         ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
             """Surrogate loss using clipped probability ratios."""
 
-            # TODO (dries): Make this multi-agent.
-            network = trainer.store.networks["networks"]["network_agent"]
-
+            # TODO (dries): Fix this statefull assignment. Use jax.lax.switch
+            # instead per agent.
+            network = trainer.store.networks["networks"][
+                trainer.store.current_agent_net_key
+            ]
             distribution_params, values = network.network.apply(params, observations)
             log_probs = network.log_prob(distribution_params, actions)
             entropy = network.entropy(distribution_params)

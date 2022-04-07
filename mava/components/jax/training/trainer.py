@@ -19,20 +19,20 @@ from dataclasses import dataclass
 from typing import Dict, List, Union
 
 from mava.components.jax import Component
-from mava.core_jax import SystemBuilder
+from mava.core_jax import SystemBuilder, SystemTrainer
 from mava.utils import enums
 from mava.utils.sort_utils import sort_str_num
 
 
 @dataclass
-class TrainerProcessConfig:
+class TrainerInitConfig:
     trainer_networks: Union[
         Dict[str, List], enums.Trainer
     ] = enums.Trainer.single_trainer
 
 
-class TrainerProcess(Component):
-    def __init__(self, config: TrainerProcessConfig = TrainerProcessConfig()):
+class TrainerInit(Component):
+    def __init__(self, config: TrainerInitConfig = TrainerInitConfig()):
         """_summary_
 
         Args:
@@ -97,6 +97,20 @@ class TrainerProcess(Component):
                     builder.store.table_network_config[trainer_key] = sample
 
         builder.store.networks = builder.store.network_factory()
+
+    def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
+        """_summary_"""
+        # Convert network keys for the trainer.
+        trainer.store.trainer_table_entry = trainer.store.table_network_config[
+            trainer.store.trainer_id
+        ]
+        trainer.store.trainer_agents = trainer.store.agents[
+            : len(trainer.store.trainer_table_entry)
+        ]
+        trainer.store.trainer_agent_net_keys = {
+            agent: trainer.store.trainer_table_entry[a_i]
+            for a_i, agent in enumerate(trainer.store.trainer_agents)
+        }
 
     @property
     def name(self) -> str:

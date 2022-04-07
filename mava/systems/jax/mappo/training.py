@@ -19,7 +19,7 @@ from mava.components.jax import training
 from mava.specs import DesignSpec
 
 TRAINER_SPEC = DesignSpec(
-    trainer_process=training.TrainerProcess,
+    trainer_process=training.TrainerInit,
     gae_fn=training.GAE,
     loss=training.MAPGWithTrustRegionClippingLoss,
     epoch_update=training.MAPGEpochUpdate,
