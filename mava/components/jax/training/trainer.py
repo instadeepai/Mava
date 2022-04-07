@@ -15,7 +15,7 @@
 
 """Trainer components for system builders"""
 from dataclasses import dataclass
-from typing import Any, Dict, List, Union
+from typing import Dict, List, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
@@ -94,6 +94,7 @@ class TrainerProcess(Component):
                 if most_matches < matches:
                     matches = most_matches
                     builder.store.table_network_config[trainer_key] = sample
+
         builder.store.networks = builder.store.network_factory()
 
     @property

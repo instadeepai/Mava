@@ -48,7 +48,7 @@ class ExtrasLogProbSpec(Component):
         for agent, spec in agent_specs.items():
             # Make dummy log_probs
             builder.store.extras_spec["policy_info"][agent] = np.ones(
-                shape=(1,), dtype=np.float32
+                shape=(), dtype=np.float32
             )
 
         # Add the networks keys to extras.

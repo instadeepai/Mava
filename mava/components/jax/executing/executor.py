@@ -120,7 +120,7 @@ class ExecutorInit(Component):
             net_key: i for i, net_key in enumerate(builder.store.unique_net_keys)
         }
 
-        builder.store.networks = builder.store.network_factory()["networks"]
+        builder.store.networks = builder.store.network_factory()
 
     @property
     def name(self) -> str:
@@ -242,7 +242,9 @@ class FeedforwardExecutorSelectAction(Component):
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
         """Summary"""
         agent = executor.store.agent
-        network = executor.store.networks[executor.store.agent_net_keys[agent]]
+        network = executor.store.networks["networks"][
+            executor.store.agent_net_keys[agent]
+        ]
 
         observation = executor.store.observation.observation.reshape((1, -1))
         rng_key, executor.store.key = jax.random.split(executor.store.key)

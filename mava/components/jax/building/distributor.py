@@ -52,7 +52,7 @@ class Distributor(Component):
             multi_process=self.config.multi_process,
             nodes_on_gpu=self.config.nodes_on_gpu,
             name=self.config.distributor_name,
-        ) 
+        )
 
         # tables node
         data_server = builder.store.program.add(

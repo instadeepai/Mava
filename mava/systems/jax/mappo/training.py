@@ -19,7 +19,6 @@ from mava.specs import DesignSpec
 
 TRAINER_SPEC = DesignSpec(
     trainer_process=training.TrainerProcess,
-    initial_state_fn=training.InitialState,
     gae_fn=training.GAE,
     loss=training.MAPGWithTrustRegionClippingLoss,
     epoch_update=training.MAPGEpochUpdate,

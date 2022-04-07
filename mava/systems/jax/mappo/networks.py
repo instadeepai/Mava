@@ -55,14 +55,16 @@ class PPONetworks:
 
     def get_action(
         self, observations: networks_lib.Observation, key: networks_lib.PRNGKey
-    ) -> Tuple[Dict, Dict]:
+    ) -> Tuple[np.ndarray, Dict]:
         """TODO: Add description here."""
         distribution, _ = self.network.apply(self.params, observations)
 
         actions = np.array(
             jax.numpy.squeeze(distribution.sample(seed=key)), dtype=np.int64
         )
-        log_prob = np.array(distribution.log_prob(actions), dtype=np.float32)
+        log_prob = np.squeeze(
+            np.array(distribution.log_prob(actions), dtype=np.float32)
+        )
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
@@ -83,12 +85,13 @@ def make_ppo_network(
         sample=lambda distribution, key: distribution.sample(seed=key),
     )
 
+
 def make_networks(
     spec: specs.EnvironmentSpec,
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int] = (64, 64),
     value_layer_sizes: Sequence[int] = (64, 64),
-) -> Tuple[PPONetworks, PPONetworks]:
+) -> PPONetworks:
     """TODO: Add description here."""
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
@@ -110,7 +113,7 @@ def make_discrete_networks(
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     value_layer_sizes: Sequence[int],
-) -> Tuple[PPONetworks, PPONetworks]:
+) -> PPONetworks:
     """TODO: Add description here."""
 
     num_actions = environment_spec.actions.num_values
@@ -195,9 +198,7 @@ def make_default_networks(
         #     if isinstance(specs[net_key].actions, dm_env.specs.DiscreteArray)
         #     else np.prod(specs[net_key].actions.shape, dtype=int)
         # )
-        networks[net_key] = make_networks(
-            specs[net_key], key=rng_key
-        )
+        networks[net_key] = make_networks(specs[net_key], key=rng_key)
 
     return {
         "networks": networks,

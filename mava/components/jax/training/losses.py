@@ -48,18 +48,20 @@ class MAPGWithTrustRegionClippingLoss(Loss):
         """_summary_"""
 
         def loss(
-            network: Any,
             params: Any,
             observations: Any,
-            actions: jnp.array,
-            behaviour_log_probs: jnp.array,
-            target_values: jnp.array,
-            advantages: jnp.array,
-            behavior_values: jnp.array,
+            actions: jnp.ndarray,
+            behaviour_log_probs: jnp.ndarray,
+            target_values: jnp.ndarray,
+            advantages: jnp.ndarray,
+            behavior_values: jnp.ndarray,
         ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
             """Surrogate loss using clipped probability ratios."""
 
-            distribution_params, values = network.apply(params, observations)
+            # TODO (dries): Make this multi-agent.
+            network = trainer.store.networks["networks"]["network_agent"]
+
+            distribution_params, values = network.network.apply(params, observations)
             log_probs = network.log_prob(distribution_params, actions)
             entropy = network.entropy(distribution_params)
 

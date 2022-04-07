@@ -110,9 +110,9 @@ class TrajectoryDataset(Component):
         )
 
         # Add batch dimension.
-        dataset = dataset.batch(self.config.batch_size, drop_remainder=True)
+        dataset = dataset.batch(self.config.sample_batch_size, drop_remainder=True)
 
-        builder.store.dataset = dataset.as_numpy_iterator()
+        builder.store.dataset_iterator = dataset.as_numpy_iterator()
 
     @property
     def name(self) -> str:

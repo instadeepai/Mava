@@ -18,7 +18,6 @@ import abc
 from typing import Any, NamedTuple
 
 import jax.numpy as jnp
-import optax
 
 from mava.components.jax import Component
 from mava.core_jax import SystemTrainer
@@ -39,12 +38,12 @@ class Batch(NamedTuple):
     behavior_log_probs: jnp.ndarray
 
 
-class TrainingState(NamedTuple):
-    """Training state consists of network parameters and optimiser state."""
+# class TrainingState(NamedTuple):
+#     """Training state consists of network parameters and optimiser state."""
 
-    params: Any
-    opt_state: optax.OptState
-    random_key: jnp.ndarray
+#     params: Any
+#     opt_state: optax.OptState
+#     random_key: jnp.ndarray
 
 
 class Utility(Component):

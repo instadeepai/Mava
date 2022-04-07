@@ -24,13 +24,13 @@ import reverb
 from acme.jax import utils
 
 from mava.components.jax import Component
-from mava.components.jax.training import Batch, TrainingState, Step
+from mava.components.jax.training import Batch, Step  # TrainingState
 from mava.core_jax import SystemTrainer
 
 
 @dataclass
 class DefaultStepConfig:
-    random_key: jnp.ndarray = 42
+    random_key: int = 42
 
 
 class DefaultStep(Component):
@@ -45,24 +45,19 @@ class DefaultStep(Component):
         """
         self.config = config
 
-    def on_training_init(self, trainer: SystemTrainer) -> None:
-        """_summary_"""
-        # Initialise the optimiser.
-        trainer.store.state = trainer.store.make_initial_state_fn(self.config.random_key)
-
     def on_training_step(self, trainer: SystemTrainer) -> None:
         """Does a step of SGD and logs the results."""
 
         # Do a batch of SGD.
-        sample = next(trainer.store.iterator)
-        self._state, results = trainer.store.sgd_step(trainer.store.state, sample)
+        sample = next(trainer.store.dataset_iterator)
+        results = trainer.store.step_fn(sample)
 
         # Update our counts and record it.
         # counts = self._counter.increment(steps=1) # TODO: add back in later
 
         # Snapshot and attempt to write logs.
         # self._logger.write({**results, **counts})
-        trainer.store.logger.write({**results})
+        trainer.store.trainer_logger.write({**results})
 
     @property
     def name(self) -> str:
@@ -94,37 +89,44 @@ class MAPGWithTrustRegionStep(Step):
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """_summary_"""
 
-        def sgd_step(
-            state: TrainingState, sample: reverb.ReplaySample
-        ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
+        def sgd_step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
             """Performs a minibatch SGD step, returning new state and metrics."""
 
             # Extract the data.
             data = sample.data
+
             observations, actions, rewards, termination, extra = (
-                data.observation,
-                data.action,
-                data.reward,
-                data.discount,
+                data.observations,
+                data.actions,
+                data.rewards,
+                data.discounts,
                 data.extras,
             )
 
             # TODO: Upgrade trainer setup code from single-agent to multi-agent.
-            print("Sampled data: ", observations)
-            exit()
+            observations = observations["agent_0"].observation
+            actions = actions["agent_0"]
+            rewards = rewards["agent_0"]
+            termination = termination["agent_0"]
+            extra = {"policy_info": extra["policy_info"]["agent_0"]}
 
             discounts = termination * self.config.discount
-            behavior_log_probs = extra["log_prob"]
+            behavior_log_probs = extra["policy_info"]
+
+            # TODO (dries): Turn this into the multi_agent equivalent.
+            agent_params = trainer.store.networks["networks"]["network_agent"].params
 
             def get_behavior_values(params: Any, observations: Any) -> jnp.ndarray:
                 o = jax.tree_map(
                     lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observations
                 )
-                _, behavior_values = trainer.store.networks.network.apply(params, o)
+                _, behavior_values = trainer.store.networks["networks"][
+                    "network_agent"
+                ].network.apply(params, o)
                 behavior_values = jnp.reshape(behavior_values, rewards.shape[0:2])
                 return behavior_values
 
-            behavior_values = get_behavior_values(state.params, observations)
+            behavior_values = get_behavior_values(agent_params, observations)
 
             # Vmap over batch dimension
             batch_gae_advantages = jax.vmap(trainer.store.gae_fn, in_axes=0)
@@ -137,6 +139,7 @@ class MAPGWithTrustRegionStep(Step):
                 lambda x: x[:, :-1],
                 (observations, actions, behavior_log_probs, behavior_values),
             )
+
             trajectories = Batch(
                 observations=observations,
                 actions=actions,
@@ -163,13 +166,22 @@ class MAPGWithTrustRegionStep(Step):
             # Compute gradients.
             trainer.store.grad_fn = jax.grad(trainer.store.loss_fn, has_aux=True)
 
-            params = state.params
-            opt_state = state.opt_state
+            opt_state = trainer.store.opt_state
             # Repeat training for the given number of epoch, taking a random
             # permutation for every epoch.
-            (key, params, opt_state, _), metrics = jax.lax.scan(
+            random_key, trainer.store.key = jax.random.split(trainer.store.key)
+
+            # carry: Tuple[jnp.ndarray, Any, optax.OptState, Batch],
+            params = trainer.store.networks["networks"]["network_agent"].params
+            opt_state = trainer.store.opt_state
+            (
+                trainer.store.key,
+                trainer.store.networks["networks"]["network_agent"].params,
+                trainer.store.opt_state,
+                _,
+            ), metrics = jax.lax.scan(
                 trainer.store.epoch_update_fn,
-                (state.random_key, params, opt_state, batch),
+                (random_key, params, opt_state, batch),
                 (),
                 length=trainer.store.num_epochs,
             )
@@ -192,10 +204,10 @@ class MAPGWithTrustRegionStep(Step):
             )
             metrics["rewards_mean"] = jnp.mean(jnp.abs(jnp.mean(rewards, axis=(0, 1))))
             metrics["rewards_std"] = jnp.std(rewards, axis=(0, 1))
-            new_state = TrainingState(
-                params=params, opt_state=opt_state, random_key=key
-            )
-            return new_state, metrics
+            # new_state = TrainingState(
+            #     params=params, opt_state=opt_state, random_key=key
+            # )
+            return metrics  # new_state,
 
         trainer.store.step_fn = sgd_step
 

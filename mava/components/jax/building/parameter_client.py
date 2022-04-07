@@ -68,9 +68,11 @@ class ExecutorParameterClient(BaseParameterClient):
         params = {}
         get_keys = []
         net_type_key = "networks"
-        for net_key in builder.store.networks.keys():
-            param_key = f"{net_key}_{net_type_key}"
-            params[param_key] = builder.store.networks[net_key].params
+        for agent_net_key in builder.store.networks[net_type_key].keys():
+            param_key = f"{net_type_key}-{agent_net_key}"
+            params[param_key] = builder.store.networks[net_type_key][
+                agent_net_key
+            ].params
             get_keys.append(param_key)
 
         count_names, params = self._set_up_count_parameters(params=params)
@@ -131,14 +133,14 @@ class TrainerParameterClient(BaseParameterClient):
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
         for net_type_key in builder.store.networks.keys():
-            for net_key in builder.store.networks[net_type_key].keys():
-                params[f"{net_key}_{net_type_key}"] = builder.store.networks[
+            for agent_net_key in builder.store.networks[net_type_key].keys():
+                params[f"{net_type_key}-{agent_net_key}"] = builder.store.networks[
                     net_type_key
-                ][net_key].params
-                if net_key in set(builder.store.trainer_networks):
-                    set_keys.append(f"{net_key}_{net_type_key}")
+                ][agent_net_key].params
+                if agent_net_key in set(builder.store.trainer_networks):
+                    set_keys.append(f"{net_type_key}-{agent_net_key}")
                 else:
-                    get_keys.append(f"{net_key}_{net_type_key}")
+                    get_keys.append(f"{net_type_key}-{agent_net_key}")
 
         count_names, params = self._set_up_count_parameters(params=params)
 
