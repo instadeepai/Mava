@@ -55,13 +55,16 @@ class PPONetworks:
 
     def get_action(
         self, observations: networks_lib.Observation, key: networks_lib.PRNGKey
-    ) -> Tuple[Dict, Dict]:
+    ) -> Tuple[np.ndarray, Dict]:
         """TODO: Add description here."""
         distribution, _ = self.network.apply(self.params, observations)
+
         actions = np.array(
             jax.numpy.squeeze(distribution.sample(seed=key)), dtype=np.int64
         )
-        log_prob = np.array(distribution.log_prob(actions), dtype=np.float32)
+        log_prob = np.squeeze(
+            np.array(distribution.log_prob(actions), dtype=np.float32)
+        )
         return actions, {"log_prob": log_prob}
 
     def get_value(self, observations: networks_lib.Observation) -> jnp.ndarray:
@@ -70,7 +73,7 @@ class PPONetworks:
         return value
 
 
-def make_ppo_polcy_network(
+def make_ppo_network(
     network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
 ) -> PPONetworks:
     """TODO: Add description here."""
@@ -83,19 +86,12 @@ def make_ppo_polcy_network(
     )
 
 
-def make_ppo_critic_network(
-    network: networks_lib.FeedForwardNetwork, params: Dict[str, jnp.ndarray]
-) -> PPONetworks:
-    """TODO: Add description here."""
-    return PPONetworks(network=network, params=params)
-
-
 def make_networks(
     spec: specs.EnvironmentSpec,
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int] = (64, 64),
     value_layer_sizes: Sequence[int] = (64, 64),
-) -> Tuple[PPONetworks, PPONetworks]:
+) -> PPONetworks:
     """TODO: Add description here."""
     if isinstance(spec.actions, specs.DiscreteArray):
         return make_discrete_networks(
@@ -117,48 +113,36 @@ def make_discrete_networks(
     key: networks_lib.PRNGKey,
     policy_layer_sizes: Sequence[int],
     value_layer_sizes: Sequence[int],
-) -> Tuple[PPONetworks, PPONetworks]:
+) -> PPONetworks:
     """TODO: Add description here."""
 
     num_actions = environment_spec.actions.num_values
 
-    def policy_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-        policy_network = hk.Sequential(
+    # TODO: Investigate if one forward_fn function is slower
+    # than having a policy_fn and critic_fn. Maybe jit solves
+    # this issue. Having one makes obs network calculations
+    # easier.
+    def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
+        policy_value_network = hk.Sequential(
             [
                 utils.batch_concat,
                 hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
                 networks_lib.CategoricalValueHead(num_values=num_actions),
             ]
         )
-        return policy_network(inputs)
-
-    def critic_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-        value_network = hk.Sequential(
-            [
-                utils.batch_concat,
-                hk.nets.MLP(value_layer_sizes, activation=jnp.tanh),
-                hk.Linear(1),
-                lambda x: jnp.squeeze(x, axis=-1),
-            ]
-        )
-        return value_network(inputs)
+        return policy_value_network(inputs)
 
     # Transform into pure functions.
-    policy_fn = hk.without_apply_rng(hk.transform(policy_fn))
-    critic_fn = hk.without_apply_rng(hk.transform(critic_fn))
+    forward_fn = hk.without_apply_rng(hk.transform(forward_fn))
 
     dummy_obs = utils.zeros_like(environment_spec.observations.observation)
     dummy_obs = utils.add_batch_dim(dummy_obs)  # Dummy 'sequence' dim.
 
-    policy_key, key = jax.random.split(key)
-    policy_params = policy_fn.init(policy_key, dummy_obs)  # type: ignore
-    critic_key, key = jax.random.split(key)
-    critic_params = critic_fn.init(critic_key, dummy_obs)  # type: ignore
+    network_key, key = jax.random.split(key)
+    params = forward_fn.init(network_key, dummy_obs)  # type: ignore
 
     # Create PPONetworks to add functionality required by the agent.
-    policy_network = make_ppo_polcy_network(network=policy_fn, params=policy_params)
-    critic_network = make_ppo_critic_network(network=critic_fn, params=critic_params)
-    return policy_network, critic_network
+    return make_ppo_network(network=forward_fn, params=params)
 
 
 def make_default_networks(
@@ -206,8 +190,7 @@ def make_default_networks(
     #         key: critic_networks_layer_sizes for key in specs.keys()
     #     }
 
-    policy_networks: Dict[str, Any] = {}
-    critic_networks: Dict[str, Any] = {}
+    networks: Dict[str, Any] = {}
     for net_key in specs.keys():
         # Get the number of actions
         # num_actions = (
@@ -215,11 +198,8 @@ def make_default_networks(
         #     if isinstance(specs[net_key].actions, dm_env.specs.DiscreteArray)
         #     else np.prod(specs[net_key].actions.shape, dtype=int)
         # )
-        policy_networks[net_key], critic_networks[net_key] = make_networks(
-            specs[net_key], key=rng_key
-        )
+        networks[net_key] = make_networks(specs[net_key], key=rng_key)
 
     return {
-        "policy_networks": policy_networks,
-        "critic_networks": critic_networks,
+        "networks": networks,
     }

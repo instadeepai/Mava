@@ -16,7 +16,7 @@
 """Trainer components for system builders."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Union
+from typing import Dict, List, Union
 
 from mava.components.jax import Component
 from mava.core_jax import SystemBuilder
@@ -76,7 +76,7 @@ class TrainerProcess(Component):
         # Check that all agent_net_keys are in trainer_networks
         assert unique_net_keys == unique_trainer_net_keys
         # Setup specs for each network
-        self._net_spec_keys: Dict[str, Any] = {}
+        builder.store.net_spec_keys = {}
         for i in range(len(unique_net_keys)):
             builder.store.net_spec_keys[unique_net_keys[i]] = builder.store.agents[
                 i % len(builder.store.agents)
@@ -96,14 +96,9 @@ class TrainerProcess(Component):
                     matches = most_matches
                     builder.store.table_network_config[trainer_key] = sample
 
-    def on_building_trainer_start(self, builder: SystemBuilder) -> None:
-        """_summary_"""
-        builder.store.networks = builder.store.network_factory(
-            environment_spec=builder.store.environment_spec,
-            agent_net_keys=builder.store.agent_net_keys,
-            net_spec_keys=builder.store.net_spec_keys,
-        )
+        builder.store.networks = builder.store.network_factory()
 
+    @property
     def name(self) -> str:
         """_summary_"""
         return "trainer"

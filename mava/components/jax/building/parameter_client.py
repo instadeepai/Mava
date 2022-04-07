@@ -67,10 +67,12 @@ class ExecutorParameterClient(BaseParameterClient):
         # Create policy parameters
         params = {}
         get_keys = []
-        net_type_key = "policy_networks"
-        for net_key in builder.store.policy_networks.keys():
-            param_key = f"{net_key}_{net_type_key}"
-            params[param_key] = builder.store.policy_networks[net_key].params
+        net_type_key = "networks"
+        for agent_net_key in builder.store.networks[net_type_key].keys():
+            param_key = f"{net_type_key}-{agent_net_key}"
+            params[param_key] = builder.store.networks[net_type_key][
+                agent_net_key
+            ].params
             get_keys.append(param_key)
 
         count_names, params = self._set_up_count_parameters(params=params)
@@ -131,14 +133,14 @@ class TrainerParameterClient(BaseParameterClient):
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
         for net_type_key in builder.store.networks.keys():
-            for net_key in builder.store.networks[net_type_key].keys():
-                params[f"{net_key}_{net_type_key}"] = builder.store.networks[
+            for agent_net_key in builder.store.networks[net_type_key].keys():
+                params[f"{net_type_key}-{agent_net_key}"] = builder.store.networks[
                     net_type_key
-                ][net_key].parameters
-                if net_key in set(builder.store.trainer_networks):
-                    set_keys.append(f"{net_key}_{net_type_key}")
+                ][agent_net_key].params
+                if agent_net_key in set(builder.store.trainer_networks):
+                    set_keys.append(f"{net_type_key}-{agent_net_key}")
                 else:
-                    get_keys.append(f"{net_key}_{net_type_key}")
+                    get_keys.append(f"{net_type_key}-{agent_net_key}")
 
         count_names, params = self._set_up_count_parameters(params=params)
 
@@ -146,15 +148,17 @@ class TrainerParameterClient(BaseParameterClient):
         builder.store.trainer_counts = {name: params[name] for name in count_names}
 
         # Create parameter client
-        parameter_client = ParameterClient(
-            client=builder.store.system_parameter_server,
-            parameters=params,
-            get_keys=get_keys,
-            set_keys=set_keys,
-        )
+        parameter_client = None
+        if builder.store.system_parameter_server:
+            parameter_client = ParameterClient(
+                client=builder.store.system_parameter_server,
+                parameters=params,
+                get_keys=get_keys,
+                set_keys=set_keys,
+            )
 
-        # Get all the initial parameters
-        parameter_client.get_all_and_wait()
+            # Get all the initial parameters
+            parameter_client.get_all_and_wait()
 
         builder.store.trainer_parameter_client = parameter_client
 

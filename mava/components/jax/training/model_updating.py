@@ -16,11 +16,14 @@
 """Trainer components for system updating."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import jax
 import jax.numpy as jnp
 import optax
+from acme.jax import networks as networks_lib
+from jax.random import KeyArray
+from optax._src import base as optax_base
 
 from mava.components.jax.training import Batch, Utility
 from mava.core_jax import SystemTrainer
@@ -31,6 +34,7 @@ class MAPGMinibatchUpdateConfig:
     learning_rate: float = 1e-3
     adam_epsilon: float = 1e-5
     max_gradient_norm: float = 0.5
+    optimizer: Optional[optax_base.GradientTransformation] = (None,)
 
 
 class MAPGMinibatchUpdate(Utility):
@@ -47,15 +51,29 @@ class MAPGMinibatchUpdate(Utility):
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """_summary_"""
-        grad_fn = trainer.store.grad_fn
-        optimizer = optax.chain(
-            optax.clip_by_global_norm(self.config.max_gradient_norm),
-            optax.scale_by_adam(eps=self.config.adam_epsilon),
-            optax.scale(-self.config.learning_rate),
-        )
+
+        if not self.config.optimizer:
+            trainer.store.optimizer = optax.chain(
+                optax.clip_by_global_norm(self.config.max_gradient_norm),
+                optax.scale_by_adam(eps=self.config.adam_epsilon),
+                optax.scale(-self.config.learning_rate),
+            )
+        else:
+            trainer.store.optimizer = self.config.optimizer
+
+        # Initialize optimizers.
+
+        # TODO (dries): Implement for multiple policy and critic networks.
+        assert len(trainer.store.networks["networks"]) == 1
+
+        network = list(trainer.store.networks["networks"].values())[0]
+
+        trainer.store.opt_state = trainer.store.optimizer.init(
+            network.params
+        )  # pytype: disable=attribute-error
 
         def model_update_minibatch(
-            carry: Tuple[Any, optax.OptState], minibatch: Batch
+            carry: Tuple[networks_lib.Params, optax.OptState], minibatch: Batch
         ) -> Tuple[Tuple[Any, optax.OptState], Dict[str, jnp.ndarray]]:
             """Performs model update for a single minibatch."""
             params, opt_state = carry
@@ -63,7 +81,11 @@ class MAPGMinibatchUpdate(Utility):
             advantages = (
                 minibatch.advantages - jnp.mean(minibatch.advantages, axis=0)
             ) / (jnp.std(minibatch.advantages, axis=0) + 1e-8)
-            gradients, metrics = grad_fn(
+
+            # TODO (dries): Implement this for the multiagent case.
+            net_key = list(trainer.store.networks["networks"].keys())[0]
+
+            gradients, metrics = trainer.store.grad_fn(
                 params,
                 minibatch.observations,
                 minibatch.actions,
@@ -74,8 +96,12 @@ class MAPGMinibatchUpdate(Utility):
             )
 
             # Apply updates
-            updates, opt_state = optimizer.update(gradients, opt_state)
-            params = optax.apply_updates(params, updates)
+            updates, trainer.store.opt_state = trainer.store.optimizer.update(
+                gradients, opt_state
+            )
+            trainer.store.networks["networks"][net_key].params = optax.apply_updates(
+                params, updates
+            )
 
             metrics["norm_grad"] = optax.global_norm(gradients)
             metrics["norm_updates"] = optax.global_norm(updates)
@@ -114,12 +140,14 @@ class MAPGEpochUpdate(Utility):
 
     def on_training_utility_fns(self, trainer: SystemTrainer) -> None:
         """_summary_"""
+        trainer.store.num_epochs = self.config.num_epochs
+        trainer.store.num_minibatches = self.config.num_minibatches
 
         def model_update_epoch(
-            carry: Tuple[jnp.ndarray, Any, optax.OptState, Batch],
+            carry: Tuple[KeyArray, Any, optax.OptState, Batch],
             unused_t: Tuple[()],
         ) -> Tuple[
-            Tuple[jnp.ndarray, Any, optax.OptState, Batch],
+            Tuple[KeyArray, Any, optax.OptState, Batch],
             Dict[str, jnp.ndarray],
         ]:
             """Performs model updates based on one epoch of data."""
@@ -137,7 +165,7 @@ class MAPGEpochUpdate(Utility):
             )
 
             (params, opt_state), metrics = jax.lax.scan(
-                trainer.store.model_update_minibatch,
+                trainer.store.minibatch_update_fn,
                 (params, opt_state),
                 minibatches,
                 length=self.config.num_minibatches,

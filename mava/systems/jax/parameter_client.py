@@ -54,7 +54,7 @@ class ParameterClient:
         # TODO: (Dries/Arnu): check this
         if len(self._devices) and isinstance(list(self._devices.values())[0], str):
             for key, device in self._devices.items():
-                self._devices[key] = jax.devices(device)[0]
+                self._devices[key] = jax.devices(device)[0]  # type: ignore
 
         self._request = lambda: client.get_parameters(self._get_keys)
         self._request_all = lambda: client.get_parameters(self._all_keys)
@@ -215,7 +215,7 @@ class ParameterClient:
             elif isinstance(new_parameters[key], np.ndarray):
                 if self._devices:
                     self._parameters[key] = jax.device_put(
-                        new_parameters[key], self._devices[key]
+                        new_parameters[key], self._devices[key]  # type: ignore
                     )
                 else:
                     self._parameters[key] = new_parameters[key]

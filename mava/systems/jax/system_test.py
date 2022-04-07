@@ -15,15 +15,38 @@
 
 
 """Tests for Jax-based Mava system implementation."""
+import functools
 from dataclasses import dataclass, field
 from typing import List
 
+import acme
+import optax
 import pytest
 
 from mava.components.jax import Component
+from mava.components.jax.building.adders import (
+    ParallelSequenceAdder,
+    ParallelSequenceAdderSignature,
+)
+from mava.components.jax.building.data_server import OnPolicyDataServer
+from mava.components.jax.building.datasets import TrajectoryDataset
+from mava.components.jax.building.distributor import Distributor
+from mava.components.jax.building.environments import ParallelExecutorEnvironmentLoop
+from mava.components.jax.building.loggers import Logger
+from mava.components.jax.building.networks import DefaultNetworks
+from mava.components.jax.building.parameter_client import (
+    ExecutorParameterClient,
+    TrainerParameterClient,
+)
+from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.core_jax import SystemBuilder
 from mava.specs import DesignSpec
+from mava.systems.jax import mappo
+from mava.systems.jax.mappo import EXECUTOR_SPEC, TRAINER_SPEC
+from mava.systems.jax.mappo.components import ExtrasLogProbSpec
 from mava.systems.jax.system import System
+from mava.utils.environments import debugging_utils
+from mava.utils.loggers import logger_utils
 
 
 # Mock components
@@ -359,3 +382,107 @@ def test_system_build_two_component_params(
     system_with_two_components.build(param_0=2, param_3=False)
     assert system_with_two_components._builder.store.int_plus_str == 3
     assert system_with_two_components._builder.store.float_plus_bool == 1.2
+
+
+#########################################################################
+# Full system integration test.
+class TestFullSystem(System):
+    def design(self) -> DesignSpec:
+        """Mock system design with zero components.
+
+        Returns:
+            system callback components
+        """
+        executor = EXECUTOR_SPEC.get()
+        trainer = TRAINER_SPEC.get()
+        components = DesignSpec(
+            data_server=OnPolicyDataServer,
+            data_server_adder_signature=ParallelSequenceAdderSignature,
+            extras_spec=ExtrasLogProbSpec,
+            parameter_server=DefaultParameterServer,
+            executor_parameter_client=ExecutorParameterClient,
+            **executor,
+            executor_environment_loop=ParallelExecutorEnvironmentLoop,
+            executor_adder=ParallelSequenceAdder,
+            networks=DefaultNetworks,
+            **trainer,
+            distributor=Distributor,
+            trainer_parameter_client=TrainerParameterClient,
+            trainer_dataset=TrajectoryDataset,
+            logger=Logger,
+        )
+        return components
+
+
+@pytest.fixture
+def test_full_system() -> System:
+    """Add description here."""
+    return TestFullSystem()
+
+
+def test_except_trainer(
+    test_full_system: System,
+) -> None:
+    """Test if the parameter server instantiates processes as expected."""
+
+    # Environment.
+    environment_factory = functools.partial(
+        debugging_utils.make_environment,
+        env_name="simple_spread",
+        action_space="discrete",
+    )
+
+    # Networks.
+    network_factory = mappo.make_default_networks
+
+    # Checkpointer appends "Checkpoints" to checkpoint_dir.
+    base_dir = "~/mava"
+    mava_id = "12345"
+    checkpoint_subpath = f"{base_dir}/{mava_id}"
+
+    # Log every [log_every] seconds.
+    log_every = 10
+    logger_factory = functools.partial(
+        logger_utils.make_logger,
+        directory=base_dir,
+        to_terminal=True,
+        to_tensorboard=True,
+        time_stamp=mava_id,
+        time_delta=log_every,
+    )
+
+    # Optimizer.
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(40.0), optax.scale_by_adam(), optax.scale(-1e-4)
+    )
+
+    # Build the system
+    test_full_system.build(
+        environment_factory=environment_factory,
+        network_factory=network_factory,
+        logger_factory=logger_factory,
+        checkpoint_subpath=checkpoint_subpath,
+        optimizer=optimizer,
+        executor_parameter_update_period=20,
+        multi_process=False,
+        run_evaluator=True,
+        num_executors=1,
+        use_next_extras=False,
+        sample_batch_size=2,
+    )
+
+    (
+        data_server,
+        parameter_server,
+        executor,
+        evaluator,
+        trainer,
+    ) = test_full_system._builder.store.system_build
+
+    assert isinstance(executor, acme.core.Worker)
+
+    # Step the executor
+    executor.run_episode()
+
+    # Step the trainer
+    trainer.step()

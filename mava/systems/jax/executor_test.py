@@ -211,8 +211,8 @@ class TestSystemExceptTrainer(System):
             executor_environment_loop=mocks.MockExecutorEnvironmentLoop,
             executor_adder=ParallelSequenceAdder,
             networks=DefaultNetworks,
-            trainer_parameter_client=mocks.MockTrainerParameterClient,
             distributor=Distributor,
+            trainer_parameter_client=mocks.MockTrainerParameterClient,
             logger=mocks.MockLogger,
             trainer=mocks.MockTrainer,
             trainer_dataset=mocks.MockTrainerDataset,
@@ -262,18 +262,5 @@ def test_except_trainer(
 
     assert isinstance(executor, acme.core.Worker)
 
-    # Save the executor policy
-
-    parameters = executor._executor.store.executor_parameter_client._parameters
-
-    # Change a variable in the policy network
-    parameter_server.set_parameters(
-        {"evaluator_steps": np.full(1, 1234, dtype=np.int32)}
-    )
-
     # Step the executor
     executor.run_episode()
-
-    # Check if the executor variable has changed.
-    parameters = executor._executor.store.executor_parameter_client._parameters
-    assert parameters["evaluator_steps"][0] == 1234
