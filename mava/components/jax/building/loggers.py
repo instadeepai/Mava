@@ -40,7 +40,8 @@ class Logger(Component):
     def on_building_executor_logger(self, builder: SystemBuilder) -> None:
         """[summary]"""
         logger_config = self.config.logger_config if self.config.logger_config else {}
-        name = "executor" if builder.store.executor_id != "evaluator" else "evaluator"
+        name = "executor" if not builder.store.is_evaluator else "evaluator"
+
         if self.config.logger_config and name in self.config.logger_config:
             logger_config = self.config.logger_config[name]
 

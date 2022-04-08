@@ -16,7 +16,7 @@
 """Tests for config class for Jax-based Mava systems"""
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pytest
@@ -132,7 +132,7 @@ class MockDistributor(Component):
 
 
 class TestSystemWithParallelSequenceAdder(System):
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
         Returns:
@@ -148,7 +148,7 @@ class TestSystemWithParallelSequenceAdder(System):
             setup=MockTestSetup,
             distributor=MockDistributor,
         )
-        return components
+        return components, {}
 
 
 @pytest.fixture

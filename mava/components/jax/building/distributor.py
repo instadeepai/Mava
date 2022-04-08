@@ -72,7 +72,7 @@ class Distributor(Component):
         for executor_id in range(self.config.num_executors):
             builder.store.program.add(
                 builder.executor,
-                [executor_id, data_server, parameter_server],
+                [f"executor_{executor_id}", data_server, parameter_server],
                 node_type=NodeType.corrier,
                 name="executor",
             )
@@ -98,7 +98,7 @@ class Distributor(Component):
         if not self.config.multi_process:
             builder.store.system_build = builder.store.program.get_nodes()
 
-    def on_building_launch_distributor(self, builder: SystemBuilder) -> None:
+    def on_building_launch(self, builder: SystemBuilder) -> None:
         """_summary_
 
         Args:

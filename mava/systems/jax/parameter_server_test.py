@@ -16,6 +16,7 @@
 """Tests for parameter server class for Jax-based Mava systems"""
 
 import functools
+from typing import Dict, Tuple
 
 import numpy as np
 import pytest
@@ -29,7 +30,7 @@ from mava.utils.environments import debugging_utils
 
 
 class TestSystem(System):
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
         Returns:
@@ -50,7 +51,7 @@ class TestSystem(System):
             trainer_dataset=mocks.MockTrainerDataset,
             distributor=mocks.MockDistributor,
         )
-        return components
+        return components, {}
 
 
 @pytest.fixture

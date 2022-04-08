@@ -27,7 +27,7 @@ class BaseSystem(abc.ABC):
     """Abstract system object."""
 
     @abc.abstractmethod
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """System design specifying the list of components to use.
 
         Returns:

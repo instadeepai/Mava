@@ -81,7 +81,6 @@ class ParallelExecutorEnvironmentLoop(ExecutorEnvironmentLoop):
             logger=builder.store.executor_logger,
             should_update=self.config.should_update,
         )
-        if builder.store.executor_id == "evaluator":
-            builder.store.system_evaluator = executor_environment_loop
-        else:
-            builder.store.system_executor = executor_environment_loop
+        del builder.store.executor_logger
+
+        builder.store.system_executor = executor_environment_loop

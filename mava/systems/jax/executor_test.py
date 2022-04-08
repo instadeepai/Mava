@@ -16,6 +16,7 @@
 """Tests for executor class for Jax-based Mava systems"""
 
 import functools
+from typing import Dict, Tuple
 
 import acme
 import numpy as np
@@ -42,7 +43,7 @@ from mava.utils.environments import debugging_utils
 #########################################################################
 # Test executor in isolation.
 class TestSystemExecutor(System):
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
         Returns:
@@ -64,7 +65,7 @@ class TestSystemExecutor(System):
             trainer_dataset=mocks.MockTrainerDataset,
             distributor=mocks.MockDistributor,
         )
-        return components
+        return components, {}
 
 
 @pytest.fixture
@@ -110,7 +111,7 @@ def test_executor(
 #########################################################################
 # Intergration test for the executor, variable_client and variable_server.
 class TestSystemExecutorAndParameterSever(System):
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
         Returns:
@@ -132,7 +133,7 @@ class TestSystemExecutorAndParameterSever(System):
             trainer_dataset=mocks.MockTrainerDataset,
             distributor=mocks.MockDistributor,
         )
-        return components
+        return components, {}
 
 
 @pytest.fixture
@@ -194,7 +195,7 @@ def test_executor_parameter_server(
 # Intergration test for the executor, adder, data_server, variable_client
 # and variable_server.
 class TestSystemExceptTrainer(System):
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
         Returns:
@@ -217,7 +218,7 @@ class TestSystemExceptTrainer(System):
             trainer=mocks.MockTrainer,
             trainer_dataset=mocks.MockTrainerDataset,
         )
-        return components
+        return components, {}
 
 
 @pytest.fixture

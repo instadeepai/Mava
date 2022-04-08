@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """General launcher for systems"""
-from typing import Any, List, Union
+from typing import Any, Dict, List, Union
 
 import launchpad as lp
 import reverb
@@ -35,22 +35,35 @@ class Launcher:
         self,
         multi_process: bool,
         nodes_on_gpu: List = [],
+        sp_trainer_period: int = 10,
+        sp_evaluator_period: int = 10,
         name: str = "System",
     ) -> None:
         """_summary_
 
         Args:
-            multi_process : _description_
+            multi_process : _description_.
             nodes_on_gpu : _description_.
+            sp_trainer_period : _description_.
+            sp_evaluator_period : _description_.
             name : _description_.
         """
         self._multi_process = multi_process
         self._name = name
+        self._sp_trainer_period = sp_trainer_period
+        self._sp_evaluator_period = sp_evaluator_period
         if multi_process:
             self._program = lp.Program(name=name)
             self._nodes_on_gpu = nodes_on_gpu
         else:
             self._nodes: List = []
+            self._node_dict: Dict = {
+                "data_server": None,
+                "parameter_server": None,
+                "executor": None,
+                "evaluator": None,
+                "trainer": None,
+            }
 
     def add(
         self,
@@ -81,13 +94,25 @@ class Launcher:
                 node = self._program.add_node(node_type(node_fn, *arguments))
             return node
         else:
+            if name not in self._node_dict:
+                raise ValueError(
+                    f"{name} is not a valid node name."
+                    + "Single process currently only supports "
+                    + "nodes named: {list(self._node_dict.keys())}"
+                )
+            elif self._node_dict[name] is not None:
+                raise ValueError(
+                    f"Node named {name} initialised more than onces."
+                    + "Single process currently only supports one node per type."
+                )
+
             process = node_fn(*arguments)
             if node_type == lp.ReverbNode:
-
                 # Assigning server to self to keep it alive.
                 self._replay_server = reverb.Server(process, port=None)
                 process = reverb.Client(f"localhost:{self._replay_server.port}")
             self._nodes.append(process)
+            self._node_dict[name] = process
             return process
 
     def get_nodes(self) -> List[Any]:
@@ -116,4 +141,30 @@ class Launcher:
                 local_resources=local_resources,
             )
         else:
-            raise NotImplementedError("Single process launching not implemented yet.")
+            episode = 1
+            executor_steps = 0
+
+            _ = self._node_dict["data_server"]
+            _ = self._node_dict["parameter_server"]
+            executor = self._node_dict["executor"]
+            evaluator = self._node_dict["evaluator"]
+            trainer = self._node_dict["trainer"]
+
+            while True:
+                executor_stats = executor.run_episode()
+                executor._logger.write(executor_stats)
+
+                # TODO (dries): Remove this False.
+                if episode % self._sp_trainer_period == 0 and False:
+                    _ = trainer.step()  # logging done in trainer
+                    print("Performed trainer step.")
+                if episode % self._sp_evaluator_period == 0:
+                    evaluator_stats = evaluator.run_episode()
+
+                    # TODO (dries): Do logging inside run_episode().
+                    evaluator._logger.write(evaluator_stats)
+                    print("Performed evaluator run.")
+
+                print(f"Episode {episode} completed.")
+                episode += 1
+                executor_steps += executor_stats["episode_length"]

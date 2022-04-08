@@ -12,12 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """Tests for Jax-based Mava system implementation."""
 import functools
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List, Tuple
 
 import acme
 import optax
@@ -182,18 +180,18 @@ class MockDistributorComponent(Component):
 
 
 class TestSystemWithZeroComponents(System):
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
         Returns:
             system callback components
         """
         components = DesignSpec(distributor=MockDistributorComponent)
-        return components
+        return components, {}
 
 
 class TestSystemWithOneComponent(System):
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with one component.
 
         Returns:
@@ -202,11 +200,11 @@ class TestSystemWithOneComponent(System):
         components = DesignSpec(
             main_component=ComponentZero, distributor=MockDistributorComponent
         )
-        return components
+        return components, {}
 
 
 class TestSystemWithTwoComponents(System):
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with two components.
 
         Returns:
@@ -217,7 +215,7 @@ class TestSystemWithTwoComponents(System):
             sub_component=ComponentOne,
             distributor=MockDistributorComponent,
         )
-        return components
+        return components, {}
 
 
 # Test fixtures
@@ -387,7 +385,7 @@ def test_system_build_two_component_params(
 #########################################################################
 # Full system integration test.
 class TestFullSystem(System):
-    def design(self) -> DesignSpec:
+    def design(self) -> Tuple[DesignSpec, Dict]:
         """Mock system design with zero components.
 
         Returns:
@@ -411,7 +409,7 @@ class TestFullSystem(System):
             trainer_dataset=TrajectoryDataset,
             logger=Logger,
         )
-        return components
+        return components, {}
 
 
 @pytest.fixture

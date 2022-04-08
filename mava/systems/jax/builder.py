@@ -112,13 +112,13 @@ class Builder(SystemBuilder, BuilderHookMixin):
         self.store.executor_id = executor_id
         self.store.data_server_client = data_server_client
         self.store.parameter_server_client = parameter_server_client
-        self.store.evaluator = self.store.executor_id == "evaluator"
+        self.store.is_evaluator = self.store.executor_id == "evaluator"
 
         # start of making the executor
         self.on_building_executor_start()
 
         # make adder if required
-        if not self.store.evaluator:
+        if not self.store.is_evaluator:
             # make adder signature
             self.on_building_executor_adder_priority()
 

@@ -303,6 +303,8 @@ class MockExecutorEnvironmentLoop(Callback):
             logger=builder.store.executor_logger,
             should_update=self.config.should_update,
         )
+        del builder.store.executor_logger
+
         if builder.store.executor_id == "evaluator":
             builder.store.system_evaluator = executor_environment_loop
         else:

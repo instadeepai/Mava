@@ -68,6 +68,8 @@ class MAPGMinibatchUpdate(Utility):
 
         network = list(trainer.store.networks["networks"].values())[0]
 
+        # TODO (dries): Use one optimizer per network type here and not
+        # just one.
         trainer.store.opt_state = trainer.store.optimizer.init(
             network.params
         )  # pytype: disable=attribute-error
@@ -105,6 +107,8 @@ class MAPGMinibatchUpdate(Utility):
             for agent_key in trainer.store.trainer_agents:
                 agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
                 # Apply updates
+                # TODO (dries): Use one optimizer per network type here and not
+                # just one.
                 updates, trainer.store.opt_state = trainer.store.optimizer.update(
                     gradients[agent_key], opt_state
                 )
