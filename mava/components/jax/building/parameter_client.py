@@ -81,12 +81,13 @@ class ExecutorParameterClient(BaseParameterClient):
         builder.store.executor_counts = {name: params[name] for name in count_names}
 
         parameter_client = None
-        if builder.store.system_parameter_server:
+        if builder.store.parameter_server_client:
             # Create parameter client
             parameter_client = ParameterClient(
-                client=builder.store.system_parameter_server,
+                client=builder.store.parameter_server_client,
                 parameters=params,
                 get_keys=get_keys,
+                set_keys=[],
                 update_period=self.config.executor_parameter_update_period,
             )
 
@@ -132,12 +133,13 @@ class TrainerParameterClient(BaseParameterClient):
         get_keys = []
         # TODO (dries): Only add the networks this trainer is working with.
         # Not all of them.
+        trainer_networks = builder.store.trainer_networks[builder.store.trainer_id]
         for net_type_key in builder.store.networks.keys():
             for agent_net_key in builder.store.networks[net_type_key].keys():
                 params[f"{net_type_key}-{agent_net_key}"] = builder.store.networks[
                     net_type_key
                 ][agent_net_key].params
-                if agent_net_key in set(builder.store.trainer_networks):
+                if agent_net_key in set(trainer_networks):
                     set_keys.append(f"{net_type_key}-{agent_net_key}")
                 else:
                     get_keys.append(f"{net_type_key}-{agent_net_key}")
@@ -149,9 +151,9 @@ class TrainerParameterClient(BaseParameterClient):
 
         # Create parameter client
         parameter_client = None
-        if builder.store.system_parameter_server:
+        if builder.store.parameter_server_client:
             parameter_client = ParameterClient(
-                client=builder.store.system_parameter_server,
+                client=builder.store.parameter_server_client,
                 parameters=params,
                 get_keys=get_keys,
                 set_keys=set_keys,

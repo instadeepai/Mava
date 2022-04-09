@@ -15,6 +15,7 @@
 
 """Trainer components for gradient step calculations."""
 
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
@@ -56,6 +57,23 @@ class DefaultStep(Component):
 
         # Update our counts and record it.
         # counts = self._counter.increment(steps=1) # TODO: add back in later
+
+        # TODO (dries): Confirm that this is the correctly place to put the
+        # variable client code.
+        timestamp = time.time()
+        elapsed_time = (
+            timestamp - trainer.store.timestamp
+            if hasattr(trainer.store, "timestamp")
+            else 0
+        )
+        trainer.store.timestamp = timestamp
+
+        trainer.store.trainer_parameter_client.add_async(
+            {"trainer_steps": 1, "trainer_walltime": elapsed_time},
+        )
+
+        # Update the variable source and the trainer
+        trainer.store.trainer_parameter_client.set_and_get_async()
 
         # Snapshot and attempt to write logs.
         # self._logger.write({**results, **counts})
@@ -187,17 +205,26 @@ class MAPGWithTrustRegionStep(Step):
             params = {net_key: networks[net_key].params for net_key in networks.keys()}
             opt_state = trainer.store.opt_state
 
-            (trainer.store.key, new_params, opt_state, _,), metrics = jax.lax.scan(
+            (new_key, new_params, new_opt_state, _,), metrics = jax.lax.scan(
                 trainer.store.epoch_update_fn,
                 (random_key, params, opt_state, batch),
                 (),
                 length=trainer.store.num_epochs,
             )
 
-            # Update the network weights
-            for net_key in params.keys():
-                trainer.store.networks["networks"][net_key].params = new_params[net_key]
+            # Set the new variables
+            # TODO (dries): key and opt_state is probably not being store correctly.
+            # The variable client might lose reference to it when checkpointing.
+            trainer.store.key = new_key
+            trainer.store.opt_state = new_opt_state
 
+            for net_key in params.keys():
+                # This below forloop is needed to not lose the param reference.
+                net_params = trainer.store.networks["networks"][net_key].params
+                for param_key in net_params.keys():
+                    net_params[param_key] = new_params[net_key][param_key]
+
+            # Set the metrics
             metrics = jax.tree_map(jnp.mean, metrics)
             metrics["norm_params"] = optax.global_norm(params)
             metrics["observations_mean"] = jnp.mean(

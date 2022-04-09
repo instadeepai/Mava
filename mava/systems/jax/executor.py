@@ -48,6 +48,8 @@ class Executor(SystemExecutor, ExecutorHookMixin):
 
         self.on_execution_init_end()
 
+        self._evaluator = self.store.is_evaluator
+
     def observe_first(
         self,
         timestep: dm_env.TimeStep,

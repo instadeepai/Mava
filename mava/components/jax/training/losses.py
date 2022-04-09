@@ -60,10 +60,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
             """Surrogate loss using clipped probability ratios."""
 
             # TODO (dries): Fix this statefull assignment. Use jax.lax.switch
-            # instead per agent.
-            network = trainer.store.networks["networks"][
-                trainer.store.current_agent_net_key
-            ]
+            # instead per agent. For now this is hardcoded.
+            # Was this: trainer.store.current_agent_net_key
+            network = trainer.store.networks["networks"]["network_agent"]
             distribution_params, values = network.network.apply(params, observations)
             log_probs = network.log_prob(distribution_params, actions)
             entropy = network.entropy(distribution_params)

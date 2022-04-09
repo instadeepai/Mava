@@ -16,7 +16,7 @@
 """Execution components for system builders"""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import jax
 
@@ -31,6 +31,7 @@ class ExecutorProcessConfig:
     network_sampling_setup: Union[
         List, enums.NetworkSampler
     ] = enums.NetworkSampler.fixed_agent_networks
+    interval: Optional[dict] = None
 
 
 class ExecutorInit(Component):
@@ -121,6 +122,10 @@ class ExecutorInit(Component):
         }
 
         builder.store.networks = builder.store.network_factory()
+
+    def on_execution_init_start(self, executor: SystemExecutor) -> None:
+        """_summary_"""
+        executor._interval = self.config.interval  # type: ignore
 
     @property
     def name(self) -> str:

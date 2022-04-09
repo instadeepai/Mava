@@ -89,12 +89,10 @@ class Builder(SystemBuilder, BuilderHookMixin):
         # end of make parameter server
         self.on_building_parameter_server_end()
 
-        self.store.system_parameter_server = ParameterServer(
+        return ParameterServer(
             config=self.store,
             components=self.callbacks,
         )
-
-        return self.store.system_parameter_server
 
     def executor(
         self, executor_id: str, data_server_client: Any, parameter_server_client: Any
@@ -124,6 +122,8 @@ class Builder(SystemBuilder, BuilderHookMixin):
 
             # make rate limiter
             self.on_building_executor_adder()
+        else:
+            self.store.adder = None
 
         # make executor logger
         self.on_building_executor_logger()

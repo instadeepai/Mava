@@ -59,3 +59,10 @@ class Trainer(SystemTrainer, TrainerHookMixin):
         self.on_training_step()
 
         self.on_training_step_end()
+
+    def run(self) -> None:
+        """_summary_"""
+
+        # Run the trainer.
+        while True:
+            self.step()

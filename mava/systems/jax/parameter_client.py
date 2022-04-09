@@ -39,8 +39,9 @@ class ParameterClient:
     ):
         """Initialise the parameter server."""
         self._all_keys = sort_str_num(list(parameters.keys()))
-        self._get_keys = get_keys if get_keys is not None else self._all_keys
-        self._set_keys = set_keys if set_keys is not None else self._all_keys
+        # TODO (dries): Is the below change correct?
+        self._get_keys = get_keys if get_keys is not None else []
+        self._set_keys = set_keys if set_keys is not None else []
         self._parameters: Dict[str, Any] = parameters
         self._get_call_counter = 0
         self._set_call_counter = 0
@@ -200,18 +201,25 @@ class ParameterClient:
         """Copies the new parameters to the old ones."""
         for key in new_parameters.keys():
             if isinstance(new_parameters[key], dict):
-                for agent_key in new_parameters[key].keys():
-                    for type_key in self._parameters[key][agent_key].keys():
+                for type1_key in new_parameters[key].keys():
+                    for type2_key in self._parameters[key][type1_key].keys():
                         if self._devices:
                             # Move variables to a proper device.
-                            self._parameters[key][agent_key][type_key] = jax.device_put(
-                                new_parameters[key][agent_key][type_key],
-                                self._devices[key][agent_key],  # type: ignore
+                            # self._parameters[key][type1_key][
+                            #     type2_key
+                            # ] = jax.device_put(  # type: ignore
+                            #     new_parameters[key][type1_key],
+                            #     self._devices[key][type1_key],
+                            # )
+                            raise NotImplementedError(
+                                "Support for devices"
+                                + "have not been implemented"
+                                + "yet in the parameter client."
                             )
                         else:
-                            self._parameters[key][agent_key][type_key] = new_parameters[
-                                key
-                            ][agent_key][type_key]
+                            self._parameters[key][type1_key][
+                                type2_key
+                            ] = new_parameters[key][type1_key][type2_key]
             elif isinstance(new_parameters[key], np.ndarray):
                 if self._devices:
                     self._parameters[key] = jax.device_put(

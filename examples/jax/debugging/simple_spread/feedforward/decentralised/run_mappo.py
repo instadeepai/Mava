@@ -94,7 +94,7 @@ def main(_: Any) -> None:
         sample_batch_size=5,
         num_epochs=15,
         num_executors=1,
-        multi_process=False,
+        multi_process=True,
     )
 
     # Launch the system.

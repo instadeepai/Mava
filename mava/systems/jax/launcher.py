@@ -151,18 +151,13 @@ class Launcher:
             trainer = self._node_dict["trainer"]
 
             while True:
-                executor_stats = executor.run_episode()
-                executor._logger.write(executor_stats)
+                executor_stats = executor.run_episode_and_log()
 
-                # TODO (dries): Remove this False.
-                if episode % self._sp_trainer_period == 0 and False:
+                if episode % self._sp_trainer_period == 0:
                     _ = trainer.step()  # logging done in trainer
                     print("Performed trainer step.")
                 if episode % self._sp_evaluator_period == 0:
-                    evaluator_stats = evaluator.run_episode()
-
-                    # TODO (dries): Do logging inside run_episode().
-                    evaluator._logger.write(evaluator_stats)
+                    _ = evaluator.run_episode_and_log()
                     print("Performed evaluator run.")
 
                 print(f"Episode {episode} completed.")
