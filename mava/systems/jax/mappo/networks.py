@@ -137,7 +137,7 @@ def make_discrete_networks(
 
     # TODO (dries): Investigate if one forward_fn function is slower
     # than having a policy_fn and critic_fn. Maybe jit solves
-    # this issue. Having one makes obs network calculations
+    # this issue. Having one function makes obs network calculations
     # easier.
     def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
         policy_value_network = hk.Sequential(

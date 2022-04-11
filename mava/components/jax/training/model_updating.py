@@ -81,20 +81,15 @@ class MAPGMinibatchUpdate(Utility):
             )
 
             # Calculate the gradients and agent metrics.
-            gradients = {}
-            agent_metrics = {}
-            for agent_key in trainer.store.trainer_agents:
-                agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
-                # trainer.store.current_agent_net_key = agent_net_key
-                gradients[agent_key], agent_metrics[agent_key] = trainer.store.grad_fn(
-                    params[agent_net_key],
-                    minibatch.observations[agent_key].observation,
-                    minibatch.actions[agent_key],
-                    minibatch.behavior_log_probs[agent_key],
-                    minibatch.target_values[agent_key],
-                    advantages[agent_key],
-                    minibatch.behavior_values[agent_key],
-                )
+            gradients, agent_metrics = trainer.store.grad_fn(
+                params,
+                minibatch.observations,
+                minibatch.actions,
+                minibatch.behavior_log_probs,
+                minibatch.target_values,
+                advantages,
+                minibatch.behavior_values,
+            )
 
             # Update the networks and optimizors.
             metrics = {}
