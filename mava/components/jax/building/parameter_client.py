@@ -135,14 +135,22 @@ class TrainerParameterClient(BaseParameterClient):
         # Not all of them.
         trainer_networks = builder.store.trainer_networks[builder.store.trainer_id]
         for net_type_key in builder.store.networks.keys():
-            for agent_net_key in builder.store.networks[net_type_key].keys():
-                params[f"{net_type_key}-{agent_net_key}"] = builder.store.networks[
+            for net_key in builder.store.networks[net_type_key].keys():
+                params[f"{net_type_key}-{net_key}"] = builder.store.networks[
                     net_type_key
-                ][agent_net_key].params
-                if agent_net_key in set(trainer_networks):
-                    set_keys.append(f"{net_type_key}-{agent_net_key}")
+                ][net_key].params
+                if net_key in set(trainer_networks):
+                    set_keys.append(f"{net_type_key}-{net_key}")
                 else:
-                    get_keys.append(f"{net_type_key}-{agent_net_key}")
+                    get_keys.append(f"{net_type_key}-{net_key}")
+
+        # Add the optimizers to the variable server.
+        # TODO (dries): Adjust this if using policy and critic optimizers.
+        # TODO (dries): Add this back if we want the optimizer_state to
+        # be store in the variable source. However some code might
+        # need to be moved around as the builder currently does not
+        # have access to the opt_states yet.
+        # params["optimizer_state"] = trainer.store.opt_states
 
         count_names, params = self._set_up_count_parameters(params=params)
 

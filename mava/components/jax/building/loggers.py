@@ -29,6 +29,8 @@ class LoggerConfig:
     logger_config: Optional[Any] = None
 
 
+# TODO (dries): Fix executor_executor and evaluator_evaluator tensorboard logging.
+# It should only be executor and evaluator.
 class Logger(Component):
     def __init__(
         self,

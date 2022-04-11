@@ -246,6 +246,7 @@ class FeedforwardExecutorSelectAction(Component):
     # Select action
     def on_execution_select_action_compute(self, executor: SystemExecutor) -> None:
         """Summary"""
+
         agent = executor.store.agent
         network = executor.store.networks["networks"][
             executor.store.agent_net_keys[agent]
@@ -253,6 +254,10 @@ class FeedforwardExecutorSelectAction(Component):
 
         observation = executor.store.observation.observation.reshape((1, -1))
         rng_key, executor.store.key = jax.random.split(executor.store.key)
+
+        # TODO (dries): We are currently using jit in the networks per agent.
+        # We can also try jit over all the agents in a for loop. This would
+        # allow the jit function to save us even more time.
         executor.store.action_info, executor.store.policy_info = network.get_action(
             observation, rng_key
         )

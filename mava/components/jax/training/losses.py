@@ -18,6 +18,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple
 
+import jax
 import jax.numpy as jnp
 import rlax
 
@@ -29,8 +30,8 @@ from mava.core_jax import SystemTrainer
 class MAPGTrustRegionClippingLossConfig:
     clipping_epsilon: float = 0.2
     clip_value: bool = True
-    entropy_cost: float = 0.0
-    value_cost: float = 1.0
+    entropy_cost: float = 0.01
+    value_cost: float = 0.5
 
 
 class MAPGWithTrustRegionClippingLoss(Loss):
@@ -62,6 +63,9 @@ class MAPGWithTrustRegionClippingLoss(Loss):
             # TODO (dries): Fix this statefull assignment. Use jax.lax.switch
             # instead per agent. For now this is hardcoded.
             # Was this: trainer.store.current_agent_net_key
+
+            # TODO (dries): Just do this for all agents in a loop.
+
             network = trainer.store.networks["networks"]["network_agent"]
             distribution_params, values = network.network.apply(params, observations)
             log_probs = network.log_prob(distribution_params, actions)
@@ -109,4 +113,5 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                 "loss_entropy": entropy_loss,
             }
 
-        trainer.store.loss_fn = loss
+        # Create the gradient funciton.
+        trainer.store.grad_fn = jax.grad(loss, has_aux=True)

@@ -62,23 +62,17 @@ class MAPGMinibatchUpdate(Utility):
             trainer.store.optimizer = self.config.optimizer
 
         # Initialize optimizers.
-
-        # TODO (dries): Implement for multiple policy and critic networks.
-        assert len(trainer.store.networks["networks"]) == 1
-
-        network = list(trainer.store.networks["networks"].values())[0]
-
-        # TODO (dries): Use one optimizer per network type here and not
-        # just one.
-        trainer.store.opt_state = trainer.store.optimizer.init(
-            network.params
-        )  # pytype: disable=attribute-error
+        trainer.store.opt_states = {}
+        for net_key in trainer.store.networks["networks"].keys():
+            trainer.store.opt_states[net_key] = trainer.store.optimizer.init(
+                trainer.store.networks["networks"][net_key].params
+            )  # pytype: disable=attribute-error
 
         def model_update_minibatch(
             carry: Tuple[networks_lib.Params, optax.OptState], minibatch: Batch
         ) -> Tuple[Tuple[Any, optax.OptState], Dict[str, Any]]:
             """Performs model update for a single minibatch."""
-            params, opt_state = carry
+            params, opt_states = carry
 
             # Normalize advantages at the minibatch level before using them.
             advantages = jax.tree_map(
@@ -109,8 +103,8 @@ class MAPGMinibatchUpdate(Utility):
                 # Apply updates
                 # TODO (dries): Use one optimizer per network type here and not
                 # just one.
-                updates, trainer.store.opt_state = trainer.store.optimizer.update(
-                    gradients[agent_key], opt_state
+                updates, opt_states[agent_net_key] = trainer.store.optimizer.update(
+                    gradients[agent_key], opt_states[agent_net_key]
                 )
                 params[agent_net_key] = optax.apply_updates(
                     params[agent_net_key], updates
@@ -121,7 +115,7 @@ class MAPGMinibatchUpdate(Utility):
                 )
                 agent_metrics[agent_key]["norm_updates"] = optax.global_norm(updates)
                 metrics[agent_key] = agent_metrics
-            return (params, opt_state), metrics
+            return (params, opt_states), metrics
 
         trainer.store.minibatch_update_fn = model_update_minibatch
 
@@ -167,8 +161,8 @@ class MAPGEpochUpdate(Utility):
             Dict[str, jnp.ndarray],
         ]:
             """Performs model updates based on one epoch of data."""
-            key, params, opt_state, batch = carry
-            key, subkey = jax.random.split(key)
+            key, params, opt_states, batch = carry
+            new_key, subkey = jax.random.split(key)
             permutation = jax.random.permutation(subkey, self.config.batch_size)
 
             shuffled_batch = jax.tree_map(
@@ -181,14 +175,14 @@ class MAPGEpochUpdate(Utility):
                 shuffled_batch,
             )
 
-            (params, opt_state), metrics = jax.lax.scan(
+            (new_params, new_opt_states), metrics = jax.lax.scan(
                 trainer.store.minibatch_update_fn,
-                (params, opt_state),
+                (params, opt_states),
                 minibatches,
                 length=self.config.num_minibatches,
             )
 
-            return (key, params, opt_state, batch), metrics
+            return (new_key, new_params, new_opt_states, batch), metrics
 
         trainer.store.epoch_update_fn = model_update_epoch
 

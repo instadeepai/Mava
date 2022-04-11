@@ -59,7 +59,13 @@ def main(_: Any) -> None:
     )
 
     # Networks.
-    network_factory = mappo.make_default_networks
+    def network_factory(*args: Any, **kwargs: Any) -> Any:
+        return mappo.make_default_networks(  # type: ignore
+            policy_layer_sizes=(64, 64),
+            critic_layer_sizes=(512, 512, 256),
+            *args,
+            **kwargs,
+        )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_subpath = f"{FLAGS.base_dir}/{FLAGS.mava_id}"

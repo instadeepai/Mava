@@ -48,7 +48,14 @@ class PPOSystem(System):
         # Set the default configs
         # TODO (Arnu): Feel free to change this however you like.
         # Maybe moving it to config.py if you want.
-        default_params = {"use_next_extras": False}
+        default_params = {
+            "sample_batch_size": 512,
+            "sequence_length": 20,
+            "period": 10,
+            "use_next_extras": False,
+            # "entropy_cost": 0.0,
+            # "value_cost": 1.0,
+        }
 
         # Defualt components
         executor = EXECUTOR_SPEC.get()

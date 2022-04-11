@@ -25,9 +25,10 @@ import optax
 import reverb
 import tree
 from acme.jax import utils
+from jax import jit
 
 from mava.components.jax import Component
-from mava.components.jax.training import Batch, Step  # TrainingState
+from mava.components.jax.training import Batch, Step, TrainingState
 from mava.core_jax import SystemTrainer
 
 
@@ -109,7 +110,10 @@ class MAPGWithTrustRegionStep(Step):
     def on_training_step_fn(self, trainer: SystemTrainer) -> None:
         """_summary_"""
 
-        def sgd_step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
+        @jit
+        def sgd_step(
+            states: TrainingState, sample: reverb.ReplaySample
+        ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
             """Performs a minibatch SGD step, returning new state and metrics."""
 
             # Extract the data.
@@ -138,7 +142,7 @@ class MAPGWithTrustRegionStep(Step):
                     lambda x: jnp.reshape(x, [-1] + list(x.shape[2:])), observation
                 )
                 _, behavior_values = networks[net_key].network.apply(
-                    networks[net_key].params, o
+                    states.params[net_key], o
                 )
                 behavior_values = jnp.reshape(behavior_values, reward.shape[0:2])
                 return behavior_values
@@ -192,41 +196,16 @@ class MAPGWithTrustRegionStep(Step):
                 lambda x: x.reshape((batch_size,) + x.shape[2:]), trajectories
             )
 
-            # Compute gradients.
-            trainer.store.grad_fn = jax.grad(trainer.store.loss_fn, has_aux=True)
-
-            opt_state = trainer.store.opt_state
-            # Repeat training for the given number of epoch, taking a random
-            # permutation for every epoch.
-            random_key, trainer.store.key = jax.random.split(trainer.store.key)
-
-            # carry: Tuple[jnp.ndarray, Any, optax.OptState, Batch],
-            networks = trainer.store.networks["networks"]
-            params = {net_key: networks[net_key].params for net_key in networks.keys()}
-            opt_state = trainer.store.opt_state
-
-            (new_key, new_params, new_opt_state, _,), metrics = jax.lax.scan(
+            (new_key, new_params, new_opt_states, _,), metrics = jax.lax.scan(
                 trainer.store.epoch_update_fn,
-                (random_key, params, opt_state, batch),
+                (states.random_key, states.params, states.opt_states, batch),
                 (),
                 length=trainer.store.num_epochs,
             )
 
-            # Set the new variables
-            # TODO (dries): key and opt_state is probably not being store correctly.
-            # The variable client might lose reference to it when checkpointing.
-            trainer.store.key = new_key
-            trainer.store.opt_state = new_opt_state
-
-            for net_key in params.keys():
-                # This below forloop is needed to not lose the param reference.
-                net_params = trainer.store.networks["networks"][net_key].params
-                for param_key in net_params.keys():
-                    net_params[param_key] = new_params[net_key][param_key]
-
             # Set the metrics
             metrics = jax.tree_map(jnp.mean, metrics)
-            metrics["norm_params"] = optax.global_norm(params)
+            metrics["norm_params"] = optax.global_norm(states.params)
             metrics["observations_mean"] = jnp.mean(
                 utils.batch_concat(
                     jax.tree_map(
@@ -247,12 +226,48 @@ class MAPGWithTrustRegionStep(Step):
             metrics["rewards_std"] = jax.tree_map(
                 lambda x: jnp.std(x, axis=(0, 1)), rewards
             )
-            # new_state = TrainingState(
-            #     params=params, opt_state=opt_state, random_key=key
-            # )
-            return metrics  # new_state,
 
-        trainer.store.step_fn = sgd_step
+            new_states = TrainingState(
+                params=new_params, opt_states=new_opt_states, random_key=new_key
+            )
+            return new_states, metrics
+
+        def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
+
+            # Repeat training for the given number of epoch, taking a random
+            # permutation for every epoch.
+            networks = trainer.store.networks["networks"]
+            params = {net_key: networks[net_key].params for net_key in networks.keys()}
+            opt_states = trainer.store.opt_states
+            random_key, _ = jax.random.split(trainer.store.key)
+
+            states = TrainingState(
+                params=params, opt_states=opt_states, random_key=random_key
+            )
+            new_states, metrics = sgd_step(states, sample)
+
+            # Set the new variables
+            # TODO (dries): key is probably not being store correctly.
+            # The variable client might lose reference to it when checkpointing.
+            # We also need to add the optimizer and random_key to the variable
+            # server.
+            trainer.store.key = new_states.random_key
+
+            networks = trainer.store.networks["networks"]
+            params = {net_key: networks[net_key].params for net_key in networks.keys()}
+            for net_key in params.keys():
+                # This below forloop is needed to not lose the param reference.
+                net_params = trainer.store.networks["networks"][net_key].params
+                for param_key in net_params.keys():
+                    net_params[param_key] = new_states.params[net_key][param_key]
+
+                # Update the optimizer
+                # This needs to be in the loop to not lose the reference.
+                trainer.store.opt_states[net_key] = new_states.opt_states[net_key]
+
+            return metrics
+
+        trainer.store.step_fn = step
 
     @property
     def name(self) -> str:
