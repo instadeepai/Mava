@@ -1,17 +1,16 @@
-from typing import Any
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    PieceWiseLinearTimestepScheduler as PWLTS,
+)
 
 
 class TestExplorationScheduling:
     """Testing the exploration schedule."""
 
     @staticmethod
-    def create_piecewise_linear_exploration_schedule() -> Any:
+    def create_piecewise_linear_exploration_schedule() -> PWLTS:
         """Create a piecewise linear exploration schedule for further tests."""
-        from mava.components.tf.modules.exploration.exploration_scheduling import (
-            PieceWiseLinearTimestepScheduler,
-        )
 
-        exploration_schedule = PieceWiseLinearTimestepScheduler(
+        exploration_schedule = PWLTS(
             timesteps=[50, 100, 200],
             epsilons=[0.3, 0.2, 0.6],
             initial_fallback_epsilon=0.9,
