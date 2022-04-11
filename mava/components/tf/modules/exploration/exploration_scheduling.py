@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import abc
+from typing import List
 
 import numpy as np
 import tensorflow as tf
@@ -233,5 +234,71 @@ class ConstantScheduler:
 
         Returns:
             constant epsilon.
+        """
+        return self._epsilon
+
+
+class PieceWiseLinearTimestepScheduler:
+    """A piecewise linear scheduler for epsilon.
+
+    Args:
+        timesteps : list of timesteps at which epsilon is changed. The list should be in
+        ascending order.
+        epsilons : list of epsilon values at each timestep.
+        initial_fallback_epsilon : epsilon value to use when timestep is less than the
+        first timestep in the list.
+        final_fallback_epsilon : epsilon value to use when timestep is greater than the
+        last timestep in the list.
+    """
+
+    def __init__(
+        self,
+        timesteps: List[int],
+        epsilons: List[float],
+        initial_fallback_epsilon: float = 1.0,
+        final_fallback_epsilon: float = 0.05,
+    ):
+        """Constructor for PieceWiseLinearTimestepScheduler."""
+        self._timesteps = timesteps
+        self._epsilons = epsilons
+        self._initial_fallback_epsilon = initial_fallback_epsilon
+        self._final_fallback_epsilon = final_fallback_epsilon
+        self._epsilon = epsilons[0]
+
+    def decrement_epsilon(self, time_t: int) -> float:
+        """Decrement/update epsilon.
+
+        Args:
+            time_t : executor timestep.
+
+        Returns:
+            current epsilon value, which interpolates between the epsilon values at the
+            timesteps.
+        """
+        if time_t < self._timesteps[0]:
+            self._epsilon = self._initial_fallback_epsilon
+        elif time_t > self._timesteps[-1]:
+            self._epsilon = self._final_fallback_epsilon
+        else:
+            for i in range(len(self._timesteps) - 1):
+                if self._timesteps[i] <= time_t <= self._timesteps[i + 1]:
+                    epsilon_begin = self._epsilons[i]
+                    epsilon_end = self._epsilons[i + 1]
+                    timestep_begin = self._timesteps[i]
+                    timestep_end = self._timesteps[i + 1]
+                    epsilon_delta = epsilon_end - epsilon_begin
+                    timestep_delta = timestep_end - timestep_begin
+                    break
+            self._epsilon = (
+                epsilon_begin
+                + epsilon_delta * (time_t - timestep_begin) / timestep_delta
+            )
+        return self._epsilon
+
+    def get_epsilon(self) -> float:
+        """Get epsilon value.
+
+        Returns:
+            current epsilon.
         """
         return self._epsilon
