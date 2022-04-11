@@ -29,12 +29,12 @@ class BaseParameterClient(Component):
         self, params: Dict[str, Any]
     ) -> Tuple[List[str], Dict[str, Any]]:
         add_params = {
-            "trainer_steps": np.zeros(1, dtype=np.int32),
-            "trainer_walltime": np.zeros(1, dtype=np.float32),
-            "evaluator_steps": np.zeros(1, dtype=np.int32),
-            "evaluator_episodes": np.zeros(1, dtype=np.int32),
-            "executor_episodes": np.zeros(1, dtype=np.int32),
-            "executor_steps": np.zeros(1, dtype=np.int32),
+            "trainer_steps": np.array(0, dtype=np.int32),
+            "trainer_walltime": np.array(0, dtype=np.float32),
+            "evaluator_steps": np.array(0, dtype=np.int32),
+            "evaluator_episodes": np.array(0, dtype=np.int32),
+            "executor_episodes": np.array(0, dtype=np.int32),
+            "executor_steps": np.array(0, dtype=np.int32),
         }
         params.update(add_params)
         return list(add_params.keys()), params

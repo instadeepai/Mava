@@ -226,7 +226,16 @@ class ParameterClient:
                         new_parameters[key], self._devices[key]  # type: ignore
                     )
                 else:
-                    self._parameters[key] = new_parameters[key]
+                    # Note (dries): These in-place operators are used instead
+                    # of direct assignment to not lose reference to the numpy
+                    # array.
+
+                    self._parameters[key] *= 0
+                    # Remove last dim of numpy array if needed
+                    if new_parameters[key].shape != self._parameters[key].shape:
+                        self._parameters[key] += new_parameters[key][0]
+                    else:
+                        self._parameters[key] += new_parameters[key]
 
             elif isinstance(new_parameters[key], tuple):
                 for i in range(len(self._parameters[key])):

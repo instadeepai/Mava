@@ -73,11 +73,13 @@ class DefaultStep(Component):
             {"trainer_steps": 1, "trainer_walltime": elapsed_time},
         )
 
-        # Update the variable source and the trainer
+        # Update the variable source and the trainer.
         trainer.store.trainer_parameter_client.set_and_get_async()
 
-        # Snapshot and attempt to write logs.
-        # self._logger.write({**results, **counts})
+        # Add the trainer counts.
+        results.update(trainer.store.trainer_counts)
+
+        # Write to the loggers.
         trainer.store.trainer_logger.write({**results})
 
     @property

@@ -29,8 +29,6 @@ class LoggerConfig:
     logger_config: Optional[Any] = None
 
 
-# TODO (dries): Fix executor_executor and evaluator_evaluator tensorboard logging.
-# It should only be executor and evaluator.
 class Logger(Component):
     def __init__(
         self,
@@ -48,7 +46,7 @@ class Logger(Component):
             logger_config = self.config.logger_config[name]
 
         builder.store.executor_logger = self.config.logger_factory(  # type: ignore
-            f"{name}_{builder.store.executor_id}", **logger_config
+            f"{builder.store.executor_id}", **logger_config
         )
 
     def on_building_trainer_logger(self, builder: SystemBuilder) -> None:
@@ -59,7 +57,7 @@ class Logger(Component):
             logger_config = self.config.logger_config[name]
 
         builder.store.trainer_logger = self.config.logger_factory(  # type: ignore
-            f"{name}_{builder.store.trainer_id}", **logger_config
+            f"{builder.store.trainer_id}", **logger_config
         )
 
     @property
