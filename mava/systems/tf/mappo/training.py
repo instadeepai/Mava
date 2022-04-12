@@ -279,11 +279,11 @@ class MAPPOTrainer(mava.Trainer):
         }
         # Get data from replay.
         inputs = next(self._iterator)
-        # Split for possible minibatches
-        batch_size = inputs.data.observations[self._agents[0]].observation.shape[0]
-        dataset = tf.data.Dataset.from_tensor_slices(inputs.data)
-        dataset = dataset.shuffle(batch_size).batch(self._minibatch_size)
         for _ in range(self._num_epochs):
+            # Split for possible minibatches
+            batch_size = inputs.data.observations[self._agents[0]].observation.shape[0]
+            dataset = tf.data.Dataset.from_tensor_slices(inputs.data)
+            dataset = dataset.shuffle(batch_size).batch(self._minibatch_size)
             for minibatch_data in dataset:
                 loss = self._minibatch_update(minibatch_data)
 
