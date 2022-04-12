@@ -335,9 +335,6 @@ class MAPPOTrainer(mava.Trainer):
         if "core_states" in extras:
             core_states = tree.map_structure(lambda s: s[0], extras["core_states"])
 
-        # transform observation using observation networks
-        observations_trans = self._transform_observations(observations)
-
         # Store losses.
         policy_losses: Dict[str, Any] = {}
         critic_losses: Dict[str, Any] = {}
