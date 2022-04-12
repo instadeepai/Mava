@@ -149,25 +149,6 @@ def make_discrete_networks(
         )
         return policy_value_network(inputs)
 
-        # def forward_fn(inputs: jnp.ndarray) -> networks_lib.FeedForwardNetwork:
-
-        #     policy_network = hk.Sequential(
-        #         [
-        #             utils.batch_concat,
-        #             hk.nets.MLP(policy_layer_sizes, activation=jax.nn.relu),
-        #             networks_lib.CategoricalHead(num_values=num_actions),
-        #         ]
-        #     )
-        #     critic_network = hk.Sequential(
-        #         [
-        #             utils.batch_concat,
-        #             hk.nets.MLP(critic_layer_sizes, activation=jax.nn.relu),
-        #             hk.Linear(1),
-        #         ]
-        #     )
-
-        # return policy_network(inputs), critic_network(inputs)
-
     # Transform into pure functions.
     forward_fn = hk.without_apply_rng(hk.transform(forward_fn))
 
