@@ -322,10 +322,6 @@ class MAPPOTrainer(mava.Trainer):
         Args:
             inputs: input data from the data table (transitions)
         """
-
-        # Convert to sequence data
-        data = tf2_utils.batch_to_sequence(inputs)
-
         # Unpack input data as follows:
         data = tf2_utils.batch_to_sequence(inputs)
         observations, actions, rewards, discounts, extras = (
