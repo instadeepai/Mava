@@ -49,7 +49,8 @@ class PPOSystem(System):
         # Set the default configs
         default_params = MAPPODefaultConfig()
 
-        # Default components
+        # Default system processes
+        # Executor
         executor = EXECUTOR_SPEC.get()
         executor_process = DesignSpec(
             **executor,
@@ -58,18 +59,21 @@ class PPOSystem(System):
             networks=DefaultNetworks,
         ).get()
 
+        # Trainer
         trainer = TRAINER_SPEC.get()
         trainer_process = DesignSpec(
             **trainer,
             trainer_dataset=TrajectoryDataset,
         ).get()
 
+        # Data Server
         data_server_process = DesignSpec(
             data_server=OnPolicyDataServer,
             data_server_adder_signature=ParallelSequenceAdderSignature,
             extras_spec=ExtrasLogProbSpec,
         ).get()
 
+        # Parameter Server
         parameter_server_process = DesignSpec(
             parameter_server=DefaultParameterServer,
             executor_parameter_client=ExecutorParameterClient,
