@@ -263,7 +263,7 @@ class MADQN:
             _, self._agent_net_keys = sample_new_agent_keys(
                 agents,
                 self._network_sampling_setup,  # type: ignore
-                fix_sampler=fix_sampler
+                fix_sampler=fix_sampler,
             )
         # Check that the environment and agent_net_keys has the same amount of agents
         sample_length = len(self._network_sampling_setup[0])  # type: ignore

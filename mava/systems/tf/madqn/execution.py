@@ -492,7 +492,7 @@ class MADQNRecurrentExecutor(executors.RecurrentExecutor, DQNExecutor):
             agents,
             self._network_sampling_setup,
             self._net_keys_to_ids,
-            self._fix_sampler
+            self._fix_sampler,
         )
 
         if self._store_recurrent_state:
