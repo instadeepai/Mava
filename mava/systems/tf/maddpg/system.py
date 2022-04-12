@@ -323,6 +323,12 @@ class MADDPG:
         for i in range(len(unique_net_keys)):
             self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
 
+        #### TODO MAKE NET SPEC KEYS AN ARGUMENT
+        self._net_spec_keys = {
+            "network_agent_0": "agent_0",
+            "network_agent_1": f"agent_{5}",
+        }
+
         # Setup table_network_config
         table_network_config = {}
         for trainer_key in self._trainer_networks.keys():
@@ -378,6 +384,7 @@ class MADDPG:
                 num_executors=num_executors,
                 network_sampling_setup=self._network_sampling_setup,  # type: ignore
                 fix_sampler=fix_sampler,
+                net_spec_keys=self._net_spec_keys,
                 net_keys_to_ids=net_keys_to_ids,
                 unique_net_keys=unique_net_keys,
                 discount=discount,
