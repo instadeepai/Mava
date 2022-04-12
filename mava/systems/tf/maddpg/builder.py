@@ -56,6 +56,8 @@ class MADDPGConfig:
         table_network_config: Networks each table (trainer) expects.
         network_sampling_setup: List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
+        fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
         net_keys_to_ids: mapping from net_key to network id.
         unique_net_keys: list of unique net_keys.
         checkpoint_minute_interval: The number of minutes to wait between
@@ -105,6 +107,7 @@ class MADDPGConfig:
     trainer_networks: Dict[str, List]
     table_network_config: Dict[str, List]
     network_sampling_setup: List
+    fix_sampler: Optional[List]
     net_keys_to_ids: Dict[str, int]
     unique_net_keys: List[str]
     checkpoint_minute_interval: int
@@ -498,6 +501,7 @@ class MADDPGBuilder:
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
             network_sampling_setup=self._config.network_sampling_setup,
+            fix_sampler=self._config.fix_sampler,
             variable_client=variable_client,
             adder=adder,
             evaluator=evaluator,

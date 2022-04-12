@@ -75,6 +75,7 @@ class MADDPG:
         network_sampling_setup: Union[
             List, enums.NetworkSampler
         ] = enums.NetworkSampler.fixed_agent_networks,
+        fix_sampler: Optional[List] = None,
         shared_weights: bool = True,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
@@ -142,6 +143,8 @@ class MADDPG:
                 Custom list: Alternatively one can specify a custom nested list,
                 with network keys in, that will be used by the executors at
                 the start of each episode to sample networks for each agent.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
             shared_weights: whether agents should share weights or not.
                 When network_sampling_setup are provided the value of shared_weights is
                 ignored.
@@ -269,6 +272,7 @@ class MADDPG:
             _, self._agent_net_keys = sample_new_agent_keys(
                 agents,
                 self._network_sampling_setup,  # type: ignore
+                fix_sampler=fix_sampler,
             )
 
         # Check that the environment and agent_net_keys has the same amount of agents
@@ -373,6 +377,7 @@ class MADDPG:
                 table_network_config=table_network_config,
                 num_executors=num_executors,
                 network_sampling_setup=self._network_sampling_setup,  # type: ignore
+                fix_sampler=fix_sampler,
                 net_keys_to_ids=net_keys_to_ids,
                 unique_net_keys=unique_net_keys,
                 discount=discount,
