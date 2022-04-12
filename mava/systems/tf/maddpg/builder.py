@@ -58,7 +58,8 @@ class MADDPGConfig:
                 sampled from by the executors at the start of an environment run.
         fix_sampler: Optional list that can fix the executor sampler to sample
                 in a specific way.
-        TODO: net_spec_keys
+        net_spec_keys: Optional network to agent mapping used to get the environment
+                specs for each network.
         net_keys_to_ids: mapping from net_key to network id.
         unique_net_keys: list of unique net_keys.
         checkpoint_minute_interval: The number of minutes to wait between
