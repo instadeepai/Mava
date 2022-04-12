@@ -9,7 +9,6 @@ class TestExplorationScheduling:
     @staticmethod
     def create_piecewise_linear_exploration_schedule() -> PWLTS:
         """Create a piecewise linear exploration schedule for further tests."""
-
         exploration_schedule = PWLTS(
             timesteps=[50, 100, 200],
             epsilons=[0.3, 0.2, 0.6],
