@@ -16,5 +16,5 @@
 """Jax MAPPO system."""
 from mava.systems.jax.mappo.execution import EXECUTOR_SPEC
 from mava.systems.jax.mappo.networks import make_default_networks
-from mava.systems.jax.mappo.system import PPOSystem
+from mava.systems.jax.mappo.system import MAPPOSystem
 from mava.systems.jax.mappo.training import TRAINER_SPEC

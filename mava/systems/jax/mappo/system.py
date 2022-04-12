@@ -39,7 +39,7 @@ from mava.systems.jax.mappo.execution import EXECUTOR_SPEC
 from mava.systems.jax.mappo.training import TRAINER_SPEC
 
 
-class PPOSystem(System):
+class MAPPOSystem(System):
     def design(self) -> Tuple[DesignSpec, Any]:
         """Mock system design with zero components.
 

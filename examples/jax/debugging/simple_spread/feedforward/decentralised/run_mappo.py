@@ -87,7 +87,7 @@ def main(_: Any) -> None:
     )
 
     # Create the system.
-    system = mappo.PPOSystem()
+    system = mappo.MAPPOSystem()
 
     # Build the system.
     system.build(
