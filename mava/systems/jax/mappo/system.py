@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Jax MAPPO system."""
-from typing import Dict, Tuple
+from typing import Any, Tuple
 
 from mava.components.jax.building.adders import (
     ParallelSequenceAdder,
@@ -34,46 +34,54 @@ from mava.components.jax.updating.parameter_server import DefaultParameterServer
 from mava.specs import DesignSpec
 from mava.systems.jax import System
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
+from mava.systems.jax.mappo.config import MAPPODefaultConfig
 from mava.systems.jax.mappo.execution import EXECUTOR_SPEC
 from mava.systems.jax.mappo.training import TRAINER_SPEC
 
 
 class PPOSystem(System):
-    def design(self) -> Tuple[DesignSpec, Dict]:
+    def design(self) -> Tuple[DesignSpec, Any]:
         """Mock system design with zero components.
 
         Returns:
             system callback components
         """
         # Set the default configs
-        # TODO (Arnu): Feel free to change this however you like.
-        # Maybe moving it to config.py if you want.
-        default_params = {
-            "sample_batch_size": 512,
-            "sequence_length": 20,
-            "period": 10,
-            "use_next_extras": False,
-            # "entropy_cost": 0.0,
-            # "value_cost": 1.0,
-        }
+        default_params = MAPPODefaultConfig()
 
-        # Defualt components
+        # Default components
         executor = EXECUTOR_SPEC.get()
+        executor_process = DesignSpec(
+            **executor,
+            executor_adder=ParallelSequenceAdder,
+            executor_environment_loop=ParallelExecutorEnvironmentLoop,
+            networks=DefaultNetworks,
+        ).get()
+
         trainer = TRAINER_SPEC.get()
-        components = DesignSpec(
+        trainer_process = DesignSpec(
+            **trainer,
+            trainer_dataset=TrajectoryDataset,
+        ).get()
+
+        data_server_process = DesignSpec(
             data_server=OnPolicyDataServer,
             data_server_adder_signature=ParallelSequenceAdderSignature,
             extras_spec=ExtrasLogProbSpec,
+        ).get()
+
+        parameter_server_process = DesignSpec(
             parameter_server=DefaultParameterServer,
             executor_parameter_client=ExecutorParameterClient,
-            **executor,
-            executor_environment_loop=ParallelExecutorEnvironmentLoop,
-            executor_adder=ParallelSequenceAdder,
-            networks=DefaultNetworks,
-            **trainer,
-            distributor=Distributor,
             trainer_parameter_client=TrainerParameterClient,
-            trainer_dataset=TrajectoryDataset,
+        ).get()
+
+        system = DesignSpec(
+            **data_server_process,
+            **parameter_server_process,
+            **executor_process,
+            **trainer_process,
+            distributor=Distributor,
             logger=Logger,
         )
-        return components, default_params
+        return system, default_params
