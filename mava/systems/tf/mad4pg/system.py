@@ -58,6 +58,7 @@ class MAD4PG(MADDPG):
         network_sampling_setup: Union[
             List, enums.NetworkSampler
         ] = enums.NetworkSampler.fixed_agent_networks,
+        fix_sampler: Optional[List] = None,
         shared_weights: bool = True,
         discount: float = 0.99,
         batch_size: int = 256,
@@ -122,6 +123,8 @@ class MAD4PG(MADDPG):
                 Custom list: Alternatively one can specify a custom nested list,
                 with network keys in, that will be used by the executors at
                 the start of each episode to sample networks for each agent.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
             shared_weights: whether agents should share weights or not.
                 When network_sampling_setup are provided the value of shared_weights is
                 ignored.
@@ -199,6 +202,7 @@ class MAD4PG(MADDPG):
             environment_spec=environment_spec,
             trainer_networks=trainer_networks,
             network_sampling_setup=network_sampling_setup,
+            fix_sampler=fix_sampler,
             shared_weights=shared_weights,
             discount=discount,
             batch_size=batch_size,
