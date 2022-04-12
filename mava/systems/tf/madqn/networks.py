@@ -36,6 +36,7 @@ DiscreteArray = specs.DiscreteArray
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
+    net_spec_keys: Dict[str,str] = {},
     value_networks_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
     architecture_type: ArchitectureType = ArchitectureType.feedforward,
     atari_torso_observation_network: bool = False,
@@ -76,9 +77,12 @@ def make_default_networks(
     assert value_network_func is not None
 
     specs = environment_spec.get_agent_specs()
-
+    
     # Create agent_type specs
-    specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+    if not net_spec_keys:
+        specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
+    else:
+        specs = {net_key: specs[value] for net_key, value in net_spec_keys.items()}
 
     if isinstance(value_networks_layer_sizes, Sequence):
         value_networks_layer_sizes = {
