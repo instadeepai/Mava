@@ -16,27 +16,11 @@
 """Jax MAPPO system."""
 from typing import Any, Tuple
 
-from mava.components.jax.building.adders import (
-    ParallelSequenceAdder,
-    ParallelSequenceAdderSignature,
-)
-from mava.components.jax.building.data_server import OnPolicyDataServer
-from mava.components.jax.building.datasets import TrajectoryDataset
-from mava.components.jax.building.distributor import Distributor
-from mava.components.jax.building.environments import ParallelExecutorEnvironmentLoop
-from mava.components.jax.building.loggers import Logger
-from mava.components.jax.building.networks import DefaultNetworks
-from mava.components.jax.building.parameter_client import (
-    ExecutorParameterClient,
-    TrainerParameterClient,
-)
-from mava.components.jax.updating.parameter_server import DefaultParameterServer
+from mava.components.jax import building, executing, training, updating
 from mava.specs import DesignSpec
 from mava.systems.jax import System
 from mava.systems.jax.mappo.components import ExtrasLogProbSpec
 from mava.systems.jax.mappo.config import MAPPODefaultConfig
-from mava.systems.jax.mappo.execution import EXECUTOR_SPEC
-from mava.systems.jax.mappo.training import TRAINER_SPEC
 
 
 class MAPPOSystem(System):
@@ -51,33 +35,39 @@ class MAPPOSystem(System):
 
         # Default system processes
         # Executor
-        executor = EXECUTOR_SPEC.get()
         executor_process = DesignSpec(
-            **executor,
-            executor_adder=ParallelSequenceAdder,
-            executor_environment_loop=ParallelExecutorEnvironmentLoop,
-            networks=DefaultNetworks,
+            executor_init=executing.ExecutorInit,
+            executor_observe=executing.FeedforwardExecutorObserve,
+            executor_select_action=executing.FeedforwardExecutorSelectAction,
+            executor_adder=building.ParallelSequenceAdder,
+            executor_environment_loop=building.ParallelExecutorEnvironmentLoop,
+            networks=building.DefaultNetworks,
         ).get()
 
         # Trainer
-        trainer = TRAINER_SPEC.get()
         trainer_process = DesignSpec(
-            **trainer,
-            trainer_dataset=TrajectoryDataset,
+            trainer_init=training.TrainerInit,
+            gae_fn=training.GAE,
+            loss=training.MAPGWithTrustRegionClippingLoss,
+            epoch_update=training.MAPGEpochUpdate,
+            minibatch_update=training.MAPGMinibatchUpdate,
+            sgd_step=training.MAPGWithTrustRegionStep,
+            step=training.DefaultStep,
+            trainer_dataset=building.TrajectoryDataset,
         ).get()
 
         # Data Server
         data_server_process = DesignSpec(
-            data_server=OnPolicyDataServer,
-            data_server_adder_signature=ParallelSequenceAdderSignature,
+            data_server=building.OnPolicyDataServer,
+            data_server_adder_signature=building.ParallelSequenceAdderSignature,
             extras_spec=ExtrasLogProbSpec,
         ).get()
 
         # Parameter Server
         parameter_server_process = DesignSpec(
-            parameter_server=DefaultParameterServer,
-            executor_parameter_client=ExecutorParameterClient,
-            trainer_parameter_client=TrainerParameterClient,
+            parameter_server=updating.DefaultParameterServer,
+            executor_parameter_client=building.ExecutorParameterClient,
+            trainer_parameter_client=building.TrainerParameterClient,
         ).get()
 
         system = DesignSpec(
@@ -85,7 +75,7 @@ class MAPPOSystem(System):
             **parameter_server_process,
             **executor_process,
             **trainer_process,
-            distributor=Distributor,
-            logger=Logger,
+            distributor=building.Distributor,
+            logger=building.Logger,
         )
         return system, default_params
