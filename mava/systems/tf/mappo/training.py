@@ -22,6 +22,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
+import tensorflow_probability as tfp
 import tree
 from acme.tf import utils as tf2_utils
 from acme.utils import counting, loggers
@@ -32,6 +33,7 @@ from mava.types import OLT, NestedArray
 from mava.utils import training_utils as train_utils
 from mava.utils.sort_utils import sort_str_num
 
+tfd = tfp.distributions
 train_utils.set_growing_gpu_memory()
 
 
@@ -389,7 +391,15 @@ class MAPPOTrainer(mava.Trainer):
                     )
                     policy = policy_network(actor_observation)
 
-                    policy.batch_reshape(dims, name="policy")
+                    if isinstance(policy, tfp.distributions.Distribution):
+                        # Tensorflow probability.
+                        policy = tfd.BatchReshape(
+                            policy, batch_shape=dims, name="policy"
+                        )
+                    else:
+                        # Custom distribution function.
+                        policy.batch_reshape(dims, name="policy")
+
                     action_prob = policy.log_prob(action)
 
                     policy_entropy = policy.entropy()
