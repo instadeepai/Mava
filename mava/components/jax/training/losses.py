@@ -93,7 +93,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                     # Value function loss. Exclude the bootstrap value
                     unclipped_value_error = target_values - values
-                    unclipped_value_loss = unclipped_value_error**2
+                    unclipped_value_loss = unclipped_value_error ** 2
 
                     if self.config.clip_value:
                         # Clip values to reduce variablility during critic training.
@@ -103,7 +103,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             clipping_epsilon,
                         )
                         clipped_value_error = target_values - clipped_values
-                        clipped_value_loss = clipped_value_error**2
+                        clipped_value_loss = clipped_value_error ** 2
                         value_loss = jnp.mean(
                             jnp.fmax(unclipped_value_loss, clipped_value_loss)
                         )
@@ -138,6 +138,87 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                     target_values[agent_key],
                     advantages[agent_key],
                     behavior_values[agent_key],
+                )
+            return grads, loss_info
+
+        # Save the gradient funciton.
+        trainer.store.grad_fn = loss_grad_fn
+
+
+@dataclass
+class AlphaZeroLossConfig:
+    L2_regularisation_coeff: float = 0.0001
+    value_cost: float = 1.0
+
+class AlphaZeroLoss(Loss):
+    def __init__(
+        self, config: AlphaZeroLossConfig = AlphaZeroLossConfig(),
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    def on_training_loss_fns(self, trainer: SystemTrainer) -> None:
+        """_summary_"""
+
+        def loss_grad_fn(
+            params: Any,
+            observations: Any,
+            search_policies: Dict[str, jnp.ndarray],
+            target_values: Dict[str, jnp.ndarray],
+        ) -> Tuple[Dict[str, jnp.ndarray], Dict[str, Dict[str, jnp.ndarray]]]:
+            """Surrogate loss using clipped probability ratios."""
+
+            grads = {}
+            loss_info = {}
+            for agent_key in trainer.store.trainer_agents:
+                agent_net_key = trainer.store.trainer_agent_net_keys[agent_key]
+                network = trainer.store.networks["networks"][agent_net_key]
+
+                # Note (dries): This is placed here to set the networks correctly in
+                # the case of non-shared weights.
+                def loss_fn(
+                    params: Any,
+                    observations: Any,
+                    search_policies: jnp.ndarray,
+                    target_values: jnp.ndarray,
+                ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
+                    logits, values = network.network.apply(params, observations)
+
+                    policy_loss = jnp.mean(
+                        rlax.categorical_cross_entropy(search_policies, logits)
+                    )
+
+                    value_loss = jnp.mean(rlax.l2_loss(values, target_values))
+
+                    # Entropy regulariser.
+                    l2_regularisation = sum(jnp.sum(jnp.square(parameter)) for parameter in jax.tree_leaves(params))
+
+                    total_loss = (
+                        policy_loss
+                        + value_loss * self.config.value_cost
+                        + l2_regularisation * self.config.L2_regularisation_coeff
+                    )
+
+                    loss_info = {
+                        "loss_total": total_loss,
+                        "loss_policy": policy_loss,
+                        "loss_value": value_loss,
+                        "loss_regularisation_term": l2_regularisation,
+                    }
+
+                    return total_loss, loss_info
+
+                grads[agent_key], loss_info[agent_key] = jax.grad(
+                    loss_fn, has_aux=True
+                )(
+                    params[agent_net_key],
+                    observations[agent_key].observation,
+                    search_policies[agent_key],
+                    target_values[agent_key],
                 )
             return grads, loss_info
 
