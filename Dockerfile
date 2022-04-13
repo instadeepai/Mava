@@ -95,3 +95,67 @@ RUN ./bash_scripts/install_meltingpot.sh
 # Add meltingpot to python path
 ENV PYTHONPATH "${PYTHONPATH}:${folder}/../packages/meltingpot"
 ##########################################################
+
+# New Jax Images
+##########################################################
+# Core Mava-Jax image
+FROM mava-core as jax-core
+# Jax gpu config.
+ENV XLA_PYTHON_CLIENT_PREALLOCATE=false
+## Install core jax dependencies.
+# Install jax gpu
+RUN pip install -e .[jax]
+RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_releases.html
+##########################################################
+
+##########################################################
+# PZ image
+FROM tf-core AS pz-jax
+RUN pip install -e .[pz]
+# PettingZoo Atari envs
+RUN apt-get update
+RUN apt-get install ffmpeg libsm6 libxext6  -y
+RUN apt-get install -y unrar-free
+RUN pip install autorom
+RUN AutoROM -v
+##########################################################
+
+##########################################################
+# SMAC image
+FROM tf-core AS sc2-jax
+## Install smac environment
+RUN apt-get -y install git
+RUN pip install .[sc2]
+# We use the pz wrapper for smac
+RUN pip install .[pz]
+ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
+##########################################################
+
+##########################################################
+# Flatland Image
+FROM tf-core AS flatland-jax
+RUN pip install -e .[flatland]
+##########################################################
+
+#########################################################
+## Robocup Image
+FROM tf-core AS robocup-jax
+RUN apt-get install sudo -y
+RUN ./bash_scripts/install_robocup.sh
+##########################################################
+
+##########################################################
+## OpenSpiel Image
+FROM tf-core AS openspiel-jax
+RUN pip install .[open_spiel]
+##########################################################
+
+##########################################################
+# MeltingPot Image
+FROM tf-core AS meltingpot-jax
+# Install meltingpot
+RUN apt-get install -y git
+RUN ./bash_scripts/install_meltingpot.sh
+# Add meltingpot to python path
+ENV PYTHONPATH "${PYTHONPATH}:${folder}/../packages/meltingpot"
+##########################################################
