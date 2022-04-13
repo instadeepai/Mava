@@ -279,3 +279,43 @@ class MAPGWithTrustRegionStep(Step):
             _description_
         """
         return "step_fn"
+
+
+@dataclass
+class MAMCTSStepConfig:
+    discount: float = 0.99
+
+
+class MAMCTSStep(Step):
+    def __init__(
+        self,
+        config: MAMCTSStepConfig = MAMCTSStepConfig(),
+    ):
+        """_summary_
+
+        Args:
+            config : _description_.
+        """
+        self.config = config
+
+    def on_training_step_fn(self, trainer: SystemTrainer) -> None:
+        """_summary_"""
+
+        @jit
+        def sgd_step(
+            states: TrainingState, sample: reverb.ReplaySample
+        ) -> Tuple[TrainingState, Dict[str, jnp.ndarray]]:
+            """Performs a minibatch SGD step, returning new state and metrics."""
+            pass
+
+        def step(sample: reverb.ReplaySample) -> Tuple[Dict[str, jnp.ndarray]]:
+            pass
+
+    @property
+    def name(self) -> str:
+        """_summary_
+
+        Returns:
+            _description_
+        """
+        return "step_fn"

@@ -93,7 +93,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
 
                     # Value function loss. Exclude the bootstrap value
                     unclipped_value_error = target_values - values
-                    unclipped_value_loss = unclipped_value_error ** 2
+                    unclipped_value_loss = unclipped_value_error**2
 
                     if self.config.clip_value:
                         # Clip values to reduce variablility during critic training.
@@ -103,7 +103,7 @@ class MAPGWithTrustRegionClippingLoss(Loss):
                             clipping_epsilon,
                         )
                         clipped_value_error = target_values - clipped_values
-                        clipped_value_loss = clipped_value_error ** 2
+                        clipped_value_loss = clipped_value_error**2
                         value_loss = jnp.mean(
                             jnp.fmax(unclipped_value_loss, clipped_value_loss)
                         )
@@ -150,9 +150,11 @@ class AlphaZeroLossConfig:
     L2_regularisation_coeff: float = 0.0001
     value_cost: float = 1.0
 
+
 class AlphaZeroLoss(Loss):
     def __init__(
-        self, config: AlphaZeroLossConfig = AlphaZeroLossConfig(),
+        self,
+        config: AlphaZeroLossConfig = AlphaZeroLossConfig(),
     ):
         """_summary_
 
@@ -195,7 +197,10 @@ class AlphaZeroLoss(Loss):
                     value_loss = jnp.mean(rlax.l2_loss(values, target_values))
 
                     # Entropy regulariser.
-                    l2_regularisation = sum(jnp.sum(jnp.square(parameter)) for parameter in jax.tree_leaves(params))
+                    l2_regularisation = sum(
+                        jnp.sum(jnp.square(parameter))
+                        for parameter in jax.tree_leaves(params)
+                    )
 
                     total_loss = (
                         policy_loss
