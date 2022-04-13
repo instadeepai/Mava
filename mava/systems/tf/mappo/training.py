@@ -281,12 +281,13 @@ class MAPPOTrainer(mava.Trainer):
         }
         # Get data from replay.
         inputs = next(self._iterator)
+        batch_size = inputs.data.observations[self._agents[0]].observation.shape[0]
+        dataset = tf.data.Dataset.from_tensor_slices(inputs.data)
         for _ in range(self._num_epochs):
             # Split for possible minibatches
-            batch_size = inputs.data.observations[self._agents[0]].observation.shape[0]
-            dataset = tf.data.Dataset.from_tensor_slices(inputs.data)
-            dataset = dataset.shuffle(batch_size).batch(self._minibatch_size)
-            for minibatch_data in dataset:
+            dataset = dataset.shuffle(batch_size)
+            minibatch_dataset = dataset.batch(self._minibatch_size)
+            for minibatch_data in minibatch_dataset:
                 loss = self._minibatch_update(minibatch_data)
 
                 # Logging sum of losses
@@ -353,6 +354,8 @@ class MAPPOTrainer(mava.Trainer):
                     actions[agent]["log_probs"],
                     observations_trans[agent],
                 )
+
+                print("termination: ", termination.shape)
 
                 loss_mask = tf.concat(
                     (tf.ones((1, termination.shape[1])), termination[:-1]), 0
