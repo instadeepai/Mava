@@ -312,7 +312,7 @@ class MADQN:
         if net_spec_keys:
             self._net_spec_keys = net_spec_keys
         else:
-            self._net_spec_keys={}
+            self._net_spec_keys = {}
             for i in range(len(unique_net_keys)):
                 self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
 
