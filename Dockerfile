@@ -110,7 +110,7 @@ RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-rele
 
 ##########################################################
 # PZ image
-FROM tf-core AS pz-jax
+FROM jax-core AS pz-jax
 RUN pip install -e .[pz]
 # PettingZoo Atari envs
 RUN apt-get update
@@ -122,7 +122,7 @@ RUN AutoROM -v
 
 ##########################################################
 # SMAC image
-FROM tf-core AS sc2-jax
+FROM jax-core AS sc2-jax
 ## Install smac environment
 RUN apt-get -y install git
 RUN pip install .[sc2]
@@ -133,26 +133,26 @@ ENV SC2PATH /home/app/mava/3rdparty/StarCraftII
 
 ##########################################################
 # Flatland Image
-FROM tf-core AS flatland-jax
+FROM jax-core AS flatland-jax
 RUN pip install -e .[flatland]
 ##########################################################
 
 #########################################################
 ## Robocup Image
-FROM tf-core AS robocup-jax
+FROM jax-core AS robocup-jax
 RUN apt-get install sudo -y
 RUN ./bash_scripts/install_robocup.sh
 ##########################################################
 
 ##########################################################
 ## OpenSpiel Image
-FROM tf-core AS openspiel-jax
+FROM jax-core AS openspiel-jax
 RUN pip install .[open_spiel]
 ##########################################################
 
 ##########################################################
 # MeltingPot Image
-FROM tf-core AS meltingpot-jax
+FROM jax-core AS meltingpot-jax
 # Install meltingpot
 RUN apt-get install -y git
 RUN ./bash_scripts/install_meltingpot.sh
