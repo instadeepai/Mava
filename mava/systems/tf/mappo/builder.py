@@ -48,6 +48,16 @@ class MAPPOConfig:
             used if using single optim.
         agent_net_keys: (dict, optional): specifies what network each agent uses.
             Defaults to {}.
+        trainer_networks: networks each trainer trains on.
+        table_network_config: Networks each table (trainer) expects.
+        network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+        fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
+        net_spec_keys: Optional network to agent mapping used to get the environment
+                specs for each network.
+        net_keys_to_ids: mapping from net_key to network id.
+        unique_net_keys: list of unique net_keys.
         checkpoint_minute_interval (int): The number of minutes to wait between
             checkpoints.
         sequence_length: recurrent sequence rollout length.
@@ -90,6 +100,8 @@ class MAPPOConfig:
     trainer_networks: Dict[str, List]
     table_network_config: Dict[str, List]
     network_sampling_setup: List
+    fix_sampler: Optional[List]
+    net_spec_keys: Dict[str, str]
     net_keys_to_ids: Dict[str, int]
     unique_net_keys: List[str]
     checkpoint_minute_interval: int
@@ -171,19 +183,34 @@ class MAPPOBuilder:
             )
         return env_adder_spec
 
-    def covert_specs(self, spec: Dict[str, Any], num_networks: int) -> Dict[str, Any]:
+    def get_nets_specific_specs(
+        self, spec: Dict[str, Any], network_names: List
+    ) -> Dict[str, Any]:
+        """Convert specs.
+        Args:
+            spec: agent specs
+            network_names: names of the networks in the desired reverb table (to get specs for)
+        Returns:
+            distilled version of agent specs containing only specs related to `networks_names`
+        """
         if type(spec) is not dict:
             return spec
 
-        agents = sort_str_num(self._config.agent_net_keys.keys())[:num_networks]
+        agents = []
+        for network in network_names:
+            agents.append(self._config.net_spec_keys[network])
+
+        agents = sort_str_num(agents)
         converted_spec: Dict[str, Any] = {}
         if agents[0] in spec.keys():
-            for agent in agents:
-                converted_spec[agent] = spec[agent]
+            for i, agent in enumerate(agents):
+                converted_spec[self._agents[i]] = spec[agent]
         else:
             # For the extras
             for key in spec.keys():
-                converted_spec[key] = self.covert_specs(spec[key], num_networks)
+                converted_spec[key] = self.get_nets_specific_specs(
+                    spec[key], network_names
+                )
         return converted_spec
 
     def make_replay_tables(
@@ -203,24 +230,26 @@ class MAPPOBuilder:
         # Create system architecture with target networks.
         adder_env_spec = self.add_log_prob_to_spec(environment_spec)
 
-        # Create table per trainer
         replay_tables = []
         for table_key in self._config.table_network_config.keys():
-            # TODO (dries): Clean the below coverter code up.
+            # TODO (dries): Clean the below converter code up.
             # Convert a Mava spec
-            num_networks = len(self._config.table_network_config[table_key])
+            tables_network_names = self._config.table_network_config[table_key]
             env_spec = copy.deepcopy(adder_env_spec)
-            env_spec._specs = self.covert_specs(env_spec._specs, num_networks)
+            env_spec._specs = self.get_nets_specific_specs(
+                env_spec._specs, tables_network_names
+            )
 
             env_spec._keys = list(sort_str_num(env_spec._specs.keys()))
             if env_spec.extra_specs is not None:
-                env_spec.extra_specs = self.covert_specs(
-                    env_spec.extra_specs, num_networks
+                env_spec.extra_specs = self.get_nets_specific_specs(
+                    env_spec.extra_specs, tables_network_names
                 )
-            extra_specs = self.covert_specs(
+            extra_specs = self.get_nets_specific_specs(
                 self._extra_specs,
-                num_networks,
+                tables_network_names,
             )
+
             signature = reverb_adders.ParallelSequenceAdder.signature(
                 env_spec,
                 sequence_length=self._config.sequence_length,
@@ -429,6 +458,7 @@ class MAPPOBuilder:
             agent_specs=self._config.environment_spec.get_agent_specs(),
             agent_net_keys=self._config.agent_net_keys,
             network_sampling_setup=self._config.network_sampling_setup,
+            fix_sampler=self._config.fix_sampler,
             variable_client=variable_client,
             adder=adder,
             evaluator=evaluator,

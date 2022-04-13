@@ -63,6 +63,8 @@ class MAPPO:
         network_sampling_setup: Union[
             List, enums.NetworkSampler
         ] = enums.NetworkSampler.fixed_agent_networks,
+        fix_sampler: Optional[List] = None,
+        net_spec_keys: Dict = {},
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         shared_weights: bool = True,
         executor_variable_update_period: int = 100,
@@ -116,6 +118,24 @@ class MAPPO:
                 or recurrent. Defaults to execution.MAPPOFeedForwardExecutor.
             num_executors : number of executor processes to run in
                 parallel. Defaults to 1.
+            trainer_networks: networks each trainer trains on.
+            network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+                enums.NetworkSampler settings:
+                fixed_agent_networks: Keeps the networks
+                used by each agent fixed throughout training.
+                random_agent_networks: Creates N network policies, where N is the
+                number of agents. Randomly select policies from this sets for each
+                agent at the start of a episode. This sampling is done with
+                replacement so the same policy can be selected for more than one
+                agent for a given episode.
+                Custom list: Alternatively one can specify a custom nested list,
+                with network keys in, that will be used by the executors at
+                the start of each episode to sample networks for each agent.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
+            net_spec_keys: Optional network to agent mapping used to get the environment
+                specs for each network.
             num_caches : number of trainer node caches. Defaults to 0.
             environment_spec : description of
                 the action, observation spaces etc. for each agent in the system.
@@ -294,6 +314,7 @@ class MAPPO:
             _, self._agent_net_keys = sample_new_agent_keys(
                 agents,
                 self._network_sampling_setup,  # type: ignore
+                fix_sampler=fix_sampler,
             )
 
         # Check that the environment and agent_net_keys has the same amount of agents
@@ -340,9 +361,10 @@ class MAPPO:
         # Check that all agent_net_keys are in trainer_networks
         assert unique_net_keys == unique_trainer_net_keys
         # Setup specs for each network
-        self._net_spec_keys = {}
-        for i in range(len(unique_net_keys)):
-            self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
+        self._net_spec_keys = net_spec_keys
+        if not net_spec_keys:
+            for i in range(len(unique_net_keys)):
+                self._net_spec_keys[unique_net_keys[i]] = agents[i % len(agents)]
 
         # Setup table_network_config
         table_network_config = {}
@@ -407,6 +429,8 @@ class MAPPO:
                 trainer_networks=self._trainer_networks,
                 table_network_config=table_network_config,
                 network_sampling_setup=self._network_sampling_setup,  # type: ignore
+                fix_sampler=fix_sampler,
+                net_spec_keys=self._net_spec_keys,
                 net_keys_to_ids=net_keys_to_ids,
                 unique_net_keys=unique_net_keys,
                 termination_condition=termination_condition,
