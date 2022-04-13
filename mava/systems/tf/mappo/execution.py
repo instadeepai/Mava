@@ -48,6 +48,7 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
+        fix_sampler: Optional[List],
         net_keys_to_ids: Dict[str, int],
         adder: Optional[adders.ReverbParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
@@ -62,12 +63,18 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
             adder: adder which sends data to a replay buffer.
             variable_client: client to copy weights from the trainer.
             agent_net_keys: specifies what network each agent uses.
+            network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
+            net_keys_to_ids: Specifies a mapping from network keys to their integer id.
             evaluator: whether the executor will be used for
                 evaluation. Defaults to False.
             interval: interval that evaluations are run at.
         """
         self._agent_specs = agent_specs
         self._network_sampling_setup = network_sampling_setup
+        self._fix_sampler = fix_sampler
         self._counts = counts
         self._network_int_keys_extras: Dict[str, Any] = {}
         self._net_keys_to_ids = net_keys_to_ids
@@ -192,6 +199,7 @@ class MAPPOFeedForwardExecutor(executors.FeedForwardExecutor):
             agents,
             self._network_sampling_setup,
             self._net_keys_to_ids,
+            self._fix_sampler,
         )
         extras["network_int_keys"] = self._network_int_keys_extras
         self._adder.add_first(timestep, extras)
@@ -242,6 +250,7 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
         agent_specs: Dict[str, EnvironmentSpec],
         agent_net_keys: Dict[str, str],
         network_sampling_setup: List,
+        fix_sampler: Optional[List],
         net_keys_to_ids: Dict[str, int],
         adder: Optional[adders.ReverbParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
@@ -253,17 +262,23 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
         Args:
             policy_networks: policy networks for each agent in
                 the system.
+            agent_net_keys: specifies what network each agent uses.
+            network_sampling_setup: List of networks that are randomly
+                sampled from by the executors at the start of an environment run.
+            fix_sampler: Optional list that can fix the executor sampler to sample
+                in a specific way.
+            net_keys_to_ids: Specifies a mapping from network keys to their integer id.
             adder: adder which sends data
                 to a replay buffer. Defaults to None.
             variable_client (Optional[tf2_variable_utils.VariableClient], optional):
                 client to copy weights from the trainer. Defaults to None.
-            agent_net_keys: specifies what network each agent uses.
             evaluator (bool, optional): whether the executor will be used for
                 evaluation. Defaults to False.
             interval: interval that evaluations are run at.
         """
         self._agent_specs = agent_specs
         self._network_sampling_setup = network_sampling_setup
+        self._fix_sampler = fix_sampler
         self._counts = counts
         self._net_keys_to_ids = net_keys_to_ids
         self._network_int_keys_extras: Dict[str, Any] = {}
@@ -397,6 +412,7 @@ class MAPPORecurrentExecutor(executors.RecurrentExecutor):
             agents,
             self._network_sampling_setup,
             self._net_keys_to_ids,
+            self._fix_sampler,
         )
 
         numpy_states = {
