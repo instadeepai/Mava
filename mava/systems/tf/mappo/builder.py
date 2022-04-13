@@ -93,8 +93,8 @@ class MAPPOConfig:
     net_keys_to_ids: Dict[str, int]
     unique_net_keys: List[str]
     checkpoint_minute_interval: int
-    sequence_length: int = 10
-    sequence_period: int = 9
+    sequence_length: int = 21
+    sequence_period: int = 20
     discount: float = 0.99
     lambda_gae: float = 0.95
     max_queue_size: Optional[int] = 1000

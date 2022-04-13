@@ -70,7 +70,7 @@ class MAPPO:
             snt.Optimizer, Dict[str, snt.Optimizer]
         ] = snt.optimizers.Adam(learning_rate=5e-4),
         critic_optimizer: Optional[snt.Optimizer] = snt.optimizers.Adam(
-            learning_rate=1e-3
+            learning_rate=5e-4
         ),
         discount: float = 0.99,
         lambda_gae: float = 0.95,
@@ -80,7 +80,7 @@ class MAPPO:
         max_gradient_norm: Optional[float] = 0.5,
         max_queue_size: Optional[int] = None,
         batch_size: int = 512,
-        minibatch_size: int = 128,
+        minibatch_size: int = None,
         num_epochs: int = 5,
         sequence_length: int = 20,
         sequence_period: Optional[int] = 10,
